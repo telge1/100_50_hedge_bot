@@ -799,6 +799,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             },
                         )
                     )
+                    short_tp_intent = self._build_short_tp_pair_intent(
+                        snapshot,
+                        state,
+                        trigger_price,
+                        long_cycle_number,
+                        context,
+                    )
+                    if short_tp_intent:
+                        intents.append(short_tp_intent)
                     state["long_add_pending"] = True
                     cycle_state["long_add_pending"] = True
         long_intents = [intent for intent in intents if intent.side == "long"]
@@ -861,10 +870,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
 
+        reduction_multiplier = 0.5
+        effective_reduction_pct = self.config.reduction_pct_per_fill * reduction_multiplier
         short_qty = self._fixed_short_cycle_qty(
             float(state.get("initial_short_qty") or 0.0),
             snapshot.short_qty,
             long_fill_price,
+            reduction_multiplier=reduction_multiplier,
         )
         short_reduce_reference = long_fill_price
         short_distance_pct_config = self.config.short_fill_distance_pct
@@ -901,8 +913,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_formula="short_reduce_reference * (1 - distance_pct)",
             trigger_price_raw=raw_trigger_price,
             trigger_price_normalized=trigger_price,
-            qty_formula="current_short_qty * reduction_pct_per_fill",
-            qty_raw=snapshot.short_qty * self._pct(self.config.reduction_pct_per_fill),
+            reduction_multiplier=reduction_multiplier,
+            reduction_pct_used=effective_reduction_pct,
+            qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
+            qty_raw=snapshot.short_qty * self._pct(effective_reduction_pct),
             qty_normalized=short_qty,
             order_type="Limit",
             reduce_only=True,
@@ -1344,8 +1358,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         initial_short_qty: float,
         current_open_short_qty: float,
         reference_price: float,
+        reduction_multiplier: float = 1.0,
     ) -> float:
-        raw_qty = current_open_short_qty * self._pct(self.config.reduction_pct_per_fill)
+        effective_pct = self.config.reduction_pct_per_fill * reduction_multiplier
+        raw_qty = current_open_short_qty * self._pct(effective_pct)
         normalized = self._normalize_qty(min(raw_qty, current_open_short_qty))
         if normalized <= 0:
             return 0.0
@@ -1354,6 +1370,79 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if normalized * reference_price < self.config.min_notional_usdt:
             return 0.0
         return normalized
+
+    def _short_tp_pair_purpose(self, cycle_index: int) -> str:
+        return f"CYCLE_{cycle_index}_SHORT_TP"
+
+    def _build_short_tp_pair_intent(
+        self,
+        snapshot: HedgeSnapshot,
+        state: dict,
+        trigger_price: float,
+        long_cycle_number: int,
+        context: StrategyContext,
+    ) -> StrategyIntent | None:
+        purpose = self._short_tp_pair_purpose(long_cycle_number)
+        if snapshot.has_open_purpose(purpose):
+            return None
+
+        reduction_multiplier = 0.5
+        effective_pct = self.config.reduction_pct_per_fill * reduction_multiplier
+        current_short_qty = (
+            snapshot.short_qty
+            if snapshot.short_qty > 0
+            else float(state.get("initial_short_qty") or 0.0)
+        )
+        if current_short_qty <= 0:
+            return None
+        short_qty = self._fixed_short_cycle_qty(
+            float(state.get("initial_short_qty") or 0.0),
+            current_short_qty,
+            trigger_price,
+            reduction_multiplier=reduction_multiplier,
+        )
+        if short_qty <= 0 or trigger_price <= 0:
+            return None
+
+        normalized_price = self._normalize_price(trigger_price)
+        context.audit.log_event(
+            "fixed_cycle_short_tp_pair_planned",
+            strategy=self.name,
+            cycle_index=long_cycle_number,
+            side="short",
+            purpose=purpose,
+            entry_reference_price=float(state.get("entry_reference_price") or 0.0),
+            trigger_formula="long_reduce_trigger_price",
+            current_short_qty=current_short_qty,
+            trigger_price_raw=trigger_price,
+            trigger_price_normalized=normalized_price,
+            reduction_multiplier=reduction_multiplier,
+            reduction_pct_used=effective_pct,
+            qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
+            qty_raw=current_short_qty * self._pct(effective_pct),
+            qty_normalized=short_qty,
+            order_type="Limit",
+            reduce_only=True,
+        )
+        return StrategyIntent(
+            side="short",
+            qty=short_qty,
+            purpose=purpose,
+            order_type="Limit",
+            price=normalized_price,
+            reduce_only=True,
+            trigger_price=normalized_price,
+            trigger_direction=2,
+            trigger_by="LastPrice",
+            position_idx=2,
+            metadata={
+                "cycle_index": long_cycle_number,
+                "cycle_role": "short_tp_pair",
+                "replace_open_purpose": purpose,
+                "entry_reference_price": float(state.get("entry_reference_price") or 0.0),
+                "long_reduce_trigger_price": trigger_price,
+            },
+        )
 
     def _normalize_qty(self, qty: float) -> float:
         if qty <= 0:
@@ -1595,6 +1684,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         for cycle_index in range(1, self.config.max_cycles + 1):
             purposes.append(self._cycle_purpose("long", cycle_index))
             purposes.append(self._cycle_purpose("short", cycle_index))
+            purposes.append(self._short_tp_pair_purpose(cycle_index))
         return purposes
 
     def _exit_purposes(self) -> list[str]:

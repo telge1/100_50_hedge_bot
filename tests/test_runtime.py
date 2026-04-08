@@ -315,6 +315,80 @@ def test_long_reduce_uses_config_percent_distance():
     )
 
 
+def test_long_reduce_plans_short_tp_pair():
+    strategy = FixedCycleHedgeStrategy()
+    runtime_state = RuntimeState()
+    runtime_state.strategy_state.update(
+        {
+            "initial_entry_confirmed": True,
+            "entry_reference_price": 1.305,
+            "initial_long_qty": 76.5,
+            "initial_short_qty": 38.2,
+            "long_add_pending": False,
+            "cycle_state": {},
+            "cycle_waiting_for_short_tp": False,
+            "current_long_cycle_index": 0,
+            "current_short_cycle_index": 0,
+            "current_effective_cycle": 0,
+        }
+    )
+    context = StrategyContext(
+        audit=AuditLogger(logging.getLogger("downside-reduce"), "logs/tests_audit.jsonl"),
+        runtime_name=strategy.name,
+        symbol="XRPUSDT",
+        category="linear",
+        min_order_value=1.0,
+    )
+    logged: dict[str, dict] = {}
+
+    def capture(event: str, **kwargs: dict) -> None:
+        logged[event] = kwargs
+
+    context.audit.log_event = capture
+    snapshot = HedgeSnapshot(
+        symbol="XRPUSDT",
+        current_price=1.303,
+        long_qty=76.6,
+        short_qty=38.3,
+        long_avg=1.305,
+        short_avg=1.3049,
+    )
+
+    with patch.object(
+        FixedCycleHedgeStrategy, "_fixed_long_cycle_qty", return_value=5.0
+    ), patch.object(
+        FixedCycleHedgeStrategy, "_fixed_short_cycle_qty", return_value=3.0
+    ):
+        intents = strategy._build_downside_cycle_intents(snapshot, runtime_state, context)
+
+    short_tp_purpose = strategy._short_tp_pair_purpose(1)
+    short_tp_intents = [intent for intent in intents if intent.purpose == short_tp_purpose]
+    assert short_tp_intents, "Die gekoppelte Short-TP-Order wurde nicht erstellt"
+    short_tp_intent = short_tp_intents[0]
+    assert short_tp_intent.trigger_direction == 2
+    audit_event = logged.get("fixed_cycle_short_tp_pair_planned") or {}
+    assert math.isclose(
+        short_tp_intent.trigger_price,
+        audit_event.get("trigger_price_normalized") or 0.0,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("reduction_multiplier") or 0.0,
+        0.5,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("reduction_pct_used") or 0.0,
+        strategy.config.reduction_pct_per_fill * 0.5,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("qty_normalized") or 0.0,
+        3.0,
+        rel_tol=1e-9,
+    )
+
+
 def test_short_reduce_intent_stays_below_long_fill():
     strategy = FixedCycleHedgeStrategy()
     strategy.config.min_notional_usdt = 0.0
@@ -381,4 +455,99 @@ def test_short_reduce_intent_stays_below_long_fill():
         audit_event.get("trigger_price_normalized") or 0.0,
         rel_tol=1e-9,
         abs_tol=0.0,
+    )
+    reduction_multiplier = 0.5
+    expected_reduction_pct = strategy.config.reduction_pct_per_fill * reduction_multiplier
+    expected_qty_raw = snapshot.short_qty * strategy._pct(expected_reduction_pct)
+    expected_qty_normalized = strategy._normalize_qty(
+        min(expected_qty_raw, snapshot.short_qty)
+    )
+    assert math.isclose(
+        audit_event.get("reduction_multiplier") or 0.0,
+        reduction_multiplier,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("reduction_pct_used") or 0.0,
+        expected_reduction_pct,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("qty_raw") or 0.0,
+        expected_qty_raw,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("qty_normalized") or 0.0,
+        expected_qty_normalized,
+        rel_tol=1e-9,
+    )
+
+
+def test_short_tp_pair_falls_back_to_initial_short_qty():
+    strategy = FixedCycleHedgeStrategy()
+    runtime_state = RuntimeState()
+    state = runtime_state.strategy_state
+    state.update(
+        {
+            "initial_entry_confirmed": True,
+            "entry_reference_price": 1.305,
+            "initial_long_qty": 76.5,
+            "initial_short_qty": 38.2,
+            "long_add_pending": False,
+            "cycle_state": {},
+            "cycle_waiting_for_short_tp": False,
+            "current_long_cycle_index": 0,
+            "current_short_cycle_index": 0,
+            "current_effective_cycle": 0,
+        }
+    )
+    context = StrategyContext(
+        audit=AuditLogger(logging.getLogger("short-tp-fallback"), "logs/tests_audit.jsonl"),
+        runtime_name=strategy.name,
+        symbol="XRPUSDT",
+        category="linear",
+        min_order_value=1.0,
+    )
+    logged: dict[str, dict] = {}
+
+    def capture(event: str, **kwargs: dict) -> None:
+        logged[event] = kwargs
+
+    context.audit.log_event = capture
+    snapshot = HedgeSnapshot(
+        symbol="XRPUSDT",
+        current_price=1.303,
+        long_qty=76.6,
+        short_qty=0.0,
+        long_avg=1.305,
+        short_avg=0.0,
+    )
+
+    with patch.object(
+        FixedCycleHedgeStrategy, "_fixed_long_cycle_qty", return_value=5.0
+    ), patch.object(
+        FixedCycleHedgeStrategy, "_fixed_short_cycle_qty", return_value=3.0
+    ):
+        intents = strategy._build_downside_cycle_intents(snapshot, runtime_state, context)
+
+    short_tp_purpose = strategy._short_tp_pair_purpose(1)
+    short_tp_intents = [intent for intent in intents if intent.purpose == short_tp_purpose]
+    assert short_tp_intents, "Keine Short-TP-Paar-Order geplant"
+    audit_event = logged.get("fixed_cycle_short_tp_pair_planned") or {}
+    assert math.isclose(
+        audit_event.get("current_short_qty") or 0.0,
+        state["initial_short_qty"],
+        rel_tol=1e-9,
+    )
+    expected_reduction_pct = strategy.config.reduction_pct_per_fill * 0.5
+    assert math.isclose(
+        audit_event.get("reduction_pct_used") or 0.0,
+        expected_reduction_pct,
+        rel_tol=1e-9,
+    )
+    assert math.isclose(
+        audit_event.get("qty_normalized") or 0.0,
+        3.0,
+        rel_tol=1e-9,
     )
