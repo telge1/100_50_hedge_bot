@@ -287,6 +287,10 @@ class BybitOrderManager:
         position_idx: int,
         category: str = "linear",
         order_link_id: str | None = None,
+        trigger_price: float | None = None,
+        trigger_direction: int | None = None,
+        trigger_by: str | None = None,
+        close_on_trigger: bool = False,
     ) -> Mapping[str, Any] | None:
         normalized_qty = self.normalize_qty(symbol, qty, category)
         if normalized_qty <= 0:
@@ -304,6 +308,14 @@ class BybitOrderManager:
         }
         if order_link_id:
             body["orderLinkId"] = order_link_id
+        if trigger_price is not None:
+            body["triggerPrice"] = f"{trigger_price}"
+        if trigger_direction is not None:
+            body["triggerDirection"] = trigger_direction
+        if trigger_by:
+            body["triggerBy"] = trigger_by
+        if close_on_trigger:
+            body["closeOnTrigger"] = True
         return self._post("/v5/order/create", json.dumps(body))
 
     def cancel_order(

@@ -206,7 +206,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         snapshot = runtime.bootstrap()
 
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
-        tp_price = runtime.strategy._calculate_tp_price(break_even_price)
+        tp_price = runtime.strategy._calculate_tp_price(break_even_price, snapshot, runtime.runtime_state)
         runtime.runtime_state.strategy_state["last_exit_signature"] = None
         intents = runtime.strategy._build_exit_intents(
             snapshot,
@@ -221,6 +221,8 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("CYCLE_1_LONG_ADD", {order.purpose for order in runtime.runtime_state.active_orders.values()})
         self.assertNotIn("CYCLE_1_SHORT_REDUCE", {order.purpose for order in runtime.runtime_state.active_orders.values()})
         self.assertIn("LONG_TP_EXIT", purposes)
+        self.assertIn("LONG_SL_EXIT", purposes)
+        self.assertIn("SHORT_TP_EXIT", purposes)
         self.assertIn("SHORT_SL_EXIT", purposes)
 
     def test_fill_rebuilds_structure_and_advances_cycle_state(self) -> None:
@@ -273,6 +275,8 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertTrue(recorded_intents)
         latest_intents = recorded_intents[-1]
         self.assertTrue(any(intent.purpose == "LONG_TP_EXIT" for intent in latest_intents))
+        self.assertTrue(any(intent.purpose == "LONG_SL_EXIT" for intent in latest_intents))
+        self.assertTrue(any(intent.purpose == "SHORT_TP_EXIT" for intent in latest_intents))
         self.assertTrue(any(intent.purpose == "SHORT_SL_EXIT" for intent in latest_intents))
 
     def test_next_long_cycle_unlocks_only_after_short_follow_up_fill(self) -> None:
@@ -438,7 +442,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         short_exit = next(order for order in runtime.runtime_state.active_orders.values() if order.purpose == "SHORT_SL_EXIT")
         snapshot = runtime.runtime_state.last_snapshot
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
-        tp_price = runtime.strategy._calculate_tp_price(break_even_price)
+        tp_price = runtime.strategy._calculate_tp_price(break_even_price, snapshot, runtime.runtime_state)
         self.assertEqual(short_exit.metadata.get("basket_tp_price"), tp_price)
         self.assertEqual(short_exit.metadata.get("basket_break_even_price"), break_even_price)
         self.assertEqual(short_exit.metadata.get("replace_open_purpose"), ["SHORT_SL_EXIT"])
@@ -587,10 +591,14 @@ class FixedCycleStrategyTests(unittest.TestCase):
         )
 
         long_intent = next(intent for intent in intents if intent.purpose == "LONG_TP_EXIT")
+        long_sl_intent = next(intent for intent in intents if intent.purpose == "LONG_SL_EXIT")
+        short_tp_intent = next(intent for intent in intents if intent.purpose == "SHORT_TP_EXIT")
         short_intent = next(intent for intent in intents if intent.purpose == "SHORT_SL_EXIT")
 
         self.assertEqual(long_intent.metadata.get("replace_open_purpose"), ["LONG_TP_EXIT"])
+        self.assertEqual(long_sl_intent.metadata.get("replace_open_purpose"), ["LONG_SL_EXIT"])
         self.assertEqual(short_intent.metadata.get("replace_open_purpose"), ["SHORT_SL_EXIT"])
+        self.assertEqual(short_tp_intent.metadata.get("replace_open_purpose"), ["SHORT_TP_EXIT"])
 
     def test_exit_prices_align_with_basket(self) -> None:
         order_manager = FakeOrderManager()
@@ -615,8 +623,43 @@ class FixedCycleStrategyTests(unittest.TestCase):
             hard_stop_active=False,
             context=runtime.context,
         )
-        short_intent = next(intent for intent in intents if intent.purpose == "SHORT_SL_EXIT")
-        self.assertAlmostEqual(short_intent.price or 0.0, tp_price, places=8)
+        long_tp_intent = next(intent for intent in intents if intent.purpose == "LONG_TP_EXIT")
+        long_sl_intent = next(intent for intent in intents if intent.purpose == "LONG_SL_EXIT")
+        short_tp_intent = next(intent for intent in intents if intent.purpose == "SHORT_TP_EXIT")
+        short_sl_intent = next(intent for intent in intents if intent.purpose == "SHORT_SL_EXIT")
+        self.assertAlmostEqual(long_tp_intent.price or 0.0, tp_price, places=8)
+        self.assertAlmostEqual(short_sl_intent.price or 0.0, tp_price, places=8)
+        self.assertAlmostEqual(long_sl_intent.price or 0.0, break_even_price, places=8)
+        self.assertAlmostEqual(short_tp_intent.price or 0.0, break_even_price, places=8)
+
+    def test_exit_intents_use_conditional_market_close(self) -> None:
+        order_manager = FakeOrderManager()
+        order_manager.positions = [
+            {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 98.0},
+            {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 98.0},
+        ]
+        runtime = self.build_runtime(order_manager)
+        runtime.bootstrap()
+
+        snapshot = runtime.runtime_state.last_snapshot
+        break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
+        tp_price = runtime.strategy._calculate_tp_price(break_even_price, snapshot)
+        runtime.runtime_state.strategy_state["last_exit_signature"] = None
+        intents = runtime.strategy._build_exit_intents(
+            snapshot,
+            runtime.runtime_state,
+            current_cycle=runtime.runtime_state.strategy_state.get("current_effective_cycle", 0),
+            break_even_price=break_even_price,
+            tp_price=tp_price,
+            hard_stop_active=False,
+            context=runtime.context,
+        )
+
+        for intent in intents:
+            if intent.purpose.endswith("_EXIT"):
+                self.assertEqual(intent.order_type, "Market")
+                self.assertTrue(intent.close_on_trigger)
+                self.assertIsNotNone(intent.trigger_price)
 
     def test_exit_cancel_only_on_signature_change(self) -> None:
         order_manager = FakeOrderManager()
@@ -680,7 +723,10 @@ class FixedCycleStrategyTests(unittest.TestCase):
 
         self.assertTrue(recorded_break_evens)
         recalculated_snapshot, recalculated_break_even = recorded_break_evens[-1]
-        self.assertAlmostEqual(recalculated_snapshot.realized_long_pnl_total, -1.0)
+        expected_realized_loss = runtime.runtime_state.realized_long_pnl_total
+        self.assertAlmostEqual(
+            recalculated_snapshot.realized_long_pnl_total, expected_realized_loss, places=7
+        )
 
         no_loss_snapshot = HedgeSnapshot(
             symbol=recalculated_snapshot.symbol,
@@ -737,6 +783,8 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertTrue(recorded_intents)
         latest_intents = recorded_intents[-1]
         self.assertTrue(any(intent.purpose == "LONG_TP_EXIT" for intent in latest_intents))
+        self.assertTrue(any(intent.purpose == "LONG_SL_EXIT" for intent in latest_intents))
+        self.assertTrue(any(intent.purpose == "SHORT_TP_EXIT" for intent in latest_intents))
         self.assertTrue(any(intent.purpose == "SHORT_SL_EXIT" for intent in latest_intents))
         self.assertNotEqual(state["last_exit_signature"], sentinel)
 

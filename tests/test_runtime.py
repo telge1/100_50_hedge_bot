@@ -210,6 +210,32 @@ def test_untracked_order_link_id_triggers_fallback():
     assert order.exchange_order_id == "link-order"
 
 
+def test_short_tp_fill_maps_order_id():
+    runtime = build_runtime()
+    order = _create_managed_order(
+        runtime=runtime,
+        client_order_id="cycle-1-short-tp",
+        side="short",
+        purpose="CYCLE_1_SHORT_TP",
+        qty=4.6,
+        reduce_only=True,
+    )
+
+    with patch.object(runtime, "_finalize_managed_order") as finalize:
+        runtime.on_websocket_fill(
+            "short-tp-exec",
+            4.6,
+            1.3482,
+            order_side="Buy",
+            order_link_id=order.client_order_id,
+        )
+        finalize.assert_called_once_with(order.client_order_id, order)
+
+    assert runtime.runtime_state.exchange_to_client_id.get("short-tp-exec") == order.client_order_id
+    assert order.exchange_order_id == "short-tp-exec"
+    assert order.status == "FILLED"
+
+
 def test_downside_long_intent_is_reduce_only():
     strategy = FixedCycleHedgeStrategy()
     runtime_state = RuntimeState()

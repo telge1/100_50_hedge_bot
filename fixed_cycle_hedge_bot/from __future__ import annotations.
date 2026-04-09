@@ -95,10 +95,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
     LONG_ENTRY_PURPOSE = "INITIAL_LONG_ENTRY"
     SHORT_ENTRY_PURPOSE = "INITIAL_SHORT_ENTRY"
-    LONG_TP_EXIT_PURPOSE = "LONG_TP_EXIT"
-    LONG_SL_EXIT_PURPOSE = "LONG_SL_EXIT"
-    SHORT_TP_EXIT_PURPOSE = "SHORT_TP_EXIT"
-    SHORT_SL_EXIT_PURPOSE = "SHORT_SL_EXIT"
+    LONG_EXIT_PURPOSE = "LONG_TP_EXIT"
+    SHORT_EXIT_PURPOSE = "SHORT_SL_EXIT"
     SHORT_HARD_STOP_PURPOSE = "SHORT_HARD_STOP_EXIT"
 
     def __init__(self, config: FixedCycleHedgeConfig | None = None) -> None:
@@ -489,33 +487,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
 
         current_cycle = int(state.get("current_effective_cycle") or 0)
-
-        open_initial_orders = [
-            {
-                "purpose": getattr(order, "purpose", None),
-                "status": getattr(order, "status", None),
-            }
-            for order in snapshot.active_orders
-            if getattr(order, "purpose", None) in {
-                self.LONG_ENTRY_PURPOSE,
-                self.SHORT_ENTRY_PURPOSE,
-            }
-            and getattr(order, "status", None) in {"OPEN", "PARTIAL"}
-        ]
-        positions_ready = (
-            snapshot.long_qty > 0
-            and snapshot.short_qty > 0
-            and snapshot.long_avg > 0
-            and snapshot.short_avg > 0
-        )
-        if open_initial_orders and not positions_ready:
-            context.audit.log_event(
-                "fixed_cycle_structure_skip",
-                strategy=self.name,
-                skip_reason="initial_entry_order_still_open",
-                open_initial_orders=open_initial_orders,
-            )
-            return []
         initial_long_qty = float(state.get("initial_long_qty") or 0.0)
         initial_short_qty = float(state.get("initial_short_qty") or 0.0)
         seeded_cycle_state = False
@@ -564,8 +535,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         downside_intents: list[StrategyIntent] = []
         if not hard_stop_active:
             downside_intents = self._build_downside_cycle_intents(snapshot, runtime_state, context)
-
-        exit_intents: list[StrategyIntent] = self._build_exit_intents(
+        exit_intents = self._build_exit_intents(
             snapshot,
             runtime_state,
             current_cycle,
@@ -708,6 +678,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         long_cycle_number = int(state.get("current_long_cycle_index") or 0) + 1
         short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
         intents.extend(short_intents)
+
         if long_cycle_number <= self.config.max_cycles:
             purpose = self._cycle_purpose("long", long_cycle_number)
             if long_add_pending and not snapshot.has_open_purpose(purpose):
@@ -741,22 +712,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
                 raw_trigger_price = long_reference * (1 - long_distance_pct)
                 trigger_price = self._normalize_price(raw_trigger_price)
-                if reference_price > 0:
-                    min_allowed_trigger = max(
-                        reference_price - self.config.price_tick_size,
-                        self.config.price_tick_size,
-                    )
-                    if trigger_price >= min_allowed_trigger:
-                        adjusted_trigger = self._normalize_price(min_allowed_trigger)
-                        context.audit.log_event(
-                            "long_reduce_trigger_adjusted",
-                            strategy=self.name,
-                            original_trigger=trigger_price,
-                            adjusted_trigger=adjusted_trigger,
-                            reference_price=reference_price,
-                            tick_size=self.config.price_tick_size,
-                        )
-                        trigger_price = adjusted_trigger
+                if reference_price > 0 and trigger_price >= reference_price:
+                    guarded_trigger = max(reference_price - self.config.price_tick_size, self.config.price_tick_size)
+                    trigger_price = self._normalize_price(guarded_trigger)
                 raw_qty = snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill)
                 will_append_intent = trigger_price > 0 and long_qty > 0
                 skip_reason: str | None = None
@@ -826,13 +784,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             side="long",
                             qty=long_qty,
                             purpose=purpose,
-                            order_type="Market",
+                            order_type="Limit",
+                            price=trigger_price + self.config.price_tick_size,
                             reduce_only=True,
                             trigger_price=trigger_price,
                             trigger_direction=2,
                             trigger_by="LastPrice",
-                            close_on_trigger=True,
-                            position_idx=1,
+                            order_filter="StopOrder",
                             metadata={
                                 "cycle_index": long_cycle_number,
                                 "cycle_role": "long_reduce",
@@ -841,6 +799,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             },
                         )
                     )
+                    short_tp_intent = self._build_short_tp_pair_intent(
+                        snapshot,
+                        state,
+                        trigger_price,
+                        long_cycle_number,
+                        context,
+                    )
+                    if short_tp_intent:
+                        intents.append(short_tp_intent)
                     state["long_add_pending"] = True
                     cycle_state["long_add_pending"] = True
         long_intents = [intent for intent in intents if intent.side == "long"]
@@ -959,12 +926,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 side="short",
                 qty=short_qty,
                 purpose=purpose,
-                order_type="Market",
+                order_type="Limit",
+                price=price,
                 reduce_only=True,
                 trigger_price=trigger_price,
                 trigger_direction=2,
                 trigger_by="LastPrice",
-                close_on_trigger=True,
                 position_idx=2,
                 metadata={
                     "cycle_index": cycle_index,
@@ -1017,61 +984,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
-        open_initial_orders = [
-            {
-                "purpose": getattr(order, "purpose", None),
-                "status": getattr(order, "status", None),
-            }
-            for order in snapshot.active_orders
-            if getattr(order, "purpose", None) in {
-                self.LONG_ENTRY_PURPOSE,
-                self.SHORT_ENTRY_PURPOSE,
-            }
-            and getattr(order, "status", None) in {"OPEN", "PARTIAL"}
-        ]
-        if open_initial_orders:
-            context.audit.log_event(
-                "fixed_cycle_exit_skip",
-                strategy=self.name,
-                skip_reason="initial_entry_order_still_open",
-                open_initial_orders=open_initial_orders,
-            )
-            return intents
-
-        long_tp_price = tp_price
         short_sl_price = tp_price
-        long_sl_price = break_even_price
-        long_sl_reference = snapshot.current_price if snapshot.current_price > 0 else long_tp_price
-        if long_sl_price >= long_sl_reference:
-            adjusted = max(long_sl_reference - self.config.price_tick_size, self.config.price_tick_size)
-            context.audit.log_event(
-                "long_sl_trigger_adjusted",
-                strategy=self.name,
-                original_trigger=long_sl_price,
-                adjusted_trigger=adjusted,
-                reference_price=long_sl_reference,
-                tick_size=self.config.price_tick_size,
-            )
-            long_sl_price = adjusted
-        short_tp_price = break_even_price
-        short_tp_reference = snapshot.current_price if snapshot.current_price > 0 else short_sl_price
-        if short_tp_price >= short_tp_reference:
-            adjusted = max(short_tp_reference - self.config.price_tick_size, self.config.price_tick_size)
-            context.audit.log_event(
-                "short_tp_trigger_adjusted",
-                strategy=self.name,
-                original_trigger=short_tp_price,
-                adjusted_trigger=adjusted,
-                reference_price=short_tp_reference,
-                tick_size=self.config.price_tick_size,
-            )
-            short_tp_price = adjusted
         signature = {
             "basket_tp_price": tp_price,
             "basket_break_even_price": break_even_price,
-            "long_tp_price": long_tp_price,
-            "long_sl_price": long_sl_price,
-            "short_tp_price": short_tp_price,
             "short_sl_price": short_sl_price,
             "long_qty": snapshot.long_qty,
             "short_qty": snapshot.short_qty,
@@ -1098,70 +1014,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "exit_mode": "basket_exit",
         }
 
-        def build_metadata(purpose: str, exit_type: str) -> dict[str, Any]:
-            metadata = dict(metadata_base)
-            metadata["replace_open_purpose"] = [purpose]
-            metadata["exit_type"] = exit_type
-            return metadata
-
+        long_metadata = dict(metadata_base)
+        long_metadata["replace_open_purpose"] = [self.LONG_EXIT_PURPOSE]
         intents.append(
             StrategyIntent(
                 side="long",
                 qty=snapshot.long_qty,
-                purpose=self.LONG_TP_EXIT_PURPOSE,
-                order_type="Market",
+                purpose=self.LONG_EXIT_PURPOSE,
+                price=tp_price,
+                order_type="Limit",
                 reduce_only=True,
-                trigger_price=long_tp_price,
+                trigger_price=tp_price,
                 trigger_direction=1,
                 trigger_by="LastPrice",
-                close_on_trigger=True,
                 position_idx=1,
-                metadata=build_metadata(self.LONG_TP_EXIT_PURPOSE, "long_tp"),
+                metadata=long_metadata,
             )
         )
-        intents.append(
-            StrategyIntent(
-                side="long",
-                qty=snapshot.long_qty,
-                purpose=self.LONG_SL_EXIT_PURPOSE,
-                order_type="Market",
-                reduce_only=True,
-                trigger_price=long_sl_price,
-                trigger_direction=2,
-                trigger_by="LastPrice",
-                close_on_trigger=True,
-                position_idx=1,
-                metadata=build_metadata(self.LONG_SL_EXIT_PURPOSE, "long_sl"),
-            )
-        )
+
+        short_metadata = dict(metadata_base)
+        short_metadata["replace_open_purpose"] = [self.SHORT_EXIT_PURPOSE]
         intents.append(
             StrategyIntent(
                 side="short",
                 qty=snapshot.short_qty,
-                purpose=self.SHORT_TP_EXIT_PURPOSE,
-                order_type="Market",
-                reduce_only=True,
-                trigger_price=short_tp_price,
-                trigger_direction=2,
-                trigger_by="LastPrice",
-                close_on_trigger=True,
-                position_idx=2,
-                metadata=build_metadata(self.SHORT_TP_EXIT_PURPOSE, "short_tp"),
-            )
-        )
-        intents.append(
-            StrategyIntent(
-                side="short",
-                qty=snapshot.short_qty,
-                purpose=self.SHORT_SL_EXIT_PURPOSE,
-                order_type="Market",
+                purpose=self.SHORT_EXIT_PURPOSE,
+                price=short_sl_price,
+                order_type="Limit",
                 reduce_only=True,
                 trigger_price=short_sl_price,
                 trigger_direction=1,
                 trigger_by="LastPrice",
-                close_on_trigger=True,
                 position_idx=2,
-                metadata=build_metadata(self.SHORT_SL_EXIT_PURPOSE, "short_sl"),
+                metadata=short_metadata,
             )
         )
 
@@ -1190,14 +1075,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             break_even_price = snapshot.current_price
         else:
             break_even_price = (
-            (snapshot.long_avg * snapshot.long_qty)
-            - (snapshot.short_avg * snapshot.short_qty)
-        ) / denominator
+                (snapshot.long_avg * snapshot.long_qty)
+                - (snapshot.short_avg * snapshot.short_qty)
+            ) / denominator
         realized_long_loss = max(-snapshot.realized_long_pnl_total, 0.0)
         realized_short_loss = max(-snapshot.realized_short_pnl_total, 0.0)
         loss_compensation = realized_long_loss + realized_short_loss
-        if loss_compensation > 0 and abs(denominator) > 1e-9:
-            break_even_price += loss_compensation / denominator
         logger.info(
             "fixed_cycle_break_even_inputs %s",
             {
@@ -1551,7 +1434,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_price=normalized_price,
             trigger_direction=2,
             trigger_by="LastPrice",
-            order_filter="StopOrder",
             position_idx=2,
             metadata={
                 "cycle_index": long_cycle_number,
@@ -1589,25 +1471,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
         context: StrategyContext,
     ) -> list[StrategyIntent]:
-        open_initial_orders = [
-            {
-                "purpose": getattr(order, "purpose", None),
-                "status": getattr(order, "status", None),
-            }
-            for order in snapshot.active_orders
-            if getattr(order, "purpose", None)
-            in {self.LONG_ENTRY_PURPOSE, self.SHORT_ENTRY_PURPOSE}
-            and getattr(order, "status", None) in {"OPEN", "PARTIAL"}
-        ]
-        if open_initial_orders:
-            context.audit.log_event(
-                "fixed_cycle_fast_path_skip",
-                strategy=self.name,
-                skip_reason="initial_entry_order_still_open",
-                open_initial_orders=open_initial_orders,
-            )
-            return []
-
         side = fill_event.side
         state = runtime_state.strategy_state
         key = "current_long_cycle_index" if side == "long" else "current_short_cycle_index"
@@ -1825,12 +1688,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return purposes
 
     def _exit_purposes(self) -> list[str]:
-        return [
-            self.LONG_TP_EXIT_PURPOSE,
-            self.LONG_SL_EXIT_PURPOSE,
-            self.SHORT_TP_EXIT_PURPOSE,
-            self.SHORT_SL_EXIT_PURPOSE,
-        ]
+        return [self.LONG_EXIT_PURPOSE, self.SHORT_EXIT_PURPOSE]
 
     def on_order_update(
         self,

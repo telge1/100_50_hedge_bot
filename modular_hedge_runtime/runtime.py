@@ -220,10 +220,9 @@ class GenericHedgeRuntime:
         order_link_id: str | None = None,
         order_side: str | None = None,
     ) -> None:
-        client_id = (
-            self.runtime_state.exchange_to_client_id.get(exchange_order_id)
-            or (order_link_id if order_link_id in self.runtime_state.active_orders else None)
-        )
+        client_id = self.runtime_state.exchange_to_client_id.get(exchange_order_id)
+        if not client_id and order_link_id and order_link_id in self.runtime_state.active_orders:
+            client_id = order_link_id
         if not client_id:
             client_id = self._match_exit_order_for_fill(
                 order_side=order_side,
@@ -243,6 +242,7 @@ class GenericHedgeRuntime:
                 cumulative_qty=cumulative_qty,
             )
             return
+        self._ensure_exchange_order_mapping(client_id, exchange_order_id)
         self._ingest_fill_event(
             exchange_order_id=exchange_order_id,
             client_id=client_id,
@@ -464,6 +464,19 @@ class GenericHedgeRuntime:
             )
             return self.order_manager.place_limit_order(payload)
         if managed_order.reduce_only:
+            if intent.close_on_trigger:
+                return self.order_manager.place_reduce_market_order(
+                    symbol=self.config.symbol,
+                    side=exchange_side,
+                    qty=managed_order.qty,
+                    position_idx=position_idx,
+                    category=self.config.category,
+                    order_link_id=managed_order.client_order_id,
+                    trigger_price=intent.trigger_price,
+                    trigger_direction=intent.trigger_direction,
+                    trigger_by=intent.trigger_by,
+                    close_on_trigger=True,
+                )
             return self.order_manager.place_reduce_market_order(
                 symbol=self.config.symbol,
                 side=exchange_side,
@@ -625,6 +638,19 @@ class GenericHedgeRuntime:
         if managed_order.status == "FILLED":
             self._finalize_managed_order(client_id, managed_order)
         self._save_strategy_state()
+
+    def _ensure_exchange_order_mapping(self, client_id: str | None, exchange_order_id: str | None) -> None:
+        if not client_id or not exchange_order_id:
+            return
+        existing = self.runtime_state.exchange_to_client_id.get(exchange_order_id)
+        if existing and existing != client_id:
+            self.runtime_state.exchange_to_client_id.pop(exchange_order_id, None)
+        managed_order = self.runtime_state.active_orders.get(client_id)
+        if managed_order and managed_order.exchange_order_id and managed_order.exchange_order_id != exchange_order_id:
+            self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)
+        self.runtime_state.exchange_to_client_id[exchange_order_id] = client_id
+        if managed_order:
+            managed_order.exchange_order_id = exchange_order_id
 
     def _reconcile_active_orders(self) -> None:
         if not self.runtime_state.active_orders:

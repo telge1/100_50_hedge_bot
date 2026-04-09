@@ -249,6 +249,8 @@ Exit nach jeden Fill neu berechnen z.b long 1$ Profit und short 1$ verlust = be 
 
 Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 
+fixed_cycle_hedge_runtime.log
+
 ########################################################################################################################
 
 Start:
@@ -262,7 +264,22 @@ echten Fill-Preis speichern
 Danach:
 Short-TP nur für diese Cycle-Stufe berechnen
 Basis = Long-Fill-Preis
-Ziel = 1.6% + 0.25% Puffer über dem Long-Fill-Preis
+Ziel = 0.8% + 0.25% Puffer unter dem Long-Fill-Preis
 Danach:
 Exit nach jedem Fill neu berechnen
 und erst dann nächster Cycle
+
+
+
+
+Start: Long 100 / Short 50
+Bei -0.8%:
+Long -15%
+Long-Fill-Preis speichern
+Bei long_fill_price + 1.85%:
+restliche Short -15%
+Nach jedem Fill:
+Exit neu berechnen auf Basket-Basis
+
+
+INFO modular_hedge_runtime.order_manager Ensuring hedge mode
