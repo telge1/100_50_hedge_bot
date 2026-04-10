@@ -181,6 +181,7 @@ class FillEvent:
 class RuntimeState:
     strategy_state: dict[str, Any] = field(default_factory=dict)
     active_orders: dict[str, ManagedOrder] = field(default_factory=dict)
+    finalized_orders: dict[str, ManagedOrder] = field(default_factory=dict)
     exchange_to_client_id: dict[str, str] = field(default_factory=dict)
     realized_long_pnl_total: float = 0.0
     realized_short_pnl_total: float = 0.0

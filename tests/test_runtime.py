@@ -104,6 +104,12 @@ def test_sell_fill_matches_long_tp_exit():
 
 def test_buy_fill_matches_short_sl_exit():
     runtime = build_runtime()
+    logged_events: list[tuple[str, dict]] = []
+
+    def capture(event: str, **kwargs):
+        logged_events.append((event, kwargs))
+
+    runtime.audit.log_event = capture
     order = _create_managed_order(
         runtime=runtime,
         client_order_id="test-short-sl",
@@ -121,6 +127,9 @@ def test_buy_fill_matches_short_sl_exit():
     )
 
     assert order.exchange_order_id == "fill-exchange-short"
+    assert runtime.runtime_state.exchange_to_client_id.get("fill-exchange-short") == order.client_order_id
+    assert any(event == "unmatched_fill_matched" for event, _ in logged_events)
+    assert not any(event == "unmatched_fill" for event, _ in logged_events)
 
 
 def test_initial_entry_not_matched_by_fallback():
@@ -208,6 +217,43 @@ def test_untracked_order_link_id_triggers_fallback():
     )
 
     assert order.exchange_order_id == "link-order"
+
+
+def test_late_fill_for_finalized_reduce_order_is_not_unmatched():
+    runtime = build_runtime()
+    logged_events: list[tuple[str, dict]] = []
+
+    def capture(event: str, **kwargs):
+        logged_events.append((event, kwargs))
+
+    runtime.audit.log_event = capture
+    order = _create_managed_order(
+        runtime=runtime,
+        client_order_id="cycle-1-long-reduce",
+        side="long",
+        purpose="CYCLE_1_LONG_ADD",
+        qty=50.0,
+        reduce_only=True,
+        exchange_order_id="reduce-order-1",
+    )
+    order.status = "FILLED"
+    order.filled_qty = 50.0
+    order.remaining_qty = 0.0
+    runtime._finalize_managed_order(order.client_order_id, order)
+
+    runtime.on_websocket_fill(
+        "reduce-order-1",
+        12.0,
+        1.204,
+        exec_id="late-exec-1",
+        order_link_id=order.client_order_id,
+        order_side="Sell",
+    )
+
+    assert runtime.runtime_state.exchange_to_client_id.get("reduce-order-1") == order.client_order_id
+    assert runtime.runtime_state.finalized_orders.get(order.client_order_id) is order
+    assert any(event == "late_fill_ignored" for event, _ in logged_events)
+    assert not any(event == "unmatched_fill" for event, _ in logged_events)
 
 
 def test_short_tp_fill_maps_order_id():

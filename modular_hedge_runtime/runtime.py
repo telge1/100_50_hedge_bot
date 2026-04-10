@@ -191,7 +191,7 @@ class GenericHedgeRuntime:
         client_id = self.runtime_state.exchange_to_client_id.get(order_id)
         if not client_id:
             return
-        managed_order = self.runtime_state.active_orders.get(client_id)
+        managed_order = self._get_managed_order(client_id)
         if not managed_order:
             return
         managed_order.status = self._normalize_order_status(payload.get("orderStatus"), managed_order.status)
@@ -221,7 +221,7 @@ class GenericHedgeRuntime:
         order_side: str | None = None,
     ) -> None:
         client_id = self.runtime_state.exchange_to_client_id.get(exchange_order_id)
-        if not client_id and order_link_id and order_link_id in self.runtime_state.active_orders:
+        if not client_id and order_link_id and self._get_managed_order(order_link_id):
             client_id = order_link_id
         if not client_id:
             client_id = self._match_exit_order_for_fill(
@@ -276,14 +276,14 @@ class GenericHedgeRuntime:
         for order in self.runtime_state.active_orders.values():
             if order.status in {"FILLED", "CANCELED", "REJECTED"}:
                 continue
-            if not order.reduce_only or order.side != target_side:
+            if not self._is_fill_match_candidate(order) or order.side != target_side:
                 continue
             remaining = order.remaining_qty or order.qty
             if remaining <= 0.0 or qty <= 0.0:
                 continue
             if qty > remaining + 1e-9:
                 continue
-            priority = 2 if order.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"} else 1
+            priority = 3 if order.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"} else 2 if "EXIT" in order.purpose else 1
             gap_after = remaining - qty
             price_diff = (
                 abs(price - order.price) if order.price is not None and price > 0 else float("inf")
@@ -322,12 +322,28 @@ class GenericHedgeRuntime:
             exchange_order_id=exchange_order_id,
             matched_client_order_id=best_order.client_order_id,
             purpose=best_order.purpose,
+            matched_side=best_order.side,
+            reduce_only=best_order.reduce_only,
             qty=qty,
             price=price,
             side=order_side,
+            remaining_qty=best_order.remaining_qty,
             previous_exchange_id=previous_exchange_id,
         )
         return best_order.client_order_id
+
+    @staticmethod
+    def _is_fill_match_candidate(order: ManagedOrder) -> bool:
+        if not order.reduce_only:
+            return False
+        purpose = str(order.purpose or "").upper()
+        if purpose.startswith("INITIAL_"):
+            return False
+        if "EXIT" in purpose or "REDUCE" in purpose:
+            return True
+        cycle_role = str(order.metadata.get("cycle_role") or "").lower()
+        exit_type = str(order.metadata.get("exit_type") or "").lower()
+        return cycle_role.endswith("reduce") or exit_type.endswith(("tp", "sl"))
 
     def _dispatch(self, source: str, intents: list[StrategyIntent], snapshot: HedgeSnapshot) -> None:
         if not intents:
@@ -575,7 +591,7 @@ class GenericHedgeRuntime:
         cumulative_qty: float | None,
         source: str,
     ) -> None:
-        managed_order = self.runtime_state.active_orders.get(client_id)
+        managed_order = self._get_managed_order(client_id)
         if not managed_order:
             return
         with self._lock:
@@ -585,10 +601,37 @@ class GenericHedgeRuntime:
             if exec_id:
                 processed_exec_ids.add(exec_id)
                 managed_order.metadata["processed_exec_ids"] = sorted(processed_exec_ids)
+            if cumulative_qty is None and managed_order.filled_qty >= managed_order.qty - 1e-9:
+                self.audit.log_event(
+                    "late_fill_ignored",
+                    strategy=self.strategy.name,
+                    source=source,
+                    client_order_id=client_id,
+                    exchange_order_id=exchange_order_id,
+                    purpose=managed_order.purpose,
+                    exec_id=exec_id,
+                    qty=qty,
+                    price=price,
+                )
+                return
             previous_filled = managed_order.filled_qty
             if cumulative_qty is not None and cumulative_qty > previous_filled:
                 incremental_qty = cumulative_qty - previous_filled
                 managed_order.filled_qty = min(managed_order.qty, cumulative_qty)
+            elif cumulative_qty is not None:
+                self.audit.log_event(
+                    "late_fill_ignored",
+                    strategy=self.strategy.name,
+                    source=source,
+                    client_order_id=client_id,
+                    exchange_order_id=exchange_order_id,
+                    purpose=managed_order.purpose,
+                    exec_id=exec_id,
+                    qty=qty,
+                    price=price,
+                    cumulative_qty=cumulative_qty,
+                )
+                return
             else:
                 incremental_qty = qty
                 managed_order.filled_qty = min(managed_order.qty, previous_filled + qty)
@@ -635,7 +678,7 @@ class GenericHedgeRuntime:
         )
         snapshot = self.refresh_snapshot("fill")
         self._dispatch("fill", self.strategy.on_fill(fill_event, snapshot, self.runtime_state, self.context), snapshot)
-        if managed_order.status == "FILLED":
+        if managed_order.status == "FILLED" and client_id in self.runtime_state.active_orders:
             self._finalize_managed_order(client_id, managed_order)
         self._save_strategy_state()
 
@@ -645,7 +688,7 @@ class GenericHedgeRuntime:
         existing = self.runtime_state.exchange_to_client_id.get(exchange_order_id)
         if existing and existing != client_id:
             self.runtime_state.exchange_to_client_id.pop(exchange_order_id, None)
-        managed_order = self.runtime_state.active_orders.get(client_id)
+        managed_order = self._get_managed_order(client_id)
         if managed_order and managed_order.exchange_order_id and managed_order.exchange_order_id != exchange_order_id:
             self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)
         self.runtime_state.exchange_to_client_id[exchange_order_id] = client_id
@@ -1194,8 +1237,8 @@ class GenericHedgeRuntime:
 
     def _finalize_managed_order(self, client_id: str, managed_order: ManagedOrder) -> None:
         self.runtime_state.active_orders.pop(client_id, None)
-        if managed_order.exchange_order_id:
-            self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)
+        self.runtime_state.finalized_orders[client_id] = managed_order
+        self._prune_finalized_orders()
         self.audit.log_event(
             "order_finalized",
             strategy=self.strategy.name,
@@ -1205,6 +1248,23 @@ class GenericHedgeRuntime:
             filled_qty=managed_order.filled_qty,
             remaining_qty=managed_order.remaining_qty,
         )
+
+    def _get_managed_order(self, client_id: str | None) -> ManagedOrder | None:
+        if not client_id:
+            return None
+        return self.runtime_state.active_orders.get(client_id) or self.runtime_state.finalized_orders.get(client_id)
+
+    def _prune_finalized_orders(self, max_orders: int = 200) -> None:
+        finalized_orders = self.runtime_state.finalized_orders
+        if len(finalized_orders) <= max_orders:
+            return
+        stale_orders = sorted(finalized_orders.values(), key=lambda order: order.updated_at)
+        for order in stale_orders[: len(finalized_orders) - max_orders]:
+            finalized_orders.pop(order.client_order_id, None)
+            if order.exchange_order_id:
+                mapped_client_id = self.runtime_state.exchange_to_client_id.get(order.exchange_order_id)
+                if mapped_client_id == order.client_order_id:
+                    self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
 
     @staticmethod
     def _runtime_side_from_exchange(order: dict[str, Any]) -> str:
