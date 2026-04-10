@@ -1,0 +1,59 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.env/
+.envrc
+
+# =========================
+# Logs (WICHTIG!)
+# =========================
+logs/
+*.log
+*.jsonl
+
+# =========================
+# Runtime / State Files
+# =========================
+state.json
+*.state
+*.db
+*.sqlite3
+
+# =========================
+# Config (optional je nach Nutzung)
+# =========================
+# Wenn sensible Daten drin sind:
+config.yaml
+*.env
+
+# =========================
+# Data / Backtests
+# =========================
+data/
+*.csv
+*.parquet
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+# =========================
+# Git
+# =========================
+*.swp
+*.swo
