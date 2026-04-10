@@ -6,7 +6,7 @@
   
   "reduction_pct_per_fill": 25,
  
-  "long_fill_distance_pct": 0.03, 
+  "long_fill_distance_pct": 0.03,  
   "short_fill_distance_pct": 0.06,
   
   "tp_profit_target_pct": 0.22,
