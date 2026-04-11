@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from .audit_logger import AuditLogger
 from .models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent
@@ -15,6 +15,7 @@ class StrategyContext:
     symbol: str
     category: str
     min_order_value: float
+    cancel_open_orders_by_purpose: Callable[[list[str]], None] | None = None
 
 
 class HedgeStrategy(ABC):

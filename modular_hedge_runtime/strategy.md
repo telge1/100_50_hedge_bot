@@ -249,7 +249,11 @@ Exit nach jeden Fill neu berechnen z.b long 1$ Profit und short 1$ verlust = be 
 
 Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 
-fixed_cycle_hedge_runtime.log
+########################################################################################################################
+
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log
+
+./start_fixed_cycle.sh
 
 ########################################################################################################################
 
@@ -282,4 +286,28 @@ Nach jedem Fill:
 Exit neu berechnen auf Basket-Basis
 
 
-INFO modular_hedge_runtime.order_manager Ensuring hedge mode
+#####################################################
+
+bot formel
+
+long_loss_usdt = long_reduce_qty * (long_avg - long_fill_price)
+
+long_fee_usdt = long_reduce_qty * long_fill_price * fee_rate
+
+required_short_gross_usdt = long_loss_usdt + long_fee_usdt
+
+short_tp_price = short_entry_price - required_short_move
+
+
+required_short_move =
+    required_short_gross_usdt / (short_reduce_qty * (1 - fee_rate))
+
+
+short_tp_price =
+short_entry_price
+-
+(
+  (long_reduce_qty * (long_avg - long_fill_price) + long_reduce_qty * long_fill_price * fee_rate)
+  /
+  (short_reduce_qty * (1 - fee_rate))
+)    

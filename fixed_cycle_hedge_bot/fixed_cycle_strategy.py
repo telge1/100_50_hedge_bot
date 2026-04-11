@@ -52,6 +52,7 @@ class FixedCycleHedgeConfig:
 
     rest_poll_after_fill_ms: int = 250
     ws_enabled: bool = True
+    restart: bool = True  # persist cycle state across restarts when enabled
     order_refresh_cooldown_ms: int = 750
 
     price_tick_size: float = 0.1
@@ -160,19 +161,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             snapshot=snapshot,
         )
 
+        self._update_initial_entry_confirmation(snapshot, runtime_state)
         if snapshot.long_qty > 0 and snapshot.short_qty > 0:
-            state["initial_entry_confirmed"] = True
-            context.audit.log_event(
-                "fixed_cycle_initial_entry_skipped",
-                strategy=self.name,
-                reason="positions_already_exist",
-                long_qty=snapshot.long_qty,
-                short_qty=snapshot.short_qty,
-            )
-            self._seed_initial_reference_if_missing(snapshot, runtime_state)
-            self._sync_state_from_snapshot(snapshot, runtime_state)
-            state["bot_state"] = self.STATE_PREPLACING_DOWNSIDE_ORDERS
-            return self._rebuild_structure(snapshot, runtime_state, context, reason="startup_existing_positions")
+            if state.get("initial_entry_confirmed"):
+                context.audit.log_event(
+                    "fixed_cycle_initial_entry_skipped",
+                    strategy=self.name,
+                    reason="positions_already_exist",
+                    long_qty=snapshot.long_qty,
+                    short_qty=snapshot.short_qty,
+                )
+                self._seed_initial_reference_if_missing(snapshot, runtime_state)
+                self._sync_state_from_snapshot(snapshot, runtime_state)
+                state["bot_state"] = self.STATE_PREPLACING_DOWNSIDE_ORDERS
+                return self._rebuild_structure(snapshot, runtime_state, context, reason="startup_existing_positions")
 
         if self._has_open_initial_entry_orders(snapshot, runtime_state):
             state["initial_entry_submitted"] = True
@@ -227,9 +229,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         state = runtime_state.strategy_state
         self._sync_state_from_snapshot(snapshot, runtime_state)
-
-        if snapshot.long_qty > 0 or snapshot.short_qty > 0:
-            state["initial_entry_confirmed"] = True
+        self._update_initial_entry_confirmation(snapshot, runtime_state)
 
         if (
             snapshot.long_qty <= 0
@@ -457,6 +457,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         self._seed_initial_reference_if_missing(snapshot, runtime_state)
         self._sync_state_from_snapshot(snapshot, runtime_state)
+        self._update_initial_entry_confirmation(snapshot, runtime_state)
         cycle_state = self._ensure_cycle_state(runtime_state)
         has_no_strategy_orders = self._has_no_strategy_orders(snapshot)
         active_order_purposes = [
@@ -528,6 +529,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return self._build_entry_intents(snapshot, runtime_state, context)
 
         if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
+            self._cancel_all_pending_orders(context)
             state["bot_state"] = self.STATE_EXITED
             context.audit.log_event("fixed_cycle_exited", strategy=self.name, reason=reason, snapshot=snapshot)
             self._reset_cycle_state(runtime_state)
@@ -895,7 +897,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
 
-        reduction_multiplier = 0.5
+        reduction_multiplier = 1.0
         effective_reduction_pct = self.config.reduction_pct_per_fill * reduction_multiplier
         short_qty = self._fixed_short_cycle_qty(
             float(state.get("initial_short_qty") or 0.0),
@@ -1388,6 +1390,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             for order in runtime_state.active_orders.values()
         )
 
+    def _update_initial_entry_confirmation(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        has_open_initial_orders = self._has_open_initial_entry_orders(snapshot, runtime_state)
+        confirmed = (
+            snapshot.long_qty > 0
+            and snapshot.short_qty > 0
+            and not has_open_initial_orders
+        )
+        state["initial_entry_confirmed"] = confirmed
+        if confirmed:
+            state["initial_entry_submitted"] = True
+        return confirmed
+
     def _collect_open_initial_entry_orders(self, snapshot: HedgeSnapshot) -> list[dict[str, str | None]]:
         entry_purposes = {self.LONG_ENTRY_PURPOSE, self.SHORT_ENTRY_PURPOSE}
         return [
@@ -1701,6 +1720,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return state
 
     def _write_cycle_state(self, cycle_state: dict) -> None:
+        if not self.config.restart:
+            return
         path = self._cycle_state_file_path()
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         tmp_path.write_text(json.dumps(cycle_state), encoding="utf-8")
@@ -1710,10 +1731,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         cycle_state = state.get("cycle_state")
         if not cycle_state:
-            cycle_state = self._load_cycle_state()
+            cycle_state = self._load_cycle_state() if self.config.restart else self._default_cycle_state()
         if cycle_state.get("symbol") != self.config.symbol:
             cycle_state = self._default_cycle_state()
-            self._write_cycle_state(cycle_state)
+            if self.config.restart:
+                self._write_cycle_state(cycle_state)
         state["cycle_state"] = cycle_state
         state.setdefault("current_long_cycle_index", int(cycle_state.get("long_cycle_index") or 0))
         state.setdefault("current_short_cycle_index", int(cycle_state.get("short_cycle_index") or 0))
@@ -1722,6 +1744,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("short_tp_pending_cycle", int(cycle_state.get("short_tp_pending_cycle") or 0))
         state.setdefault("long_add_pending", bool(cycle_state.get("long_add_pending")))
         return cycle_state
+
+    def _cancel_all_pending_orders(self, context: StrategyContext) -> None:
+        canceler = context.cancel_open_orders_by_purpose
+        if not canceler:
+            return
+        canceler(self._all_cycle_purposes() + self._exit_purposes())
 
     def _reset_cycle_state(self, runtime_state: RuntimeState) -> dict:
         state = runtime_state.strategy_state

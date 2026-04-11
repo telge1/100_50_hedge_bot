@@ -18,11 +18,28 @@ from unittest.mock import patch
 
 
 class DummyOrderManager:
+    def __init__(self):
+        self.positions = []
+        self.open_orders = []
+        self.order_history = {}
+
     def fetch_positions(self, *args, **kwargs):
-        return []
+        return list(self.positions)
 
     def fetch_mark_price(self, *args, **kwargs):
         return 1.0
+
+    def fetch_open_orders(self, *args, **kwargs):
+        return list(self.open_orders)
+
+    def fetch_order_history(self, *args, **kwargs):
+        order_id = kwargs.get("order_id")
+        order_link_id = kwargs.get("order_link_id")
+        if order_id and order_id in self.order_history:
+            return list(self.order_history[order_id])
+        if order_link_id and order_link_id in self.order_history:
+            return list(self.order_history[order_link_id])
+        return []
 
     def normalize_qty(self, *args, **kwargs):
         if "qty" in kwargs:
@@ -41,13 +58,17 @@ class DummyOrderManager:
         return {"result": {"orderId": f"market-{kwargs.get('order_link_id', 'market')}"}}
 
 
-def build_runtime() -> GenericHedgeRuntime:
+def build_runtime(order_manager: DummyOrderManager | None = None) -> GenericHedgeRuntime:
     config = GenericRuntimeConfig(
         api_key="test",
         secret_key="test",
         ensure_exchange_ready=False,
     )
-    runtime = GenericHedgeRuntime(config, FixedCycleHedgeStrategy(), order_manager=DummyOrderManager())
+    runtime = GenericHedgeRuntime(
+        config,
+        FixedCycleHedgeStrategy(),
+        order_manager=order_manager or DummyOrderManager(),
+    )
     runtime.context.refresh_snapshot = runtime.refresh_snapshot
     return runtime
 
@@ -280,6 +301,90 @@ def test_short_tp_fill_maps_order_id():
     assert runtime.runtime_state.exchange_to_client_id.get("short-tp-exec") == order.client_order_id
     assert order.exchange_order_id == "short-tp-exec"
     assert order.status == "FILLED"
+
+
+def test_sell_fill_matches_initial_short_entry_with_position_idx_fallback():
+    runtime = build_runtime()
+    order = _create_managed_order(
+        runtime=runtime,
+        client_order_id="test-initial-short",
+        side="short",
+        purpose="INITIAL_SHORT_ENTRY",
+        qty=12.0,
+        reduce_only=False,
+    )
+
+    runtime.on_websocket_fill(
+        "short-entry-exec",
+        12.0,
+        1.204,
+        order_side="Sell",
+        position_idx=2,
+    )
+
+    assert runtime.runtime_state.exchange_to_client_id.get("short-entry-exec") == order.client_order_id
+    assert order.exchange_order_id == "short-entry-exec"
+    assert order.status == "FILLED"
+
+
+def test_reconcile_finalizes_initial_short_entry_when_position_matches():
+    order_manager = DummyOrderManager()
+    order_manager.positions = [
+        {"side": "Sell", "size": "12", "avgPrice": "1.205"},
+    ]
+    runtime = build_runtime(order_manager=order_manager)
+    order = _create_managed_order(
+        runtime=runtime,
+        client_order_id="test-reconcile-initial-short",
+        side="short",
+        purpose="INITIAL_SHORT_ENTRY",
+        qty=12.0,
+        reduce_only=False,
+        exchange_order_id="short-entry-order",
+    )
+
+    runtime._reconcile_active_orders()
+
+    assert order.client_order_id not in runtime.runtime_state.active_orders
+    assert runtime.runtime_state.finalized_orders.get(order.client_order_id) is order
+    assert order.status == "FILLED"
+    assert order.filled_qty == 12.0
+
+
+def test_initial_entry_confirmed_requires_no_open_initial_orders():
+    strategy = FixedCycleHedgeStrategy()
+    runtime_state = RuntimeState()
+    runtime_state.active_orders["initial-short"] = ManagedOrder(
+        client_order_id="initial-short",
+        side="short",
+        qty=12.0,
+        purpose=strategy.SHORT_ENTRY_PURPOSE,
+        price=None,
+        order_type="Market",
+        reduce_only=False,
+        status="OPEN",
+        remaining_qty=12.0,
+    )
+    snapshot = HedgeSnapshot(
+        symbol="XRPUSDT",
+        current_price=1.2,
+        long_qty=20.0,
+        short_qty=12.0,
+        long_avg=1.19,
+        short_avg=1.21,
+        active_orders=(runtime_state.active_orders["initial-short"].to_snapshot(),),
+    )
+    context = StrategyContext(
+        audit=AuditLogger(logging.getLogger("initial-entry-confirmed"), "logs/tests_audit.jsonl"),
+        runtime_name=strategy.name,
+        symbol="XRPUSDT",
+        category="linear",
+        min_order_value=1.0,
+    )
+
+    strategy.on_tick(snapshot, runtime_state, context)
+
+    assert runtime_state.strategy_state["initial_entry_confirmed"] is False
 
 
 def test_downside_long_intent_is_reduce_only():

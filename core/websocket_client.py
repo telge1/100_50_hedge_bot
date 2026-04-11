@@ -227,6 +227,7 @@ class BybitWebSocketClient:
         side = item.get("side", "N/A")
         order_id = item.get("orderId")
         order_link_id = item.get("orderLinkId")
+        position_idx = self._safe_int(item.get("positionIdx"))
         exec_id = item.get("execId")
         exec_qty = self._safe_float(item.get("execQty"))
         exec_price = self._safe_float(item.get("execPrice"))
@@ -262,12 +263,14 @@ class BybitWebSocketClient:
             "cumulative_qty": cumulative_qty if cumulative_qty > 0 else None,
             "order_link_id": order_link_id,
             "order_side": side,
+            "position_idx": position_idx,
         }
         try:
             self.on_fill_callback(fill_order_id, exec_qty, exec_price, **kwargs)
         except TypeError as exc:
-            if "order_side" in str(exc):
+            if "order_side" in str(exc) or "position_idx" in str(exc):
                 kwargs.pop("order_side", None)
+                kwargs.pop("position_idx", None)
                 try:
                     self.on_fill_callback(fill_order_id, exec_qty, exec_price, **kwargs)
                     return

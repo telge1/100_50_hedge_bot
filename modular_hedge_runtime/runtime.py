@@ -68,6 +68,7 @@ class GenericHedgeRuntime:
             symbol=config.symbol,
             category=config.category,
             min_order_value=config.min_order_value,
+            cancel_open_orders_by_purpose=self._cancel_open_orders_by_purpose,
         )
         self._stop_event = threading.Event()
         self._price_thread: threading.Thread | None = None
@@ -219,6 +220,7 @@ class GenericHedgeRuntime:
         cumulative_qty: float | None = None,
         order_link_id: str | None = None,
         order_side: str | None = None,
+        position_idx: int | None = None,
     ) -> None:
         client_id = self.runtime_state.exchange_to_client_id.get(exchange_order_id)
         if not client_id and order_link_id and self._get_managed_order(order_link_id):
@@ -226,6 +228,14 @@ class GenericHedgeRuntime:
         if not client_id:
             client_id = self._match_exit_order_for_fill(
                 order_side=order_side,
+                qty=qty,
+                exchange_order_id=exchange_order_id,
+                price=price,
+            )
+        if not client_id:
+            client_id = self._match_initial_entry_order_for_fill(
+                order_side=order_side,
+                position_idx=position_idx,
                 qty=qty,
                 exchange_order_id=exchange_order_id,
                 price=price,
@@ -331,6 +341,83 @@ class GenericHedgeRuntime:
             previous_exchange_id=previous_exchange_id,
         )
         return best_order.client_order_id
+
+    def _match_initial_entry_order_for_fill(
+        self,
+        *,
+        order_side: str | None,
+        position_idx: int | None,
+        qty: float,
+        exchange_order_id: str,
+        price: float,
+    ) -> str | None:
+        target_side = self._infer_entry_fill_side(order_side=order_side, position_idx=position_idx)
+        if not target_side:
+            return None
+
+        expected_purpose = "INITIAL_LONG_ENTRY" if target_side == "long" else "INITIAL_SHORT_ENTRY"
+        candidates: list[ManagedOrder] = []
+        for order in self.runtime_state.active_orders.values():
+            if order.status in {"FILLED", "CANCELED", "REJECTED"}:
+                continue
+            if order.reduce_only:
+                continue
+            if order.side != target_side or order.purpose != expected_purpose:
+                continue
+            remaining = order.remaining_qty or max(order.qty - order.filled_qty, 0.0)
+            if remaining <= 0.0 or qty <= 0.0:
+                continue
+            if qty > remaining + 1e-9:
+                continue
+            candidates.append(order)
+
+        if len(candidates) != 1:
+            if len(candidates) > 1:
+                self.audit.log_event(
+                    "initial_entry_fill_match_ambiguous",
+                    strategy=self.strategy.name,
+                    exchange_order_id=exchange_order_id,
+                    order_side=order_side,
+                    position_idx=position_idx,
+                    qty=qty,
+                    price=price,
+                    candidates=[order.client_order_id for order in candidates],
+                )
+            return None
+
+        matched_order = candidates[0]
+        previous_exchange_id = matched_order.exchange_order_id
+        if previous_exchange_id and previous_exchange_id != exchange_order_id:
+            self.runtime_state.exchange_to_client_id.pop(previous_exchange_id, None)
+        matched_order.exchange_order_id = exchange_order_id
+        self.runtime_state.exchange_to_client_id[exchange_order_id] = matched_order.client_order_id
+        self.audit.log_event(
+            "initial_entry_fill_matched",
+            strategy=self.strategy.name,
+            exchange_order_id=exchange_order_id,
+            matched_client_order_id=matched_order.client_order_id,
+            purpose=matched_order.purpose,
+            matched_side=matched_order.side,
+            order_side=order_side,
+            position_idx=position_idx,
+            qty=qty,
+            price=price,
+            previous_exchange_id=previous_exchange_id,
+        )
+        return matched_order.client_order_id
+
+    @staticmethod
+    def _infer_entry_fill_side(*, order_side: str | None, position_idx: int | None) -> str | None:
+        if position_idx == 1:
+            return "long"
+        if position_idx == 2:
+            return "short"
+        normalized_side = str(order_side or "").strip().lower()
+        if normalized_side in {"buy", "long"}:
+            return "long"
+        if normalized_side in {"sell", "short"}:
+            return "short"
+        return None
 
     @staticmethod
     def _is_fill_match_candidate(order: ManagedOrder) -> bool:
@@ -704,6 +791,7 @@ class GenericHedgeRuntime:
             )
             return
         open_orders = self.order_manager.fetch_open_orders(self.config.symbol, self.config.category) or []
+        positions = self._fetch_exchange_position_mapping()
         open_by_exchange_id = {
             str(order.get("orderId")): order for order in open_orders if order.get("orderId")
         }
@@ -754,6 +842,12 @@ class GenericHedgeRuntime:
                     exchange_order_id=managed_order.exchange_order_id,
                     managed_order=self._managed_order_summary(managed_order),
                 )
+                if self._reconcile_initial_entry_from_position(
+                    client_id=client_id,
+                    managed_order=managed_order,
+                    positions=positions,
+                ):
+                    continue
                 continue
             history_order = history[0]
             normalized_history_status = self._normalize_order_status(history_order.get("orderStatus"), managed_order.status)
@@ -826,7 +920,61 @@ class GenericHedgeRuntime:
                     filled_qty=managed_order.filled_qty,
                     remaining_qty=managed_order.remaining_qty,
                 )
+            if self._reconcile_initial_entry_from_position(
+                client_id=client_id,
+                managed_order=managed_order,
+                positions=positions,
+            ):
+                continue
         self._save_strategy_state()
+
+    def _reconcile_initial_entry_from_position(
+        self,
+        *,
+        client_id: str,
+        managed_order: ManagedOrder,
+        positions: dict[str, float],
+    ) -> bool:
+        if managed_order.reduce_only or managed_order.purpose not in {"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"}:
+            return False
+        if managed_order.status in {"FILLED", "CANCELED", "REJECTED"}:
+            return False
+
+        position_qty = float(positions.get("long_qty") if managed_order.side == "long" else positions.get("short_qty") or 0.0)
+        position_avg = float(positions.get("long_avg") if managed_order.side == "long" else positions.get("short_avg") or 0.0)
+        qty_tolerance = max(abs(managed_order.qty) * 1e-6, 1e-9)
+        if position_qty + qty_tolerance < managed_order.qty:
+            return False
+
+        missing_qty = max(managed_order.qty - managed_order.filled_qty, 0.0)
+        if missing_qty <= qty_tolerance:
+            return False
+
+        exchange_order_id = managed_order.exchange_order_id or client_id
+        exec_price = position_avg if position_avg > 0 else float(managed_order.price or 0.0)
+        exec_id = f"reconcile-position-{client_id}-{managed_order.qty}"
+        self.audit.log_event(
+            "initial_entry_position_reconciled",
+            strategy=self.strategy.name,
+            client_order_id=client_id,
+            exchange_order_id=exchange_order_id,
+            purpose=managed_order.purpose,
+            side=managed_order.side,
+            position_qty=position_qty,
+            expected_qty=managed_order.qty,
+            previous_filled_qty=managed_order.filled_qty,
+            inferred_exec_price=exec_price,
+        )
+        self._ingest_fill_event(
+            exchange_order_id=exchange_order_id,
+            client_id=client_id,
+            qty=missing_qty,
+            price=exec_price,
+            exec_id=exec_id,
+            cumulative_qty=managed_order.qty,
+            source="reconcile_position",
+        )
+        return True
 
     @staticmethod
     def _history_fill_price(history_order: dict[str, Any], fallback_price: float) -> float:
