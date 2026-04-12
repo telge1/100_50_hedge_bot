@@ -545,6 +545,31 @@ class BybitOrderManager:
         result = data.get("result") or {}
         return result.get("list", []) or result.get("data", []) or []
 
+    def fetch_closed_pnl(
+        self,
+        symbol: str | None = None,
+        category: str = "linear",
+        *,
+        limit: int = 100,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+        cursor: str | None = None,
+    ) -> list[Mapping[str, Any]] | None:
+        params: dict[str, Any] = {"category": category, "limit": max(1, min(limit, 100))}
+        if symbol:
+            params["symbol"] = symbol.upper()
+        if start_time_ms is not None:
+            params["startTime"] = int(start_time_ms)
+        if end_time_ms is not None:
+            params["endTime"] = int(end_time_ms)
+        if cursor:
+            params["cursor"] = cursor
+        data = self._get("/v5/position/closed-pnl", params)
+        if not data:
+            return None
+        result = data.get("result") or {}
+        return result.get("list", []) or result.get("data", []) or []
+
     def fetch_positions(
         self,
         symbol: str | None = None,

@@ -252,8 +252,14 @@ Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 ########################################################################################################################
 
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl
 
 ./start_fixed_cycle.sh
+
+"target_profit_usdt": 0.002,  =? 0.2$
+
+2025-01-23 12:34:56,789 INFO runtime.fixed_cycle Fixed cycle fill handling started: {"fill": {...}, ...}
+
 
 ########################################################################################################################
 
@@ -288,26 +294,3 @@ Exit neu berechnen auf Basket-Basis
 
 #####################################################
 
-bot formel
-
-long_loss_usdt = long_reduce_qty * (long_avg - long_fill_price)
-
-long_fee_usdt = long_reduce_qty * long_fill_price * fee_rate
-
-required_short_gross_usdt = long_loss_usdt + long_fee_usdt
-
-short_tp_price = short_entry_price - required_short_move
-
-
-required_short_move =
-    required_short_gross_usdt / (short_reduce_qty * (1 - fee_rate))
-
-
-short_tp_price =
-short_entry_price
--
-(
-  (long_reduce_qty * (long_avg - long_fill_price) + long_reduce_qty * long_fill_price * fee_rate)
-  /
-  (short_reduce_qty * (1 - fee_rate))
-)    

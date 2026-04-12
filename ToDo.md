@@ -64,4 +64,8 @@ Ich will einen echten Patch-Diff sehen, so dass Cursor mir die Änderungen zum A
 
 
 
-LOW COST PROMPT + Ziel + Scope“
+LOW COST PROMPT + Ziel + Scope“--symbol SANDUSDT \
+  --limit 50 \
+  --order-id d3280ead-551d-46ae-83c9-d16a4bf05b1e
+
+  python -m fixed_cycle_hedge_bot.tools.test_closed_pnl_fetch --symbol SANDUSDT --order-id d3280ead-551d-46ae-83c9-d16a4bf05b1e
