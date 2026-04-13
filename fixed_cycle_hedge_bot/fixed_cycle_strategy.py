@@ -165,18 +165,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         self._update_initial_entry_confirmation(snapshot, runtime_state)
         if snapshot.long_qty > 0 and snapshot.short_qty > 0:
-            if state.get("initial_entry_confirmed"):
-                context.audit.log_event(
-                    "fixed_cycle_initial_entry_skipped",
-                    strategy=self.name,
-                    reason="positions_already_exist",
-                    long_qty=snapshot.long_qty,
-                    short_qty=snapshot.short_qty,
-                )
-                self._seed_initial_reference_if_missing(snapshot, runtime_state)
-                self._sync_state_from_snapshot(snapshot, runtime_state)
-                state["bot_state"] = self.STATE_PREPLACING_DOWNSIDE_ORDERS
-                return self._rebuild_structure(snapshot, runtime_state, context, reason="startup_existing_positions")
+            context.audit.log_event(
+                "fixed_cycle_initial_entry_skipped",
+                strategy=self.name,
+                reason="existing_positions_on_exchange",
+                long_qty=snapshot.long_qty,
+                short_qty=snapshot.short_qty,
+            )
+            state["initial_entry_confirmed"] = True
+            context.audit.log_event(
+                "fixed_cycle_initial_entry_skipped",
+                strategy=self.name,
+                reason="positions_already_exist",
+                long_qty=snapshot.long_qty,
+                short_qty=snapshot.short_qty,
+            )
+            self._seed_initial_reference_if_missing(snapshot, runtime_state)
+            self._sync_state_from_snapshot(snapshot, runtime_state)
+            state["bot_state"] = self.STATE_PREPLACING_DOWNSIDE_ORDERS
+            return self._rebuild_structure(snapshot, runtime_state, context, reason="startup_existing_positions")
 
         if self._has_open_initial_entry_orders(snapshot, runtime_state):
             state["initial_entry_submitted"] = True
@@ -565,19 +572,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         state["bot_state"] = self.STATE_HARD_STOP_MODE if hard_stop_active else self.STATE_RUNNING
 
-        context.audit.log_event(
-            "fixed_cycle_structure_rebuilt",
-            strategy=self.name,
-            reason=reason,
-            hard_stop_active=hard_stop_active,
-            break_even_price=break_even_price,
-            tp_price=tp_price,
-            current_long_cycle_index=state.get("current_long_cycle_index"),
-            current_short_cycle_index=state.get("current_short_cycle_index"),
-            current_effective_cycle=state.get("current_effective_cycle"),
-            intents=intents,
-            traces=[trace.to_dict() for trace in break_even_traces],
-        )
+        has_real_structure_change = bool(downside_intents or exit_intents)
+        if has_real_structure_change:
+            context.audit.log_event(
+                "fixed_cycle_structure_rebuilt",
+                strategy=self.name,
+                reason=reason,
+                hard_stop_active=hard_stop_active,
+                break_even_price=break_even_price,
+                tp_price=tp_price,
+                current_long_cycle_index=state.get("current_long_cycle_index"),
+                current_short_cycle_index=state.get("current_short_cycle_index"),
+                current_effective_cycle=state.get("current_effective_cycle"),
+                intents=intents,
+                traces=[trace.to_dict() for trace in break_even_traces],
+            )
+        else:
+            logger.debug(
+                "fixed_cycle_structure_rebuilt skipped (no new intents) %s",
+                {"reason": reason},
+            )
 
         logger.debug(
             "fixed_cycle_rebuild_result_detailed %s",
@@ -925,6 +939,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             closed_pnl_ready = self._refresh_long_fill_closed_pnl(
                 cycle_index=cycle_index,
                 long_fill=long_fill,
+                runtime_state=runtime_state,
                 context=context,
             )
             self._write_cycle_state(cycle_state)
@@ -964,7 +979,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             reduction_multiplier=reduction_multiplier,
         )
         long_reduce_qty = float(long_fill.get("qty") or 0.0)
-        confirmed_closed_pnl = self._safe_float(long_fill.get("closed_pnl"), None)
+        confirmed_closed_pnl = self._safe_float(long_fill.get("confirmed_closed_pnl"), None)
+        if confirmed_closed_pnl is None:
+            confirmed_closed_pnl = self._safe_float(long_fill.get("closed_pnl"), None)
         confirmed_closed_qty = self._safe_float(long_fill.get("closed_qty"), None)
         confirmed_closed_avg_price = self._safe_float(long_fill.get("closed_avg_price"), None)
         confirmed_closed_cost = self._safe_float(long_fill.get("closed_cost"), None)
@@ -1007,7 +1024,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
 
-        long_loss_usdt = max(-confirmed_closed_pnl, 0.0)
+        long_loss_usdt = max(-(confirmed_closed_pnl or 0.0), 0.0)
+        required_short_gross = long_loss_usdt + target_profit_usdt
         if long_loss_usdt <= 0:
             context.audit.log_event(
                 "fixed_cycle_downside_skip",
@@ -1023,13 +1041,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 long_reduce_qty=long_reduce_qty,
             )
             return []
-        required_short_gross = long_loss_usdt + target_profit_usdt
-        required_price_move = (
-            (short_entry_price * fee_rate) + (required_short_gross / short_qty)
-        ) / (1 + fee_rate)
-        raw_trigger_price = short_entry_price - required_price_move
+        raw_trigger_price = self._calc_short_tp_trigger_price_from_confirmed_loss(
+            short_entry_price=short_entry_price,
+            short_qty=short_qty,
+            confirmed_long_closed_pnl=confirmed_closed_pnl,
+            target_profit_usdt=target_profit_usdt,
+            fee_rate=fee_rate,
+        )
         raw_trigger_price = max(raw_trigger_price, self.config.price_tick_size)
         trigger_price = self._normalize_price(raw_trigger_price)
+        required_price_move = short_entry_price - trigger_price
         price = self._normalize_price(
             max(trigger_price - self.config.price_tick_size, self.config.price_tick_size)
         )
@@ -1056,8 +1077,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "closed_pnl": confirmed_closed_pnl,
                 "closed_qty": confirmed_closed_qty,
                 "long_loss_usdt": long_loss_usdt,
-                "required_short_gross": required_short_gross,
-                "required_price_move": required_price_move,
+                "required_net_profit": long_loss_usdt + target_profit_usdt,
                 "trigger_price": trigger_price,
                 "short_qty": short_qty,
             },
@@ -1267,6 +1287,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_prices=[intent.trigger_price for intent in intents],
         )
         return intents
+
+    def _calc_short_tp_trigger_price_from_confirmed_loss(
+        self,
+        *,
+        short_entry_price: float,
+        short_qty: float,
+        confirmed_long_closed_pnl: float,
+        target_profit_usdt: float,
+        fee_rate: float,
+    ) -> float:
+        required_net_profit = abs(float(confirmed_long_closed_pnl)) + float(target_profit_usdt)
+        numerator = short_entry_price - (required_net_profit / short_qty)
+        denominator = 1.0 + fee_rate
+        return numerator / denominator
 
     def _calculate_break_even(
         self,
@@ -1510,6 +1544,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "total_qty": total_qty,
                 "weighted_price_sum": weighted_price_sum,
                 "avg_price": avg_price,
+                "client_order_id": fill_event.client_order_id,
+                "confirmed_pnl_applied": False,
             }
             long_fill = fills[str(cycle_index)]
             self._seed_long_fill_closed_pnl_fields(long_fill, fill_event.exchange_order_id)
@@ -1525,9 +1561,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     self._refresh_long_fill_closed_pnl(
                         cycle_index=cycle_index,
                         long_fill=long_fill,
+                        runtime_state=runtime_state,
                         context=context,
                         occurred_at_ms=int(fill_event.occurred_at.timestamp() * 1000),
                     )
+                    if long_fill.get("confirmed_closed_pnl") is not None:
+                        self._cleanup_order_pnl(runtime_state, long_fill.get("client_order_id"))
             if float(cycle_state.get("entry_price") or 0.0) <= 0:
                 cycle_state["entry_price"] = fill_event.exec_price
 
@@ -1886,6 +1925,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         *,
         cycle_index: int,
         long_fill: dict,
+        runtime_state: RuntimeState,
         context: StrategyContext,
         occurred_at_ms: int | None = None,
     ) -> bool:
@@ -1989,7 +2029,54 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         long_fill["closed_pnl_ready"] = long_fill["closed_pnl"] is not None
         long_fill["closed_pnl_updated_time"] = self._safe_int(match.get("updatedTime") or match.get("createdTime"))
         long_fill["fill_count"] = self._safe_int(match.get("fillCount"))
+        long_fill["confirmed_closed_pnl"] = long_fill["closed_pnl"]
+        long_fill["confirmed_pnl_applied"] = long_fill.get("confirmed_pnl_applied", False)
+        self._apply_confirmed_realized_pnl(
+            runtime_state=runtime_state,
+            client_order_id=long_fill.get("client_order_id"),
+            confirmed_pnl=long_fill["confirmed_closed_pnl"],
+            side="long",
+        )
         return bool(long_fill["closed_pnl_ready"])
+
+    def _apply_confirmed_realized_pnl(
+        self,
+        runtime_state: RuntimeState,
+        client_order_id: str | None,
+        confirmed_pnl: float | None,
+        side: str,
+    ) -> None:
+        if not client_order_id or confirmed_pnl is None:
+            return
+        applied = runtime_state.confirmed_pnl_applied
+        if client_order_id in applied:
+            return
+        had_temp = client_order_id in runtime_state.temporary_pnl_by_order
+        temp_pnl = runtime_state.temporary_pnl_by_order.pop(client_order_id, 0.0)
+        if not had_temp:
+            logger.warning(
+                "missing_temp_pnl",
+                extra={
+                    "client_order_id": client_order_id,
+                    "side": side,
+                    "confirmed_pnl": confirmed_pnl,
+                },
+            )
+        if side == "long":
+            if temp_pnl != 0.0:
+                runtime_state.realized_long_pnl_total -= temp_pnl
+            runtime_state.realized_long_pnl_total += confirmed_pnl
+        else:
+            if temp_pnl != 0.0:
+                runtime_state.realized_short_pnl_total -= temp_pnl
+            runtime_state.realized_short_pnl_total += confirmed_pnl
+        applied.add(client_order_id)
+
+    def _cleanup_order_pnl(self, runtime_state: RuntimeState, client_order_id: str | None) -> None:
+        if not client_order_id:
+            return
+        runtime_state.temporary_pnl_by_order.pop(client_order_id, None)
+        runtime_state.confirmed_pnl_applied.discard(client_order_id)
 
     @classmethod
     @staticmethod

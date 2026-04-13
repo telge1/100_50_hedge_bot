@@ -690,6 +690,20 @@ class GenericHedgeRuntime:
     ) -> None:
         managed_order = self.runtime_state.active_orders.get(client_id)
         if not managed_order:
+            processed_qty = self.runtime_state.processed_fill_cumulative.get(client_id, 0.0)
+            if processed_qty > 0:
+                self.audit.log_event(
+                    "fill_duplicate_ignored",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    exchange_order_id=exchange_order_id,
+                    cumulative_qty=cumulative_qty,
+                    processed_cumulative=processed_qty,
+                    source=source,
+                )
+            return
+        processed_qty = self.runtime_state.processed_fill_cumulative.get(client_id, 0.0)
+        if cumulative_qty is not None and cumulative_qty <= processed_qty:
             return
         with self._lock:
             processed_exec_ids = set(managed_order.metadata.get("processed_exec_ids") or [])
@@ -698,6 +712,8 @@ class GenericHedgeRuntime:
             if exec_id:
                 processed_exec_ids.add(exec_id)
                 managed_order.metadata["processed_exec_ids"] = sorted(processed_exec_ids)
+            if processed_qty >= managed_order.qty and managed_order.qty > 0:
+                return
             previous_filled = managed_order.filled_qty
             if cumulative_qty is not None and cumulative_qty > previous_filled:
                 incremental_qty = cumulative_qty - previous_filled
@@ -722,8 +738,14 @@ class GenericHedgeRuntime:
                 pnl = calculate_pnl(entry_price, price, incremental_qty, managed_order.side)
                 if managed_order.side == "long":
                     self.runtime_state.realized_long_pnl_total += pnl
+                    self.runtime_state.temporary_pnl_by_order[client_id] = (
+                        self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
+                    )
                 else:
                     self.runtime_state.realized_short_pnl_total += pnl
+                    self.runtime_state.temporary_pnl_by_order[client_id] = (
+                        self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
+                    )
             fill_event = FillEvent(
                 exchange_order_id=exchange_order_id,
                 client_order_id=client_id,
@@ -739,6 +761,9 @@ class GenericHedgeRuntime:
                 exec_id=exec_id,
                 metadata={**dict(managed_order.metadata), "fill_source": source},
                 traces=list(managed_order.trace),
+            )
+            self.runtime_state.processed_fill_cumulative[client_id] = max(
+                processed_qty, managed_order.filled_qty
             )
         with self._lock:
             self.audit.log_event(

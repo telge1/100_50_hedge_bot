@@ -251,14 +251,23 @@ Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 
 ########################################################################################################################
 
-rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log
-rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.stdout.log
 
 ./start_fixed_cycle.sh
 
-"target_profit_usdt": 0.002,  =? 0.2$
+./bot_control.sh hard-reset # bot stoppen plus reset
 
-2025-01-23 12:34:56,789 INFO runtime.fixed_cycle Fixed cycle fill handling started: {"fill": {...}, ...}
+
+python fixed_cycle_hedge_bot/tools/simulator.py \
+  --mode single \
+  --start-price 100 \
+  --drop-pct 6 \
+  --step-pct 0.1 \
+  --long-add-grid 0.5,0.6,0.7
+
+  --long-add-distance-pct 0.8
 
 
 ########################################################################################################################
@@ -280,7 +289,10 @@ Exit nach jedem Fill neu berechnen
 und erst dann nächster Cycle
 
 
-
+Start mit 100 / 50
+LONG ADD bei 0.5%
+Nach 2 vollständigen Zyklen resetten
+Dann wieder neu 100 / 50 aufbauen
 
 Start: Long 100 / Short 50
 Bei -0.8%:
@@ -294,3 +306,4 @@ Exit neu berechnen auf Basket-Basis
 
 #####################################################
 
+114.93

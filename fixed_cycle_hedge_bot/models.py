@@ -193,6 +193,9 @@ class RuntimeState:
     last_snapshot: HedgeSnapshot | None = None
     started_at: datetime = field(default_factory=utcnow)
     sequence: int = 0
+    temporary_pnl_by_order: dict[str, float] = field(default_factory=dict)
+    confirmed_pnl_applied: set[str] = field(default_factory=set)
+    processed_fill_cumulative: dict[str, float] = field(default_factory=dict)
 
     def next_sequence(self) -> int:
         self.sequence += 1

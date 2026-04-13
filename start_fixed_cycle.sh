@@ -3,7 +3,9 @@
 # Run fixed-cycle strategy via the modular fixed_cycle runner.
 # Make sure env keys are set (see /strategy/env or /env/local.env) before launching.
 cd "$(dirname "$0")"
-python -m fixed_cycle_hedge_bot.runner \
+nohup python -m fixed_cycle_hedge_bot.runner \
   --strategy fixed_cycle \
   --strategy-config-file fixed_cycle_hedge_bot/config/fixed_cycle_config.json \
-  --audit-log-file logs/generic_hedge_runtime_audit.jsonl
+  --audit-log-file logs/generic_hedge_runtime_audit.jsonl \
+  > logs/fixed_cycle_runner.stdout.log 2>&1 &
+echo "Fixed cycle bot started via nohup (logs/fixed_cycle_runner.stdout.log)"
