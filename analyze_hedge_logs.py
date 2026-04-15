@@ -18,6 +18,17 @@ TIMELINE_SKIP_EVENTS = {
     "snapshot_refreshed",
     "strategy_noop",
 }
+BLOCK_START_EVENT = "analyzer_block_started"
+BLOCK_RECOVERY_EVENT = "analyzer_recovery_detected"
+BLOCK_EXIT_ARMED_EVENT = "analyzer_exit_armed"
+BLOCK_CLOSED_EVENT = "analyzer_block_closed"
+
+MARKER_EVENTS = {
+    BLOCK_START_EVENT,
+    BLOCK_RECOVERY_EVENT,
+    BLOCK_EXIT_ARMED_EVENT,
+    BLOCK_CLOSED_EVENT,
+}
 
 
 def _parse_runtime_timestamp(raw: str) -> Optional[datetime]:
@@ -209,8 +220,28 @@ class NormalizedEvent:
     avg_price: Optional[float] = None
     trigger_price: Optional[float] = None
     closed_pnl: Optional[float] = None
+    tp_initial: Optional[float] = None
+    tp_final: Optional[float] = None
+    tp_steps: Optional[int] = None
 
     event_id: Optional[int] = None
+
+@dataclass
+class RunBlock:
+    block_id: int
+    start_event_id: Optional[int]
+    end_event_id: Optional[int]
+    start_ts: Optional[datetime]
+    end_ts: Optional[datetime]
+    symbol: Optional[str]
+    strategy: Optional[str]
+    block_type: Optional[str]
+    bot_state: Optional[str]
+    cycle_index: Optional[int]
+    is_closed: bool
+    events: List[NormalizedEvent] = field(default_factory=list)
+    exit_armed_event_id: Optional[int] = None
+    recovery_event_id: Optional[int] = None
 
 @dataclass
 class Session:
@@ -237,6 +268,107 @@ class Anomaly:
     order_key: Optional[Tuple[str, ...]]
     event_ids: List[int] = field(default_factory=list)
 
+
+def _is_marker_event(event: NormalizedEvent) -> bool:
+    return (event.event_name or "") in MARKER_EVENTS
+
+
+def build_run_blocks(events: Sequence[NormalizedEvent]) -> List[RunBlock]:
+    blocks: List[RunBlock] = []
+    current: Optional[RunBlock] = None
+    block_counter = 0
+
+    def _finalize_block(block: RunBlock, closed: bool = False, end_event: Optional[NormalizedEvent] = None) -> None:
+        if end_event:
+            block.end_event_id = end_event.event_id
+            block.end_ts = end_event.timestamp
+        block.is_closed = closed
+        blocks.append(block)
+
+    for event in events:
+        name = event.event_name or ""
+        if name == BLOCK_START_EVENT:
+            if current:
+                _finalize_block(current, closed=False)
+            block_counter += 1
+            current = RunBlock(
+                block_id=block_counter,
+                start_event_id=event.event_id,
+                end_event_id=None,
+                start_ts=event.timestamp,
+                end_ts=None,
+                symbol=event.symbol,
+                strategy=event.strategy,
+                block_type=event.payload.get("block_type"),
+                bot_state=event.payload.get("bot_state"),
+                cycle_index=event.cycle_index,
+                is_closed=False,
+            )
+            if current.symbol is None:
+                current.symbol = _extract_symbol(event.payload)
+            if current.strategy is None:
+                current.strategy = event.payload.get("strategy")
+            current.events.append(event)
+            continue
+
+        if not current:
+            continue
+
+        current.events.append(event)
+        if name == BLOCK_RECOVERY_EVENT and current.recovery_event_id is None:
+            current.recovery_event_id = event.event_id
+        if name == BLOCK_EXIT_ARMED_EVENT and current.exit_armed_event_id is None:
+            current.exit_armed_event_id = event.event_id
+        if name == BLOCK_CLOSED_EVENT:
+            _finalize_block(current, closed=True, end_event=event)
+            current = None
+
+    if current:
+        _finalize_block(current, closed=False)
+
+    return blocks
+
+
+def map_event_to_block(blocks: Sequence[RunBlock]) -> Dict[int, int]:
+    event_map: Dict[int, int] = {}
+    for block in blocks:
+        for ev in block.events:
+            if ev.event_id is not None:
+                event_map[ev.event_id] = block.block_id
+    return event_map
+
+
+ALLOWED_EVENT_NAMES = {
+    "analyzer_block_started",
+    "analyzer_recovery_detected",
+    "analyzer_exit_armed",
+    "analyzer_block_closed",
+    "order_submitted",
+    "fill_received",
+    "order_finalized",
+    "fixed_cycle_long_reduce_planned",
+    "fixed_cycle_exit_skip",
+    "intent_reuse_existing_order",
+    "intent_replace_decision",
+    "intent_equivalence_check",
+    "reconcile_guard_noop",
+    "intent_replaced_cancel",
+}
+NO_RENDER_EVENT_NAMES = {
+    "modular_hedge_runtime.order_manager",
+    "order_payload_ready",
+}
+
+
+def _is_block_signal_event(event: NormalizedEvent) -> bool:
+    name = event.event_name or ""
+    if name in NO_RENDER_EVENT_NAMES:
+        return False
+    if name in ALLOWED_EVENT_NAMES:
+        return True
+    if event.level and event.level.upper() in {"WARNING", "ERROR"}:
+        return True
+    return False
 
 def parse_runtime_events(path: Path) -> Iterable[NormalizedEvent]:
     sequence = 0
@@ -282,12 +414,14 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
         message_body = f"{body}\n{extra}" if extra else body
         json_start = message_body.find("{")
         parsed = None
+        metadata = {}
         if json_start != -1:
             candidate = message_body[json_start:]
             parsed = _safe_json_load(candidate)
             if parsed is not None:
                 payload = parsed
                 message_body = message_body[:json_start].strip()
+                metadata = payload.get("metadata") or {}
         if not payload:
             payload = {"message": message_body}
         event_name = payload.get("event") or payload.get("event_name")
@@ -333,6 +467,9 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
         raw_message="\n".join(lines),
         payload=payload,
         sequence=sequence,
+        tp_initial=_safe_float(metadata.get("tp_initial")),
+        tp_final=_safe_float(metadata.get("tp_final")),
+        tp_steps=metadata.get("tp_adjust_steps"),
     )
     return normalized
 
@@ -767,6 +904,8 @@ def filter_events(
     only_anomalies: bool = False,
     anomalies: Optional[List[Anomaly]] = None,
     event_to_session: Optional[Dict[int, int]] = None,
+    block_ids: Optional[Set[int]] = None,
+    event_to_block: Optional[Dict[int, int]] = None,
 ) -> List[NormalizedEvent]:
     anomaly_event_ids: Set[int] = set()
     if only_anomalies and anomalies:
@@ -791,6 +930,10 @@ def filter_events(
         if session_ids and event.event_id is not None:
             sid = event_to_session.get(event.event_id) if event_to_session else None
             if not sid or sid not in session_ids:
+                continue
+        if block_ids and event.event_id is not None:
+            bid = event_to_block.get(event.event_id) if event_to_block else None
+            if bid not in block_ids:
                 continue
         if only_important:
             if not event.level or event.level.upper() not in {"WARNING", "ERROR"}:
@@ -902,6 +1045,192 @@ def render_anomalies(anomalies: List[Anomaly]) -> None:
         )
 
 
+def render_blocks(
+    blocks: Sequence[RunBlock],
+    lifecycles: Dict[Tuple[str, ...], OrderLifecycle],
+    cycle_pnl_reports: Sequence[Dict[str, Any]],
+    fee_rate: float,
+    symbol_filter: Optional[str] = None,
+) -> None:
+    ALWAYS_PRINT_EVENT_NAMES = {
+        BLOCK_START_EVENT,
+        BLOCK_RECOVERY_EVENT,
+        BLOCK_EXIT_ARMED_EVENT,
+        BLOCK_CLOSED_EVENT,
+        "fill_received",
+        "order_finalized",
+        "fixed_cycle_long_reduce_planned",
+        "fixed_cycle_exit_skip",
+    }
+
+    if not blocks:
+        print("No run blocks found.")
+        return
+
+    report_lookup = {
+        (report["symbol"], report["cycle"]): report for report in cycle_pnl_reports
+    }
+
+    for block in blocks:
+        if symbol_filter and block.symbol != symbol_filter:
+            continue
+        start_ts = block.start_ts.isoformat() if block.start_ts else "N/A"
+        end_ts = block.end_ts.isoformat() if block.end_ts else "open"
+        status = "CLOSED" if block.is_closed else "OPEN"
+        print(
+            f"\nBlock {block.block_id}: {status} | {start_ts} → {end_ts} | "
+            f"symbol={block.symbol or 'n/a'} strategy={block.strategy or 'n/a'} "
+            f"type={block.block_type or 'n/a'} bot_state={block.bot_state or 'n/a'} "
+            f"cycle={block.cycle_index or 'n/a'}"
+        )
+        print(f"  Fee rate: {fee_rate:.6f}")
+        if block.recovery_event_id:
+            print(f"  Recovery marker event_id={block.recovery_event_id}")
+        if block.exit_armed_event_id:
+            print(f"  Exit armed marker event_id={block.exit_armed_event_id}")
+        if block.end_event_id:
+            print(f"  Closed at event_id={block.end_event_id}")
+
+        block_event_ids = {ev.event_id for ev in block.events if ev.event_id is not None}
+        lifecycle_hits = sum(
+            1
+            for lifecycle in lifecycles.values()
+            if any(ev.event_id in block_event_ids for ev in lifecycle.events if ev.event_id is not None)
+        )
+        summary = None
+        if block.symbol and block.cycle_index is not None:
+            summary = report_lookup.get((block.symbol, block.cycle_index))
+        if summary:
+            long_add = summary["long_add"]
+            short_tp = summary["short_tp"]
+            print(
+                f"  Cycle summary: long_loss=${long_add['loss_usdt'] or 0:.4f}, "
+                f"short_net=${short_tp['net_profit_usdt'] or 0:.4f}"
+            )
+
+        print(f"  Related lifecycles: {lifecycle_hits}")
+        processed_events: List[NormalizedEvent] = []
+        dedup_map: Dict[Tuple[str, str, str, float, float, float], Tuple[NormalizedEvent, int]] = {}
+        runtime_preferred = {"order_submitted", "fill_received"}
+
+        def render_key(event: NormalizedEvent) -> Tuple[str, str, str, float, float, float, str]:
+            name = event.event_name or "unknown"
+            return (
+                name,
+                (event.purpose or "").upper(),
+                event.status or "",
+                round(event.price or 0.0, 8),
+                round(event.trigger_price or 0.0, 8),
+                round(event.qty or 0.0, 4),
+                event.reason or "",
+            )
+
+        def canonical_render_key(event: NormalizedEvent) -> Tuple[str, str, float, float, float]:
+            return (
+                event.event_name or "",
+                (event.purpose or "").upper(),
+                round(event.price or 0.0, 8),
+                round(event.trigger_price or 0.0, 8),
+                round(event.qty or 0.0, 4),
+            )
+
+        runtime_keys: Set[Tuple[str, str, str, float, float, float]] = set()
+        for ev in block.events:
+            if ev.source != "runtime":
+                continue
+            if not _is_block_signal_event(ev):
+                continue
+            name = ev.event_name or "unknown"
+            if name in NO_RENDER_EVENT_NAMES:
+                continue
+            runtime_keys.add(canonical_render_key(ev))
+
+        for ev in block.events:
+            if not _is_block_signal_event(ev):
+                continue
+            event_name = ev.event_name or "unknown"
+            if event_name in NO_RENDER_EVENT_NAMES:
+                continue
+            if event_name in ALWAYS_PRINT_EVENT_NAMES or (
+                ev.level and ev.level.upper() in {"WARNING", "ERROR"}
+            ):
+                processed_events.append(ev)
+                continue
+            key = render_key(ev)
+            if ev.source == "audit" and canonical_render_key(ev) in runtime_keys:
+                continue
+            existing = dedup_map.get(key)
+            if existing is None:
+                dedup_map[key] = (ev, len(processed_events))
+                processed_events.append(ev)
+            else:
+                existing_event, idx = existing
+                prefer_new = (
+                    event_name in runtime_preferred
+                    and ev.source == "runtime"
+                    and existing_event.source != "runtime"
+                )
+                if prefer_new:
+                    dedup_map[key] = (ev, idx)
+                    processed_events[idx] = ev
+                # otherwise keep the first seen event
+        for ev in processed_events:
+            event_name = ev.event_name or "unknown"
+            ts = ev.timestamp.isoformat() if ev.timestamp else "N/A"
+            details = []
+            if ev.price is not None:
+                details.append(f"price={ev.price:.6f}")
+            if ev.qty is not None:
+                details.append(f"qty={ev.qty:.3f}")
+            if ev.trigger_price is not None:
+                details.append(f"trigger={ev.trigger_price:.6f}")
+            if ev.decision:
+                details.append(f"decision={ev.decision}")
+            if ev.reason:
+                details.append(f"reason={ev.reason}")
+            existing_trigger = ev.payload.get("existing_trigger_price")
+            new_trigger = ev.payload.get("new_trigger_price")
+            existing_qty = ev.payload.get("existing_qty")
+            new_qty = ev.payload.get("new_qty")
+            if existing_trigger is not None and new_trigger is not None:
+                diff = abs(existing_trigger - new_trigger)
+                details.append(f"trigger_diff={diff:.8f}")
+            if existing_qty is not None and new_qty is not None:
+                details.append(f"qty_diff={abs(existing_qty - new_qty):.6f}")
+            if ev.closed_pnl is not None:
+                details.append(f"closed_pnl={ev.closed_pnl:.4f}")
+            detail_str = " ".join(details)
+            print(
+                f"  {ev.event_id or '??'} [{ev.source}] {ts} {event_name} "
+                f"{ev.purpose or ''} {detail_str}".strip()
+            )
+            if ev.event_name == "intent_reuse_existing_order":
+                print(f"    🔁 REUSED ORDER: {ev.purpose} {ev.side}")
+            if ev.event_name == "intent_replaced_cancel":
+                print(f"    ❌ REPLACED ORDER: {ev.purpose} {ev.side}")
+                if ev.reason:
+                    print(f"      reason={ev.reason}")
+                existing_trigger = ev.payload.get("existing_trigger_price")
+                new_trigger = ev.payload.get("new_trigger_price")
+                existing_qty = ev.payload.get("existing_qty")
+                new_qty = ev.payload.get("new_qty")
+                if existing_trigger is not None and new_trigger is not None:
+                    print(f"      trigger_diff={abs(existing_trigger - new_trigger):.8f}")
+                if existing_qty is not None and new_qty is not None:
+                    print(f"      qty_diff={abs(existing_qty - new_qty):.6f}")
+            if ev.event_name == "intent_equivalence_check":
+                print(
+                    f"    🔍 CHECK: {ev.purpose} result={ev.payload.get('result')} "
+                    f"reason={ev.payload.get('reject_reason')}"
+                )
+            if ev.event_name == "reconcile_guard_noop":
+                print("    🟢 RECONCILE NOOP (structure unchanged)")
+        reuse_count = sum(1 for ev in processed_events if ev.event_name == "intent_reuse_existing_order")
+        replace_count = sum(1 for ev in processed_events if ev.event_name == "intent_replaced_cancel")
+        check_count = sum(1 for ev in processed_events if ev.event_name == "intent_equivalence_check")
+        print(f"  Decisions: reused={reuse_count} replaced={replace_count} checks={check_count}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze fixed/generic hedge logs")
     parser.add_argument(
@@ -934,9 +1263,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--mode",
-        choices=["summary", "timeline", "orders", "sessions", "anomalies", "cycle-pnl", "json"],
+        choices=["summary", "timeline", "orders", "sessions", "anomalies", "cycle-pnl", "json", "blocks"],
         default="summary",
     )
+    parser.add_argument("--block", help="Block id (number or 'last')")
     parser.add_argument("--gap-threshold", type=int, default=GAP_THRESHOLD_SECONDS)
     args = parser.parse_args()
 
@@ -955,6 +1285,8 @@ def main() -> None:
         fee_rate=args.fee_rate,
         symbol_filter=args.symbol,
     )
+    blocks = build_run_blocks(merged)
+    event_to_block = map_event_to_block(blocks)
 
     session_filter: Optional[Set[int]] = None
     if args.session:
@@ -966,6 +1298,18 @@ def main() -> None:
                 session_filter = {int(args.session)}
             except ValueError:
                 pass
+    block_filter: Optional[Set[int]] = None
+    if args.block:
+        if args.block.lower() == "last":
+            if blocks:
+                block_filter = {blocks[-1].block_id}
+        else:
+            try:
+                block_id = int(args.block)
+            except ValueError:
+                block_id = None
+            if block_id is not None and any(block.block_id == block_id for block in blocks):
+                block_filter = {block_id}
 
     source_filter = set(args.source) if args.source else None
     filtered_events = filter_events(
@@ -982,7 +1326,11 @@ def main() -> None:
         only_anomalies=args.only_anomalies,
         anomalies=anomalies,
         event_to_session=event_to_session,
+        block_ids=block_filter,
+        event_to_block=event_to_block,
     )
+
+    selected_blocks = [block for block in blocks if not block_filter or block.block_id in block_filter]
 
     if args.mode == "summary":
         render_summary(filtered_events, sessions, anomalies, lifecycles)
@@ -1002,8 +1350,37 @@ def main() -> None:
             "sessions": [session.__dict__ for session in sessions],
             "anomalies": [anomaly.__dict__ for anomaly in anomalies],
             "cycle_pnl": cycle_pnl_reports,
+            "blocks": [
+                {
+                    "block_id": block.block_id,
+                    "start_event_id": block.start_event_id,
+                    "end_event_id": block.end_event_id,
+                    "start_ts": block.start_ts,
+                    "end_ts": block.end_ts,
+                    "symbol": block.symbol,
+                    "strategy": block.strategy,
+                    "block_type": block.block_type,
+                    "bot_state": block.bot_state,
+                    "cycle_index": block.cycle_index,
+                    "is_closed": block.is_closed,
+                    "exit_armed_event_id": block.exit_armed_event_id,
+                    "recovery_event_id": block.recovery_event_id,
+                    "event_ids": [
+                        ev.event_id for ev in block.events if ev.event_id is not None
+                    ],
+                }
+                for block in blocks
+            ],
         }
         print(json.dumps(output, default=str, indent=2))
+    elif args.mode == "blocks":
+        render_blocks(
+            selected_blocks,
+            lifecycles,
+            cycle_pnl_reports,
+            args.fee_rate,
+            symbol_filter=args.symbol,
+        )
 
 
 if __name__ == "__main__":

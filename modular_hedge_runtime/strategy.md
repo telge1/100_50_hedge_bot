@@ -251,13 +251,15 @@ Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 
 ########################################################################################################################
 
+./bot_control.sh hard-reset
+
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log && \
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl && \
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.stdout.log
 
 ./start_fixed_cycle.sh
 
-./bot_control.sh hard-reset # bot stoppen plus reset
+python analyze_hedge_logs.py --mode blocks
 
 
 python fixed_cycle_hedge_bot/tools/simulator.py \

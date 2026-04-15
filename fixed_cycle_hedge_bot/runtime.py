@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -325,11 +326,111 @@ class GenericHedgeRuntime:
             )
             return None
         self._ensure_max_leverage_before_trading()
+        equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
+        decision = "reuse" if reason.startswith("match") else "replace"
+        self.audit.log_event(
+            "intent_equivalence_check",
+            strategy=self.strategy.name,
+            purpose=intent.purpose,
+            side=intent.side,
+            candidate_client_order_id=candidate_id,
+            result=decision,
+            reject_reason=reason,
+            existing_trigger_price=existing_trigger,
+            existing_qty=existing_qty,
+            new_trigger_price=intent.trigger_price,
+            new_qty=intent.qty,
+        )
+        self.audit.log_event(
+            "intent_replace_decision",
+            strategy=self.strategy.name,
+            purpose=intent.purpose,
+            side=intent.side,
+            decision=decision,
+            reason=reason,
+        )
+        replace_purposes_raw = intent.metadata.get("replace_open_purpose")
+        if (
+            reason == "no_candidate"
+            and replace_purposes_raw
+            and not self.runtime_state.active_orders
+            and not snapshot.active_orders
+        ):
+            skip_reason = (
+                "active_orders_empty_race_condition"
+                if snapshot.active_orders
+                else "no_runtime_orders"
+            )
+            self.audit.log_event(
+                "intent_skip_due_to_empty_snapshot",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                reason=skip_reason,
+            )
+            return None
+        if equivalent_order:
+            self.audit.log_event(
+                "intent_reuse_existing_order",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                client_order_id=equivalent_order.client_order_id,
+                exchange_order_id=equivalent_order.exchange_order_id,
+            )
+            return equivalent_order.client_order_id
+
+        self.audit.log_event(
+            "intent_submit_started",
+            strategy=self.strategy.name,
+            purpose=intent.purpose,
+            side=intent.side,
+            qty=intent.qty,
+            order_type=intent.order_type,
+            trigger_price=intent.trigger_price,
+            reduce_only=intent.reduce_only,
+            position_idx=intent.position_idx,
+        )
         replace_purposes_raw = intent.metadata.get("replace_open_purpose")
         if replace_purposes_raw:
             replace_purposes = [replace_purposes_raw] if isinstance(replace_purposes_raw, str) else list(replace_purposes_raw)
-            self._cancel_open_orders_by_purpose(replace_purposes)
+            replace_context = (
+                {
+                    "reason": reason,
+                    "existing_trigger_price": existing_trigger,
+                    "new_trigger_price": intent.trigger_price,
+                    "existing_qty": existing_qty,
+                    "new_qty": intent.qty,
+                }
+                if reason != "match"
+                else None
+            )
+            self._cancel_open_orders_by_purpose_internal(replace_purposes, replace_context)
         client_id = f"{self.strategy.name}-{intent.purpose.lower()}-{uuid4().hex[:10]}"
+        tick_size = float(self.strategy.config.price_tick_size or 0.0) or 1e-8
+        current_price = snapshot.current_price
+        if intent.trigger_price is not None:
+            trigger_price = intent.trigger_price
+
+            if intent.trigger_direction == 2:  # falling
+                trigger_price = math.floor(trigger_price / tick_size) * tick_size
+                if trigger_price >= current_price:
+                    trigger_price = current_price - tick_size
+
+            elif intent.trigger_direction == 1:  # rising
+                trigger_price = math.ceil(trigger_price / tick_size) * tick_size
+                if trigger_price <= current_price:
+                    trigger_price = current_price + tick_size
+
+            intent.trigger_price = trigger_price
+            self.audit.log_event(
+                "intent_trigger_adjusted",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                trigger_price=trigger_price,
+                current_price=current_price,
+                direction=intent.trigger_direction,
+            )
         managed_order = ManagedOrder(
             client_order_id=client_id,
             side=intent.side,
@@ -369,6 +470,15 @@ class GenericHedgeRuntime:
                 error_code=type(exc).__name__,
                 error_message=str(exc),
             )
+            self.audit.log_event(
+                "intent_submit_failed",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                reason="exception",
+                error_code=type(exc).__name__,
+                error_message=str(exc),
+            )
             raise
         if not response:
             self.audit.log_event(
@@ -381,6 +491,15 @@ class GenericHedgeRuntime:
                 price=managed_order.price,
                 order_link_id=managed_order.client_order_id,
                 status="rejected",
+                error_code="no_response",
+                error_message="exchange returned no response",
+            )
+            self.audit.log_event(
+                "intent_submit_failed",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                reason="no_response",
                 error_code="no_response",
                 error_message="exchange returned no response",
             )
@@ -434,7 +553,189 @@ class GenericHedgeRuntime:
 
     def cancel_open_orders_by_purpose(self, purposes: list[str]) -> None:
         with self._lock:
-            self._cancel_open_orders_by_purpose(purposes)
+            self._cancel_open_orders_by_purpose_internal(purposes)
+
+
+    def _find_equivalent_open_order(
+        self, intent: StrategyIntent
+    ) -> tuple[
+        ManagedOrder | None,
+        str,
+        str | None,
+        float | None,
+        float | None,
+    ]:
+        tick_size = float(self.strategy.config.price_tick_size or 0.0) or 1e-8
+        price_tol = tick_size * 3
+        qty_tol = (float(self.strategy.config.qty_step or 0.0) or 1e-9) * 2
+        target_trigger = intent.trigger_price or 0.0
+        is_long_add = "LONG_ADD" in str(intent.purpose)
+        is_exit_order = intent.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
+        long_add_qty_tol = max(qty_tol, 50.0)
+        exit_trigger_tol = max(price_tol, tick_size * 2)
+        last_candidate_id = None
+        last_trigger = None
+        last_qty = None
+        last_reason = "no_candidate"
+        candidate_count = 0
+        rejected_count = 0
+        for order in self.runtime_state.active_orders.values():
+            if order.status not in {"OPEN", "PARTIAL"}:
+                continue
+            if order.purpose != intent.purpose:
+                continue
+            if order.side != intent.side or order.order_type != intent.order_type:
+                continue
+            if order.reduce_only != intent.reduce_only:
+                continue
+            existing_idx = int(
+                order.metadata.get("position_idx") or (1 if order.side == "long" else 2)
+            )
+            intent_idx = int(intent.position_idx or (1 if intent.side == "long" else 2))
+            candidate_count += 1
+            if existing_idx != intent_idx:
+                last_candidate_id = order.client_order_id
+                last_reason = "position_idx_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent.position_idx,
+                    actual=order.metadata.get("position_idx"),
+                )
+                continue
+            if str(order.metadata.get("trigger_direction") or "") != str(intent.trigger_direction or ""):
+                last_candidate_id = order.client_order_id
+                last_reason = "trigger_direction_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent.trigger_direction,
+                    actual=order.metadata.get("trigger_direction"),
+                )
+                continue
+            if str(order.metadata.get("trigger_by") or "") != str(intent.trigger_by or ""):
+                last_candidate_id = order.client_order_id
+                last_reason = "trigger_by_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent.trigger_by,
+                    actual=order.metadata.get("trigger_by"),
+                )
+                continue
+            if order.metadata.get("close_on_trigger") != intent.close_on_trigger:
+                last_candidate_id = order.client_order_id
+                last_reason = "close_on_trigger_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent.close_on_trigger,
+                    actual=order.metadata.get("close_on_trigger"),
+                )
+                continue
+            existing_filter = str(order.metadata.get("order_filter") or "")
+            intent_filter = str(intent.order_filter or "")
+            if existing_filter != intent_filter:
+                last_candidate_id = order.client_order_id
+                last_reason = "order_filter_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent_filter,
+                    actual=existing_filter,
+                )
+                continue
+            existing_trigger = self._safe_float(order.metadata.get("trigger_price"), None)
+            existing_qty = order.qty
+            last_candidate_id = order.client_order_id
+            last_trigger = existing_trigger
+            last_qty = existing_qty
+            self.audit.log_event(
+                "intent_equivalence_candidate",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                candidate_client_order_id=order.client_order_id,
+                candidate_exchange_order_id=order.exchange_order_id,
+                result="match" if existing_trigger is not None and abs(existing_trigger - target_trigger) <= price_tol and abs(existing_qty - intent.qty) <= qty_tol else "reject",
+                reject_reason=last_reason,
+                existing_trigger_price=existing_trigger,
+                new_trigger_price=target_trigger,
+                existing_qty=existing_qty,
+                new_qty=intent.qty,
+            )
+            if is_exit_order:
+                trigger_limit = exit_trigger_tol
+            else:
+                trigger_limit = price_tol
+            if existing_trigger is None or abs(existing_trigger - target_trigger) > trigger_limit:
+                last_reason = "trigger_diff"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=target_trigger,
+                    actual=existing_trigger,
+                )
+                continue
+            if is_long_add:
+                qty_limit = long_add_qty_tol
+            else:
+                qty_limit = qty_tol
+            if abs(existing_qty - intent.qty) > qty_limit:
+                last_reason = "qty_diff"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected=intent.qty,
+                    actual=existing_qty,
+                )
+                continue
+            return order, "match", last_candidate_id, existing_trigger, existing_qty
+        final_reason = last_reason if candidate_count > 0 else "no_candidate"
+        self.audit.log_event(
+            "intent_equivalence_summary",
+            strategy=self.strategy.name,
+            purpose=intent.purpose,
+            total_candidates=candidate_count,
+            rejected_candidates=rejected_count,
+            final_reason=final_reason,
+        )
+        return None, final_reason, last_candidate_id, last_trigger, last_qty
 
     def _ensure_max_leverage_before_trading(self) -> None:
         cache_key = (self.config.category, self.config.symbol.upper())
@@ -451,7 +752,11 @@ class GenericHedgeRuntime:
         if ensured:
             self._max_leverage_ready_symbols.add(cache_key)
 
-    def _cancel_open_orders_by_purpose(self, purposes: list[str]) -> None:
+    def _cancel_open_orders_by_purpose_internal(
+        self,
+        purposes: list[str],
+        replace_context: dict[str, Any] | None = None,
+    ) -> None:
         purposes_set = {purpose for purpose in purposes if purpose}
         if not purposes_set:
             return
@@ -476,6 +781,11 @@ class GenericHedgeRuntime:
                 exchange_order_id=order.exchange_order_id,
                 purpose=order.purpose,
                 canceled=canceled,
+                reason=replace_context.get("reason") if replace_context else None,
+                existing_trigger_price=replace_context.get("existing_trigger_price") if replace_context else None,
+                new_trigger_price=replace_context.get("new_trigger_price") if replace_context else None,
+                existing_qty=replace_context.get("existing_qty") if replace_context else None,
+                new_qty=replace_context.get("new_qty") if replace_context else None,
             )
 
     def _submit_to_exchange(self, managed_order: ManagedOrder, snapshot: HedgeSnapshot) -> Any:
