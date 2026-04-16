@@ -10,7 +10,7 @@
   "short_fill_distance_pct": 0.15,
   
   "tp_profit_target_pct": 0.5,
-  "tp_buffer_pct": 0.11,
+  "tp_buffer_pct": 0.02,
   
   "target_profit_usdt": 0.002, 
  

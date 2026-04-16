@@ -86,6 +86,7 @@ class GenericHedgeRuntime:
             self.order_manager.ensure_hedge_mode(self.config.symbol, self.config.category)
             self.order_manager.ensure_max_leverage(self.config.symbol, self.config.category)
         self._recover_active_orders_from_exchange()
+        self._ensure_max_leverage_before_trading()
         snapshot = self.refresh_snapshot("startup")
         self.audit.log_event(
             "runtime_bootstrap",
@@ -407,30 +408,38 @@ class GenericHedgeRuntime:
             )
             self._cancel_open_orders_by_purpose_internal(replace_purposes, replace_context)
         client_id = f"{self.strategy.name}-{intent.purpose.lower()}-{uuid4().hex[:10]}"
-        tick_size = float(self.strategy.config.price_tick_size or 0.0) or 1e-8
         current_price = snapshot.current_price
         if intent.trigger_price is not None:
             trigger_price = intent.trigger_price
-
-            if intent.trigger_direction == 2:  # falling
-                trigger_price = math.floor(trigger_price / tick_size) * tick_size
-                if trigger_price >= current_price:
-                    trigger_price = current_price - tick_size
-
-            elif intent.trigger_direction == 1:  # rising
-                trigger_price = math.ceil(trigger_price / tick_size) * tick_size
-                if trigger_price <= current_price:
-                    trigger_price = current_price + tick_size
-
-            intent.trigger_price = trigger_price
-            self.audit.log_event(
-                "intent_trigger_adjusted",
-                strategy=self.strategy.name,
-                purpose=intent.purpose,
-                trigger_price=trigger_price,
-                current_price=current_price,
-                direction=intent.trigger_direction,
-            )
+            invalid_reason = None
+            if current_price is None or current_price <= 0:
+                self.audit.log_event(
+                    "intent_trigger_invalid",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    trigger_price=trigger_price,
+                    current_price=current_price,
+                    direction=intent.trigger_direction,
+                    reason="missing_current_price",
+                )
+                return None
+            if intent.trigger_direction == 2 and trigger_price >= current_price:
+                invalid_reason = "falling_trigger_not_below_market"
+            elif intent.trigger_direction == 1 and trigger_price <= current_price:
+                invalid_reason = "rising_trigger_not_above_market"
+            if invalid_reason is not None:
+                self.audit.log_event(
+                    "intent_trigger_invalid",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    trigger_price=trigger_price,
+                    current_price=current_price,
+                    direction=intent.trigger_direction,
+                    reason=invalid_reason,
+                )
+                return None
         managed_order = ManagedOrder(
             client_order_id=client_id,
             side=intent.side,
@@ -751,6 +760,57 @@ class GenericHedgeRuntime:
         )
         if ensured:
             self._max_leverage_ready_symbols.add(cache_key)
+
+        rules = self.order_manager.get_cached_instrument_rules(
+            self.config.symbol, self.config.category
+        )
+        symbol_upper = self.config.symbol.upper()
+        if rules:
+            self.runtime_state.instrument_rules[symbol_upper] = rules
+            self.logger.info(
+                "loaded_instrument_rules %s",
+                {
+                    "symbol": symbol_upper,
+                    "tick_size": str(rules.get("tick_size") or "0"),
+                    "qty_step": str(rules.get("qty_step") or "0"),
+                    "min_order_qty": str(rules.get("min_order_qty") or "0"),
+                    "min_notional_value": str(rules.get("min_notional") or "0"),
+                    "source": "bybit",
+                },
+            )
+        else:
+            self.logger.warning(
+                "loaded_instrument_rules_missing %s",
+                {"symbol": symbol_upper, "reason": "rules_not_found_in_runtime_state"},
+            )
+            rules = self.order_manager.get_cached_instrument_rules(
+                self.config.symbol, self.config.category
+            )
+            if rules:
+                symbol_upper = self.config.symbol.upper()
+                self.runtime_state.instrument_rules[symbol_upper] = rules
+                self.logger.info(
+                    "loaded_instrument_rules %s",
+                    {
+                        "symbol": symbol_upper,
+                        "tick_size": str(rules.get("tick_size") or "0"),
+                        "qty_step": str(rules.get("qty_step") or "0"),
+                        "min_order_qty": str(rules.get("min_order_qty") or "0"),
+                        "min_notional_value": str(rules.get("min_notional") or "0"),
+                    },
+                )
+            else:
+                self.logger.warning(
+                    "loaded_instrument_rules missing for %s", self.config.symbol.upper()
+                )
+            rules = self.order_manager.get_cached_instrument_rules(self.config.symbol, self.config.category)
+            if rules:
+                self.runtime_state.instrument_rules[self.config.symbol.upper()] = rules
+            else:
+                self.logger.warning(
+                    "Instrument rules missing while ensuring max leverage for %s",
+                    self.config.symbol.upper(),
+                )
 
     def _cancel_open_orders_by_purpose_internal(
         self,

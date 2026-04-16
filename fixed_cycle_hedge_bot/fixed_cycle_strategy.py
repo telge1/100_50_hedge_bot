@@ -6,6 +6,7 @@ import time
 import logging
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -398,9 +399,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 entry_reference_price=entry_reference_price,
             )
 
-        long_qty = self._normalize_qty(self.config.base_notional_usdt / resolved_price)
+        long_qty = self._normalize_qty(
+            self.config.base_notional_usdt / resolved_price, runtime_state
+        )
         short_qty = self._normalize_qty(
-            (self.config.base_notional_usdt * self.config.hedge_ratio_short) / resolved_price
+            (self.config.base_notional_usdt * self.config.hedge_ratio_short) / resolved_price,
+            runtime_state,
         )
 
         if long_qty <= 0 or short_qty <= 0:
@@ -422,7 +426,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
 
         order_type = self.config.initial_entry_order_type
-        price = self._normalize_price(resolved_price) if order_type == "Limit" else None
+        price = self._normalize_price(resolved_price, runtime_state) if order_type == "Limit" else None
 
         traces = [
             CalculationTrace(
@@ -841,9 +845,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     initial_long_qty,
                     snapshot.long_qty,
                     reference_price,
+                    runtime_state,
                 )
                 raw_trigger_price = long_reference * (1 - long_distance_pct)
-                trigger_price = self._normalize_price(raw_trigger_price)
+                trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
                 # trigger stay strictly at long_fill_distance_pct below reference
                 raw_qty = snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill)
                 will_append_intent = trigger_price > 0 and long_qty > 0
@@ -1057,6 +1062,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             snapshot.short_qty,
             long_fill_price,
             reduction_multiplier=reduction_multiplier,
+            runtime_state=runtime_state,
         )
         long_reduce_qty = float(long_fill.get("qty") or 0.0)
         confirmed_closed_pnl = self._safe_float(long_fill.get("confirmed_closed_pnl"), None)
@@ -1139,11 +1145,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
 
-        price_tick_size = float(self.config.price_tick_size or 0.0)
+        symbol, rules, _ = self._resolve_instrument_rules(runtime_state)
+        tp_price = self._normalize_price(tp_price, runtime_state)
+        instrument_tick_size = (
+            float(rules["tick_size"]) if rules and rules.get("tick_size") else 0.0
+        )
+        price_tick_size = instrument_tick_size or float(self.config.price_tick_size or 0.0)
         if price_tick_size <= 0:
             price_tick_size = 0.01
-
-        tp_price = math.floor(tp_price / price_tick_size) * price_tick_size
 
         expected = long_loss_usdt + target_profit_usdt
 
@@ -1166,11 +1175,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             i += 1
 
         raw_trigger_price = max(tp_price, price_tick_size)
-        trigger_price = self._normalize_price(raw_trigger_price)
+        trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
         required_price_move = short_entry_price - trigger_price
         required_short_gross = short_qty * required_price_move
         price = self._normalize_price(
-            max(trigger_price - self.config.price_tick_size, self.config.price_tick_size)
+            max(trigger_price - self.config.price_tick_size, self.config.price_tick_size),
+            runtime_state,
         )
         if short_qty <= 0 or trigger_price <= 0:
             context.audit.log_event(
@@ -1221,9 +1231,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             long_loss_usdt=long_loss_usdt,
             required_short_gross=required_short_gross,
             required_price_move=required_price_move,
-            trigger_formula="short_entry_price - ((max(-confirmed_closed_pnl, 0) + target_profit_usdt) / (short_reduce_qty * (1 - fee_rate)))",
+            required_net=required_net,
+            trigger_formula="((short_entry_price * (1 - fee_rate)) - (required_net / short_qty)) / (1 + fee_rate)",
+            trigger_formula_details="tp_price is decremented by price_tick_size until compute_net(tp) >= required_net; compute_net subtracts both entry and exit fees",
             trigger_price_raw=raw_trigger_price,
             trigger_price_normalized=trigger_price,
+            price_tick_size=price_tick_size,
             reduction_multiplier=reduction_multiplier,
             reduction_pct_used=effective_reduction_pct,
             qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
@@ -1343,13 +1356,43 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         long_tp_price = tp_price
         short_sl_price = tp_price
         current_price = snapshot.current_price
-        tick_size = float(self.config.price_tick_size or 0.0)
-        if tick_size <= 0:
-            tick_size = max(current_price * 0.001, 1e-8)
+        symbol, rules, source = self._resolve_instrument_rules(runtime_state)
+        tick_decimal = rules["tick_size"] if rules and rules.get("tick_size", Decimal("0")) > 0 else Decimal(
+            str(self.config.price_tick_size)
+        )
+        tick_size = float(tick_decimal)
+        logger.info(
+            "exit_tick_size %s",
+            {
+                "symbol": symbol,
+                "tick_size": str(tick_decimal),
+                "source": source,
+                "price_tick_config": self.config.price_tick_size,
+            },
+        )
         if current_price > 0:
             min_valid_trigger = current_price + tick_size
+            logger.info(
+                "exit_trigger_clamp %s",
+                {
+                    "symbol": symbol,
+                    "tp_price": tp_price,
+                    "min_valid_trigger": min_valid_trigger,
+                    "current_price": current_price,
+                    "tick_size": str(tick_decimal),
+                },
+            )
             long_tp_price = max(long_tp_price, min_valid_trigger)
             short_sl_price = max(short_sl_price, min_valid_trigger)
+            logger.info(
+                "exit_trigger_result %s",
+                {
+                    "symbol": symbol,
+                    "long_tp_price": long_tp_price,
+                    "short_sl_price": short_sl_price,
+                    "tp_price": tp_price,
+                },
+            )
         long_tp_valid = (
             current_price <= 0
             or long_tp_price >= current_price + tick_size
@@ -1532,7 +1575,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
 
-        break_even_price = self._normalize_price(max(break_even_price, self.config.price_tick_size))
+        break_even_price = self._normalize_price(
+            max(break_even_price, self.config.price_tick_size), runtime_state
+        )
 
         traces = [
             CalculationTrace(
@@ -1579,7 +1624,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             break_even_price
             + components["loss_recovery"]
             + components["goal_profit"]
-            + components["buffer"]
+            + components["buffer"],
+            runtime_state,
         )
         logger.info(
             "fixed_cycle_tp_components %s",
@@ -1902,9 +1948,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         initial_long_qty: float,
         current_open_long_qty: float,
         reference_price: float,
+        runtime_state: RuntimeState | None = None,
     ) -> float:
         raw_qty = current_open_long_qty * self._pct(self.config.reduction_pct_per_fill)
-        normalized = self._normalize_qty(raw_qty)
+        normalized = self._normalize_qty(raw_qty, runtime_state)
         if normalized <= 0:
             return 0.0
         if reference_price <= 0:
@@ -1919,10 +1966,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         current_open_short_qty: float,
         reference_price: float,
         reduction_multiplier: float = 1.0,
+        runtime_state: RuntimeState | None = None,
     ) -> float:
         effective_pct = self.config.reduction_pct_per_fill * reduction_multiplier
         raw_qty = current_open_short_qty * self._pct(effective_pct)
-        normalized = self._normalize_qty(min(raw_qty, current_open_short_qty))
+        normalized = self._normalize_qty(min(raw_qty, current_open_short_qty), runtime_state)
         if normalized <= 0:
             return 0.0
         if reference_price <= 0:
@@ -1960,11 +2008,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             current_short_qty,
             trigger_price,
             reduction_multiplier=reduction_multiplier,
+            runtime_state=runtime_state,
         )
         if short_qty <= 0 or trigger_price <= 0:
             return None
 
-        normalized_price = self._normalize_price(trigger_price)
+        normalized_price = self._normalize_price(trigger_price, runtime_state)
         context.audit.log_event(
             "fixed_cycle_short_tp_pair_planned",
             strategy=self.name,
@@ -2005,17 +2054,98 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
 
-    def _normalize_qty(self, qty: float) -> float:
+    def _normalize_qty(self, qty: float, runtime_state: RuntimeState | None = None) -> float:
         if qty <= 0:
             return 0.0
-        stepped = int(qty / self.config.qty_step) * self.config.qty_step
-        return round(max(stepped, 0.0), 12) if stepped >= self.config.min_order_qty else 0.0
+        symbol, rules, source = self._resolve_instrument_rules(runtime_state)
+        qty_step = rules["qty_step"] if rules and rules.get("qty_step", Decimal("0")) > 0 else Decimal(
+            str(self.config.qty_step)
+        )
+        min_order_qty = rules["min_order_qty"] if rules and rules.get("min_order_qty", Decimal("0")) > 0 else Decimal(
+            str(self.config.min_order_qty)
+        )
+        min_notional = rules["min_notional"] if rules and rules.get("min_notional", Decimal("0")) > 0 else Decimal(
+            str(self.config.min_notional_usdt)
+        )
+        qty_dec = Decimal(str(qty))
+        if qty_step > 0:
+            stepped = (qty_dec / qty_step).to_integral_value(rounding=ROUND_DOWN) * qty_step
+        else:
+            stepped = qty_dec
+        normalized = rounded_value = max(stepped, Decimal("0"))
+        if normalized <= 0 and min_order_qty > 0:
+            normalized = min_order_qty
+        elif min_order_qty > 0 and normalized < min_order_qty:
+            normalized = min_order_qty
+        rounded_float = float(normalized)
+        logger.info(
+            "normalize_qty %s",
+            {
+                "symbol": symbol,
+                "input_qty": qty,
+                "qty_step_used": str(qty_step),
+                "rounded_qty": rounded_float,
+                "source": source,
+            },
+        )
+        logger.info(
+            "normalize_qty_debug %s", {"symbol": symbol, "has_rules": source == "instrument_rules"}
+        )
+        return rounded_float
 
-    def _normalize_price(self, price: float) -> float:
+    def _normalize_price(self, price: float, runtime_state: RuntimeState | None = None) -> float:
         if price <= 0:
             return 0.0
-        tick = self.config.price_tick_size
-        return round(round(price / tick) * tick, 12)
+        symbol, rules, source = self._resolve_instrument_rules(runtime_state)
+        tick_size = (
+            rules["tick_size"]
+            if rules and rules.get("tick_size", Decimal("0")) > 0
+            else Decimal(str(self.config.price_tick_size))
+        )
+        if tick_size <= 0:
+            tick_size = Decimal(str(self.config.price_tick_size))
+            source = "config_fallback"
+        price_dec = Decimal(str(price))
+        divisor = (price_dec / tick_size).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        rounded = (divisor * tick_size).quantize(Decimal("1e-12"), rounding=ROUND_HALF_UP)
+        round_mode = "up" if rounded >= price_dec else "down"
+        normalized = float(rounded)
+        logger.info(
+            "normalize_price %s",
+            {
+                "symbol": symbol,
+                "input_price": price,
+                "tick_size_used": str(tick_size),
+                "rounded_price": normalized,
+                "round_mode": round_mode,
+                "source": source,
+            },
+        )
+        logger.info(
+            "normalize_price_debug %s",
+            {"symbol": symbol, "has_rules": source == "instrument_rules"},
+        )
+        return normalized
+
+    def _resolve_instrument_rules(
+        self, runtime_state: RuntimeState | None
+    ) -> tuple[str, dict[str, Decimal] | None, str]:
+        symbol = self.config.symbol.upper()
+        if not runtime_state:
+            return symbol, None, "config_fallback"
+        rules = runtime_state.instrument_rules.get(symbol)
+        if rules:
+            return symbol, rules, "instrument_rules"
+        if symbol not in runtime_state.instrument_rules_fallback_warned:
+            runtime_state.instrument_rules_fallback_warned.add(symbol)
+            logger.warning(
+                "instrument_rules_missing_fallback %s",
+                {
+                    "symbol": symbol,
+                    "reason": "rules_not_found_in_runtime_state",
+                },
+            )
+        return symbol, None, "config_fallback"
 
     @staticmethod
     def _pct(value: float) -> float:
@@ -2074,7 +2204,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         extra_offset = self._pct(self.config.second_order_safety_offset_pct) if target_cycle == 2 else 0.0
         multiplier = 1 - (distance_pct * target_cycle) - extra_offset
         corrected_trigger_price = self._normalize_price(
-            max(fill_event.exec_price * multiplier, self.config.price_tick_size)
+            max(fill_event.exec_price * multiplier, self.config.price_tick_size),
+            runtime_state,
         )
 
         tick = self.config.price_tick_size or 1e-9

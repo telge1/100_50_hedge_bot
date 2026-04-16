@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Mapping
 
 
@@ -196,6 +197,8 @@ class RuntimeState:
     temporary_pnl_by_order: dict[str, float] = field(default_factory=dict)
     confirmed_pnl_applied: set[str] = field(default_factory=set)
     processed_fill_cumulative: dict[str, float] = field(default_factory=dict)
+    instrument_rules: dict[str, dict[str, Decimal]] = field(default_factory=dict)
+    instrument_rules_fallback_warned: set[str] = field(default_factory=set)
 
     def next_sequence(self) -> int:
         self.sequence += 1

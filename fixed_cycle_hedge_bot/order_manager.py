@@ -604,6 +604,27 @@ class BybitOrderManager:
         self._instrument_cache[cache_key] = instrument
         return instrument
 
+    def get_cached_instrument_rules(
+        self, symbol: str, category: str = "linear"
+    ) -> dict[str, Decimal] | None:
+        cache_key = (category, symbol.upper())
+        instrument = self._instrument_cache.get(cache_key)
+        if not instrument:
+            return None
+        price_filter = instrument.get("priceFilter") or {}
+        lot_size_filter = instrument.get("lotSizeFilter") or {}
+        tick_size = Decimal(str(price_filter.get("tickSize") or "0"))
+        qty_step = Decimal(str(lot_size_filter.get("qtyStep") or "0"))
+        min_order_qty = Decimal(str(lot_size_filter.get("minOrderQty") or "0"))
+        min_notional = Decimal(str(lot_size_filter.get("minNotionalValue") or "0"))
+        rules: dict[str, Decimal] = {
+            "tick_size": tick_size,
+            "qty_step": qty_step,
+            "min_order_qty": min_order_qty,
+            "min_notional": min_notional,
+        }
+        return rules
+
     def fetch_mark_price(self, symbol: str, category: str = "linear") -> float | None:
         data = self._get("/v5/market/tickers", {"symbol": symbol.upper(), "category": category})
         if not data:
