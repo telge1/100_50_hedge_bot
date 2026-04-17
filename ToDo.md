@@ -63,6 +63,6 @@ WICHTIG:
 Ich will einen echten Patch-Diff sehen, so dass Cursor mir die Änderungen zum Accept/Keep-all anbietet.
 
 
-Die Exit-Orders liegen so weit über dem Long-Durchschnitt, weil wir den im Code errechneten TP-Preis (tp_price) noch gegen eine Mindestdistanz zum aktuellen Marktpreis absichern. In _calculate_tp_price/ _calculate_tp_components addieren wir Break-even plus Profit- und Bufferkomponenten auf einen Referenzpreis (Entry-Referenz, Long-avg oder aktueller Preis) und normalisieren das Ergebnis (tp_price wird in den Event-Logs als tp_price = 0.0036 mit den einzelnen Komponenten dokumentiert). Das ist zunächst relativ nah am Entry (nur ca. 0.5 % darüber).
-
-Unabhängig davon zwingt _build_exit_intents den tatsächlichen Trigger aller Exit-Orders aber, mindestens current_price + tick_size zu sein, damit der Trigger nicht unterhalb oder zu dicht am Markt liegt. Wenn der aktuelle Preis bei rund 0.003619 liegt und das Tick-Size 0.0001 beträgt (wie in euren Settings), landet current_price + tick_size bei ≈ 0.003719. Da long_tp_price = max(tp_price, current_price + tick_size) ist, bekommt LONG_TP_EXIT automatisch den höheren Wert und der Trigger bleibt ungefähr 2.7 % über dem Long-Avg. Dasselbe gilt für SHORT_SL_EXIT (die Short-Seite wird auf denselben Trigger gesetzt). Details siehe fixed_cycle_strategy.py in den Abschnitten um _calculate_tp_price/ _calculate_tp_components sowie die Clamp-Logik ab Zeile ~1342 (long_tp_price = max(long_tp_price, current_price + tick_size)).
+👉 dynamische TP-Optimierung (z. B. abhängig von Volatilität / Spread)
+oder
+👉 Exit früher triggern bei schnellen Rebounds

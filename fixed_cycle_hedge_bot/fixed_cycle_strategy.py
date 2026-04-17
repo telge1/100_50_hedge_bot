@@ -1115,7 +1115,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         fee_rate = float(fee_rate)
 
         long_loss_usdt = max(-float(confirmed_closed_pnl or 0.0), 0.0)
-        required_net = long_loss_usdt + float(target_profit_usdt or 0.0)
+        long_add_loss_usdt = float(long_fill.get("last_long_add_loss_usdt", 0.0))
+        recovered_short_profit = float(
+            getattr(snapshot, "realized_short_pnl_total", 0.0) or 0.0
+        )
+        recovered_short_profit = max(recovered_short_profit, 0.0)
+        remaining_loss = max(long_add_loss_usdt - recovered_short_profit, 0.0)
+        required_net = remaining_loss + float(target_profit_usdt or 0.0)
 
         if short_qty <= 0:
             context.audit.log_event(
@@ -1555,8 +1561,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             - (snapshot.short_avg * snapshot.short_qty)
         ) / denominator
         realized_long_loss = max(-snapshot.realized_long_pnl_total, 0.0)
+        realized_short_profit = max(snapshot.realized_short_pnl_total, 0.0)
         realized_short_loss = max(-snapshot.realized_short_pnl_total, 0.0)
-        loss_compensation = realized_long_loss + realized_short_loss
+        loss_compensation = max(realized_long_loss - realized_short_profit, 0.0) + realized_short_loss
         if loss_compensation > 0 and abs(denominator) > 1e-9:
             break_even_price += loss_compensation / denominator
         logger.info(
@@ -1570,6 +1577,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "realized_pnl_total": snapshot.realized_pnl_total,
                 "realized_long_pnl_total": snapshot.realized_long_pnl_total,
                 "realized_short_pnl_total": snapshot.realized_short_pnl_total,
+                "realized_long_loss": realized_long_loss,
+                "realized_short_profit": realized_short_profit,
+                "realized_short_loss": realized_short_loss,
                 "loss_compensation": loss_compensation,
                 "denominator": denominator,
             },
@@ -1600,6 +1610,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "realized_long_loss": realized_long_loss,
                     "realized_short_loss": realized_short_loss,
                     "loss_compensation": loss_compensation,
+                    "realized_short_profit": realized_short_profit,
                 },
             )
         ]
@@ -1622,7 +1633,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         components = self._calculate_tp_components(snapshot, runtime_state)
         tp_price = self._normalize_price(
             break_even_price
-            + components["loss_recovery"]
             + components["goal_profit"]
             + components["buffer"],
             runtime_state,
@@ -1689,8 +1699,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
             return 0.0
         realized_long_loss = max(-snapshot.realized_long_pnl_total, 0.0)
+        realized_short_profit = max(snapshot.realized_short_pnl_total, 0.0)
         realized_short_loss = max(-snapshot.realized_short_pnl_total, 0.0)
-        loss_total = realized_long_loss + realized_short_loss
+        loss_total = max(realized_long_loss - realized_short_profit, 0.0) + realized_short_loss
         return loss_total / net_qty if loss_total > 0 else 0.0
 
     def _seed_initial_reference_if_missing(
@@ -1810,6 +1821,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     )
                     if long_fill.get("confirmed_closed_pnl") is not None:
                         self._cleanup_order_pnl(runtime_state, long_fill.get("client_order_id"))
+            confirmed_closed_pnl = long_fill.get("confirmed_closed_pnl")
+            if confirmed_closed_pnl is not None:
+                long_add_loss_usdt = max(-float(confirmed_closed_pnl), 0.0)
+                long_fill["last_long_add_loss_usdt"] = long_add_loss_usdt
             if float(cycle_state.get("entry_price") or 0.0) <= 0:
                 cycle_state["entry_price"] = fill_event.exec_price
 
@@ -1835,6 +1850,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_state["short_cycle_index"] = max(short_index, cycle_index)
             if float(cycle_state.get("entry_price") or 0.0) <= 0:
                 cycle_state["entry_price"] = fill_event.exec_price
+            if order_fully_completed and "SHORT_REDUCE" in fill_event.purpose:
+                state["exit_rebuild_allowed"] = True
             if order_fully_completed and state.get("cycle_waiting_for_short_tp") and int(
                 state.get("pending_long_cycle_index") or 0
             ) == cycle_index:

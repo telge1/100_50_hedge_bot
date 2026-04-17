@@ -1,5 +1,5 @@
 {
-  "symbol": "1000PEPEUSDT",
+  "symbol": "ETHFIUSDT",
   "category": "linear",
   "base_notional_usdt": 100.0,
   "hedge_ratio_short": 0.5,
@@ -9,7 +9,7 @@
   "long_fill_distance_pct": 0.5,  
   "short_fill_distance_pct": 0.15,
   
-  "tp_profit_target_pct": 0.5,
+  "tp_profit_target_pct": 0.75,
   "tp_buffer_pct": 0.02,
   
   "target_profit_usdt": 0.002, 
