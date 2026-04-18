@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import ast
 import json
 import re
 import sys
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
 
 RUNTIME_PATTERN = re.compile(
     r"(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>[A-Z]+) (?P<logger>[^\s]+) (?P<body>.*)"
@@ -29,6 +32,88 @@ MARKER_EVENTS = {
     BLOCK_EXIT_ARMED_EVENT,
     BLOCK_CLOSED_EVENT,
 }
+
+CALCULATION_EVENT_NAMES = {
+    "fixed_cycle_break_even_inputs",
+    "fixed_cycle_tp_components",
+    "fixed_cycle_short_tp_pair_planned",
+    "fixed_cycle_exit_manifest",
+    "fixed_cycle_structure_rebuilt",
+    "fixed_cycle_downside_build_result",
+}
+
+CHAIN_STATE_KEYS = {
+    "bot_state",
+    "cycle_index",
+    "current_long_cycle_index",
+    "current_short_cycle_index",
+    "current_effective_cycle",
+    "cycle_waiting_for_short_tp",
+    "short_tp_pending_cycle",
+    "entry_reference_price",
+    "long_qty",
+    "short_qty",
+}
+
+REASON_CODES = {
+    "MISSING_TRIGGER",
+    "MISSING_CALCULATION",
+    "MISSING_ORDER_SUBMIT",
+    "MISSING_RUNTIME_LINK",
+    "MISSING_AUDIT_LINK",
+    "TP_MISMATCH",
+    "REPLACEMENT_NOT_CLOSED",
+    "PARTIAL_LIFECYCLE",
+    "MISSING_RESULT",
+    "WAITING_FOR_FILL",
+}
+
+ORDER_CHAIN_EVENT_PRIORITY = [
+    "fixed_cycle_long_reduce_planned",
+    "intent_submit_started",
+    "order_submitted",
+    "order_reconciled_open",
+]
+
+ORDER_CHAIN_CALC_EVENTS = {
+    "fixed_cycle_long_reduce_planned",
+    "fixed_cycle_break_even_inputs",
+    "fixed_cycle_tp_components",
+    "fixed_cycle_structure_rebuilt",
+    "analyzer_exit_armed",
+    "fixed_cycle_exit_manifest",
+    "exit_trigger_clamp",
+    "exit_trigger_result",
+}
+
+
+class ChainType(str, Enum):
+    LONG_ADD_ORDER_CHAIN = "LONG_ADD_ORDER_CHAIN"
+    LONG_ADD_FILL_EFFECT_CHAIN = "LONG_ADD_FILL_EFFECT_CHAIN"
+
+REASON_CODES = {
+    "MISSING_TRIGGER",
+    "MISSING_CALCULATION",
+    "MISSING_ORDER_SUBMIT",
+    "MISSING_RUNTIME_LINK",
+    "MISSING_AUDIT_LINK",
+    "TP_MISMATCH",
+    "REPLACEMENT_NOT_CLOSED",
+    "PARTIAL_LIFECYCLE",
+    "MISSING_RESULT",
+}
+
+
+def _split_event_name_and_tail(message: str) -> Tuple[Optional[str], str]:
+    content = message.strip()
+    if not content:
+        return None, ""
+    if " " in content:
+        head, tail = content.split(" ", 1)
+    else:
+        head, tail = content, ""
+    return head, tail.strip()
+
 
 
 def _parse_runtime_timestamp(raw: str) -> Optional[datetime]:
@@ -55,6 +140,12 @@ def _safe_json_load(text: str) -> Optional[Dict[str, Any]]:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (ValueError, SyntaxError):
+            return None
         return None
 
 
@@ -225,6 +316,76 @@ class NormalizedEvent:
     tp_steps: Optional[int] = None
 
     event_id: Optional[int] = None
+    logged_fields: Set[str] = field(default_factory=set)
+    derived_fields: Dict[str, str] = field(default_factory=dict)
+    calculation_name: Optional[str] = None
+    calculation_inputs: Dict[str, Any] = field(default_factory=dict)
+
+    def add_derived_field(self, name: str, description: str) -> None:
+        self.derived_fields[name] = description
+
+
+@dataclass
+class ChainValidation:
+    chain_id: int
+    status: str
+    issues: List[str] = field(default_factory=list)
+    missing_links: List[str] = field(default_factory=list)
+    tp_deviation: Optional[float] = None
+    missing_runtime: bool = False
+    missing_audit: bool = False
+    replacement_issues: List[str] = field(default_factory=list)
+    reason_codes: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ChainSummary:
+    total: int
+    complete: int
+    broken: int
+    partial: int
+    mismatch_tp: int
+    missing_runtime_links: int
+    missing_audit_links: int
+    replacement_issues: int
+    waiting_for_fill: int
+
+
+@dataclass
+class ReplacementInfo:
+    old_order_id: Optional[str]
+    new_order_id: Optional[str]
+    reason: Optional[str]
+
+
+@dataclass
+class OrderChain:
+    key: Tuple[str, ...]
+    purpose: Optional[str]
+    side: Optional[str]
+    submitted_event: Optional[NormalizedEvent]
+    lifecycle_events: List[NormalizedEvent] = field(default_factory=list)
+    fill_events: List[NormalizedEvent] = field(default_factory=list)
+    replacement: Optional[ReplacementInfo] = None
+
+
+@dataclass
+class EventChain:
+    chain_id: int
+    chain_type: ChainType
+    trigger_event: NormalizedEvent
+    trigger_event_ts: Optional[datetime]
+    trigger_purpose: Optional[str]
+    trigger_order_id: Optional[str]
+    dedup_reason: Optional[str] = None
+    linked_fill_chain_id: Optional[int] = None
+    calculation_events: List[NormalizedEvent] = field(default_factory=list)
+    order_chains: List[OrderChain] = field(default_factory=list)
+    result_events: List[NormalizedEvent] = field(default_factory=list)
+    state_before: Optional[Dict[str, Any]] = None
+    state_after: Optional[Dict[str, Any]] = None
+    derived_summary: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class RunBlock:
@@ -403,6 +564,7 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
     raw_body = "\n".join(lines)
     event_name = None
     payload: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = {}
     if match:
         timestamp = _parse_runtime_timestamp(match.group("ts"))
         level = match.group("level")
@@ -413,8 +575,7 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
             extra = "\n".join(lines[1:])
         message_body = f"{body}\n{extra}" if extra else body
         json_start = message_body.find("{")
-        parsed = None
-        metadata = {}
+        payload = {}
         if json_start != -1:
             candidate = message_body[json_start:]
             parsed = _safe_json_load(candidate)
@@ -425,6 +586,13 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
         if not payload:
             payload = {"message": message_body}
         event_name = payload.get("event") or payload.get("event_name")
+        candidate_event, remainder = _split_event_name_and_tail(message_body)
+        if not event_name and candidate_event:
+            event_name = candidate_event
+        if remainder.startswith("{"):
+            appended = _safe_json_load(remainder)
+            if appended:
+                payload = {**payload, **appended}
         if not event_name:
             event_name = logger
         raw_body = message_body if payload != {"message": message_body} else message_body
@@ -471,6 +639,11 @@ def _normalize_runtime_block(lines: List[str], sequence: int) -> NormalizedEvent
         tp_final=_safe_float(metadata.get("tp_final")),
         tp_steps=metadata.get("tp_adjust_steps"),
     )
+    normalized.logged_fields.update(payload.keys())
+    normalized.logged_fields.update({"event_name", "logger", "source"})
+    if normalized.event_name in CALCULATION_EVENT_NAMES:
+        normalized.calculation_name = normalized.event_name
+        normalized.calculation_inputs = payload.copy()
     return normalized
 
 
@@ -678,6 +851,664 @@ def detect_anomalies(lifecycles: Dict[Tuple[str, ...], OrderLifecycle]) -> List[
                 )
     return anomalies
 
+
+def _timestamp_or_min(ts: Optional[datetime]) -> datetime:
+    if ts is None:
+        return datetime.min
+    return ts
+
+
+def _extract_state_snapshot(event: Optional[NormalizedEvent]) -> Optional[Dict[str, Any]]:
+    if not event:
+        return None
+    state: Dict[str, Any] = {
+        "symbol": event.symbol,
+        "purpose": event.purpose,
+        "side": event.side,
+    }
+    if event.timestamp:
+        state["timestamp"] = event.timestamp.isoformat()
+    for key in CHAIN_STATE_KEYS:
+        value = event.payload.get(key)
+        if value is not None and key not in state:
+            state[key] = value
+    return state
+
+
+def _string_contains_long_add(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    text = str(value).lower()
+    return "long_add" in text or "long add" in text or ("cycle_" in text and "long" in text)
+
+
+def _metadata_contains_long_add(metadata: Mapping[str, Any]) -> List[str]:
+    reasons: List[str] = []
+    for key, value in metadata.items():
+        if isinstance(value, str) and _string_contains_long_add(value):
+            reasons.append(f"metadata:{key}")
+    return reasons
+
+
+def _long_add_detection_signal(event: NormalizedEvent) -> Dict[str, Any]:
+    reasons: List[str] = []
+    purpose_like = False
+    if _string_contains_long_add(event.purpose):
+        reasons.append("purpose_field")
+        purpose_like = True
+    if event.event_name and _string_contains_long_add(event.event_name):
+        reasons.append("event_name")
+    payload = event.payload
+    for container_name in ("order", "managed_order", "fill"):
+        container = payload.get(container_name) or {}
+        if isinstance(container, dict):
+            if _string_contains_long_add(container.get("purpose")):
+                reasons.append(f"{container_name}_purpose")
+            metadata = container.get("metadata") or {}
+            reasons.extend(
+                f"{container_name}_{entry}" for entry in _metadata_contains_long_add(metadata)
+            )
+    metadata = payload.get("metadata") or {}
+    reasons.extend(_metadata_contains_long_add(metadata))
+    client_id = payload.get("client_order_id") or event.order_link_id
+    if _string_contains_long_add(client_id):
+        reasons.append("client_order_id")
+    return {"has_indicator": bool(reasons), "reasons": reasons, "purpose_like": purpose_like}
+
+
+def _debug_print_candidate(
+    event: NormalizedEvent,
+    matched: bool,
+    reasons: List[str],
+    old_match: bool,
+    old_reason: Optional[str],
+) -> None:
+    fill = event.payload.get("fill") or {}
+    fill_meta = fill.get("metadata") or {}
+    fill_keys = list(fill.keys())
+    print(
+        f"DEBUG_LONG_ADD | matched={matched} old_match={old_match} old_reason={old_reason or 'n/a'} "
+        f"reasons={reasons}"
+    )
+    print(
+        f"  source={event.source} event={event.event_name} purpose={event.purpose} "
+        f"client_order={event.order_link_id} exchange_order={event.exchange_order_id} "
+        f"side={event.side} cycle_index={event.cycle_index} "
+        f"qty={event.qty} price={event.price}"
+    )
+    print(f"  logged_fields={sorted(event.logged_fields)}")
+    print(f"  fill_metadata={fill_meta} fill_keys={fill_keys}")
+
+
+def detect_long_add_candidates(
+    events: Sequence[NormalizedEvent], debug: bool = False
+) -> List[NormalizedEvent]:
+    direct_info: Dict[int, Dict[str, Any]] = {}
+    long_add_order_ids: Set[str] = set()
+    for event in events:
+        info = _long_add_detection_signal(event)
+        direct_info[id(event)] = info
+        if info["has_indicator"]:
+            long_add_order_ids.update(_order_event_keys(event))
+
+    candidates: List[NormalizedEvent] = []
+    debug_stats = {"total": 0, "matched": 0, "rejected": []}
+    for event in events:
+        info = direct_info[id(event)]
+        order_keys = _order_event_keys(event)
+        matched = False
+        reasons: List[str] = []
+        if info["has_indicator"]:
+            matched = True
+            reasons.extend(info["reasons"])
+        if not matched:
+            for key in order_keys:
+                if "long_add" in key.lower():
+                    matched = True
+                    reasons.append("order_id_contains_long_add")
+                    break
+        if not matched and long_add_order_ids and set(order_keys) & long_add_order_ids:
+            matched = True
+            reasons.append("linked_long_add_order_id")
+        if matched:
+            candidates.append(event)
+        if debug and (info["has_indicator"] or order_keys):
+            debug_stats["total"] += 1
+            old_match = (
+                event.event_name == "fill_received"
+                and info["purpose_like"]
+            )
+            old_reason = None
+            if not old_match:
+                if event.event_name != "fill_received":
+                    old_reason = "not_fill_event"
+                else:
+                    old_reason = "missing_long_add_purpose"
+            if matched:
+                debug_stats["matched"] += 1
+            else:
+                debug_stats["rejected"].append((event, old_reason))
+            _debug_print_candidate(event, matched, reasons, old_match, old_reason)
+    if debug:
+        print(
+            f"DEBUG_LONG_ADD SUMMARY: total_candidates={debug_stats['total']} "
+            f"matched={debug_stats['matched']} "
+            f"rejected={len(debug_stats['rejected'])}"
+        )
+        for event, reason in debug_stats["rejected"]:
+            print(
+                f"  Rejected event_id={event.event_id or '??'} old_reason={reason or 'n/a'} "
+                f"event_name={event.event_name} purpose={event.purpose}"
+            )
+    return candidates
+
+def _summarize_order_chain(lifecycle: OrderLifecycle) -> OrderChain:
+    submitted = next((ev for ev in lifecycle.events if ev.event_name == "order_submitted"), None)
+    purpose = submitted.payload.get("purpose") if submitted else None
+    side = submitted.payload.get("side") if submitted else None
+    fills = [ev for ev in lifecycle.events if ev.event_name == "fill_received"]
+    replacement: Optional[ReplacementInfo] = None
+    for event in lifecycle.events:
+        if event.event_name == "intent_replaced_cancel":
+            old_id = event.payload.get("exchange_order_id") or event.payload.get("client_order_id")
+            reason = event.payload.get("reason")
+            new_id = None
+            for later in lifecycle.events:
+                if later.event_name == "order_submitted" and event.timestamp and later.timestamp and later.timestamp >= event.timestamp:
+                    new_id = later.payload.get("exchange_order_id") or later.payload.get("order_link_id")
+                    break
+            replacement = ReplacementInfo(old_order_id=old_id, new_order_id=new_id, reason=reason)
+            break
+    return OrderChain(
+        key=lifecycle.key,
+        purpose=purpose,
+        side=side,
+        submitted_event=submitted,
+        lifecycle_events=list(lifecycle.events),
+        fill_events=fills,
+        replacement=replacement,
+    )
+
+
+def _find_chain_for_timestamp(
+    timestamp: Optional[datetime], windows: List[Tuple[datetime, Optional[datetime], EventChain]]
+) -> Optional[EventChain]:
+    if timestamp is None:
+        return None
+    for start, end, chain in windows:
+        if start <= timestamp and (end is None or timestamp < end):
+            return chain
+    return None
+
+
+def _order_event_keys(event: NormalizedEvent) -> List[str]:
+    keys: List[str] = []
+    for candidate in (
+        event.payload.get("exchange_order_id"),
+        event.payload.get("order_link_id"),
+        event.payload.get("client_order_id"),
+        event.order_link_id,
+        event.exchange_order_id,
+    ):
+        if candidate:
+            keys.append(str(candidate))
+    return keys
+
+
+def _build_order_index(events: Sequence[NormalizedEvent]) -> Dict[str, List[NormalizedEvent]]:
+    index: Dict[str, List[NormalizedEvent]] = defaultdict(list)
+    for ev in events:
+        for key in _order_event_keys(ev):
+            index[key].append(ev)
+    return index
+
+
+def validate_event_chains(
+    chains: Sequence[EventChain], events: Sequence[NormalizedEvent]
+) -> Tuple[List[ChainValidation], ChainSummary]:
+    validations: List[ChainValidation] = []
+    order_index = _build_order_index(events)
+    missing_runtime_links = 0
+    missing_audit_links = 0
+    replacement_issues = 0
+    mismatch_tp = 0
+    complete = 0
+    broken = 0
+    partial = 0
+    waiting_for_fill = 0
+
+    for chain in chains:
+        if chain.chain_type == ChainType.LONG_ADD_ORDER_CHAIN:
+            validation = ChainValidation(chain_id=chain.chain_id, status="COMPLETE")
+            if not chain.linked_fill_chain_id:
+                validation.status = "WAITING_FOR_FILL"
+                validation.issues.append("no fill yet")
+                validation.reason_codes.append("WAITING_FOR_FILL")
+                waiting_for_fill += 1
+            else:
+                complete += 1
+            validations.append(validation)
+            continue
+        has_calc = bool(chain.calculation_events)
+        has_order_submit = any(order.submitted_event for order in chain.order_chains)
+        has_lifecycle = any(order.lifecycle_events for order in chain.order_chains)
+        has_result = bool(chain.result_events)
+        status = "COMPLETE"
+        missing_links: List[str] = []
+        validation = ChainValidation(chain_id=chain.chain_id, status=status)
+        if not has_calc:
+            status = "MISSING_CALCULATION"
+            missing_links.append("calculation")
+            validation.reason_codes.append("MISSING_CALCULATION")
+            validation.issues.append("missing calculation step")
+        if not has_order_submit:
+            status = "MISSING_ORDER"
+            missing_links.append("order_submit")
+            validation.reason_codes.append("MISSING_ORDER_SUBMIT")
+            validation.issues.append("missing order submit")
+        if not has_lifecycle:
+            status = "BROKEN"
+            missing_links.append("order_lifecycle")
+            validation.reason_codes.append("PARTIAL_LIFECYCLE")
+            validation.issues.append("missing lifecycle events")
+        if not has_result:
+            status = "PARTIAL"
+            missing_links.append("result")
+            validation.reason_codes.append("MISSING_RESULT")
+            validation.issues.append("missing result event")
+        validation.missing_links = missing_links
+
+        for order in chain.order_chains:
+            submit_runtime = (
+                order.submitted_event and order.submitted_event.source == "runtime"
+            )
+            lifecycle_runtime = any(ev.source == "runtime" for ev in order.lifecycle_events)
+            lifecycle_audit = any(ev.source == "audit" for ev in order.lifecycle_events)
+            final_statuses = {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
+            lifecycle_statuses = {
+                (ev.payload.get("status") or ev.status or "").upper()
+                for ev in order.lifecycle_events
+                if ev.payload or ev.status
+            }
+            if lifecycle_statuses and not lifecycle_statuses & final_statuses:
+                validation.reason_codes.append("PARTIAL_LIFECYCLE")
+                validation.issues.append("lifecycle lacks final status")
+            if lifecycle_audit and not (submit_runtime or lifecycle_runtime):
+                validation.missing_runtime = True
+                missing_runtime_links += 1
+                validation.issues.append("audit event without runtime order")
+                validation.reason_codes.append("MISSING_RUNTIME_LINK")
+            if submit_runtime and not lifecycle_audit:
+                validation.missing_audit = True
+                missing_audit_links += 1
+                validation.issues.append("runtime order without audit lifecycle")
+                validation.reason_codes.append("MISSING_AUDIT_LINK")
+
+            if order.replacement:
+                old_id = order.replacement.old_order_id
+                new_id = order.replacement.new_order_id
+                if old_id:
+                    old_events = order_index.get(old_id, [])
+                    old_closed = any(
+                        (
+                            (ev.payload.get("status") or ev.status or "").upper()
+                            in {"CANCELED", "CANCELLED", "FILLED", "REJECTED"}
+                        )
+                        for ev in old_events
+                    )
+                    if not old_closed:
+                        issue = f"replacement old order {old_id} not closed"
+                        validation.replacement_issues.append(issue)
+                        validation.reason_codes.append("REPLACEMENT_NOT_CLOSED")
+                        replacement_issues += 1
+                        validation.issues.append(issue)
+                if new_id:
+                    new_events = order_index.get(new_id, [])
+                    if not new_events:
+                        issue = f"replacement new order {new_id} missing lifecycle"
+                        validation.replacement_issues.append(issue)
+                        validation.reason_codes.append("REPLACEMENT_NOT_CLOSED")
+                        replacement_issues += 1
+                        validation.issues.append(issue)
+
+        expected = chain.derived_summary.get("expected_tp_price")
+        actual = chain.derived_summary.get("actual_trigger_price") or chain.derived_summary.get(
+            "normalized_trigger_price"
+        )
+        deviation = None
+        if expected is not None and actual is not None:
+            deviation = actual - expected
+            validation.tp_deviation = deviation
+            tolerance = 0.0005
+            if abs(deviation) > tolerance:
+                validation.issues.append(
+                    f"tp mismatch deviation={deviation:.6f} expected={expected:.6f} actual={actual:.6f}"
+                )
+                validation.reason_codes.append("TP_MISMATCH")
+                mismatch_tp += 1
+                if status == "COMPLETE":
+                    status = "MISMATCH_TP"
+                validation.status = status
+        validation.status = status
+        if status == "COMPLETE":
+            complete += 1
+        elif status == "PARTIAL":
+            partial += 1
+            broken += 1
+        else:
+            broken += 1
+        validations.append(validation)
+
+    summary = ChainSummary(
+        total=len(chains),
+        complete=complete,
+        broken=broken,
+        partial=partial,
+        mismatch_tp=mismatch_tp,
+        missing_runtime_links=missing_runtime_links,
+        missing_audit_links=missing_audit_links,
+        replacement_issues=replacement_issues,
+        waiting_for_fill=waiting_for_fill,
+    )
+    return validations, summary
+
+
+def summarize_validations(validations: Sequence[ChainValidation]) -> ChainSummary:
+    total = len(validations)
+    complete = sum(1 for val in validations if val.status == "COMPLETE")
+    partial = sum(1 for val in validations if val.status == "PARTIAL")
+    broken_statuses = {"BROKEN", "MISMATCH_TP", "MISSING_ORDER", "MISSING_CALCULATION"}
+    broken = sum(1 for val in validations if val.status in broken_statuses)
+    mismatch_tp = sum(1 for val in validations if "TP_MISMATCH" in val.reason_codes)
+    missing_runtime_links = sum(1 for val in validations if val.missing_runtime)
+    missing_audit_links = sum(1 for val in validations if val.missing_audit)
+    replacement_issues = sum(len(val.replacement_issues) for val in validations)
+    waiting_for_fill = sum(1 for val in validations if val.status == "WAITING_FOR_FILL")
+    return ChainSummary(
+        total=total,
+        complete=complete,
+        broken=broken,
+        partial=partial,
+        mismatch_tp=mismatch_tp,
+        missing_runtime_links=missing_runtime_links,
+        missing_audit_links=missing_audit_links,
+        replacement_issues=replacement_issues,
+        waiting_for_fill=waiting_for_fill,
+    )
+
+
+def aggregate_reason_summary(validations: Sequence[ChainValidation]) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for val in validations:
+        counter.update(val.reason_codes)
+    return counter
+
+
+def filter_chain_validations(
+    chains: Sequence[EventChain],
+    validations: Sequence[ChainValidation],
+    *,
+    only_issues: bool,
+    status: Optional[str],
+    purpose_contains: Optional[str],
+    cycle_index: Optional[int],
+) -> Tuple[List[EventChain], List[ChainValidation]]:
+    zipped = [(chain, val) for chain, val in zip(chains, validations)]
+    if only_issues:
+        zipped = [(chain, val) for chain, val in zipped if val.issues]
+    if status:
+        zipped = [(chain, val) for chain, val in zipped if val.status == status]
+    if purpose_contains:
+        needle = purpose_contains.lower()
+        zipped = [
+            (chain, val)
+            for chain, val in zipped
+            if chain.trigger_purpose and needle in chain.trigger_purpose.lower()
+        ]
+    if cycle_index is not None:
+        zipped = [
+            (chain, val)
+            for chain, val in zipped
+            if chain.trigger_event.cycle_index == cycle_index
+        ]
+    return [chain for chain, _ in zipped], [val for _, val in zipped]
+def _calculate_chain_metrics(chain: EventChain) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {}
+    break_even = next(
+        (
+            ev.payload.get("break_even_price")
+            for ev in chain.calculation_events
+            if ev.event_name == "fixed_cycle_break_even_inputs"
+        ),
+        None,
+    )
+    tp_event = next(
+        (ev for ev in chain.calculation_events if ev.event_name == "fixed_cycle_tp_components"),
+        None,
+    )
+    tp_price = tp_event.payload.get("tp_price") if tp_event else None
+    short_tp_plan = next(
+        (
+            ev
+            for ev in chain.calculation_events
+            if ev.event_name == "fixed_cycle_short_tp_pair_planned"
+        ),
+        None,
+    )
+    normalized_trigger = short_tp_plan.payload.get("trigger_price_normalized") if short_tp_plan else None
+    short_qty = next(
+        (
+            ev.qty
+            for ev in chain.result_events
+            if ev.purpose and "SHORT_TP" in ev.purpose and ev.qty is not None
+        ),
+        None,
+    )
+    if short_qty is None and short_tp_plan:
+        short_qty = short_tp_plan.payload.get("qty_normalized") or short_tp_plan.payload.get("qty_raw")
+    if break_even is not None and tp_price is not None:
+        summary["required_price_move"] = round(tp_price - break_even, 8)
+    if short_qty is not None and normalized_trigger is not None:
+        try:
+            normalized_qty = float(short_qty)
+            normalized_price = float(normalized_trigger)
+            summary["required_short_gross"] = round(normalized_qty * normalized_price, 6)
+        except (TypeError, ValueError):
+            pass
+    if short_qty is not None and tp_price is not None and break_even is not None:
+        diff = tp_price - break_even
+        try:
+            summary["target_profit_usdt"] = round(diff * float(short_qty), 6)
+        except (TypeError, ValueError):
+            pass
+    if short_tp_plan:
+        summary["trigger_formula"] = short_tp_plan.payload.get("trigger_formula")
+        summary["raw_trigger_price"] = short_tp_plan.payload.get("trigger_price_raw")
+        summary["normalized_trigger_price"] = normalized_trigger
+    expected_tp = None
+    if tp_event:
+        be_price = tp_event.payload.get("break_even_price")
+        goal_price = tp_event.payload.get("goal_profit_price_component")
+        buffer_price = tp_event.payload.get("buffer_price_component")
+        try:
+            expected_tp = sum(
+                value or 0.0
+                for value in (be_price, goal_price, buffer_price)
+                if value is not None
+            )
+            summary["expected_tp_price"] = expected_tp
+        except (TypeError, ValueError):
+            expected_tp = None
+    actual_trigger = normalized_trigger
+    if actual_trigger is not None:
+        summary["actual_trigger_price"] = actual_trigger
+    if expected_tp is not None and actual_trigger is not None:
+        deviation = actual_trigger - expected_tp
+        summary["tp_deviation"] = deviation
+        try:
+            summary["tp_relative_diff_pct"] = round(
+                abs(deviation) / expected_tp * 100, 4
+            )
+        except (TypeError, ZeroDivisionError):
+            summary["tp_relative_diff_pct"] = None
+    return summary
+
+
+def build_event_chains(
+    events: Sequence[NormalizedEvent],
+    lifecycles: Dict[Tuple[str, ...], OrderLifecycle],
+    debug_long_add: bool = False,
+) -> List[EventChain]:
+    long_add_candidates = detect_long_add_candidates(events, debug_long_add)
+    long_add_order_ids = {
+        key for ev in long_add_candidates for key in _order_event_keys(ev)
+    }
+    order_triggers: Dict[str, Dict[str, Any]] = {}
+    order_dedup_logs: List[Tuple[NormalizedEvent, str]] = []
+    sorted_events = sorted(events, key=lambda ev: _timestamp_or_min(ev.timestamp))
+    for event in sorted_events:
+        if event.event_name not in ORDER_CHAIN_EVENT_PRIORITY:
+            continue
+        order_ids = [oid for oid in _order_event_keys(event) if oid in long_add_order_ids]
+        if not order_ids:
+            continue
+        priority = ORDER_CHAIN_EVENT_PRIORITY.index(event.event_name)
+        for order_id in order_ids:
+            existing = order_triggers.get(order_id)
+            if existing and priority >= existing["priority"]:
+                order_dedup_logs.append((event, order_id))
+                continue
+            order_triggers[order_id] = {"event": event, "priority": priority}
+
+    order_windows: List[Tuple[datetime, Optional[datetime], EventChain]] = []
+    chains: List[EventChain] = []
+    chain_id = 1
+    sorted_order_ids = sorted(
+        order_triggers.items(), key=lambda item: _timestamp_or_min(item[1]["event"].timestamp)
+    )
+    for idx, (order_id, info) in enumerate(sorted_order_ids):
+        event = info["event"]
+        start = event.timestamp or datetime.min
+        end = (
+            _timestamp_or_min(sorted_order_ids[idx + 1][1]["event"].timestamp)
+            if idx + 1 < len(sorted_order_ids)
+            else None
+        )
+        chain = EventChain(
+            chain_id=chain_id,
+            chain_type=ChainType.LONG_ADD_ORDER_CHAIN,
+            trigger_event=event,
+            trigger_event_ts=event.timestamp,
+            trigger_purpose=event.purpose,
+            trigger_order_id=order_id,
+            state_before=_extract_state_snapshot(event),
+        )
+        order_windows.append((start, end, chain))
+        chains.append(chain)
+        chain_id += 1
+    if debug_long_add and order_dedup_logs:
+        print("LONG_ADD_ORDER_CHAIN DEDUPLICATION:")
+        for event, oid in order_dedup_logs:
+            print(
+                f"  skipped {event.event_name} for {oid} repurposed by existing order trigger"
+            )
+    for event in events:
+        chain = _find_chain_for_timestamp(event.timestamp, order_windows)
+        if not chain:
+            continue
+        if event.event_name in ORDER_CHAIN_CALC_EVENTS:
+            chain.calculation_events.append(event)
+    for start, end, chain in order_windows:
+        if chain.calculation_events:
+            after_event = chain.calculation_events[-1]
+            chain.state_after = _extract_state_snapshot(after_event)
+            chain.derived_summary = _calculate_chain_metrics(chain)
+
+    fill_triggers: Dict[str, Dict[str, Any]] = {}
+    fill_dedup_logs: List[Tuple[NormalizedEvent, str]] = []
+    for event in long_add_candidates:
+        if event.event_name != "fill_received":
+            continue
+        order_ids = _order_event_keys(event)
+        for order_id in order_ids:
+            if order_id in fill_triggers:
+                fill_dedup_logs.append((event, order_id))
+                continue
+            fill_triggers[order_id] = {"event": event}
+    if debug_long_add and fill_dedup_logs:
+        print("LONG_ADD_FILL_EFFECT_CHAIN DEDUPLICATION:")
+        for event, oid in fill_dedup_logs:
+            print(f"  skipped duplicate fill {event.event_id} for order {oid}")
+    fill_events = [info["event"] for info in fill_triggers.values()]
+    if not fill_events:
+        return chains
+    windows: List[Tuple[datetime, Optional[datetime], EventChain]] = []
+    sorted_fills = sorted(fill_events, key=lambda ev: _timestamp_or_min(ev.timestamp))
+    for idx, trigger in enumerate(sorted_fills):
+        start = trigger.timestamp or datetime.min
+        end = sorted_fills[idx + 1].timestamp if idx + 1 < len(sorted_fills) else None
+        chain = EventChain(
+            chain_id=chain_id,
+            chain_type=ChainType.LONG_ADD_FILL_EFFECT_CHAIN,
+            trigger_event=trigger,
+            trigger_event_ts=trigger.timestamp,
+            trigger_purpose=trigger.purpose,
+            trigger_order_id=(
+                trigger.payload.get("fill", {}).get("client_order_id")
+                or trigger.payload.get("fill", {}).get("order_link_id")
+                or (_order_event_keys(trigger)[0] if _order_event_keys(trigger) else None)
+            ),
+            state_before=_extract_state_snapshot(trigger),
+        )
+        windows.append((start, end, chain))
+        chain_id += 1
+    fill_chain_map = {
+        chain.trigger_order_id: chain.chain_id for _, _, chain in windows if chain.trigger_order_id
+    }
+    for event in events:
+        chain = _find_chain_for_timestamp(event.timestamp, windows)
+        if not chain:
+            continue
+        if event.event_name in CALCULATION_EVENT_NAMES.union(ORDER_CHAIN_CALC_EVENTS):
+            chain.calculation_events.append(event)
+        if event.event_name == "fill_received":
+            chain.result_events.append(event)
+    for start, end, chain in windows:
+        if chain.calculation_events:
+            after_event = next(
+                (
+                    ev
+                    for ev in reversed(chain.calculation_events)
+                    if ev.event_name in {"fixed_cycle_exit_manifest", "fixed_cycle_structure_rebuilt"}
+                ),
+                chain.calculation_events[-1],
+            )
+            chain.state_after = _extract_state_snapshot(after_event)
+        elif chain.result_events:
+            chain.state_after = _extract_state_snapshot(chain.result_events[-1])
+        chain.derived_summary = _calculate_chain_metrics(chain)
+    assigned_lifecycles: Set[Tuple[str, ...]] = set()
+    for lifecycle in lifecycles.values():
+        lifecycle_ts = min(
+            (ev.timestamp for ev in lifecycle.events if ev.timestamp),
+            default=None,
+        )
+        if not lifecycle_ts:
+            continue
+        chain = _find_chain_for_timestamp(lifecycle_ts, windows)
+        if chain and lifecycle.key not in assigned_lifecycles:
+            chain.order_chains.append(_summarize_order_chain(lifecycle))
+            assigned_lifecycles.add(lifecycle.key)
+    chains.extend(chain for _, _, chain in windows)
+    # link order chains to fill chains
+    for chain in chains:
+        if chain.chain_type == ChainType.LONG_ADD_ORDER_CHAIN and chain.trigger_order_id:
+            linked_id = fill_chain_map.get(chain.trigger_order_id)
+            chain.linked_fill_chain_id = linked_id
+            if debug_long_add:
+                status = "fill detected" if linked_id else "no fill detected"
+                print(f"DEBUG_CHAIN_LINK | order {chain.trigger_order_id} -> {status}")
+    return chains
 
 def _event_effective_price(event: NormalizedEvent) -> Optional[float]:
     return event.price or event.avg_price or event.trigger_price
@@ -1231,6 +2062,164 @@ def render_blocks(
         print(f"  Decisions: reused={reuse_count} replaced={replace_count} checks={check_count}")
 
 
+LOG_KEY_BLACKLIST = {"fill", "order", "exchange_order", "managed_order"}
+
+
+def _format_state(state: Optional[Dict[str, Any]]) -> str:
+    if not state:
+        return "n/a"
+    parts = [f"{key}={state[key]}" for key in sorted(state.keys())]
+    return " | ".join(parts)
+
+
+def _log_value_summary(event: NormalizedEvent, keys: Optional[Iterable[str]] = None) -> str:
+    keys_to_render = []
+    if keys:
+        keys_to_render = [key for key in keys if key in event.payload]
+    else:
+        candidate_keys = [k for k in sorted(event.logged_fields) if k not in LOG_KEY_BLACKLIST]
+        keys_to_render = candidate_keys[:4]
+        if not keys_to_render and event.payload:
+            keys_to_render = sorted(event.payload.keys())[:4]
+    items = []
+    for key in keys_to_render:
+        value = event.payload.get(key)
+        items.append(f"{key}={value!r}")
+    return ", ".join(items) if items else "n/a"
+
+
+def render_chains(
+    chains: Sequence[EventChain],
+    validations: Sequence[ChainValidation],
+    summary: ChainSummary,
+) -> None:
+    if not chains:
+        print("No long-add chains detected.")
+        return
+    validation_map = {val.chain_id: val for val in validations}
+    for chain in chains:
+        validation = validation_map.get(chain.chain_id)
+        verdict = validation.status if validation else "UNKNOWN"
+        trigger_label = chain.trigger_purpose or "LONG_ADD"
+        if any(ev.purpose and "SHORT_TP" in ev.purpose.upper() for ev in chain.result_events):
+            result_label = "SHORT_TP"
+        elif any(ev.purpose and "EXIT" in ev.purpose.upper() for ev in chain.result_events):
+            result_label = "EXIT_REBUILD"
+        else:
+            result_label = "SHORT_TP_LIFECYCLE"
+        chain_type_label = chain.chain_type.value
+        dedup_note = f" dedup={chain.dedup_reason}" if chain.dedup_reason else ""
+        print(f"[{verdict}] {chain_type_label} {trigger_label} -> {result_label}{dedup_note}")
+        trigger = chain.trigger_event
+        trigger_ts = trigger.timestamp.isoformat() if trigger.timestamp else "N/A"
+        print(f"\nCHAIN {chain.chain_id} | Trigger {trigger.event_name} @ {trigger_ts}")
+        if validation:
+            issue_summary = "; ".join(validation.issues) if validation.issues else "none"
+            print(f"  Status={validation.status} issues={issue_summary}")
+            if validation.tp_deviation is not None:
+                print(f"    TP deviation: {validation.tp_deviation:.6f}")
+            if validation.missing_runtime:
+                print("    Missing runtime link for audit events")
+            if validation.missing_audit:
+                print("    Missing audit coverage for runtime order")
+
+        print(
+            f"  Purpose={chain.trigger_purpose} order_id={chain.trigger_order_id} "
+            f"state_before={_format_state(chain.state_before)}"
+        )
+        if chain.chain_type == ChainType.LONG_ADD_ORDER_CHAIN:
+            fill_status = "fill linked" if chain.linked_fill_chain_id else "no fill detected"
+            print(f"  Fill trace: {fill_status}")
+        print(f"  State after: {_format_state(chain.state_after)}")
+        if chain.calculation_events:
+            print("  Calculations:")
+            for ev in chain.calculation_events:
+                ts = ev.timestamp.isoformat() if ev.timestamp else "N/A"
+                log_summary = _log_value_summary(ev)
+                print(
+                    f"    - {ev.event_name} [{ev.source}] @{ts} | log values=({log_summary})"
+                )
+            if chain.derived_summary:
+                derived = ", ".join(f"{k}={v}" for k, v in chain.derived_summary.items())
+                print(f"    Derived chain values: {derived}")
+            expected_tp = chain.derived_summary.get("expected_tp_price")
+            actual_tp = chain.derived_summary.get("actual_trigger_price") or chain.derived_summary.get(
+                "normalized_trigger_price"
+            )
+            rel = chain.derived_summary.get("tp_relative_diff_pct")
+            if expected_tp is not None and actual_tp is not None:
+                abs_diff = abs(actual_tp - expected_tp)
+                rel_diff = f"{rel:.4f}%" if rel is not None else "n/a"
+                print(
+                    f"    TP snapshot: expected={expected_tp} actual={actual_tp} "
+                    f"abs_diff={abs_diff:.6f} rel_diff={rel_diff}"
+                )
+        else:
+            print("  Calculations: none")
+        if chain.order_chains:
+            print("  Orders:")
+            for idx, order in enumerate(chain.order_chains, 1):
+                submitted_ts = (
+                    order.submitted_event.timestamp.isoformat()
+                    if order.submitted_event and order.submitted_event.timestamp
+                    else "N/A"
+                )
+                submitted_price = (
+                    order.submitted_event.payload.get("price")
+                    if order.submitted_event
+                    else None
+                )
+                print(
+                    f"    {idx}. purpose={order.purpose} side={order.side} "
+                    f"submitted=@{submitted_ts} price={submitted_price}"
+                )
+                if order.replacement:
+                    print(
+                        f"      Replacement: {order.replacement.old_order_id} "
+                        f"→ {order.replacement.new_order_id} "
+                        f"reason={order.replacement.reason}"
+                    )
+                if order.lifecycle_events:
+                    lifecycle_summary = ", ".join(
+                        f"{ev.event_name}[{ev.status or ''}]"
+                        for ev in order.lifecycle_events
+                        if ev.event_name
+                    )
+                    print(f"      Lifecycle: {lifecycle_summary}")
+                if order.fill_events:
+                    for fill in order.fill_events:
+                        fill_ts = fill.timestamp.isoformat() if fill.timestamp else "N/A"
+                        print(
+                            f"      Fill: purpose={fill.purpose} qty={fill.qty} price={fill.price} status={fill.status} @{fill_ts}"
+                        )
+        else:
+            print("  Orders: none")
+        if chain.result_events:
+            print("  Result events:")
+            for ev in chain.result_events:
+                ts = ev.timestamp.isoformat() if ev.timestamp else "N/A"
+                log_summary = _log_value_summary(ev)
+                print(
+                    f"    - {ev.event_name} ({ev.purpose}) status={ev.status} "
+                    f"price={ev.price} qty={ev.qty} @{ts} | log fields=({log_summary})"
+                )
+    print("\nChain validation summary:")
+    print(f"  Total chains: {summary.total}")
+    print(f"  Complete chains: {summary.complete}")
+    print(f"  Broken chains: {summary.broken}")
+    print(f"  Partial chains: {summary.partial}")
+    print(f"  Mismatched TP: {summary.mismatch_tp}")
+    print(f"  Missing runtime links: {summary.missing_runtime_links}")
+    print(f"  Missing audit links: {summary.missing_audit_links}")
+    print(f"  Replacement issues: {summary.replacement_issues}")
+    print(f"  Waiting for fill: {summary.waiting_for_fill}")
+    reason_counter = aggregate_reason_summary(validations)
+    if reason_counter:
+        print("Reason code counts:")
+        for code, count in sorted(reason_counter.items()):
+            print(f"  {code}: {count}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze fixed/generic hedge logs")
     parser.add_argument(
@@ -1263,9 +2252,28 @@ def main() -> None:
     )
     parser.add_argument(
         "--mode",
-        choices=["summary", "timeline", "orders", "sessions", "anomalies", "cycle-pnl", "json", "blocks"],
+        choices=[
+            "summary",
+            "timeline",
+            "orders",
+            "sessions",
+            "anomalies",
+            "cycle-pnl",
+            "json",
+            "blocks",
+            "chains",
+        ],
         default="summary",
     )
+    parser.add_argument("--only-issues", action="store_true", help="Show only chains with issues")
+    parser.add_argument(
+        "--chain-status",
+        choices=["COMPLETE", "PARTIAL", "BROKEN", "MISMATCH_TP", "MISSING_ORDER", "MISSING_CALCULATION"],
+        help="Filter chains by validation status",
+    )
+    parser.add_argument("--purpose-contains", help="Only show chains whose trigger purpose contains this substring")
+    parser.add_argument("--cycle-index", type=int, help="Only show chains tied to this cycle index")
+    parser.add_argument("--debug-long-add", action="store_true", help="Dump detection candidates for long-add chains")
     parser.add_argument("--block", help="Block id (number or 'last')")
     parser.add_argument("--gap-threshold", type=int, default=GAP_THRESHOLD_SECONDS)
     args = parser.parse_args()
@@ -1280,11 +2288,13 @@ def main() -> None:
     sessions, event_to_session = group_sessions(merged, gap_threshold_seconds=args.gap_threshold)
     lifecycles = build_order_lifecycles(merged)
     anomalies = detect_anomalies(lifecycles)
+    chains = build_event_chains(merged, lifecycles, debug_long_add=args.debug_long_add)
     cycle_pnl_reports = build_cycle_pnl_report(
         lifecycles,
         fee_rate=args.fee_rate,
         symbol_filter=args.symbol,
     )
+    validations, chain_summary = validate_event_chains(chains, merged)
     blocks = build_run_blocks(merged)
     event_to_block = map_event_to_block(blocks)
 
@@ -1381,6 +2391,17 @@ def main() -> None:
             args.fee_rate,
             symbol_filter=args.symbol,
         )
+    elif args.mode == "chains":
+        filtered_chains, filtered_validations = filter_chain_validations(
+            chains,
+            validations,
+            only_issues=args.only_issues,
+            status=args.chain_status,
+            purpose_contains=args.purpose_contains,
+            cycle_index=args.cycle_index,
+        )
+        filtered_summary = summarize_validations(filtered_validations)
+        render_chains(filtered_chains, filtered_validations, filtered_summary)
 
 
 if __name__ == "__main__":

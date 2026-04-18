@@ -165,6 +165,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("initial_entry_confirmed", False)
         state.setdefault("initial_entry_retry_count", 0)
         state.setdefault("last_exit_signature", None)
+        state.setdefault("net_long_loss_balance", 0.0)
+        state.setdefault("net_short_loss_balance", 0.0)
+        state.setdefault("processed_pnl_exec_ids", set())
+        state.setdefault("processed_pnl_exec_ids_order", [])
         state["recovery_marker_emitted"] = False
         state["block_closed_marker_emitted"] = False
         state["exit_armed_marker_emitted"] = False
@@ -1560,10 +1564,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             (snapshot.long_avg * snapshot.long_qty)
             - (snapshot.short_avg * snapshot.short_qty)
         ) / denominator
-        realized_long_loss = max(-snapshot.realized_long_pnl_total, 0.0)
-        realized_short_profit = max(snapshot.realized_short_pnl_total, 0.0)
-        realized_short_loss = max(-snapshot.realized_short_pnl_total, 0.0)
-        loss_compensation = max(realized_long_loss - realized_short_profit, 0.0) + realized_short_loss
+        realized_long_loss = float(state.get("net_long_loss_balance") or 0.0)
+        realized_short_profit = 0.0
+        realized_short_loss = float(state.get("net_short_loss_balance") or 0.0)
+        loss_compensation = realized_long_loss + realized_short_loss
         if loss_compensation > 0 and abs(denominator) > 1e-9:
             break_even_price += loss_compensation / denominator
         logger.info(
@@ -1656,7 +1660,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState | None,
     ) -> dict[str, float]:
         reference_price = self._tp_reference_price(snapshot, runtime_state)
-        loss_recovery = self._loss_recovery_price_component(snapshot)
+        loss_recovery = self._loss_recovery_price_component(snapshot, runtime_state)
         goal_profit = reference_price * self._pct(self.config.tp_profit_target_pct)
         buffer = reference_price * self._pct(self.config.tp_buffer_pct)
         return {
@@ -1682,7 +1686,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         base_price = max(candidates) if candidates else 0.0
         return max(base_price, float(self.config.price_tick_size) or 1e-9)
 
-    def _loss_recovery_price_component(self, snapshot: HedgeSnapshot | None) -> float:
+    def _loss_recovery_price_component(
+        self, snapshot: HedgeSnapshot | None, runtime_state: RuntimeState | None
+    ) -> float:
         if not snapshot:
             return 0.0
         net_qty = snapshot.long_qty - snapshot.short_qty
@@ -1698,10 +1704,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
             return 0.0
-        realized_long_loss = max(-snapshot.realized_long_pnl_total, 0.0)
-        realized_short_profit = max(snapshot.realized_short_pnl_total, 0.0)
-        realized_short_loss = max(-snapshot.realized_short_pnl_total, 0.0)
-        loss_total = max(realized_long_loss - realized_short_profit, 0.0) + realized_short_loss
+        state = runtime_state.strategy_state if runtime_state else {}
+        realized_long_loss = float(state.get("net_long_loss_balance") or 0.0)
+        realized_short_loss = float(state.get("net_short_loss_balance") or 0.0)
+        loss_total = realized_long_loss + realized_short_loss
         return loss_total / net_qty if loss_total > 0 else 0.0
 
     def _seed_initial_reference_if_missing(
@@ -1800,6 +1806,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "weighted_price_sum": weighted_price_sum,
                 "avg_price": avg_price,
                 "client_order_id": fill_event.client_order_id,
+                "exec_id": fill_event.exec_id,
                 "confirmed_pnl_applied": False,
             }
             long_fill = fills[str(cycle_index)]
@@ -1818,6 +1825,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         runtime_state=runtime_state,
                         context=context,
                         occurred_at_ms=int(fill_event.occurred_at.timestamp() * 1000),
+                        exec_id=fill_event.exec_id,
                     )
                     if long_fill.get("confirmed_closed_pnl") is not None:
                         self._cleanup_order_pnl(runtime_state, long_fill.get("client_order_id"))
@@ -2315,6 +2323,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
         context: StrategyContext,
         occurred_at_ms: int | None = None,
+        exec_id: str | None = None,
     ) -> bool:
         self._seed_long_fill_closed_pnl_fields(long_fill)
         order_id = str(long_fill.get("order_id") or "").strip()
@@ -2423,6 +2432,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             client_order_id=long_fill.get("client_order_id"),
             confirmed_pnl=long_fill["confirmed_closed_pnl"],
             side="long",
+            exec_id=exec_id or long_fill.get("exec_id"),
         )
         return bool(long_fill["closed_pnl_ready"])
 
@@ -2432,8 +2442,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         client_order_id: str | None,
         confirmed_pnl: float | None,
         side: str,
+        exec_id: str | None = None,
     ) -> None:
         if not client_order_id or confirmed_pnl is None:
+            return
+        if not exec_id and not client_order_id:
+            return
+        state = runtime_state.strategy_state
+        processed = state.setdefault("processed_pnl_exec_ids", set())
+        if isinstance(processed, list):
+            processed = set(processed)
+            state["processed_pnl_exec_ids"] = processed
+        order = state.setdefault("processed_pnl_exec_ids_order", [])
+        exec_key = exec_id or client_order_id
+        if exec_key in processed:
             return
         applied = runtime_state.confirmed_pnl_applied
         if client_order_id in applied:
@@ -2449,15 +2471,47 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "confirmed_pnl": confirmed_pnl,
                 },
             )
-        if side == "long":
+        state = runtime_state.strategy_state
+        net_long = float(state.get("net_long_loss_balance") or 0.0)
+        net_short = float(state.get("net_short_loss_balance") or 0.0)
+        side_norm = (side or "").lower()
+        if side_norm in {"long", "buy"}:
             if temp_pnl != 0.0:
                 runtime_state.realized_long_pnl_total -= temp_pnl
             runtime_state.realized_long_pnl_total += confirmed_pnl
-        else:
+            if confirmed_pnl < 0:
+                net_long += abs(confirmed_pnl)
+            else:
+                net_short = max(net_short - confirmed_pnl, 0.0)
+        elif side_norm in {"short", "sell"}:
             if temp_pnl != 0.0:
                 runtime_state.realized_short_pnl_total -= temp_pnl
             runtime_state.realized_short_pnl_total += confirmed_pnl
+            if confirmed_pnl < 0:
+                net_short += abs(confirmed_pnl)
+            else:
+                net_long = max(net_long - confirmed_pnl, 0.0)
+        else:
+            logger.warning(
+                "invalid_side_for_pnl",
+                extra={
+                    "side": side,
+                    "confirmed_pnl": confirmed_pnl,
+                    "client_order_id": client_order_id,
+                },
+            )
+            return
         applied.add(client_order_id)
+        processed.add(exec_key)
+        if isinstance(order, list):
+            order.append(exec_key)
+            if len(order) > 5000:
+                old = order.pop(0)
+                processed.discard(old)
+        state["processed_pnl_exec_ids"] = processed
+        state["processed_pnl_exec_ids_order"] = order
+        state["net_long_loss_balance"] = net_long
+        state["net_short_loss_balance"] = net_short
 
     def _cleanup_order_pnl(self, runtime_state: RuntimeState, client_order_id: str | None) -> None:
         if not client_order_id:
@@ -2591,6 +2645,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["entry_reference_price"] = None
         state["last_exit_signature"] = None
         cycle_state["entry_price"] = None
+        state["net_long_loss_balance"] = 0.0
+        state["net_short_loss_balance"] = 0.0
+        state["processed_pnl_exec_ids"] = set()
+        state["processed_pnl_exec_ids_order"] = []
         self._write_cycle_state(cycle_state)
         return cycle_state
 
