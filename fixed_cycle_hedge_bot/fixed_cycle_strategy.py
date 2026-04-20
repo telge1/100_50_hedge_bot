@@ -104,6 +104,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     STATE_RUNNING = "RUNNING"
     STATE_RECONCILING_AFTER_FILL = "RECONCILING_AFTER_FILL"
     STATE_RESETTING_EXITS = "RESETTING_EXITS"
+    STATE_REFILL_PENDING = "REFILL_PENDING"
     STATE_HARD_STOP_MODE = "HARD_STOP_MODE"
     STATE_EXITED = "EXITED"
     STATE_ERROR = "ERROR"
@@ -151,6 +152,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("short_tp_pending_cycle", 0)
         state.setdefault("long_add_pending", False)
         state.setdefault("cycle_completed_count", 0)
+        state.setdefault("cycle_long_add_filled", False)
+        state.setdefault("cycle_short_tp_filled", False)
+        state.setdefault("refill_pending", False)
         state.setdefault("open_long_qty", snapshot.long_qty)
         state.setdefault("open_short_qty", snapshot.short_qty)
         state.setdefault("long_avg", snapshot.long_avg)
@@ -358,9 +362,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self._sync_state_from_snapshot(refreshed_snapshot, runtime_state)
         state = runtime_state.strategy_state
 
-        if state.get("cycle_completed_count", 0) >= 2:
+        if state.get("refill_pending") and not state.get("refill_state"):
             refill_intents = self._build_entry_intents(refreshed_snapshot, runtime_state, context)
             if refill_intents:
+                state["refill_state"] = {"REQUESTED": True}
                 return refill_intents
         fast_intents = self._fast_path_second_order(fill_event, refreshed_snapshot, runtime_state, context)
 
@@ -384,7 +389,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         state = runtime_state.strategy_state
 
-        if int(state.get("cycle_completed_count") or 0) >= 2:
+        if state.get("refill_pending") and not state.get("refill_state"):
             current_price = float(snapshot.current_price or 0.0)
             if current_price <= 0:
                 return []
@@ -1838,6 +1843,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
             if refill_state.get("REFILL_LONG") and refill_state.get("REFILL_SHORT"):
                 state["cycle_completed_count"] = 0
+                state["refill_pending"] = False
+                state["cycle_long_add_filled"] = False
+                state["cycle_short_tp_filled"] = False
                 state["cycle_waiting_for_short_tp"] = False
                 state["pending_long_cycle_index"] = 0
                 state["short_tp_pending_cycle"] = 0
@@ -1846,10 +1854,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 state["long_add_rebuild_allowed"] = True
                 state["refill_state"] = {}
 
+                cycle_state["long_add_pending"] = False
                 cycle_state["cycle_waiting_for_short_tp"] = False
                 cycle_state["pending_long_cycle_index"] = 0
                 cycle_state["short_tp_pending_cycle"] = 0
-                cycle_state["long_add_pending"] = False
 
                 if context is not None:
                     context.audit.log_event(
@@ -1865,6 +1873,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if "_LONG_" in fill_event.purpose and "LONG_ADD" in fill_event.purpose:
             state["long_add_pending"] = fill_event.status != "FILLED"
             cycle_state["long_add_pending"] = state["long_add_pending"]
+            state["cycle_long_add_filled"] = True
+            logger.info(
+                "[CYCLE-LONG] purpose=%s status=%s long_flag=%s cycle_count=%s",
+                fill_event.purpose,
+                fill_event.status,
+                state.get("cycle_long_add_filled"),
+                state.get("cycle_completed_count"),
+            )
             if order_fully_completed:
                 state["exit_rebuild_allowed"] = True
                 state["long_add_rebuild_allowed"] = True
@@ -1925,6 +1941,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_state["entry_price"] = fill_event.exec_price
 
         if "_SHORT_" in fill_event.purpose:
+            if "SHORT_TP" in fill_event.purpose or "SHORT_REDUCE" in fill_event.purpose:
+                state["cycle_short_tp_filled"] = True
+                logger.info(
+                    "[CYCLE-SHORT] purpose=%s status=%s short_flag=%s cycle_count=%s",
+                    fill_event.purpose,
+                    fill_event.status,
+                    state.get("cycle_short_tp_filled"),
+                    state.get("cycle_completed_count"),
+                )
             fills = cycle_state.setdefault("short_fills", {})
             entry = dict(fills.get(str(cycle_index)) or {})
             total_qty = float(entry.get("total_qty") or 0.0) + float(fill_event.exec_qty or 0.0)
@@ -1948,16 +1973,34 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_state["entry_price"] = fill_event.exec_price
             if order_fully_completed and "SHORT_REDUCE" in fill_event.purpose:
                 state["exit_rebuild_allowed"] = True
-            if order_fully_completed and state.get("cycle_waiting_for_short_tp") and int(
-                state.get("pending_long_cycle_index") or 0
-            ) == cycle_index:
+            logger.info(
+                "[CYCLE-CHECK] long_flag=%s short_flag=%s",
+                state.get("cycle_long_add_filled"),
+                state.get("cycle_short_tp_filled"),
+            )
+            if state.get("cycle_long_add_filled") and state.get("cycle_short_tp_filled"):
                 state["cycle_completed_count"] = int(state.get("cycle_completed_count") or 0) + 1
+                logger.info(
+                    "[CYCLE-COMPLETE] cycle_count=%s",
+                    state.get("cycle_completed_count"),
+                )
+                state["cycle_long_add_filled"] = False
+                state["cycle_short_tp_filled"] = False
                 state["cycle_waiting_for_short_tp"] = False
                 state["pending_long_cycle_index"] = 0
                 state["short_tp_pending_cycle"] = 0
                 cycle_state["cycle_waiting_for_short_tp"] = False
                 cycle_state["pending_long_cycle_index"] = 0
                 cycle_state["short_tp_pending_cycle"] = 0
+
+                if state["cycle_completed_count"] >= 2:
+                    logger.info("[REFILL-TRIGGER] switching to STATE_REFILL_PENDING")
+                    state["bot_state"] = self.STATE_REFILL_PENDING
+                    state["refill_pending"] = True
+                    state["long_add_pending"] = False
+                    state["long_add_rebuild_allowed"] = True
+                    state["refill_state"] = {}
+                    return
         if fill_event.purpose == self.SHORT_TP_EXIT_PURPOSE and order_fully_completed:
             state["exit_rebuild_allowed"] = True
         state["current_effective_cycle"] = max(
