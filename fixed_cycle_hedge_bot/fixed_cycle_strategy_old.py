@@ -356,12 +356,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         refreshed_snapshot = context.refresh_snapshot("fixed_cycle_post_fill_rest") if context.refresh_snapshot else snapshot
         self._seed_initial_reference_if_missing(refreshed_snapshot, runtime_state)
         self._sync_state_from_snapshot(refreshed_snapshot, runtime_state)
-        state = runtime_state.strategy_state
-
-        if state.get("cycle_completed_count", 0) >= 2:
-            refill_intents = self._build_entry_intents(refreshed_snapshot, runtime_state, context)
-            if refill_intents:
-                return refill_intents
         fast_intents = self._fast_path_second_order(fill_event, refreshed_snapshot, runtime_state, context)
 
         return fast_intents + self._rebuild_structure(refreshed_snapshot, runtime_state, context, reason="fill_reconcile")
@@ -382,56 +376,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
         context: StrategyContext,
     ) -> list[StrategyIntent]:
-        state = runtime_state.strategy_state
-
-        if int(state.get("cycle_completed_count") or 0) >= 2:
-            current_price = float(snapshot.current_price or 0.0)
-            if current_price <= 0:
-                return []
-
-            initial_long_qty = float(state.get("initial_long_qty") or 0.0)
-            initial_short_qty = float(state.get("initial_short_qty") or 0.0)
-
-            current_long_qty = float(snapshot.long_qty or 0.0)
-            current_short_qty = float(snapshot.short_qty or 0.0)
-
-            missing_long_qty = max(initial_long_qty - current_long_qty, 0.0)
-            missing_short_qty = max(initial_short_qty - current_short_qty, 0.0)
-
-            intents: list[StrategyIntent] = []
-
-            if missing_long_qty > 0:
-                refill_long_qty = self._normalize_qty(missing_long_qty, runtime_state)
-                if refill_long_qty > 0:
-                    intents.append(
-                        StrategyIntent(
-                            side="long",
-                            qty=refill_long_qty,
-                            price=None,
-                            purpose="REFILL_LONG",
-                            order_type="Market",
-                            reduce_only=False,
-                            metadata={"entry_role": "refill_long"},
-                        )
-                    )
-
-            if missing_short_qty > 0:
-                refill_short_qty = self._normalize_qty(missing_short_qty, runtime_state)
-                if refill_short_qty > 0:
-                    intents.append(
-                        StrategyIntent(
-                            side="short",
-                            qty=refill_short_qty,
-                            price=None,
-                            purpose="REFILL_SHORT",
-                            order_type="Market",
-                            reduce_only=False,
-                            metadata={"entry_role": "refill_short"},
-                        )
-                    )
-
-            return intents
-
         entry_reference_price = float(runtime_state.strategy_state.get("entry_reference_price") or 0.0)
         resolved_price = snapshot.current_price if snapshot.current_price > 0 else 0.0
         if resolved_price <= 0 and runtime_state.last_snapshot and runtime_state.last_snapshot.current_price > 0:
@@ -1828,38 +1772,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         processed = set(cycle_state.get("processed_fill_ids") or [])
         fill_key = self._fill_persistence_key(fill_event)
         if fill_key in processed:
-            return
-
-        purpose = fill_event.purpose or ""
-        if purpose in {"REFILL_LONG", "REFILL_SHORT"}:
-            refill_state = state.setdefault("refill_state", {})
-            if order_fully_completed:
-                refill_state[purpose] = True
-
-            if refill_state.get("REFILL_LONG") and refill_state.get("REFILL_SHORT"):
-                state["cycle_completed_count"] = 0
-                state["cycle_waiting_for_short_tp"] = False
-                state["pending_long_cycle_index"] = 0
-                state["short_tp_pending_cycle"] = 0
-                state["long_add_pending"] = False
-                state["exit_rebuild_allowed"] = True
-                state["long_add_rebuild_allowed"] = True
-                state["refill_state"] = {}
-
-                cycle_state["cycle_waiting_for_short_tp"] = False
-                cycle_state["pending_long_cycle_index"] = 0
-                cycle_state["short_tp_pending_cycle"] = 0
-                cycle_state["long_add_pending"] = False
-
-                if context is not None:
-                    context.audit.log_event(
-                        "fixed_cycle_refill_completed",
-                        strategy=self.name,
-                    )
-
-            processed.add(fill_key)
-            cycle_state["processed_fill_ids"] = list(processed)
-            self._write_cycle_state(cycle_state)
             return
 
         if "_LONG_" in fill_event.purpose and "LONG_ADD" in fill_event.purpose:
