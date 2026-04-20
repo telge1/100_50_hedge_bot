@@ -1220,7 +1220,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if price_tick_size <= 0:
             price_tick_size = 0.01
 
-        expected = long_loss_usdt + target_profit_usdt
+        expected = required_net
 
         def compute_net(tp: float) -> float:
             return (
@@ -1271,7 +1271,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "closed_pnl": confirmed_closed_pnl,
                 "closed_qty": confirmed_closed_qty,
                 "long_loss_usdt": long_loss_usdt,
-                "required_net_profit": long_loss_usdt + target_profit_usdt,
+                "required_net_profit": required_net,
                 "trigger_price": trigger_price,
                 "short_qty": short_qty,
             },
