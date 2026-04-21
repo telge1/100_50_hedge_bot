@@ -66,3 +66,6 @@ Ich will einen echten Patch-Diff sehen, so dass Cursor mir die Änderungen zum A
 👉 dynamische TP-Optimierung (z. B. abhängig von Volatilität / Spread)
 oder
 👉 Exit früher triggern bei schnellen Rebounds
+
+
+1
