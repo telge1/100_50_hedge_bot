@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from .base import HedgeStrategy, StrategyContext
-from .models import CalculationTrace, FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent
+from .models import CalculationTrace, FillEvent, HedgeSnapshot, ManagedOrder, RuntimeState, StrategyIntent
+from .trailing_fallback import (
+    ShortTpFallbackState,
+    reset_short_tp_fallback,
+    start_short_tp_fallback,
+    update_short_tp_fallback,
+)
 
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
 
@@ -61,6 +67,10 @@ class FixedCycleHedgeConfig:
     order_refresh_cooldown_ms: int = 750
 
     price_tick_size: float = 0.1
+    trailing_stop_dist: float = 0.003
+    short_tp_fallback_activation_drop_pct: float = 0.001
+    short_tp_fallback_stop_offset_pct: float = 0.0025
+    fallback_stale_seconds: float = 8.0
     qty_step: float = 0.001
     min_order_qty: float = 0.001
     min_notional_usdt: float = 5.0
@@ -134,6 +144,196 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             getattr(self.config, "long_exit_reduce_only", None),
             getattr(self.config, "short_exit_reduce_only", None),
         )
+        self.realized_long_loss_total = 0.0
+
+    def _get_short_tp_fallback_state(self, runtime_state: RuntimeState) -> ShortTpFallbackState:
+        return ShortTpFallbackState.from_dict(runtime_state.strategy_state.get("short_tp_fallback_state"))
+
+    def _store_short_tp_fallback_state(
+        self, runtime_state: RuntimeState, fallback_state: ShortTpFallbackState
+    ) -> None:
+        runtime_state.strategy_state["short_tp_fallback_state"] = fallback_state.to_dict()
+
+    def _clear_short_tp_fallback_order_context(self, runtime_state: RuntimeState) -> None:
+        runtime_state.strategy_state.pop("short_tp_fallback_order_context", None)
+
+    def _register_short_tp_fallback_order(self, runtime_state: RuntimeState) -> None:
+        fallback_state = self._get_short_tp_fallback_state(runtime_state)
+        context = runtime_state.strategy_state.get("short_tp_fallback_order_context") or {}
+        client_order_id = fallback_state.client_order_id
+        if not client_order_id:
+            return
+        managed_order = ManagedOrder(
+            client_order_id=client_order_id,
+            side="short",
+            qty=float(fallback_state.qty or 0.0),
+            purpose=str(context.get("purpose") or "SHORT_TP_FALLBACK"),
+            price=float(fallback_state.original_trigger_price or 0.0),
+            order_type="Market",
+            reduce_only=True,
+            exchange_order_id=fallback_state.exchange_order_id,
+            status="OPEN",
+            remaining_qty=float(fallback_state.qty or 0.0),
+            metadata={
+                "cycle_index": int(context.get("cycle_index") or 0),
+                "cycle_role": "short_reduce",
+                "short_tp_fallback": True,
+            },
+        )
+        runtime_state.active_orders[client_order_id] = managed_order
+        if fallback_state.exchange_order_id:
+            runtime_state.exchange_to_client_id[fallback_state.exchange_order_id] = client_order_id
+
+    def _log_short_tp_fallback_event(
+        self,
+        event_name: str,
+        fallback_state: ShortTpFallbackState,
+        current_price: float,
+        *,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "original_trigger_price": fallback_state.original_trigger_price,
+            "activation_price": fallback_state.activation_price,
+            "trailing_distance": fallback_state.trailing_distance,
+            "qty": fallback_state.qty,
+            "current_price": current_price,
+            "lowest_price": fallback_state.lowest_price,
+            "submitted": fallback_state.submitted,
+            "submit_failed": fallback_state.submit_failed,
+            "position_idx": fallback_state.position_idx,
+        }
+        if extra:
+            payload.update(extra)
+        logger.info("%s %s", event_name, payload)
+
+    def _maybe_run_short_tp_fallback(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> None:
+        fallback_state = self._get_short_tp_fallback_state(runtime_state)
+        if not fallback_state.active:
+            return
+        current_price = float(snapshot.current_price or 0.0)
+        if current_price <= 0:
+            return
+        now_ms = int(time.time() * 1000)
+        start_ms = fallback_state.started_at_ms or now_ms
+        age_seconds = (now_ms - start_ms) / 1000
+        order_manager = context.order_manager
+
+        def _reset_fallback(*, cancel_existing_order: bool = True) -> None:
+            cancel_success = True
+            if cancel_existing_order and fallback_state.exchange_order_id and order_manager:
+                try:
+                    cancel_success = bool(
+                        order_manager.cancel_order(
+                            fallback_state.exchange_order_id,
+                            symbol=self.config.symbol,
+                            category=self.config.category,
+                        )
+                    )
+                except Exception as exc:
+                    cancel_success = False
+                    logger.warning(
+                        "SHORT_TP_FALLBACK_CANCEL_FAILED %s",
+                        {
+                            "exchange_order_id": fallback_state.exchange_order_id,
+                            "error": str(exc),
+                        },
+                    )
+            if not cancel_success:
+                return
+            reset_short_tp_fallback(fallback_state)
+            self._store_short_tp_fallback_state(runtime_state, fallback_state)
+            self._clear_short_tp_fallback_order_context(runtime_state)
+            has_short_tp = any(
+                "SHORT_TP" in str(getattr(order, "purpose", "") or "")
+                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                for order in runtime_state.active_orders.values()
+            ) or any(
+                "SHORT_TP" in str(getattr(order, "purpose", "") or "")
+                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                for order in snapshot.active_orders
+            )
+            if not has_short_tp:
+                runtime_state.strategy_state["force_short_tp_rebuild"] = True
+
+        if not fallback_state.submitted:
+            log_extra = {
+                "original_trigger_price": fallback_state.original_trigger_price,
+                "activation_price": fallback_state.activation_price,
+                "lowest_price": fallback_state.lowest_price,
+                "current_price": current_price,
+                "age_seconds": round(age_seconds, 2),
+                "submitted": fallback_state.submitted,
+            }
+            if fallback_state.original_trigger_price > 0 and current_price >= (
+                fallback_state.original_trigger_price
+            ):
+                self._log_short_tp_fallback_event(
+                    "SHORT_TP_FALLBACK_RETRY_NORMAL_TP", fallback_state, current_price, extra=log_extra
+                )
+                _reset_fallback()
+                return
+            if age_seconds >= float(self.config.fallback_stale_seconds or 0.0):
+                self._log_short_tp_fallback_event(
+                    "SHORT_TP_FALLBACK_STALE_RESET", fallback_state, current_price, extra=log_extra
+                )
+                _reset_fallback()
+                return
+        if fallback_state.submitted and snapshot.short_qty <= 0:
+            self._log_short_tp_fallback_event("SHORT_TP_FALLBACK_FILLED", fallback_state, current_price)
+            _reset_fallback()
+            return
+        if snapshot.short_qty <= 0:
+            self._log_short_tp_fallback_event("SHORT_TP_FALLBACK_ABORTED", fallback_state, current_price)
+            _reset_fallback()
+            return
+        self._log_short_tp_fallback_event("SHORT_TP_FALLBACK_ACTIVE", fallback_state, current_price)
+        if fallback_state.submitted and not fallback_state.submit_failed:
+            if fallback_state.exchange_order_id:
+                return
+        if (
+            fallback_state.last_submit_attempt_ms
+            and now_ms - int(fallback_state.last_submit_attempt_ms) < 1000
+        ):
+            return
+        fallback_state.last_submit_attempt_ms = now_ms
+        submitted, response = update_short_tp_fallback(
+            fallback_state,
+            order_manager=context.order_manager,
+            symbol=self.config.symbol,
+            category=self.config.category,
+            current_price=current_price,
+            activation_drop_pct=self.config.short_tp_fallback_activation_drop_pct,
+            stop_offset_pct=self.config.short_tp_fallback_stop_offset_pct,
+        )
+        self._store_short_tp_fallback_state(runtime_state, fallback_state)
+        if submitted:
+            self._register_short_tp_fallback_order(runtime_state)
+            self._log_short_tp_fallback_event(
+                "SHORT_TP_FALLBACK_SUBMITTED",
+                fallback_state,
+                current_price,
+                extra={"response": response},
+            )
+        elif fallback_state.submit_failed:
+            self._log_short_tp_fallback_event(
+                "SHORT_TP_FALLBACK_SUBMIT_FAILED",
+                fallback_state,
+                current_price,
+                extra={"response": response},
+            )
+        elif response:
+            self._log_short_tp_fallback_event(
+                "SHORT_TP_FALLBACK_ACTIVE",
+                fallback_state,
+                current_price,
+                extra={"response": response},
+            )
 
     def on_start(
         self,
@@ -171,6 +371,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("last_exit_signature", None)
         state.setdefault("net_long_loss_balance", 0.0)
         state.setdefault("net_short_loss_balance", 0.0)
+        state.setdefault("realized_long_loss_total", 0.0)
+        self.realized_long_loss_total = float(state.get("realized_long_loss_total") or 0.0)
         state.setdefault("processed_pnl_exec_ids", set())
         state.setdefault("processed_pnl_exec_ids_order", [])
         state["recovery_marker_emitted"] = False
@@ -178,6 +380,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["exit_armed_marker_emitted"] = False
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("exit_rebuild_allowed", True)
+        state.setdefault("fresh_restart_required", False)
+        if state.get("fresh_restart_required"):
+            if (
+                snapshot.long_qty > 0
+                or snapshot.short_qty > 0
+                or not self._has_no_strategy_orders(snapshot)
+                or any(
+                    order.status not in {"FILLED", "CANCELED", "REJECTED"}
+                    for order in runtime_state.active_orders.values()
+                )
+            ):
+                return []
+            state["fresh_restart_required"] = False
 
         self._ensure_cycle_state(runtime_state)
 
@@ -286,6 +501,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         self._sync_state_from_snapshot(snapshot, runtime_state)
         self._update_initial_entry_confirmation(snapshot, runtime_state)
+        self._maybe_run_short_tp_fallback(snapshot, runtime_state, context)
+        if state.pop("force_short_tp_rebuild", False):
+            return self._rebuild_structure(snapshot, runtime_state, context, reason="short_tp_fallback_reset")
+        if state.get("fresh_restart_required"):
+            if (
+                snapshot.long_qty > 0
+                or snapshot.short_qty > 0
+                or not self._has_no_strategy_orders(snapshot)
+                or any(
+                    order.status not in {"FILLED", "CANCELED", "REJECTED"}
+                    for order in runtime_state.active_orders.values()
+                )
+            ):
+                return []
+            state["fresh_restart_required"] = False
 
         if (
             snapshot.long_qty <= 0
@@ -346,6 +576,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         state["bot_state"] = self.STATE_RECONCILING_AFTER_FILL
         self._advance_cycle_from_fill(fill_event, runtime_state, context)
+        if fill_event.metadata.get("short_tp_fallback") and fill_event.status == "FILLED":
+            fallback_state = self._get_short_tp_fallback_state(runtime_state)
+            self._log_short_tp_fallback_event(
+                "SHORT_TP_FALLBACK_FILLED",
+                fallback_state,
+                float(snapshot.current_price or fill_event.exec_price or 0.0),
+                extra={
+                    "client_order_id": fill_event.client_order_id,
+                    "exchange_order_id": fill_event.exchange_order_id,
+                },
+            )
+            reset_short_tp_fallback(fallback_state)
+            self._store_short_tp_fallback_state(runtime_state, fallback_state)
+            self._clear_short_tp_fallback_order_context(runtime_state)
 
         context.audit.log_event(
             "fixed_cycle_fill_handling_started",
@@ -368,6 +612,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 state["refill_state"] = {"REQUESTED": True}
                 return refill_intents
         fast_intents = self._fast_path_second_order(fill_event, refreshed_snapshot, runtime_state, context)
+        old_exit_trigger_prices = self._collect_exit_trigger_prices_from_snapshot(refreshed_snapshot)
+        self._log_realized_state(
+            tag="fixed_cycle_fill_state",
+            snapshot=refreshed_snapshot,
+            runtime_state=runtime_state,
+            stage="fill",
+            reason=fill_event.purpose,
+            old_exit_trigger_prices=old_exit_trigger_prices,
+            new_exit_trigger_prices={},
+            basket_tp_price=float(state.get("latest_tp_price") or 0.0),
+        )
 
         return fast_intents + self._rebuild_structure(refreshed_snapshot, runtime_state, context, reason="fill_reconcile")
 
@@ -562,6 +817,97 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state.strategy_state["last_structure_refresh_ms"] = now_ms
         return self._rebuild_structure(snapshot, runtime_state, context, reason=reason)
 
+    def _get_realized_net_pnl_total(
+        self, runtime_state: RuntimeState | None, snapshot: HedgeSnapshot | None = None
+    ) -> float:
+        total = 0.0
+        if runtime_state:
+            total = float(
+                (runtime_state.realized_long_pnl_total or 0.0)
+                + (runtime_state.realized_short_pnl_total or 0.0)
+            )
+        if abs(total) <= 1e-12 and snapshot:
+            total = float(snapshot.realized_pnl_total or 0.0)
+        return total
+
+    def _required_remaining_profit(
+        self, runtime_state: RuntimeState | None, snapshot: HedgeSnapshot | None = None
+    ) -> float:
+        required_target = float(self.config.target_profit_usdt or 0.0)
+        net_pnl = self._get_realized_net_pnl_total(runtime_state, snapshot)
+        return max(required_target - net_pnl, 0.0)
+
+    def _collect_exit_trigger_prices_from_snapshot(
+        self, snapshot: HedgeSnapshot | None
+    ) -> dict[str, float]:
+        prices: dict[str, float] = {}
+        if not snapshot:
+            return prices
+        exit_purposes = set(self._exit_purposes())
+        for order in snapshot.active_orders:
+            if not order or order.purpose not in exit_purposes:
+                continue
+            trigger = getattr(order, "trigger_price", None) or getattr(order, "price", None)
+            if trigger is None:
+                continue
+            prices[order.purpose] = float(trigger)
+        return prices
+
+    def _collect_exit_trigger_prices_from_intents(
+        self, intents: list[StrategyIntent]
+    ) -> dict[str, float]:
+        prices: dict[str, float] = {}
+        exit_purposes = set(self._exit_purposes())
+        for intent in intents:
+            if not intent or intent.purpose not in exit_purposes:
+                continue
+            trigger = intent.trigger_price or intent.price
+            if trigger is None:
+                continue
+            prices[intent.purpose] = float(trigger)
+        return prices
+
+    def _log_realized_state(
+        self,
+        *,
+        tag: str,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState,
+        stage: str,
+        reason: str | None,
+        old_exit_trigger_prices: dict[str, float],
+        new_exit_trigger_prices: dict[str, float],
+        basket_tp_price: float | None = None,
+    ) -> None:
+        state = runtime_state.strategy_state
+        fill_info = state.get("last_fill_info") or {}
+        long_pnl = float(runtime_state.realized_long_pnl_total or 0.0)
+        short_pnl = float(runtime_state.realized_short_pnl_total or 0.0)
+        net_pnl = self._get_realized_net_pnl_total(runtime_state, snapshot)
+        required_remaining_profit = self._required_remaining_profit(runtime_state, snapshot)
+        long_qty = float(snapshot.long_qty if snapshot else state.get("open_long_qty") or 0.0)
+        short_qty = float(snapshot.short_qty if snapshot else state.get("open_short_qty") or 0.0)
+        logger.info(
+            tag,
+            {
+                "stage": stage,
+                "reason": reason,
+                "fill_purpose": fill_info.get("fill_purpose"),
+                "confirmed_closed_pnl": fill_info.get("confirmed_closed_pnl"),
+                "realized_long_pnl_total": long_pnl,
+                "realized_short_pnl_total": short_pnl,
+                "realized_net_pnl_total": net_pnl,
+                "target_profit_usdt": float(self.config.target_profit_usdt or 0.0),
+                "required_remaining_profit": required_remaining_profit,
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+                "net_qty": long_qty - short_qty,
+                "old_exit_trigger_prices": old_exit_trigger_prices or {},
+                "new_exit_trigger_prices": new_exit_trigger_prices or {},
+                "basket_tp_price": basket_tp_price,
+            },
+        )
+
     def _rebuild_structure(
         self,
         snapshot: HedgeSnapshot,
@@ -742,6 +1088,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "only_exit_intents": len(downside_intents) == 0 and len(exit_intents) > 0,
             },
         )
+        old_exit_trigger_prices = self._collect_exit_trigger_prices_from_snapshot(snapshot)
+        new_exit_trigger_prices = self._collect_exit_trigger_prices_from_intents(exit_intents)
+        self._log_realized_state(
+            tag="fixed_cycle_rebuild_state",
+            snapshot=snapshot,
+            runtime_state=runtime_state,
+            stage="rebuild",
+            reason=reason,
+            old_exit_trigger_prices=old_exit_trigger_prices,
+            new_exit_trigger_prices=new_exit_trigger_prices,
+            basket_tp_price=tp_price,
+        )
         return intents
 
     def _build_downside_cycle_intents(
@@ -752,6 +1110,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         intents: list[StrategyIntent] = []
         state = runtime_state.strategy_state
+        if state.get("trailing_active"):
+            return intents
         open_initial_orders = self._collect_open_initial_entry_orders(snapshot)
         if open_initial_orders:
             context.audit.log_event(
@@ -1041,6 +1401,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         cycle_state = self._ensure_cycle_state(runtime_state)
         cycle_index = int(state.get("short_tp_pending_cycle") or 0)
+        fallback_state = self._get_short_tp_fallback_state(runtime_state)
+        if fallback_state.active:
+            current_price = float(snapshot.current_price or 0.0)
+
+            if current_price >= fallback_state.original_trigger_price:
+                logger.info("Fallback cancel → price recovered above trigger")
+                reset_short_tp_fallback(fallback_state)
+                self._store_short_tp_fallback_state(runtime_state, fallback_state)
+                self._clear_short_tp_fallback_order_context(runtime_state)
+            else:
+                return []
         if cycle_index <= 0 or not state.get("cycle_waiting_for_short_tp"):
             return []
 
@@ -1180,13 +1551,27 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         fee_rate = float(fee_rate)
 
         long_loss_usdt = max(-float(confirmed_closed_pnl or 0.0), 0.0)
-        long_add_loss_usdt = float(long_fill.get("last_long_add_loss_usdt", 0.0))
-        recovered_short_profit = float(
-            getattr(snapshot, "realized_short_pnl_total", 0.0) or 0.0
-        )
-        recovered_short_profit = max(recovered_short_profit, 0.0)
-        remaining_loss = max(long_add_loss_usdt - recovered_short_profit, 0.0)
-        required_net = remaining_loss + float(target_profit_usdt or 0.0)
+        required_net = max(long_loss_usdt + target_profit_usdt, 0.0)
+        required_remaining_profit = required_net
+        required_price_move = required_net / short_qty if short_qty > 0 else 0.0
+        if (
+            long_loss_usdt > 0
+            and required_net <= float(target_profit_usdt or 0.0)
+        ):
+            logger.warning(
+                "short_tp_required_net_suspicious",
+                extra={
+                    "long_loss_usdt": long_loss_usdt,
+                    "target_profit_usdt": target_profit_usdt,
+                    "required_net": required_net,
+                    "realized_net_pnl_total": self._get_realized_net_pnl_total(
+                        runtime_state, snapshot
+                    ),
+                    "confirmed_closed_pnl": confirmed_closed_pnl,
+                    "short_qty": short_qty,
+                    "short_entry_price": short_entry_price,
+                },
+            )
 
         if short_qty <= 0:
             context.audit.log_event(
@@ -1247,6 +1632,45 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         raw_trigger_price = max(tp_price, price_tick_size)
         trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
+        realized_net_pnl_total = self._get_realized_net_pnl_total(runtime_state, snapshot)
+        logger.debug(
+            "short_tp_loss_recovery",
+            extra={
+                "realized_net_pnl_total": realized_net_pnl_total,
+                "required_remaining_profit": required_remaining_profit,
+                "required_price_move": required_price_move,
+                "tp_price": tp_price,
+            },
+        )
+        current_price = float(snapshot.current_price or 0.0)
+        activation_price = trigger_price * (1 - self.config.short_tp_fallback_activation_drop_pct)
+        if current_price > 0 and current_price <= activation_price and not fallback_state.active:
+            started = start_short_tp_fallback(
+                fallback_state,
+                qty=short_qty,
+                original_trigger_price=trigger_price,
+                current_price=current_price,
+                activation_drop_pct=self.config.short_tp_fallback_activation_drop_pct,
+                stop_offset_pct=self.config.short_tp_fallback_stop_offset_pct,
+            )
+            if started:
+                runtime_state.strategy_state["short_tp_fallback_order_context"] = {
+                    "purpose": purpose,
+                    "cycle_index": cycle_index,
+                }
+                self._log_short_tp_fallback_event(
+                    "SHORT_TP_FALLBACK_START",
+                    fallback_state,
+                    current_price,
+                    extra={
+                        "short_tp_trigger_price": trigger_price,
+                        "activation_price": activation_price,
+                        "decision_reason": "current_price<=activation_price_and_fallback_inactive",
+                        "normal_tp_skipped": True,
+                    },
+                )
+                self._store_short_tp_fallback_state(runtime_state, fallback_state)
+                return []
         required_price_move = short_entry_price - trigger_price
         required_short_gross = short_qty * required_price_move
         price = self._normalize_price(
@@ -1496,6 +1920,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if context.cancel_open_orders_by_purpose:
             context.cancel_open_orders_by_purpose(self._exit_purposes())
 
+        cycle_idx = int(state.get("current_effective_cycle") or 0)
         metadata_base = {
             "basket_break_even_price": break_even_price,
             "basket_tp_price": tp_price,
@@ -1506,6 +1931,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             metadata = dict(metadata_base)
             metadata["replace_open_purpose"] = [purpose]
             metadata["exit_type"] = exit_type
+            metadata["cycle_index"] = cycle_idx
             return metadata
 
         if long_tp_valid:
@@ -1619,16 +2045,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         denominator = snapshot.long_qty - snapshot.short_qty
         if abs(denominator) <= 1e-9:
-            break_even_price = snapshot.current_price
+            base_break_even = snapshot.current_price
         else:
-            break_even_price = (
-            (snapshot.long_avg * snapshot.long_qty)
-            - (snapshot.short_avg * snapshot.short_qty)
-        ) / denominator
-        realized_long_loss = float(state.get("net_long_loss_balance") or 0.0)
-        realized_short_profit = 0.0
-        realized_short_loss = float(state.get("net_short_loss_balance") or 0.0)
-        loss_compensation = realized_long_loss + realized_short_loss
+            base_break_even = (
+                (snapshot.long_avg * snapshot.long_qty)
+                - (snapshot.short_avg * snapshot.short_qty)
+            ) / denominator
+        break_even_price = base_break_even
+        realized_long_pnl_total = float(snapshot.realized_long_pnl_total or 0.0)
+        realized_short_pnl_total = float(snapshot.realized_short_pnl_total or 0.0)
+        realized_net_pnl_total = realized_long_pnl_total + realized_short_pnl_total
+        realized_long_loss = max(-realized_long_pnl_total, 0.0)
+        realized_short_profit = max(realized_short_pnl_total, 0.0)
+        realized_short_loss = max(-realized_short_pnl_total, 0.0)
+        old_loss_compensation = float(state.get("net_long_loss_balance") or 0.0) + float(
+            state.get("net_short_loss_balance") or 0.0
+        )
+        loss_compensation = max(-realized_net_pnl_total, 0.0)
         if loss_compensation > 0 and abs(denominator) > 1e-9:
             break_even_price += loss_compensation / denominator
         logger.info(
@@ -1642,10 +2075,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "realized_pnl_total": snapshot.realized_pnl_total,
                 "realized_long_pnl_total": snapshot.realized_long_pnl_total,
                 "realized_short_pnl_total": snapshot.realized_short_pnl_total,
+                "realized_net_pnl_total": realized_net_pnl_total,
                 "realized_long_loss": realized_long_loss,
                 "realized_short_profit": realized_short_profit,
                 "realized_short_loss": realized_short_loss,
-                "loss_compensation": loss_compensation,
+                "old_loss_compensation": old_loss_compensation,
+                "corrected_loss_compensation": loss_compensation,
                 "denominator": denominator,
             },
         )
@@ -1658,17 +2093,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             CalculationTrace(
                 name="break_even_price",
                 formula=(
-                    "break_even = (long_avg*long_qty - short_avg*short_qty) / (long_qty - short_qty)"
+                    "break_even = base_break_even + "
+                    "max(-(realized_long_pnl_total + realized_short_pnl_total), 0) / (long_qty - short_qty)"
                 ),
                 inputs={
+                    "long_avg": snapshot.long_avg,
+                    "short_avg": snapshot.short_avg,
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "denominator": denominator,
                     "realized_long_pnl_total": snapshot.realized_long_pnl_total,
                     "realized_short_pnl_total": snapshot.realized_short_pnl_total,
-                    "realized_pnl_total": snapshot.realized_pnl_total,
-                    "short_avg": snapshot.short_avg,
-                    "short_qty": snapshot.short_qty,
-                    "long_avg": snapshot.long_avg,
-                    "long_qty": snapshot.long_qty,
-                    "denominator": denominator,
+                    "realized_net_pnl_total": realized_net_pnl_total,
+                    "loss_compensation": loss_compensation,
+                    "base_break_even": base_break_even,
                 },
                 result={"break_even_price": break_even_price},
                 details={
@@ -1676,6 +2114,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "realized_short_loss": realized_short_loss,
                     "loss_compensation": loss_compensation,
                     "realized_short_profit": realized_short_profit,
+                    "base_break_even": base_break_even,
                 },
             )
         ]
@@ -1752,24 +2191,38 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> float:
         if not snapshot:
             return 0.0
-        net_qty = snapshot.long_qty - snapshot.short_qty
-        if abs(net_qty) <= 1e-9:
-            if max(-snapshot.realized_long_pnl_total, 0.0) + max(-snapshot.realized_short_pnl_total, 0.0) > 0:
-                logger.warning(
-                    "fixed_cycle_loss_recovery_denominator_zero %s",
-                    {
-                        "long_qty": snapshot.long_qty,
-                        "short_qty": snapshot.short_qty,
-                        "realized_long_loss": max(-snapshot.realized_long_pnl_total, 0.0),
-                        "realized_short_loss": max(-snapshot.realized_short_pnl_total, 0.0),
-                    },
-                )
+        required_remaining_profit = self._required_remaining_profit(runtime_state, snapshot)
+        if required_remaining_profit <= 0:
             return 0.0
-        state = runtime_state.strategy_state if runtime_state else {}
-        realized_long_loss = float(state.get("net_long_loss_balance") or 0.0)
-        realized_short_loss = float(state.get("net_short_loss_balance") or 0.0)
-        loss_total = realized_long_loss + realized_short_loss
-        return loss_total / net_qty if loss_total > 0 else 0.0
+        net_qty = float(snapshot.long_qty or 0.0) - float(snapshot.short_qty or 0.0)
+        if net_qty <= 1e-9:
+            logger.warning(
+                "fixed_cycle_loss_recovery_denominator_zero",
+                {
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "net_qty": net_qty,
+                    "required_remaining_profit": required_remaining_profit,
+                },
+            )
+            return 0.0
+        return required_remaining_profit / net_qty
+
+    def _get_realized_long_loss_total(
+        self, runtime_state: RuntimeState | None
+    ) -> float:
+        stored_total = float(getattr(self, "realized_long_loss_total", 0.0) or 0.0)
+        if runtime_state:
+            stored_total = float(runtime_state.strategy_state.get("realized_long_loss_total") or stored_total)
+        return stored_total
+
+    def _add_realized_long_loss(self, runtime_state: RuntimeState, loss_usdt: float) -> None:
+        if loss_usdt <= 0:
+            return
+        state = runtime_state.strategy_state
+        total = float(state.get("realized_long_loss_total") or 0.0) + loss_usdt
+        state["realized_long_loss_total"] = total
+        self.realized_long_loss_total = total
 
     def _seed_initial_reference_if_missing(
         self,
@@ -1819,10 +2272,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext | None = None,
     ) -> None:
         cycle_index = int(fill_event.metadata.get("cycle_index") or 0)
-        if cycle_index <= 0:
+        purpose = fill_event.purpose or ""
+        exit_purposes = {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+        is_exit_fill = fill_event.status == "FILLED" and purpose in exit_purposes
+        if cycle_index <= 0 and not is_exit_fill:
             return
 
         state = runtime_state.strategy_state
+        fill_info = {
+            "fill_purpose": fill_event.purpose,
+            "confirmed_closed_pnl": None,
+        }
         cycle_state = self._ensure_cycle_state(runtime_state)
         snapshot = runtime_state.last_snapshot
         order_fully_completed = (
@@ -1832,7 +2292,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_state["symbol"] = self.config.symbol
         processed = set(cycle_state.get("processed_fill_ids") or [])
         fill_key = self._fill_persistence_key(fill_event)
-        if fill_key in processed:
+        purpose = fill_event.purpose or ""
+        exit_purposes = {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+        is_exit_fill = fill_event.status == "FILLED" and purpose in exit_purposes
+        if fill_key in processed and not is_exit_fill:
             return
 
         purpose = fill_event.purpose or ""
@@ -1937,6 +2400,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if confirmed_closed_pnl is not None:
                 long_add_loss_usdt = max(-float(confirmed_closed_pnl), 0.0)
                 long_fill["last_long_add_loss_usdt"] = long_add_loss_usdt
+                self._add_realized_long_loss(runtime_state, long_add_loss_usdt)
+                fill_info["confirmed_closed_pnl"] = confirmed_closed_pnl
             if float(cycle_state.get("entry_price") or 0.0) <= 0:
                 cycle_state["entry_price"] = fill_event.exec_price
 
@@ -2047,10 +2512,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             _emit_analyzer_event(logger, "analyzer_block_closed", payload)
             state["block_closed_marker_emitted"] = True
             self._reset_cycle_state(runtime_state)
+            state["fresh_restart_required"] = True
+            state["initial_entry_confirmed"] = False
+            state["initial_entry_submitted"] = False
+            state["initial_entry_retry_count"] = 0
+            state["entry_reference_price"] = 0.0
+            state["initial_long_qty"] = 0.0
+            state["initial_short_qty"] = 0.0
+            state["initial_total_notional_usdt"] = 0.0
+            state["last_exit_signature"] = None
+            state["net_long_loss_balance"] = 0.0
+            state["net_short_loss_balance"] = 0.0
 
         processed.add(fill_key)
         cycle_state["processed_fill_ids"] = list(processed)
         self._write_cycle_state(cycle_state)
+        state["last_fill_info"] = fill_info
 
     def _has_no_strategy_orders(self, snapshot: HedgeSnapshot) -> bool:
         valid_purposes = set(self._all_cycle_purposes() + self._exit_purposes())
@@ -2769,6 +3246,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["exit_armed_marker_emitted"] = False
         state["exit_rebuild_allowed"] = True
         state["long_add_rebuild_allowed"] = True
+        state["fresh_restart_required"] = False
         state["entry_reference_price"] = None
         state["last_exit_signature"] = None
         state["current_effective_cycle"] = 0
@@ -2778,6 +3256,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_state["entry_price"] = None
         state["net_long_loss_balance"] = 0.0
         state["net_short_loss_balance"] = 0.0
+        state["realized_long_loss_total"] = 0.0
+        self.realized_long_loss_total = 0.0
         state["processed_pnl_exec_ids"] = set()
         state["processed_pnl_exec_ids_order"] = []
         self._write_cycle_state(cycle_state)

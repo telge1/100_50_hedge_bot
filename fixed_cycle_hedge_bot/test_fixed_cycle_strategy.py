@@ -70,6 +70,9 @@ class FakeOrderManager:
         self.cancel_calls.append({"order_id": order_id, "symbol": symbol, "category": category})
         return True
 
+    def get_cached_instrument_rules(self, symbol: str, category: str = "linear") -> dict[str, float]:
+        return {}
+
     def ensure_hedge_mode(self, symbol: str, category: str = "linear") -> bool:
         return True
 
@@ -376,11 +379,107 @@ class FixedCycleStrategyTests(unittest.TestCase):
             source=baseline_snapshot.source,
             updated_at=baseline_snapshot.updated_at,
         )
+        runtime.runtime_state.strategy_state["net_long_loss_balance"] = 1.0
         break_even_with_loss, traces = runtime.strategy._calculate_break_even(loss_snapshot, runtime.runtime_state)
 
         self.assertGreater(break_even_with_loss, baseline_break_even)
         self.assertAlmostEqual(traces[0].details.get("realized_long_loss", 0.0), 1.0)
         self.assertAlmostEqual(traces[0].details.get("loss_compensation", 0.0), 1.0)
+
+    def test_tp_recovers_realized_long_loss_total_and_target_profit(self) -> None:
+        order_manager = FakeOrderManager()
+        config = FixedCycleHedgeConfig(
+            symbol="BTCUSDT",
+            category="linear",
+            rest_poll_after_fill_ms=0,
+            order_refresh_cooldown_ms=0,
+            max_cycles=3,
+            price_tick_size=0.1,
+            qty_step=0.001,
+            reduction_pct_per_fill=15,
+            long_fill_distance_pct=0.15,
+            target_profit_usdt=0.015,
+        )
+        runtime = self.build_runtime(order_manager, config=config)
+        runtime.bootstrap()
+
+        target_realized_long_loss = 0.145
+        runtime.runtime_state.strategy_state["realized_long_loss_total"] = target_realized_long_loss
+        runtime.strategy.realized_long_loss_total = target_realized_long_loss
+
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=105.0,
+            long_qty=1259.0,
+            short_qty=629.0,
+            long_avg=100.0,
+            short_avg=98.0,
+        )
+        break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
+        tp_price = runtime.strategy._calculate_tp_price(
+            break_even_price, snapshot, runtime.runtime_state
+        )
+
+        long_profit = max(tp_price - snapshot.long_avg, 0.0) * snapshot.long_qty
+        short_loss = max(tp_price - snapshot.short_avg, 0.0) * snapshot.short_qty
+        net_recovery = long_profit - short_loss - target_realized_long_loss
+
+        self.assertGreaterEqual(
+            net_recovery,
+            float(runtime.strategy.config.target_profit_usdt or 0.0) - 1e-9,
+            "basket TP should first recover realized long loss total before adding the target profit",
+        )
+
+    def test_required_remaining_profit_tracks_realized_net_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        config = FixedCycleHedgeConfig(
+            symbol="BTCUSDT",
+            category="linear",
+            rest_poll_after_fill_ms=0,
+            order_refresh_cooldown_ms=0,
+            max_cycles=3,
+            price_tick_size=0.1,
+            qty_step=0.001,
+            reduction_pct_per_fill=15,
+            long_fill_distance_pct=0.15,
+            target_profit_usdt=0.015,
+        )
+        runtime = self.build_runtime(order_manager, config=config)
+        runtime.bootstrap()
+
+        snapshot = runtime.runtime_state.last_snapshot
+        runtime.runtime_state.realized_long_pnl_total = -0.145
+        runtime.runtime_state.realized_short_pnl_total = 0.0
+        required = runtime.strategy._required_remaining_profit(
+            runtime.runtime_state, snapshot
+        )
+        self.assertAlmostEqual(
+            required,
+            float(config.target_profit_usdt) + 0.145,
+            msg="Required profit must include accrued long loss",
+        )
+
+        runtime.runtime_state.realized_short_pnl_total = 0.1
+        required_after_short_profit = runtime.strategy._required_remaining_profit(
+            runtime.runtime_state, snapshot
+        )
+        self.assertAlmostEqual(
+            required_after_short_profit,
+            float(config.target_profit_usdt)
+            - (runtime.runtime_state.realized_long_pnl_total + runtime.runtime_state.realized_short_pnl_total),
+            msg="Short profit reduces remaining required profit",
+        )
+
+        runtime.runtime_state.realized_long_pnl_total = 0.02
+        runtime.runtime_state.realized_short_pnl_total = 0.02
+        required_when_target_met = runtime.strategy._required_remaining_profit(
+            runtime.runtime_state, snapshot
+        )
+        self.assertEqual(
+            required_when_target_met,
+            0.0,
+            "Remaining profit should clamp to zero once net PnL exceeds the target",
+        )
 
     def test_adaptive_tp_price_moves_closer_for_healthy_structure(self) -> None:
         strategy = FixedCycleHedgeStrategy(

@@ -640,6 +640,57 @@ class BybitOrderManager:
         except (TypeError, ValueError):
             return None
 
+    def fetch_last_price(self, symbol: str, category: str = "linear") -> float | None:
+        data = self._get("/v5/market/tickers", {"symbol": symbol.upper(), "category": category})
+        if not data:
+            return None
+        result = data.get("result") or {}
+        tickers = result.get("list") or []
+        if not tickers:
+            return None
+        ticker = tickers[0]
+        price = ticker.get("lastPrice")
+        try:
+            return float(price)
+        except (TypeError, ValueError):
+            return None
+
+    def fetch_best_ask(self, symbol: str, category: str = "linear") -> float | None:
+        data = self._get("/v5/market/tickers", {"symbol": symbol.upper(), "category": category})
+        if not data:
+            return None
+        result = data.get("result") or {}
+        tickers = result.get("list") or []
+        if not tickers:
+            return None
+        ticker = tickers[0]
+        price = (
+            ticker.get("ask1Price")
+            or ticker.get("bestAskPrice")
+            or ticker.get("askPrice")
+            or ticker.get("bestAsk")
+        )
+        try:
+            return float(price)
+        except (TypeError, ValueError):
+            return None
+
+    def normalize_price(self, symbol: str, price: float, category: str = "linear") -> float:
+        if price <= 0:
+            return price
+        instrument = self.fetch_instrument_info(symbol, category)
+        if not instrument:
+            return price
+        price_filter = instrument.get("priceFilter") or {}
+        tick_size = Decimal(str(price_filter.get("tickSize") or "0"))
+        if tick_size <= 0:
+            return price
+        normalized_ticks = (Decimal(str(price)) / tick_size).to_integral_value(rounding=ROUND_DOWN)
+        normalized = normalized_ticks * tick_size
+        if normalized <= 0:
+            normalized = tick_size
+        return float(normalized)
+
     def normalize_qty(self, symbol: str, qty: float, category: str = "linear") -> float:
         if qty <= 0:
             return 0.0

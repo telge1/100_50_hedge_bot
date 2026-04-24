@@ -61,6 +61,7 @@ class FixedCycleHedgeConfig:
     order_refresh_cooldown_ms: int = 750
 
     price_tick_size: float = 0.1
+    trailing_stop_dist: float = 0.003
     qty_step: float = 0.001
     min_order_qty: float = 0.001
     min_notional_usdt: float = 5.0
@@ -751,6 +752,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         intents: list[StrategyIntent] = []
         state = runtime_state.strategy_state
+        if state.get("trailing_active"):
+            return intents
         open_initial_orders = self._collect_open_initial_entry_orders(snapshot)
         if open_initial_orders:
             context.audit.log_event(
@@ -859,9 +862,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_distance_pct_config = self.config.short_fill_distance_pct
         short_distance_pct = self._clamp_pct_fraction(self._pct(short_distance_pct_config))
         short_cycle_number = int(state.get("current_short_cycle_index") or 0) + 1
-        if state.get("cycle_waiting_for_long_tp") and state.get("cycle_short_reduce_filled"):
-            short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
-            intents.extend(short_intents)
+        short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
+        intents.extend(short_intents)
         if short_cycle_number <= self.config.max_cycles:
             purpose = self._cycle_purpose("short", short_cycle_number)
             previous_short_purpose = self._cycle_purpose("short", short_cycle_number - 1) if short_cycle_number > 1 else None
@@ -2694,7 +2696,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "last_cycle_reference_price": 0.0,
             "long_cycle_index": 0,
             "short_cycle_index": 0,
-            "long_add_pending": False,
+            "short_reduce_pending": False,
             "long_fills": {},
             "short_fills": {},
             "processed_fill_ids": [],
@@ -2751,7 +2753,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             int(state.get("long_tp_pending_cycle") or 0),
             int(cycle_state.get("long_tp_pending_cycle") or 0),
         )
-        state.setdefault("long_add_pending", bool(cycle_state.get("long_add_pending")))
+        state.setdefault("short_reduce_pending", bool(cycle_state.get("short_reduce_pending")))
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("short_add_rebuild_allowed", True)
         return cycle_state

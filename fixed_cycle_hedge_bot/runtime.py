@@ -27,6 +27,7 @@ from .models import (
 )
 from .order_manager import BybitOrderManager, OrderPayload
 from .position_manager import PositionManager
+from .trailing_fallback import TrailingFallbackManager
 
 
 @dataclass
@@ -79,6 +80,7 @@ class GenericHedgeRuntime:
         self._ws_thread: threading.Thread | None = None
         self._lock = threading.RLock()
         self._max_leverage_ready_symbols: set[tuple[str, str]] = set()
+        self._trailing_fallback = TrailingFallbackManager()
 
     def bootstrap(self) -> HedgeSnapshot:
         self._load_strategy_state()
@@ -121,6 +123,32 @@ class GenericHedgeRuntime:
     def process_tick(self) -> HedgeSnapshot:
         with self._lock:
             snapshot = self.refresh_snapshot("tick")
+            if self._trailing_fallback.active:
+                self._trailing_fallback.update(snapshot.current_price)
+                if self._trailing_fallback.should_submit():
+                    fallback_intent = StrategyIntent(
+                        purpose="TRAILING_SHORT_REDUCE",
+                        side="short",
+                        position_idx=2,
+                        qty=self._trailing_fallback.qty,
+                        order_type="Market",
+                        reduce_only=True,
+                    )
+
+                    self.audit.log_event(
+                        "trailing_fallback_triggered",
+                        strategy=self.strategy.name,
+                        intent=fallback_intent,
+                        trailing_lowest_price=self._trailing_fallback.state.lowest_price,
+                        trailing_max_rebound=self._trailing_fallback.state.max_rebound_price,
+                        trailing_dist=self._trailing_fallback.state.trailing_dist,
+                        snapshot_price=snapshot.current_price,
+                    )
+                    submitted_client_id = self.submit_intent(fallback_intent, snapshot, source="trailing_fallback")
+                    if submitted_client_id:
+                        self._trailing_fallback.mark_submitted()
+                        self._trailing_fallback.reset()
+                        self.runtime_state.strategy_state.pop("trailing_active", None)
             self._dispatch("tick", self.strategy.on_tick(snapshot, self.runtime_state, self.context), snapshot)
             return snapshot
 
@@ -409,6 +437,7 @@ class GenericHedgeRuntime:
             self._cancel_open_orders_by_purpose_internal(replace_purposes, replace_context)
         client_id = f"{self.strategy.name}-{intent.purpose.lower()}-{uuid4().hex[:10]}"
         current_price = snapshot.current_price
+        strategy_state = self.runtime_state.strategy_state
         if intent.trigger_price is not None:
             trigger_price = intent.trigger_price
             invalid_reason = None
@@ -423,6 +452,24 @@ class GenericHedgeRuntime:
                     direction=intent.trigger_direction,
                     reason="missing_current_price",
                 )
+                return None
+            if (
+                intent.position_idx == 2
+                and intent.trigger_direction == 2
+                and current_price <= trigger_price
+                and intent.metadata.get("cycle_role") == "short_reduce"
+            ):
+                if self._trailing_fallback.active:
+                    return None
+                self._trailing_fallback.activate(
+                    purpose=intent.purpose,
+                    position_idx=intent.position_idx,
+                    qty=intent.qty,
+                    trigger_price=trigger_price,
+                    current_price=current_price,
+                    trailing_dist=float(self.strategy.config.trailing_stop_dist),
+                )
+                strategy_state["trailing_active"] = intent.purpose
                 return None
             if intent.trigger_direction == 2 and trigger_price >= current_price:
                 invalid_reason = "falling_trigger_not_below_market"
