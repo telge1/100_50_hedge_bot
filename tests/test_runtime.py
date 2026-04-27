@@ -2,10 +2,19 @@ import logging
 import math
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fixed_cycle_hedge_bot.fixed_cycle_strategy import FixedCycleHedgeStrategy
+from fixed_cycle_hedge_bot.models import (
+    HedgeSnapshot as FixedCycleHedgeSnapshot,
+    StrategyIntent as FixedCycleStrategyIntent,
+)
+from fixed_cycle_hedge_bot.runtime import (
+    GenericHedgeRuntime as FixedCycleRuntime,
+    GenericRuntimeConfig as FixedCycleRuntimeConfig,
+)
 from modular_hedge_runtime.audit_logger import AuditLogger
 from modular_hedge_runtime.base import StrategyContext
 from modular_hedge_runtime.models import (
@@ -22,6 +31,9 @@ class DummyOrderManager:
         self.positions = []
         self.open_orders = []
         self.order_history = {}
+        self.last_reduce_kwargs: dict[str, Any] | None = None
+        self.reduce_call_count = 0
+        self.last_post_error: dict[str, Any] | None = None
 
     def fetch_positions(self, *args, **kwargs):
         return list(self.positions)
@@ -49,13 +61,50 @@ class DummyOrderManager:
         return 0.0
 
     def place_limit_order(self, payload):
-        return {"result": {"orderId": f"limit-{payload['order_link_id']}"}}
+        order_link_id = getattr(payload, "order_link_id", None)
+        if isinstance(payload, dict):
+            order_link_id = payload.get("order_link_id", order_link_id)
+        return {"result": {"orderId": f"limit-{order_link_id or 'limit'}"}}
 
     def place_reduce_market_order(self, **kwargs):
+        self.reduce_call_count += 1
+        self.last_reduce_kwargs = kwargs
+        self.last_post_error = None
         return {"result": {"orderId": f"reduce-{kwargs.get('order_link_id', 'reduce')}"}}
 
     def place_market_order(self, **kwargs):
         return {"result": {"orderId": f"market-{kwargs.get('order_link_id', 'market')}"}}
+
+    def ensure_hedge_mode(self, *args, **kwargs):
+        return True
+
+    def ensure_max_leverage(self, *args, **kwargs):
+        return True
+
+    def get_cached_instrument_rules(self, *args, **kwargs):
+        return {}
+
+
+class RejectingReduceOrderManager(DummyOrderManager):
+    def __init__(self, fail_fallback: bool = False):
+        super().__init__()
+        self.fail_fallback = fail_fallback
+
+    def place_reduce_market_order(self, **kwargs):
+        self.reduce_call_count += 1
+        self.last_reduce_kwargs = kwargs
+        if self.reduce_call_count == 1:
+            self.last_post_error = {"retCode": 110093, "retMsg": "expect Falling"}
+            return None
+        if self.fail_fallback:
+            self.last_post_error = {"retCode": 110093, "retMsg": "expect Falling"}
+            return None
+        self.last_post_error = None
+        return {
+            "result": {
+                "orderId": f"reduce-{kwargs.get('order_link_id', 'reduce')}-{self.reduce_call_count}"
+            }
+        }
 
 
 def build_runtime(order_manager: DummyOrderManager | None = None) -> GenericHedgeRuntime:
@@ -71,6 +120,44 @@ def build_runtime(order_manager: DummyOrderManager | None = None) -> GenericHedg
     )
     runtime.context.refresh_snapshot = runtime.refresh_snapshot
     return runtime
+
+
+def build_fixed_cycle_runtime(order_manager: DummyOrderManager | None = None) -> FixedCycleRuntime:
+    config = FixedCycleRuntimeConfig(
+        api_key="test",
+        secret_key="test",
+        ensure_exchange_ready=False,
+    )
+    runtime = FixedCycleRuntime(
+        config,
+        FixedCycleHedgeStrategy(),
+        order_manager=order_manager or DummyOrderManager(),
+    )
+    runtime.context.refresh_snapshot = runtime.refresh_snapshot
+    return runtime
+
+
+def _build_long_add_intent(
+    *,
+    qty: float,
+    trigger_price: float,
+    purpose: str = "CYCLE_1_LONG_ADD",
+) -> FixedCycleStrategyIntent:
+    return FixedCycleStrategyIntent(
+        side="long",
+        qty=qty,
+        purpose=purpose,
+        order_type="Market",
+        reduce_only=True,
+        trigger_price=trigger_price,
+        trigger_direction=2,
+        trigger_by="LastPrice",
+        close_on_trigger=True,
+        position_idx=1,
+        metadata={
+            "cycle_role": "long_reduce",
+        },
+    )
 
 
 def _create_managed_order(
@@ -728,3 +815,88 @@ def test_short_tp_pair_falls_back_to_initial_short_qty():
         3.0,
         rel_tol=1e-9,
     )
+
+
+def test_long_add_stale_trigger_market_fallback():
+    manager = DummyOrderManager()
+    runtime = build_fixed_cycle_runtime(order_manager=manager)
+    logs: list[tuple[str, dict]] = []
+
+    def capture(event: str, **kwargs):
+        logs.append((event, kwargs))
+
+    runtime.audit.log_event = capture
+    snapshot = FixedCycleHedgeSnapshot(
+        symbol="CHIPUSDT",
+        current_price=9.0,
+        long_qty=3.0,
+        short_qty=0.0,
+        long_avg=9.5,
+        short_avg=0.0,
+    )
+    intent = _build_long_add_intent(qty=5.0, trigger_price=10.0)
+
+    client_id = runtime.submit_intent(intent, snapshot, source="test")
+    assert client_id
+    assert manager.last_reduce_kwargs
+    assert manager.last_reduce_kwargs["qty"] == 3.0
+    assert manager.last_reduce_kwargs.get("trigger_price") is None
+    assert any(event == "pre_long_add_trigger_validation" for event, _ in logs)
+    assert any(event == "stale_long_add_trigger_market_fallback" for event, _ in logs)
+    assert any(event == "long_add_market_fallback_submitted" for event, _ in logs)
+    active = runtime.runtime_state.active_orders.get(client_id)
+    assert active
+    assert active.purpose == "CYCLE_1_LONG_ADD"
+
+
+def test_long_add_conditional_rejection_triggers_market_fallback():
+    manager = RejectingReduceOrderManager()
+    runtime = build_fixed_cycle_runtime(order_manager=manager)
+    logs: list[tuple[str, dict]] = []
+
+    def capture(event: str, **kwargs):
+        logs.append((event, kwargs))
+
+    runtime.audit.log_event = capture
+    snapshot = FixedCycleHedgeSnapshot(
+        symbol="CHIPUSDT",
+        current_price=110.0,
+        long_qty=10.0,
+        short_qty=0.0,
+        long_avg=110.0,
+        short_avg=0.0,
+    )
+    intent = _build_long_add_intent(qty=5.0, trigger_price=100.0)
+
+    client_id = runtime.submit_intent(intent, snapshot, source="test")
+    assert client_id
+    assert manager.reduce_call_count == 2
+    assert manager.last_reduce_kwargs
+    assert manager.last_reduce_kwargs["qty"] == 5.0
+    assert manager.last_reduce_kwargs.get("trigger_price") is None
+    assert any(event == "long_add_conditional_rejected_market_fallback" for event, _ in logs)
+    assert any(event == "long_add_market_fallback_submitted" for event, _ in logs)
+
+
+def test_long_add_market_fallback_failure_logged():
+    manager = RejectingReduceOrderManager(fail_fallback=True)
+    runtime = build_fixed_cycle_runtime(order_manager=manager)
+    logs: list[tuple[str, dict]] = []
+
+    def capture(event: str, **kwargs):
+        logs.append((event, kwargs))
+
+    runtime.audit.log_event = capture
+    snapshot = FixedCycleHedgeSnapshot(
+        symbol="CHIPUSDT",
+        current_price=110.0,
+        long_qty=5.0,
+        short_qty=0.0,
+        long_avg=110.0,
+        short_avg=0.0,
+    )
+    intent = _build_long_add_intent(qty=3.0, trigger_price=100.0)
+
+    assert runtime.submit_intent(intent, snapshot, source="test") is None
+    assert manager.reduce_call_count == 2
+    assert any(event == "long_add_market_fallback_failed" for event, _ in logs)

@@ -255,11 +255,14 @@ Exit = Basket-BE + Verlust-Rückholung + Zielprofit + Puffer
 
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log && \
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_calc_audit.log && \
 rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.stdout.log
 
 ./start_fixed_cycle.sh
 
 python analyze_hedge_logs.py --mode blocks
+
+python3 /home/telgenbuescher/projects/spread_recovery_hedge/fixed_cycle_hedge_bot/tools/coin_scanner.py
 
 
 python fixed_cycle_hedge_bot/tools/simulator.py \

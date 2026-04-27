@@ -248,8 +248,27 @@ class FixedCycleStrategyTests(unittest.TestCase):
         recorded_intents: list[list] = []
         original_build_exit = runtime.strategy._build_exit_intents
 
-        def capturing(self, snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context):
-            result = original_build_exit(snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context)
+        def capturing(
+            self,
+            snapshot,
+            runtime_state,
+            current_cycle,
+            break_even_price,
+            tp_price,
+            hard_stop_active,
+            context,
+            force_exit_rebuild=False,
+        ):
+            result = original_build_exit(
+                snapshot,
+                runtime_state,
+                current_cycle,
+                break_even_price,
+                tp_price,
+                hard_stop_active,
+                context,
+                force_exit_rebuild=force_exit_rebuild,
+            )
             recorded_intents.append(result)
             return result
 

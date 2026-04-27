@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit-Verlauf - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .equity-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        .equity-card {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4a9eff;
+        }
+        .equity-card h3 { margin: 0 0 12px 0; color: #4a9eff; font-size: 22px; font-weight: 600; }
+        .equity-value { font-size: 38px; font-weight: 700; color: #fff; }
+        .equity-available { font-size: 15px; color: #94a3b8; margin-top: 4px; }
+        .equity-available .equity-available-value { color: #cbd5e1; font-weight: 600; }
+        .equity-adjusted { font-size: 18px; color: #888; margin-top: 8px; }
+        .equity-adjusted .equity-adjusted-value { color: #b0b0b0; font-weight: 600; }
+        .profit-verlauf-container {
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        .profit-verlauf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .profit-verlauf-header h2 { margin: 0; font-size: 24px; color: #fff; }
+        .account-select {
+            padding: 10px 16px;
+            font-size: 16px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .btn-refresh {
+            padding: 10px 18px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-refresh:hover { opacity: 0.9; }
+        .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+        .closed-pnl-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .closed-pnl-table th,
+        .closed-pnl-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        .closed-pnl-table th {
+            background: #252525;
+            color: #4a9eff;
+            font-weight: 600;
+        }
+        .closed-pnl-table tr:hover { background: rgba(255,255,255,0.03); }
+        .closed-pnl-table .pnl-positive { color: #4caf50; }
+        .closed-pnl-table .pnl-negative { color: #f44336; }
+        .closed-pnl-table .pnl-zero { color: #888; }
+        .closed-pnl-table .wallet-cell { white-space: nowrap; color: #b0b0b0; }
+        .loading { text-align: center; padding: 30px; color: #888; }
+        /* Mobile: Position Calculator im Menü ausblenden */
+        @media (max-width: 900px) {
+            .dashboard-navigation .nav-link-position-calculator {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📈 Profit-Verlauf</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link active">📈 Profit-Verlauf</a>
+            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+        </div>
+        
+        <div class="dashboard-content">
+            <!-- Profil-Auswahl (Main/Sub vs Long_bot_1/Short_bot_1 vs Long_bot_2/Short_bot_2) -->
+            <div class="profit-verlauf-header" style="margin-bottom: 15px;">
+                <span style="font-size: 16px; color: #888;">Profil:</span>
+                <select id="profileSelect" class="account-select" title="Account-Paar für Equity und Unrealised PnL">
+                    <option value="main">Main / Sub</option>
+                    <option value="bot_1">Long_bot_1 / Short_bot_1</option>
+                    <option value="bot_2">Long_bot_2 / Short_bot_2</option>
+                </select>
+            </div>
+            <!-- Equity Section (Labels dynamisch je Profil) -->
+            <div class="equity-section">
+                <div class="equity-card">
+                    <h3 id="equityLabelMain">🟢 Main Account</h3>
+                    <div class="equity-value" id="mainMarginBalance">--</div>
+                    <div class="equity-available" id="mainAvailableBalanceWrap">Available: <span class="equity-available-value" id="mainAvailableBalance">--</span></div>
+                    <div class="equity-adjusted" id="mainAdjustedEquityWrap">≈ <span class="equity-adjusted-value" id="mainAdjustedEquity">--</span> (Wallet + Unrealised PnL)</div>
+                </div>
+                <div class="equity-card">
+                    <h3 id="equityLabelSub">🔴 Sub Account</h3>
+                    <div class="equity-value" id="subMarginBalance">--</div>
+                    <div class="equity-available" id="subAvailableBalanceWrap">Available: <span class="equity-available-value" id="subAvailableBalance">--</span></div>
+                    <div class="equity-adjusted" id="subAdjustedEquityWrap">≈ <span class="equity-adjusted-value" id="subAdjustedEquity">--</span> (Wallet + Unrealised PnL)</div>
+                </div>
+                <div class="equity-card">
+                    <h3>💰 Total Equity</h3>
+                    <div class="equity-value" id="totalEquity">--</div>
+                    <div class="equity-available" id="totalAvailableBalanceWrap">Available: <span class="equity-available-value" id="totalAvailableBalance">--</span></div>
+                    <div class="equity-adjusted" id="totalAdjustedEquityWrap">≈ <span class="equity-adjusted-value" id="totalAdjustedEquity">--</span> (Wallet + Unrealised PnL)</div>
+                </div>
+            </div>
+                    
+            <!-- Closed PnL Section -->
+            <div class="profit-verlauf-container">
+                <div class="profit-verlauf-header">
+                    <h2>📋 Closed PnL</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="accountSelect" class="account-select">
+                            <option value="main">Main</option>
+                            <option value="sub">Sub</option>
+                            <option value="Long_bot_1">Long_bot_1</option>
+                            <option value="Short_bot_1">Short_bot_1</option>
+                            <option value="Long_bot_2">Long_bot_2</option>
+                            <option value="Short_bot_2">Short_bot_2</option>
+                        </select>
+                        <button type="button" id="refreshClosedPnlBtn" class="btn-refresh" title="Daten neu laden">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div id="closedPnlContent">
+                    <div class="loading">Lade Closed PnL...</div>
+                    </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let lastMainUnrealisedPnl = 0;
+        let lastSubUnrealisedPnl = 0;
+
+        /** Aktuell gewähltes Profil (main, bot_1, bot_2). Aus URL oder Select. */
+        function getSelectedProfile() {
+            const fromUrl = new URLSearchParams(window.location.search).get('profile');
+            if (fromUrl && ['main', 'bot_1', 'bot_2'].includes(fromUrl)) return fromUrl;
+            const sel = document.getElementById('profileSelect');
+            if (sel && sel.value && ['main', 'bot_1', 'bot_2'].includes(sel.value)) return sel.value;
+            return 'main';
+        }
+
+        /** Profile-Query an API-URL anhängen. */
+        function addProfileToUrl(url) {
+            const p = getSelectedProfile();
+            const sep = url.indexOf('?') >= 0 ? '&' : '?';
+            return url + sep + 'profile=' + encodeURIComponent(p || 'main');
+        }
+
+        /** Equity-Labels je Profil aktualisieren. */
+        function updateEquityLabels() {
+            const p = getSelectedProfile();
+            const mainEl = document.getElementById('equityLabelMain');
+            const subEl = document.getElementById('equityLabelSub');
+            if (p === 'bot_1') {
+                if (mainEl) mainEl.textContent = '🟢 Long_bot_1';
+                if (subEl) subEl.textContent = '🔴 Short_bot_1';
+            } else if (p === 'bot_2') {
+                if (mainEl) mainEl.textContent = '🟢 Long_bot_2';
+                if (subEl) subEl.textContent = '🔴 Short_bot_2';
+            } else {
+                if (mainEl) mainEl.textContent = '🟢 Main Account';
+                if (subEl) subEl.textContent = '🔴 Sub Account';
+            }
+        }
+
+        function parseMarginFromDom(id) {
+            const el = document.getElementById(id);
+            if (!el) return 0;
+            const raw = (el.textContent || '').replace(/\s*USDT\s*/gi, '').trim();
+            if (!raw || raw === '--') return 0;
+            const n = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function updateAdjustedEquityDisplay(optMain, optSub) {
+            const mainMargin = optMain != null ? Number(optMain) : parseMarginFromDom('mainMarginBalance');
+            const subMargin = optSub != null ? Number(optSub) : parseMarginFromDom('subMarginBalance');
+            const mainAdjusted = mainMargin + Math.abs(lastMainUnrealisedPnl);
+            const subAdjusted = subMargin + Math.abs(lastSubUnrealisedPnl);
+            const totalAdjusted = mainAdjusted + subAdjusted;
+            const fmt = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+            const mainEl = document.getElementById('mainAdjustedEquity');
+            const subEl = document.getElementById('subAdjustedEquity');
+            const totalEl = document.getElementById('totalAdjustedEquity');
+            if (mainEl) mainEl.textContent = fmt(mainAdjusted);
+            if (subEl) subEl.textContent = fmt(subAdjusted);
+            if (totalEl) totalEl.textContent = fmt(totalAdjusted);
+        }
+
+        async function loadAllSymbolsUnrealisedPnl() {
+            try {
+                const symRes = await fetch(addProfileToUrl('/api/hedge/symbols?positions_only=true'), { credentials: 'include', signal: AbortSignal.timeout(12000) });
+                if (!symRes.ok) return;
+                const symData = await symRes.json();
+                const symbols = (symData.success && symData.symbols && symData.symbols.length) ? symData.symbols : [];
+                if (symbols.length === 0) {
+                    lastMainUnrealisedPnl = 0;
+                    lastSubUnrealisedPnl = 0;
+                    updateAdjustedEquityDisplay();
+                    return;
+                }
+                const positionPromises = symbols.map(sym =>
+                    fetch(addProfileToUrl(`/api/hedge/positions/${encodeURIComponent(sym)}`), { credentials: 'include', signal: AbortSignal.timeout(25000) }).then(r => r.ok ? r.json() : null).catch(() => null)
+                );
+                const results = await Promise.all(positionPromises);
+                let totalMain = 0, totalSub = 0;
+                for (const data of results) {
+                    if (!data || !data.success) continue;
+                    const long = data.long || {}, short = data.short || {};
+                    const sub = data.sub || {}, subLong = sub.long || {}, subShort = sub.short || {};
+                    const longPnl = long.unrealised_pnl ?? 0, shortPnl = short.unrealised_pnl ?? 0;
+                    const subLongPnl = subLong.unrealised_pnl ?? 0, subShortPnl = subShort.unrealised_pnl ?? 0;
+                    if (longPnl < 0) totalMain += longPnl;
+                    if (shortPnl < 0) totalMain += shortPnl;
+                    if (subLongPnl < 0) totalSub += subLongPnl;
+                    if (subShortPnl < 0) totalSub += subShortPnl;
+                }
+                lastMainUnrealisedPnl = totalMain;
+                lastSubUnrealisedPnl = totalSub;
+                updateAdjustedEquityDisplay();
+            } catch (e) {
+                lastMainUnrealisedPnl = 0;
+                lastSubUnrealisedPnl = 0;
+                updateAdjustedEquityDisplay();
+            }
+        }
+
+        async function loadEquity() {
+            try {
+                const response = await fetch(addProfileToUrl('/api/hedge/equity'), { signal: AbortSignal.timeout(35000) });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (data.success) {
+                    const mainVal = data.main_margin_balance != null ? Number(data.main_margin_balance) : 0;
+                    const subVal = data.sub_margin_balance != null ? Number(data.sub_margin_balance) : 0;
+                    const totalVal = mainVal + subVal;
+                    const fmt = (v) => v != null ? v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT' : '--';
+                    document.getElementById('mainMarginBalance').textContent = data.main_margin_balance != null ? fmt(data.main_margin_balance) : '--';
+                    document.getElementById('subMarginBalance').textContent = data.sub_margin_balance != null ? fmt(data.sub_margin_balance) : '--';
+                    document.getElementById('totalEquity').textContent = fmt(totalVal);
+                    const mainAv = data.main_available_balance;
+                    const subAv = data.sub_available_balance;
+                    document.getElementById('mainAvailableBalance').textContent = fmt(mainAv);
+                    document.getElementById('subAvailableBalance').textContent = fmt(subAv);
+                    const totalAv = (mainAv != null ? Number(mainAv) : 0) + (subAv != null ? Number(subAv) : 0);
+                    document.getElementById('totalAvailableBalance').textContent = totalAv > 0 ? fmt(totalAv) : '--';
+                    await loadAllSymbolsUnrealisedPnl();
+                    const account = document.getElementById('accountSelect')?.value;
+                    const cache = typeof closedPnlCache !== 'undefined' && closedPnlCache[account];
+                    if (cache && cache.length) renderClosedPnlTable(cache);
+                }
+            } catch (e) { console.error('loadEquity:', e); }
+        }
+
+        function formatTime(ms) {
+            if (!ms) return '--';
+            const ts = parseInt(ms, 10);
+            if (isNaN(ts) || ts <= 0) return '--';
+            const d = new Date(ts);
+            // Hinweis: Server/Bybit liefern UTC-Timestamps, wir zeigen hier lokal UTC+3 (z.B. Zypern)
+            return d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Moscow' });
+        }
+
+        /** P&L-Formatierung wie Bybit: 4 Dezimalstellen */
+        function formatPnl(v) {
+            const n = parseFloat(v);
+            if (isNaN(n)) return '--';
+            return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        }
+
+        function pnlClass(v) {
+            const n = parseFloat(v);
+            if (n > 0) return 'pnl-positive';
+            if (n < 0) return 'pnl-negative';
+            return 'pnl-zero';
+        }
+
+        /** Bybit: Side=Sell = Long geschlossen, Side=Buy = Short geschlossen */
+        function sideToType(side) {
+            const s = (side || '').toLowerCase();
+            if (s === 'sell') return 'Long';
+            if (s === 'buy') return 'Short';
+            return side || '--';
+        }
+
+        /** Eindeutiger Schlüssel pro Closed-PnL-Eintrag (Bybit: orderId oder Fallback) */
+        function recordKey(r) {
+            const id = r.orderId || r.id;
+            if (id) return String(id);
+            const ts = r.updatedTime || r.createdTime || 0;
+            return `${ts}-${r.symbol || ''}-${(r.side || '').toLowerCase()}-${r.closedPnl}-${r.closedSize || ''}`;
+        }
+
+        /** Cache: pro Account alle bekannten Einträge (Verlauf bleibt erhalten, neue werden hinzugefügt) */
+        const CLOSED_PNL_ACCOUNTS = ['main', 'sub', 'Long_bot_1', 'Short_bot_1', 'Long_bot_2', 'Short_bot_2'];
+        let closedPnlCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, []]));
+        const CLOSED_PNL_CACHE_MAX = 500; // Obergrenze pro Account
+
+        function computeNettoPairs(list) {
+            const TIME_WINDOW_MS = 15 * 60 * 1000; // 15 Minuten (Burn-Zyklus kann mehrere Minuten dauern)
+            const paired = new Set();
+            const nettoByIndex = {};
+            const records = list.map((r, i) => ({
+                ...r,
+                _idx: i,
+                _ts: parseInt(r.updatedTime || r.createdTime || 0, 10),
+                _pnl: parseFloat(r.closedPnl || 0),
+                _side: (r.side || '').toLowerCase()
+            })).sort((a, b) => a._ts - b._ts);
+
+            // Sonderfall: Genau 2 Einträge, gleiches Symbol → immer Gesamt profit berechnen und nur einmal anzeigen
+            if (list.length === 2 && records[0].symbol === records[1].symbol) {
+                const netto = records[0]._pnl + records[1]._pnl;
+                const showInIdx = records[0]._ts <= records[1]._ts ? records[0]._idx : records[1]._idx;
+                nettoByIndex[showInIdx] = netto;
+                return nettoByIndex;
+            }
+
+            for (let i = 0; i < records.length; i++) {
+                if (paired.has(i)) continue;
+                const a = records[i];
+                for (let j = i + 1; j < records.length; j++) {
+                    if (paired.has(j)) continue;
+                    const b = records[j];
+                    if (a.symbol !== b.symbol) continue;
+                    if (b._ts - a._ts > TIME_WINDOW_MS) break;
+                    const netto = a._pnl + b._pnl;
+                    const showInIdx = a._ts <= b._ts ? a._idx : b._idx;
+                    nettoByIndex[showInIdx] = netto;
+                    paired.add(i);
+                    paired.add(j);
+                    break;
+                }
+            }
+            return nettoByIndex;
+        }
+
+        /** Aktuellen Wallet-Wert für gewählten Account: DOM (main/sub) oder lastMarginByAccount (Bot-Accounts).
+         * Bei Profil bot_1: Long_bot_1/Short_bot_1 werden aus Equity-Karten (main/sub) gelesen. */
+        let lastMarginByAccount = {};
+        function getCurrentWalletForAccount(account) {
+            const acc = account || document.getElementById('accountSelect')?.value;
+            const profile = getSelectedProfile();
+            if (acc === 'main') {
+                const el = document.getElementById('mainMarginBalance');
+                return (el && el.textContent) ? el.textContent.trim() : '--';
+            }
+            if (acc === 'sub') {
+                const el = document.getElementById('subMarginBalance');
+                return (el && el.textContent) ? el.textContent.trim() : '--';
+            }
+            if (profile === 'bot_1' && (acc === 'Long_bot_1' || acc === 'Short_bot_1')) {
+                const el = acc === 'Long_bot_1' ? document.getElementById('mainMarginBalance') : document.getElementById('subMarginBalance');
+                return (el && el.textContent) ? el.textContent.trim() : '--';
+            }
+            if (profile === 'bot_2' && (acc === 'Long_bot_2' || acc === 'Short_bot_2')) {
+                const el = acc === 'Long_bot_2' ? document.getElementById('mainMarginBalance') : document.getElementById('subMarginBalance');
+                return (el && el.textContent) ? el.textContent.trim() : '--';
+            }
+            const stored = lastMarginByAccount[acc];
+            if (stored != null && Number.isFinite(stored)) {
+                return stored.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+            }
+            return '--';
+        }
+
+        /** Wallet-String (z.B. "39,92 USDT") in Zahl parsen. */
+        function parseWalletToNumber(walletText) {
+            if (!walletText || walletText === '--') return null;
+            const raw = String(walletText).replace(/\s*USDT\s*/gi, '').trim();
+            if (!raw) return null;
+            const normalized = raw.replace(/\./g, '').replace(',', '.');
+            const n = parseFloat(normalized);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function formatWalletUsdt(value) {
+            if (value == null || !Number.isFinite(value)) return '--';
+            return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+        }
+
+        function renderClosedPnlTable(list) {
+            const content = document.getElementById('closedPnlContent');
+            if (!list || list.length === 0) {
+                content.innerHTML = '<div class="loading">Keine Closed-PnL-Einträge.</div>';
+                return;
+            }
+            // Immer nach Zeit sortieren (neueste zuerst), gleiche Logik wie Main – damit Sub dieselbe Reihenfolge hat
+            const ts = r => parseInt(r.updatedTime || r.createdTime || 0, 10);
+            list = [...list].sort((a, b) => ts(b) - ts(a));
+            const account = document.getElementById('accountSelect')?.value || 'main';
+            const walletLabel = 'Wallet (' + (account === 'sub' ? 'Sub' : account === 'main' ? 'Main' : account) + ')';
+            const walletText = getCurrentWalletForAccount(account);
+            const currentWallet = parseWalletToNumber(walletText);
+            const nettoByIndex = computeNettoPairs(list);
+            // Liste neueste zuerst. Wallet genau zu diesem Zeitpunkt = aktueller Wallet − alle PnL die danach realisiert wurden (Zeilen darüber)
+            let cumulativePnlNachher = 0;
+            const rows = list.map((r, i) => {
+                const pnl = parseFloat(r.closedPnl || 0);
+                const walletZuDiesemZeitpunkt = currentWallet != null ? currentWallet - cumulativePnlNachher : null;
+                cumulativePnlNachher += pnl;
+                const netto = nettoByIndex[i];
+                const nettoCell = netto !== undefined
+                    ? `<span class="${pnlClass(netto)}">${formatPnl(netto)}</span>`
+                    : '--';
+                const typ = sideToType(r.side);
+                const walletCellText = formatWalletUsdt(walletZuDiesemZeitpunkt);
+                return `<tr>
+                    <td>${formatTime(r.updatedTime || r.createdTime)}</td>
+                    <td>${r.symbol || '--'}</td>
+                    <td>${typ}</td>
+                    <td><span class="${pnlClass(pnl)}">${formatPnl(pnl)}</span></td>
+                    <td>${nettoCell}</td>
+                    <td class="wallet-cell" title="Wallet-Stand genau zu diesem Zeitpunkt">${walletCellText}</td>
+                </tr>`;
+            }).join('');
+            content.innerHTML = `<table class="closed-pnl-table">
+                <thead><tr><th>Zeit</th><th>Coin</th><th>Typ</th><th>P&L</th><th>Netto-P&L</th><th>${walletLabel}</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        async function loadClosedPnl() {
+            const account = document.getElementById('accountSelect').value;
+            const content = document.getElementById('closedPnlContent');
+            const btn = document.getElementById('refreshClosedPnlBtn');
+            const cache = closedPnlCache[account] || [];
+            const isFirstLoad = cache.length === 0;
+            if (isFirstLoad) content.innerHTML = '<div class="loading">Lade Closed PnL...</div>';
+            if (btn) btn.disabled = true;
+            try {
+                const response = await fetch(`/api/profit-verlauf/closed-pnl?account=${account}&limit=50`, {
+                    signal: AbortSignal.timeout(20000)
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    content.innerHTML = `<div class="loading" style="color:#f44336">${data.error || 'Fehler'}</div>`;
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                const list = data.list || [];
+                if (data.margin_balance != null) lastMarginByAccount[account] = data.margin_balance;
+                const seen = new Set(cache.map(r => recordKey(r)));
+                let added = 0;
+                for (const r of list) {
+                    const key = recordKey(r);
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    cache.push(r);
+                    added++;
+                }
+                cache.sort((a, b) => (parseInt(b.updatedTime || b.createdTime || 0, 10) - parseInt(a.updatedTime || a.createdTime || 0, 10)));
+                if (cache.length > CLOSED_PNL_CACHE_MAX) cache.splice(CLOSED_PNL_CACHE_MAX);
+                closedPnlCache[account] = cache;
+                renderClosedPnlTable(cache);
+            } catch (e) {
+                if (cache.length === 0) content.innerHTML = `<div class="loading" style="color:#f44336">Netzwerkfehler: ${e.message}</div>`;
+                else renderClosedPnlTable(cache);
+            } finally {
+                if (document.getElementById('refreshClosedPnlBtn')) document.getElementById('refreshClosedPnlBtn').disabled = false;
+            }
+        }
+
+        document.getElementById('accountSelect').addEventListener('change', function() {
+            closedPnlCache[document.getElementById('accountSelect').value] = closedPnlCache[document.getElementById('accountSelect').value] || [];
+            loadClosedPnl();
+        });
+        document.getElementById('refreshClosedPnlBtn').addEventListener('click', loadClosedPnl);
+
+        document.getElementById('profileSelect').addEventListener('change', function() {
+            const p = this.value;
+            const url = new URL(window.location.href);
+            url.searchParams.set('profile', p);
+            window.history.replaceState({}, '', url);
+            updateEquityLabels();
+            loadEquity();
+        });
+
+        (function init() {
+            const p = getSelectedProfile();
+            const sel = document.getElementById('profileSelect');
+            if (sel && sel.value !== p) sel.value = p;
+            updateEquityLabels();
+        })();
+        loadEquity();
+        loadClosedPnl();
+        // Equity und Closed PnL alle 60s automatisch aktualisieren (Verlauf wird durch Merge ergänzt)
+        setInterval(loadEquity, 60000);
+        setInterval(loadClosedPnl, 60000);
+    </script>
+</body>
+</html>

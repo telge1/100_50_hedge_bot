@@ -65,6 +65,20 @@ function delete_state_files() {
   done
 }
 
+function cleanup_exchange() {
+  local prev_dir
+  local exit_code=0
+  prev_dir="$(pwd)"
+  cd "$SCRIPT_DIR" || return 1
+  log_info "Running exchange cleanup (cancel-open orders)..."
+  if ! python -m fixed_cycle_hedge_bot.cleanup --config-file "$SCRIPT_DIR/fixed_cycle_hedge_bot/config/fixed_cycle_config.json"; then
+    log_err "Exchange cleanup failed"
+    exit_code=1
+  fi
+  cd "$prev_dir" >/dev/null || true
+  return $exit_code
+}
+
 if [[ $# -lt 1 ]]; then
   log_err "Usage: $0 {soft-stop|hard-reset}"
   exit 1
@@ -83,6 +97,7 @@ case "$cmd" in
       log_err "Failed to stop bot; aborting hard reset."
       exit 1
     fi
+    cleanup_exchange
     delete_state_files
     exit 0
     ;;

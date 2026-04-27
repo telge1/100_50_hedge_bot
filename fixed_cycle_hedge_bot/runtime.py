@@ -6,6 +6,8 @@ import math
 import threading
 from dataclasses import dataclass
 from datetime import datetime
+import time
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -90,6 +92,34 @@ class GenericHedgeRuntime:
         self._recover_active_orders_from_exchange()
         self._ensure_max_leverage_before_trading()
         snapshot = self.refresh_snapshot("startup")
+        state = self.runtime_state.strategy_state
+        allow_start = True
+        startup_flat_confirmed = False
+        if (
+            snapshot.long_qty <= 0.0
+            and snapshot.short_qty <= 0.0
+            and not snapshot.active_orders
+        ):
+            snapshot, startup_flat_confirmed = self._confirm_startup_flat_snapshot(snapshot)
+        if startup_flat_confirmed:
+            conflict, conflict_details = self._startup_state_conflict()
+            if conflict:
+                self.logger.warning(
+                    "startup_state_indicates_existing_context %s",
+                    conflict_details,
+                )
+                block_payload = {
+                    "state_file": self.config.strategy_state_file or "<none>",
+                    "active_orders": [order.client_order_id for order in self.runtime_state.active_orders.values()],
+                    "conflict_details": conflict_details,
+                    "snapshot_long_qty": snapshot.long_qty,
+                    "snapshot_short_qty": snapshot.short_qty,
+                }
+                self.logger.warning(
+                    "startup_fresh_entry_blocked_by_state %s",
+                    block_payload,
+                )
+                allow_start = False
         self.audit.log_event(
             "runtime_bootstrap",
             strategy=self.strategy.name,
@@ -97,11 +127,12 @@ class GenericHedgeRuntime:
             category=self.config.category,
             snapshot=snapshot,
         )
-        self._dispatch(
-            "start",
-            self.strategy.on_start(snapshot, self.runtime_state, self.context),
-            snapshot,
-        )
+        if allow_start:
+            self._dispatch(
+                "start",
+                self.strategy.on_start(snapshot, self.runtime_state, self.context),
+                snapshot,
+            )
         self._save_strategy_state()
         return snapshot
 
@@ -165,7 +196,7 @@ class GenericHedgeRuntime:
             return snapshot
 
     def refresh_snapshot(self, source: str) -> HedgeSnapshot:
-        positions = self._fetch_exchange_position_mapping()
+        positions = self._fetch_exchange_position_mapping(source)
         current_price = self.order_manager.fetch_mark_price(self.config.symbol, self.config.category)
         if current_price is None:
             current_price = self.runtime_state.last_snapshot.current_price if self.runtime_state.last_snapshot else 0.0
@@ -186,22 +217,133 @@ class GenericHedgeRuntime:
         )
         return snapshot
 
-    def _fetch_exchange_position_mapping(self) -> dict[str, float]:
-        positions = self.order_manager.fetch_positions(self.config.symbol, self.config.category)
+    def _fetch_exchange_position_mapping(self, source: str) -> dict[str, float]:
+        symbol = self.config.symbol
+        category = self.config.category
+        max_attempts = 5 if source == "startup" else 1
+        attempt = 0
         long_qty = 0.0
         short_qty = 0.0
         long_avg = 0.0
         short_avg = 0.0
-        for position in positions:
-            side = str(position.get("side") or position.get("positionSide") or "").lower()
-            size = float(position.get("size") or position.get("positionQty") or 0.0)
-            avg = float(position.get("avgPrice") or position.get("entryPrice") or 0.0)
-            if side in {"buy", "long"}:
-                long_qty = size
-                long_avg = avg
-            elif side in {"sell", "short"}:
-                short_qty = size
-                short_avg = avg
+        rows: list[dict[str, Any]] = []
+        while attempt < max_attempts:
+            attempt += 1
+            fetched = self.order_manager.fetch_positions(symbol, category) or []
+            rows = fetched
+            rows_count = len(rows)
+            rows_preview: list[dict[str, Any]] = []
+            for row in rows[:5]:
+                rows_preview.append(
+                    {
+                        "symbol": row.get("symbol"),
+                        "side": row.get("side"),
+                        "size": row.get("size") or row.get("positionQty"),
+                        "qty": row.get("qty"),
+                        "positionIdx": row.get("positionIdx"),
+                    }
+                )
+            log_extra_base = {
+                "reason": source,
+                "source": source,
+                "attempt": attempt,
+                "category": category,
+                "symbol": symbol,
+            }
+            fetch_started_payload = {
+                **log_extra_base,
+                "rows_count": rows_count,
+                "rows_preview": rows_preview,
+            }
+            self.logger.debug(
+                "bootstrap_positions_fetch_started %s",
+                fetch_started_payload,
+            )
+            raw_payload = {
+                **log_extra_base,
+                "rows_count": rows_count,
+                "rows_preview": rows_preview,
+            }
+            self.logger.debug(
+                "bootstrap_positions_raw %s",
+                raw_payload,
+            )
+            parsed_long_qty = 0.0
+            parsed_short_qty = 0.0
+            parsed_long_avg = 0.0
+            parsed_short_avg = 0.0
+            for position in rows:
+                side = str(position.get("side") or position.get("positionSide") or "").lower()
+                size = float(position.get("size") or position.get("positionQty") or 0.0)
+                avg = float(position.get("avgPrice") or position.get("entryPrice") or 0.0)
+                if side in {"buy", "long"}:
+                    parsed_long_qty = size
+                    parsed_long_avg = avg
+                elif side in {"sell", "short"}:
+                    parsed_short_qty = size
+                    parsed_short_avg = avg
+            long_qty = parsed_long_qty
+            short_qty = parsed_short_qty
+            long_avg = parsed_long_avg
+            short_avg = parsed_short_avg
+            parsed_payload = {
+                **log_extra_base,
+                "rows_count": rows_count,
+                "rows_preview": rows_preview,
+                "parsed_long_qty": long_qty,
+                "parsed_short_qty": short_qty,
+                "parsed_long_avg": long_avg,
+                "parsed_short_avg": short_avg,
+            }
+            self.logger.debug(
+                "bootstrap_positions_parsed %s",
+                parsed_payload,
+            )
+            if long_qty > 0.0 or short_qty > 0.0:
+                break
+            if attempt < max_attempts:
+                retry_payload = {
+                    **log_extra_base,
+                    "rows_count": rows_count,
+                    "rows_preview": rows_preview,
+                    "parsed_long_qty": long_qty,
+                    "parsed_short_qty": short_qty,
+                }
+                self.logger.debug(
+                    "bootstrap_positions_empty_retry %s",
+                    retry_payload,
+                )
+                time.sleep(0.3)
+        if long_qty <= 0.0 and short_qty <= 0.0:
+            rows_count = len(rows)
+            rows_preview = []
+            for row in rows[:5]:
+                rows_preview.append(
+                    {
+                        "symbol": row.get("symbol"),
+                        "side": row.get("side"),
+                        "size": row.get("size") or row.get("positionQty"),
+                        "qty": row.get("qty"),
+                        "positionIdx": row.get("positionIdx"),
+                    }
+                )
+            final_payload = {
+                "reason": source,
+                "source": source,
+                "attempt": attempt,
+                "category": category,
+                "symbol": symbol,
+                "rows_count": rows_count,
+                "rows_preview": rows_preview,
+                "parsed_long_qty": long_qty,
+                "parsed_short_qty": short_qty,
+                "parsed_long_avg": long_avg,
+                "parsed_short_avg": short_avg,
+            }
+            self.logger.debug(
+                "bootstrap_positions_final_flat %s",
+                final_payload,
+            )
         self.position_manager.sync_positions(long_qty, long_avg, short_qty, short_avg)
         return {
             "long_qty": self.position_manager.long_size,
@@ -209,6 +351,76 @@ class GenericHedgeRuntime:
             "long_avg": self.position_manager.long_avg,
             "short_avg": self.position_manager.short_avg,
         }
+
+    def _confirm_startup_flat_snapshot(
+        self,
+        initial_snapshot: HedgeSnapshot,
+    ) -> tuple[HedgeSnapshot, bool]:
+        attempt_payload = {
+            "reason": "startup",
+            "symbol": self.config.symbol,
+            "initial_long_qty": initial_snapshot.long_qty,
+            "initial_short_qty": initial_snapshot.short_qty,
+            "active_orders": [order.client_order_id for order in initial_snapshot.active_orders],
+        }
+        self.logger.info(
+            "startup_flat_confirm_attempt_1 %s",
+            attempt_payload,
+        )
+        time.sleep(1.0)
+        confirm_snapshot = self.refresh_snapshot("startup_confirm")
+        confirm_payload = {
+            "reason": "startup",
+            "symbol": self.config.symbol,
+            "long_qty": confirm_snapshot.long_qty,
+            "short_qty": confirm_snapshot.short_qty,
+            "active_orders": [order.client_order_id for order in confirm_snapshot.active_orders],
+        }
+        self.logger.info(
+            "startup_flat_confirm_attempt_2 %s",
+            confirm_payload,
+        )
+        confirmed = (
+            confirm_snapshot.long_qty <= 0.0
+            and confirm_snapshot.short_qty <= 0.0
+            and not confirm_snapshot.active_orders
+        )
+        if confirmed:
+            self.logger.info(
+                "startup_flat_confirmed_allow_fresh_entry %s",
+                confirm_payload,
+            )
+        else:
+            confirm_payload["reason"] = "non_flat"
+            self.logger.info(
+                "startup_flat_not_confirmed_block_fresh_entry %s",
+                confirm_payload,
+            )
+        return confirm_snapshot, confirmed
+
+    def _startup_state_conflict(self) -> tuple[bool, dict[str, Any]]:
+        state = self.runtime_state.strategy_state
+        cycle_state = state.get("cycle_state") or {}
+        conflict = bool(
+            state.get("initial_entry_confirmed")
+            or state.get("initial_entry_submitted")
+            or int(state.get("cycle_completed_count") or 0) > 0
+            or cycle_state.get("trade_active")
+            or cycle_state.get("long_add_pending")
+            or cycle_state.get("cycle_waiting_for_short_tp")
+            or int(cycle_state.get("short_tp_pending_cycle") or 0) > 0
+        )
+        details = {
+            "initial_entry_confirmed": state.get("initial_entry_confirmed"),
+            "initial_entry_submitted": state.get("initial_entry_submitted"),
+            "cycle_completed_count": state.get("cycle_completed_count"),
+            "trade_active": cycle_state.get("trade_active"),
+            "long_add_pending": cycle_state.get("long_add_pending"),
+            "cycle_waiting_for_short_tp": cycle_state.get("cycle_waiting_for_short_tp"),
+            "short_tp_pending_cycle": cycle_state.get("short_tp_pending_cycle"),
+            "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
+        }
+        return conflict, details
 
     def handle_websocket_event(self, topic: str, payload: Any) -> None:
         if isinstance(payload, list):
@@ -438,6 +650,12 @@ class GenericHedgeRuntime:
         client_id = f"{self.strategy.name}-{intent.purpose.lower()}-{uuid4().hex[:10]}"
         current_price = snapshot.current_price
         strategy_state = self.runtime_state.strategy_state
+        fallback_context = self._build_long_add_market_fallback_context(
+            intent=intent,
+            snapshot=snapshot,
+            normalized_qty=normalized_qty,
+        )
+        should_force_fallback = bool(fallback_context and fallback_context.get("should_fallback"))
         if intent.trigger_price is not None:
             trigger_price = intent.trigger_price
             invalid_reason = None
@@ -475,7 +693,7 @@ class GenericHedgeRuntime:
                 invalid_reason = "falling_trigger_not_below_market"
             elif intent.trigger_direction == 1 and trigger_price <= current_price:
                 invalid_reason = "rising_trigger_not_above_market"
-            if invalid_reason is not None:
+            if invalid_reason is not None and not should_force_fallback:
                 self.audit.log_event(
                     "intent_trigger_invalid",
                     strategy=self.strategy.name,
@@ -487,15 +705,49 @@ class GenericHedgeRuntime:
                     reason=invalid_reason,
                 )
                 return None
+        submit_qty = normalized_qty
+        fallback_reason: str | None = None
+        force_market_fallback = False
+        if fallback_context:
+            cycle_role = str(intent.metadata.get("cycle_role") or "")
+            self.audit.log_event(
+                "pre_long_add_trigger_validation",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                trigger_price=fallback_context["trigger_price"],
+                current_price=fallback_context["current_price"],
+                qty=normalized_qty,
+                clamped_qty=fallback_context["fallback_qty"],
+                available_long_qty=fallback_context["available_long_qty"],
+                should_fallback=fallback_context["should_fallback"],
+                cycle_role=cycle_role,
+            )
+            if fallback_context["should_fallback"]:
+                fallback_reason = "stale_trigger"
+                force_market_fallback = True
+                submit_qty = fallback_context["fallback_qty"]
+                self.audit.log_event(
+                    "stale_long_add_trigger_market_fallback",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    trigger_price=fallback_context["trigger_price"],
+                    current_price=fallback_context["current_price"],
+                    fallback_qty=fallback_context["fallback_qty"],
+                    available_long_qty=fallback_context["available_long_qty"],
+                    cycle_role=cycle_role,
+                )
+        submit_notional = submit_qty * submit_price
         managed_order = ManagedOrder(
             client_order_id=client_id,
             side=intent.side,
-            qty=normalized_qty,
+            qty=submit_qty,
             purpose=intent.purpose,
             price=intent.price,
             order_type=intent.order_type,
             reduce_only=intent.reduce_only,
-            remaining_qty=normalized_qty,
+            remaining_qty=submit_qty,
             metadata={
                 **dict(intent.metadata),
                 "source": source,
@@ -507,11 +759,17 @@ class GenericHedgeRuntime:
                 "close_on_trigger": intent.close_on_trigger,
                 "position_idx": intent.position_idx,
                 "order_filter": intent.order_filter,
+                "market_fallback": force_market_fallback,
+                "market_fallback_reason": fallback_reason,
             },
             trace=list(intent.trace),
         )
         try:
-            response = self._submit_to_exchange(managed_order, snapshot)
+            response = self._submit_to_exchange(
+                managed_order,
+                snapshot,
+                force_market_fallback=force_market_fallback,
+            )
         except Exception as exc:
             self.audit.log_event(
                 "order_rejected",
@@ -567,7 +825,58 @@ class GenericHedgeRuntime:
                 intent=intent,
                 traces=trace_dicts(intent.trace),
             )
-            return None
+            error_info = getattr(self.order_manager, "last_post_error", None)
+            if force_market_fallback:
+                self.audit.log_event(
+                    "long_add_market_fallback_failed",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    client_order_id=client_id,
+                    qty=managed_order.qty,
+                    reason=fallback_reason,
+                    error_code=self._long_add_error_code(error_info),
+                    error_message=self._long_add_error_message(error_info),
+                )
+                return None
+            if fallback_context and self._should_trigger_rejection_market_fallback(error_info):
+                self.audit.log_event(
+                    "long_add_conditional_rejected_market_fallback",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    trigger_price=fallback_context["trigger_price"],
+                    current_price=fallback_context["current_price"],
+                    ret_code=self._long_add_error_code(error_info),
+                    ret_msg=self._long_add_error_message(error_info),
+                )
+                fallback_reason = "conditional_rejection"
+                force_market_fallback = True
+                managed_order.qty = fallback_context["fallback_qty"]
+                managed_order.remaining_qty = managed_order.qty
+                managed_order.metadata["market_fallback"] = True
+                managed_order.metadata["market_fallback_reason"] = fallback_reason
+                response = self._submit_to_exchange(
+                    managed_order,
+                    snapshot,
+                    force_market_fallback=True,
+                )
+                if not response:
+                    error_info = getattr(self.order_manager, "last_post_error", error_info)
+                    self.audit.log_event(
+                        "long_add_market_fallback_failed",
+                        strategy=self.strategy.name,
+                        purpose=intent.purpose,
+                        side=intent.side,
+                        client_order_id=client_id,
+                        qty=managed_order.qty,
+                        reason=fallback_reason,
+                        error_code=self._long_add_error_code(error_info),
+                        error_message=self._long_add_error_message(error_info),
+                    )
+                    return None
+            else:
+                return None
         exchange_order_id = ((response.get("result") or {}).get("orderId")) if isinstance(response, dict) else None
         response_code = None
         if isinstance(response, dict):
@@ -600,12 +909,108 @@ class GenericHedgeRuntime:
             client_order_id=client_id,
             exchange_order_id=exchange_order_id,
             intent=intent,
-            normalized_qty=normalized_qty,
-            submit_notional=notional,
+            normalized_qty=submit_qty,
+            submit_notional=submit_notional,
             traces=trace_dicts(intent.trace),
         )
+        if fallback_reason:
+            fallback_event = {
+                "strategy": self.strategy.name,
+                "purpose": intent.purpose,
+                "side": intent.side,
+                "client_order_id": client_id,
+                "qty": managed_order.qty,
+                "reason": fallback_reason,
+            }
+            if fallback_context:
+                fallback_event.update(
+                    {
+                        "trigger_price": fallback_context["trigger_price"],
+                        "current_price": fallback_context["current_price"],
+                        "available_long_qty": fallback_context["available_long_qty"],
+                        "fallback_qty": fallback_context["fallback_qty"],
+                    }
+                )
+            self.audit.log_event("long_add_market_fallback_submitted", **fallback_event)
         self._save_strategy_state()
         return client_id
+
+    def _build_long_add_market_fallback_context(
+        self,
+        *,
+        intent: StrategyIntent,
+        snapshot: HedgeSnapshot,
+        normalized_qty: float,
+    ) -> dict[str, Any] | None:
+        purpose = str(intent.purpose or "").upper()
+        if not ((purpose.startswith("CYCLE_") and purpose.endswith("_LONG_ADD")) or purpose == "LONG_REDUCE"):
+            return None
+        trigger_price = self._safe_float(intent.trigger_price, None)
+        if trigger_price is None:
+            trigger_price = self._safe_float(intent.metadata.get("trigger_price"), None)
+        if trigger_price is None:
+            return None
+        current_price = float(snapshot.current_price or 0.0)
+        if current_price <= 0:
+            return None
+        available_long_qty = float(snapshot.long_qty or 0.0)
+        fallback_qty = normalized_qty
+        if available_long_qty > 0 and fallback_qty > available_long_qty:
+            fallback_qty = available_long_qty
+        if fallback_qty <= 0:
+            return None
+        return {
+            "trigger_price": trigger_price,
+            "current_price": current_price,
+            "available_long_qty": available_long_qty,
+            "fallback_qty": fallback_qty,
+            "should_fallback": current_price <= trigger_price,
+        }
+
+    def _should_trigger_rejection_market_fallback(
+        self,
+        error_info: dict[str, Any] | None,
+    ) -> bool:
+        if not error_info:
+            return False
+        code = str(
+            error_info.get("retCode")
+            or error_info.get("ret_code")
+            or error_info.get("code")
+            or ""
+        )
+        msg = str(
+            error_info.get("retMsg")
+            or error_info.get("ret_msg")
+            or error_info.get("message")
+            or error_info.get("error")
+            or ""
+        )
+        if code == "110093":
+            return True
+        return "expect falling" in msg.lower()
+
+    @staticmethod
+    def _long_add_error_code(error_info: dict[str, Any] | None) -> str | None:
+        if not error_info:
+            return None
+        return (
+            error_info.get("retCode")
+            or error_info.get("ret_code")
+            or error_info.get("code")
+        )
+
+    @staticmethod
+    def _long_add_error_message(error_info: dict[str, Any] | None) -> str | None:
+        if not error_info:
+            return None
+        return (
+            error_info.get("retMsg")
+            or error_info.get("ret_msg")
+            or error_info.get("message")
+            or error_info.get("error")
+            or str(error_info)
+        )
 
     def cancel_open_orders_by_purpose(self, purposes: list[str]) -> None:
         with self._lock:
@@ -895,7 +1300,12 @@ class GenericHedgeRuntime:
                 new_qty=replace_context.get("new_qty") if replace_context else None,
             )
 
-    def _submit_to_exchange(self, managed_order: ManagedOrder, snapshot: HedgeSnapshot) -> Any:
+    def _submit_to_exchange(
+        self,
+        managed_order: ManagedOrder,
+        snapshot: HedgeSnapshot,
+        force_market_fallback: bool = False,
+    ) -> Any:
         exchange_side = self._exchange_side(managed_order.side, managed_order.reduce_only)
         position_idx_raw = managed_order.metadata.get("position_idx")
         position_idx = int(position_idx_raw) if position_idx_raw is not None else (1 if managed_order.side == "long" else 2)
@@ -908,6 +1318,64 @@ class GenericHedgeRuntime:
         tp_limit_price = self._safe_float(managed_order.metadata.get("tp_limit_price"), None)
         slippage_tolerance_type = managed_order.metadata.get("slippage_tolerance_type")
         slippage_tolerance = self._safe_float(managed_order.metadata.get("slippage_tolerance"), None)
+        if force_market_fallback and managed_order.reduce_only:
+            self.audit.log_event(
+                "order_payload_ready",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                order_type=managed_order.order_type,
+                qty=managed_order.qty,
+                price=managed_order.price,
+                trigger_price=trigger_price,
+                reduce_only=managed_order.reduce_only,
+                order_link_id=managed_order.client_order_id,
+                exchange_side=exchange_side,
+                reference_price=snapshot.current_price,
+                trigger_direction=trigger_direction,
+                trigger_by=trigger_by,
+                order_filter=order_filter,
+                market_fallback=True,
+                fallback_reason=managed_order.metadata.get("market_fallback_reason"),
+            )
+            return self.order_manager.place_reduce_market_order(
+                symbol=self.config.symbol,
+                side=exchange_side,
+                qty=managed_order.qty,
+                position_idx=position_idx,
+                category=self.config.category,
+                order_link_id=managed_order.client_order_id,
+            )
+        if managed_order.reduce_only and trigger_price is not None:
+            self.audit.log_event(
+                "order_payload_ready",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                order_type=managed_order.order_type,
+                qty=managed_order.qty,
+                price=managed_order.price,
+                trigger_price=trigger_price,
+                reduce_only=managed_order.reduce_only,
+                order_link_id=managed_order.client_order_id,
+                exchange_side=exchange_side,
+                reference_price=snapshot.current_price,
+                trigger_direction=trigger_direction,
+                trigger_by=trigger_by,
+                order_filter=order_filter,
+            )
+            return self.order_manager.place_reduce_market_order(
+                symbol=self.config.symbol,
+                side=exchange_side,
+                qty=managed_order.qty,
+                position_idx=position_idx,
+                category=self.config.category,
+                order_link_id=managed_order.client_order_id,
+                trigger_price=trigger_price,
+                trigger_direction=int(trigger_direction) if trigger_direction is not None else None,
+                trigger_by=str(trigger_by) if trigger_by else None,
+                close_on_trigger=bool(close_on_trigger) if close_on_trigger is not None else False,
+            )
         if exit_api == "short_tp_limit":
             self.audit.log_event(
                 "order_payload_ready",
@@ -1881,7 +2349,7 @@ def configure_runtime_logging(log_file: str) -> None:
         root_logger.removeHandler(handler)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
-    file_handler = logging.FileHandler(log_path)
+    file_handler = RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=5)
     file_handler.setFormatter(formatter)
     root_logger.addHandler(stream_handler)
     root_logger.addHandler(file_handler)

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+        </div>
+        
+        <div class="dashboard-content">
+            <!-- Services Status -->
+            <div class="services-status-container">
+                <div class="services-status-header">
+                    <span class="services-status-title">🔧 System Services Status</span>
+                    {% if services_status.all_active %}
+                    <span class="services-status-badge services-status-ok">✅ Alle Services aktiv</span>
+                    {% else %}
+                    <span class="services-status-badge services-status-error">⚠️ Einige Services inaktiv</span>
+                    {% endif %}
+                </div>
+                <div class="services-status-grid">
+                    {% for key, service in services_status.services.items() %}
+                    <div class="service-status-card {% if service.active %}service-active{% else %}service-inactive{% endif %}">
+                        <div class="service-status-name">{{ service.display_name }}</div>
+                        <div class="service-status-description">{{ service.description }}</div>
+                        <div class="service-status-indicator">
+                            {% if service.active %}
+                            <span class="service-status-dot service-dot-active"></span>
+                            <span class="service-status-text">Aktiv</span>
+                            {% else %}
+                            <span class="service-status-dot service-dot-inactive"></span>
+                            <span class="service-status-text">Inaktiv</span>
+                            {% endif %}
+                        </div>
+                        <div class="service-status-actions">
+                            {% if service.active %}
+                            <button class="btn-service-stop" onclick="controlService('{{ key }}', 'stop', event)" title="Service stoppen">
+                                ⏹️ Stoppen
+                            </button>
+                            {% else %}
+                            <button class="btn-service-start" onclick="controlService('{{ key }}', 'start', event)" title="Service starten">
+                                ▶️ Starten
+                            </button>
+                            {% endif %}
+                            <button class="btn-service-restart" onclick="controlService('{{ key }}', 'restart', event)" title="Service neu starten">
+                                🔄 Neustart
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Bots</div>
+                    <div class="stat-value">{{ all_bots|length }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Bots</div>
+                    <div class="stat-value">{{ all_bots|selectattr("running")|list|length }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Burns</div>
+                    <div class="stat-value">{{ all_bots|sum(attribute="state.burn_count") }}</div>
+                </div>
+            </div>
+            
+            <!-- Bot Selection -->
+            <div class="bot-selector-container">
+                <label for="botSelector" class="bot-selector-label">🔀 Bot auswählen:</label>
+                <select id="botSelector" class="bot-selector">
+                    {% for bot_option in all_bots %}
+                    <option value="{{ bot_option.symbol }}" data-bot-type="{{ bot_option.get('bot_type', 'long') }}" {% if bot and bot_option.symbol == bot.symbol and bot_option.get('bot_type', 'long') == bot.get('bot_type', 'long') %}selected{% endif %}>
+                        {{ bot_option.get('bot_type', 'long')|upper }} - {{ bot_option.symbol }} {% if bot_option.running %}🟢{% else %}🔴{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Bots Table -->
+            <div class="bots-table">
+                <div class="table-header">Bot-Instanz (Live-Status)</div>
+                {% if bot %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Status</th>
+                            <th>Position</th>
+                            <th>Orders</th>
+                            <th>Zyklus</th>
+                            <th>Burns</th>
+                            <th>Config</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td rowspan="2">
+                                <span class="symbol-badge">{{ bot.symbol }}</span>
+                                {% if bot.get('bot_type', 'long') == 'short' %}
+                                <span class="bot-type-badge bot-type-short">{{ bot.get('bot_type', 'long')|upper }}</span>
+                                {% else %}
+                                <span class="bot-type-badge bot-type-long">{{ bot.get('bot_type', 'long')|upper }}</span>
+                                {% endif %}
+                            </td>
+                            <td rowspan="2" class="status-cell">
+                                <div class="status-content">
+                                    {% if bot.running %}
+                                    <span class="status-badge status-running">🟢 Running</span>
+                                    {% else %}
+                                    <span class="status-badge status-stopped">🔴 Stopped</span>
+                                    {% endif %}
+                                    <div class="price-spread-container">
+                                        {% if bot.position.current_price %}
+                                        <div class="price-card">
+                                            <div class="price-header">Current Price</div>
+                                            <div class="price-value">{{ "%.5f"|format(bot.position.current_price) }}</div>
+                                        </div>
+                                        {% endif %}
+                                        {% if bot.position.long.size and bot.position.short.size and bot.position.long.entry_price and bot.position.short.entry_price %}
+                                        {% set spread_absolute = bot.position.long.entry_price - bot.position.short.entry_price %}
+                                        {% set spread_percent = ((spread_absolute / bot.position.short.entry_price) * 100) if bot.position.short.entry_price > 0 else 0 %}
+                                        <div class="spread-card">
+                                            <div class="spread-header">Spread</div>
+                                            <div class="spread-value">{{ "%.2f"|format(spread_percent) }}%</div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="position-info">
+                                    {% if bot.position.long.size %}
+                                    <div class="position-card position-long">
+                                        <div class="position-header position-header-long">📈 Long</div>
+                                        <div class="position-size-row">
+                                            <span class="position-size-coins position-size-coins-long">{{ "%.2f"|format(bot.position.long.size or 0) }}</span>
+                                            <span class="position-size-label">Coins</span>
+                                        </div>
+                                        <div class="position-value-row">
+                                            <span class="position-value-usdt">{{ "%.2f"|format(bot.position.long.value_usdt or 0) }}</span>
+                                            <span class="position-value-label">USDT</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if bot.position.short.size %}
+                                    <div class="position-card position-short">
+                                        <div class="position-header position-header-short">📉 Short</div>
+                                        <div class="position-size-row">
+                                            <span class="position-size-coins position-size-coins-short">{{ "%.2f"|format(bot.position.short.size or 0) }}</span>
+                                            <span class="position-size-label">Coins</span>
+                                        </div>
+                                        <div class="position-value-row">
+                                            <span class="position-value-usdt">{{ "%.2f"|format(bot.position.short.value_usdt or 0) }}</span>
+                                            <span class="position-value-label">USDT</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if not bot.position.long.size and not bot.position.short.size %}
+                                    <div class="position-card">
+                                        <div class="position-header">Keine Positionen</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="orders-info">
+                                    {% if bot.position.long.size %}
+                                    <div class="order-card order-long">
+                                        <div class="order-header order-header-long">📈 Long Orders</div>
+                                        <div class="order-item">
+                                            <span class="order-label">TP:</span>
+                                            {% if bot.position.long.tp_set %}
+                                            <span class="order-status order-set">✅ {{ "%.5f"|format(bot.position.long.tp_price) }}</span>
+                                            {% else %}
+                                            <span class="order-status order-not-set">❌</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="order-item">
+                                            <span class="order-label">SL:</span>
+                                            {% if bot.position.long.sl_set %}
+                                            <span class="order-status order-set">✅ {{ "%.5f"|format(bot.position.long.sl_price) }}</span>
+                                            {% else %}
+                                            <span class="order-status order-not-set">❌</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if bot.position.short.size %}
+                                    <div class="order-card order-short">
+                                        <div class="order-header order-header-short">📉 Short Orders</div>
+                                        <div class="order-item">
+                                            <span class="order-label">TP:</span>
+                                            {% if bot.position.short.tp_set %}
+                                            <span class="order-status order-set">✅ {{ "%.5f"|format(bot.position.short.tp_price) }}</span>
+                                            {% else %}
+                                            <span class="order-status order-not-set">❌</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="order-item">
+                                            <span class="order-label">SL:</span>
+                                            {% if bot.position.short.sl_set %}
+                                            <span class="order-status order-set">✅ {{ "%.5f"|format(bot.position.short.sl_price) }}</span>
+                                            {% else %}
+                                            <span class="order-status order-not-set">❌</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if not bot.position.long.size and not bot.position.short.size %}
+                                    <div class="order-card">
+                                        <div class="order-header">Keine Orders</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="cycle-column">
+                                    <div class="cycle-card">
+                                        <div class="cycle-progress-container">
+                                            <div class="cycle-progress">
+                                                <div class="cycle-progress-bar" style="width: {{ bot.state.cycle_progress }}%"></div>
+                                            </div>
+                                            <div class="cycle-info">
+                                                <span class="cycle-burn-count">🔥 {{ bot.state.burn_count }}/{{ bot.state.burns_before_rebuy }}</span>
+                                                {% if bot.state.next_rebuy_in == 0 %}
+                                                <span class="cycle-rebuy-badge">⚡ Rebuy!</span>
+                                                {% else %}
+                                                <span class="cycle-next-burn">{{ bot.state.next_rebuy_in }} bis Rebuy</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% if bot.running %}
+                                    <div class="action-card action-card-stop">
+                                        <button class="btn-stop" onclick="stopBot('{{ bot.symbol }}', '{{ bot.get('bot_type', 'long') }}', event)">⏹️ Stop</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="burns-column">
+                                    <div class="burns-card">
+                                        <div class="burns-item">
+                                            <span class="burns-label">Total Burned:</span>
+                                            <span class="burns-value">{{ "%.2f"|format(bot.state.total_burned or 0) }}</span>
+                                        </div>
+                                        {% if bot.next_burn and bot.next_burn.valid %}
+                                        <div class="burns-item">
+                                            <span class="burns-label">Next Burn:</span>
+                                            <span class="burns-value burns-next-burn-coins">{{ "%.2f"|format(bot.next_burn.burn_size_coins or 0) }} Coins</span>
+                                        </div>
+                                        <div class="burns-item">
+                                            <span class="burns-label">Burn in USDT:</span>
+                                            <span class="burns-value burns-next-burn-usdt">{{ "%.2f"|format(bot.next_burn.burn_size_usdt or 0) }} USDT</span>
+                                        </div>
+                                        {% else %}
+                                        <div class="burns-item">
+                                            <span class="burns-label">Next Burn:</span>
+                                            <span class="burns-value">N/A</span>
+                                        </div>
+                                        {% endif %}
+                                        {% if bot.rebuy_info and bot.rebuy_info.valid and bot.state.next_rebuy_in == 0 %}
+                                        <div class="burns-item rebuy-info-item" style="margin-top: 12px; padding-top: 12px; border-top: 2px solid #2a5f3f;">
+                                            <span class="burns-label" style="color: #4ade80;">⚡ Rebuy ({{ "%.0f"|format(bot.rebuy_info.target_notional or 0) }} USDT Ziel):</span>
+                                            {% if bot.rebuy_info.not_needed %}
+                                            <span class="burns-value" style="color: #86efac;">Kein Rebuy nötig</span>
+                                            {% else %}
+                                            <span class="burns-value burns-rebuy-coins" style="color: #4ade80;">{{ "%.2f"|format(bot.rebuy_info.rebuy_size_coins or 0) }} Coins</span>
+                                            <div class="burns-item" style="margin-top: 4px;">
+                                                <span class="burns-label" style="color: #4ade80;">Rebuy in USDT:</span>
+                                                <span class="burns-value burns-rebuy-usdt" style="color: #4ade80;">{{ "%.2f"|format(bot.rebuy_info.rebuy_size_usdt or 0) }} USDT</span>
+                                            </div>
+                                            <div class="burns-item" style="margin-top: 4px;">
+                                                <span class="burns-label" style="color: #4ade80;">Neue Long Size:</span>
+                                                <span class="burns-value burns-rebuy-new-size" style="color: #4ade80;">{{ "%.2f"|format(bot.rebuy_info.new_long_size_usdt or 0) }} USDT</span>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% if bot.running %}
+                                    <div class="action-card action-card-restart">
+                                        <button class="btn-restart" onclick="restartBot('{{ bot.symbol }}', '{{ bot.get('bot_type', 'long') }}', event)">🔄 Restart</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="config-column">
+                                    <button class="btn-config" onclick="showConfig('{{ bot.symbol }}', '{{ bot.get('bot_type', 'long') }}')">⚙️ Config</button>
+                                    {% if not bot.running %}
+                                    <div class="action-card action-card-start">
+                                        <button class="btn-start" onclick="startBot('{{ bot.symbol }}', '{{ bot.get('bot_type', 'long') }}', event)">▶️ Start</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-bot-message">
+                    <p>Kein Bot ausgewählt oder keine Bots vorhanden.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Config Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Config für <span id="configSymbol"></span></h2>
+                <span class="modal-close" onclick="closeConfig()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="configForm">
+                    <!-- Long-Bot Fields -->
+                    <div id="longBotFields">
+                        <div class="form-group">
+                            <label class="form-label">Long TP Percentage:</label>
+                            <input type="number" step="0.1" class="form-input" id="long_tp_percentage" name="long_tp_percentage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Short TP Percentage:</label>
+                            <input type="number" step="0.1" class="form-input" id="short_tp_percentage" name="short_tp_percentage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Short Reentry Step Percentage:</label>
+                            <input type="number" step="0.01" class="form-input" id="short_reentry_step_percentage" name="short_reentry_step_percentage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Long Notional (USDT):</label>
+                            <input type="number" step="0.01" class="form-input" id="target_long_notional" name="target_long_notional" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Short-Bot Fields -->
+                    <div id="shortBotFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">Long TP Percentage (für Burn & Short-TP):</label>
+                            <input type="number" step="0.1" class="form-input" id="long_tp_percentage_short" name="long_tp_percentage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Long Reentry Step Percentage:</label>
+                            <input type="number" step="0.01" class="form-input" id="long_reentry_step_percentage" name="long_reentry_step_percentage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Target Short Notional (USDT):</label>
+                            <input type="number" step="0.01" class="form-input" id="target_short_notional" name="target_short_notional" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Common Fields -->
+                    <div class="form-group">
+                        <label class="form-label">Burns Before Rebuy:</label>
+                        <input type="number" step="1" class="form-input" id="burns_before_rebuy" name="burns_before_rebuy" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">BE Target Profit (USDT):</label>
+                        <input type="number" step="0.01" class="form-input" id="be_target_profit" name="be_target_profit" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" onclick="closeConfig()">Abbrechen</button>
+                        <button type="submit" class="btn-save">💾 Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
+

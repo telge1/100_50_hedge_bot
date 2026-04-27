@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📈 Live Charts - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .live-chart-container {
+            margin-top: 20px;
+            background: #111827;
+            border-radius: 10px;
+            padding: 16px 20px 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        .live-chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .live-chart-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .live-chart-symbol-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 16px;
+        }
+        .live-chart-symbol-input label {
+            font-size: 16px;
+            color: #e5e7eb;
+        }
+        .live-chart-symbol-input input {
+            background: #020617;
+            border-radius: 6px;
+            border: 1px solid #1f2937;
+            padding: 8px 12px;
+            color: #e5e7eb;
+            width: 120px;
+            text-transform: uppercase;
+            font-size: 16px;
+        }
+        .live-chart-symbol-input select {
+            background: #020617;
+            border-radius: 6px;
+            border: 1px solid #1f2937;
+            padding: 8px 12px;
+            color: #e5e7eb;
+            font-size: 16px;
+            min-height: 40px;
+        }
+        .live-chart-symbol-input button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .live-chart-symbol-input button:hover {
+            background: #1d4ed8;
+        }
+        #liveChart {
+            width: 100%;
+            height: 520px;
+        }
+        .burn-legend {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+        .burn-legend code {
+            background: #020617;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .positions-grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        @media (max-width: 900px) {
+            .positions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .positions-col {
+            background: rgba(2,6,23,0.55);
+            border: 1px solid #1f2937;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .positions-col h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        .positions-col h3 .count {
+            font-size: 12px;
+            color: #9ca3af;
+            font-weight: 500;
+        }
+        .tiles {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 10px;
+        }
+        .tile {
+            background: #0b1220;
+            border: 1px solid #1f2937;
+            border-radius: 10px;
+            padding: 10px 10px 9px;
+            cursor: pointer;
+            transition: transform .06s ease, border-color .12s ease;
+        }
+        .tile:hover {
+            transform: translateY(-1px);
+            border-color: #334155;
+        }
+        .tile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .tile-symbol {
+            font-weight: 700;
+            letter-spacing: .3px;
+        }
+        .badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+            color: #e5e7eb;
+            background: rgba(37,99,235,0.12);
+        }
+        .tile-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 10px;
+            font-size: 12px;
+            color: #cbd5e1;
+        }
+        .kpi label {
+            display: block;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 1px;
+        }
+        .kpi .val {
+            font-variant-numeric: tabular-nums;
+        }
+        .side-row {
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .side-box {
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 6px 7px;
+            background: rgba(2,6,23,0.5);
+        }
+        .side-box .title {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 2px;
+        }
+        .pnl-pos { color: #22c55e; }
+        .pnl-neg { color: #ef4444; }
+        .muted { color: #9ca3af; }
+    </style>
+    <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📈 Live Charts – Multi-Symbol Hedge Bot</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+            <a href="/live-charts" class="nav-link active">📈 Live Charts</a>
+            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="live-chart-container">
+                <div class="live-chart-header">
+                    <div class="live-chart-title">
+                        Live Chart für <code>{{ symbol or '–' }}</code>
+                    </div>
+                    <form class="live-chart-symbol-input" method="get" action="/live-charts">
+                        <label for="accountSelect">Profil:</label>
+                        <select id="accountSelect" name="account">
+                            <option value="main" {% if account == 'main' %}selected{% endif %}>Main</option>
+                            <option value="sub" {% if account == 'sub' %}selected{% endif %}>Sub</option>
+                            <option value="Long_bot_1" {% if account == 'Long_bot_1' %}selected{% endif %}>Long_bot_1</option>
+                            <option value="Short_bot_1" {% if account == 'Short_bot_1' %}selected{% endif %}>Short_bot_1</option>
+                            <option value="Long_bot_2" {% if account == 'Long_bot_2' %}selected{% endif %}>Long_bot_2</option>
+                            <option value="Short_bot_2" {% if account == 'Short_bot_2' %}selected{% endif %}>Short_bot_2</option>
+                        </select>
+
+                        <label for="symbolSelect">Symbol:</label>
+                        <select id="symbolSelect" name="symbol">
+                            {% if available_symbols %}
+                                {% for s in available_symbols %}
+                                    <option value="{{ s }}" {% if s == symbol %}selected{% endif %}>{{ s }}</option>
+                                {% endfor %}
+                            {% else %}
+                                {% if symbol %}
+                                    <option value="{{ symbol }}" selected>{{ symbol }}</option>
+                                {% else %}
+                                    <option value="" selected>– keine aktiven Bots –</option>
+                                {% endif %}
+                            {% endif %}
+                        </select>
+                        <button type="submit">Laden</button>
+                    </form>
+                </div>
+
+                <div class="positions-grid" id="positionsGrid">
+                    <div class="positions-col" id="mainCol">
+                        <h3>
+                            <span id="mainColLabel">{{ main_label or 'Main (Long)' }}</span>
+                            <span class="count" id="mainCount">–</span>
+                        </h3>
+                        <div class="tiles" id="tilesMain"></div>
+                    </div>
+                    <div class="positions-col" id="subCol" {% if single_account %}style="display:none"{% endif %}>
+                        <h3>
+                            <span id="subColLabel">{{ sub_label or 'Sub (Short)' }}</span>
+                            <span class="count" id="subCount">–</span>
+                        </h3>
+                        <div class="tiles" id="tilesSub"></div>
+                    </div>
+                </div>
+
+                <div id="liveChart"></div>
+                <div id="liveChartMessage" style="margin-top: 6px; font-size: 13px; color: #f97316;"></div>
+                <pre id="liveChartDebug" style="margin-top: 8px; font-size: 11px; color: #9ca3af; background:#020617; padding:6px 8px; border-radius:4px; max-height:160px; overflow:auto;"></pre>
+                <div class="burn-legend">
+                    Burn-Levels aus Config:
+                    {% if burn_levels %}
+                        {% for p in burn_levels %}
+                            <code>{{ "%.6f"|format(p) }}</code>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <span>keine Burn-Levels gefunden (prüfe {{ bot_type }}_config_{{ symbol }}.yaml)</span>
+                    {% endif %}
+                </div>
+                <div class="burn-legend">
+                    TP Exit-Levels aus Config:
+                    {% if exit_levels %}
+                        {% for p in exit_levels %}
+                            <code>{{ "%.6f"|format(p) }}</code>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <span>keine Exit-Levels gefunden</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const symbol = "{{ symbol }}";
+        const account = "{{ account }}";
+        const profile = "{{ profile or 'main' }}";
+        const singleAccount = {{ 'true' if single_account else 'false' }};
+        const burnLevels = [{% for p in burn_levels %}{{ "%.6f"|format(p) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const exitLevels = [{% for p in exit_levels %}{{ "%.6f"|format(p) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const initialLongEntry = {{ long_entry_price if long_entry_price is not none else 'null' }};
+        const initialShortEntry = {{ short_entry_price if short_entry_price is not none else 'null' }};
+        const initialShortTp = {{ short_tp_price if short_tp_price is not none else 'null' }};
+
+        const messageEl = document.getElementById('liveChartMessage');
+        const debugEl = document.getElementById('liveChartDebug');
+
+        let longEntryLine = null;
+        let shortEntryLine = null;
+        let currentLongEntry = initialLongEntry;
+        let currentShortEntry = initialShortEntry;
+        let shortTpLine = null;
+        let currentShortTp = initialShortTp;
+
+        const DEBUG_MAX_LINES = 200;
+        function logDebug(msg, obj) {
+            const time = new Date().toISOString().split('T')[1].slice(0,8);
+            let line = `[${time}] ${msg}`;
+            if (obj !== undefined) {
+                try {
+                    line += ' ' + JSON.stringify(obj);
+                } catch(e) {
+                    line += ' ' + String(obj);
+                }
+            }
+            console.log(line);
+            if (debugEl) {
+                const cur = (debugEl.textContent || '').split('\\n').filter(Boolean);
+                cur.push(line);
+                if (cur.length > DEBUG_MAX_LINES) {
+                    cur.splice(0, cur.length - DEBUG_MAX_LINES);
+                }
+                debugEl.textContent = cur.join('\\n') + "\\n";
+            }
+        }
+
+        let lastPriceLine = null;
+        function updateLastPriceLine(candleSeries, price) {
+            if (lastPriceLine) {
+                try { candleSeries.removePriceLine(lastPriceLine); } catch (_) {}
+                lastPriceLine = null;
+            }
+            if (typeof price === 'number' && !Number.isNaN(price)) {
+                lastPriceLine = candleSeries.createPriceLine({
+                    price: price,
+                    color: '#ef4444',
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'Last',
+                });
+            }
+        }
+
+        let tpLines = [];
+        function drawExitLevels(candleSeries) {
+            try {
+                (tpLines || []).forEach(l => { try { candleSeries.removePriceLine(l); } catch (_) {} });
+            } catch (_) {}
+            tpLines = [];
+            (exitLevels || []).forEach((p, idx) => {
+                if (typeof p !== 'number' || Number.isNaN(p) || p <= 0) return;
+                const line = candleSeries.createPriceLine({
+                    price: p,
+                    color: '#22c55e', // grün für TP
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: 'TP ' + (idx + 1),
+                });
+                tpLines.push(line);
+            });
+        }
+
+        async function fetchKlines() {
+            const url = `/api/live-klines?symbol=${encodeURIComponent(symbol)}&interval=5&limit=200`;
+            // Nicht bei jedem Poll ins Debug spammen
+            const res = await fetch(url);
+            if (!res.ok) {
+                const txt = await res.text();
+                logDebug("Kline-Request fehlgeschlagen", { status: res.status, body: txt });
+                if (messageEl) {
+                    messageEl.textContent = `Klines-API Fehler (${res.status}): ${txt}`;
+                }
+                return [];
+            }
+            const data = await res.json();
+            if (!data.success) {
+                logDebug("API-Fehler", data);
+                if (messageEl) {
+                    messageEl.textContent = `API-Fehler: ${data.error || 'unbekannt'}`;
+                }
+                return [];
+            }
+            if (messageEl) {
+                messageEl.textContent = '';
+            }
+            logDebug("Klines empfangen", { count: (data.candles || []).length });
+            return data.candles || [];
+        }
+
+        function fmt(n, decimals = 4) {
+            if (typeof n !== 'number' || Number.isNaN(n)) return '–';
+            return n.toFixed(decimals);
+        }
+        function fmtInt(n) {
+            if (typeof n !== 'number' || Number.isNaN(n)) return '–';
+            return String(Math.round(n));
+        }
+        function pnlClass(v) {
+            if (typeof v !== 'number' || Number.isNaN(v) || v === 0) return 'muted';
+            return v > 0 ? 'pnl-pos' : 'pnl-neg';
+        }
+
+        function renderTiles(list, containerEl, account) {
+            if (!containerEl) return;
+            if (!Array.isArray(list) || list.length === 0) {
+                containerEl.innerHTML = `<div class="muted" style="font-size:12px;">Keine aktiven Positionen</div>`;
+                return;
+            }
+            containerEl.innerHTML = list.map(item => {
+                const sym = item.symbol || '';
+                const cur = (typeof item.current_price === 'number') ? item.current_price : null;
+                const long = item.long || null;
+                const sh = item.short || null;
+                const burnCount = Array.isArray(item.burn_levels) ? item.burn_levels.length : 0;
+                const tpCount = Array.isArray(item.exit_levels) ? item.exit_levels.length : 0;
+                const openUrl = `/live-charts?account=${encodeURIComponent(account || 'main')}&symbol=${encodeURIComponent(sym)}`;
+
+                const longPnl = long ? (Number(long.unrealised_pnl || 0) + Number(long.realised_pnl || 0)) : null;
+                const shortPnl = sh ? (Number(sh.unrealised_pnl || 0) + Number(sh.realised_pnl || 0)) : null;
+
+                return `
+                    <div class="tile" onclick="window.location.href='${openUrl}'" title="Öffnen: ${sym} (${account})">
+                        <div class="tile-header">
+                            <div class="tile-symbol">${sym}</div>
+                            <div class="badge">${(account || 'main').toUpperCase()}</div>
+                        </div>
+                        <div class="tile-kpis">
+                            <div class="kpi">
+                                <label>Last</label>
+                                <div class="val">${cur != null ? fmt(cur, 6) : '–'}</div>
+                            </div>
+                            <div class="kpi">
+                                <label>TP/Burn</label>
+                                <div class="val">${tpCount} / ${burnCount}</div>
+                            </div>
+                        </div>
+                        <div class="side-row">
+                            <div class="side-box">
+                                <div class="title">Long</div>
+                                ${long ? `
+                                    <div class="val">Entry: ${fmt(Number(long.entry_price || 0), 6)}</div>
+                                    <div class="val">Size: ${fmt(Number(long.size || 0), 2)}</div>
+                                    <div class="val ${pnlClass(longPnl)}">PnL: ${fmt(Number(longPnl || 0), 2)}</div>
+                                ` : `<div class="muted">–</div>`}
+                            </div>
+                            <div class="side-box">
+                                <div class="title">Short</div>
+                                ${sh ? `
+                                    <div class="val">Entry: ${fmt(Number(sh.entry_price || 0), 6)}</div>
+                                    <div class="val">Size: ${fmt(Number(sh.size || 0), 2)}</div>
+                                    <div class="val ${pnlClass(shortPnl)}">PnL: ${fmt(Number(shortPnl || 0), 2)}</div>
+                                ` : `<div class="muted">–</div>`}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function refreshPositionsGrid() {
+            const mainEl = document.getElementById('tilesMain');
+            const subEl = document.getElementById('tilesSub');
+            const mainCountEl = document.getElementById('mainCount');
+            const subCountEl = document.getElementById('subCount');
+            const mainCol = document.getElementById('mainCol');
+            const subCol = document.getElementById('subCol');
+            try {
+                const accountParam = (typeof account !== 'undefined' && account) ? '?account=' + encodeURIComponent(account) : '?account=main';
+                const res = await fetch('/api/live-positions-grid' + accountParam, { credentials: 'include' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    if (mainEl) mainEl.innerHTML = `<div class="muted" style="font-size:12px;">Grid-Fehler</div>`;
+                    if (subEl) subEl.innerHTML = `<div class="muted" style="font-size:12px;">Grid-Fehler</div>`;
+                    return;
+                }
+                const mainList = Array.isArray(data.main) ? data.main : [];
+                const subList = Array.isArray(data.sub) ? data.sub : [];
+                const isSingle = !!data.single_account;
+                if (mainCountEl) mainCountEl.textContent = `${mainList.length} Symbole`;
+                if (subCountEl) subCountEl.textContent = `${subList.length} Symbole`;
+                renderTiles(mainList, mainEl, account || 'main');
+                renderTiles(subList, subEl, account || 'sub');
+                if (mainCol) mainCol.style.display = '';
+                if (subCol) subCol.style.display = isSingle ? 'none' : '';
+            } catch (e) {
+                // silent
+            }
+        }
+
+        async function fetchPositions() {
+            const url = `/api/live-positions?symbol=${encodeURIComponent(symbol)}&account=${encodeURIComponent(account || 'main')}`;
+            logDebug(`fetchPositions -> ${url}`);
+            const res = await fetch(url);
+            if (!res.ok) {
+                const txt = await res.text();
+                logDebug("Positions-Request fehlgeschlagen", { status: res.status, body: txt });
+                return null;
+            }
+            const data = await res.json();
+            if (!data.success) {
+                logDebug("Positions-API-Fehler", data);
+                return null;
+            }
+            logDebug("Positions empfangen", {
+                long_entry_price: data.long_entry_price,
+                short_entry_price: data.short_entry_price,
+                current_price: data.current_price,
+            });
+            return data;
+        }
+
+        function updateEntryLines(candleSeries, longPrice, shortPrice) {
+            // Long-Linie
+            if (longEntryLine) {
+                try {
+                    candleSeries.removePriceLine(longEntryLine);
+                } catch (e) {
+                    logDebug("Fehler beim Entfernen der Long-Linie", String(e));
+                }
+                longEntryLine = null;
+            }
+            if (typeof longPrice === 'number' && !Number.isNaN(longPrice)) {
+                longEntryLine = candleSeries.createPriceLine({
+                    price: longPrice,
+                    color: '#16a34a',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: 'Long Entry',
+                });
+            }
+
+            // Short-Linie
+            if (shortEntryLine) {
+                try {
+                    candleSeries.removePriceLine(shortEntryLine);
+                } catch (e) {
+                    logDebug("Fehler beim Entfernen der Short-Linie", String(e));
+                }
+                shortEntryLine = null;
+            }
+            if (typeof shortPrice === 'number' && !Number.isNaN(shortPrice)) {
+                shortEntryLine = candleSeries.createPriceLine({
+                    price: shortPrice,
+                    color: '#dc2626',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: 'Short Entry',
+                });
+            }
+        }
+
+        function updateShortTpLine(candleSeries, tpPrice) {
+            if (shortTpLine) {
+                try {
+                    candleSeries.removePriceLine(shortTpLine);
+                } catch (e) {
+                    logDebug("Fehler beim Entfernen der Short-TP-Linie", String(e));
+                }
+                shortTpLine = null;
+            }
+            if (typeof tpPrice === 'number' && !Number.isNaN(tpPrice)) {
+                shortTpLine = candleSeries.createPriceLine({
+                    price: tpPrice,
+                    color: '#22c55e', // grün, da TP beim Short ist
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: 'Short TP',
+                });
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            try {
+                logDebug("Init live chart (onload)", { symbol, burnLevels, exitLevels });
+
+                // Tile-Grid initial + Polling
+                refreshPositionsGrid();
+                setInterval(refreshPositionsGrid, 5000);
+
+                if (!symbol) {
+                    logDebug("Kein Symbol gesetzt – breche Chart-Initialisierung ab.");
+                    if (messageEl) {
+                        messageEl.textContent = "Kein aktiver Bot für diesen Account – bitte oben Account & Symbol wählen.";
+                    }
+                    return;
+                }
+
+                const chartElement = document.getElementById('liveChart');
+                if (!chartElement) {
+                    logDebug("Kein chartElement gefunden");
+                    return;
+                }
+
+                const chart = LightweightCharts.createChart(chartElement, {
+                    layout: {
+                        background: { color: '#020617' },
+                        textColor: '#e5e7eb',
+                    },
+                    grid: {
+                        vertLines: { color: '#1f2937' },
+                        horzLines: { color: '#1f2937' },
+                    },
+                    rightPriceScale: { borderColor: '#374151' },
+                    timeScale: { borderColor: '#374151' },
+                });
+
+                // lightweight-charts v5: addCandlestickSeries() → addSeries(CandlestickSeries, options)
+                const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+                    priceFormat: {
+                        type: 'price',
+                        precision: 5,
+                        minMove: 0.00001,
+                    },
+                });
+                let klines;
+                try {
+                    klines = await fetchKlines();
+                } catch (e) {
+                    logDebug("Exception in fetchKlines", String(e));
+                    if (messageEl && !messageEl.textContent) {
+                        messageEl.textContent = "Fehler beim Laden der Klines – siehe Debug-Log.";
+                    }
+                    return;
+                }
+
+                if (!klines.length) {
+                    logDebug("Keine Klines geladen (after fetch)");
+                    if (messageEl && !messageEl.textContent) {
+                        messageEl.textContent = "Keine Klines geladen – prüfe Symbol oder Bybit-Daten.";
+                    }
+                } else {
+                    logDebug("Setze Candles", klines.slice(-3));  // letzte 3 zur Kontrolle
+                    candleSeries.setData(klines);
+                    chart.timeScale().fitContent();
+
+                    const last = klines[klines.length - 1];
+                    // aktuelle Last-Price-Linie (dezent, gestrichelt, rot)
+                    updateLastPriceLine(candleSeries, last.close);
+                    // Start-Entry-Linien aus Backend (falls vorhanden)
+                    updateEntryLines(
+                        candleSeries,
+                        typeof initialLongEntry === 'number' ? initialLongEntry : null,
+                        typeof initialShortEntry === 'number' ? initialShortEntry : null,
+                    );
+
+                    // Start-Short-TP-Linie (falls vorhanden)
+                    updateShortTpLine(
+                        candleSeries,
+                        typeof initialShortTp === 'number' ? initialShortTp : null,
+                    );
+
+                    // Exit-Levels als grüne TP-Linien einzeichnen
+                    drawExitLevels(candleSeries);
+
+                    // Burn-Levels als rote Linien einzeichnen
+                    burnLevels.forEach((p, idx) => {
+                        candleSeries.createPriceLine({
+                            price: p,
+                            color: '#ef4444',
+                            lineWidth: 1,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            axisLabelVisible: true,
+                            title: 'Burn ' + (idx + 1),
+                        });
+                    });
+                }
+
+                // Resize-Handling
+                new ResizeObserver(() => {
+                    const rect = chartElement.getBoundingClientRect();
+                    chart.applyOptions({ width: rect.width, height: rect.height });
+                }).observe(chartElement);
+
+                // Periodische Aktualisierung der Entry-Preise (z. B. alle 10s)
+                setInterval(async () => {
+                    if (!symbol) {
+                        return;
+                    }
+                    try {
+                        const pos = await fetchPositions();
+                        if (!pos) {
+                            return;
+                        }
+                        const newLong = typeof pos.long_entry_price === 'number' ? pos.long_entry_price : null;
+                        const newShort = typeof pos.short_entry_price === 'number' ? pos.short_entry_price : null;
+                        const newShortTp = typeof pos.short_tp_price === 'number' ? pos.short_tp_price : null;
+
+                        if (newLong !== currentLongEntry || newShort !== currentShortEntry || newShortTp !== currentShortTp) {
+                            logDebug("Entry-Preise geändert", {
+                                oldLong: currentLongEntry,
+                                newLong,
+                                oldShort: currentShortEntry,
+                                newShort,
+                                oldShortTp: currentShortTp,
+                                newShortTp,
+                            });
+                            currentLongEntry = newLong;
+                            currentShortEntry = newShort;
+                            updateEntryLines(candleSeries, newLong, newShort);
+                            currentShortTp = newShortTp;
+                            updateShortTpLine(candleSeries, newShortTp);
+                        }
+                    } catch (e) {
+                        logDebug("Fehler beim periodischen Positions-Fetch", String(e));
+                    }
+                }, 10000);
+
+                // Periodische Aktualisierung der Candles (damit der Preis live "mitläuft")
+                setInterval(async () => {
+                    try {
+                        const newKlines = await fetchKlines();
+                        if (Array.isArray(newKlines) && newKlines.length) {
+                            candleSeries.setData(newKlines);
+                            const last = newKlines[newKlines.length - 1];
+                            updateLastPriceLine(candleSeries, last.close);
+                        }
+                    } catch (e) {
+                        logDebug("Fehler beim periodischen Klines-Fetch", String(e));
+                    }
+                }, 5000);
+            } catch (e) {
+                logDebug("Fehler im onload-Handler", String(e));
+                if (messageEl && !messageEl.textContent) {
+                    messageEl.textContent = "Fehler im Chart-Script – siehe Debug-Log.";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

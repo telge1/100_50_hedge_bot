@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi Zyklus aus Chart - Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .multi-zyklus-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .multi-zyklus-section { margin-bottom: 24px; padding: 16px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid #444; }
+        .multi-zyklus-section h3 { margin: 0 0 12px 0; color: #fff; }
+        .upload-btn { background: #2196f3; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .upload-btn:hover { background: #1976d2; }
+        .upload-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        #chartUploadInput { display: none; }
+        .prices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 12px 0; }
+        .price-field { display: flex; flex-direction: column; gap: 4px; }
+        .price-field label { color: #aaa; font-size: 12px; }
+        .price-field input { background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 8px; }
+        .price-field input[readonly] { background: #2a2a2a; color: #888; border-color: #444; }
+        .config-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+        .config-tab { padding: 10px 20px; background: #444; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .config-tab.active { background: #2196f3; }
+        .config-tab-panel { display: none; }
+        .config-tab-panel.active { display: block; }
+        .config-textarea { width: 100%; min-height: 400px; background: #1e1e1e; color: #ddd; border: 1px solid #555; border-radius: 4px; padding: 12px; font-family: monospace; font-size: 13px; resize: vertical; }
+        .levels-input { width: 100%; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 8px; }
+        .btn-save { background: #4caf50; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-save:hover { background: #43a047; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+            <a href="/live-charts" class="nav-link">📈 Live Charts</a>
+            <a href="/multi-zyklus-chart" class="nav-link active">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+        </div>
+
+        <div class="dashboard-content multi-zyklus-container">
+            <h1>📊 Multi Zyklus aus Chart</h1>
+            <p style="color: #aaa; margin-bottom: 24px;">Chart-Screenshot hochladen, Preise auslesen und Configs für Long- und Short-Bot generieren.</p>
+
+            <div class="multi-zyklus-section">
+                <h3>1. Size &amp; Chart</h3>
+                <div class="prices-grid" style="margin-bottom: 12px;">
+                    <div class="price-field">
+                        <label>Size (USDT für alle Bots)</label>
+                        <input type="number" id="sizeInput" step="any" min="1" value="15" placeholder="15" title="initial_long_usdt / initial_short_usdt für alle Bots">
+                        <span style="font-size: 11px; color: #888;">initial_long_usdt / initial_short_usdt</span>
+                    </div>
+                </div>
+                <input type="file" id="chartUploadInput" accept="image/png,image/jpeg,image/jpg">
+                <button type="button" id="uploadChartBtn" class="upload-btn">📤 Chart auswählen</button>
+            </div>
+
+            <div class="multi-zyklus-section" id="pricesSection" style="display: none;">
+                <h3>2. Erkannte Preise (editierbar)</h3>
+                <div class="prices-grid">
+                    <div class="price-field">
+                        <label>Symbol</label>
+                        <input type="text" id="symbolInput" placeholder="z.B. ASTERUSDT">
+                    </div>
+                    <div class="price-field">
+                        <label>Aktueller Preis (vom Chart)</label>
+                        <input type="text" id="currentPriceInput" readonly placeholder="0.70280" title="Vom Candle-Counter erkannt">
+                    </div>
+                    <div class="price-field">
+                        <label>Main (Long) Level</label>
+                        <input type="number" id="mainLevelInput" step="any" placeholder="0.69798" title="Level wo Main-Account (Long) öffnet – manuell eintragen">
+                        <span style="font-size: 11px; color: #888;">Erster Bot, Preis selbst eintragen</span>
+                    </div>
+                    <div class="price-field">
+                        <label>Sub (Short) Level</label>
+                        <input type="number" id="subLevelInput" step="any" placeholder="0.69798" title="Level wo Sub-Account (Short) öffnet – manuell eintragen">
+                        <span style="font-size: 11px; color: #888;">Erster Bot, Preis selbst eintragen</span>
+                    </div>
+                    <div class="price-field">
+                        <label>Long Bot 1 Level (unter Main)</label>
+                        <input type="number" id="longBot1Input" step="any" placeholder="0.68005" title="Level für long_bot_1">
+                    </div>
+                    <div class="price-field">
+                        <label>Long Bot 2 Level (unter Long Bot 1)</label>
+                        <input type="number" id="longBot2Input" step="any" placeholder="0.63788" title="Level für long_bot_2">
+                    </div>
+                    <div class="price-field">
+                        <label>Short Bot 1 Level (über Sub)</label>
+                        <input type="number" id="shortBot1Input" step="any" placeholder="0.73202" title="Level für short_bot_1">
+                    </div>
+                    <div class="price-field">
+                        <label>Short Bot 2 Level (über Short Bot 1)</label>
+                        <input type="number" id="shortBot2Input" step="any" placeholder="0.70882" title="Level für short_bot_2">
+                    </div>
+                </div>
+                <button type="button" id="generateConfigsBtn" class="upload-btn" style="margin-top: 12px;">⚙️ Configs generieren</button>
+            </div>
+
+            <div class="multi-zyklus-section" id="configsSection" style="display: none;">
+                <h3>3. Generierte Configs</h3>
+                <div class="config-tabs">
+                    <button type="button" class="config-tab active" data-tab="main">🟢 Main (Long)</button>
+                    <button type="button" class="config-tab" data-tab="sub">🔴 Sub (Short)</button>
+                    <button type="button" class="config-tab" data-tab="long1">🟢 Long Bot 1</button>
+                    <button type="button" class="config-tab" data-tab="long2">🟢 Long Bot 2</button>
+                    <button type="button" class="config-tab" data-tab="short1">🔴 Short Bot 1</button>
+                    <button type="button" class="config-tab" data-tab="short2">🔴 Short Bot 2</button>
+                </div>
+                <div id="mainConfigPanel" class="config-tab-panel active">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/long_config_<span id="mainSymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveMainConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawMain" class="config-textarea"></textarea>
+                </div>
+                <div id="subConfigPanel" class="config-tab-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/short_config_<span id="subSymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveSubConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawSub" class="config-textarea"></textarea>
+                </div>
+                <div id="long1ConfigPanel" class="config-tab-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/bot_1/long_config_<span id="long1SymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveLong1ConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawLong1" class="config-textarea"></textarea>
+                </div>
+                <div id="long2ConfigPanel" class="config-tab-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/bot_2/long_config_<span id="long2SymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveLong2ConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawLong2" class="config-textarea"></textarea>
+                </div>
+                <div id="short1ConfigPanel" class="config-tab-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/bot_1/short_config_<span id="short1SymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveShort1ConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawShort1" class="config-textarea"></textarea>
+                </div>
+                <div id="short2ConfigPanel" class="config-tab-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #9e9e9e; font-size: 12px;">config/bot_2/short_config_<span id="short2SymbolHint">SYMBOL</span>.yaml</span>
+                        <button type="button" id="saveShort2ConfigBtn" class="btn-save">Aktualisieren</button>
+                    </div>
+                    <textarea id="configRawShort2" class="config-textarea"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadChartBtn').addEventListener('click', () => document.getElementById('chartUploadInput').click());
+
+        document.getElementById('chartUploadInput').addEventListener('change', async function() {
+            if (!this.files || this.files.length === 0) return;
+            const file = this.files[0];
+            const btn = document.getElementById('uploadChartBtn');
+            btn.disabled = true;
+            btn.textContent = 'Verarbeite...';
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await fetch('/api/multi-zyklus/upload', { method: 'POST', body: formData, credentials: 'include' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    alert(data.error || data.detail || 'Upload fehlgeschlagen');
+                    return;
+                }
+                document.getElementById('symbolInput').value = data.coin || '';
+                document.getElementById('currentPriceInput').value = data.entry != null ? data.entry : '';
+                // Main + Sub = orangene Linie (main_sub_levels), nicht Entry
+                const mainSub = Array.isArray(data.main_sub_levels) ? data.main_sub_levels : [];
+                const mainSubVal = mainSub[0] ?? (data.entry != null ? data.entry : '');
+                document.getElementById('mainLevelInput').value = mainSubVal;
+                document.getElementById('subLevelInput').value = mainSubVal;
+                // Long Bot 1/2 = erste/zweite grüne Linie unter der orangenen
+                const ll = Array.isArray(data.long_levels) ? data.long_levels : [];
+                const sl = Array.isArray(data.short_levels) ? data.short_levels : [];
+                document.getElementById('longBot1Input').value = ll[0] ?? '';
+                document.getElementById('longBot2Input').value = ll[1] ?? '';
+                document.getElementById('shortBot1Input').value = sl[0] ?? '';
+                document.getElementById('shortBot2Input').value = sl[1] ?? '';
+                document.getElementById('pricesSection').style.display = 'block';
+            } catch (e) {
+                alert('Fehler: ' + (e.message || 'Unbekannt'));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📤 Chart auswählen';
+                document.getElementById('chartUploadInput').value = '';
+            }
+        });
+
+        document.getElementById('generateConfigsBtn').addEventListener('click', async function() {
+            const symbol = (document.getElementById('symbolInput').value || '').trim().toUpperCase();
+            const sizeVal = (document.getElementById('sizeInput').value || '').trim().replace(',', '.');
+            const size = parseFloat(sizeVal) || 15;
+            const mainLevel = parseFloat((document.getElementById('mainLevelInput').value || '').trim().replace(',', '.'));
+            const subLevel = parseFloat((document.getElementById('subLevelInput').value || '').trim().replace(',', '.'));
+            const longBot1 = parseFloat((document.getElementById('longBot1Input').value || '').trim().replace(',', '.'));
+            const longBot2 = parseFloat((document.getElementById('longBot2Input').value || '').trim().replace(',', '.'));
+            const shortBot1 = parseFloat((document.getElementById('shortBot1Input').value || '').trim().replace(',', '.'));
+            const shortBot2 = parseFloat((document.getElementById('shortBot2Input').value || '').trim().replace(',', '.'));
+            if (!symbol) { alert('Bitte Symbol eingeben.'); return; }
+            if (!Number.isFinite(mainLevel) || mainLevel <= 0) { alert('Bitte Main (Long) Level eingeben.'); return; }
+            if (!Number.isFinite(subLevel) || subLevel <= 0) { alert('Bitte Sub (Short) Level eingeben.'); return; }
+            if (!Number.isFinite(longBot1) || !Number.isFinite(longBot2)) { alert('Bitte Long Bot 1 und Long Bot 2 Level eingeben.'); return; }
+            if (!Number.isFinite(shortBot1) || !Number.isFinite(shortBot2)) { alert('Bitte Short Bot 1 und Short Bot 2 Level eingeben.'); return; }
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Generiere...';
+            try {
+                const res = await fetch('/api/multi-zyklus/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol,
+                        size,
+                        main_level: mainLevel, sub_level: subLevel,
+                        long_bot_1: longBot1, long_bot_2: longBot2,
+                        short_bot_1: shortBot1, short_bot_2: shortBot2
+                    }),
+                    credentials: 'include'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    alert(data.error || data.detail || 'Generierung fehlgeschlagen');
+                    return;
+                }
+                if (data.save_error) {
+                    alert('Configs generiert, aber Speichern fehlgeschlagen:\n' + data.save_error);
+                } else if (data.saved_paths && data.saved_paths.length) {
+                    const msg = 'Configs gespeichert in config/, config/bot_1 und config/bot_2:\n\n' + data.saved_paths.map(p => p.replace(/^.*\/config\//, 'config/')).join('\n');
+                    alert(msg);
+                }
+                document.getElementById('configRawMain').value = data.main_yaml || '';
+                document.getElementById('configRawSub').value = data.sub_yaml || '';
+                document.getElementById('configRawLong1').value = data.long_bot_1_yaml || '';
+                document.getElementById('configRawLong2').value = data.long_bot_2_yaml || '';
+                document.getElementById('configRawShort1').value = data.short_bot_1_yaml || '';
+                document.getElementById('configRawShort2').value = data.short_bot_2_yaml || '';
+                document.getElementById('mainSymbolHint').textContent = symbol;
+                document.getElementById('subSymbolHint').textContent = symbol;
+                document.getElementById('long1SymbolHint').textContent = symbol;
+                document.getElementById('long2SymbolHint').textContent = symbol;
+                document.getElementById('short1SymbolHint').textContent = symbol;
+                document.getElementById('short2SymbolHint').textContent = symbol;
+                document.getElementById('configRawMain').dataset.symbol = symbol;
+                document.getElementById('configRawSub').dataset.symbol = symbol;
+                document.getElementById('configRawLong1').dataset.symbol = symbol;
+                document.getElementById('configRawLong2').dataset.symbol = symbol;
+                document.getElementById('configRawShort1').dataset.symbol = symbol;
+                document.getElementById('configRawShort2').dataset.symbol = symbol;
+                document.getElementById('configsSection').style.display = 'block';
+            } catch (e) {
+                alert('Fehler: ' + (e.message || 'Unbekannt'));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚙️ Configs generieren';
+            }
+        });
+
+        document.querySelectorAll('.config-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.config-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.config-tab-panel').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                const tabId = this.dataset.tab;
+                document.getElementById(tabId + 'ConfigPanel').classList.add('active');
+            });
+        });
+
+        async function saveConfig(botType, profile) {
+            let textarea, btn;
+            if (profile === 'main') {
+                textarea = document.getElementById('configRawMain');
+                btn = document.getElementById('saveMainConfigBtn');
+            } else if (profile === 'sub') {
+                textarea = document.getElementById('configRawSub');
+                btn = document.getElementById('saveSubConfigBtn');
+            } else {
+                const suffix = (botType === 'long' ? 'Long' : 'Short') + (profile === 'bot_1' ? '1' : '2');
+                textarea = document.getElementById('configRaw' + suffix);
+                btn = document.getElementById('save' + suffix + 'ConfigBtn');
+            }
+            const symbol = (textarea.dataset.symbol || document.getElementById('symbolInput').value || '').trim().toUpperCase();
+            if (!symbol) { alert('Symbol fehlt.'); return; }
+            const body = { bot_type: botType, symbol, content: textarea.value };
+            if (profile && profile !== 'main' && profile !== 'sub') body.profile = profile;
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/hedge/config-raw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    credentials: 'include'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.success) alert('Config gespeichert.');
+                else alert(data.error || 'Fehler beim Speichern');
+            } catch (e) {
+                alert('Fehler: ' + (e.message || 'Unbekannt'));
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('saveMainConfigBtn').addEventListener('click', () => saveConfig('long', 'main'));
+        document.getElementById('saveSubConfigBtn').addEventListener('click', () => saveConfig('short', 'sub'));
+        document.getElementById('saveLong1ConfigBtn').addEventListener('click', () => saveConfig('long', 'bot_1'));
+        document.getElementById('saveLong2ConfigBtn').addEventListener('click', () => saveConfig('long', 'bot_2'));
+        document.getElementById('saveShort1ConfigBtn').addEventListener('click', () => saveConfig('short', 'bot_1'));
+        document.getElementById('saveShort2ConfigBtn').addEventListener('click', () => saveConfig('short', 'bot_2'));
+    </script>
+</body>
+</html>

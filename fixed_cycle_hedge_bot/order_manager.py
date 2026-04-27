@@ -78,6 +78,7 @@ class BybitOrderManager:
         self._session = requests.Session()
         self._instrument_cache: dict[tuple[str, str], Mapping[str, Any]] = {}
         self._max_leverage_cache: set[tuple[str, str]] = set()
+        self.last_post_error: dict[str, Any] | None = None
 
     def _sign(self, body: str) -> str:
         timestamp = str(int(time.time() * 1_000))
@@ -102,15 +103,19 @@ class BybitOrderManager:
             resp = self._session.post(url, headers=headers, data=body, timeout=timeout)
             if resp.status_code != 200:
                 logger.warning("Bybit POST %s failed %s – %s", path, resp.status_code, resp.text[:200])
+                self.last_post_error = {"http_status": resp.status_code, "error": resp.text[:200]}
                 return None
             data = resp.json()
             if data.get("retCode") != 0:
                 logger.warning(
                     "Bybit POST %s returned %s %s", path, data.get("retCode"), data.get("retMsg")
                 )
+                self.last_post_error = data
                 return None
+            self.last_post_error = None
             return data
         except Exception as exc:
+            self.last_post_error = {"exception": str(exc)}
             logger.exception("Bybit POST %s exception", path, exc_info=exc)
             return None
 
@@ -329,6 +334,11 @@ class BybitOrderManager:
         if symbol:
             payload["symbol"] = symbol.upper()
         result = self._post("/v5/order/cancel", json.dumps(payload))
+        return bool(result)
+
+    def cancel_all_orders(self, *, symbol: str, category: str = "linear") -> bool:
+        payload = {"category": category, "symbol": symbol.upper()}
+        result = self._post("/v5/order/cancel-all", json.dumps(payload))
         return bool(result)
 
     def set_take_profit(self, symbol: str, tp_price: float, position_idx: int = 1) -> Mapping[str, Any] | None:

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Alert - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .price-alert-container {
+            max-width: 640px;
+            margin: 20px auto;
+            background: #111827;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        .price-alert-header {
+            margin-bottom: 24px;
+        }
+        .price-alert-header h1 {
+            font-size: 22px;
+            margin: 0 0 8px 0;
+            color: #e5e7eb;
+        }
+        .price-alert-header p {
+            margin: 0;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        .price-alert-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #9ca3af;
+        }
+        .form-group input, .form-group select {
+            background: #020617;
+            border: 1px solid #1f2937;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #e5e7eb;
+            font-size: 15px;
+            min-width: 100px;
+        }
+        .form-group input[type="text"] {
+            text-transform: uppercase;
+            width: 140px;
+        }
+        .form-group input[type="number"] {
+            width: 120px;
+        }
+        .btn-activate {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .btn-activate:hover {
+            background: #1d4ed8;
+        }
+        .btn-activate:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-stop {
+            padding: 8px 14px;
+            font-size: 13px;
+            background: #dc2626;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-stop:hover { background: #b91c1c; }
+        .current-price-box {
+            background: #0b1220;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .current-price-box .label { color: #9ca3af; font-size: 14px; }
+        .current-price-box .value { font-size: 20px; font-weight: 700; color: #22c55e; }
+        .current-price-box .refresh { font-size: 12px; color: #6b7280; }
+        .current-price-box .live-badge { font-size: 11px; color: #22c55e; margin-left: 6px; }
+        .active-alerts {
+            margin-top: 20px;
+        }
+        .active-alerts h3 {
+            font-size: 16px;
+            color: #e5e7eb;
+            margin: 0 0 12px 0;
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0b1220;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+        }
+        .alert-item .info { color: #e5e7eb; font-size: 14px; }
+        .alert-item .info span { color: #9ca3af; margin-left: 4px; }
+        .status-msg { margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 14px; }
+        .status-msg.success { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .status-msg.error { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .alert-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #0b1220;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+        }
+        .alert-row .form-group input, .alert-row .form-group select { min-width: 90px; }
+        .alert-row .form-group input[type="text"] { width: 110px; }
+        .alert-row .form-group input[type="number"] { width: 100px; }
+        .btn-add-alert {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 8px;
+            border: 2px dashed #4b5563;
+            background: transparent;
+            color: #9ca3af;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-add-alert:hover { border-color: #2563eb; color: #2563eb; background: rgba(37,99,235,0.1); }
+        .btn-remove-row {
+            padding: 6px 10px;
+            font-size: 12px;
+            background: transparent;
+            border: 1px solid #4b5563;
+            color: #9ca3af;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-remove-row:hover { border-color: #ef4444; color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+            <a href="/live-charts" class="nav-link">📈 Live Charts</a>
+            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link active">🔔 Price Alert</a>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="price-alert-container">
+                <div class="price-alert-header">
+                    <h1>🔔 Price Alert</h1>
+                    <p>Benachrichtigung per ntfy, wenn ein Coin einen Zielpreis erreicht (Above oder Below).</p>
+                </div>
+
+                <div class="current-price-box" id="currentPriceBox">
+                    <div>
+                        <span class="label">Aktueller Preis für</span>
+                        <strong id="priceSymbolDisplay">–</strong>
+                        <span class="refresh" id="priceRefreshHint"></span>
+                        <span class="live-badge" id="priceLiveBadge"></span>
+                    </div>
+                    <div class="value" id="currentPriceVal">–</div>
+                </div>
+
+                <div id="alertRowsContainer"></div>
+                <div style="margin-top: 8px;">
+                    <button type="button" class="btn-add-alert" id="btnAddAlert" title="Weiteren Price-Alert hinzufügen">+</button>
+                </div>
+
+                <div id="statusMsg"></div>
+
+                <div class="active-alerts" id="activeAlertsSection">
+                    <h3>Aktive Alerts</h3>
+                    <div id="activeAlertsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentPriceVal = document.getElementById('currentPriceVal');
+        const priceSymbolDisplay = document.getElementById('priceSymbolDisplay');
+        const priceRefreshHint = document.getElementById('priceRefreshHint');
+        const priceLiveBadge = document.getElementById('priceLiveBadge');
+        const statusMsg = document.getElementById('statusMsg');
+        const activeAlertsList = document.getElementById('activeAlertsList');
+        const alertRowsContainer = document.getElementById('alertRowsContainer');
+        const btnAddAlert = document.getElementById('btnAddAlert');
+
+        const PRICE_REFRESH_INTERVAL_MS = 5000;
+        const ALERTS_REFRESH_INTERVAL_MS = 10000;
+        let priceRefreshSymbol = '';
+
+        function showStatus(msg, isError) {
+            statusMsg.textContent = msg;
+            statusMsg.className = 'status-msg ' + (isError ? 'error' : 'success');
+            statusMsg.style.display = msg ? 'block' : 'none';
+            if (msg) setTimeout(() => { statusMsg.textContent = ''; statusMsg.style.display = 'none'; }, 5000);
+        }
+
+        async function fetchCurrentPrice(symbol) {
+            if (!symbol || !symbol.trim()) return null;
+            try {
+                const r = await fetch('/api/price-alert/current-price?symbol=' + encodeURIComponent(symbol.trim().toUpperCase()));
+                const j = await r.json();
+                if (j.success && j.price != null) return j.price;
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function refreshCurrentPrice() {
+            const sym = priceRefreshSymbol.trim().toUpperCase();
+            if (!sym) {
+                currentPriceVal.textContent = '–';
+                priceSymbolDisplay.textContent = '–';
+                priceRefreshHint.textContent = '';
+                priceLiveBadge.textContent = '';
+                return;
+            }
+            priceSymbolDisplay.textContent = sym;
+            currentPriceVal.textContent = '…';
+            const price = await fetchCurrentPrice(sym);
+            if (price != null) {
+                currentPriceVal.textContent = price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+                priceRefreshHint.textContent = '(von Bybit)';
+                priceLiveBadge.textContent = '• Live';
+            } else {
+                currentPriceVal.textContent = '–';
+                priceRefreshHint.textContent = '(Fehler)';
+                priceLiveBadge.textContent = '';
+            }
+        }
+
+        function createAlertRow() {
+            const row = document.createElement('div');
+            row.className = 'alert-row';
+            row.innerHTML = `
+                <div class="form-group">
+                    <label>Symbol</label>
+                    <input type="text" class="row-symbol" placeholder="TONUSDT" maxlength="20" />
+                </div>
+                <div class="form-group">
+                    <label>Preis</label>
+                    <input type="number" class="row-price" placeholder="7.50" step="any" min="0" />
+                </div>
+                <div class="form-group">
+                    <label>Trigger</label>
+                    <select class="row-trigger">
+                        <option value="above">Above (≥)</option>
+                        <option value="below">Below (≤)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn-activate row-activate">Aktivieren</button>
+                </div>
+                <div class="form-group" style="margin-left:auto;">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn-remove-row row-remove">−</button>
+                </div>
+            `;
+            const symIn = row.querySelector('.row-symbol');
+            symIn.addEventListener('focus', () => { priceRefreshSymbol = symIn.value; refreshCurrentPrice(); });
+            symIn.addEventListener('blur', () => { if (symIn.value.trim()) { priceRefreshSymbol = symIn.value; refreshCurrentPrice(); } });
+            symIn.addEventListener('input', () => { if (symIn === document.activeElement) { priceRefreshSymbol = symIn.value; refreshCurrentPrice(); } });
+            row.querySelector('.row-activate').addEventListener('click', () => activateRow(row));
+            row.querySelector('.row-remove').addEventListener('click', () => {
+                if (alertRowsContainer.children.length > 1) row.remove();
+            });
+            return row;
+        }
+
+        async function activateRow(row) {
+            const symbol = (row.querySelector('.row-symbol').value || '').trim().toUpperCase();
+            const targetPrice = parseFloat(row.querySelector('.row-price').value);
+            const trigger = row.querySelector('.row-trigger').value;
+            if (!symbol || isNaN(targetPrice) || targetPrice <= 0) {
+                showStatus('Bitte Symbol und gültigen Preis eingeben.', true);
+                return;
+            }
+            const btn = row.querySelector('.row-activate');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/price-alert/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ symbol, target_price: targetPrice, trigger })
+                });
+                const j = await r.json();
+                if (j.success) {
+                    showStatus(j.message || 'Alert aktiviert.', false);
+                    loadActiveAlerts();
+                } else {
+                    showStatus(j.error || 'Fehler beim Aktivieren.', true);
+                }
+            } catch (err) {
+                showStatus('Netzwerkfehler: ' + err.message, true);
+            }
+            btn.disabled = false;
+        }
+
+        btnAddAlert.addEventListener('click', () => {
+            alertRowsContainer.appendChild(createAlertRow());
+        });
+
+        // Erste Zeile
+        alertRowsContainer.appendChild(createAlertRow());
+
+        // Preis-Loop: nutze zuletzt fokussiertes oder erstes ausgefülltes Symbol
+        setInterval(() => {
+            if (!priceRefreshSymbol) {
+                const first = document.querySelector('.row-symbol');
+                if (first && first.value.trim()) priceRefreshSymbol = first.value.trim().toUpperCase();
+            }
+            if (priceRefreshSymbol) refreshCurrentPrice();
+        }, PRICE_REFRESH_INTERVAL_MS);
+        setInterval(loadActiveAlerts, ALERTS_REFRESH_INTERVAL_MS);
+
+        async function loadActiveAlerts() {
+            try {
+                const r = await fetch('/api/price-alert/status');
+                const j = await r.json();
+                if (!j.success || !j.alerts || Object.keys(j.alerts).length === 0) {
+                    activeAlertsList.innerHTML = '<p style="color:#9ca3af;font-size:14px;">Keine aktiven Alerts.</p>';
+                    return;
+                }
+                let html = '';
+                for (const [, info] of Object.entries(j.alerts)) {
+                    const sym = info.symbol || '';
+                    const tp = info.target_price;
+                    const tr = info.trigger || 'above';
+                    html += '<div class="alert-item">';
+                    html += '<span class="info">' + sym + ' ' + (tr === 'above' ? '≥' : '≤') + ' ' + tp + '</span>';
+                    html += '<button type="button" class="btn-stop" onclick="stopAlert(\'' + sym + '\',' + tp + ',\'' + tr + '\')">Stop</button>';
+                    html += '</div>';
+                }
+                activeAlertsList.innerHTML = html || '<p style="color:#9ca3af;font-size:14px;">Keine aktiven Alerts.</p>';
+            } catch (e) {
+                activeAlertsList.innerHTML = '<p style="color:#ef4444;">Fehler beim Laden.</p>';
+            }
+        }
+
+        async function stopAlert(symbol, targetPrice, trigger) {
+            try {
+                const r = await fetch('/api/price-alert/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ symbol, target_price: targetPrice, trigger })
+                });
+                const j = await r.json();
+                if (j.success) {
+                    showStatus('Alert für ' + symbol + ' beendet.', false);
+                    loadActiveAlerts();
+                } else {
+                    showStatus(j.error || 'Fehler beim Beenden.', true);
+                }
+            } catch (e) {
+                showStatus('Netzwerkfehler.', true);
+            }
+        }
+
+        async function testAlert() {
+            try {
+                const r = await fetch('/api/alerts/test', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const j = await r.json();
+                if (j.success) {
+                    showStatus('✅ Test-Alert gesendet! Prüfe dein Handy.', false);
+                } else {
+                    showStatus('❌ ' + (j.message || 'Fehler'), true);
+                }
+            } catch (e) {
+                showStatus('❌ Fehler: ' + e.message, true);
+            }
+        }
+
+        loadActiveAlerts();
+        refreshCurrentPrice();
+    </script>
+</body>
+</html>

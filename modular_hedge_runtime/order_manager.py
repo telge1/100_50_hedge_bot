@@ -321,6 +321,11 @@ class BybitOrderManager:
         result = self._post("/v5/order/cancel", json.dumps(payload))
         return bool(result)
 
+    def cancel_all_orders(self, *, symbol: str, category: str = "linear") -> bool:
+        payload = {"category": category, "symbol": symbol.upper()}
+        result = self._post("/v5/order/cancel-all", json.dumps(payload))
+        return bool(result)
+
     def set_take_profit(self, symbol: str, tp_price: float, position_idx: int = 1) -> Mapping[str, Any] | None:
         return self.set_position_trading_stop(symbol=symbol, position_idx=position_idx, take_profit=tp_price)
 

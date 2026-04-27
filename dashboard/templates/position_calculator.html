@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Position Calculator - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/position-calculator" class="nav-link active">🧮 Position Calculator</a>
+            <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+        </div>
+        
+        <div class="dashboard-content">
+            <div class="position-calculator-container">
+                <div class="calculator-header">
+                    <h1>🧮 Position Calculator</h1>
+                    <p class="calculator-description">Berechne den durchschnittlichen Entry-Preis für mehrere Positionen</p>
+                </div>
+                
+                <div class="calculator-controls">
+                    <div class="control-group">
+                        <label for="positionType" class="control-label">Position Type:</label>
+                        <select id="positionType" class="position-select">
+                            <option value="long">📈 Long</option>
+                            <option value="short">📉 Short</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="entries-table-container">
+                    <table class="entries-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Entry Price</th>
+                                <th>Size</th>
+                                <th>Average Price</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entriesTableBody">
+                            <!-- Entries will be dynamically added here -->
+                        </tbody>
+                    </table>
+                    
+                    <div class="entries-actions">
+                        <button id="addEntryBtn" class="btn-add-entry" onclick="addEntry()">➕ Add Entry</button>
+                    </div>
+                </div>
+                
+                <div class="calculator-summary">
+                    <div class="summary-card">
+                        <div class="summary-label">Total Size:</div>
+                        <div class="summary-value" id="totalSize">0.00</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Average Entry Price:</div>
+                        <div class="summary-value" id="finalAveragePrice">0.00000</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Total Value (USDT):</div>
+                        <div class="summary-value" id="totalValue">0.00</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Hedgebotpositions Block -->
+            <div class="hedgebotpositions-container">
+                <div class="hedgebotpositions-header">
+                    <h2>🤖 Hedgebotpositions</h2>
+                    <p class="hedgebotpositions-description">Simuliere die Bot-Logik mit 4 Burns und Rebuy. Long Position wird automatisch vom Position Calculator übernommen oder kann manuell eingegeben werden.</p>
+                </div>
+                
+                <!-- Initial Setup -->
+                <div class="hedgebotpositions-setup">
+                    <div class="setup-section">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                            <h3 style="margin: 0;">📈 Long Position</h3>
+                            <button onclick="loadCurrentPositions()" class="btn-load-positions" id="loadPositionsBtn">
+                                📥 Lade aktuelle Positionsdaten
+                            </button>
+                        </div>
+                        <div class="setup-fields" style="margin-bottom: 12px;">
+                            <div class="setup-field">
+                                <label>Symbol auswählen:</label>
+                                <select id="positionSymbolSelector" class="setup-input" style="max-width: 200px;">
+                                    {% for bot in all_bots %}
+                                    <option value="{{ bot.symbol }}">{{ bot.symbol }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label>Long Average Price:</label>
+                                <input type="number" step="0.00001" id="hedgeLongAvg" class="setup-input" placeholder="0.00000" oninput="calculateHedgebotpositions()">
+                            </div>
+                            <div class="setup-field">
+                                <label>Long Total Size:</label>
+                                <input type="number" step="0.01" id="hedgeLongSize" class="setup-input" placeholder="0.00" oninput="calculateHedgebotpositions()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setup-section">
+                        <h3>📉 Short Position Setup</h3>
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label>Short Entry Price:</label>
+                                <input type="number" step="0.00001" id="hedgeShortEntry" class="setup-input" placeholder="0.00000" oninput="calculateHedgebotpositions()">
+                            </div>
+                            <div class="setup-field">
+                                <label>Short Size (Standard: 50% von Long):</label>
+                                <input type="number" step="0.01" id="hedgeShortSize" class="setup-input" placeholder="0.00" oninput="calculateHedgebotpositions()">
+                            </div>
+                            <div class="setup-field">
+                                <label>Short TP in %:</label>
+                                <input type="number" step="0.01" id="hedgeShortTPPercent" class="setup-input" placeholder="0.00" oninput="calculateHedgebotpositions()">
+                            </div>
+                            <!-- Reentry Step % wird fest aus Config verwendet (wie im Bot) -->
+                            <input type="hidden" id="hedgeReentryPercent" value="{{ short_reentry_step_percentage }}">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Burns Table -->
+                <div class="burns-table-container">
+                    <table class="burns-table">
+                        <thead>
+                            <tr>
+                                <th>Burn</th>
+                                <th>Short Entry</th>
+                                <th>Short Size</th>
+                                <th>Short TP %</th>
+                                <th>Burn Price</th>
+                                <th>Short Profit (USDT)</th>
+                                <th>Burn Coins</th>
+                                <th>Burn USDT</th>
+                                <th>Long Size (nach)</th>
+                                <th>Short Entry (neu)</th>
+                                <th>Short Size (neu)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="burnsTableBody">
+                            <!-- Burns will be dynamically calculated here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Rebuy Info -->
+                <div class="rebuy-container">
+                    <h3>🔄 Rebuy nach Burn 4</h3>
+                    <div class="rebuy-setup">
+                        <!-- Config-Werte werden fest aus Config verwendet -->
+                        <input type="hidden" id="rebuyStepPercent" value="{{ short_reentry_step_percentage }}">
+                        <input type="hidden" id="targetLongNotional" value="{{ target_long_notional }}">
+                        <div class="rebuy-field">
+                            <label>Rebuy Entry Price (automatisch berechnet oder manuell):</label>
+                            <input type="number" step="0.00001" id="rebuyEntryPrice" class="rebuy-input" placeholder="0.00000" oninput="calculateRebuy()">
+                        </div>
+                    </div>
+                    <div class="rebuy-info">
+                        <div class="rebuy-field">
+                            <label>Rebuy Long Size (auf Ziel-Notional {{ target_long_notional }} USDT):</label>
+                            <div class="rebuy-value" id="rebuyLongSize">0.00</div>
+                        </div>
+                        <div class="rebuy-field">
+                            <label>Neuer Long Average Price:</label>
+                            <div class="rebuy-value" id="rebuyNewAvgPrice">0.00000</div>
+                        </div>
+                        <div class="rebuy-field">
+                            <label>Neue Long Size in USDT:</label>
+                            <div class="rebuy-value" id="rebuyLongSizeUSDT">0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/position_calculator.js"></script>
+    <script src="/static/js/hedgebotpositions.js"></script>
+</body>
+</html>
