@@ -12,6 +12,7 @@ from typing import Any
 
 from .base import HedgeStrategy, StrategyContext
 from .models import CalculationTrace, FillEvent, HedgeSnapshot, ManagedOrder, RuntimeState, StrategyIntent
+from .hedge_exit_math import calculate_hedge_exit_price
 from .trailing_fallback import (
     ShortTpFallbackState,
     reset_short_tp_fallback,
@@ -2623,30 +2624,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> tuple[float, list[CalculationTrace]]:
         state = runtime_state.strategy_state
 
-        denominator = snapshot.long_qty - snapshot.short_qty
+        long_qty = snapshot.long_qty
+        short_qty = snapshot.short_qty
+        long_avg = snapshot.long_avg
+        short_avg = snapshot.short_avg
+        denominator = long_qty - short_qty
         if abs(denominator) <= 1e-9:
-            base_break_even = snapshot.current_price
+            base_break_even = long_avg
         else:
             base_break_even = (
-                (snapshot.long_avg * snapshot.long_qty)
-                - (snapshot.short_avg * snapshot.short_qty)
+                (long_avg * long_qty) - (short_avg * short_qty)
             ) / denominator
         break_even_price = base_break_even
-        realized_long_pnl_total = float(snapshot.realized_long_pnl_total or 0.0)
-        realized_short_pnl_total = float(snapshot.realized_short_pnl_total or 0.0)
-        realized_net_pnl_total = realized_long_pnl_total + realized_short_pnl_total
-        realized_long_loss = max(-realized_long_pnl_total, 0.0)
-        realized_short_profit = max(realized_short_pnl_total, 0.0)
-        realized_short_loss = max(-realized_short_pnl_total, 0.0)
-        pending_cycle_loss_usdt = float(state.get("pending_cycle_loss_usdt") or 0.0)
-        old_loss_compensation = float(state.get("net_long_loss_balance") or 0.0) + float(
-            state.get("net_short_loss_balance") or 0.0
-        )
-        pending_loss_price_component = 0.0
-        loss_compensation = pending_cycle_loss_usdt
-        if loss_compensation > 0 and abs(denominator) > 1e-9:
-            pending_loss_price_component = loss_compensation / denominator
-            break_even_price += pending_loss_price_component
         logger.info(
             "fixed_cycle_break_even_inputs %s",
             {
@@ -2658,15 +2647,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "realized_pnl_total": snapshot.realized_pnl_total,
                 "realized_long_pnl_total": snapshot.realized_long_pnl_total,
                 "realized_short_pnl_total": snapshot.realized_short_pnl_total,
-                "realized_net_pnl_total": realized_net_pnl_total,
-                "realized_long_loss": realized_long_loss,
-                "realized_short_profit": realized_short_profit,
-                "realized_short_loss": realized_short_loss,
-                "old_loss_compensation": old_loss_compensation,
-                "corrected_loss_compensation": loss_compensation,
                 "base_break_even": base_break_even,
-                "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
-                "pending_loss_price_component": pending_loss_price_component,
                 "final_break_even_price": break_even_price,
                 "denominator": denominator,
             },
@@ -2679,34 +2660,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         traces = [
             CalculationTrace(
                 name="break_even_price",
-                formula=(
-                    "break_even = base_break_even + "
-                    "pending_cycle_loss_usdt / (long_qty - short_qty)"
-                ),
+                formula="(long_avg * long_qty - short_avg * short_qty) / (long_qty - short_qty)",
                 inputs={
                     "long_avg": snapshot.long_avg,
                     "short_avg": snapshot.short_avg,
                     "long_qty": snapshot.long_qty,
                     "short_qty": snapshot.short_qty,
                     "denominator": denominator,
-                    "realized_long_pnl_total": snapshot.realized_long_pnl_total,
-                    "realized_short_pnl_total": snapshot.realized_short_pnl_total,
-                    "realized_net_pnl_total": realized_net_pnl_total,
-                    "loss_compensation": loss_compensation,
-                    "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
-                    "pending_loss_price_component": pending_loss_price_component,
-                    "base_break_even": base_break_even,
                 },
                 result={"break_even_price": break_even_price},
-                details={
-                    "realized_long_loss": realized_long_loss,
-                    "realized_short_loss": realized_short_loss,
-                    "loss_compensation": loss_compensation,
-                    "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
-                    "pending_loss_price_component": pending_loss_price_component,
-                    "realized_short_profit": realized_short_profit,
-                    "base_break_even": base_break_even,
-                },
+                details={"base_break_even": base_break_even},
             )
         ]
         return break_even_price, traces
@@ -2725,23 +2688,46 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         snapshot: HedgeSnapshot | None = None,
         runtime_state: RuntimeState | None = None,
     ) -> float:
-        components = self._calculate_tp_components(snapshot, runtime_state)
-        tp_price = self._normalize_price(
-            break_even_price
-            + components["goal_profit"]
-            + components["buffer"],
-            runtime_state,
+        state = runtime_state.strategy_state if runtime_state else {}
+        snapshot_long_avg = snapshot.long_avg if snapshot else float(state.get("long_avg") or 0.0)
+        snapshot_short_avg = snapshot.short_avg if snapshot else float(state.get("short_avg") or 0.0)
+        snapshot_long_qty = snapshot.long_qty if snapshot else float(state.get("open_long_qty") or 0.0)
+        snapshot_short_qty = snapshot.short_qty if snapshot else float(state.get("open_short_qty") or 0.0)
+        realized_long_pnl = float((runtime_state.realized_long_pnl_total if runtime_state else 0.0) or 0.0)
+        realized_short_pnl = float((runtime_state.realized_short_pnl_total if runtime_state else 0.0) or 0.0)
+        realized_cycle_net = realized_long_pnl + realized_short_pnl
+        components = calculate_hedge_exit_price(
+            long_avg=snapshot_long_avg,
+            long_qty=snapshot_long_qty,
+            short_avg=snapshot_short_avg,
+            short_qty=snapshot_short_qty,
+            tp_profit_target_pct=float(self.config.tp_profit_target_pct or 0.0),
+            tp_buffer_pct=float(self.config.tp_buffer_pct or 0.0),
+            realized_cycle_net=realized_cycle_net,
         )
+        tp_price = self._normalize_price(components.exit_price, runtime_state)
+        long_profit_at_exit = (tp_price - snapshot_long_avg) * snapshot_long_qty
+        short_loss_at_exit = (tp_price - snapshot_short_avg) * snapshot_short_qty
+        open_hedge_net_at_exit = long_profit_at_exit - short_loss_at_exit
+        expected_total_net_after_exit = open_hedge_net_at_exit + components.realized_cycle_net
+        target_total_profit_usdt = components.target_profit_usdt + components.buffer_usdt
+        target_delta_usdt = expected_total_net_after_exit - target_total_profit_usdt
         logger.info(
             "fixed_cycle_tp_components %s",
             {
                 "break_even_price": break_even_price,
-                "reference_price": components["reference_price"],
-                "loss_recovery_price_component": components["loss_recovery"],
-                "pending_loss_price_component": components.get("pending_loss_price_component", 0.0),
-                "goal_profit_price_component": components["goal_profit"],
-                "buffer_price_component": components["buffer"],
-                "pending_cycle_loss_usdt": components.get("pending_cycle_loss_usdt", 0.0),
+                "profit_basis_usdt": components.profit_basis_usdt,
+                "target_profit_usdt": components.target_profit_usdt,
+                "buffer_usdt": components.buffer_usdt,
+                "realized_cycle_net": components.realized_cycle_net,
+                "required_profit_usdt": components.required_profit_usdt,
+                "net_qty": components.net_qty,
+                "long_profit_at_exit": long_profit_at_exit,
+                "short_loss_at_exit": short_loss_at_exit,
+                "open_hedge_net_at_exit": open_hedge_net_at_exit,
+                "expected_total_net_after_exit": expected_total_net_after_exit,
+                "target_total_profit_usdt": target_total_profit_usdt,
+                "target_delta_usdt": target_delta_usdt,
                 "tp_price": tp_price,
             },
         )

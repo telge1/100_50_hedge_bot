@@ -260,6 +260,13 @@ rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.s
 
 ./start_fixed_cycle.sh
 
+#################################################################################################################
+
+/home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
+/home/telgenbuescher/projects/spread_recovery_hedge/scripts/stop_fixed_cycle.sh
+
+#################################################################################################################
+
 python analyze_hedge_logs.py --mode blocks
 
 python3 /home/telgenbuescher/projects/spread_recovery_hedge/fixed_cycle_hedge_bot/tools/coin_scanner.py
@@ -309,6 +316,114 @@ Nach jedem Fill:
 Exit neu berechnen auf Basket-Basis
 
 
-#####################################################
+################################## exit order kalkulation ###################
 
-114.93
+🔥 FINAL EXIT-LOGIK (DEIN SYSTEM)
+🧠 GRUNDPRINZIP
+Wir rechnen IMMER:
+
+Long-Gewinn
+- Short-Verlust
++ bereits realisierte Gewinne/Verluste
+= Zielprofit
+📊 1️⃣ Ziel definieren
+profit_basis_usdt = long_qty * long_avg
+
+target_profit_usdt =
+profit_basis_usdt * tp_profit_target_pct / 100
+
+buffer_usdt =
+profit_basis_usdt * tp_buffer_pct / 100
+
+👉 Beispiel:
+
+Long = 100$
+tp_profit_target_pct = 0.55%
+
+target_profit_usdt = 0.55$
+🔁 2️⃣ Realisierte PnL tracken (WICHTIG)
+realized_cycle_net =
+Summe aller bisherigen Cycle-Ergebnisse
+
+👉 Beispiele:
+
+❌ Nur Long Add Verlust
+Long Add = -0.20$
+
+realized_cycle_net = -0.20
+✅ Danach Short TP Gewinn
+Short TP = +0.30$
+
+realized_cycle_net = -0.20 + 0.30 = +0.10
+
+👉 Jetzt hast du +0.10$ Guthaben
+
+🎯 3️⃣ Was muss der Exit noch holen?
+required_profit_usdt =
+target_profit_usdt
++ buffer_usdt
+- realized_cycle_net
+🔥 Beispiele
+Fall A – Verlust vorhanden
+realized_cycle_net = -0.20
+
+required_profit_usdt =
+0.55 - (-0.20)
+= 0.75$
+
+👉 Exit muss höher → Verlust zurückholen
+
+Fall B – Gewinn vorhanden
+realized_cycle_net = +0.10
+
+required_profit_usdt =
+0.55 - 0.10
+= 0.45$
+
+👉 Exit kann tiefer → Gewinn schon teilweise erreicht
+
+🧮 4️⃣ FINAL EXIT PREIS
+exit_price =
+(
+(long_avg * long_qty)
+- (short_avg * short_qty)
++ required_profit_usdt
+)
+/
+(long_qty - short_qty)
+🧠 INTUITION (WICHTIG!)
+Du hast ein Konto (Cycle-PnL Konto):
+
+- Verlust → Schulden → Exit höher
+- Gewinn → Guthaben → Exit tiefer
+🔁 5️⃣ UPDATE-REGEL
+
+👉 Nach JEDEM Fill:
+
+Long Add ❗
+Short TP ❗
+→ realized_cycle_net neu berechnen
+→ required_profit_usdt neu berechnen
+→ exit_price neu berechnen
+→ Exit Orders neu setzen
+🚨 WICHTIGSTE REGEL
+Du darfst NIEMALS nur pending_loss betrachten
+
+Du brauchst IMMER:
+realized_cycle_net = Verluste + Gewinne
+🔑 MERKSATZ (ABSOLUT FINAL)
+Exit = aktueller Hedge-Zustand
+     + (Zielprofit - bereits verdienter Gewinn + Verlust) / Netto-Position
+
+oder einfacher:
+
+Was fehlt noch bis Ziel → das muss der Exit holen
+✅ DEIN BEISPIEL (GENAU RICHTIG)
+Long Add = -0.20
+Short TP = +0.30
+
+→ realized_cycle_net = +0.10
+
+→ required_profit_usdt = 0.55 - 0.10 = 0.45
+
+→ Exit wird tiefer gesetzt ✅
