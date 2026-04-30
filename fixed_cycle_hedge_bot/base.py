@@ -64,3 +64,11 @@ class HedgeStrategy(ABC):
         context: StrategyContext,
     ) -> list[StrategyIntent]:
         return []
+
+    def prepare_for_clean_startup(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> bool:
+        return False

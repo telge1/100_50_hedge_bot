@@ -1,6 +1,10 @@
 {
-  "symbol": "POPCATUSDT",
+  "symbol": "SOLVUSDT",
   "category": "linear",
+  "dynamic_symbol_enabled": true,
+  "best_coin_file": "logs/best_coin.json",
+  "best_coin_max_age_minutes": 45,
+  "dynamic_symbol_hold_minutes": 0,
   "base_notional_usdt": 100.0,
   "hedge_ratio_short": 0.5,
   

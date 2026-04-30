@@ -260,12 +260,29 @@ rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.s
 
 ./start_fixed_cycle.sh
 
-#################################################################################################################
+####################################### Start/Stop Bot ##########################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/stop_fixed_cycle.sh
 
-#################################################################################################################
+####################################### Dashboard ###############################################################
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now dashboard
+sudo systemctl restart dashboard
+
+sudo systemctl status dashboard
+
+################################## Coin Scanner ###################################################################
+
+sudo systemctl stop coin_scanner.timer
+sudo systemctl stop coin_scanner.service
+
+sudo systemctl daemon-reload
+sudo systemctl start coin_scanner.service
+sudo systemctl start coin_scanner.timer
+
+###################################################################################################################
 
 python analyze_hedge_logs.py --mode blocks
 

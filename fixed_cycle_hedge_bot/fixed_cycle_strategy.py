@@ -5,10 +5,10 @@ import math
 import time
 import logging
 from dataclasses import asdict, dataclass, fields
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from .base import HedgeStrategy, StrategyContext
 from .models import CalculationTrace, FillEvent, HedgeSnapshot, ManagedOrder, RuntimeState, StrategyIntent
@@ -28,6 +28,9 @@ PNL_VALIDATION_THRESHOLD_USDT = 0.01
 class FixedCycleHedgeConfig:
     symbol: str = "BTCUSDT"
     category: str = "linear"
+    dynamic_symbol_enabled: bool = False
+    best_coin_file: str = "logs/best_coin.json"
+    best_coin_max_age_minutes: int = 45
 
     base_notional_usdt: float = 100.0
     hedge_ratio_short: float = 0.5
@@ -76,6 +79,7 @@ class FixedCycleHedgeConfig:
     qty_step: float = 0.001
     min_order_qty: float = 0.001
     min_notional_usdt: float = 5.0
+    dynamic_symbol_hold_minutes: int = 10
 
     @classmethod
     def from_json_file(cls, path: str | Path | None, *, enforce_expected_path: bool = True) -> "FixedCycleHedgeConfig":
@@ -116,6 +120,14 @@ def _emit_analyzer_event(logger: logging.Logger, event: str, payload: dict[str, 
         **payload,
     }
     logger.info(json.dumps(data))
+
+
+def _log_event(event: str, payload: dict[str, Any]) -> None:
+    logger.info("%s %s", event, payload)
+
+
+def _log_warning_event(event: str, payload: dict[str, Any]) -> None:
+    logger.warning("%s %s", event, payload)
 
 
 def _safe_audit_value(value: Any) -> Any:
@@ -226,6 +238,136 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state.active_orders[client_order_id] = managed_order
         if fallback_state.exchange_order_id:
             runtime_state.exchange_to_client_id[fallback_state.exchange_order_id] = client_order_id
+
+    def _force_fresh_start_reset(self, runtime_state: RuntimeState) -> None:
+        state = runtime_state.strategy_state
+        state["full_exit_reset_in_progress"] = False
+        state["block_exit_rebuild_until_pnl_ready"] = False
+        state["force_exit_rebuild"] = False
+        state["last_exit_signature"] = None
+        state["last_fill_info"] = {}
+        state["latest_break_even_price"] = 0.0
+        state["latest_tp_price"] = 0.0
+        state["last_short_tp_trigger_price"] = 0.0
+        state["last_expected_short_tp_net"] = 0.0
+        state["last_short_tp_qty"] = 0.0
+        state["short_tp_fallback_state"] = None
+        state["short_tp_fallback_order_context"] = None
+        state["pending_cycle_loss_usdt"] = 0.0
+        state["pending_loss_updated_in_fill"] = False
+        state["pending_loss_exit_old_signature"] = None
+        state["pending_loss_exit_rebuild_reason"] = None
+        state["initial_entry_confirmed"] = False
+        state["initial_entry_submitted"] = False
+        state["entry_reference_price"] = 0.0
+        state["initial_long_qty"] = 0.0
+        state["initial_short_qty"] = 0.0
+
+    def prepare_for_clean_startup(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> bool:
+        if snapshot.long_qty > 0 or snapshot.short_qty > 0 or snapshot.active_orders:
+            return False
+        state = runtime_state.strategy_state
+        cycle_state = state.get("cycle_state") or {}
+        stale_runtime_orders = [
+            order.purpose or order.client_order_id
+            for order in runtime_state.active_orders.values()
+            if order.status not in {"FILLED", "CANCELED", "REJECTED"}
+        ]
+        has_stale_state = bool(
+            stale_runtime_orders
+            or state.get("initial_entry_confirmed")
+            or state.get("initial_entry_submitted")
+            or int(state.get("cycle_completed_count") or 0) > 0
+            or bool(state.get("cycle_waiting_for_short_tp"))
+            or int(state.get("short_tp_pending_cycle") or 0) > 0
+            or bool(cycle_state.get("trade_active"))
+            or bool(cycle_state.get("long_add_pending"))
+            or bool(cycle_state.get("cycle_waiting_for_short_tp"))
+            or int(cycle_state.get("short_tp_pending_cycle") or 0) > 0
+            or float(state.get("pending_cycle_loss_usdt") or 0.0) > 0.0
+        )
+        if not has_stale_state:
+            return False
+
+        stale_details = {
+            "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
+            "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
+            "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
+            "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
+            "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
+            "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+            "cycle_state_trade_active": bool(cycle_state.get("trade_active")),
+            "cycle_state_long_add_pending": bool(cycle_state.get("long_add_pending")),
+            "cycle_state_waiting_for_short_tp": bool(cycle_state.get("cycle_waiting_for_short_tp")),
+            "cycle_state_short_tp_pending_cycle": int(cycle_state.get("short_tp_pending_cycle") or 0),
+            "stale_runtime_orders": stale_runtime_orders,
+        }
+        logger.info("fixed_cycle_clean_startup_reset_begin %s", stale_details)
+
+        runtime_state.active_orders.clear()
+        runtime_state.exchange_to_client_id.clear()
+        runtime_state.temporary_pnl_by_order.clear()
+        runtime_state.confirmed_pnl_applied.clear()
+        runtime_state.processed_fill_cumulative.clear()
+        runtime_state.realized_long_pnl_total = 0.0
+        runtime_state.realized_short_pnl_total = 0.0
+
+        self._reset_cycle_state(runtime_state)
+        self._force_fresh_start_reset(runtime_state)
+
+        state["bot_state"] = self.STATE_INIT
+        state["cycle_completed_count"] = 0
+        state["cycle_pair_count"] = 0
+        state["cycle_long_add_filled"] = False
+        state["cycle_short_tp_filled"] = False
+        state["pending_long_cycle_index"] = 0
+        state["pending_short_cycle_index"] = 0
+        state["current_long_cycle_index"] = 0
+        state["current_short_cycle_index"] = 0
+        state["current_effective_cycle"] = 0
+        state["long_add_pending"] = False
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
+        state["refill_long_filled"] = False
+        state["refill_short_filled"] = False
+        state["refill_state"] = {}
+        state["initial_entry_retry_count"] = 0
+        state["initial_total_notional_usdt"] = 0.0
+        state["last_structure_refresh_ms"] = 0
+        state["open_long_qty"] = 0.0
+        state["open_short_qty"] = 0.0
+        state["long_avg"] = 0.0
+        state["short_avg"] = 0.0
+        state["realized_pnl_total"] = 0.0
+        state["audit_processed_exit_fill_ids"] = []
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.0,
+            "final_short_exit_pnl": 0.0,
+            "total_realized_pnl": 0.0,
+        }
+        state["dynamic_entry_hold_initialized"] = False
+        state.pop("next_dynamic_entry_allowed_at", None)
+        state["fresh_restart_required"] = False
+
+        logger.info(
+            "fixed_cycle_clean_startup_reset_complete %s",
+            {
+                "symbol": self.config.symbol,
+                "cycle_completed_count": state.get("cycle_completed_count"),
+                "cycle_waiting_for_short_tp": state.get("cycle_waiting_for_short_tp"),
+                "short_tp_pending_cycle": state.get("short_tp_pending_cycle"),
+                "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
+                "active_order_count": len(runtime_state.active_orders),
+            },
+        )
+        return True
 
     def _log_short_tp_fallback_event(
         self,
@@ -448,20 +590,38 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("fresh_restart_required", False)
         if state.get("fresh_restart_required"):
+            if state.get("full_exit_reset_in_progress"):
+                return []
             if (
                 snapshot.long_qty > 0
                 or snapshot.short_qty > 0
-                or not self._has_no_strategy_orders(snapshot)
+                or snapshot.active_orders
                 or any(
                     order.status not in {"FILLED", "CANCELED", "REJECTED"}
                     for order in runtime_state.active_orders.values()
                 )
             ):
                 return []
-            state["fresh_restart_required"] = False
+            if not self._dynamic_symbol_entry_gate_allows_entry(runtime_state, context, "fresh_restart"):
+                return []
+            self._maybe_update_symbol_from_best_coin(runtime_state, context, "fresh_restart")
+            state["full_exit_reset_in_progress"] = True
+            try:
+                logger.info("fixed_cycle_full_exit_reset_start", {})
+                self._reset_cycle_state(runtime_state)
+                self._force_fresh_start_reset(runtime_state)
+                runtime_state.realized_long_pnl_total = 0.0
+                runtime_state.realized_short_pnl_total = 0.0
+                intents = self._build_entry_intents(snapshot, runtime_state, context)
+                if intents:
+                    state["fresh_restart_required"] = False
+                    state["dynamic_entry_hold_initialized"] = False
+                    state.pop("next_dynamic_entry_allowed_at", None)
+                return intents
+            finally:
+                state["full_exit_reset_in_progress"] = False
 
         self._ensure_cycle_state(runtime_state)
-
         context.audit.log_event(
             "fixed_cycle_start",
             strategy=self.name,
@@ -523,6 +683,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return []
 
         state["bot_state"] = self.STATE_OPENING_HEDGE
+        if not self._dynamic_symbol_entry_gate_allows_entry(runtime_state, context, "startup"):
+            return []
+        self._maybe_update_symbol_from_best_coin(runtime_state, context, "startup")
         retry_count = int(state.get("initial_entry_retry_count") or 0) + 1
         state["initial_entry_retry_count"] = retry_count
         context.audit.log_event(
@@ -541,6 +704,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 intent_count=len(intents),
                 retry_count=retry_count,
             )
+            state["dynamic_entry_hold_initialized"] = False
+            state.pop("next_dynamic_entry_allowed_at", None)
         long_intents = [intent for intent in intents if intent.side == "long"]
         short_intents = [intent for intent in intents if intent.side == "short"]
         first_long_purpose = self._cycle_purpose("long", 1)
@@ -597,6 +762,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
                 return []
 
+            if not self._dynamic_symbol_entry_gate_allows_entry(runtime_state, context, "tick_retry"):
+                return []
+            self._maybe_update_symbol_from_best_coin(runtime_state, context, "tick_retry")
+
             retry_count = int(state.get("initial_entry_retry_count") or 0) + 1
             state["initial_entry_retry_count"] = retry_count
             context.audit.log_event(
@@ -615,6 +784,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     intent_count=len(intents),
                     retry_count=retry_count,
                 )
+                state["dynamic_entry_hold_initialized"] = False
+                state.pop("next_dynamic_entry_allowed_at", None)
             return intents
 
         if state.get("bot_state") == self.STATE_EXITED:
@@ -1434,13 +1605,42 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 reason="initial_entry_phase",
                 snapshot=snapshot,
             )
-            return self._build_entry_intents(snapshot, runtime_state, context)
+            if not self._dynamic_symbol_entry_gate_allows_entry(
+                runtime_state, context, "structure_initial_entry"
+            ):
+                return []
+            self._maybe_update_symbol_from_best_coin(runtime_state, context, "structure_initial_entry")
+            intents = self._build_entry_intents(snapshot, runtime_state, context)
+            if intents:
+                state["dynamic_entry_hold_initialized"] = False
+                state.pop("next_dynamic_entry_allowed_at", None)
+            return intents
 
+        if (
+            snapshot.long_qty <= 0
+            and snapshot.short_qty <= 0
+            and not snapshot.active_orders
+            and not any(
+                order.status not in {"FILLED", "CANCELED", "REJECTED"}
+                for order in runtime_state.active_orders.values()
+            )
+            and not state.get("full_exit_reset_in_progress")
+        ):
+            self._maybe_start_dynamic_symbol_hold_after_flat(snapshot, runtime_state, context, reason)
+            state["fresh_restart_required"] = True
+            logger.info(
+                "fixed_cycle_full_exit_detected",
+                {
+                    "strategy": self.name,
+                    "fresh_restart_required": True,
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                },
+            )
         if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
             self._cancel_all_pending_orders(context)
             state["bot_state"] = self.STATE_EXITED
             context.audit.log_event("fixed_cycle_exited", strategy=self.name, reason=reason, snapshot=snapshot)
-            self._reset_cycle_state(runtime_state)
             return []
 
         hard_stop_active = current_cycle >= self.config.hard_stop_cycle
@@ -2307,10 +2507,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         if not state.get("exit_rebuild_allowed", True) and not force_exit_rebuild:
+            active_order_purposes = [getattr(order, "purpose", None) for order in snapshot.active_orders]
             context.audit.log_event(
                 "fixed_cycle_exit_skip",
                 strategy=self.name,
                 skip_reason="exit_locked",
+                long_qty=snapshot.long_qty,
+                short_qty=snapshot.short_qty,
+                long_exit_filled=bool(state.get("long_exit_filled")),
+                short_exit_filled=bool(state.get("short_exit_filled")),
+                current_cycle=int(state.get("current_effective_cycle") or 0),
+                active_order_purposes=active_order_purposes,
             )
             return intents
 
@@ -2886,6 +3093,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_completed_count=state.get("cycle_completed_count"),
                 cycle_pair_count=state.get("cycle_pair_count"),
             )
+        self._reset_exit_state_for_new_structure(runtime_state, "refill_completed")
 
     def _advance_cycle_from_fill(
         self,
@@ -3087,8 +3295,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     state["refill_trigger_cycle_completed_count"] = state.get("cycle_completed_count")
                     state["refill_trigger_purpose"] = fill_event.purpose
                     return
-        if fill_event.purpose == self.SHORT_TP_EXIT_PURPOSE and order_fully_completed:
+        if fill_event.purpose == self.LONG_TP_EXIT_PURPOSE and order_fully_completed:
+            state["long_exit_filled"] = True
+            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "LONG_TP_EXIT")
+        if (
+            fill_event.purpose == self.SHORT_TP_EXIT_PURPOSE
+            and order_fully_completed
+        ):
+            state["short_exit_filled"] = True
+            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "SHORT_TP_EXIT")
             state["exit_rebuild_allowed"] = True
+        if fill_event.purpose == self.SHORT_SL_EXIT_PURPOSE and order_fully_completed:
+            state["short_exit_filled"] = True
+            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "SHORT_SL_EXIT")
         state["current_effective_cycle"] = max(
             int(state.get("current_short_cycle_index") or 0),
             int(state.get("cycle_completed_count") or 0),
@@ -3181,9 +3400,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             and snapshot.short_qty > 0
             and not has_open_initial_orders
         )
+        previously_confirmed = bool(state.get("initial_entry_confirmed"))
         state["initial_entry_confirmed"] = confirmed
         if confirmed:
             state["initial_entry_submitted"] = True
+            if not previously_confirmed:
+                self._reset_exit_state_for_new_structure(runtime_state, "initial_entry_confirmed")
         return confirmed
 
     def _collect_open_initial_entry_orders(self, snapshot: HedgeSnapshot) -> list[dict[str, str | None]]:
@@ -4447,6 +4669,301 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return
         canceler(self._all_cycle_purposes() + self._exit_purposes())
 
+    def _maybe_finalize_exit_after_leg_fill(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext | None,
+        reason: str,
+    ) -> None:
+        state = runtime_state.strategy_state
+        snapshot = runtime_state.last_snapshot
+        long_qty = float(snapshot.long_qty) if snapshot else float(state.get("open_long_qty") or 0.0)
+        short_qty = float(snapshot.short_qty) if snapshot else float(state.get("open_short_qty") or 0.0)
+        long_done = bool(state.get("long_exit_filled")) or long_qty <= 0
+        short_done = bool(state.get("short_exit_filled")) or short_qty <= 0
+        logger.info(
+            "exit_leg_filled",
+            {
+                "purpose": reason,
+                "long_exit_filled": long_done,
+                "short_exit_filled": short_done,
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+            },
+        )
+        if long_done and short_done:
+            if not state.get("exit_locked"):
+                state["exit_locked"] = True
+                state["exit_rebuild_allowed"] = False
+                logger.info(
+                    "final_exit_completed_both_legs",
+                    {
+                        "reason": reason,
+                        "long_qty": long_qty,
+                        "short_qty": short_qty,
+                    },
+                )
+                if context:
+                    self._cancel_all_pending_orders(context)
+                    logger.info(
+                        "exit_cancel_all_after_both_legs_only",
+                        {
+                            "reason": reason,
+                            "long_qty": long_qty,
+                            "short_qty": short_qty,
+                        },
+                    )
+            return
+        waiting_side = "short" if not short_done else "long"
+        logger.info(
+            "final_exit_waiting_other_leg",
+            {
+                "waiting_for": waiting_side,
+                "reason": reason,
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+            },
+        )
+
+    def _load_best_coin_symbol_from_file(self, path: str | Path) -> Optional[dict[str, Any]]:
+        file_path = Path(path)
+        if not file_path.exists():
+            logger.debug("best_coin_file_missing", {"path": str(file_path)})
+            return None
+        try:
+            payload = json.loads(file_path.read_text(encoding="utf-8") or "{}")
+        except Exception as exc:
+            _log_event(
+                "best_coin_file_invalid",
+                {"path": str(file_path), "error": str(exc)},
+            )
+            return None
+        if not isinstance(payload, dict):
+            logger.info(
+                "best_coin_file_invalid",
+                {"path": str(file_path), "error": "payload not object"},
+            )
+            return None
+        symbol = payload.get("symbol")
+        score = payload.get("score")
+        timestamp_raw = payload.get("timestamp")
+        reason = payload.get("reason")
+        if not symbol or not isinstance(symbol, str):
+            logger.info(
+                "best_coin_file_invalid",
+                {"path": str(file_path), "error": "missing symbol"},
+            )
+            return None
+        if not timestamp_raw or not isinstance(timestamp_raw, str):
+            logger.info(
+                "best_coin_file_invalid",
+                {"path": str(file_path), "error": "missing timestamp"},
+            )
+            return None
+        try:
+            timestamp = datetime.fromisoformat(timestamp_raw)
+        except ValueError as exc:
+            logger.info(
+                "best_coin_file_invalid",
+                {"path": str(file_path), "error": str(exc)},
+            )
+            return None
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        age_minutes = (datetime.now(timezone.utc) - timestamp).total_seconds() / 60
+        max_age = float(self.config.best_coin_max_age_minutes or 0) or 0
+        if max_age and age_minutes > max_age:
+            _log_event(
+                "best_coin_file_stale",
+                {
+                    "path": str(file_path),
+                    "symbol": symbol,
+                    "score": score,
+                    "age_minutes": round(age_minutes, 1),
+                },
+            )
+            return None
+        _log_event(
+            "best_coin_file_loaded",
+            {
+                "path": str(file_path),
+                "symbol": symbol,
+                "score": score,
+                "timestamp": timestamp_raw,
+                "reason": reason,
+            },
+        )
+        return {
+            "symbol": symbol,
+            "score": score,
+            "timestamp": timestamp,
+            "age_minutes": age_minutes,
+            "reason": reason,
+        }
+
+    def _compute_next_dynamic_scan_ready_at(self, now: datetime) -> datetime:
+        base = now.replace(second=0, microsecond=0)
+        minute = base.minute
+        if minute < 30:
+            slot = base.replace(minute=30)
+        else:
+            slot = (base + timedelta(hours=1)).replace(minute=0)
+        return slot + timedelta(minutes=3)
+
+    def _maybe_start_dynamic_symbol_hold_after_flat(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        reason: str,
+    ) -> None:
+        state = runtime_state.strategy_state
+        if not self.config.dynamic_symbol_enabled:
+            return
+        if state.get("dynamic_entry_hold_initialized"):
+            return
+        if snapshot.long_qty > 0 or snapshot.short_qty > 0:
+            return
+        if snapshot.active_orders:
+            return
+        active_runtime_orders = [
+            order
+            for order in runtime_state.active_orders.values()
+            if order.status not in {"FILLED", "CANCELED", "REJECTED"}
+        ]
+        if active_runtime_orders:
+            return
+        now = datetime.now(timezone.utc)
+        next_ready = self._compute_next_dynamic_scan_ready_at(now)
+        minutes_until_ready = (next_ready - now).total_seconds() / 60
+        hold_minutes = float(self.config.dynamic_symbol_hold_minutes or 0) or 0
+        state["last_trade_closed_at"] = now.isoformat()
+        state["dynamic_entry_hold_initialized"] = True
+        if minutes_until_ready <= hold_minutes:
+            state["next_dynamic_entry_allowed_at"] = next_ready.isoformat()
+            _log_event(
+                "dynamic_entry_hold_started",
+                {
+                    "reason": reason,
+                    "now": now.isoformat(),
+                    "next_dynamic_entry_allowed_at": next_ready.isoformat(),
+                    "minutes_until_ready": round(minutes_until_ready, 2),
+                    "dynamic_symbol_hold_minutes": hold_minutes,
+                },
+            )
+        else:
+            state["next_dynamic_entry_allowed_at"] = now.isoformat()
+            _log_event(
+                "dynamic_entry_no_hold_needed",
+                {
+                    "reason": reason,
+                    "now": now.isoformat(),
+                    "next_dynamic_entry_allowed_at": now.isoformat(),
+                    "next_dynamic_scan_ready_at": next_ready.isoformat(),
+                    "minutes_until_ready": round(minutes_until_ready, 2),
+                    "dynamic_symbol_hold_minutes": hold_minutes,
+                },
+            )
+
+    def _dynamic_symbol_entry_gate_allows_entry(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        reason: str,
+    ) -> bool:
+        if not self.config.dynamic_symbol_enabled:
+            return True
+        state = runtime_state.strategy_state
+        allowed_at_raw = state.get("next_dynamic_entry_allowed_at")
+        if not allowed_at_raw:
+            return True
+        try:
+            allowed_at = datetime.fromisoformat(allowed_at_raw)
+        except ValueError:
+            _log_warning_event(
+                "dynamic_entry_allowed_at_invalid",
+                {"value": allowed_at_raw},
+            )
+            return True
+        if allowed_at.tzinfo is None:
+            allowed_at = allowed_at.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        seconds_remaining = (allowed_at - now).total_seconds()
+        if now < allowed_at:
+            _log_event(
+                "dynamic_entry_waiting_for_next_scan_result",
+                {
+                    "reason": reason,
+                    "now": now.isoformat(),
+                    "next_dynamic_entry_allowed_at": allowed_at.isoformat(),
+                    "seconds_remaining": max(0.0, round(seconds_remaining, 2)),
+                },
+            )
+            return False
+        _log_event(
+            "dynamic_entry_allowed_after_hold",
+            {
+                "reason": reason,
+                "now": now.isoformat(),
+                "next_dynamic_entry_allowed_at": allowed_at.isoformat(),
+                "seconds_past_due": max(0.0, round(-seconds_remaining, 2)),
+            },
+        )
+        return True
+
+    def _maybe_update_symbol_from_best_coin(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext | None,
+        reason: str,
+    ) -> None:
+        if not self.config.dynamic_symbol_enabled:
+            return
+        best_coin = self._load_best_coin_symbol_from_file(
+            self.config.best_coin_file or "logs/best_coin.json"
+        )
+        if not best_coin:
+            _log_event(
+                "dynamic_symbol_selection_skipped",
+                {
+                    "reason": reason,
+                    "symbol": self.config.symbol,
+                },
+            )
+            return
+        desired_symbol = best_coin["symbol"].upper()
+        self.config.symbol = desired_symbol
+        _log_event(
+            "dynamic_symbol_selected_for_fresh_entry",
+            {
+                "reason": reason,
+                "new_symbol": desired_symbol,
+                "score": best_coin.get("score"),
+            },
+        )
+
+    def _reset_exit_state_for_new_structure(
+        self,
+        runtime_state: RuntimeState,
+        reason: str,
+    ) -> None:
+        state = runtime_state.strategy_state
+        snapshot = runtime_state.last_snapshot
+        long_qty = float(snapshot.long_qty) if snapshot else float(state.get("open_long_qty") or 0.0)
+        short_qty = float(snapshot.short_qty) if snapshot else float(state.get("open_short_qty") or 0.0)
+        state["exit_locked"] = False
+        state["long_exit_filled"] = False
+        state["short_exit_filled"] = False
+        state["force_exit_rebuild"] = True
+        logger.info(
+            "exit_state_reset_for_new_structure",
+            {
+                "reason": reason,
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+            },
+        )
+
     def _cancel_all_orders_after_exit(
         self,
         runtime_state: RuntimeState,
@@ -4530,6 +5047,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self.realized_long_loss_total = 0.0
         state["processed_pnl_exec_ids"] = []
         state["processed_pnl_exec_ids_order"] = []
+        state["long_exit_filled"] = False
+        state["short_exit_filled"] = False
+        state["exit_locked"] = False
         self._write_cycle_state(cycle_state)
         return cycle_state
 

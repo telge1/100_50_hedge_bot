@@ -10,7 +10,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import subprocess
 import uvicorn
-from pathlib import Path
 import os
 import time
 from functools import lru_cache
@@ -23,9 +22,39 @@ import math
 import signal
 from typing import Set, Dict, List, Optional
 import threading
+import re
+import logging
+import sys
+import yaml
+from datetime import datetime
+import shutil
+from pathlib import Path
+
+# Add parent directory to path for imports
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+vendor_root = Path(__file__).resolve().parent / "vendor"
+if vendor_root.exists():
+    sys.path.insert(0, str(vendor_root))
+# So bot_monitor (and others) use the same project root for data/run PID files
+os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
 from utils.auth import authenticate_user, get_user_role
-from utils.bot_monitor import get_all_bots, get_bot_status, load_bot_state, is_bot_running, is_any_bot_running, get_all_services_status, is_master_bot_running, find_all_master_bot_processes, find_all_master_bot_api_processes, is_master_bot_api_running, get_bot_pid_from_run_dir
+from utils.bot_monitor import (
+    get_all_bots,
+    get_bot_status,
+    load_bot_state,
+    is_bot_running,
+    is_any_bot_running,
+    get_all_services_status,
+    is_master_bot_running,
+    find_all_master_bot_processes,
+    find_all_master_bot_api_processes,
+    is_master_bot_api_running,
+    get_bot_pid_from_run_dir,
+    get_fixed_cycle_symbol,
+    find_fixed_cycle_runner_pid,
+)
 from utils.config_manager import load_config, save_config, save_config_with_cycles, get_default_config, get_config_path, format_config_with_blocks, get_config_header_comment
 from utils.position_info import (
     get_position_info,
@@ -38,18 +67,6 @@ from utils.position_info import (
     simulate_tp_profit,
 )
 from utils.notifications import send_ntfy_alert, send_bot_alert
-from datetime import datetime
-import shutil
-import logging
-import sys
-import yaml
-from pathlib import Path
-
-# Add parent directory to path for imports
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
-# So bot_monitor (and others) use the same project root for data/run PID files
-os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
 # Import BybitOrderManager für Equity-Endpoint (noch nicht auf Master Bot API migriert)
 from core.bybit_order_manager import BybitOrderManager
@@ -70,19 +87,27 @@ _BOT_START_IN_PROGRESS: Set[str] = set()
 _BOT_START_LOCK = threading.Lock()
 
 # Setup logging with DEBUG level and file handler
-os.makedirs('logs', exist_ok=True)
-log_file = "logs/dashboard.log"
+log_dir = Path("logs")
+log_dir.mkdir(parents=True, exist_ok=True)
+dashboard_log_file = log_dir / "dashboard.log"
+master_log_file = log_dir / "master.log"
+
 # Beim Neustart: Dashboard-Log leeren (frischer Lauf)
-if os.path.exists(log_file):
-    open(log_file, 'w', encoding='utf-8').close()
+if dashboard_log_file.exists():
+    dashboard_log_file.write_text("", encoding="utf-8")
 
 # Create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-# File handler (DEBUG level - all details)
-file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
+# Dashboard file handler (DEBUG level - all details)
+dashboard_handler = logging.FileHandler(dashboard_log_file, mode="a", encoding="utf-8")
+dashboard_handler.setLevel(logging.DEBUG)
+dashboard_handler.setFormatter(formatter)
+
+# Master file handler (INFO level, keeps growing)
+master_handler = logging.FileHandler(master_log_file, mode="a", encoding="utf-8")
+master_handler.setLevel(logging.INFO)
+master_handler.setFormatter(formatter)
 
 # Console handler (INFO level - less verbose)
 console_handler = logging.StreamHandler()
@@ -92,13 +117,13 @@ console_handler.setFormatter(formatter)
 # Configure root logger
 logging.basicConfig(
     level=logging.DEBUG,
-    handlers=[file_handler, console_handler]
+    handlers=[dashboard_handler, master_handler, console_handler],
 )
 
 logger = logging.getLogger(__name__)
 logger.debug("=" * 80)
 logger.debug("🚀 Dashboard gestartet - Logging initialisiert")
-logger.debug(f"📁 Log-Datei: {log_file}")
+logger.debug("📁 Dashboard-Log-Datei: %s", dashboard_log_file)
 logger.debug("=" * 80)
 
 # Globale Variable für Start-Zeit (für Health-Check)
@@ -414,6 +439,76 @@ def _get_live_positions_snapshot(account: str, symbol: str, profile: Optional[st
     return live
 
 
+def _collect_symbols_from_bybit(profile: Optional[str]) -> list[str]:
+    """Return symbols having open positions via BybitOrderManager (used for fallback)."""
+    managers: list[tuple[str, str]] = []
+    if profile and profile in ("bot_1", "bot_2", "main"):
+        long_key, long_sec, short_key, short_sec = _get_account_keys_by_profile(profile)
+        if long_key and long_sec:
+            managers.append((long_key, long_sec))
+        if short_key and short_sec:
+            managers.append((short_key, short_sec))
+    else:
+        main_key, main_sec = _get_account_keys("main")
+        sub_key, sub_sec = _get_account_keys("sub")
+        if main_key and main_sec:
+            managers.append((main_key, main_sec))
+        if sub_key and sub_sec:
+            managers.append((sub_key, sub_sec))
+
+    def _fetch(symbol: Optional[str]) -> set[str]:
+        result: set[str] = set()
+        if not managers:
+            return result
+        for api_key, secret_key in managers:
+            try:
+                om = BybitOrderManager(api_key, secret_key)
+                positions = om.fetch_positions_direct(symbol, 5) or []
+            except Exception as exc:
+                logger.debug("symbols-bybit-fallback: error fetching positions for key=%s symbol=%s: %s",
+                             api_key[:6], symbol or "ALL", exc)
+                continue
+            for pos in positions:
+                info = pos.get("info", {}) or pos
+                sym = (info.get("symbol") or "").strip().upper()
+                size = float(info.get("size", 0) or 0)
+                if sym and size > 0:
+                    result.add(sym)
+        return result
+
+    symbols = _fetch(None)
+    if symbols:
+        return sorted(symbols)
+
+    candidates: set[str] = set(_list_symbols_from_dropdown_config_sources(profile=profile))
+    candidates.update(_list_symbols_from_logs("long"))
+    candidates.update(_list_symbols_from_logs("short"))
+    candidates.update(_list_symbols_from_config())
+    candidates.update(_symbols_from_dashboard_log())
+    current_symbol = _get_current_symbol_from_config()
+    if current_symbol:
+        candidates.add(current_symbol)
+    if not candidates:
+        return []
+
+    for sym in candidates:
+        symbols.update(_fetch(sym))
+    return sorted(symbols)
+
+async def _fallback_symbols_from_bybit(profile: Optional[str], reason: str) -> dict | None:
+    symbols = await asyncio.to_thread(_collect_symbols_from_bybit, profile)
+    if not symbols:
+        return None
+    logger.info("[API] /api/hedge/symbols fallback to Bybit positions (%s): %s", reason, symbols)
+    return {
+        "success": True,
+        "symbols": symbols,
+        "count": len(symbols),
+        "hedge_count": len(symbols),
+        "debug": {"source": "bybit_positions_fallback", "reason": reason},
+    }
+
+
 def _get_live_positions_all_snapshot(account: str, profile: Optional[str] = None) -> dict:
     """
     Fetch live positions for ALL symbols of an account (throttled).
@@ -529,6 +624,68 @@ def _list_symbols_from_logs(bot_type: str) -> List[str]:
         if len(parts) >= 3:
             symbols.append(parts[-1])
     return sorted(set(symbols))
+
+
+def _symbols_from_dashboard_log() -> List[str]:
+    """Extract symbols referenced by the dashboard in recent API calls."""
+    log_paths = [
+        Path(__file__).resolve().parent / "logs" / "dashboard.log",
+        Path("/tmp/dashboard.log"),
+    ]
+    symbols: set[str] = set()
+    pattern = re.compile(r"/api/hedge/positions/([A-Z0-9]+)")
+    for log_file in log_paths:
+        if not log_file.exists():
+            continue
+        try:
+            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    match = pattern.search(line)
+                    if match:
+                        symbols.add(match.group(1).upper())
+        except Exception:
+            continue
+    return sorted(symbols)
+
+
+def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict):
+    """Mark Long Bot as running when fixed_cycle_hedge_bot.runner is active."""
+    symbol = get_fixed_cycle_symbol()
+    if not symbol:
+        return
+    pid = find_fixed_cycle_runner_pid()
+    if symbol not in bots_by_symbol:
+        bots_by_symbol[symbol] = {}
+    long_entry = bots_by_symbol[symbol].get("long", {})
+    running = long_entry.get("running", False) or bool(pid)
+    status_text = long_entry.get("status_text") or ("Long Bot läuft" if running else "Long Bot gestoppt")
+    bots_by_symbol[symbol]["long"] = {
+        "running": running,
+        "status": "running" if running else "stopped",
+        "status_text": status_text,
+        "pid": pid,
+        "service_name": long_entry.get("service_name") or "fixed_cycle_hedge_bot.runner"
+    }
+
+
+def _inject_fixed_cycle_overview_entry(bots_list: list[dict], prof_key: str):
+    """Ensure fixed cycle symbol appears in all-bots overview for Bot 1."""
+    if prof_key != "bot_1":
+        return
+    symbol = get_fixed_cycle_symbol()
+    if not symbol:
+        return
+    pid = find_fixed_cycle_runner_pid()
+    running = bool(pid)
+    for bot in bots_list:
+        if bot.get("symbol") == symbol:
+            bot["long"] = bot.get("long") or running
+            return
+    bots_list.insert(0, {
+        "symbol": symbol,
+        "long": running,
+        "short": False
+    })
 
 
 def _list_symbols_from_config() -> List[str]:
@@ -3329,25 +3486,36 @@ async def api_get_hedge_symbols(
             log_symbols = sorted(s for s in set(_list_symbols_from_logs("long") + _list_symbols_from_logs("short") + _list_symbols_from_dropdown_config_sources(profile=profile)) if s not in SYMBOLS_EXCLUDED_FROM_DROPDOWN_FALLBACK)
             return {"success": True, "symbols": log_symbols, "count": len(log_symbols), "hedge_count": len(log_symbols), "debug": {"source": "profile_fallback", "error": str(e)}}
     if positions_only:
+        master_url = f"{MASTER_BOT_API_URL}/master/positions"
+        logger.info(f"[API] /api/hedge/symbols?positions_only=true - Master URL: {master_url}")
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 response = await client.get(
-                    f"{MASTER_BOT_API_URL}/master/positions",
+                    master_url,
                     headers={
                         "X-Request-ID": str(uuid.uuid4()),
                         "X-Internal-Token": MASTER_BOT_API_TOKEN,
                         "Content-Type": "application/json",
                     },
                 )
+            logger.info(f"[API] /api/hedge/symbols?positions_only=true - HTTP {response.status_code}")
+            body_text = response.text
+            logger.debug("[API] Master API body (positions_only): %s", body_text[:800])
             if response.status_code != 200:
-                logger.warning(f"[API] /api/hedge/symbols?positions_only=true - HTTP {response.status_code}, Fallback auf Logs+Config (wie vorher)")
+                fallback = await _fallback_symbols_from_bybit(profile, f"http_status_{response.status_code}")
+                if fallback:
+                    return fallback
                 log_symbols = sorted(set(
                     _list_symbols_from_logs("long") + _list_symbols_from_logs("short") + _list_symbols_from_dropdown_config_sources()
                 ))
                 return {"success": True, "symbols": log_symbols, "count": len(log_symbols), "hedge_count": len(log_symbols), "debug": {"source": "logs_and_config_fallback"}}
             api_response = response.json()
             if not api_response.get("success"):
-                logger.warning("[API] /api/hedge/symbols?positions_only=true - API success=false, Fallback auf Logs+Config")
+                warning = "[API] /api/hedge/symbols?positions_only=true - API success=false, fallback to Bybit"
+                logger.warning(warning)
+                fallback = await _fallback_symbols_from_bybit(profile, "api_success_false")
+                if fallback:
+                    return fallback
                 log_symbols = sorted(
                     s for s in set(_list_symbols_from_logs("long") + _list_symbols_from_logs("short") + _list_symbols_from_dropdown_config_sources())
                     if s not in SYMBOLS_EXCLUDED_FROM_DROPDOWN_FALLBACK
@@ -3370,7 +3538,10 @@ async def api_get_hedge_symbols(
                 "debug": {"source": "positions_only_plus_config", "positions": symbols_with_position, "config": cfg_symbols},
             }
         except Exception as e:
-            logger.warning(f"[API] /api/hedge/symbols?positions_only=true - Fehler: {e}, Fallback auf Logs+Config (wie vorher)")
+            logger.warning(f"[API] /api/hedge/symbols?positions_only=true - Fehler: {e}, Fallback auf Logs+Config oder Bybit")
+            fallback = await _fallback_symbols_from_bybit(profile, "exception")
+            if fallback:
+                return fallback
             log_symbols = sorted(
                 s for s in set(_list_symbols_from_logs("long") + _list_symbols_from_logs("short") + _list_symbols_from_dropdown_config_sources())
                 if s not in SYMBOLS_EXCLUDED_FROM_DROPDOWN_FALLBACK
@@ -6964,6 +7135,7 @@ async def api_get_system_status(
         except Exception as e:
             logger.debug(f"[SYSTEM-STATUS] Konnte Symbole mit Positionen nicht abrufen (optional): {e}")
         
+        _ensure_fixed_cycle_long_bot_status(bots_by_symbol)
         logger.info(f"[SYSTEM-STATUS] Finale bots_by_symbol vor Response: {len(bots_by_symbol)} Symbole, Details: {bots_by_symbol}")
         
         # Price-at (Start-Preis-Bot) State – profilspezifisch.
@@ -7046,6 +7218,7 @@ async def api_get_all_bots_overview(user: dict = Depends(require_auth)):
                     "long": long_running,
                     "short": short_running,
                 })
+            _inject_fixed_cycle_overview_entry(bots_list, prof_key)
             result["profiles"][prof_key] = {
                 "label": prof_label,
                 "bots": bots_list,
@@ -7263,6 +7436,122 @@ async def api_stop_service(service_name: str, user: dict = Depends(require_auth)
         return {"success": False, "error": str(e)}
 
 
+def _run_stop_fixed_cycle_script(script_path: Path, project_root: Path) -> dict:
+    logger.info(
+        "stop_fixed_cycle_script_begin %s",
+        {"script_path": str(script_path), "project_root": str(project_root)},
+    )
+    if not script_path.exists():
+        logger.error("stop_fixed_cycle.sh missing at %s", script_path)
+        return {"success": False, "error": "stop_fixed_cycle.sh not found"}
+
+    try:
+        result = subprocess.run(
+            [str(script_path)],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            logger.info(
+                "stop_fixed_cycle_script_success %s",
+                {"stdout": result.stdout.strip()},
+            )
+            return {"success": True, "message": "Fixed cycle stop script executed"}
+        logger.warning(
+            "stop_fixed_cycle_script_failed %s",
+            {
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+        )
+        return {
+            "success": False,
+            "error": result.stderr or f"Return code {result.returncode}",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    except subprocess.TimeoutExpired:
+        logger.error("stop_fixed_cycle.sh timed out")
+        return {"success": False, "error": "stop_fixed_cycle.sh timed out"}
+    except Exception as exc:
+        logger.error("stop_fixed_cycle.sh failed: %s", exc, exc_info=True)
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/api/scripts/stop-fixed-cycle")
+@app.post("/dashboard/api/scripts/stop-fixed-cycle")
+async def api_run_stop_fixed_cycle_script(user: dict = Depends(require_auth)):
+    """Run scripts/stop_fixed_cycle.sh when the dashboard stop button is clicked."""
+    logger.info("stop_fixed_cycle_api_requested %s", {"user": user.get("username")})
+    project_root = Path(__file__).resolve().parent.parent
+    script_path = project_root / "scripts" / "stop_fixed_cycle.sh"
+    if not script_path.exists():
+        logger.error("stop_fixed_cycle.sh missing at %s", script_path)
+        return JSONResponse({"success": False, "error": "stop_fixed_cycle.sh not found"}, status_code=400)
+    return _run_stop_fixed_cycle_script(script_path, project_root)
+
+
+def _run_restart_fixed_cycle_script(script_path: Path, project_root: Path) -> dict:
+    logger.info(
+        "restart_fixed_cycle_script_begin %s",
+        {"script_path": str(script_path), "project_root": str(project_root)},
+    )
+    if not script_path.exists():
+        logger.error("restart_fixed_cycle.sh missing at %s", script_path)
+        return {"success": False, "error": "restart_fixed_cycle.sh not found"}
+
+    try:
+        result = subprocess.run(
+            [str(script_path)],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            logger.info(
+                "restart_fixed_cycle_script_success %s",
+                {"stdout": result.stdout.strip()},
+            )
+            return {"success": True, "message": "Fixed cycle restart script executed"}
+        logger.warning(
+            "restart_fixed_cycle_script_failed %s",
+            {
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+        )
+        return {
+            "success": False,
+            "error": result.stderr or f"Return code {result.returncode}",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    except subprocess.TimeoutExpired:
+        logger.error("restart_fixed_cycle.sh timed out")
+        return {"success": False, "error": "restart_fixed_cycle.sh timed out"}
+    except Exception as exc:
+        logger.error("restart_fixed_cycle.sh failed: %s", exc, exc_info=True)
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/api/scripts/restart-fixed-cycle")
+@app.post("/dashboard/api/scripts/restart-fixed-cycle")
+async def api_run_restart_fixed_cycle_script(user: dict = Depends(require_auth)):
+    """Execute scripts/restart_fixed_cycle.sh when Start button is clicked."""
+    logger.info("restart_fixed_cycle_api_requested %s", {"user": user.get("username")})
+    project_root = Path(__file__).resolve().parent.parent
+    script_path = project_root / "scripts" / "restart_fixed_cycle.sh"
+    if not script_path.exists():
+        logger.error("restart_fixed_cycle.sh missing at %s", script_path)
+        return JSONResponse({"success": False, "error": "restart_fixed_cycle.sh not found"}, status_code=400)
+    return _run_restart_fixed_cycle_script(script_path, project_root)
+
+
 if __name__ == "__main__":
     # Bind to 0.0.0.0 to allow access from other devices
     # WICHTIG: reload=False für Production (reload=True kann zu Instabilität führen)
@@ -7277,35 +7566,7 @@ if __name__ == "__main__":
     logger.info(f"🔄 Reload: {reload_enabled}")
     logger.info("=" * 80)
     
-    # Stelle sicher, dass der Watchdog läuft
-    try:
-        watchdog_check = subprocess.run(
-            ['systemctl', 'is-active', 'dashboard-watchdog.service'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if watchdog_check.returncode != 0:
-            logger.info("🐕 Watchdog läuft nicht - versuche zu starten...")
-            try:
-                sudo_password = get_sudo_password()
-                watchdog_start = subprocess.run(
-                    ['sudo', '-S', 'systemctl', 'start', 'dashboard-watchdog.service'],
-                    input=f'{sudo_password}\n',
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if watchdog_start.returncode == 0:
-                    logger.info("✅ Watchdog erfolgreich gestartet")
-                else:
-                    logger.warning(f"⚠️ Konnte Watchdog nicht starten: {watchdog_start.stderr}")
-            except Exception as e:
-                logger.warning(f"⚠️ Fehler beim Starten des Watchdogs: {e}")
-        else:
-            logger.info("✅ Watchdog läuft bereits")
-    except Exception as e:
-        logger.warning(f"⚠️ Konnte Watchdog-Status nicht prüfen: {e}")
+    logger.info("🐕 Watchdog-Autostart deaktiviert, um Fremd-Dashboard-Reaktivierung zu vermeiden")
     
     uvicorn.run(
         "app:app",

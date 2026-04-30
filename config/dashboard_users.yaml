@@ -1,0 +1,4 @@
+users:
+- password_hash: $2b$12$EjKR.SnAeFt2gNPWx3330u6lno2w3StHV9pIX8kAwExzYE.sL0B7a
+  role: admin
+  username: telge

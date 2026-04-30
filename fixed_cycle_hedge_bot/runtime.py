@@ -102,6 +102,21 @@ class GenericHedgeRuntime:
         ):
             snapshot, startup_flat_confirmed = self._confirm_startup_flat_snapshot(snapshot)
         if startup_flat_confirmed:
+            startup_state_cleaned = self.strategy.prepare_for_clean_startup(
+                snapshot,
+                self.runtime_state,
+                self.context,
+            )
+            if startup_state_cleaned:
+                self.logger.info(
+                    "startup_state_cleaned_for_fresh_entry %s",
+                    {
+                        "symbol": self.config.symbol,
+                        "strategy": self.strategy.name,
+                        "snapshot_long_qty": snapshot.long_qty,
+                        "snapshot_short_qty": snapshot.short_qty,
+                    },
+                )
             conflict, conflict_details = self._startup_state_conflict()
             if conflict:
                 self.logger.warning(
@@ -621,6 +636,10 @@ class GenericHedgeRuntime:
             )
             return equivalent_order.client_order_id
 
+        final_symbol_payload = {"symbol": self.config.symbol}
+        if hasattr(self.strategy, "config"):
+            final_symbol_payload["strategy_symbol"] = getattr(self.strategy.config, "symbol", None)
+        self.logger.info("final_symbol_used", final_symbol_payload)
         self.audit.log_event(
             "intent_submit_started",
             strategy=self.strategy.name,
@@ -1941,7 +1960,18 @@ class GenericHedgeRuntime:
                 for item in open_orders
             )
             if not has_open_match:
-                order.status = "OPEN"
+                self.runtime_state.active_orders.pop(client_id, None)
+                if order.exchange_order_id:
+                    self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
+                self.audit.log_event(
+                    "startup_order_recovery_pruned_stale_order",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    exchange_order_id=order.exchange_order_id,
+                    purpose=order.purpose,
+                    side=order.side,
+                    status=order.status,
+                )
         self.audit.log_event(
             "startup_order_recovery_completed",
             strategy=self.strategy.name,

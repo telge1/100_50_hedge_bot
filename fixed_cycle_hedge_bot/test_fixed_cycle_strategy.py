@@ -1,6 +1,7 @@
 import logging
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -227,6 +228,237 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("LONG_SL_EXIT", purposes)
         self.assertIn("SHORT_TP_EXIT", purposes)
         self.assertIn("SHORT_SL_EXIT", purposes)
+
+    def test_bootstrap_cleans_stale_restart_state_before_fresh_entry(self) -> None:
+        order_manager = FakeOrderManager()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "strategy_state.json"
+            state_file.write_text(
+                """
+{
+  "strategy_state": {
+    "initial_entry_confirmed": true,
+    "cycle_completed_count": 2,
+    "cycle_waiting_for_short_tp": true,
+    "short_tp_pending_cycle": 2,
+    "pending_cycle_loss_usdt": 12.5,
+    "cycle_state": {
+      "symbol": "BTCUSDT",
+      "trade_active": true,
+      "long_add_pending": true,
+      "cycle_waiting_for_short_tp": true,
+      "short_tp_pending_cycle": 2
+    }
+  },
+  "realized_long_pnl_total": 3.5,
+  "realized_short_pnl_total": -1.25,
+  "active_orders": []
+}
+""".strip(),
+                encoding="utf-8",
+            )
+            strategy = FixedCycleHedgeStrategy(
+                FixedCycleHedgeConfig(
+                    symbol="BTCUSDT",
+                    category="linear",
+                    rest_poll_after_fill_ms=0,
+                    order_refresh_cooldown_ms=0,
+                    max_cycles=3,
+                    price_tick_size=0.1,
+                    qty_step=0.001,
+                    reduction_pct_per_fill=15,
+                    long_fill_distance_pct=0.15,
+                )
+            )
+            runtime = GenericHedgeRuntime(
+                GenericRuntimeConfig(
+                    api_key="key",
+                    secret_key="secret",
+                    symbol="BTCUSDT",
+                    category="linear",
+                    min_order_value=1.0,
+                    ensure_exchange_ready=False,
+                    audit_log_file=None,
+                    strategy_state_file=str(state_file),
+                ),
+                strategy,
+                logger=logging.getLogger("test.fixed_cycle"),
+                order_manager=order_manager,
+            )
+
+            runtime.bootstrap()
+
+            state = runtime.runtime_state.strategy_state
+            self.assertFalse(state["cycle_waiting_for_short_tp"])
+            self.assertEqual(state["short_tp_pending_cycle"], 0)
+            self.assertEqual(state["cycle_completed_count"], 0)
+            self.assertEqual(state["pending_cycle_loss_usdt"], 0.0)
+            self.assertFalse(state["initial_entry_confirmed"])
+            self.assertEqual(runtime.runtime_state.realized_long_pnl_total, 0.0)
+            self.assertEqual(runtime.runtime_state.realized_short_pnl_total, 0.0)
+            self.assertEqual(len(runtime.runtime_state.active_orders), 2)
+            self.assertEqual(len(order_manager.market_orders), 2)
+
+    def test_bootstrap_prunes_persisted_active_orders_missing_on_exchange(self) -> None:
+        order_manager = FakeOrderManager()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = Path(tmpdir) / "strategy_state.json"
+            state_file.write_text(
+                """
+{
+  "strategy_state": {
+    "cycle_waiting_for_short_tp": true,
+    "short_tp_pending_cycle": 1,
+    "cycle_state": {
+      "symbol": "BTCUSDT",
+      "trade_active": true,
+      "long_add_pending": true,
+      "cycle_waiting_for_short_tp": true,
+      "short_tp_pending_cycle": 1
+    }
+  },
+  "active_orders": [
+    {
+      "client_order_id": "fixed_cycle-cycle_1_long_add-stale",
+      "side": "long",
+      "qty": 0.25,
+      "purpose": "CYCLE_1_LONG_ADD",
+      "price": 99.8,
+      "order_type": "Limit",
+      "reduce_only": false,
+      "exchange_order_id": "stale-exchange-order",
+      "status": "OPEN",
+      "filled_qty": 0.0,
+      "remaining_qty": 0.25,
+      "metadata": {},
+      "trace": [],
+      "created_at": "2026-04-30T00:00:00+00:00",
+      "updated_at": "2026-04-30T00:00:00+00:00"
+    }
+  ]
+}
+""".strip(),
+                encoding="utf-8",
+            )
+            strategy = FixedCycleHedgeStrategy(
+                FixedCycleHedgeConfig(
+                    symbol="BTCUSDT",
+                    category="linear",
+                    rest_poll_after_fill_ms=0,
+                    order_refresh_cooldown_ms=0,
+                    max_cycles=3,
+                    price_tick_size=0.1,
+                    qty_step=0.001,
+                    reduction_pct_per_fill=15,
+                    long_fill_distance_pct=0.15,
+                )
+            )
+            runtime = GenericHedgeRuntime(
+                GenericRuntimeConfig(
+                    api_key="key",
+                    secret_key="secret",
+                    symbol="BTCUSDT",
+                    category="linear",
+                    min_order_value=1.0,
+                    ensure_exchange_ready=False,
+                    audit_log_file=None,
+                    strategy_state_file=str(state_file),
+                ),
+                strategy,
+                logger=logging.getLogger("test.fixed_cycle"),
+                order_manager=order_manager,
+            )
+
+            runtime.bootstrap()
+
+            purposes = {order.purpose for order in runtime.runtime_state.active_orders.values()}
+            self.assertNotIn("CYCLE_1_LONG_ADD", purposes)
+            self.assertEqual(len(runtime.runtime_state.active_orders), 2)
+            self.assertEqual(len(order_manager.market_orders), 2)
+            self.assertFalse(runtime.runtime_state.strategy_state["cycle_waiting_for_short_tp"])
+            self.assertEqual(runtime.runtime_state.strategy_state["short_tp_pending_cycle"], 0)
+
+    def test_dynamic_entry_no_hold_needed_logs_payload(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(
+            order_manager,
+            FixedCycleHedgeConfig(
+                symbol="BTCUSDT",
+                category="linear",
+                dynamic_symbol_enabled=True,
+                dynamic_symbol_hold_minutes=10,
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.1,
+                qty_step=0.001,
+                reduction_pct_per_fill=15,
+                long_fill_distance_pct=0.15,
+            ),
+        )
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+        )
+        future_scan = datetime.now(timezone.utc) + timedelta(minutes=20)
+
+        with patch.object(runtime.strategy, "_compute_next_dynamic_scan_ready_at", return_value=future_scan):
+            with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy.logger.info") as mock_info:
+                runtime.strategy._maybe_start_dynamic_symbol_hold_after_flat(
+                    snapshot,
+                    runtime.runtime_state,
+                    runtime.context,
+                    "unit_test_no_hold",
+                )
+
+        dynamic_logs = [call.args for call in mock_info.call_args_list if call.args and call.args[0] == "%s %s"]
+        self.assertTrue(any(args[1] == "dynamic_entry_no_hold_needed" for args in dynamic_logs))
+        payload = next(args[2] for args in dynamic_logs if args[1] == "dynamic_entry_no_hold_needed")
+        self.assertEqual(payload["reason"], "unit_test_no_hold")
+        self.assertIn("next_dynamic_scan_ready_at", payload)
+        self.assertIn("minutes_until_ready", payload)
+
+    def test_dynamic_entry_waiting_for_next_scan_result_logs_payload(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(
+            order_manager,
+            FixedCycleHedgeConfig(
+                symbol="BTCUSDT",
+                category="linear",
+                dynamic_symbol_enabled=True,
+                dynamic_symbol_hold_minutes=10,
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.1,
+                qty_step=0.001,
+                reduction_pct_per_fill=15,
+                long_fill_distance_pct=0.15,
+            ),
+        )
+        runtime.runtime_state.strategy_state["next_dynamic_entry_allowed_at"] = (
+            datetime.now(timezone.utc) + timedelta(seconds=90)
+        ).isoformat()
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy.logger.info") as mock_info:
+            allowed = runtime.strategy._dynamic_symbol_entry_gate_allows_entry(
+                runtime.runtime_state,
+                runtime.context,
+                "unit_test_wait",
+            )
+
+        self.assertFalse(allowed)
+        dynamic_logs = [call.args for call in mock_info.call_args_list if call.args and call.args[0] == "%s %s"]
+        self.assertTrue(any(args[1] == "dynamic_entry_waiting_for_next_scan_result" for args in dynamic_logs))
+        payload = next(
+            args[2] for args in dynamic_logs if args[1] == "dynamic_entry_waiting_for_next_scan_result"
+        )
+        self.assertEqual(payload["reason"], "unit_test_wait")
+        self.assertGreater(payload["seconds_remaining"], 0)
 
     def test_fill_rebuilds_structure_and_advances_cycle_state(self) -> None:
         order_manager = FakeOrderManager()

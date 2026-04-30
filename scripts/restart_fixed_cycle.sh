@@ -3,6 +3,7 @@
 set -u
 
 PROJECT_ROOT="/home/telgenbuescher/projects/spread_recovery_hedge"
+PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 
 echo "Running hard reset..."
 cd "${PROJECT_ROOT}" || exit 1
@@ -23,4 +24,4 @@ echo "After cleanup:"
 ls -lah "${PROJECT_ROOT}/logs" | grep -E "fixed_cycle|generic_hedge" || true
 
 echo "Starting fixed cycle bot..."
-"${PROJECT_ROOT}/start_fixed_cycle.sh"
+PYTHON="${PYTHON}" "${PROJECT_ROOT}/start_fixed_cycle.sh"

@@ -3640,8 +3640,7 @@
                 if (data.success !== false) {
                     loadBotOverview();
                     const inputSymbol = (document.getElementById('startSymbolInputLong')?.value || document.getElementById('startSymbolInputShort')?.value || '').trim().toUpperCase();
-                    const urlSymbol = (new URLSearchParams(window.location.search).get('symbol') || '').trim().toUpperCase();
-                    const symbolForStatus = inputSymbol || (currentSymbol || '').trim().toUpperCase() || urlSymbol;
+                    const symbolForStatus = inputSymbol || (currentSymbol || '').trim().toUpperCase();
                     if (symbolForStatus) {
                         data.bots = data.bots || {};
                         try {
@@ -3697,7 +3696,7 @@
                 // Master Bot & Hedge Guard: Restart-Button (startet automatisch, wenn nicht läuft)
                 let actionButton = '';
                 if (serviceKey === 'master') {
-                    actionButton = `<button class="btn-service-control btn-service-restart" onclick="restartService('${serviceKey}')" title="Restartet den Master Bot und alle laufenden Bots">🔄 Restart</button>`;
+                    actionButton = `<button class="btn-service-control btn-service-stop" onclick="stopService('${serviceKey}')">⏹️ Stop</button>`;
                 } else if (serviceKey === 'hedge_guard') {
                     actionButton = `<button class="btn-service-control" type="button" id="hedgeGuardActionsBtn" onclick="document.getElementById('hedgeGuardDropdown').classList.toggle('show'); event.stopPropagation();">⋮ Aktionen</button><div id="hedgeGuardDropdown" class="dropdown-content"><a href="#" onclick="toggleHedgeGuardCardHidden(); return false">Ausblenden</a><a href="#" onclick="restartService('hedge_guard'); return false">Alle neu starten</a></div>`;
                 } else {
@@ -3753,12 +3752,11 @@
             const botSymbols = Object.keys(bots);
             console.log('Symbols in bots:', botSymbols);
             
-            // Symbol für Bot-Status & Aktionen. symbolForStatus zuerst (profil-spezifisch geladen), sonst Dropdown > Input > etc.
+            // Symbol für Bot-Status & Aktionen. URL-Symbol wird bewusst ignoriert, damit der Dashboard-Link keinen Coin erzwingt.
             selectedSymbol = null;
             const symbolForStatus = (data.symbolForStatus || '').trim().toUpperCase();
             const inputSymbol = (document.getElementById('startSymbolInputLong')?.value || document.getElementById('startSymbolInputShort')?.value || '').trim().toUpperCase();
             const uiSymbol = (currentSymbol || '').trim().toUpperCase();
-            const urlSymbol = (new URLSearchParams(window.location.search).get('symbol') || '').trim().toUpperCase();
             const runningLongSymbol = botSymbols.find(sym => (bots[sym]?.long?.running));
             const priceAt = data.price_at || { long: {}, short: {} };
             const priceAtSymbols = new Set([...(Object.keys(priceAt.long || {})), ...(Object.keys(priceAt.short || {}))]);
@@ -3770,9 +3768,6 @@
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (inputSymbol) {
                 selectedSymbol = inputSymbol;
-                if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
-            } else if (urlSymbol) {
-                selectedSymbol = urlSymbol;
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (runningLongSymbol) {
                 selectedSymbol = runningLongSymbol;
@@ -3790,32 +3785,34 @@
             const shortPriceAt = selectedSymbol ? (priceAt.short || {})[selectedSymbol] : null;
 
             // Long Bot Status (mit Start-Button / Price-at-Anzeige)
-            const longBot = selectedBots['long'] || { running: false };
+            const longBot = selectedBots['long'] || { running: false, status: 'stopped', status_text: '' };
             const longRunning = longBot.running || false;
             const longPriceAtActive = !!(longPriceAt && longPriceAt.target_price);
-            const longStatusClass = (longRunning || longPriceAtActive) ? 'running' : 'stopped';
-            const longIndicatorClass = (longRunning || longPriceAtActive) ? 'running' : 'stopped';
+            const longStatus = longBot.status || (longRunning ? 'running' : 'stopped');
+            const longStatusClass = longStatus;
+            const longIndicatorClass = longStatus;
             
             let longBotButton = '';
-            let longBotDesc = 'Status des Long-Bots';
+            let longBotDesc = longBot.status_text || (longRunning ? 'Long Bot läuft und wartet auf Positionen' : 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
             const longRestartButton = selectedSymbol
                 ? `<button class="btn-service-control btn-service-start" onclick="restartLongBotAutoDetect('${selectedSymbol}', event)" title="Long Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`
                 : `<button class="btn-service-control btn-service-start" onclick="restartLongBotAutoDetect(undefined, event)" title="Long Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`;
             if (selectedSymbol) {
                 if (longRunning) {
-                    longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopSingleBotFromStatus('long', '${selectedSymbol}', event)" title="Long Bot stoppen">⏹️ Stop</button> ${longRestartButton}`;
-                    longBotDesc = 'Long Bot läuft und wartet auf Positionen';
+                    longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopFixedCycleScript(event)" title="Long Bot stoppen">⏹️ Stop</button> ${longRestartButton}`;
+                    if (!longBot.status_text) {
+                        longBotDesc = 'Long Bot läuft und wartet auf Positionen';
+                    }
                 } else if (longPriceAtActive) {
                     const triggerLabel = (longPriceAt.trigger || 'below') === 'below' ? '≤' : '≥';
                     longBotDesc = 'Price-at Bot aktiv – startet bei Preis ' + triggerLabel + ' ' + longPriceAt.target_price;
                     longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopPriceAtFromStatus('long', '${selectedSymbol}')" title="Start-Preis-Überwachung beenden">⏹️ Stop</button> ${longRestartButton}`;
                 } else {
-                    longBotButton = `<button class="btn-service-control btn-service-start" onclick="startSingleBotFromStatus('long', event)" title="Long Bot starten">▶️ Start</button> ${longRestartButton}`;
-                    longBotDesc = 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen';
+                    longBotButton = `<button class="btn-service-control btn-service-start" onclick="startFixedCycleScript(event)" title="Long Bot starten">▶️ Start</button> ${longRestartButton}`;
                 }
             } else {
-                longBotButton = longRestartButton;
-                longBotDesc = 'Wählen Sie ein Symbol aus, um den Bot-Status zu sehen';
+                longBotButton = `<button class="btn-service-control btn-service-start" onclick="startFixedCycleScript(event)" title="Long Bot starten">▶️ Start</button>`;
+                longBotDesc = 'Long Bot kann ohne festes Symbol gestartet werden';
             }
             
             html += `
@@ -3834,14 +3831,15 @@
             `;
             
             // Short Bot Status (mit Start-Button / Price-at-Anzeige)
-            const shortBot = selectedBots['short'] || { running: false };
+            const shortBot = selectedBots['short'] || { running: false, status: 'stopped', status_text: '' };
             const shortRunning = shortBot.running || false;
             const shortPriceAtActive = !!(shortPriceAt && shortPriceAt.target_price);
-            const shortStatusClass = (shortRunning || shortPriceAtActive) ? 'running' : 'stopped';
-            const shortIndicatorClass = (shortRunning || shortPriceAtActive) ? 'running' : 'stopped';
+            const shortStatus = shortBot.status || (shortRunning ? 'running' : 'stopped');
+            const shortStatusClass = shortStatus;
+            const shortIndicatorClass = shortStatus;
             
             let shortBotButton = '';
-            let shortBotDesc = 'Status des Short-Bots';
+            let shortBotDesc = shortBot.status_text || (shortRunning ? 'Short Bot läuft und wartet auf Positionen' : 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
             const shortRestartButton = selectedSymbol
                 ? `<button class="btn-service-control btn-service-start" onclick="restartShortBotAutoDetect('${selectedSymbol}', event)" title="Short Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`
                 : `<button class="btn-service-control btn-service-start" onclick="restartShortBotAutoDetect(undefined, event)" title="Short Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`;
@@ -3858,8 +3856,8 @@
                     shortBotDesc = 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen';
                 }
             } else {
-                shortBotButton = shortRestartButton;
-                shortBotDesc = 'Wählen Sie ein Symbol aus, um den Bot-Status zu sehen';
+                shortBotButton = `<button class="btn-service-control btn-service-start" onclick="startSingleBotFromStatus('short', event)" title="Short Bot starten">▶️ Start</button>`;
+                shortBotDesc = 'Short Bot kann ohne festes Symbol gestartet werden';
             }
             
             html += `
@@ -3886,11 +3884,11 @@
             // Aktualisiere "Beide Bots starten" Button im Header
             const startBothBotsHeaderBtn = document.getElementById('startBothBotsHeaderBtn');
             if (startBothBotsHeaderBtn) {
-                if (selectedSymbol && (!longRunning || !shortRunning)) {
+                if (!longRunning || !shortRunning) {
                     startBothBotsHeaderBtn.style.display = 'inline-block';
                     startBothBotsHeaderBtn.onclick = () => startBothBotsFromStatusHeader();
-                    startBothBotsHeaderBtn.title = `Startet beide Bots für ${selectedSymbol}`;
-                } else if (selectedSymbol && longRunning && shortRunning) {
+                    startBothBotsHeaderBtn.title = 'Startet den Fixed-Cycle-Code ohne festes Symbol';
+                } else if (longRunning && shortRunning) {
                     startBothBotsHeaderBtn.style.display = 'none';
                 } else {
                     startBothBotsHeaderBtn.style.display = 'none';
@@ -3985,16 +3983,11 @@
             }
             const isLong = (botType === 'long');
             const symbolInput = document.getElementById(isLong ? 'startSymbolInputLong' : 'startSymbolInputShort');
-            const symbolFromUi = (currentSymbol || '').trim().toUpperCase();
+            const symbolFromUi = '';
             const symbolFromInput = symbolInput ? symbolInput.value.trim().toUpperCase() : '';
             const symbol = symbolFromUi || symbolFromInput;
             if (!symbol) {
-                showToast(
-                    'warning',
-                    'Kein Symbol gebunden',
-                    'Bitte zuerst ein Symbol oder eine aktive Position auswählen.',
-                    5000
-                );
+                await startFixedCycleScript(evt);
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                 return;
             }
@@ -4117,6 +4110,76 @@
                 removeToast(toastId);
                 showToast('error', 'Fehler', `Fehler beim Starten: ${error.message}`, 8000);
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+            }
+        }
+
+        async function stopFixedCycleScript(evt) {
+            lastUserActionTime = Date.now();
+            const btn = (evt && evt.target) ? evt.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Stoppe...';
+            }
+            const toastId = 'stop-fixed-cycle';
+            showToast('info', 'Stoppe Fixed Cycle', 'Das Stop-Skript läuft...', 0, toastId);
+            try {
+                const response = await fetch('/api/scripts/stop-fixed-cycle', {
+                    method: 'POST',
+                    credentials: 'include',
+                });
+                const data = await response.json().catch(() => ({}));
+                removeToast(toastId);
+                if (data.success) {
+                    showToast('success', 'Stop erfolgreich', data.message || 'Fixed Cycle wird gestoppt.', 5000);
+                } else {
+                    showToast('error', 'Stop fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
+                }
+            } catch (error) {
+                removeToast(toastId);
+                showToast('error', 'Stop fehlgeschlagen', error.message || 'Fehler beim Stoppen.', 8000);
+            } finally {
+                await new Promise(r => setTimeout(r, 500));
+                loadSystemStatus();
+                if (selectedSymbol) await loadBotStatus(selectedSymbol);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '⏹️ Stop';
+                }
+            }
+        }
+
+        async function startFixedCycleScript(evt) {
+            lastUserActionTime = Date.now();
+            const btn = (evt && evt.target) ? evt.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Starte...';
+            }
+            const toastId = 'start-fixed-cycle';
+            showToast('info', 'Start Fixed Cycle', 'Der Restart-Skript wird ausgeführt...', 0, toastId);
+            try {
+                const response = await fetch('/api/scripts/restart-fixed-cycle', {
+                    method: 'POST',
+                    credentials: 'include',
+                });
+                const data = await response.json().catch(() => ({}));
+                removeToast(toastId);
+                if (data.success) {
+                    showToast('success', 'Restart ausgelöst', data.message || 'Fixed Cycle wird neu gestartet.', 5000);
+                } else {
+                    showToast('error', 'Restart fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
+                }
+            } catch (error) {
+                removeToast(toastId);
+                showToast('error', 'Restart fehlgeschlagen', error.message || 'Fehler beim Restart.', 8000);
+            } finally {
+                await new Promise(r => setTimeout(r, 500));
+                loadSystemStatus();
+                if (selectedSymbol) await loadBotStatus(selectedSymbol);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '▶️ Start';
+                }
             }
         }
 
@@ -4512,17 +4575,14 @@
                 btn.textContent = '⏳ Starte Bots...';
                 await new Promise(r => setTimeout(r, 0));
             }
-            const longRow = getLongRowValues();
-            const shortRow = getShortRowValues();
-            const symbolFromRows = (longRow.symbol || '').trim() || (shortRow.symbol || '').trim();
-            symbol = (currentSymbol || symbol || symbolFromRows || '').trim().toUpperCase();
-            if (!symbol) {
-                showToast('error', 'Kein Symbol', 'Bitte wählen Sie zuerst ein Symbol aus (Long oder Short Zeile).', 5000);
+            const explicitSymbol = (symbol || '').trim().toUpperCase();
+            if (!explicitSymbol) {
+                await startFixedCycleScript();
                 if (btn) { btn.disabled = false; btn.textContent = '🚀 Beide Bots starten'; }
                 return;
             }
             
-            showToast('info', 'Starte Bots...', `Beide Bots für ${symbol} – strikt Config-Daten`, 0);
+            showToast('info', 'Starte Bots...', `Beide Bots für ${explicitSymbol} – strikt Config-Daten`, 0);
             
             try {
                 // Kein Config-Update vor Start – Bot nutzt strikt nur Config, keine Form-Felder
@@ -4533,8 +4593,8 @@
                 let longStartPrice = null, shortStartPrice = null;
                 try {
                     const [longCfgRes, shortCfgRes] = await Promise.all([
-                        fetch(addProfileToUrl(`/api/bots/${encodeURIComponent(symbol)}/config?bot_type=long`), { credentials: 'include' }),
-                        fetch(addProfileToUrl(`/api/bots/${encodeURIComponent(symbol)}/config?bot_type=short`), { credentials: 'include' })
+                        fetch(addProfileToUrl(`/api/bots/${encodeURIComponent(explicitSymbol)}/config?bot_type=long`), { credentials: 'include' }),
+                        fetch(addProfileToUrl(`/api/bots/${encodeURIComponent(explicitSymbol)}/config?bot_type=short`), { credentials: 'include' })
                     ]);
                     const longCfg = (await longCfgRes.json()).config || {};
                     const shortCfg = (await shortCfgRes.json()).config || {};
@@ -4553,7 +4613,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
-                            body: JSON.stringify({ bot_type: 'long', symbol, target_price: longStartPrice, trigger: 'below', profile: prof })
+                            body: JSON.stringify({ bot_type: 'long', symbol: explicitSymbol, target_price: longStartPrice, trigger: 'below', profile: prof })
                         });
                         const longData = await longRes.json();
                         if (!longData.success) showToast('error', 'Long Start-Preis', longData.error || 'Fehler', 5000);
@@ -4563,45 +4623,45 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
-                            body: JSON.stringify({ bot_type: 'short', symbol, target_price: shortStartPrice, trigger: 'above', profile: prof })
+                            body: JSON.stringify({ bot_type: 'short', symbol: explicitSymbol, target_price: shortStartPrice, trigger: 'above', profile: prof })
                         });
                         const shortData = await shortRes.json();
                         if (!shortData.success) showToast('error', 'Short Start-Preis', shortData.error || 'Fehler', 5000);
                     }
                     if (!longAtPrice) {
                         if (prof && prof !== 'main') {
-                            await fetch(`/api/hedge/start-bot-script`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'long', symbol, profile: prof }) });
+                            await fetch(`/api/hedge/start-bot-script`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'long', symbol: explicitSymbol, profile: prof }) });
                         } else {
-                            await fetch(`/api/bots/${symbol}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'long', profile: prof }) });
+                            await fetch(`/api/bots/${explicitSymbol}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'long', profile: prof }) });
                         }
                     }
                     if (!shortAtPrice) {
                         if (prof && prof !== 'main') {
-                            await fetch(`/api/hedge/start-bot-script`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'short', symbol, profile: prof }) });
+                            await fetch(`/api/hedge/start-bot-script`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'short', symbol: explicitSymbol, profile: prof }) });
                         } else {
-                            await fetch(`/api/bots/${symbol}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'short', profile: prof }) });
+                            await fetch(`/api/bots/${explicitSymbol}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ bot_type: 'short', profile: prof }) });
                         }
                     }
                     showToast('success', 'Gestartet', (longAtPrice ? 'Long startet bei Preis ' + longStartPrice + '. ' : '') + (shortAtPrice ? 'Short startet bei Preis ' + shortStartPrice + '.' : '') + ( (!longAtPrice || !shortAtPrice) ? ' Übrige Bots gestartet.' : '' ), 8000);
                     if (btn) { btn.disabled = false; btn.textContent = '🚀 Beide Bots starten'; }
                     await new Promise(r => setTimeout(r, 600));
-                    await loadSystemStatus(); if (symbol) await loadBotStatus(symbol);
+                    await loadSystemStatus(); if (explicitSymbol) await loadBotStatus(explicitSymbol);
                     return;
                 }
 
-                showToast('info', 'Bots werden gestartet...', `Beide Bots für ${symbol} – strikt Config-Daten`, 0);
+                showToast('info', 'Bots werden gestartet...', `Beide Bots für ${explicitSymbol} – strikt Config-Daten`, 0);
 
                 const body = { profile: prof };
                 // Keine Größen aus Form – Backend nutzt strikt Config
 
-                const response = await fetch(`/api/hedge/start-bots/${symbol}`, {
+                const response = await fetch(`/api/hedge/start-bots/${explicitSymbol}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 const data = await response.json();
                 if (!data?.success && data?.error_code === 'MISSING_SYMBOL_CONFIG') {
-                    showMissingSymbolConfig(data, symbol, 'both');
+                    showMissingSymbolConfig(data, explicitSymbol, 'both');
                     if (btn) { btn.disabled = false; btn.textContent = '🚀 Beide Bots starten'; }
                     return;
                 }
@@ -4614,23 +4674,23 @@
                 
                 const checkBotStatus = async () => {
                     attempts++;
-                    const longRunning = await checkBotRunningStatus(symbol, 'long');
-                    const shortRunning = await checkBotRunningStatus(symbol, 'short');
+                    const longRunning = await checkBotRunningStatus(explicitSymbol, 'long');
+                    const shortRunning = await checkBotRunningStatus(explicitSymbol, 'short');
                     
                     await loadSystemStatus();
-                    if (symbol) await loadBotStatus(symbol);
+                    if (explicitSymbol) await loadBotStatus(explicitSymbol);
                     
                     if (longRunning && shortRunning) {
-                        showToast('success', 'Beide Bots gestartet!', `Long und Short Bot für ${symbol} laufen jetzt.`, 5000);
+                        showToast('success', 'Beide Bots gestartet!', `Long und Short Bot für ${explicitSymbol} laufen jetzt.`, 5000);
                         if (btn) { btn.disabled = false; btn.textContent = '🚀 Beide Bots starten'; }
                         return;
                     } else if (attempts < maxAttempts) {
                         setTimeout(checkBotStatus, checkInterval);
                     } else {
-                        const finalLong = await checkBotRunningStatus(symbol, 'long');
-                        const finalShort = await checkBotRunningStatus(symbol, 'short');
+                        const finalLong = await checkBotRunningStatus(explicitSymbol, 'long');
+                        const finalShort = await checkBotRunningStatus(explicitSymbol, 'short');
                         if (finalLong && finalShort) {
-                            showToast('success', 'Beide Bots gestartet!', `Long und Short Bot für ${symbol} laufen jetzt.`, 5000);
+                            showToast('success', 'Beide Bots gestartet!', `Long und Short Bot für ${explicitSymbol} laufen jetzt.`, 5000);
                         } else {
                             const longMsg = data.results?.long?.message || 'Unbekannter Fehler';
                             const shortMsg = data.results?.short?.message || 'Unbekannter Fehler';
@@ -4650,8 +4710,7 @@
         }
         
         async function startBothBotsFromStatusHeader() {
-            // Verwendet das aktuelle Symbol
-            await startBothBotsFromStatus(currentSymbol);
+            await startBothBotsFromStatus('');
         }
         
         async function runPreFlightCheck() {
@@ -5203,7 +5262,7 @@
             }
         }
 
-        /** URL auf aktuellen Coin setzen (Pfad aus location, damit Unterpfade funktionieren). useReplace=true für ersten Load ohne extra History-Eintrag. */
+        /** URL auf Dashboard-Basis halten; Symbol wird bewusst nicht persistiert. */
         function setDashboardUrlForSymbol(symbol, useReplace) {
             if (!window.history) {
                 dashboardDebug('setDashboardUrlForSymbol: kein history', symbol);
@@ -5212,7 +5271,6 @@
             const pathname = window.location.pathname || '';
             const base = pathname.split('?')[0].split('#')[0] || '/dashboard';
             const params = new URLSearchParams();
-            if (symbol) params.set('symbol', symbol);
             const prof = getSelectedProfile();
             if (prof && prof !== 'main') params.set('profile', prof);
             const url = params.toString() ? base + '?' + params.toString() : base;
@@ -5410,10 +5468,6 @@
                 }
 
                 let initialSymbol = '';
-                const urlSymbol = (urlParams.get('symbol') || '').trim().toUpperCase();
-                if (urlSymbol && symbols.includes(urlSymbol)) {
-                    initialSymbol = urlSymbol;
-                }
                 if (!initialSymbol) {
                     try {
                         const cfgRes = await fetch('/api/hedge/current-symbol', { credentials: 'include' });

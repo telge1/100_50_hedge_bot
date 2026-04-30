@@ -7,10 +7,15 @@ orderbook depth, tight spread, and simulated 100 USDT slippage.
 Falls back to relaxed thresholds when initial filters yield nothing.
 """
 
+import numpy as np
 import asyncio
 import aiohttp
-import numpy as np
+import json
+import os
 import time
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Any
 
 BASE_URL = "https://api.bybit.com"
 INTERVAL = "1"
@@ -37,6 +42,21 @@ FALLBACK_PARAMS = {
     "max_spread_pct": 0.35,
     "max_slippage_pct": 0.50,
 }
+
+BEST_COIN_FILE = Path("logs") / "best_coin.json"
+
+
+def _write_best_coin_atomic(best_coin: dict[str, Any]) -> None:
+    try:
+        BEST_COIN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = BEST_COIN_FILE.with_suffix(".tmp")
+        payload = json.dumps(best_coin, ensure_ascii=False, indent=2)
+        temp_path.write_text(payload, encoding="utf-8")
+        os.replace(temp_path, BEST_COIN_FILE)
+        print(f"🔥 Best coin written to {BEST_COIN_FILE}")
+    except Exception as exc:
+        print(f"⚠️ Failed to write best coin file: {exc}")
+
 
 
 async def fetch_json(session, url):
@@ -262,4 +282,22 @@ if __name__ == "__main__":
             f"spread:{coin['spread_pct']:>5}% | depth:{coin['depth']:>8,.0f} | "
             f"buySlip:{coin['simulated_buy_slippage']:>5}% | sellSlip:{coin['simulated_sell_slippage']:>5}%"
         )
-    print(f"\n⏱ Laufzeit: {time.time() - start:.1f}s")
+    duration = time.time() - start
+    print(f"\n⏱ Laufzeit: {duration:.1f}s")
+
+    if coins:
+        best = coins[0]
+        best_coin_record = {
+            "symbol": best["symbol"],
+            "score": best["score"],
+            "timestamp": datetime.now(timezone(timedelta(hours=3))).isoformat(),
+            "source": "coin_scanner",
+            "reason": "highest_score",
+            "duration_s": round(duration, 1),
+        }
+        _write_best_coin_atomic(best_coin_record)
+    else:
+        if BEST_COIN_FILE.exists():
+            print("⚠️ Kein Kandidat gefunden, best_coin.json bleibt unverändert")
+        else:
+            print("⚠️ Kein Kandidat gefunden und keine best_coin.json vorhanden")

@@ -198,12 +198,63 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
 
 def get_bot_status(symbol: str, bot_type: str = "long") -> dict:
     """Get bot status"""
+    running = is_bot_running(symbol, bot_type=bot_type)
+    status = "running" if running else "stopped"
+    status_text = f"{bot_type.capitalize()} Bot läuft" if running else f"{bot_type.capitalize()} Bot gestoppt"
     return {
         "symbol": symbol,
         "bot_type": bot_type,
-        "running": is_bot_running(symbol, bot_type=bot_type),
-        "service_name": f"hedgebot-{bot_type}@{symbol}"
+        "running": running,
+        "service_name": f"hedgebot-{bot_type}@{symbol}",
+        "status": status,
+        "status_text": status_text,
+        "pid": None
     }
+
+
+def get_fixed_cycle_symbol() -> Optional[str]:
+    """Symbol configured in fixed_cycle_config.json, if present."""
+    try:
+        project_dir = _get_project_root()
+        config_file = project_dir / "fixed_cycle_hedge_bot" / "config" / "fixed_cycle_config.json"
+        if config_file.exists():
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            symbol = str(data.get("symbol") or "").strip().upper()
+            return symbol if symbol else None
+    except Exception:
+        pass
+    return None
+
+
+def find_fixed_cycle_runner_pid() -> Optional[int]:
+    """Find PID of manually started fixed_cycle_hedge_bot.runner process."""
+    pattern = "fixed_cycle_hedge_bot.runner"
+    if PSUTIL_AVAILABLE:
+        for proc in psutil.process_iter(["pid", "cmdline", "status"]):
+            try:
+                if proc.info.get("status") in (psutil.STATUS_DEAD, psutil.STATUS_ZOMBIE):
+                    continue
+                cmdline = proc.info.get("cmdline") or []
+                if any(pattern in str(part) for part in cmdline):
+                    return proc.info.get("pid")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    else:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", pattern],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                pid_str = (result.stdout or "").strip().splitlines()[0]
+                if pid_str.isdigit():
+                    return int(pid_str)
+        except Exception:
+            pass
+    return None
 
 
 def get_bot_pid_from_run_dir(symbol: str, bot_type: str) -> Tuple[Optional[int], Optional[Path]]:

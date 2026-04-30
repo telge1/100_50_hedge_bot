@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass
-from typing import Callable
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
 
 from strategy.config import StrategyConfig
 
@@ -9,6 +13,140 @@ from .basket_exit_strategy import BasketExitConfig, BasketExitHedgeStrategy
 from .dynamic_breakeven_strategy import DynamicBreakevenConfig, DynamicBreakevenHedgeStrategy
 from .fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
 from .runtime import GenericHedgeRuntime, GenericRuntimeConfig
+
+logger = logging.getLogger(__name__)
+
+
+def _load_startup_best_coin_info(config: FixedCycleHedgeConfig) -> dict[str, Any] | None:
+    if not config.dynamic_symbol_enabled:
+        logger.info("startup_best_coin_skipped", {"reason": "dynamic_disabled"})
+        return None
+    file_path = Path(config.best_coin_file or "logs/best_coin.json")
+    if not file_path.exists():
+        logger.info("startup_best_coin_skipped", {"reason": "missing_file", "path": str(file_path)})
+        return None
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8") or "{}")
+    except Exception as exc:
+        logger.info(
+            "startup_best_coin_skipped",
+            {"reason": "invalid_json", "path": str(file_path), "error": str(exc)},
+        )
+        return None
+    if not isinstance(payload, dict):
+        logger.info(
+            "startup_best_coin_skipped",
+            {"reason": "invalid_json", "path": str(file_path), "error": "payload not object"},
+        )
+        return None
+    symbol = payload.get("symbol")
+    timestamp_raw = payload.get("timestamp")
+    if not symbol or not isinstance(symbol, str):
+        logger.info(
+            "startup_best_coin_skipped",
+            {"reason": "invalid_symbol", "path": str(file_path), "symbol": symbol},
+        )
+        return None
+    symbol_upper = symbol.upper()
+    if not symbol_upper.endswith("USDT"):
+        logger.info(
+            "startup_best_coin_skipped",
+            {
+                "reason": "invalid_symbol",
+                "path": str(file_path),
+                "symbol": symbol_upper,
+                "detail": "must end with USDT",
+            },
+        )
+        return None
+    if not timestamp_raw or not isinstance(timestamp_raw, str):
+        logger.info(
+            "startup_best_coin_skipped",
+            {"reason": "invalid_timestamp", "path": str(file_path), "symbol": symbol_upper},
+        )
+        return None
+    try:
+        timestamp = datetime.fromisoformat(timestamp_raw)
+    except ValueError as exc:
+        logger.info(
+            "startup_best_coin_skipped",
+            {"reason": "invalid_timestamp", "path": str(file_path), "symbol": symbol_upper, "error": str(exc)},
+        )
+        return None
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    age_minutes = (now - timestamp).total_seconds() / 60
+    max_age = float(config.best_coin_max_age_minutes or 0) or 0
+    if max_age and age_minutes > max_age:
+        logger.info(
+            "startup_best_coin_skipped",
+            {
+                "reason": "stale",
+                "path": str(file_path),
+                "symbol": symbol_upper,
+                "age_minutes": round(age_minutes, 1),
+                "max_age_minutes": max_age,
+            },
+        )
+        return None
+    hold_minutes = float(config.dynamic_symbol_hold_minutes or 0) or 0
+    minute_in_cycle = now.minute % 30
+    if hold_minutes and minute_in_cycle < hold_minutes:
+        logger.info(
+            "startup_best_coin_skipped",
+            {
+                "reason": "hold_window",
+                "path": str(file_path),
+                "symbol": symbol_upper,
+                "hold_minutes": hold_minutes,
+                "minute_in_cycle": minute_in_cycle,
+            },
+        )
+        return None
+    logger.info(
+        "startup_best_coin_loaded",
+        {
+            "path": str(file_path),
+            "symbol": symbol_upper,
+            "score": payload.get("score"),
+            "timestamp": timestamp_raw,
+            "reason": payload.get("reason"),
+        },
+    )
+    return {
+        "symbol": symbol_upper,
+        "score": payload.get("score"),
+        "timestamp": timestamp,
+        "reason": payload.get("reason"),
+        "age_minutes": age_minutes,
+    }
+
+
+def apply_startup_best_coin_symbol(
+    strategy_config: FixedCycleHedgeConfig,
+) -> tuple[str, str] | None:
+    best_coin = _load_startup_best_coin_info(strategy_config)
+    if not best_coin:
+        return None
+    old_symbol = strategy_config.symbol
+    new_symbol = best_coin["symbol"]
+    strategy_config.symbol = new_symbol
+    logger.info(
+        "startup_best_coin_applied",
+        {
+            "path": strategy_config.best_coin_file,
+            "old_symbol": old_symbol,
+            "new_symbol": new_symbol,
+            "score": best_coin.get("score"),
+            "reason": best_coin.get("reason"),
+        },
+    )
+    logger.info(
+        "dynamic_symbol_updated",
+        {"reason": "startup_best_coin", "old_symbol": old_symbol, "new_symbol": new_symbol},
+    )
+    return old_symbol, new_symbol
 
 
 @dataclass(frozen=True)
@@ -52,6 +190,17 @@ def _build_basket_exit_runtime(base_config: StrategyConfig, strategy_config_path
 
 def _build_fixed_cycle_runtime(base_config: StrategyConfig, strategy_config_path: str | None = None) -> GenericHedgeRuntime:
     strategy_config = FixedCycleHedgeConfig.from_json_file(strategy_config_path)
+    applied_symbols = apply_startup_best_coin_symbol(strategy_config)
+    if applied_symbols:
+        old_symbol, new_symbol = applied_symbols
+        logger.info(
+            "runtime_active_symbol_updated",
+            {
+                "reason": "startup_best_coin",
+                "old_symbol": old_symbol,
+                "new_symbol": new_symbol,
+            },
+        )
     runtime_config = GenericRuntimeConfig(
         api_key=base_config.api_key,
         secret_key=base_config.secret_key,
