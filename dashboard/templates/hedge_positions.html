@@ -3245,6 +3245,9 @@
 
         let lastUserActionTime = 0;
         const USER_ACTION_GRACE_MS = 2500;
+        let pendingFixedCycleStart = false;
+        let pendingFixedCycleStartAt = 0;
+        const PENDING_FIXED_CYCLE_STATUS_MS = 15000;
 
         /** Config aus aktueller Config-Datei in die Form-Felder laden (Long oder Short). Symbol: zuerst Coin-Dropdown (explizite Auswahl), dann currentSymbol/Input. */
         async function loadConfigIntoForm(target) {
@@ -3786,11 +3789,11 @@
 
             // Long Bot Status (mit Start-Button / Price-at-Anzeige)
             const longBot = selectedBots['long'] || { running: false, status: 'stopped', status_text: '' };
-            const longRunning = longBot.running || false;
+            let longRunning = longBot.running || false;
             const longPriceAtActive = !!(longPriceAt && longPriceAt.target_price);
             const longStatus = longBot.status || (longRunning ? 'running' : 'stopped');
-            const longStatusClass = longStatus;
-            const longIndicatorClass = longStatus;
+            let longStatusClass = longStatus;
+            let longIndicatorClass = longStatus;
             
             let longBotButton = '';
             let longBotDesc = longBot.status_text || (longRunning ? 'Long Bot läuft und wartet auf Positionen' : 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
@@ -3832,11 +3835,35 @@
             
             // Short Bot Status (mit Start-Button / Price-at-Anzeige)
             const shortBot = selectedBots['short'] || { running: false, status: 'stopped', status_text: '' };
-            const shortRunning = shortBot.running || false;
+            let shortRunning = shortBot.running || false;
             const shortPriceAtActive = !!(shortPriceAt && shortPriceAt.target_price);
             const shortStatus = shortBot.status || (shortRunning ? 'running' : 'stopped');
-            const shortStatusClass = shortStatus;
-            const shortIndicatorClass = shortStatus;
+            let shortStatusClass = shortStatus;
+            let shortIndicatorClass = shortStatus;
+
+            const pendingStartActive =
+                pendingFixedCycleStart &&
+                (Date.now() - pendingFixedCycleStartAt < PENDING_FIXED_CYCLE_STATUS_MS);
+            if (pendingStartActive) {
+                longRunning = true;
+                shortRunning = true;
+                longStatusClass = 'running';
+                shortStatusClass = 'running';
+                longIndicatorClass = 'running';
+                shortIndicatorClass = 'running';
+                if (!longBot.status_text) {
+                    longBotDesc = 'Long Bot startet gerade (Status wird noch aktualisiert)';
+                }
+                if (!shortBot.status_text) {
+                    shortBotDesc = 'Short Bot startet gerade (Status wird noch aktualisiert)';
+                }
+            }
+            if (longRunning && shortRunning) {
+                pendingFixedCycleStart = false;
+            }
+            if (!pendingStartActive && pendingFixedCycleStart && Date.now() - pendingFixedCycleStartAt >= PENDING_FIXED_CYCLE_STATUS_MS) {
+                pendingFixedCycleStart = false;
+            }
             
             let shortBotButton = '';
             let shortBotDesc = shortBot.status_text || (shortRunning ? 'Short Bot läuft und wartet auf Positionen' : 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
@@ -4166,6 +4193,8 @@
                 removeToast(toastId);
                 if (data.success) {
                     showToast('success', 'Restart ausgelöst', data.message || 'Fixed Cycle wird neu gestartet.', 5000);
+                    pendingFixedCycleStart = true;
+                    pendingFixedCycleStartAt = Date.now();
                 } else {
                     showToast('error', 'Restart fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
                 }

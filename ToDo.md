@@ -83,9 +83,12 @@ Bitte starte danach nginx neu (z. B. sudo systemctl restart nginx oder den ent
 
 sudo systemctl restart dashboard.service
 
+exit fallback market
+reset state 
 
 
 
+8.36 10:34 1/05
 
 
 

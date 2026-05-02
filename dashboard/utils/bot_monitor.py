@@ -70,6 +70,47 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
     import logging
     logger = logging.getLogger(__name__)
     service_name = f'hedgebot-{bot_type}@{symbol}'
+    project_dir = _get_project_root()
+    pid_file = project_dir / "logs" / "fixed_cycle_bot.pid"
+    if pid_file.exists():
+        pid_valid = False
+        pid_cmdline = None
+        pid_value = None
+        try:
+            pid_raw = pid_file.read_text(encoding="utf-8").strip()
+            pid_value = int(pid_raw) if pid_raw.isdigit() else None
+        except Exception as exc:
+            logger.debug("Invalid PID file %s: %s", pid_file, exc)
+        if pid_value:
+            try:
+                if PSUTIL_AVAILABLE:
+                    proc = psutil.Process(pid_value)
+                    if proc.is_running():
+                        cmdline = proc.cmdline() or []
+                        pid_cmdline = " ".join(str(x) for x in cmdline)
+                        if any("fixed_cycle_hedge_bot.runner" in str(part) for part in cmdline):
+                            pid_valid = True
+                else:
+                    os.kill(pid_value, 0)
+                    pid_valid = True
+            except Exception as exc:
+                logger.debug("PID %s invalid: %s", pid_value, exc)
+        logger.debug(
+            "PID-file check: path=%s pid=%s valid=%s cmdline=%s",
+            pid_file,
+            pid_value,
+            pid_valid,
+            pid_cmdline,
+        )
+        if not pid_valid:
+            try:
+                pid_file.unlink(missing_ok=True)
+                logger.debug("Removed stale PID file %s", pid_file)
+            except Exception:
+                pass
+        else:
+            logger.debug("PID-file marks fixed-cycle bot as running (pid=%s)", pid_value)
+            return True
 
     # First try systemd service (with one retry after 1s to avoid false "stopped" after dashboard restart)
     for attempt in range(2):

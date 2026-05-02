@@ -68,13 +68,25 @@ function delete_state_files() {
 function cleanup_exchange() {
   local prev_dir
   local exit_code=0
+  local python_bin
+  local cleanup_cmd
+
   prev_dir="$(pwd)"
   cd "$SCRIPT_DIR" || return 1
   log_info "Running exchange cleanup (cancel-open orders)..."
-  if ! python -m fixed_cycle_hedge_bot.cleanup --config-file "$SCRIPT_DIR/fixed_cycle_hedge_bot/config/fixed_cycle_config.json"; then
+
+  python_bin="${BOT_CONTROL_PYTHON:-python}"
+  cleanup_cmd=("$python_bin" -m fixed_cycle_hedge_bot.cleanup --config-file "$SCRIPT_DIR/fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
+  if [[ -n "${BOT_CONTROL_CLEANUP_SYMBOL:-}" ]]; then
+    log_info "Cleanup symbol override: ${BOT_CONTROL_CLEANUP_SYMBOL}"
+    cleanup_cmd+=(--symbol "${BOT_CONTROL_CLEANUP_SYMBOL}")
+  fi
+
+  if ! "${cleanup_cmd[@]}"; then
     log_err "Exchange cleanup failed"
     exit_code=1
   fi
+
   cd "$prev_dir" >/dev/null || true
   return $exit_code
 }
@@ -97,6 +109,7 @@ case "$cmd" in
       log_err "Failed to stop bot; aborting hard reset."
       exit 1
     fi
+  rm -f "$SCRIPT_DIR/logs/fixed_cycle_bot.pid"
     cleanup_exchange
     delete_state_files
     exit 0

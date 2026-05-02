@@ -457,6 +457,7 @@ class GenericHedgeRuntime:
         managed_order = self.runtime_state.active_orders.get(client_id)
         if not managed_order:
             return
+        previous_status = managed_order.status
         managed_order.status = self._normalize_order_status(payload.get("orderStatus"), managed_order.status)
         managed_order.updated_at = utcnow()
         if managed_order.status in {"PARTIAL", "FILLED"}:
@@ -468,7 +469,42 @@ class GenericHedgeRuntime:
             self.strategy.on_order_update(payload, snapshot, self.runtime_state, self.context),
             snapshot,
         )
-        if managed_order.status in {"CANCELED", "REJECTED", "FILLED"}:
+        normalized_status = managed_order.status
+        if normalized_status in {"CANCELED", "REJECTED"}:
+            self.audit.log_event(
+                "ws_order_terminal_diagnostics",
+                strategy=self.strategy.name,
+                symbol=self.config.symbol,
+                category=self.config.category,
+                client_order_id=client_id,
+                exchange_order_id=order_id,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                managed_status_before=previous_status,
+                normalized_status=normalized_status,
+                raw_order_status=payload.get("orderStatus"),
+                cancel_type=payload.get("cancelType"),
+                reject_reason=payload.get("rejectReason"),
+                cancel_reason=payload.get("cancelReason"),
+                stop_order_type=payload.get("stopOrderType"),
+                order_type=payload.get("orderType"),
+                side_raw=payload.get("side"),
+                position_idx=payload.get("positionIdx"),
+                reduce_only=payload.get("reduceOnly"),
+                close_on_trigger=payload.get("closeOnTrigger"),
+                trigger_price=payload.get("triggerPrice"),
+                trigger_by=payload.get("triggerBy"),
+                trigger_direction=payload.get("triggerDirection"),
+                qty=payload.get("qty"),
+                cum_exec_qty=payload.get("cumExecQty"),
+                leaves_qty=payload.get("leavesQty"),
+                price=payload.get("price"),
+                avg_price=payload.get("avgPrice"),
+                created_time=payload.get("createdTime"),
+                updated_time=payload.get("updatedTime"),
+                full_payload=payload,
+            )
+        if normalized_status in {"CANCELED", "REJECTED", "FILLED"}:
             self._finalize_managed_order(client_id, managed_order)
         self._save_strategy_state()
 
@@ -1291,9 +1327,35 @@ class GenericHedgeRuntime:
         purposes_set = {purpose for purpose in purposes if purpose}
         if not purposes_set:
             return
+        snapshot = self.runtime_state.last_snapshot
+        long_qty = float(snapshot.long_qty or 0.0) if snapshot else 0.0
+        short_qty = float(snapshot.short_qty or 0.0) if snapshot else 0.0
         for client_id, order in list(self.runtime_state.active_orders.items()):
             if order.purpose not in purposes_set or order.status in {"FILLED", "CANCELED", "REJECTED"}:
                 continue
+            # CRITICAL EXIT PROTECTION GUARD
+            if order.purpose == self.strategy.SHORT_SL_EXIT_PURPOSE:
+                if long_qty <= 0.0 and short_qty > 0.0:
+                    self.audit.log_event(
+                        "cancel_blocked_protect_short_sl",
+                        strategy=self.strategy.name,
+                        client_order_id=client_id,
+                        reason="short_position_still_open",
+                        long_qty=long_qty,
+                        short_qty=short_qty,
+                    )
+                    continue
+            if order.purpose == self.strategy.LONG_TP_EXIT_PURPOSE:
+                if short_qty <= 0.0 and long_qty > 0.0:
+                    self.audit.log_event(
+                        "cancel_blocked_protect_long_tp",
+                        strategy=self.strategy.name,
+                        client_order_id=client_id,
+                        reason="long_position_still_open",
+                        long_qty=long_qty,
+                        short_qty=short_qty,
+                    )
+                    continue
             canceled = False
             if order.exchange_order_id:
                 canceled = self.order_manager.cancel_order(

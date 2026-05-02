@@ -54,6 +54,7 @@ class FixedCycleHedgeConfig:
     tp_profit_target_pct: float = 0.5
     tp_buffer_pct: float = 0.0  # optional extra buffer on top of BE+profit target
     fee_safety_buffer_pct: float = 0.14
+    order_fee_rate_pct: float = 0.055
     target_profit_usdt: float = 0.002
     net_realized_pnl_target: float = 0.0
 
@@ -244,6 +245,27 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["full_exit_reset_in_progress"] = False
         state["block_exit_rebuild_until_pnl_ready"] = False
         state["force_exit_rebuild"] = False
+        state["long_add_locked"] = False
+        state["long_add_pending"] = False
+        state["cycle_waiting_for_short_tp"] = False
+        state["short_tp_pending_cycle"] = 0
+        state["exit_locked"] = False
+        state["exit_rebuild_allowed"] = True
+        state["trailing_active"] = None
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
+        state["refill_long_filled"] = False
+        state["refill_short_filled"] = False
+        state["force_short_tp_rebuild"] = False
+        state["cycle_long_add_filled"] = False
+        state["cycle_short_tp_filled"] = False
+        state["cycle_pair_count"] = 0
+        state["cycle_completed_count"] = 0
+        state["current_long_cycle_index"] = 0
+        state["current_short_cycle_index"] = 0
+        state["current_effective_cycle"] = 0
+        state["pending_long_cycle_index"] = 0
+        state["pending_short_cycle_index"] = 0
         state["last_exit_signature"] = None
         state["last_fill_info"] = {}
         state["latest_break_even_price"] = 0.0
@@ -319,6 +341,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         self._reset_cycle_state(runtime_state)
         self._force_fresh_start_reset(runtime_state)
+        logger.info(
+            "fixed_cycle_restart_state_cleanup_complete %s",
+            {
+                "symbol": self.config.symbol,
+                "long_add_locked": state.get("long_add_locked"),
+                "long_add_pending": state.get("long_add_pending"),
+                "cycle_waiting_for_short_tp": state.get("cycle_waiting_for_short_tp"),
+                "short_tp_pending_cycle": state.get("short_tp_pending_cycle"),
+                "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
+                "exit_locked": state.get("exit_locked"),
+                "exit_rebuild_allowed": state.get("exit_rebuild_allowed"),
+                "trailing_active": state.get("trailing_active"),
+                "refill_pending": state.get("refill_pending"),
+                "refill_in_progress": state.get("refill_in_progress"),
+                "cycle_completed_count": state.get("cycle_completed_count"),
+                "cycle_pair_count": state.get("cycle_pair_count"),
+                "current_long_cycle_index": state.get("current_long_cycle_index"),
+                "current_short_cycle_index": state.get("current_short_cycle_index"),
+                "current_effective_cycle": state.get("current_effective_cycle"),
+                "cycle_state": state.get("cycle_state"),
+            },
+        )
 
         state["bot_state"] = self.STATE_INIT
         state["cycle_completed_count"] = 0
@@ -2577,14 +2621,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
-        long_tp_price = tp_price
-        short_sl_price = tp_price
         current_price = snapshot.current_price
         symbol, rules, source = self._resolve_instrument_rules(runtime_state)
         tick_decimal = rules["tick_size"] if rules and rules.get("tick_size", Decimal("0")) > 0 else Decimal(
             str(self.config.price_tick_size)
         )
         tick_size = float(tick_decimal)
+        long_tp_price = tp_price
+        short_sl_price = max(tp_price - tick_size, tick_size)
         logger.info(
             "exit_tick_size %s",
             {
@@ -2594,37 +2638,43 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "price_tick_config": self.config.price_tick_size,
             },
         )
-        if current_price > 0:
-            min_valid_trigger = current_price + tick_size
-            logger.info(
-                "exit_trigger_clamp %s",
-                {
-                    "symbol": symbol,
-                    "tp_price": tp_price,
-                    "min_valid_trigger": min_valid_trigger,
-                    "current_price": current_price,
-                    "tick_size": str(tick_decimal),
-                },
+        market_exit_mode = current_price >= tp_price
+        long_tp_valid = False
+        short_sl_valid = False
+        if not market_exit_mode:
+            if current_price > 0:
+                min_short_trigger = current_price + tick_size
+                min_long_trigger = current_price + (2 * tick_size)
+                logger.info(
+                    "exit_trigger_clamp %s",
+                    {
+                        "symbol": symbol,
+                        "tp_price": tp_price,
+                        "min_short_trigger": min_short_trigger,
+                        "min_long_trigger": min_long_trigger,
+                        "current_price": current_price,
+                    },
+                )
+                short_sl_price = max(short_sl_price, min_short_trigger)
+                long_tp_price = max(long_tp_price, short_sl_price + tick_size, min_long_trigger)
+                logger.info(
+                    "exit_trigger_result %s",
+                    {
+                        "symbol": symbol,
+                        "long_tp_price": long_tp_price,
+                        "short_sl_price": short_sl_price,
+                        "tp_price": tp_price,
+                        "current_price": current_price,
+                    },
+                )
+            long_tp_valid = (
+                current_price <= 0
+                or long_tp_price >= current_price + tick_size
             )
-            long_tp_price = max(long_tp_price, min_valid_trigger)
-            short_sl_price = max(short_sl_price, min_valid_trigger)
-            logger.info(
-                "exit_trigger_result %s",
-                {
-                    "symbol": symbol,
-                    "long_tp_price": long_tp_price,
-                    "short_sl_price": short_sl_price,
-                    "tp_price": tp_price,
-                },
+            short_sl_valid = (
+                current_price <= 0
+                or short_sl_price >= current_price + tick_size
             )
-        long_tp_valid = (
-            current_price <= 0
-            or long_tp_price >= current_price + tick_size
-        )
-        short_sl_valid = (
-            current_price <= 0
-            or short_sl_price >= current_price + tick_size
-        )
         signature = {
             "basket_tp_price": tp_price,
             "basket_break_even_price": break_even_price,
@@ -2692,82 +2742,130 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             metadata["cycle_index"] = cycle_idx
             return metadata
 
-        if long_tp_valid:
-            intents.append(
-                StrategyIntent(
-                    side="long",
-                    qty=snapshot.long_qty,
-                    purpose=self.LONG_TP_EXIT_PURPOSE,
-                    order_type="Market",
-                    reduce_only=True,
+        if market_exit_mode:
+            logger.info(
+                "basket_market_exit_immediate",
+                {
+                    "symbol": symbol,
+                    "current_price": current_price,
+                    "tp_price": tp_price,
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                },
+            )
+            if snapshot.long_qty > 0:
+                intents.append(
+                    StrategyIntent(
+                        side="long",
+                        qty=snapshot.long_qty,
+                        purpose=self.LONG_TP_EXIT_PURPOSE,
+                        order_type="Market",
+                        reduce_only=True,
+                        trigger_price=None,
+                        trigger_direction=None,
+                        trigger_by=None,
+                        close_on_trigger=None,
+                        position_idx=1,
+                        metadata=build_metadata(
+                            self.LONG_TP_EXIT_PURPOSE, "basket_market_long_exit"
+                        ),
+                    )
+                )
+            if snapshot.short_qty > 0:
+                intents.append(
+                    StrategyIntent(
+                        side="short",
+                        qty=snapshot.short_qty,
+                        purpose=self.SHORT_SL_EXIT_PURPOSE,
+                        order_type="Market",
+                        reduce_only=True,
+                        trigger_price=None,
+                        trigger_direction=None,
+                        trigger_by=None,
+                        close_on_trigger=None,
+                        position_idx=2,
+                        metadata=build_metadata(
+                            self.SHORT_SL_EXIT_PURPOSE, "basket_market_short_exit"
+                        ),
+                    )
+                )
+        else:
+            if long_tp_valid:
+                intents.append(
+                    StrategyIntent(
+                        side="long",
+                        qty=snapshot.long_qty,
+                        purpose=self.LONG_TP_EXIT_PURPOSE,
+                        order_type="Market",
+                        reduce_only=True,
+                        trigger_price=long_tp_price,
+                        trigger_direction=1,
+                        trigger_by="LastPrice",
+                        close_on_trigger=True,
+                        position_idx=1,
+                        metadata=build_metadata(self.LONG_TP_EXIT_PURPOSE, "long_tp"),
+                    )
+                )
+                _audit_calc(
+                    "exit_order_plan_calc",
+                    {
+                        "purpose": self.LONG_TP_EXIT_PURPOSE,
+                        "side": "long",
+                        "qty": snapshot.long_qty,
+                        "trigger_price": long_tp_price,
+                        "expected_profit_or_loss": (long_tp_price - break_even_price) * snapshot.long_qty,
+                        "cycle_index": cycle_idx,
+                        "cycle_role": "long_exit",
+                        "break_even_price": break_even_price,
+                    },
+                )
+            else:
+                context.audit.log_event(
+                    "fixed_cycle_exit_skip",
+                    strategy=self.name,
+                    skip_reason="long_trigger_not_far_enough_from_market",
+                    current_price=current_price,
                     trigger_price=long_tp_price,
-                    trigger_direction=1,
-                    trigger_by="LastPrice",
-                    close_on_trigger=True,
-                    position_idx=1,
-                    metadata=build_metadata(self.LONG_TP_EXIT_PURPOSE, "long_tp"),
+                    tick_size=tick_size,
                 )
-            )
-            _audit_calc(
-                "exit_order_plan_calc",
-                {
-                    "purpose": self.LONG_TP_EXIT_PURPOSE,
-                    "side": "long",
-                    "qty": snapshot.long_qty,
-                    "trigger_price": long_tp_price,
-                    "expected_profit_or_loss": (long_tp_price - break_even_price) * snapshot.long_qty,
-                    "cycle_index": cycle_idx,
-                    "cycle_role": "long_exit",
-                    "break_even_price": break_even_price,
-                },
-            )
-        else:
-            context.audit.log_event(
-                "fixed_cycle_exit_skip",
-                strategy=self.name,
-                skip_reason="long_trigger_not_far_enough_from_market",
-                current_price=current_price,
-                trigger_price=long_tp_price,
-                tick_size=tick_size,
-            )
-        if short_sl_valid:
-            intents.append(
-                StrategyIntent(
-                    side="short",
-                    qty=snapshot.short_qty,
-                    purpose=self.SHORT_SL_EXIT_PURPOSE,
-                    order_type="Market",
-                    reduce_only=True,
+            if short_sl_valid:
+                intents.append(
+                    StrategyIntent(
+                        side="short",
+                        qty=snapshot.short_qty,
+                        purpose=self.SHORT_SL_EXIT_PURPOSE,
+                        order_type="Market",
+                        reduce_only=True,
+                        trigger_price=short_sl_price,
+                        trigger_direction=1,
+                        trigger_by="LastPrice",
+                        close_on_trigger=True,
+                        position_idx=2,
+                        metadata=build_metadata(self.SHORT_SL_EXIT_PURPOSE, "short_sl"),
+                    )
+                )
+                _audit_calc(
+                    "exit_order_plan_calc",
+                    {
+                        "purpose": self.SHORT_SL_EXIT_PURPOSE,
+                        "side": "short",
+                        "qty": snapshot.short_qty,
+                        "trigger_price": short_sl_price,
+                        "expected_profit_or_loss": (short_sl_price - break_even_price) * snapshot.short_qty,
+                        "cycle_index": cycle_idx,
+                        "cycle_role": "short_exit",
+                        "break_even_price": break_even_price,
+                    },
+                )
+            else:
+                context.audit.log_event(
+                    "fixed_cycle_exit_skip",
+                    strategy=self.name,
+                    skip_reason="short_trigger_not_far_enough_from_market",
+                    current_price=current_price,
                     trigger_price=short_sl_price,
-                    trigger_direction=1,
-                    trigger_by="LastPrice",
-                    close_on_trigger=True,
-                    position_idx=2,
-                    metadata=build_metadata(self.SHORT_SL_EXIT_PURPOSE, "short_sl"),
+                    tick_size=tick_size,
                 )
-            )
-            _audit_calc(
-                "exit_order_plan_calc",
-                {
-                    "purpose": self.SHORT_SL_EXIT_PURPOSE,
-                    "side": "short",
-                    "qty": snapshot.short_qty,
-                    "trigger_price": short_sl_price,
-                    "expected_profit_or_loss": (short_sl_price - break_even_price) * snapshot.short_qty,
-                    "cycle_index": cycle_idx,
-                    "cycle_role": "short_exit",
-                    "break_even_price": break_even_price,
-                },
-            )
-        else:
-            context.audit.log_event(
-                "fixed_cycle_exit_skip",
-                strategy=self.name,
-                skip_reason="short_trigger_not_far_enough_from_market",
-                current_price=current_price,
-                trigger_price=short_sl_price,
-                tick_size=tick_size,
-            )
 
         if not intents:
             return intents
@@ -2912,26 +3010,50 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             tp_buffer_pct=float(self.config.tp_buffer_pct or 0.0),
             realized_cycle_net=realized_cycle_net,
         )
-        tp_price = self._normalize_price(components.exit_price, runtime_state)
+        fee_rate = max(float(self.config.order_fee_rate_pct or 0.0), 0.0) / 100.0
+        long_notional = snapshot_long_avg * snapshot_long_qty
+        short_notional = snapshot_short_avg * snapshot_short_qty
+        entry_fee_usdt = fee_rate * (long_notional + short_notional)
+        close_fee_denominator = components.net_qty - fee_rate * (snapshot_long_qty + snapshot_short_qty)
+        fee_adjusted_exit_price = components.exit_price
+        if fee_rate > 0 and close_fee_denominator > 1e-12:
+            fee_adjusted_exit_price = (
+                long_notional
+                - short_notional
+                + components.required_profit_usdt
+                + entry_fee_usdt
+            ) / close_fee_denominator
+        tp_price = self._normalize_price(fee_adjusted_exit_price, runtime_state)
         long_profit_at_exit = (tp_price - snapshot_long_avg) * snapshot_long_qty
         short_loss_at_exit = (tp_price - snapshot_short_avg) * snapshot_short_qty
         open_hedge_net_at_exit = long_profit_at_exit - short_loss_at_exit
-        expected_total_net_after_exit = open_hedge_net_at_exit + components.realized_cycle_net
+        close_fee_usdt = fee_rate * tp_price * (snapshot_long_qty + snapshot_short_qty)
+        total_fee_adjustment_usdt = entry_fee_usdt + close_fee_usdt
+        open_hedge_net_after_fees = open_hedge_net_at_exit - total_fee_adjustment_usdt
+        expected_total_net_after_exit = open_hedge_net_after_fees + components.realized_cycle_net
         target_total_profit_usdt = components.target_profit_usdt + components.buffer_usdt
         target_delta_usdt = expected_total_net_after_exit - target_total_profit_usdt
         logger.info(
             "fixed_cycle_tp_components %s",
             {
                 "break_even_price": break_even_price,
+                "fee_rate": fee_rate,
+                "order_fee_rate_pct": float(self.config.order_fee_rate_pct or 0.0),
                 "profit_basis_usdt": components.profit_basis_usdt,
                 "target_profit_usdt": components.target_profit_usdt,
                 "buffer_usdt": components.buffer_usdt,
                 "realized_cycle_net": components.realized_cycle_net,
                 "required_profit_usdt": components.required_profit_usdt,
                 "net_qty": components.net_qty,
+                "entry_fee_usdt": entry_fee_usdt,
+                "close_fee_usdt": close_fee_usdt,
+                "total_fee_adjustment_usdt": total_fee_adjustment_usdt,
+                "fee_adjusted_exit_price": fee_adjusted_exit_price,
+                "raw_exit_price_without_fees": components.exit_price,
                 "long_profit_at_exit": long_profit_at_exit,
                 "short_loss_at_exit": short_loss_at_exit,
                 "open_hedge_net_at_exit": open_hedge_net_at_exit,
+                "open_hedge_net_after_fees": open_hedge_net_after_fees,
                 "expected_total_net_after_exit": expected_total_net_after_exit,
                 "target_total_profit_usdt": target_total_profit_usdt,
                 "target_delta_usdt": target_delta_usdt,
@@ -3352,6 +3474,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             _emit_analyzer_event(logger, "analyzer_block_closed", payload)
             state["block_closed_marker_emitted"] = True
             self._reset_cycle_state(runtime_state)
+            runtime_state.realized_long_pnl_total = 0.0
+            runtime_state.realized_short_pnl_total = 0.0
+            logger.info(
+                "fixed_cycle_full_exit_runtime_pnl_reset %s",
+                {
+                    "symbol": self.config.symbol,
+                    "realized_long_pnl_total": runtime_state.realized_long_pnl_total,
+                    "realized_short_pnl_total": runtime_state.realized_short_pnl_total,
+                    "fresh_restart_required": True,
+                    "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
+                },
+            )
             state["fresh_restart_required"] = True
             state["initial_entry_confirmed"] = False
             state["initial_entry_submitted"] = False
@@ -5019,6 +5153,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _reset_cycle_state(self, runtime_state: RuntimeState) -> dict:
         state = runtime_state.strategy_state
         cycle_state = self._default_cycle_state()
+        cycle_state["trade_active"] = False
+        cycle_state["long_add_pending"] = False
+        cycle_state["cycle_waiting_for_short_tp"] = False
+        cycle_state["short_tp_pending_cycle"] = 0
+        cycle_state["pending_loss_exit_old_signature"] = None
+        cycle_state["pending_loss_exit_rebuild_reason"] = None
         state["cycle_state"] = cycle_state
         state["current_long_cycle_index"] = 0
         state["current_short_cycle_index"] = 0
