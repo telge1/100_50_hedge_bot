@@ -1,5 +1,5 @@
 {
-  "symbol": "SOLVUSDT",
+  "symbol": "KNCUSDT",
   "category": "linear",
   "dynamic_symbol_enabled": true,
   "best_coin_file": "logs/best_coin.json",
@@ -42,6 +42,8 @@
   "trailing_stop_dist": 0.0025,
   "short_tp_fallback_activation_drop_pct": 0.005,
   "short_tp_fallback_stop_offset_pct": 0.0025,
+  
+  "short_tp_min_threshold_pct_after_long_reduce": 0.01,
 
 
   "qty_step": 0.001,

@@ -76,6 +76,7 @@ class FixedCycleHedgeConfig:
     trailing_stop_dist: float = 0.003
     short_tp_fallback_activation_drop_pct: float = 0.001
     short_tp_fallback_stop_offset_pct: float = 0.0025
+    short_tp_min_threshold_pct_after_long_reduce: float = 0.006
     fallback_stale_seconds: float = 8.0
     qty_step: float = 0.001
     min_order_qty: float = 0.001
@@ -2353,6 +2354,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             i += 1
 
         raw_trigger_price = max(tp_price, price_tick_size)
+        long_avg = float(snapshot.long_avg or 0.0)
+        min_threshold_pct = float(self.config.short_tp_min_threshold_pct_after_long_reduce or 0.0)
+        original_trigger_price_raw = raw_trigger_price
+        safe_short_tp_price = None
+        short_tp_guard_applied = False
+
+        if (
+            raw_trigger_price is not None
+            and raw_trigger_price > 0
+            and long_avg > 0
+            and min_threshold_pct > 0
+        ):
+            safe_short_tp_price = long_avg * (1 - min_threshold_pct)
+
+            if raw_trigger_price > safe_short_tp_price:
+                raw_trigger_price = safe_short_tp_price
+                short_tp_guard_applied = True
+                logger.info(
+                    "short_tp_min_threshold_guard_applied %s",
+                    {
+                        "cycle_index": cycle_index,
+                        "long_avg": long_avg,
+                        "short_avg": float(snapshot.short_avg or 0.0),
+                        "current_price": float(snapshot.current_price or 0.0),
+                        "original_trigger_price_raw": original_trigger_price_raw,
+                        "safe_short_tp_price": safe_short_tp_price,
+                        "final_trigger_price_raw": raw_trigger_price,
+                        "min_threshold_pct": min_threshold_pct,
+                        "short_qty": short_qty,
+                        "reason": "short_tp_after_long_reduce_too_close_to_long_avg",
+                    },
+                )
+
         trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
         state["last_expected_short_tp_net"] = required_net
         state["last_short_tp_trigger_price"] = trigger_price
@@ -2428,6 +2462,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "required_net_profit": required_net,
                 "trigger_price": trigger_price,
                 "short_qty": short_qty,
+                "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
+                "short_tp_guard_long_avg": long_avg,
+                "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
+                "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
+                "short_tp_guard_applied": short_tp_guard_applied,
             },
         )
         context.audit.log_event(
@@ -2462,6 +2501,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
             qty_raw=snapshot.short_qty * self._pct(effective_reduction_pct),
             qty_normalized=short_qty,
+            short_tp_min_threshold_pct_after_long_reduce=min_threshold_pct,
+            short_tp_guard_long_avg=long_avg,
+            short_tp_guard_original_trigger_price_raw=original_trigger_price_raw,
+            short_tp_guard_safe_short_tp_price=safe_short_tp_price,
+            short_tp_guard_applied=short_tp_guard_applied,
             order_type="Limit",
             reduce_only=True,
         )
@@ -2481,6 +2525,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "fee_rate": fee_rate,
                 "trigger_price": trigger_price,
                 "raw_trigger_price": raw_trigger_price,
+                "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
+                "short_tp_guard_long_avg": long_avg,
+                "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
+                "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
+                "short_tp_guard_applied": short_tp_guard_applied,
                 "break_even_price": float(state.get("latest_break_even_price") or 0.0),
                 "expected_short_tp_net": required_net,
                 "pending_cycle_loss_usdt_before": pending_before,
