@@ -8,10 +8,15 @@ PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 echo "Running hard reset..."
 cd "${PROJECT_ROOT}" || exit 1
 
-./bot_control.sh hard-reset
+BOT_CONTROL_PYTHON="${PYTHON}" ./bot_control.sh hard-reset
 RESET_CODE=$?
 
 echo "hard-reset exit code: ${RESET_CODE}"
+
+if [[ "${RESET_CODE}" -ne 0 ]]; then
+  echo "[ERROR] hard-reset failed (exit_code=${RESET_CODE}); aborting restart." >&2
+  exit 1
+fi
 
 echo "Cleaning log files..."
 rm -vf \

@@ -6944,21 +6944,22 @@ async def api_pre_flight_check(user: dict = Depends(require_auth)):
 
 @app.get("/api/system/processes")
 async def api_get_system_processes(user: dict = Depends(require_auth)):
-    """Laufende Prozesse (ps aux), gefiltert nach .py – wie ps aux | grep .py"""
+    """Laufende Prozesse wie im Terminal: `ps aux | grep .py` (inkl. grep selbst)."""
     try:
+        # Use bash -lc so the pipeline behaves exactly like in an interactive shell.
         result = subprocess.run(
-            ["ps", "aux"],
+            ["bash", "-lc", "ps aux | grep .py"],
             capture_output=True,
             text=True,
             timeout=10,
         )
-        if result.returncode != 0 and result.stderr:
-            return {"success": False, "error": result.stderr.strip(), "output": ""}
-        lines = (result.stdout or "").strip().splitlines()
-        # Erste Zeile = Header beibehalten, Rest: nur Zeilen die .py enthalten (ohne grep selbst)
-        header = lines[0] if lines else ""
-        filtered = [line for line in lines[1:] if ".py" in line] if len(lines) > 1 else []
-        output = header + "\n" + "\n".join(filtered) if filtered else header + "\n(keine Python-Prozesse)"
+        if result.returncode not in (0, 1):
+            # grep returns 1 when no matches; that's not an error for us.
+            err = (result.stderr or "").strip() or f"exit_code={result.returncode}"
+            return {"success": False, "error": err, "output": ""}
+        output = (result.stdout or "").rstrip("\n")
+        if not output.strip():
+            output = "(keine Treffer für: ps aux | grep .py)"
         return {"success": True, "output": output}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Timeout (ps aux)", "output": ""}

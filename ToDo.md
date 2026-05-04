@@ -166,3 +166,10 @@ python -m py_compile fixed_cycle_hedge_bot/fixed_cycle_strategy.py
 - Kein sofortiger short_tp_invalid mehr
 - Kein dauerhafter trailing_short_reduce Loop
 - Stabilere Cycles auch bei Slippage / kleinen Losses
+
+100 0.15
+1000 1.50 = 1000/10= 100
+10.000 15   10000/10 =1000
+100.000 150
+
+8.09

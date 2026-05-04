@@ -4,6 +4,7 @@ import json
 import math
 import time
 import logging
+import subprocess
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
@@ -649,6 +650,42 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return []
             if not self._dynamic_symbol_entry_gate_allows_entry(runtime_state, context, "fresh_restart"):
                 return []
+            best_coin = self._load_best_coin_symbol_from_file(
+                self.config.best_coin_file or "logs/best_coin.json"
+            )
+            desired_symbol = (
+                best_coin["symbol"].upper() if best_coin and best_coin.get("symbol") else None
+            )
+            current_config_symbol = str(self.config.symbol or "").upper()
+            snapshot_symbol = str(snapshot.symbol or "").upper()
+            restart_requested = bool(state.get("restart_requested_after_full_exit"))
+            if (
+                desired_symbol
+                and snapshot_symbol
+                and desired_symbol != current_config_symbol
+                and desired_symbol != snapshot_symbol
+                and not restart_requested
+            ):
+                active_snapshot_order_purposes = [
+                    getattr(order, "purpose", None) or getattr(order, "client_order_id", None)
+                    for order in snapshot.active_orders
+                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                ]
+                active_runtime_order_purposes = [
+                    getattr(order, "purpose", None) or getattr(order, "client_order_id", None)
+                    for order in runtime_state.active_orders.values()
+                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                ]
+                if self._trigger_restart_script_after_full_exit(
+                    snapshot,
+                    runtime_state,
+                    context,
+                    desired_symbol,
+                    active_snapshot_order_purposes,
+                    active_runtime_order_purposes,
+                    reason="full_exit_flat_symbol_changed",
+                ):
+                    return []
             self._maybe_update_symbol_from_best_coin(runtime_state, context, "fresh_restart")
             state["full_exit_reset_in_progress"] = True
             try:
@@ -4983,6 +5020,58 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "age_minutes": age_minutes,
             "reason": reason,
         }
+
+    def _trigger_restart_script_after_full_exit(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext | None,
+        desired_symbol: str,
+        active_snapshot_order_purposes: list[str],
+        active_runtime_order_purposes: list[str],
+        *,
+        reason: str,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        if state.get("restart_requested_after_full_exit"):
+            return False
+        current_symbol = str(self.config.symbol or "").upper()
+        snapshot_symbol = str(snapshot.symbol or "").upper()
+        script_path = Path(__file__).resolve().parents[1] / "scripts" / "restart_fixed_cycle.sh"
+        payload = {
+            "current_config_symbol": current_symbol,
+            "snapshot_symbol": snapshot_symbol,
+            "desired_symbol": desired_symbol,
+            "reason": reason,
+            "long_qty": snapshot.long_qty,
+            "short_qty": snapshot.short_qty,
+            "active_snapshot_order_purposes": active_snapshot_order_purposes,
+            "active_runtime_order_purposes": active_runtime_order_purposes,
+            "restart_script": str(script_path),
+        }
+        state["pending_dynamic_symbol"] = desired_symbol
+        state["dynamic_symbol_restart_required"] = True
+        state["restart_requested_after_full_exit"] = desired_symbol
+        _log_event("dynamic_symbol_restart_script_requested", payload)
+        if not script_path.exists():
+            _log_warning_event(
+                "dynamic_symbol_restart_script_missing",
+                {**payload, "message": "restart script missing"},
+            )
+            return False
+        try:
+            subprocess.Popen([str(script_path)], cwd=str(script_path.parent.parent))
+            _log_event(
+                "dynamic_symbol_restart_script_spawned",
+                {**payload, "message": "restart script spawn requested"},
+            )
+            return True
+        except Exception as exc:
+            _log_warning_event(
+                "dynamic_symbol_restart_script_failed",
+                {**payload, "error": str(exc)},
+            )
+            return False
 
     def _compute_next_dynamic_scan_ready_at(self, now: datetime) -> datetime:
         base = now.replace(second=0, microsecond=0)

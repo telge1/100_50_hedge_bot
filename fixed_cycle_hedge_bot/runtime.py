@@ -84,6 +84,51 @@ class GenericHedgeRuntime:
         self._max_leverage_ready_symbols: set[tuple[str, str]] = set()
         self._trailing_fallback = TrailingFallbackManager()
 
+    def _should_log_idle_event(
+        self,
+        event_key: str,
+        payload: dict[str, Any],
+        interval_seconds: float = 60.0,
+    ) -> bool:
+        cache = getattr(self, "_idle_log_cache", None)
+        if cache is None:
+            cache = {}
+            setattr(self, "_idle_log_cache", cache)
+        try:
+            signature = json.dumps(payload, sort_keys=True, default=str)
+        except Exception:
+            signature = repr(payload)
+        now = time.time()
+        last = cache.get(event_key)
+        if (
+            last is None
+            or last.get("signature") != signature
+            or (now - float(last.get("timestamp", 0.0))) >= interval_seconds
+        ):
+            cache[event_key] = {"signature": signature, "timestamp": now}
+            return True
+        return False
+
+    @staticmethod
+    def _snapshot_idle_summary(snapshot: HedgeSnapshot) -> dict[str, Any]:
+        active_orders = [
+            {
+                "purpose": getattr(order, "purpose", None),
+                "status": getattr(order, "status", None),
+            }
+            for order in snapshot.active_orders
+            if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+        ]
+        return {
+            "symbol": snapshot.symbol,
+            "long_qty": snapshot.long_qty,
+            "short_qty": snapshot.short_qty,
+            "long_avg": snapshot.long_avg,
+            "short_avg": snapshot.short_avg,
+            "active_order_count": len(active_orders),
+            "active_orders": active_orders,
+        }
+
     def bootstrap(self) -> HedgeSnapshot:
         self._load_strategy_state()
         if self.config.ensure_exchange_ready:
@@ -223,13 +268,24 @@ class GenericHedgeRuntime:
             source=source,
         )
         self.runtime_state.last_snapshot = snapshot
-        self.audit.log_event(
-            "snapshot_refreshed",
-            strategy=self.strategy.name,
-            source=source,
-            symbol=self.config.symbol,
-            snapshot=snapshot,
-        )
+        should_log_snapshot = True
+        if source in {"tick", "reconcile"}:
+            idle_payload = {
+                "source": source,
+                **self._snapshot_idle_summary(snapshot),
+            }
+            should_log_snapshot = self._should_log_idle_event(
+                f"snapshot_refreshed:{source}",
+                idle_payload,
+            )
+        if should_log_snapshot or source not in {"tick", "reconcile"}:
+            self.audit.log_event(
+                "snapshot_refreshed",
+                strategy=self.strategy.name,
+                source=source,
+                symbol=self.config.symbol,
+                snapshot=snapshot,
+            )
         return snapshot
 
     def _fetch_exchange_position_mapping(self, source: str) -> dict[str, float]:
@@ -547,18 +603,29 @@ class GenericHedgeRuntime:
     def _dispatch(self, source: str, intents: list[StrategyIntent], snapshot: HedgeSnapshot) -> None:
         strategy_state = self.runtime_state.strategy_state
         if not intents:
-            self.audit.log_event(
-                "strategy_noop",
-                strategy=self.strategy.name,
-                source=source,
-                snapshot=snapshot,
-                initial_entry_confirmed=bool(strategy_state.get("initial_entry_confirmed")),
-                current_long_cycle_index=int(strategy_state.get("current_long_cycle_index") or 0),
-                current_short_cycle_index=int(strategy_state.get("current_short_cycle_index") or 0),
-                current_effective_cycle=int(strategy_state.get("current_effective_cycle") or 0),
-                cycle_waiting_for_short_tp=bool(strategy_state.get("cycle_waiting_for_short_tp")),
-                pending_long_cycle_index=int(strategy_state.get("pending_long_cycle_index") or 0),
-            )
+            noop_payload = {
+                "source": source,
+                "initial_entry_confirmed": bool(strategy_state.get("initial_entry_confirmed")),
+                "current_long_cycle_index": int(strategy_state.get("current_long_cycle_index") or 0),
+                "current_short_cycle_index": int(strategy_state.get("current_short_cycle_index") or 0),
+                "current_effective_cycle": int(strategy_state.get("current_effective_cycle") or 0),
+                "cycle_waiting_for_short_tp": bool(strategy_state.get("cycle_waiting_for_short_tp")),
+                "pending_long_cycle_index": int(strategy_state.get("pending_long_cycle_index") or 0),
+                **self._snapshot_idle_summary(snapshot),
+            }
+            if self._should_log_idle_event("strategy_noop", noop_payload):
+                self.audit.log_event(
+                    "strategy_noop",
+                    strategy=self.strategy.name,
+                    source=source,
+                    snapshot=snapshot,
+                    initial_entry_confirmed=bool(strategy_state.get("initial_entry_confirmed")),
+                    current_long_cycle_index=int(strategy_state.get("current_long_cycle_index") or 0),
+                    current_short_cycle_index=int(strategy_state.get("current_short_cycle_index") or 0),
+                    current_effective_cycle=int(strategy_state.get("current_effective_cycle") or 0),
+                    cycle_waiting_for_short_tp=bool(strategy_state.get("cycle_waiting_for_short_tp")),
+                    pending_long_cycle_index=int(strategy_state.get("pending_long_cycle_index") or 0),
+                )
             return
         entry_purposes = {self.strategy.LONG_ENTRY_PURPOSE, self.strategy.SHORT_ENTRY_PURPOSE}
         entry_intents = [intent for intent in intents if intent.purpose in entry_purposes]
@@ -620,19 +687,37 @@ class GenericHedgeRuntime:
         self._ensure_max_leverage_before_trading()
         equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
         decision = "reuse" if reason.startswith("match") else "replace"
-        self.audit.log_event(
-            "intent_equivalence_check",
-            strategy=self.strategy.name,
-            purpose=intent.purpose,
-            side=intent.side,
-            candidate_client_order_id=candidate_id,
-            result=decision,
-            reject_reason=reason,
-            existing_trigger_price=existing_trigger,
-            existing_qty=existing_qty,
-            new_trigger_price=intent.trigger_price,
-            new_qty=intent.qty,
-        )
+        equivalence_check_payload = {
+            "purpose": intent.purpose,
+            "side": intent.side,
+            "result": decision,
+            "reject_reason": reason,
+            "candidate_client_order_id": candidate_id,
+            "existing_trigger_price": existing_trigger,
+            "existing_qty": existing_qty,
+            "new_trigger_price": intent.trigger_price,
+            "new_qty": intent.qty,
+        }
+        should_log_equivalence_check = True
+        if reason == "no_candidate":
+            should_log_equivalence_check = self._should_log_idle_event(
+                "intent_equivalence_check:no_candidate",
+                equivalence_check_payload,
+            )
+        if should_log_equivalence_check:
+            self.audit.log_event(
+                "intent_equivalence_check",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                candidate_client_order_id=candidate_id,
+                result=decision,
+                reject_reason=reason,
+                existing_trigger_price=existing_trigger,
+                existing_qty=existing_qty,
+                new_trigger_price=intent.trigger_price,
+                new_qty=intent.qty,
+            )
         self.audit.log_event(
             "intent_replace_decision",
             strategy=self.strategy.name,
@@ -1243,14 +1328,27 @@ class GenericHedgeRuntime:
                 continue
             return order, "match", last_candidate_id, existing_trigger, existing_qty
         final_reason = last_reason if candidate_count > 0 else "no_candidate"
-        self.audit.log_event(
-            "intent_equivalence_summary",
-            strategy=self.strategy.name,
-            purpose=intent.purpose,
-            total_candidates=candidate_count,
-            rejected_candidates=rejected_count,
-            final_reason=final_reason,
-        )
+        equivalence_summary_payload = {
+            "purpose": intent.purpose,
+            "total_candidates": candidate_count,
+            "rejected_candidates": rejected_count,
+            "final_reason": final_reason,
+        }
+        should_log_equivalence_summary = True
+        if final_reason == "no_candidate":
+            should_log_equivalence_summary = self._should_log_idle_event(
+                "intent_equivalence_summary:no_candidate",
+                equivalence_summary_payload,
+            )
+        if should_log_equivalence_summary:
+            self.audit.log_event(
+                "intent_equivalence_summary",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                total_candidates=candidate_count,
+                rejected_candidates=rejected_count,
+                final_reason=final_reason,
+            )
         return None, final_reason, last_candidate_id, last_trigger, last_qty
 
     def _ensure_max_leverage_before_trading(self) -> None:

@@ -10,6 +10,7 @@ cd "${PROJECT_ROOT}"
 nohup "${PYTHON}" -m fixed_cycle_hedge_bot.runner \
   --strategy fixed_cycle \
   --strategy-config-file fixed_cycle_hedge_bot/config/fixed_cycle_config.json \
+  --strategy-state-file logs/fixed_cycle_state.json \
   --audit-log-file logs/generic_hedge_runtime_audit.jsonl \
   > logs/fixed_cycle_runner.stdout.log 2>&1 &
 PID=$!
