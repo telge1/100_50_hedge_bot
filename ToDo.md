@@ -91,85 +91,14 @@ reset state
 8.36 10:34 1/05
 
 
+6.62 12:23
 
-############################## Funding Rate long add profit short tp min 0.8% #####################################
 
-Füge eine minimale Distanz-Guard für Short-TP-Follow-Up ein, ohne die Exit-Logik zu beeinflussen.
-
-Ziel:
-Verhindern, dass CYCLE_X_SHORT_REDUCE (Short-TP nach Long-Reduce) zu nah am aktuellen Preis gesetzt wird und dadurch sofort invalid/fallback wird.
-
-WICHTIG:
-Diese Änderung darf NUR für Short-TP-Follow-Up gelten.
-Exit Orders (LONG_TP_EXIT, SHORT_SL_EXIT) dürfen NICHT verändert werden.
-
-1. Config erweitern:
-
-fixed_cycle_config.json:
-"short_tp_min_distance_pct_after_long_reduce": 0.008
-
-Dataclass:
-short_tp_min_distance_pct_after_long_reduce: float = 0.008
-
-2. Code-Anpassung:
-
-Datei:
-fixed_cycle_hedge_bot/fixed_cycle_strategy.py
-
-Funktion:
-_build_short_tp_follow_up
-
-Direkt nach Berechnung von trigger_price_raw:
-
-Füge ein:
-
-current_price = snapshot.current_price
-
-min_distance_pct = config.short_tp_min_distance_pct_after_long_reduce
-safe_trigger_price = current_price * (1 - min_distance_pct)
-
-original_trigger_price = trigger_price_raw
-
-if trigger_price_raw is not None:
-    trigger_price_raw = min(trigger_price_raw, safe_trigger_price)
-
-Danach normal weiter mit Normalisierung (tick_size).
-
-3. Logging hinzufügen:
-
-Event:
-"short_tp_min_distance_guard_applied"
-
-Felder:
-- current_price
-- original_trigger_price
-- safe_trigger_price
-- final_trigger_price
-- min_distance_pct
-- cycle_index
-- short_qty
-
-4. WICHTIG:
-
-NICHT ändern:
-- _build_exit_intents
-- LONG_TP_EXIT
-- SHORT_SL_EXIT
-- break-even / exit calculation
-
-5. Test:
-
-python -m py_compile fixed_cycle_hedge_bot/fixed_cycle_strategy.py
-
-6. Erwartetes Verhalten:
-
-- Kein sofortiger short_tp_invalid mehr
-- Kein dauerhafter trailing_short_reduce Loop
-- Stabilere Cycles auch bei Slippage / kleinen Losses
 
 100 0.15
 1000 1.50 = 1000/10= 100
 10.000 15   10000/10 =1000
 100.000 150
 
-8.09
+ Wie kann das Dashboard später darauf zugreifen?
+Das Dashboard kann den Inhalt von logs/fixed_cycle_state.json (bzw. die vom Runtime gespeicherten strategy_state-Daten) lesen und dort last_trade_pnl_usdt, last_trade_pnl_breakdown etc. auslesen. Alternativ kann ein API-Endpunkt diese Felder spiegeln, sobald der Helper sie gesetzt hat.

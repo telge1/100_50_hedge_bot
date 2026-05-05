@@ -2,11 +2,12 @@ import logging
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
 from fixed_cycle_hedge_bot.fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
-from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot
+from fixed_cycle_hedge_bot.models import ActiveOrderSnapshot, FillEvent, HedgeSnapshot, ManagedOrder
 from fixed_cycle_hedge_bot.runtime import GenericHedgeRuntime, GenericRuntimeConfig
 
 
@@ -22,6 +23,7 @@ class FakeOrderManager:
         self.order_histories = {}
         self.leverage_calls = []
         self.ensure_max_leverage_calls = []
+        self.cancel_all_orders_calls = []
 
     def normalize_qty(self, symbol: str, qty: float, category: str) -> float:
         return qty
@@ -71,7 +73,19 @@ class FakeOrderManager:
         self.cancel_calls.append({"order_id": order_id, "symbol": symbol, "category": category})
         return True
 
-    def get_cached_instrument_rules(self, symbol: str, category: str = "linear") -> dict[str, float]:
+    def cancel_all_orders(self, *, symbol: str, category: str = "linear") -> bool:
+        self.cancel_all_orders_calls.append({"symbol": symbol, "category": category})
+        return True
+
+    def get_cached_instrument_rules(self, symbol: str, category: str = "linear") -> dict[str, Decimal]:
+        if symbol and symbol.upper() == "BTCUSDT":
+            return {
+                "tick_size": Decimal("0.01"),
+                "qty_step": Decimal("0.01"),
+                "min_order_qty": Decimal("0.01"),
+                "min_notional_value": Decimal("5"),
+                "min_notional": Decimal("5"),
+            }
         return {}
 
     def ensure_hedge_mode(self, symbol: str, category: str = "linear") -> bool:
@@ -130,7 +144,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
                 long_fill_distance_pct=0.15,
             )
         )
-        return GenericHedgeRuntime(
+        runtime = GenericHedgeRuntime(
             GenericRuntimeConfig(
                 api_key="key",
                 secret_key="secret",
@@ -144,6 +158,11 @@ class FixedCycleStrategyTests(unittest.TestCase):
             logger=logging.getLogger("test.fixed_cycle"),
             order_manager=order_manager,
         )
+        symbol_key = strategy.config.symbol.upper()
+        rules = order_manager.get_cached_instrument_rules(symbol_key, strategy.config.category)
+        if rules:
+            runtime.runtime_state.instrument_rules[symbol_key] = rules
+        return runtime
 
     def test_safe_float_helper(self) -> None:
         strategy = FixedCycleHedgeStrategy()
@@ -1268,6 +1287,154 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("CYCLE_1_LONG_ADD", purposes)
         if state_path.exists():
             state_path.unlink()
+
+    def test_final_exit_cleanup_waits_for_basket_completion_when_short_sl_fills_first(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = datetime.now(timezone.utc)
+
+        long_exit = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=1.0,
+            metadata={
+                "trigger_price": 101.0,
+                "basket_tp_price": 101.0,
+                "basket_break_even_price": 100.0,
+                "position_idx": 1,
+            },
+            created_at=now,
+            updated_at=now,
+        )
+        short_exit = ManagedOrder(
+            client_order_id="short-exit",
+            exchange_order_id="ex-short-exit",
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+            metadata={
+                "trigger_price": 100.99,
+                "basket_tp_price": 101.0,
+                "basket_break_even_price": 100.0,
+                "position_idx": 2,
+            },
+            created_at=now,
+            updated_at=now,
+        )
+        runtime.runtime_state.active_orders[long_exit.client_order_id] = long_exit
+        runtime.runtime_state.active_orders[short_exit.client_order_id] = short_exit
+        runtime.runtime_state.exchange_to_client_id[long_exit.exchange_order_id] = long_exit.client_order_id
+        runtime.runtime_state.exchange_to_client_id[short_exit.exchange_order_id] = short_exit.client_order_id
+        runtime.runtime_state.strategy_state["initial_entry_confirmed"] = True
+
+        post_short_fill_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=1.0,
+            short_qty=0.0,
+            long_avg=100.0,
+            short_avg=100.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id=long_exit.client_order_id,
+                    exchange_order_id=long_exit.exchange_order_id,
+                    side=long_exit.side,
+                    qty=long_exit.qty,
+                    price=long_exit.price,
+                    purpose=long_exit.purpose,
+                    order_type=long_exit.order_type,
+                    reduce_only=long_exit.reduce_only,
+                    status=long_exit.status,
+                    filled_qty=long_exit.filled_qty,
+                    remaining_qty=long_exit.remaining_qty,
+                    metadata=dict(long_exit.metadata),
+                ),
+            ),
+            source="websocket",
+            updated_at=now,
+        )
+        runtime.runtime_state.last_snapshot = post_short_fill_snapshot
+        order_manager.positions = [
+            {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 100.0},
+            {"symbol": "BTCUSDT", "side": "Sell", "size": 0.0, "avgPrice": 0.0},
+        ]
+
+        short_fill = FillEvent(
+            exchange_order_id="ex-short-exit",
+            client_order_id="short-exit",
+            side="short",
+            purpose="SHORT_SL_EXIT",
+            exec_qty=0.5,
+            exec_price=101.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-short-exit",
+            metadata={
+                "trigger_price": 100.99,
+                "basket_tp_price": 101.0,
+                "basket_break_even_price": 100.0,
+                "position_idx": 2,
+            },
+            occurred_at=now,
+        )
+        runtime.strategy.on_fill(short_fill, post_short_fill_snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertIn("long-exit", runtime.runtime_state.active_orders)
+        self.assertEqual(order_manager.cancel_all_orders_calls, [])
+        self.assertFalse(runtime.runtime_state.strategy_state.get("exit_locked"))
+
+        flat_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.01,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(),
+            source="websocket",
+            updated_at=now,
+        )
+        runtime.runtime_state.last_snapshot = flat_snapshot
+        order_manager.positions = []
+
+        long_fill = FillEvent(
+            exchange_order_id="ex-long-exit",
+            client_order_id="long-exit",
+            side="long",
+            purpose="LONG_TP_EXIT",
+            exec_qty=1.0,
+            exec_price=101.01,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-long-exit",
+            metadata={
+                "trigger_price": 101.0,
+                "basket_tp_price": 101.0,
+                "basket_break_even_price": 100.0,
+                "position_idx": 1,
+            },
+            occurred_at=now,
+        )
+        runtime.strategy.on_fill(long_fill, flat_snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(len(order_manager.cancel_all_orders_calls), 1)
+        self.assertNotIn("long-exit", runtime.runtime_state.active_orders)
 
     def test_config_loader_enforces_expected_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

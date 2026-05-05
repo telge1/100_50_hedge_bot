@@ -29,6 +29,17 @@ DEBUG_EVENTS = {
     "closed_pnl_not_yet_available",
     "closed_pnl_row_found",
     "short_tp_build_deferred",
+    "fixed_cycle_fast_path_skip",
+    "fixed_cycle_structure_skip",
+    "fixed_cycle_downside_skip",
+    "fixed_cycle_exit_skip",
+    "fixed_cycle_fill_state",
+    "fixed_cycle_rebuild_state",
+    "fixed_cycle_pre_break_even_state",
+    "fixed_cycle_post_tp_state",
+    "fixed_cycle_exit_lock_check",
+    "fixed_cycle_downside_build_result",
+    "order_reconciled_open",
 }
 
 

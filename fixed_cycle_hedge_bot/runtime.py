@@ -1356,13 +1356,24 @@ class GenericHedgeRuntime:
         if cache_key in self._max_leverage_ready_symbols:
             return
         ensured = self.order_manager.ensure_max_leverage(self.config.symbol, self.config.category)
-        self.audit.log_event(
-            "max_leverage_preflight",
-            strategy=self.strategy.name,
-            symbol=self.config.symbol,
-            category=self.config.category,
-            ensured=ensured,
-        )
+        max_leverage_event_key = f"max_leverage_preflight:{cache_key[0]}:{cache_key[1]}"
+        max_leverage_payload = {
+            "strategy": self.strategy.name,
+            "symbol": self.config.symbol,
+            "category": self.config.category,
+            "ensured": ensured,
+        }
+        should_log_max_leverage = True
+        if not ensured:
+            should_log_max_leverage = self._should_log_idle_event(
+                max_leverage_event_key,
+                max_leverage_payload,
+            )
+        if should_log_max_leverage:
+            self.audit.log_event(
+                "max_leverage_preflight",
+                **max_leverage_payload,
+            )
         if ensured:
             self._max_leverage_ready_symbols.add(cache_key)
 
