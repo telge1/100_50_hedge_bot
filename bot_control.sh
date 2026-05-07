@@ -118,20 +118,28 @@ function read_pending_dynamic_symbol() {
       continue
     fi
     symbol=$(
-      python - <<'PY'
+      python - "$file" <<'PY'
 import json, sys, pathlib
+
 path = pathlib.Path(sys.argv[1])
-data = json.loads(path.read_text())
+try:
+    data = json.loads(path.read_text())
+except Exception:
+    sys.exit(1)
+
 for candidate in ("pending_dynamic_symbol",):
     if candidate in data and data[candidate]:
         print(data[candidate])
         sys.exit(0)
+
 state = data.get("strategy_state") or {}
 symbol = state.get("pending_dynamic_symbol")
 if symbol:
     print(symbol)
+    sys.exit(0)
+
+sys.exit(1)
 PY
-      "$file"
     )
     symbol="${symbol//$'\n'/}"
     symbol="${symbol//[[:space:]]/}"
@@ -151,8 +159,9 @@ function write_pending_symbol_to_best_coin() {
   local best_coin_path="$SCRIPT_DIR/logs/best_coin.json"
   local tmp
   tmp="$(mktemp)"
-  python - <<PY >"$tmp"
+  python - "$symbol" <<'PY' >"$tmp"
 import json, datetime, sys
+
 symbol = sys.argv[1]
 payload = {
     "symbol": symbol,
@@ -224,8 +233,8 @@ case "$cmd" in
     exit $?
     ;;
 
-  hard-reset)
-    local pending_symbol
+hard-reset)
+    pending_symbol=""
     if pending_symbol="$(read_pending_dynamic_symbol)"; then
       log_info "Captured pending dynamic symbol: $pending_symbol"
       write_pending_symbol_to_best_coin "$pending_symbol"
@@ -238,7 +247,7 @@ case "$cmd" in
     fi
     rm -f "$PID_FILE"
     if ! cleanup_exchange; then
-      log_err "Hard reset failed: exchange cleanup failed."
+      log_err "hard_reset_cleanup_failed"
       exit 1
     fi
     delete_state_files

@@ -24,6 +24,7 @@ from .trailing_fallback import (
 
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
 PNL_VALIDATION_THRESHOLD_USDT = 0.01
+POST_EXIT_CLEANUP_MAX_ATTEMPTS = 5
 
 
 @dataclass
@@ -285,9 +286,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["pending_loss_exit_rebuild_reason"] = None
         state["initial_entry_confirmed"] = False
         state["initial_entry_submitted"] = False
+        state["current_trade_pnl_state_reset_for_entry"] = False
         state["entry_reference_price"] = 0.0
         state["initial_long_qty"] = 0.0
         state["initial_short_qty"] = 0.0
+        state.pop("flat_waiting_order_cleanup_logged", None)
+        state.pop("flat_waiting_final_pnl_logged", None)
+        state.pop("flat_final_pnl_ready_logged", None)
+        state.pop("final_pnl_context_missing_logged", None)
         self._restore_last_trade_pnl_fields(state, preserved_last_trade)
 
     def prepare_for_clean_startup(
@@ -303,7 +309,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         stale_runtime_orders = [
             order.purpose or order.client_order_id
             for order in runtime_state.active_orders.values()
-            if order.status not in {"FILLED", "CANCELED", "REJECTED"}
+            if order.status not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
         ]
         has_stale_state = bool(
             stale_runtime_orders
@@ -397,8 +403,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["audit_pnl_ledger"] = {
             "cycle_long_reduce_pnl": {},
             "cycle_short_tp_pnl": {},
-            "final_long_exit_pnl": 0.0,
-            "final_short_exit_pnl": 0.0,
+            "cycle_pnl_entries": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
             "total_realized_pnl": 0.0,
         }
         state["dynamic_entry_hold_initialized"] = False
@@ -490,11 +497,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             self._clear_short_tp_fallback_order_context(runtime_state)
             has_short_tp = any(
                 "SHORT_TP" in str(getattr(order, "purpose", "") or "")
-                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
                 for order in runtime_state.active_orders.values()
             ) or any(
                 "SHORT_TP" in str(getattr(order, "purpose", "") or "")
-                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
                 for order in snapshot.active_orders
             )
             if not has_short_tp:
@@ -622,8 +629,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "cycle_long_reduce_pnl": {},
                 "cycle_short_tp_pnl": {},
-                "final_long_exit_pnl": 0.0,
-                "final_short_exit_pnl": 0.0,
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
                 "total_realized_pnl": 0.0,
             },
         )
@@ -643,17 +651,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("fresh_restart_required", False)
+        self._retry_pending_cycle_closed_pnl_fills(runtime_state, context)
         if state.get("fresh_restart_required"):
             if state.get("full_exit_reset_in_progress"):
                 return []
-            if (
-                snapshot.long_qty > 0
-                or snapshot.short_qty > 0
-                or snapshot.active_orders
-                or any(
-                    order.status not in {"FILLED", "CANCELED", "REJECTED"}
-                    for order in runtime_state.active_orders.values()
-                )
+            if snapshot.long_qty > 0 or snapshot.short_qty > 0:
+                return []
+            if self._block_flat_restart_until_final_pnl(
+                snapshot, runtime_state, context, reason="on_start_fresh_restart_required"
             ):
                 return []
             if not self._dynamic_symbol_entry_gate_allows_entry(runtime_state, context, "fresh_restart"):
@@ -677,21 +682,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 active_snapshot_order_purposes = [
                     getattr(order, "purpose", None) or getattr(order, "client_order_id", None)
                     for order in snapshot.active_orders
-                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
                 ]
                 active_runtime_order_purposes = [
                     getattr(order, "purpose", None) or getattr(order, "client_order_id", None)
                     for order in runtime_state.active_orders.values()
-                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                    if getattr(order, "status", None) not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
                 ]
                 self._emit_final_trade_pnl_if_complete_or_fetch(
                     runtime_state, context, "fresh_restart_gate_retry"
                 )
-                final_pnl_ready = (
-                    bool(state.get("final_trade_pnl_audited"))
-                    and bool(state.get("last_trade_pnl_complete"))
-                    and state.get("last_trade_pnl_usdt") is not None
-                )
+                final_pnl_ready = self._final_pnl_ready_for_restart(runtime_state)
                 if not final_pnl_ready:
                     if not state.get("restart_delayed_pending_final_pnl_logged"):
                         _log_event(
@@ -712,6 +713,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                                     "last_trade_pnl_complete"
                                 ),
                                 "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                                "trade_block_id": state.get("trade_block_id"),
+                                "last_trade_block_id": state.get("last_trade_block_id"),
+                                "pnl_ready_for_current_trade": final_pnl_ready,
                                 "reason": "fresh_restart_pending_final_pnl",
                             },
                         )
@@ -727,7 +731,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "last_trade_pnl_finalized_at": state.get(
                             "last_trade_pnl_finalized_at"
                         ),
+                        "trade_block_id": state.get("trade_block_id"),
                         "last_trade_block_id": state.get("last_trade_block_id"),
+                        "pnl_ready_for_current_trade": final_pnl_ready,
                     },
                 )
                 if self._trigger_restart_script_after_full_exit(
@@ -740,6 +746,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     reason="full_exit_flat_symbol_changed",
                 ):
                     return []
+            cleanup_snapshot = self._ensure_post_exit_cleanup_ready_for_fresh_restart(
+                snapshot,
+                runtime_state,
+                context,
+                reason="on_start_fresh_restart_required",
+            )
+            if cleanup_snapshot is None:
+                return []
+            snapshot = cleanup_snapshot
             self._maybe_update_symbol_from_best_coin(runtime_state, context, "fresh_restart")
             state["full_exit_reset_in_progress"] = True
             try:
@@ -868,21 +883,81 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         self._sync_state_from_snapshot(snapshot, runtime_state)
         self._update_initial_entry_confirmation(snapshot, runtime_state)
+        self._retry_pending_cycle_closed_pnl_fills(runtime_state, context)
         self._maybe_run_short_tp_fallback(snapshot, runtime_state, context)
         if state.pop("force_short_tp_rebuild", False):
             return self._rebuild_structure(snapshot, runtime_state, context, reason="short_tp_fallback_reset")
         if state.get("fresh_restart_required"):
-            if (
-                snapshot.long_qty > 0
-                or snapshot.short_qty > 0
-                or not self._has_no_strategy_orders(snapshot)
-                or any(
-                    order.status not in {"FILLED", "CANCELED", "REJECTED"}
-                    for order in runtime_state.active_orders.values()
-                )
+            if snapshot.long_qty > 0 or snapshot.short_qty > 0:
+                return []
+            if self._block_flat_restart_until_final_pnl(
+                snapshot, runtime_state, context, reason="on_tick_fresh_restart_required"
             ):
                 return []
-            state["fresh_restart_required"] = False
+            self._emit_final_trade_pnl_if_complete_or_fetch(
+                runtime_state, context, "fresh_restart_required_flat_gate"
+            )
+            if not self._final_pnl_ready_for_restart(runtime_state):
+                if not state.get("restart_delayed_pending_final_pnl_logged"):
+                    _log_event(
+                        "fixed_cycle_restart_delayed_pending_final_pnl",
+                        {
+                            "symbol": self.config.symbol,
+                            "desired_symbol": self.config.symbol,
+                            "final_trade_pnl_audited": state.get("final_trade_pnl_audited"),
+                            "final_long_exit_audited": state.get("final_long_exit_audited"),
+                            "final_short_exit_audited": state.get("final_short_exit_audited"),
+                            "last_trade_pnl_complete": state.get("last_trade_pnl_complete"),
+                            "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                            "trade_block_id": state.get("trade_block_id"),
+                            "last_trade_block_id": state.get("last_trade_block_id"),
+                            "pnl_ready_for_current_trade": False,
+                            "reason": "fresh_restart_required_flat_gate",
+                        },
+                    )
+                    state["restart_delayed_pending_final_pnl_logged"] = True
+                return []
+            state.pop("restart_delayed_pending_final_pnl_logged", None)
+
+            cleanup_snapshot = self._ensure_post_exit_cleanup_ready_for_fresh_restart(
+                snapshot,
+                runtime_state,
+                context,
+                reason="on_tick_fresh_restart_required",
+            )
+            if cleanup_snapshot is None:
+                return []
+            snapshot = cleanup_snapshot
+
+            logger.info("fixed_cycle_full_exit_reset_start", {"source": "on_tick_fresh_restart_required"})
+            state["full_exit_reset_in_progress"] = True
+            try:
+                self._reset_cycle_state(runtime_state)
+                self._force_fresh_start_reset(runtime_state)
+                runtime_state.realized_long_pnl_total = 0.0
+                runtime_state.realized_short_pnl_total = 0.0
+
+                if not self._dynamic_symbol_entry_gate_allows_entry(
+                    runtime_state, context, "fresh_restart_tick"
+                ):
+                    return []
+
+                self._maybe_update_symbol_from_best_coin(runtime_state, context, "fresh_restart_tick")
+                intents = self._build_entry_intents(snapshot, runtime_state, context)
+                if intents:
+                    state["fresh_restart_required"] = False
+                    state["dynamic_entry_hold_initialized"] = False
+                    state.pop("next_dynamic_entry_allowed_at", None)
+                    return intents
+                return []
+            finally:
+                state["full_exit_reset_in_progress"] = False
+
+        if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
+            if self._block_flat_restart_until_final_pnl(
+                snapshot, runtime_state, context, reason="on_tick_flat_before_entry"
+            ):
+                return []
 
         if (
             snapshot.long_qty <= 0
@@ -928,6 +1003,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return []
 
         if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
+            if self._block_flat_restart_until_final_pnl(
+                snapshot, runtime_state, context, reason="on_tick_flat_exit_state"
+            ):
+                return []
             state["bot_state"] = self.STATE_EXITED
             return []
 
@@ -963,18 +1042,48 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "exec_id": fill_event.exec_id,
                 },
             )
+        fill_type, cycle_index = self._classify_exit_fill_for_audit(fill_event)
+        if fill_type == "cycle_short_tp":
+            if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                event_name = (
+                    "fixed_cycle_short_reduce_pnl_waiting_for_closed_pnl"
+                )
+                self._queue_pending_cycle_closed_pnl_fill(
+                    fill_event,
+                    runtime_state,
+                    fill_type=fill_type,
+                    cycle_index=cycle_index,
+                )
+                _log_event(
+                    event_name,
+                    {
+                        "cycle_index": cycle_index,
+                        "purpose": fill_event.purpose,
+                        "client_order_id": fill_event.client_order_id,
+                        "exchange_order_id": fill_event.exchange_order_id,
+                        "exec_id": fill_event.exec_id,
+                        "runtime_calculated_pnl": (fill_event.metadata or {}).get("runtime_calculated_pnl"),
+                        "exec_pnl": (fill_event.metadata or {}).get("exec_pnl"),
+                        "reason": "block_cycle_advance_until_bybit_closed_pnl",
+                    },
+                )
+                context.audit.log_event(
+                    event_name,
+                    strategy=self.name,
+                    cycle_index=cycle_index,
+                    purpose=fill_event.purpose,
+                    client_order_id=fill_event.client_order_id,
+                    exchange_order_id=fill_event.exchange_order_id,
+                    exec_id=fill_event.exec_id,
+                )
+                return []
         if (
             isinstance(purpose, str)
             and "SHORT" in purpose
             and metadata.get("cycle_role") == "short_reduce"
         ):
             expected = float(state.get("last_expected_short_tp_net") or 0.0)
-            confirmed_pnl_candidate = getattr(fill_event, "confirmed_pnl", None)
-            if confirmed_pnl_candidate is None:
-                confirmed_pnl_candidate = metadata.get("confirmed_closed_pnl")
-            if confirmed_pnl_candidate is None:
-                confirmed_pnl_candidate = metadata.get("closed_pnl")
-            actual = float(confirmed_pnl_candidate or 0.0)
+            actual, actual_source = self._extract_realized_fill_pnl(fill_event, fill_type)
             delta = actual - expected
             delta_pct = (delta / expected) if expected > 0 else 0.0
             filled_price = float(fill_event.exec_price or 0.0)
@@ -985,6 +1094,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 {
                     "expected_profit_usdt": expected,
                     "actual_profit_usdt": actual,
+                    "actual_source": actual_source,
                     "delta": delta,
                     "delta_pct": delta_pct,
                     "trigger_price": state.get("last_short_tp_trigger_price"),
@@ -1000,13 +1110,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "purpose": purpose,
                     "expected_profit_usdt": expected,
                     "actual_profit_usdt": actual,
+                    "actual_source": actual_source,
                     "delta": delta,
                     "delta_pct": delta_pct,
                     "expected_trigger_price": state.get("last_short_tp_trigger_price"),
                     "filled_price": filled_price,
                     "expected_qty": expected_qty,
                     "filled_qty": filled_qty,
-                    "confirmed_pnl": confirmed_pnl_candidate,
+                    "confirmed_pnl": getattr(fill_event, "confirmed_pnl", None),
                     "closed_pnl": metadata.get("closed_pnl"),
                     "exec_price": fill_event.exec_price,
                     "fee": metadata.get("fee"),
@@ -1045,6 +1156,45 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     level=logging.WARNING,
                 )
         self._advance_cycle_from_fill(fill_event, runtime_state, context)
+        if fill_type == "cycle_long_reduce":
+            if self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                try:
+                    self._audit_exit_pnl_summary(fill_event, runtime_state, context)
+                except Exception as exc:  # pragma: no cover - audit must never block
+                    logger.warning(
+                        "exit_pnl_reaudit_failed_non_blocking",
+                        {
+                            "error": str(exc),
+                            "purpose": fill_event.purpose,
+                            "client_order_id": fill_event.client_order_id,
+                            "exchange_order_id": fill_event.exchange_order_id,
+                            "exec_id": fill_event.exec_id,
+                        },
+                    )
+            else:
+                event_name = "fixed_cycle_long_reduce_pnl_waiting_for_closed_pnl"
+                _log_event(
+                    event_name,
+                    {
+                        "cycle_index": cycle_index,
+                        "purpose": fill_event.purpose,
+                        "client_order_id": fill_event.client_order_id,
+                        "exchange_order_id": fill_event.exchange_order_id,
+                        "exec_id": fill_event.exec_id,
+                        "runtime_calculated_pnl": (fill_event.metadata or {}).get("runtime_calculated_pnl"),
+                        "exec_pnl": (fill_event.metadata or {}).get("exec_pnl"),
+                        "reason": "waiting_for_long_reduce_bybit_closed_pnl",
+                    },
+                )
+                context.audit.log_event(
+                    event_name,
+                    strategy=self.name,
+                    cycle_index=cycle_index,
+                    purpose=fill_event.purpose,
+                    client_order_id=fill_event.client_order_id,
+                    exchange_order_id=fill_event.exchange_order_id,
+                    exec_id=fill_event.exec_id,
+                )
         if fill_event.metadata.get("short_tp_fallback") and fill_event.status == "FILLED":
             fallback_state = self._get_short_tp_fallback_state(runtime_state)
             self._log_short_tp_fallback_event(
@@ -1095,22 +1245,52 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         return fast_intents + self._rebuild_structure(refreshed_snapshot, runtime_state, context, reason="fill_reconcile")
 
-    def _extract_realized_fill_pnl(self, fill_event: FillEvent) -> float:
+    def _extract_realized_fill_pnl(
+        self,
+        fill_event: FillEvent,
+        fill_type: str,
+    ) -> tuple[float, str]:
         metadata = fill_event.metadata or {}
-        candidates = (
-            getattr(fill_event, "confirmed_pnl", None),
-            metadata.get("confirmed_closed_pnl"),
-            metadata.get("closed_pnl"),
-            metadata.get("exec_pnl"),
+
+        def _first_usable(*candidates: tuple[str, Any]) -> tuple[float, str]:
+            for source, value in candidates:
+                if value is None:
+                    continue
+                try:
+                    return float(value), source
+                except (TypeError, ValueError):
+                    continue
+            return 0.0, ""
+
+        if fill_type == "cycle_long_reduce":
+            return _first_usable(
+                ("confirmed_pnl", getattr(fill_event, "confirmed_pnl", None)),
+                ("closed_pnl", metadata.get("closed_pnl")),
+                ("confirmed_closed_pnl", metadata.get("confirmed_closed_pnl")),
+                ("long_closed_pnl", metadata.get("long_closed_pnl")),
+                ("long_reduce_closed_pnl", metadata.get("long_reduce_closed_pnl")),
+            )
+        if fill_type == "cycle_short_tp":
+            return _first_usable(
+                ("confirmed_pnl", getattr(fill_event, "confirmed_pnl", None)),
+                ("short_closed_pnl", metadata.get("short_closed_pnl")),
+                ("short_reduce_closed_pnl", metadata.get("short_reduce_closed_pnl")),
+                ("closed_pnl", metadata.get("closed_pnl")),
+                ("confirmed_closed_pnl", metadata.get("confirmed_closed_pnl")),
+            )
+        if fill_type in {"final_long_exit", "final_short_exit"}:
+            return _first_usable(
+                ("confirmed_pnl", getattr(fill_event, "confirmed_pnl", None)),
+                ("closed_pnl", metadata.get("closed_pnl")),
+                ("confirmed_closed_pnl", metadata.get("confirmed_closed_pnl")),
+            )
+        return _first_usable(
+            ("confirmed_pnl", getattr(fill_event, "confirmed_pnl", None)),
+            ("closed_pnl", metadata.get("closed_pnl")),
+            ("confirmed_closed_pnl", metadata.get("confirmed_closed_pnl")),
+            ("exec_pnl", metadata.get("exec_pnl")),
+            ("runtime_calculated_pnl", metadata.get("runtime_calculated_pnl")),
         )
-        for value in candidates:
-            if value is None:
-                continue
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                continue
-        return 0.0
 
     def _classify_exit_fill_for_audit(self, fill_event: FillEvent) -> tuple[str, int]:
         metadata = fill_event.metadata or {}
@@ -1144,6 +1324,214 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return "final_short_exit", 0
         return "ignore", 0
 
+    @staticmethod
+    def _is_confirmed_cycle_pnl_source(source: str) -> bool:
+        return source in {
+            "confirmed_pnl",
+            "closed_pnl",
+            "confirmed_closed_pnl",
+            "long_closed_pnl",
+            "long_reduce_closed_pnl",
+            "short_closed_pnl",
+            "short_reduce_closed_pnl",
+        }
+
+    def _has_confirmed_cycle_closed_pnl(self, fill_event: FillEvent, fill_type: str) -> bool:
+        metadata = fill_event.metadata or {}
+        if getattr(fill_event, "confirmed_pnl", None) is not None:
+            return True
+        confirmed_keys = (
+            "closed_pnl",
+            "confirmed_closed_pnl",
+            "short_closed_pnl",
+            "short_reduce_closed_pnl",
+            "long_closed_pnl",
+            "long_reduce_closed_pnl",
+        )
+        return any(metadata.get(key) is not None for key in confirmed_keys)
+
+    def _cycle_has_confirmed_pair_pnl(self, runtime_state: RuntimeState, cycle_index: int) -> bool:
+        if cycle_index <= 0:
+            return False
+        ledger = (runtime_state.strategy_state.get("audit_pnl_ledger") or {})
+        cycle_key = str(cycle_index)
+        long_entries = ledger.get("cycle_long_reduce_pnl") or {}
+        short_entries = ledger.get("cycle_short_tp_pnl") or {}
+        return cycle_key in long_entries and cycle_key in short_entries
+
+    def _queue_pending_cycle_closed_pnl_fill(
+        self,
+        fill_event: FillEvent,
+        runtime_state: RuntimeState,
+        *,
+        fill_type: str,
+        cycle_index: int,
+    ) -> None:
+        state = runtime_state.strategy_state
+        queue = state.setdefault("pending_cycle_closed_pnl_fills", [])
+        fill_dict = fill_event.to_dict()
+        queue_key = (
+            str(fill_event.exec_id or "").strip()
+            or str(fill_event.exchange_order_id or "").strip()
+            or str(fill_event.client_order_id or "").strip()
+            or f"{fill_event.purpose}:{fill_event.exec_price}:{fill_event.exec_qty}"
+        )
+        for entry in queue:
+            if str(entry.get("queue_key") or "") == queue_key:
+                entry["fill"] = fill_dict
+                entry["fill_type"] = fill_type
+                entry["cycle_index"] = cycle_index
+                return
+        queue.append(
+            {
+                "queue_key": queue_key,
+                "fill_type": fill_type,
+                "cycle_index": cycle_index,
+                "fill": fill_dict,
+            }
+        )
+        if len(queue) > 50:
+            del queue[:-50]
+
+    def _pending_cycle_fill_from_payload(self, payload: dict[str, Any]) -> FillEvent:
+        fill = dict(payload.get("fill") or {})
+        occurred_at_raw = fill.get("occurred_at")
+        occurred_at = (
+            datetime.fromisoformat(occurred_at_raw)
+            if isinstance(occurred_at_raw, str) and occurred_at_raw
+            else datetime.now(timezone.utc)
+        )
+        event = FillEvent(
+            exchange_order_id=str(fill.get("exchange_order_id") or ""),
+            client_order_id=fill.get("client_order_id"),
+            side=str(fill.get("side") or ""),
+            purpose=str(fill.get("purpose") or ""),
+            exec_qty=float(fill.get("exec_qty") or 0.0),
+            exec_price=float(fill.get("exec_price") or 0.0),
+            order_type=str(fill.get("order_type") or ""),
+            reduce_only=bool(fill.get("reduce_only")),
+            status=str(fill.get("status") or ""),
+            cumulative_qty=fill.get("cumulative_qty"),
+            incremental_qty=fill.get("incremental_qty"),
+            exec_id=fill.get("exec_id"),
+            metadata=dict(fill.get("metadata") or {}),
+            occurred_at=occurred_at,
+        )
+        confirmed_pnl = (fill.get("metadata") or {}).get("confirmed_closed_pnl")
+        if confirmed_pnl is not None:
+            event.confirmed_pnl = confirmed_pnl
+        return event
+
+    def _retry_pending_cycle_closed_pnl_fills(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> None:
+        state = runtime_state.strategy_state
+        pending = list(state.get("pending_cycle_closed_pnl_fills") or [])
+        if not pending:
+            return
+        remaining: list[dict[str, Any]] = []
+        for payload in pending:
+            fill_event = self._pending_cycle_fill_from_payload(payload)
+            try:
+                self._audit_exit_pnl_summary(fill_event, runtime_state, context)
+            except Exception:
+                remaining.append(payload)
+                continue
+            fill_type = str(payload.get("fill_type") or "")
+            if fill_type not in {"cycle_short_tp", "cycle_long_reduce"}:
+                continue
+            if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                updated_payload = dict(payload)
+                updated_payload["fill"] = fill_event.to_dict()
+                remaining.append(updated_payload)
+                continue
+            self._advance_cycle_from_fill(fill_event, runtime_state, context)
+        state["pending_cycle_closed_pnl_fills"] = remaining
+
+    def _recompute_cycle_pnl_ledger_totals(self, ledger: dict[str, Any]) -> None:
+        cycle_long_reduce_totals: dict[str, float] = {}
+        cycle_short_tp_totals: dict[str, float] = {}
+        for entry_key, entry in (ledger.get("cycle_pnl_entries") or {}).items():
+            try:
+                fill_type, cycle_key, _ = str(entry_key).split(":", 2)
+            except ValueError:
+                continue
+            pnl = float((entry or {}).get("pnl") or 0.0)
+            if fill_type == "cycle_long_reduce":
+                cycle_long_reduce_totals[cycle_key] = cycle_long_reduce_totals.get(cycle_key, 0.0) + pnl
+            elif fill_type == "cycle_short_tp":
+                cycle_short_tp_totals[cycle_key] = cycle_short_tp_totals.get(cycle_key, 0.0) + pnl
+        ledger["cycle_long_reduce_pnl"] = cycle_long_reduce_totals
+        ledger["cycle_short_tp_pnl"] = cycle_short_tp_totals
+
+    def _record_cycle_pnl_entry(
+        self,
+        ledger: dict[str, Any],
+        *,
+        fill_type: str,
+        cycle_index: int,
+        fill_event: FillEvent,
+        pnl: float,
+        pnl_source: str,
+    ) -> None:
+        cycle_entries = ledger.setdefault("cycle_pnl_entries", {})
+        order_key = (
+            str(fill_event.client_order_id or "").strip()
+            or str(fill_event.exchange_order_id or "").strip()
+            or str(fill_event.exec_id or "").strip()
+            or f"{fill_event.purpose}:{fill_event.exec_price}:{fill_event.exec_qty}"
+        )
+        entry_key = f"{fill_type}:{cycle_index}:{order_key}"
+        is_confirmed = self._is_confirmed_cycle_pnl_source(pnl_source)
+        if fill_type in {"cycle_long_reduce", "cycle_short_tp"} and not is_confirmed:
+            _log_event(
+                "fixed_cycle_unconfirmed_cycle_pnl_not_recorded",
+                {
+                    "fill_type": fill_type,
+                    "cycle_index": cycle_index,
+                    "purpose": fill_event.purpose,
+                    "client_order_id": fill_event.client_order_id,
+                    "exchange_order_id": fill_event.exchange_order_id,
+                    "exec_id": fill_event.exec_id,
+                    "pnl": pnl,
+                    "pnl_source": pnl_source,
+                },
+            )
+            return
+        existing = cycle_entries.get(entry_key)
+        if existing:
+            existing_source = str(existing.get("source") or "")
+            existing_confirmed = bool(existing.get("is_confirmed"))
+            if existing_source == pnl_source and abs(float(existing.get("pnl") or 0.0) - pnl) <= 1e-12:
+                return
+            if existing_confirmed and not is_confirmed:
+                return
+            if is_confirmed and not existing_confirmed:
+                cycle_entries[entry_key] = {
+                    "pnl": pnl,
+                    "source": pnl_source,
+                    "is_confirmed": True,
+                }
+                self._recompute_cycle_pnl_ledger_totals(ledger)
+                return
+            if not existing_confirmed and not is_confirmed:
+                cycle_entries[entry_key] = {
+                    "pnl": float(existing.get("pnl") or 0.0) + pnl,
+                    "source": pnl_source,
+                    "is_confirmed": False,
+                }
+                self._recompute_cycle_pnl_ledger_totals(ledger)
+                return
+            return
+        cycle_entries[entry_key] = {
+            "pnl": pnl,
+            "source": pnl_source,
+            "is_confirmed": is_confirmed,
+        }
+        self._recompute_cycle_pnl_ledger_totals(ledger)
+
     def _audit_exit_pnl_summary(
         self,
         fill_event: FillEvent,
@@ -1169,37 +1557,79 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         fill_type, cycle_index = self._classify_exit_fill_for_audit(fill_event)
         if fill_type == "ignore":
             return
-        processed.append(fill_id)
-        if len(processed) > 500:
-            del processed[:-500]
+        refresh_success = True
+        if fill_type == "cycle_short_tp":
+            refresh_success = self._refresh_short_reduce_closed_pnl(
+                fill_event=fill_event,
+                runtime_state=runtime_state,
+                context=context,
+                cycle_index=cycle_index,
+            )
+        if fill_type == "cycle_long_reduce":
+            refresh_success = self._has_confirmed_cycle_closed_pnl(fill_event, fill_type)
+        if refresh_success or fill_type not in {"cycle_short_tp", "cycle_long_reduce"}:
+            processed.append(fill_id)
+            if len(processed) > 500:
+                del processed[:-500]
         ledger = state.setdefault(
             "audit_pnl_ledger",
             {
                 "cycle_long_reduce_pnl": {},
                 "cycle_short_tp_pnl": {},
-                "final_long_exit_pnl": 0.0,
-                "final_short_exit_pnl": 0.0,
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
                 "total_realized_pnl": 0.0,
             },
         )
-        pnl = self._extract_realized_fill_pnl(fill_event)
+        ledger.setdefault("cycle_pnl_entries", {})
+        pnl, pnl_source = self._extract_realized_fill_pnl(fill_event, fill_type)
         snapshot = runtime_state.last_snapshot
         metadata = fill_event.metadata or {}
+        if fill_type in {"cycle_long_reduce", "cycle_short_tp"} and abs(pnl) <= 1e-12:
+            _log_warning_event(
+                "fixed_cycle_cycle_pnl_missing_confirmed_closed_pnl",
+                {
+                    "purpose": fill_event.purpose,
+                    "fill_type": fill_type,
+                    "cycle_index": cycle_index,
+                    "client_order_id": fill_event.client_order_id,
+                    "exchange_order_id": fill_event.exchange_order_id,
+                    "exec_id": fill_event.exec_id,
+                    "exec_qty": fill_event.exec_qty,
+                    "exec_price": fill_event.exec_price,
+                    "reduce_only": fill_event.reduce_only,
+                    "metadata_keys": sorted(metadata.keys()),
+                    "runtime_calculated_pnl": metadata.get("runtime_calculated_pnl"),
+                    "exec_pnl": metadata.get("exec_pnl"),
+                    "confirmed_closed_pnl": metadata.get("confirmed_closed_pnl"),
+                    "closed_pnl": metadata.get("closed_pnl"),
+                    "pnl_source": pnl_source,
+                    "reason": "cycle fill has no usable pnl value",
+                },
+            )
         occurred_at_iso = (
             fill_event.occurred_at.isoformat() if getattr(fill_event, "occurred_at", None) else None
         )
         if fill_type == "cycle_long_reduce":
-            key = str(cycle_index)
-            ledger["cycle_long_reduce_pnl"][key] = float(
-                ledger["cycle_long_reduce_pnl"].get(key, 0.0)
-            ) + pnl
+            self._record_cycle_pnl_entry(
+                ledger,
+                fill_type=fill_type,
+                cycle_index=cycle_index,
+                fill_event=fill_event,
+                pnl=pnl,
+                pnl_source=pnl_source,
+            )
         elif fill_type == "cycle_short_tp":
-            key = str(cycle_index)
-            ledger["cycle_short_tp_pnl"][key] = float(
-                ledger["cycle_short_tp_pnl"].get(key, 0.0)
-            ) + pnl
+            self._record_cycle_pnl_entry(
+                ledger,
+                fill_type=fill_type,
+                cycle_index=cycle_index,
+                fill_event=fill_event,
+                pnl=pnl,
+                pnl_source=pnl_source,
+            )
         elif fill_type == "final_long_exit":
-            ledger["final_long_exit_pnl"] = float(ledger.get("final_long_exit_pnl", 0.0)) + pnl
             state["final_long_exit_order_context"] = {
                 "symbol": str((snapshot.symbol if snapshot else None) or self.config.symbol or ""),
                 "side": "long",
@@ -1218,7 +1648,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "source": "final_long_exit",
             }
         elif fill_type == "final_short_exit":
-            ledger["final_short_exit_pnl"] = float(ledger.get("final_short_exit_pnl", 0.0)) + pnl
             state["final_short_exit_order_context"] = {
                 "symbol": str((snapshot.symbol if snapshot else None) or self.config.symbol or ""),
                 "side": "short",
@@ -1245,9 +1674,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         cycle_net = cycle_long_total + cycle_short_total
 
-        final_long_exit_pnl = float(ledger.get("final_long_exit_pnl", 0.0))
-        final_short_exit_pnl = float(ledger.get("final_short_exit_pnl", 0.0))
-        final_exit_net = final_long_exit_pnl + final_short_exit_pnl
+        raw_final_long_exit_pnl = ledger.get("final_long_exit_pnl")
+        raw_final_short_exit_pnl = ledger.get("final_short_exit_pnl")
+        final_long_exit_pnl = (
+            float(raw_final_long_exit_pnl) if raw_final_long_exit_pnl is not None else None
+        )
+        final_short_exit_pnl = (
+            float(raw_final_short_exit_pnl) if raw_final_short_exit_pnl is not None else None
+        )
+        final_exit_net = sum(
+            value
+            for value in (
+                final_long_exit_pnl,
+                final_short_exit_pnl,
+            )
+            if value is not None
+        )
 
         total_net = cycle_net + final_exit_net
         ledger["total_realized_pnl"] = total_net
@@ -1282,6 +1724,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         expected_vs_actual = {
             "expected_short_tp_net": expected if fill_type == "cycle_short_tp" else None,
             "actual_fill_pnl": pnl,
+            "actual_fill_pnl_source": pnl_source,
             "delta": delta if fill_type == "cycle_short_tp" else None,
             "delta_pct": delta_pct if fill_type == "cycle_short_tp" else None,
             "fill_type": fill_type,
@@ -1289,9 +1732,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         completed = state.setdefault("audit_completed_cycle_indices", [])
         for entry in cycle_breakdown:
             cycle_key = str(entry["cycle_index"])
+            cycle_confirmed = (
+                cycle_key in (ledger["cycle_long_reduce_pnl"] or {})
+                and cycle_key in (ledger["cycle_short_tp_pnl"] or {})
+            )
             if (
-                entry["long_add_loss_or_profit"] != 0
-                and entry["short_tp_profit_or_loss"] != 0
+                cycle_confirmed
                 and cycle_key not in completed
             ):
                 completed.append(cycle_key)
@@ -1308,14 +1754,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
 
-        def _fmt(value: float) -> str:
-            return f"{value:+.4f}"
+        def _fmt(value: float | None) -> str:
+            return "pending" if value is None else f"{value:+.4f}"
 
         latest_fill_info = {
             "purpose": fill_event.purpose,
             "fill_type": fill_type,
             "cycle_index": cycle_index,
             "pnl_this_fill": pnl,
+            "pnl_source": pnl_source,
             "exec_price": float(fill_event.exec_price or 0.0),
             "qty": float(fill_event.exec_qty or 0.0),
             "client_order_id": fill_event.client_order_id,
@@ -1349,10 +1796,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             summary_lines.append(f"LONG_ADD_{idx} Verlust/Profit: {_fmt(entry['long_add_loss_or_profit'])}")
             summary_lines.append(f"SHORT_TP_{idx} Profit/Loss: {_fmt(entry['short_tp_profit_or_loss'])}")
             summary_lines.append(f"Cycle Net: {_fmt(entry['cycle_net_pnl'])}")
+            cycle_key = str(idx)
             status = (
                 "COMPLETED"
-                if entry["long_add_loss_or_profit"] != 0
-                and entry["short_tp_profit_or_loss"] != 0
+                if (
+                    cycle_key in (ledger["cycle_long_reduce_pnl"] or {})
+                    and cycle_key in (ledger["cycle_short_tp_pnl"] or {})
+                )
                 else "OPEN / WAITING"
             )
             summary_lines.append(f"Status: {status}")
@@ -1388,6 +1838,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
             "summary_text": summary_text,
             "expected_vs_actual": expected_vs_actual,
+            "pnl_source": pnl_source,
         }
         _audit_calc("exit_pnl_summary", payload)
 
@@ -1408,6 +1859,109 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext,
     ) -> list[StrategyIntent]:
         state = runtime_state.strategy_state
+        if self._post_exit_cleanup_pending(runtime_state):
+            if not self._attempt_post_exit_cleanup(snapshot, runtime_state, context):
+                return []
+        if (
+            not state.get("refill_pending")
+            and (snapshot.long_qty > 0 or snapshot.short_qty > 0)
+        ):
+            _log_warning_event(
+                "fixed_cycle_initial_entry_blocked_open_position",
+                {
+                    "reason": "build_entry_intents_open_position_guard",
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "long_avg": snapshot.long_avg,
+                    "short_avg": snapshot.short_avg,
+                    "current_price": snapshot.current_price,
+                    "bot_state": state.get("bot_state"),
+                    "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
+                    "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
+                    "fresh_restart_required": bool(state.get("fresh_restart_required")),
+                },
+            )
+            return []
+        final_pnl_ready = self._final_pnl_ready_for_restart(runtime_state)
+        if not final_pnl_ready and state.get("current_trade_pnl_state_reset_for_entry"):
+            final_pnl_ready = (
+                bool(state.get("final_trade_pnl_audited"))
+                and bool(state.get("last_trade_pnl_complete"))
+                and state.get("last_trade_pnl_usdt") is not None
+            )
+        if not state.get("refill_pending"):
+            active_snapshot_order_purposes, active_runtime_order_purposes = (
+                self._collect_active_strategy_order_purposes(snapshot, runtime_state)
+            )
+            if active_snapshot_order_purposes or active_runtime_order_purposes:
+                _log_event(
+                    "fixed_cycle_fresh_entry_blocked_active_strategy_orders",
+                    {
+                        "symbol": self.config.symbol,
+                        "reason": "active_strategy_orders",
+                        "active_snapshot_order_purposes": active_snapshot_order_purposes,
+                        "active_runtime_order_purposes": active_runtime_order_purposes,
+                        "long_qty": snapshot.long_qty,
+                        "short_qty": snapshot.short_qty,
+                        "last_trade_pnl_complete": bool(state.get("last_trade_pnl_complete")),
+                        "final_trade_pnl_audited": bool(state.get("final_trade_pnl_audited")),
+                        "current_trade_pnl_state_reset_for_entry": bool(
+                            state.get("current_trade_pnl_state_reset_for_entry")
+                        ),
+                    },
+                )
+                return []
+        if (
+            not state.get("refill_pending")
+            and snapshot.long_qty <= 0
+            and snapshot.short_qty <= 0
+        ):
+            if self._previous_trade_evidence_present(runtime_state):
+                ledger = state.get("audit_pnl_ledger") or {}
+                final_long_exit_pnl = ledger.get("final_long_exit_pnl")
+                final_short_exit_pnl = ledger.get("final_short_exit_pnl")
+                if not final_pnl_ready:
+                    _log_event(
+                        "fixed_cycle_fresh_entry_blocked_pending_final_exit_settlement",
+                        {
+                            "symbol": self.config.symbol,
+                            "reason": "final_pnl_pending",
+                            "final_long_exit_pnl": final_long_exit_pnl,
+                            "final_short_exit_pnl": final_short_exit_pnl,
+                            "final_trade_pnl_audited": bool(state.get("final_trade_pnl_audited")),
+                            "last_trade_pnl_complete": bool(state.get("last_trade_pnl_complete")),
+                            "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                            "trade_block_id": state.get("trade_block_id"),
+                            "last_trade_block_id": state.get("last_trade_block_id"),
+                            "pnl_ready_for_current_trade": False,
+                        },
+                    )
+                    return []
+                snapshot_purposes, runtime_purposes = self._collect_active_final_exit_purposes(
+                    snapshot, runtime_state
+                )
+                if snapshot_purposes or runtime_purposes:
+                    _log_event(
+                        "fixed_cycle_fresh_entry_blocked_pending_final_exit_settlement",
+                        {
+                            "symbol": self.config.symbol,
+                            "reason": "final_exit_orders_pending",
+                            "pending_snapshot_final_exit_purposes": snapshot_purposes,
+                            "pending_runtime_final_exit_purposes": runtime_purposes,
+                            "final_long_exit_pnl": final_long_exit_pnl,
+                            "final_short_exit_pnl": final_short_exit_pnl,
+                            "trade_block_id": state.get("trade_block_id"),
+                            "last_trade_block_id": state.get("last_trade_block_id"),
+                            "pnl_ready_for_current_trade": True,
+                        },
+                    )
+                    return []
+            if not state.get("current_trade_pnl_state_reset_for_entry"):
+                self._reset_current_trade_pnl_state(
+                    runtime_state,
+                    reason="before_initial_entry",
+                )
+                state["current_trade_pnl_state_reset_for_entry"] = True
 
         if state.get("refill_pending") and not state.get("refill_state"):
             current_price = float(snapshot.current_price or 0.0)
@@ -1595,6 +2149,506 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             total = float(snapshot.realized_pnl_total or 0.0)
         return total
 
+    @staticmethod
+    def _final_pnl_ready_for_restart(runtime_state: RuntimeState) -> bool:
+        state = runtime_state.strategy_state
+        current_trade_block_id = state.get("trade_block_id")
+        last_trade_block_id = state.get("last_trade_block_id")
+        return (
+            bool(state.get("final_trade_pnl_audited"))
+            and bool(state.get("last_trade_pnl_complete"))
+            and state.get("last_trade_pnl_usdt") is not None
+            and bool(current_trade_block_id)
+            and last_trade_block_id == current_trade_block_id
+        )
+
+    @staticmethod
+    def _is_active_final_exit_order(order: Any) -> bool:
+        purpose = str(getattr(order, "purpose", "") or "").upper()
+        status = str(getattr(order, "status", "") or "").upper()
+        return (
+            purpose
+            in {
+                FixedCycleHedgeStrategy.LONG_TP_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.LONG_SL_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.SHORT_TP_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.SHORT_SL_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.SHORT_HARD_STOP_PURPOSE,
+            }
+            and status not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
+        )
+
+    def _collect_active_final_exit_purposes(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> tuple[list[str], list[str]]:
+        snapshot_purposes: list[str] = []
+        runtime_purposes: list[str] = []
+        for order in snapshot.active_orders:
+            if self._is_active_final_exit_order(order):
+                snapshot_purposes.append(
+                    str(getattr(order, "purpose", "") or getattr(order, "client_order_id", "") or "")
+                )
+        for order in runtime_state.active_orders.values():
+            if self._is_active_final_exit_order(order):
+                runtime_purposes.append(
+                    str(getattr(order, "purpose", "") or getattr(order, "client_order_id", "") or "")
+                )
+        return snapshot_purposes, runtime_purposes
+
+    def _has_active_final_exit_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        snapshot_purposes, runtime_purposes = self._collect_active_final_exit_purposes(
+            snapshot, runtime_state
+        )
+        return bool(snapshot_purposes or runtime_purposes)
+
+    def _previous_trade_evidence_present(self, runtime_state: RuntimeState) -> bool:
+        state = runtime_state.strategy_state
+        audit_pnl_ledger = state.get("audit_pnl_ledger") or {}
+        cycle_long_reduce_total = sum(
+            float(value or 0.0)
+            for value in (audit_pnl_ledger.get("cycle_long_reduce_pnl") or {}).values()
+        )
+        cycle_short_tp_total = sum(
+            float(value or 0.0)
+            for value in (audit_pnl_ledger.get("cycle_short_tp_pnl") or {}).values()
+        )
+        return any(
+            [
+                bool(state.get("initial_entry_confirmed")),
+                bool(state.get("final_long_exit_order_context")),
+                bool(state.get("final_short_exit_order_context")),
+                float(audit_pnl_ledger.get("final_long_exit_pnl") or 0.0) != 0.0,
+                float(audit_pnl_ledger.get("final_short_exit_pnl") or 0.0) != 0.0,
+                cycle_long_reduce_total != 0.0,
+                cycle_short_tp_total != 0.0,
+                bool(state.get("final_long_exit_audited")),
+                bool(state.get("final_short_exit_audited")),
+                bool(state.get("exit_locked")),
+                bool(state.get("fresh_restart_required")),
+                bool(state.get("last_trade_block_id")),
+                bool(state.get("trade_block_id")),
+            ]
+        )
+
+    @staticmethod
+    def _is_terminal_order_status(status: Any) -> bool:
+        return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
+
+    def _is_strategy_order_purpose(self, purpose: Any) -> bool:
+        text = str(purpose or "").upper()
+        return (
+            text
+            in {
+                self.LONG_ENTRY_PURPOSE,
+                self.SHORT_ENTRY_PURPOSE,
+                self.LONG_TP_EXIT_PURPOSE,
+                self.LONG_SL_EXIT_PURPOSE,
+                self.SHORT_TP_EXIT_PURPOSE,
+                self.SHORT_SL_EXIT_PURPOSE,
+                self.SHORT_HARD_STOP_PURPOSE,
+                "REFILL_LONG",
+                "REFILL_SHORT",
+                "SHORT_TP_FALLBACK",
+            }
+            or text.startswith("CYCLE_")
+        )
+
+    def _is_final_exit_only_order(self, order: Any) -> bool:
+        purpose = str(getattr(order, "purpose", "") or "").upper()
+        reduce_only = bool(getattr(order, "reduce_only", False))
+        final_exit_purposes = {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_SL_EXIT_PURPOSE,
+            self.SHORT_TP_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_HARD_STOP_PURPOSE,
+            "FINAL_LONG_EXIT",
+            "FINAL_SHORT_EXIT",
+        }
+        if purpose in final_exit_purposes:
+            return True
+        return bool(
+            reduce_only
+            and "EXIT" in purpose
+            and not purpose.startswith("CYCLE_")
+            and not purpose.startswith("INITIAL_")
+            and not purpose.startswith("REFILL_")
+        )
+
+    def _only_final_exit_orders_remain(self, active_orders: list[Any]) -> bool:
+        return bool(active_orders) and all(self._is_final_exit_only_order(order) for order in active_orders)
+
+    def _is_unsettled_strategy_order(self, order: Any) -> bool:
+        purpose = getattr(order, "purpose", None)
+        if not self._is_strategy_order_purpose(purpose):
+            return False
+        remaining_qty = float(getattr(order, "remaining_qty", 0.0) or 0.0)
+        if remaining_qty > 1e-9:
+            return True
+        return not self._is_terminal_order_status(getattr(order, "status", None))
+
+    @staticmethod
+    def _strategy_order_summary(order: Any) -> dict[str, Any]:
+        return {
+            "client_order_id": getattr(order, "client_order_id", None),
+            "exchange_order_id": getattr(order, "exchange_order_id", None),
+            "purpose": getattr(order, "purpose", None),
+            "status": getattr(order, "status", None),
+            "filled_qty": float(getattr(order, "filled_qty", 0.0) or 0.0),
+            "remaining_qty": float(getattr(order, "remaining_qty", 0.0) or 0.0),
+            "qty": float(getattr(order, "qty", 0.0) or 0.0),
+        }
+
+    def _collect_unsettled_strategy_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        unsettled_runtime_orders = [
+            self._strategy_order_summary(order)
+            for order in runtime_state.active_orders.values()
+            if self._is_unsettled_strategy_order(order)
+        ]
+        unsettled_snapshot_orders = [
+            self._strategy_order_summary(order)
+            for order in snapshot.active_orders
+            if self._is_unsettled_strategy_order(order)
+        ]
+        return unsettled_runtime_orders, unsettled_snapshot_orders
+
+    def _force_cleanup_flat_final_exit_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        reason: str,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        active_snapshot_orders = [
+            order for order in snapshot.active_orders if self._is_unsettled_strategy_order(order)
+        ]
+        active_runtime_orders = [
+            order for order in runtime_state.active_orders.values() if self._is_unsettled_strategy_order(order)
+        ]
+        remaining_orders = [*active_snapshot_orders, *active_runtime_orders]
+        if not self._only_final_exit_orders_remain(remaining_orders):
+            return False
+
+        symbol = context.symbol or self.config.symbol
+        category = context.category or self.config.category
+        canceled_exchange_order_ids: list[str] = []
+        cancel_errors: list[dict[str, Any]] = []
+        seen_exchange_order_ids: set[str] = set()
+        for order in remaining_orders:
+            exchange_order_id = str(getattr(order, "exchange_order_id", "") or "")
+            status = str(getattr(order, "status", "") or "").upper()
+            if (
+                exchange_order_id
+                and exchange_order_id not in seen_exchange_order_ids
+                and not self._is_terminal_order_status(status)
+                and context.order_manager
+            ):
+                seen_exchange_order_ids.add(exchange_order_id)
+                try:
+                    context.order_manager.cancel_order(
+                        exchange_order_id,
+                        symbol=symbol,
+                        category=category,
+                    )
+                    canceled_exchange_order_ids.append(exchange_order_id)
+                except Exception as exc:
+                    cancel_errors.append(
+                        {
+                            "exchange_order_id": exchange_order_id,
+                            "error": str(exc),
+                        }
+                    )
+
+        removed_orders: list[dict[str, Any]] = []
+        for client_order_id, managed_order in list(runtime_state.active_orders.items()):
+            if not self._is_unsettled_strategy_order(managed_order):
+                continue
+            if not self._is_final_exit_only_order(managed_order):
+                continue
+            removed_orders.append(self._strategy_order_summary(managed_order))
+            runtime_state.active_orders.pop(client_order_id, None)
+            if managed_order.exchange_order_id:
+                runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)
+
+        state["exit_locked"] = False
+        state["exit_rebuild_allowed"] = False
+        state["force_exit_rebuild"] = False
+        state["long_exit_filled"] = False
+        state["short_exit_filled"] = False
+        state.pop("flat_waiting_order_cleanup_logged", None)
+        _log_event(
+            "fixed_cycle_flat_final_exit_order_cleanup_forced",
+            {
+                "reason": reason,
+                "long_qty": snapshot.long_qty,
+                "short_qty": snapshot.short_qty,
+                "canceled_exchange_order_ids": canceled_exchange_order_ids,
+                "cancel_errors": cancel_errors,
+                "removed_orders": removed_orders,
+                "remaining_snapshot_orders": [
+                    self._strategy_order_summary(order) for order in active_snapshot_orders
+                ],
+            },
+        )
+        return True
+
+    def _collect_active_strategy_order_purposes(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> tuple[list[str], list[str]]:
+        active_snapshot_order_purposes: list[str] = []
+        active_runtime_order_purposes: list[str] = []
+        for order in snapshot.active_orders:
+            if not self._is_unsettled_strategy_order(order):
+                continue
+            purpose = getattr(order, "purpose", None)
+            active_snapshot_order_purposes.append(
+                str(purpose or getattr(order, "client_order_id", None) or "")
+            )
+        for order in runtime_state.active_orders.values():
+            if not self._is_unsettled_strategy_order(order):
+                continue
+            purpose = getattr(order, "purpose", None)
+            active_runtime_order_purposes.append(
+                str(purpose or getattr(order, "client_order_id", None) or "")
+            )
+        return active_snapshot_order_purposes, active_runtime_order_purposes
+
+    def _has_active_strategy_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        active_snapshot_order_purposes, active_runtime_order_purposes = (
+            self._collect_active_strategy_order_purposes(snapshot, runtime_state)
+        )
+        return bool(active_snapshot_order_purposes or active_runtime_order_purposes)
+
+    def _release_exit_lock_if_unprotected_open_position(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        reason: str,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        if snapshot.long_qty <= 0 or snapshot.short_qty <= 0:
+            return False
+        snapshot_purposes, runtime_purposes = self._collect_active_final_exit_purposes(
+            snapshot, runtime_state
+        )
+        if snapshot_purposes or runtime_purposes:
+            state.pop("unprotected_open_position_first_seen_ms", None)
+            return False
+        previous_exit_locked = bool(state.get("exit_locked"))
+        previous_exit_rebuild_allowed = bool(state.get("exit_rebuild_allowed", True))
+        previous_force = bool(state.get("force_exit_rebuild"))
+        state["exit_locked"] = False
+        state["exit_rebuild_allowed"] = True
+        state["force_exit_rebuild"] = True
+        state["long_exit_filled"] = False
+        state["short_exit_filled"] = False
+        now_ms = int(time.time() * 1000)
+        state.setdefault("unprotected_open_position_first_seen_ms", now_ms)
+        should_log = (
+            previous_exit_locked
+            or bool(state.get("last_exit_signature"))
+            or bool(state.get("exit_armed_marker_emitted"))
+        )
+        if should_log:
+            _log_warning_event(
+                "fixed_cycle_exit_lock_released_missing_exit_orders",
+                {
+                    "reason": reason,
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "long_avg": snapshot.long_avg,
+                    "short_avg": snapshot.short_avg,
+                    "current_price": snapshot.current_price,
+                    "active_snapshot_final_exit_purposes": snapshot_purposes,
+                    "active_runtime_final_exit_purposes": runtime_purposes,
+                    "previous_exit_locked": previous_exit_locked,
+                    "previous_exit_rebuild_allowed": previous_exit_rebuild_allowed,
+                    "previous_force_exit_rebuild": previous_force,
+                    "long_exit_filled_before": bool(state.get("long_exit_filled")),
+                    "short_exit_filled_before": bool(state.get("short_exit_filled")),
+                    "realized_long_pnl_total": snapshot.realized_long_pnl_total,
+                    "realized_short_pnl_total": snapshot.realized_short_pnl_total,
+                    "realized_cycle_net": snapshot.realized_pnl_total,
+                    "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
+                    "last_exit_signature_is_none": state.get("last_exit_signature") is None,
+                },
+            )
+        return True
+
+    def _block_flat_restart_until_final_pnl(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        reason: str,
+    ) -> bool:
+        if snapshot.long_qty > 0 or snapshot.short_qty > 0:
+            return False
+        state = runtime_state.strategy_state
+        final_long_context_present = bool(state.get("final_long_exit_order_context"))
+        final_short_context_present = bool(state.get("final_short_exit_order_context"))
+        audit_pnl_ledger = state.get("audit_pnl_ledger") or {}
+        active_snapshot_order_purposes, active_runtime_order_purposes = (
+            self._collect_active_strategy_order_purposes(snapshot, runtime_state)
+        )
+        trade_evidence_present = (
+            self._previous_trade_evidence_present(runtime_state)
+            or any(
+                [
+                    float(runtime_state.realized_long_pnl_total or 0.0) != 0.0,
+                    float(runtime_state.realized_short_pnl_total or 0.0) != 0.0,
+                ]
+            )
+        )
+        if active_snapshot_order_purposes or active_runtime_order_purposes:
+            if (
+                bool(state.get("fresh_restart_required"))
+                and self._final_pnl_ready_for_restart(runtime_state)
+                and self._force_cleanup_flat_final_exit_orders(
+                    snapshot,
+                    runtime_state,
+                    context,
+                    reason=reason,
+                )
+            ):
+                active_snapshot_order_purposes = []
+                active_runtime_order_purposes = []
+            else:
+                if trade_evidence_present:
+                    self._emit_final_trade_pnl_if_complete_or_fetch(runtime_state, context, reason)
+                state.pop("flat_waiting_final_pnl_logged", None)
+                state.pop("flat_final_pnl_ready_logged", None)
+                if not state.get("flat_waiting_order_cleanup_logged"):
+                    pnl_ready_for_current_trade = self._final_pnl_ready_for_restart(runtime_state)
+                    _log_event(
+                        "fixed_cycle_flat_waiting_for_order_cleanup",
+                        {
+                            "reason": reason,
+                            "long_qty": snapshot.long_qty,
+                            "short_qty": snapshot.short_qty,
+                            "active_snapshot_order_purposes": active_snapshot_order_purposes,
+                            "active_runtime_order_purposes": active_runtime_order_purposes,
+                            "final_trade_pnl_audited": state.get("final_trade_pnl_audited"),
+                            "final_long_exit_audited": state.get("final_long_exit_audited"),
+                            "final_short_exit_audited": state.get("final_short_exit_audited"),
+                            "last_trade_pnl_complete": state.get("last_trade_pnl_complete"),
+                            "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                            "final_long_exit_order_context_present": final_long_context_present,
+                            "final_short_exit_order_context_present": final_short_context_present,
+                            "trade_block_id": state.get("trade_block_id"),
+                            "last_trade_block_id": state.get("last_trade_block_id"),
+                            "pnl_ready_for_current_trade": pnl_ready_for_current_trade,
+                        },
+                    )
+                    state["flat_waiting_order_cleanup_logged"] = True
+                state["bot_state"] = self.STATE_EXITED
+                state["fresh_restart_required"] = True
+                return True
+        state.pop("flat_waiting_order_cleanup_logged", None)
+        if not trade_evidence_present:
+            state.pop("flat_waiting_final_pnl_logged", None)
+            state.pop("flat_final_pnl_ready_logged", None)
+            state.pop("final_pnl_context_missing_logged", None)
+            return False
+
+        self._emit_final_trade_pnl_if_complete_or_fetch(runtime_state, context, reason)
+        if not self._final_pnl_ready_for_restart(runtime_state):
+            if (
+                (
+                    final_long_context_present
+                    or final_short_context_present
+                    or bool(state.get("final_long_exit_audited"))
+                    or bool(state.get("final_short_exit_audited"))
+                    or float(audit_pnl_ledger.get("final_long_exit_pnl") or 0.0) != 0.0
+                    or float(audit_pnl_ledger.get("final_short_exit_pnl") or 0.0) != 0.0
+                    or bool(state.get("last_trade_block_id"))
+                )
+                and (not final_long_context_present or not final_short_context_present)
+                and not state.get("final_pnl_context_missing_logged")
+            ):
+                _log_warning_event(
+                    "fixed_cycle_final_pnl_context_missing",
+                    {
+                        "reason": reason,
+                        "final_long_exit_order_context_present": final_long_context_present,
+                        "final_short_exit_order_context_present": final_short_context_present,
+                        "active_snapshot_order_purposes": active_snapshot_order_purposes,
+                        "active_runtime_order_purposes": active_runtime_order_purposes,
+                        "last_fill_info": state.get("last_fill_info"),
+                        "audit_pnl_ledger": audit_pnl_ledger,
+                        "trade_block_id": state.get("trade_block_id"),
+                        "last_trade_block_id": state.get("last_trade_block_id"),
+                        "pnl_ready_for_current_trade": self._final_pnl_ready_for_restart(runtime_state),
+                    },
+                )
+                state["final_pnl_context_missing_logged"] = True
+            state.pop("flat_final_pnl_ready_logged", None)
+            if not state.get("flat_waiting_final_pnl_logged"):
+                pnl_ready_for_current_trade = self._final_pnl_ready_for_restart(runtime_state)
+                _log_event(
+                    "fixed_cycle_flat_waiting_for_final_pnl",
+                    {
+                        "reason": reason,
+                        "final_trade_pnl_audited": state.get("final_trade_pnl_audited"),
+                        "final_long_exit_audited": state.get("final_long_exit_audited"),
+                        "final_short_exit_audited": state.get("final_short_exit_audited"),
+                        "last_trade_pnl_complete": state.get("last_trade_pnl_complete"),
+                        "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                        "long_qty": snapshot.long_qty,
+                        "short_qty": snapshot.short_qty,
+                        "active_snapshot_order_purposes": active_snapshot_order_purposes,
+                        "active_runtime_order_purposes": active_runtime_order_purposes,
+                        "final_long_exit_order_context_present": final_long_context_present,
+                        "final_short_exit_order_context_present": final_short_context_present,
+                        "trade_block_id": state.get("trade_block_id"),
+                        "last_trade_block_id": state.get("last_trade_block_id"),
+                        "pnl_ready_for_current_trade": pnl_ready_for_current_trade,
+                    },
+                )
+                state["flat_waiting_final_pnl_logged"] = True
+            state["bot_state"] = self.STATE_EXITED
+            state["fresh_restart_required"] = True
+            return True
+
+        state.pop("flat_waiting_final_pnl_logged", None)
+        state.pop("final_pnl_context_missing_logged", None)
+        if not state.get("flat_final_pnl_ready_logged"):
+            pnl_ready_for_current_trade = self._final_pnl_ready_for_restart(runtime_state)
+            _log_event(
+                "fixed_cycle_flat_final_pnl_ready_for_restart",
+                {
+                    "reason": reason,
+                    "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                    "last_trade_pnl_finalized_at": state.get("last_trade_pnl_finalized_at"),
+                    "trade_block_id": state.get("trade_block_id"),
+                    "last_trade_block_id": state.get("last_trade_block_id"),
+                    "pnl_ready_for_current_trade": pnl_ready_for_current_trade,
+                },
+            )
+            state["flat_final_pnl_ready_logged"] = True
+        return False
+
     def _required_remaining_profit(
         self, runtime_state: RuntimeState | None, snapshot: HedgeSnapshot | None = None
     ) -> float:
@@ -1680,6 +2734,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         }
         logger.debug("%s %s", tag, payload)
 
+    def _emit_throttled_strategy_audit(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        event_name: str,
+        payload: dict[str, Any],
+        *,
+        signature_key: str,
+        interval_ms: int = 120000,
+    ) -> None:
+        state = runtime_state.strategy_state
+        now_ms = int(time.time() * 1000)
+        try:
+            signature = json.dumps(payload, sort_keys=True, default=str)
+        except Exception:
+            signature = repr(payload)
+        last_sig_key = f"last_{signature_key}_signature"
+        last_ms_key = f"last_{signature_key}_logged_ms"
+        last_sig = state.get(last_sig_key)
+        last_ms = int(state.get(last_ms_key) or 0)
+        if signature != last_sig or now_ms - last_ms >= interval_ms:
+            context.audit.log_event(event_name, strategy=self.name, **payload)
+            state[last_sig_key] = signature
+            state[last_ms_key] = now_ms
+
     def _rebuild_structure(
         self,
         snapshot: HedgeSnapshot,
@@ -1694,10 +2773,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self._update_initial_entry_confirmation(snapshot, runtime_state)
         cycle_state = self._ensure_cycle_state(runtime_state)
         has_no_strategy_orders = self._has_no_strategy_orders(snapshot)
+        unsettled_runtime_orders, unsettled_snapshot_orders = self._collect_unsettled_strategy_orders(
+            snapshot, runtime_state
+        )
         active_order_purposes = [
             order.purpose
             for order in snapshot.active_orders
-            if order.purpose and order.status not in {"FILLED", "CANCELED", "REJECTED"}
+            if order.purpose and self._is_unsettled_strategy_order(order)
         ]
         logger.debug(
             "fixed_cycle_rebuild_entry %s",
@@ -1727,11 +2809,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         open_initial_orders = self._collect_open_initial_entry_orders(snapshot)
         if open_initial_orders:
-            context.audit.log_event(
+            self._emit_throttled_strategy_audit(
+                runtime_state,
+                context,
                 "fixed_cycle_structure_skip",
-                strategy=self.name,
-                skip_reason="initial_entry_order_still_open",
-                open_initial_orders=open_initial_orders,
+                {
+                    "skip_reason": "initial_entry_order_still_open",
+                    "open_initial_orders": open_initial_orders,
+                },
+                signature_key="structure_skip",
+                interval_ms=120000,
             )
             return []
 
@@ -1745,7 +2832,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 order.purpose
                 for order in snapshot.active_orders
                 if getattr(order, "purpose", None)
-                and getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                and not self._is_terminal_order_status(getattr(order, "status", None))
             ]
             cycle_index = int(state.get("current_effective_cycle") or 0)
             _emit_analyzer_event(
@@ -1804,10 +2891,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             snapshot.long_qty <= 0
             and snapshot.short_qty <= 0
             and not snapshot.active_orders
-            and not any(
-                order.status not in {"FILLED", "CANCELED", "REJECTED"}
-                for order in runtime_state.active_orders.values()
-            )
+            and not unsettled_snapshot_orders
+            and not unsettled_runtime_orders
             and not state.get("full_exit_reset_in_progress")
         ):
             self._maybe_start_dynamic_symbol_hold_after_flat(snapshot, runtime_state, context, reason)
@@ -1822,7 +2907,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
         if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
-            self._cancel_all_pending_orders(context)
+            if unsettled_runtime_orders or unsettled_snapshot_orders:
+                context.audit.log_event(
+                    "fixed_cycle_flat_waiting_unsettled_strategy_orders",
+                    strategy=self.name,
+                    reason=reason,
+                    long_qty=snapshot.long_qty,
+                    short_qty=snapshot.short_qty,
+                    unsettled_runtime_orders=unsettled_runtime_orders,
+                    unsettled_snapshot_orders=unsettled_snapshot_orders,
+                )
+                return []
+            self._cancel_all_pending_orders(context, snapshot, runtime_state)
             state["bot_state"] = self.STATE_EXITED
             context.audit.log_event("fixed_cycle_exited", strategy=self.name, reason=reason, snapshot=snapshot)
             return []
@@ -2283,7 +3379,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 if order.purpose != purpose_name:
                     continue
                 status = order.status
-                if status in {"FILLED", "CANCELED", "REJECTED"}:
+                if status in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}:
                     continue
                 if float(order.remaining_qty or 0.0) <= 0:
                     continue
@@ -2698,10 +3794,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "entry_reference_price": float(state.get("entry_reference_price") or 0.0),
                     "long_fill_price": long_fill_price,
                     "long_reduce_qty": long_reduce_qty,
-                    "confirmed_closed_pnl": confirmed_closed_pnl,
-                    "confirmed_closed_qty": confirmed_closed_qty,
-                    "confirmed_closed_avg_price": confirmed_closed_avg_price,
-                    "confirmed_closed_cost": confirmed_closed_cost,
+                "source_long_reduce_confirmed_pnl": confirmed_closed_pnl,
+                "source_long_reduce_confirmed_qty": confirmed_closed_qty,
+                "source_long_reduce_confirmed_avg_price": confirmed_closed_avg_price,
+                "source_long_reduce_confirmed_cost": confirmed_closed_cost,
+                "source_long_reduce_confirmed_pnl_updated_time": long_fill.get("closed_pnl_updated_time"),
                     "short_entry_price": short_entry_price,
                     "short_reduce_reference": short_reduce_reference,
                     "fee_rate": fee_rate,
@@ -2726,8 +3823,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         intents: list[StrategyIntent] = []
         state = runtime_state.strategy_state
         self._ensure_cycle_state(runtime_state)
+        if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
+            logger.debug(
+                "fixed_cycle_exit_build_skipped_flat_snapshot %s",
+                {
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "current_cycle": current_cycle,
+                    "force_exit_rebuild": force_exit_rebuild,
+                },
+            )
+            return intents
         if state.get("block_exit_rebuild_until_pnl_ready"):
             return intents
+
+        if self._release_exit_lock_if_unprotected_open_position(
+            snapshot,
+            runtime_state,
+            context,
+            reason="build_exit_intents_before_exit_locked_skip",
+        ):
+            force_exit_rebuild = True
+
         logger.debug(
             "fixed_cycle_exit_lock_check",
             {
@@ -3453,6 +4570,32 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_index = int(fill_event.metadata.get("cycle_index") or 0)
         if cycle_index <= 0 and not is_exit_fill:
             return
+        fill_type, _ = self._classify_exit_fill_for_audit(fill_event)
+        if fill_type == "cycle_short_tp":
+            if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                _log_event(
+                    "fixed_cycle_cycle_advance_blocked_pending_closed_pnl",
+                    {
+                        "fill_type": fill_type,
+                        "cycle_index": cycle_index,
+                        "purpose": fill_event.purpose,
+                        "client_order_id": fill_event.client_order_id,
+                        "exchange_order_id": fill_event.exchange_order_id,
+                        "exec_id": fill_event.exec_id,
+                    },
+                )
+                if context is not None:
+                    context.audit.log_event(
+                        "fixed_cycle_cycle_advance_blocked_pending_closed_pnl",
+                        strategy=self.name,
+                        fill_type=fill_type,
+                        cycle_index=cycle_index,
+                        purpose=fill_event.purpose,
+                        client_order_id=fill_event.client_order_id,
+                        exchange_order_id=fill_event.exchange_order_id,
+                        exec_id=fill_event.exec_id,
+                    )
+                return
 
         if "_LONG_" in fill_event.purpose and "LONG_ADD" in fill_event.purpose:
             state["long_add_pending"] = fill_event.status != "FILLED"
@@ -3519,6 +4662,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         self._cleanup_order_pnl(runtime_state, long_fill.get("client_order_id"))
             confirmed_closed_pnl = long_fill.get("confirmed_closed_pnl")
             if confirmed_closed_pnl is not None:
+                metadata = dict(fill_event.metadata or {})
+                metadata["long_reduce_closed_pnl"] = confirmed_closed_pnl
+                metadata["long_closed_pnl"] = confirmed_closed_pnl
+                metadata["closed_pnl"] = confirmed_closed_pnl
+                metadata["confirmed_closed_pnl"] = confirmed_closed_pnl
+                fill_event.metadata = metadata
+                fill_event.confirmed_pnl = confirmed_closed_pnl
                 long_add_loss_usdt = max(-float(confirmed_closed_pnl), 0.0)
                 long_fill["last_long_add_loss_usdt"] = long_add_loss_usdt
                 self._add_realized_long_loss(runtime_state, long_add_loss_usdt)
@@ -3575,7 +4725,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 state.get("cycle_long_add_filled"),
                 state.get("cycle_short_tp_filled"),
             )
-            if state.get("cycle_long_add_filled") and state.get("cycle_short_tp_filled"):
+            if (
+                state.get("cycle_long_add_filled")
+                and state.get("cycle_short_tp_filled")
+                and self._cycle_has_confirmed_pair_pnl(runtime_state, cycle_index)
+            ):
                 state["cycle_completed_count"] = int(state.get("cycle_completed_count") or 0) + 1
                 state["cycle_pair_count"] = int(state.get("cycle_pair_count") or 0) + 1
                 logger.info(
@@ -3706,9 +4860,52 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if any(order.is_open() and order.purpose in entry_purposes for order in snapshot.active_orders):
             return True
         return any(
-            order.status not in {"FILLED", "CANCELED", "REJECTED"} and order.purpose in entry_purposes
+            not self._is_terminal_order_status(order.status) and order.purpose in entry_purposes
             for order in runtime_state.active_orders.values()
         )
+
+    def _finalize_initial_entry_orders_from_snapshot(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> None:
+        state = runtime_state.strategy_state
+        initial_long_qty = float(state.get("initial_long_qty") or 0.0)
+        initial_short_qty = float(state.get("initial_short_qty") or 0.0)
+        if initial_long_qty <= 0 or initial_short_qty <= 0:
+            return
+        long_confirmed = float(snapshot.long_qty) >= initial_long_qty - 1e-9
+        short_confirmed = float(snapshot.short_qty) >= initial_short_qty - 1e-9
+        if not (long_confirmed and short_confirmed):
+            return
+        updated_orders: list[str] = []
+        for order in runtime_state.active_orders.values():
+            if order.purpose == self.LONG_ENTRY_PURPOSE and long_confirmed:
+                if self._is_terminal_order_status(order.status):
+                    continue
+                order.status = "FILLED"
+                order.filled_qty = order.qty
+                order.remaining_qty = 0.0
+                updated_orders.append(order.client_order_id)
+            if order.purpose == self.SHORT_ENTRY_PURPOSE and short_confirmed:
+                if self._is_terminal_order_status(order.status):
+                    continue
+                order.status = "FILLED"
+                order.filled_qty = order.qty
+                order.remaining_qty = 0.0
+                updated_orders.append(order.client_order_id)
+        if updated_orders:
+            _log_event(
+                "fixed_cycle_initial_entry_orders_marked_filled",
+                {
+                    "symbol": self.config.symbol,
+                    "initial_long_qty": initial_long_qty,
+                    "initial_short_qty": initial_short_qty,
+                    "snapshot_long_qty": snapshot.long_qty,
+                    "snapshot_short_qty": snapshot.short_qty,
+                    "updated_order_ids": updated_orders,
+                },
+            )
 
     def _update_initial_entry_confirmation(
         self,
@@ -3716,6 +4913,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
     ) -> bool:
         state = runtime_state.strategy_state
+        self._finalize_initial_entry_orders_from_snapshot(snapshot, runtime_state)
         has_open_initial_orders = self._has_open_initial_entry_orders(snapshot, runtime_state)
         confirmed = (
             snapshot.long_qty > 0
@@ -3963,11 +5161,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         open_initial_orders = self._collect_open_initial_entry_orders(snapshot)
         if open_initial_orders:
-            context.audit.log_event(
+            self._emit_throttled_strategy_audit(
+                runtime_state,
+                context,
                 "fixed_cycle_fast_path_skip",
-                strategy=self.name,
-                skip_reason="initial_entry_order_still_open",
-                open_initial_orders=open_initial_orders,
+                {
+                    "skip_reason": "initial_entry_order_still_open",
+                    "open_initial_orders": open_initial_orders,
+                },
+                signature_key="fast_path_skip",
+                interval_ms=120000,
             )
             return []
 
@@ -4717,6 +5920,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             position_idx=1,
             cycle_role="long_reduce",
         )
+        metadata = dict(fill_event.metadata or {})
+        metadata["cycle_index"] = int(metadata.get("cycle_index") or cycle_index)
+        metadata.setdefault("cycle_role", "long_reduce")
+        metadata["long_reduce_closed_pnl"] = long_fill["confirmed_closed_pnl"]
+        metadata["long_closed_pnl"] = long_fill["confirmed_closed_pnl"]
+        metadata["closed_pnl"] = long_fill["confirmed_closed_pnl"]
+        metadata["confirmed_closed_pnl"] = long_fill["confirmed_closed_pnl"]
+        fill_event.metadata = metadata
+        fill_event.confirmed_pnl = long_fill["confirmed_closed_pnl"]
         return bool(long_fill["closed_pnl_ready"])
 
     def _apply_confirmed_realized_pnl(
@@ -4983,11 +6195,45 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("long_add_rebuild_allowed", True)
         return cycle_state
 
-    def _cancel_all_pending_orders(self, context: StrategyContext) -> None:
+    def _cancel_all_pending_orders(
+        self,
+        context: StrategyContext,
+        snapshot: HedgeSnapshot | None = None,
+        runtime_state: RuntimeState | None = None,
+    ) -> None:
         canceler = context.cancel_open_orders_by_purpose
         if not canceler:
             return
-        canceler(self._all_cycle_purposes() + self._exit_purposes())
+        cycle_purposes = self._all_cycle_purposes()
+        exit_purposes = self._exit_purposes()
+        unsettled_orders: list[dict[str, Any]] = []
+        if runtime_state is not None:
+            unsettled_orders.extend(
+                self._strategy_order_summary(order)
+                for order in runtime_state.active_orders.values()
+                if self._is_unsettled_strategy_order(order) and getattr(order, "purpose", None) in exit_purposes
+            )
+        if snapshot is not None:
+            unsettled_orders.extend(
+                self._strategy_order_summary(order)
+                for order in snapshot.active_orders
+                if self._is_unsettled_strategy_order(order) and getattr(order, "purpose", None) in exit_purposes
+            )
+        skipped_exit_purposes = sorted(
+            {
+                str(order.get("purpose") or "")
+                for order in unsettled_orders
+                if str(order.get("purpose") or "")
+            }
+        )
+        if skipped_exit_purposes:
+            context.audit.log_event(
+                "fixed_cycle_cancel_pending_skipped_unsettled_final_exit",
+                strategy=self.name,
+                skipped_exit_purposes=skipped_exit_purposes,
+                unsettled_orders=unsettled_orders,
+            )
+        canceler(cycle_purposes + [purpose for purpose in exit_purposes if purpose not in skipped_exit_purposes])
 
     def _maybe_finalize_exit_after_leg_fill(
         self,
@@ -5015,12 +6261,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 str(getattr(order, "purpose", "") or "")
                 for order in runtime_state.active_orders.values()
-                if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                if not self._is_terminal_order_status(getattr(order, "status", None))
             }
             | {
                 str(getattr(order, "purpose", "") or "")
                 for order in (snapshot.active_orders if snapshot else [])
-                if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+                if not self._is_terminal_order_status(getattr(order, "status", None))
             }
         )
         if (
@@ -5052,6 +6298,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
         if long_done and short_done:
+            unsettled_runtime_orders, unsettled_snapshot_orders = (
+                self._collect_unsettled_strategy_orders(snapshot, runtime_state)
+                if snapshot
+                else ([], [])
+            )
+            unsettled_final_exit_orders = [
+                order
+                for order in unsettled_runtime_orders + unsettled_snapshot_orders
+                if str(order.get("purpose") or "").upper()
+                in {
+                    self.LONG_TP_EXIT_PURPOSE,
+                    self.LONG_SL_EXIT_PURPOSE,
+                    self.SHORT_TP_EXIT_PURPOSE,
+                    self.SHORT_SL_EXIT_PURPOSE,
+                    self.SHORT_HARD_STOP_PURPOSE,
+                }
+            ]
+            if unsettled_final_exit_orders:
+                logger.warning(
+                    "final_exit_cleanup_delayed_unsettled_final_orders %s",
+                    {
+                        "reason": reason,
+                        "long_qty": long_qty,
+                        "short_qty": short_qty,
+                        "unsettled_final_exit_orders": unsettled_final_exit_orders,
+                    },
+                )
+                if context:
+                    context.audit.log_event(
+                        "final_exit_cleanup_delayed_unsettled_final_orders",
+                        strategy=self.name,
+                        reason=reason,
+                        long_qty=long_qty,
+                        short_qty=short_qty,
+                        unsettled_final_exit_orders=unsettled_final_exit_orders,
+                    )
+                self._emit_final_trade_pnl_if_complete_or_fetch(runtime_state, context, reason)
+                return
             if not state.get("exit_locked"):
                 state["exit_locked"] = True
                 state["exit_rebuild_allowed"] = False
@@ -5065,6 +6349,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
                 if context:
                     self._cancel_all_orders_after_exit(runtime_state, context)
+                    self._ensure_post_exit_cleanup_required(
+                        runtime_state, reason="final_exit_completed_both_legs"
+                    )
                     logger.info(
                         "exit_cancel_all_after_both_legs_only",
                         {
@@ -5107,8 +6394,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "cycle_long_reduce_pnl": {},
                 "cycle_short_tp_pnl": {},
-                "final_long_exit_pnl": 0.0,
-                "final_short_exit_pnl": 0.0,
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
                 "total_realized_pnl": 0.0,
             },
         )
@@ -5253,6 +6541,52 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         return bool(state.get("final_long_exit_audited") and state.get("final_short_exit_audited"))
 
+    def _side_realized_by_cycle_pnl(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        side: str,
+    ) -> tuple[bool, float, str]:
+        state = runtime_state.strategy_state
+        snapshot = runtime_state.last_snapshot
+        ledger = state.get("audit_pnl_ledger") or {}
+        if side == "long":
+            remaining_qty = (
+                float(snapshot.long_qty)
+                if snapshot is not None
+                else float(state.get("open_long_qty") or 0.0)
+            )
+            cycle_total = sum(
+                float(value or 0.0)
+                for value in (ledger.get("cycle_long_reduce_pnl") or {}).values()
+            )
+            runtime_realized_total = float(runtime_state.realized_long_pnl_total or 0.0)
+            confirmed_source = "cycle_long_reduce_confirmed_pnl"
+            fallback_source = "runtime_realized_long_pnl_fallback"
+        elif side == "short":
+            remaining_qty = (
+                float(snapshot.short_qty)
+                if snapshot is not None
+                else float(state.get("open_short_qty") or 0.0)
+            )
+            cycle_total = sum(
+                float(value or 0.0)
+                for value in (ledger.get("cycle_short_tp_pnl") or {}).values()
+            )
+            runtime_realized_total = float(runtime_state.realized_short_pnl_total or 0.0)
+            confirmed_source = "cycle_short_tp_confirmed_pnl"
+            fallback_source = "runtime_realized_short_pnl_fallback"
+        else:
+            raise ValueError(f"unsupported side for cycle pnl audit: {side}")
+
+        if remaining_qty > 0:
+            return False, 0.0, ""
+        if abs(cycle_total) > 1e-12:
+            return True, cycle_total, confirmed_source
+        if abs(runtime_realized_total) > 1e-12:
+            return True, runtime_realized_total, fallback_source
+        return False, 0.0, ""
+
     def _emit_final_trade_pnl_if_complete_or_fetch(
         self,
         runtime_state: RuntimeState,
@@ -5260,29 +6594,53 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         reason: str,
     ) -> bool:
         state = runtime_state.strategy_state
+        current_trade_block_id = state.get("trade_block_id")
+        last_trade_block_id = state.get("last_trade_block_id")
         if (
             state.get("final_trade_pnl_audited")
             and bool(state.get("last_trade_pnl_complete"))
             and state.get("last_trade_pnl_usdt") is not None
+            and current_trade_block_id
+            and last_trade_block_id == current_trade_block_id
         ):
             return True
+        if (
+            state.get("final_trade_pnl_audited")
+            and bool(state.get("last_trade_pnl_complete"))
+            and state.get("last_trade_pnl_usdt") is not None
+            and current_trade_block_id
+            and last_trade_block_id != current_trade_block_id
+        ):
+            _log_event(
+                "fixed_cycle_stale_final_pnl_state_ignored",
+                {
+                    "reason": reason,
+                    "trade_block_id": current_trade_block_id,
+                    "last_trade_block_id": last_trade_block_id,
+                    "last_trade_pnl_usdt": state.get("last_trade_pnl_usdt"),
+                },
+            )
         ledger = state.get("audit_pnl_ledger") or {}
-        final_long_exit_pnl = float(ledger.get("final_long_exit_pnl") or 0.0)
-        final_short_exit_pnl = float(ledger.get("final_short_exit_pnl") or 0.0)
-        if not (state.get("final_long_exit_audited") and state.get("final_short_exit_audited")):
+        final_long_exit_pnl = ledger.get("final_long_exit_pnl")
+        final_short_exit_pnl = ledger.get("final_short_exit_pnl")
+        if final_long_exit_pnl is None or final_short_exit_pnl is None:
             self._ensure_final_exit_pnl_from_exchange(runtime_state, context, reason)
             ledger = state.get("audit_pnl_ledger") or {}
-            final_long_exit_pnl = float(ledger.get("final_long_exit_pnl") or 0.0)
-            final_short_exit_pnl = float(ledger.get("final_short_exit_pnl") or 0.0)
-            if not (state.get("final_long_exit_audited") and state.get("final_short_exit_audited")):
-                return False
-        cycle_long_reduce_pnl = sum(
-            float(value or 0.0)
-            for value in (ledger.get("cycle_long_reduce_pnl") or {}).values()
+            final_long_exit_pnl = ledger.get("final_long_exit_pnl")
+            final_short_exit_pnl = ledger.get("final_short_exit_pnl")
+        if final_long_exit_pnl is None or final_short_exit_pnl is None:
+            return False
+        cycle_long_reduce_entries = dict(ledger.get("cycle_long_reduce_pnl") or {})
+        cycle_short_tp_entries = dict(ledger.get("cycle_short_tp_pnl") or {})
+        cycle_long_reduce_pnl = sum(float(value or 0.0) for value in cycle_long_reduce_entries.values())
+        cycle_short_tp_pnl = sum(float(value or 0.0) for value in cycle_short_tp_entries.values())
+        long_side_satisfied, long_side_pnl, long_side_source = self._side_realized_by_cycle_pnl(
+            runtime_state,
+            side="long",
         )
-        cycle_short_tp_pnl = sum(
-            float(value or 0.0)
-            for value in (ledger.get("cycle_short_tp_pnl") or {}).values()
+        short_side_satisfied, short_side_pnl, short_side_source = self._side_realized_by_cycle_pnl(
+            runtime_state,
+            side="short",
         )
         cycle_net_pnl = cycle_long_reduce_pnl + cycle_short_tp_pnl
         final_exit_net_pnl = final_long_exit_pnl + final_short_exit_pnl
@@ -5291,13 +6649,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         realized_short_pnl = float(runtime_state.realized_short_pnl_total or 0.0)
         trade_block_id = state.get("trade_block_id") or str(uuid4())
         state["trade_block_id"] = trade_block_id
-        source = "audit_ledger"
+        source = "bybit_closed_pnl"
         finalized_at = datetime.now(timezone.utc).isoformat()
         breakdown = {
             "realized_long_pnl_total": realized_long_pnl,
             "realized_short_pnl_total": realized_short_pnl,
-            "cycle_long_reduce_pnl": dict(ledger.get("cycle_long_reduce_pnl") or {}),
-            "cycle_short_tp_pnl": dict(ledger.get("cycle_short_tp_pnl") or {}),
+            "cycle_long_reduce_pnl": cycle_long_reduce_entries,
+            "cycle_short_tp_pnl": cycle_short_tp_entries,
             "cycle_long_reduce_pnl_total": cycle_long_reduce_pnl,
             "cycle_short_tp_pnl_total": cycle_short_tp_pnl,
             "cycle_net_pnl": cycle_net_pnl,
@@ -5308,7 +6666,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "source": source,
             "pnl_complete": True,
             "finalized_at": finalized_at,
+            "long_side_satisfied": long_side_satisfied,
+            "long_side_pnl": long_side_pnl,
+            "long_side_source": long_side_source,
+            "short_side_satisfied": short_side_satisfied,
+            "short_side_pnl": short_side_pnl,
+            "short_side_source": short_side_source,
         }
+        if (
+            abs(realized_long_pnl) > 1e-12 or abs(realized_short_pnl) > 1e-12
+        ) and not cycle_long_reduce_entries and not cycle_short_tp_entries:
+            _log_event(
+                "fixed_cycle_runtime_realized_pnl_not_counted_as_cycle_pnl",
+                {
+                    "reason": reason,
+                    "realized_long_pnl_total": realized_long_pnl,
+                    "realized_short_pnl_total": realized_short_pnl,
+                    "cycle_long_reduce_entries": cycle_long_reduce_entries,
+                    "cycle_short_tp_entries": cycle_short_tp_entries,
+                    "final_long_exit_pnl": final_long_exit_pnl,
+                    "final_short_exit_pnl": final_short_exit_pnl,
+                    "final_exit_net_pnl": final_exit_net_pnl,
+                    "total_trade_pnl": total_trade_pnl,
+                    "explanation": "runtime realized PnL is not counted as cycle PnL to avoid double counting confirmed final exits",
+                },
+            )
+        _log_event(
+            "fixed_cycle_final_exit_pnl_confirmed",
+            {
+                "reason": reason,
+                "trade_block_id": trade_block_id,
+                "final_long_exit_pnl": final_long_exit_pnl,
+                "final_short_exit_pnl": final_short_exit_pnl,
+                "final_long_exit_order_context_present": bool(state.get("final_long_exit_order_context")),
+                "final_short_exit_order_context_present": bool(state.get("final_short_exit_order_context")),
+                "cycle_net_pnl": cycle_net_pnl,
+                "source": source,
+            },
+        )
         self._persist_last_trade_pnl_summary(
             runtime_state,
             total_trade_pnl=total_trade_pnl,
@@ -5347,6 +6742,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         }
         _log_event("fixed_cycle_trade_pnl_finalized", payload_finalized)
         state["final_trade_pnl_audited"] = True
+        state["current_trade_pnl_state_reset_for_entry"] = False
+        self._ensure_post_exit_cleanup_required(runtime_state, reason=reason)
         return True
 
     def _load_best_coin_symbol_from_file(self, path: str | Path) -> Optional[dict[str, Any]]:
@@ -5505,7 +6902,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         active_runtime_orders = [
             order
             for order in runtime_state.active_orders.values()
-            if order.status not in {"FILLED", "CANCELED", "REJECTED"}
+            if order.status not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
         ]
         if active_runtime_orders:
             return
@@ -5640,6 +7037,51 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
 
+    def _reset_current_trade_pnl_state(self, runtime_state: RuntimeState, *, reason: str) -> None:
+        state = runtime_state.strategy_state
+        previous_trade_block_id = state.get("trade_block_id")
+        keys_to_reset_or_pop = [
+            "final_trade_pnl_audited",
+            "final_long_exit_audited",
+            "final_short_exit_audited",
+            "final_long_exit_order_context",
+            "final_short_exit_order_context",
+            "final_exit_closed_pnl_signatures",
+            "audit_processed_exit_fill_ids",
+            "audit_completed_cycle_indices",
+            "processed_pnl_exec_ids",
+            "processed_pnl_exec_ids_order",
+            "flat_waiting_order_cleanup_logged",
+            "flat_waiting_final_pnl_logged",
+            "flat_final_pnl_ready_logged",
+            "final_pnl_context_missing_logged",
+            "restart_delayed_pending_final_pnl_logged",
+        ]
+
+        for key in keys_to_reset_or_pop:
+            state.pop(key, None)
+
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        runtime_state.realized_long_pnl_total = 0.0
+        runtime_state.realized_short_pnl_total = 0.0
+        state["trade_block_id"] = str(uuid4())
+        _log_event(
+            "fixed_cycle_current_trade_pnl_state_reset",
+            {
+                "reason": reason,
+                "previous_trade_block_id": previous_trade_block_id,
+                "trade_block_id": state.get("trade_block_id"),
+                "last_trade_block_id": state.get("last_trade_block_id"),
+            },
+        )
+
     def _cancel_all_orders_after_exit(
         self,
         runtime_state: RuntimeState,
@@ -5677,8 +7119,24 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         purposes: list[str],
     ) -> None:
         removed = 0
+        skipped = 0
+        exit_purposes = set(self._exit_purposes())
         for client_id, order in list(runtime_state.active_orders.items()):
             if order.purpose not in purposes:
+                continue
+            if order.purpose in exit_purposes and self._is_unsettled_strategy_order(order):
+                skipped += 1
+                logger.info(
+                    "purge_active_orders_skipped_unsettled_exit %s",
+                    {
+                        "client_order_id": client_id,
+                        "exchange_order_id": order.exchange_order_id,
+                        "purpose": order.purpose,
+                        "status": order.status,
+                        "filled_qty": order.filled_qty,
+                        "remaining_qty": order.remaining_qty,
+                    },
+                )
                 continue
             runtime_state.active_orders.pop(client_id, None)
             removed += 1
@@ -5688,9 +7146,369 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "purged_active_orders",
             {
                 "removed": removed,
+                "skipped": skipped,
                 "purposes": purposes,
             },
         )
+
+    def _is_fixed_cycle_exchange_order(self, order: dict[str, Any] | None) -> bool:
+        if not order:
+            return False
+        for key in ("orderLinkId", "order_link_id", "clientOrderId", "client_order_id"):
+            value = str(order.get(key) or "").strip()
+            if value.startswith("fixed_cycle-"):
+                return True
+        return False
+
+    def _refresh_short_reduce_closed_pnl(
+        self,
+        *,
+        fill_event: FillEvent,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        cycle_index: int,
+    ) -> bool:
+        metadata = fill_event.metadata or {}
+        processed_key = "processed_closed_pnl_signatures"
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        processed_signatures = set(cycle_state.get(processed_key) or [])
+
+        order_id = str(
+            (fill_event.exchange_order_id or fill_event.client_order_id or "").strip()
+        )
+        fetcher = getattr(context.order_manager, "fetch_closed_pnl", None) if context.order_manager else None
+        if not order_id or not callable(fetcher):
+            return False
+
+        occurred_at_ms = (
+            int(fill_event.occurred_at.timestamp() * 1000)
+            if getattr(fill_event, "occurred_at", None)
+            else None
+        )
+        start_time_ms = max(0, occurred_at_ms - 300_000) if occurred_at_ms is not None else None
+        end_time_ms = (
+            occurred_at_ms + 900_000 if occurred_at_ms is not None else None
+        )
+        rows = fetcher(
+            self.config.symbol,
+            self.config.category,
+            limit=100,
+            start_time_ms=start_time_ms,
+        ) or []
+
+        if not rows:
+            return False
+
+        symbol, rules, _ = self._resolve_instrument_rules(runtime_state)
+        expected_qty = float(fill_event.exec_qty or 0.0)
+        expected_price = float(fill_event.exec_price or 0.0)
+        expected_side = self._expected_bybit_closed_pnl_side(
+            {
+                "purpose": fill_event.purpose,
+                "cycle_role": metadata.get("cycle_role", "short_reduce"),
+            }
+        )
+        qty_step = float(rules.get("qty_step") or Decimal("0.0001")) if rules else float(Decimal("0.0001"))
+        tick_size = float(
+            rules.get("tick_size")
+            if rules and rules.get("tick_size")
+            else Decimal(str(self.config.price_tick_size or 0.0001))
+        )
+        qty_tolerance = max(qty_step, expected_qty * 0.001)
+        price_tolerance = max(tick_size * 2, expected_price * 0.0005)
+
+        matched = None
+        matched_sig = None
+        match_source = None
+        for row in rows:
+            if (
+                str(row.get("orderId") or "").strip() == order_id
+                and str(row.get("symbol") or "").upper() == symbol.upper()
+            ):
+                matched = row
+                matched_sig = self._make_closed_pnl_signature(row)
+                match_source = "strict_order_id"
+                break
+        if not matched:
+            matched, matched_sig, score = self._select_closed_pnl_match(
+                rows,
+                expected_symbol=symbol,
+                expected_side=expected_side,
+                expected_qty=expected_qty,
+                expected_fill_price=expected_price,
+                start_time_ms=start_time_ms,
+                end_time_ms=end_time_ms,
+                processed_signatures=processed_signatures,
+                qty_tolerance=qty_tolerance,
+                price_tolerance=price_tolerance,
+            )
+            if matched and matched_sig:
+                match_source = "robust_signature_match"
+        if not matched:
+            return False
+        if matched_sig in processed_signatures:
+            return False
+        processed_signatures.add(matched_sig)
+        cycle_state[processed_key] = list(processed_signatures)[-200:]
+
+        closed_pnl = self._safe_float(matched.get("closedPnl"), None)
+        if closed_pnl is None:
+            return False
+        metadata["short_reduce_closed_pnl"] = closed_pnl
+        metadata["short_closed_pnl"] = closed_pnl
+        metadata["closed_pnl"] = closed_pnl
+        metadata["confirmed_closed_pnl"] = closed_pnl
+        metadata["closed_pnl_updated_time"] = self._safe_int(
+            matched.get("updatedTime") or matched.get("createdTime")
+        )
+        metadata["closed_pnl_source"] = match_source or "closed_pnl"
+        metadata["cycle_index"] = int(metadata.get("cycle_index") or cycle_index)
+        metadata.setdefault("cycle_role", "short_reduce")
+        fill_event.metadata = metadata
+        fill_event.confirmed_pnl = closed_pnl
+
+        _log_event(
+            "fixed_cycle_short_reduce_pnl_confirmed",
+            {
+                "symbol": self.config.symbol,
+                "cycle_index": cycle_index,
+                "order_id": order_id,
+                "closed_pnl": closed_pnl,
+                "match_source": match_source,
+            },
+        )
+        _log_event(
+            "closed_pnl_row_matched",
+            {
+                "order_id": order_id,
+                "cycle_index": cycle_index,
+                "symbol": self.config.symbol,
+                "closed_pnl": closed_pnl,
+                "match_source": match_source,
+            },
+        )
+        return True
+
+    def _ensure_post_exit_cleanup_required(
+        self, runtime_state: RuntimeState, *, reason: str | None = None
+    ) -> None:
+        state = runtime_state.strategy_state
+        now_iso = datetime.now(timezone.utc).isoformat()
+        state["post_exit_cleanup_required"] = True
+        state["post_exit_cleanup_verified"] = False
+        state["post_exit_cleanup_in_progress"] = False
+        state["post_exit_cleanup_attempts"] = 0
+        state["post_exit_cleanup_started_at"] = now_iso
+        state["post_exit_cleanup_verified_at"] = None
+        _log_event(
+            "fixed_cycle_post_exit_cleanup_required",
+            {
+                "symbol": self.config.symbol,
+                "reason": reason or "final_exit",
+                "trade_block_id": state.get("trade_block_id"),
+                "last_trade_block_id": state.get("last_trade_block_id"),
+            },
+        )
+
+    def _post_exit_cleanup_pending(self, runtime_state: RuntimeState) -> bool:
+        state = runtime_state.strategy_state
+        return bool(state.get("post_exit_cleanup_required") and not state.get("post_exit_cleanup_verified"))
+
+    def _attempt_post_exit_cleanup(
+        self, snapshot: HedgeSnapshot, runtime_state: RuntimeState, context: StrategyContext
+    ) -> bool:
+        state = runtime_state.strategy_state
+        if not self._post_exit_cleanup_pending(runtime_state):
+            return True
+        state["post_exit_cleanup_attempts"] = int(state.get("post_exit_cleanup_attempts") or 0) + 1
+        state["post_exit_cleanup_in_progress"] = True
+        if not state.get("post_exit_cleanup_started_at"):
+            state["post_exit_cleanup_started_at"] = datetime.now(timezone.utc).isoformat()
+
+        symbol = context.symbol or self.config.symbol
+        category = context.category or self.config.category
+        cancel_success = False
+        order_manager = context.order_manager
+
+        if order_manager and symbol:
+            try:
+                cancel_success = order_manager.cancel_all_orders(symbol=symbol, category=category)
+            except Exception as exc:
+                logger.warning(
+                    "post_exit_cleanup_cancel_failed",
+                    {
+                        "symbol": symbol,
+                        "category": category,
+                        "error": str(exc),
+                    },
+                )
+        _log_event(
+            "fixed_cycle_post_exit_cleanup_cancel_requested",
+            {
+                "symbol": symbol,
+                "category": category,
+                "attempt": state["post_exit_cleanup_attempts"],
+                "cancel_success": cancel_success,
+            },
+        )
+
+        open_orders: list[dict[str, Any]] = []
+        fetch_failed = False
+        if order_manager and symbol:
+            try:
+                open_orders = order_manager.fetch_open_orders(symbol=symbol, category=category) or []
+            except Exception as exc:
+                fetch_failed = True
+                logger.warning(
+                    "post_exit_cleanup_fetch_failed",
+                    {
+                        "symbol": symbol,
+                        "category": category,
+                        "error": str(exc),
+                    },
+                )
+        else:
+            fetch_failed = True
+        if fetch_failed:
+            _log_event(
+                "fixed_cycle_post_exit_cleanup_failed",
+                {
+                    "symbol": symbol,
+                    "category": category,
+                    "attempt": state["post_exit_cleanup_attempts"],
+                    "reason": "fetch_failed",
+                },
+            )
+
+        remaining_fixed_cycle_orders = [
+            order for order in open_orders if self._is_fixed_cycle_exchange_order(order)
+        ]
+        snapshot_purposes, runtime_purposes = self._collect_active_strategy_order_purposes(
+            snapshot, runtime_state
+        )
+        long_qty = float(snapshot.long_qty or 0.0)
+        short_qty = float(snapshot.short_qty or 0.0)
+
+        clean_snapshot = (
+            not snapshot_purposes
+            and not runtime_purposes
+            and long_qty == 0.0
+            and short_qty == 0.0
+        )
+        clean_rest = not remaining_fixed_cycle_orders and clean_snapshot and not fetch_failed
+        state["post_exit_cleanup_in_progress"] = False
+        refreshed_snapshot = None
+        if clean_rest and callable(context.refresh_snapshot):
+            try:
+                refreshed_snapshot = context.refresh_snapshot("post_exit_cleanup")
+            except Exception as exc:
+                logger.warning(
+                    "post_exit_cleanup_snapshot_refresh_failed",
+                    {
+                        "symbol": symbol,
+                        "category": category,
+                        "error": str(exc),
+                    },
+                )
+        snapshot_to_check = refreshed_snapshot or snapshot
+        runtime_state.last_snapshot = snapshot_to_check
+        snapshot_purposes, runtime_purposes = self._collect_active_strategy_order_purposes(
+            snapshot_to_check, runtime_state
+        )
+        long_qty = float(snapshot_to_check.long_qty or 0.0)
+        short_qty = float(snapshot_to_check.short_qty or 0.0)
+
+        clean_snapshot = (
+            not snapshot_purposes
+            and not runtime_purposes
+            and long_qty == 0.0
+            and short_qty == 0.0
+        )
+        if clean_rest and clean_snapshot:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            state["post_exit_cleanup_verified"] = True
+            state["post_exit_cleanup_required"] = False
+            state["post_exit_cleanup_verified_at"] = now_iso
+            state["post_exit_cleanup_verified_snapshot_updated_at"] = (
+                snapshot_to_check.updated_at.isoformat()
+                if snapshot_to_check and snapshot_to_check.updated_at
+                else now_iso
+            )
+            _log_event(
+                "fixed_cycle_post_exit_cleanup_verified",
+                {
+                    "symbol": symbol,
+                    "category": category,
+                    "attempt": state["post_exit_cleanup_attempts"],
+                },
+            )
+            return True
+
+        wait_payload = {
+            "symbol": symbol,
+            "category": category,
+            "attempt": state["post_exit_cleanup_attempts"],
+            "remaining_exchange_orders": len(remaining_fixed_cycle_orders),
+            "snapshot_orders": len(snapshot_purposes),
+            "runtime_orders": len(runtime_purposes),
+            "long_qty": long_qty,
+            "short_qty": short_qty,
+        }
+        _log_event("fixed_cycle_post_exit_cleanup_waiting", wait_payload)
+        if remaining_fixed_cycle_orders and state["post_exit_cleanup_attempts"] >= POST_EXIT_CLEANUP_MAX_ATTEMPTS:
+            _log_event(
+                "fixed_cycle_post_exit_cleanup_failed",
+                {
+                    "symbol": symbol,
+                    "category": category,
+                    "attempt": state["post_exit_cleanup_attempts"],
+                    "remaining_exchange_orders": len(remaining_fixed_cycle_orders),
+                },
+            )
+        return False
+
+    def _ensure_post_exit_cleanup_ready_for_fresh_restart(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        reason: str,
+    ) -> HedgeSnapshot | None:
+        if not self._post_exit_cleanup_pending(runtime_state):
+            return snapshot
+        success = self._attempt_post_exit_cleanup(snapshot, runtime_state, context)
+        if not success:
+            _log_event(
+                "fixed_cycle_fresh_restart_blocked_post_exit_cleanup_pending",
+                {
+                    "symbol": self.config.symbol,
+                    "reason": reason,
+                    "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                    "last_trade_block_id": runtime_state.strategy_state.get("last_trade_block_id"),
+                },
+            )
+            return None
+        refreshed = runtime_state.last_snapshot or snapshot
+        if (
+            (refreshed.long_qty or 0.0) > 0
+            or (refreshed.short_qty or 0.0) > 0
+            or bool(refreshed.active_orders)
+            or bool(runtime_state.active_orders)
+        ):
+            _log_event(
+                "fixed_cycle_fresh_restart_blocked_post_exit_cleanup_not_clean",
+                {
+                    "symbol": self.config.symbol,
+                    "reason": reason,
+                    "snapshot_long_qty": refreshed.long_qty,
+                    "snapshot_short_qty": refreshed.short_qty,
+                    "snapshot_active_orders": len(refreshed.active_orders or ()),
+                    "runtime_active_orders": len(runtime_state.active_orders),
+                },
+            )
+            return None
+        return refreshed
 
     def _reset_cycle_state(self, runtime_state: RuntimeState) -> dict:
         state = runtime_state.strategy_state
@@ -5733,6 +7551,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["long_exit_filled"] = False
         state["short_exit_filled"] = False
         state["exit_locked"] = False
+        state.pop("flat_waiting_order_cleanup_logged", None)
+        state.pop("flat_waiting_final_pnl_logged", None)
+        state.pop("flat_final_pnl_ready_logged", None)
+        state.pop("final_pnl_context_missing_logged", None)
         self._write_cycle_state(cycle_state)
         self._restore_last_trade_pnl_fields(state, preserved_last_trade)
         return cycle_state

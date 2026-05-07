@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -52,6 +53,82 @@ def _resolve_api_keys(args: argparse.Namespace) -> tuple[str, str]:
     return api_key, secret_key
 
 
+def _is_fixed_cycle_order(order: dict[str, object] | None) -> bool:
+    if not order:
+        return False
+    for key in ("orderLinkId", "order_link_id", "clientOrderId", "client_order_id"):
+        value = str(order.get(key) or "")
+        if value.startswith("fixed_cycle-"):
+            return True
+    return False
+
+
+def cleanup_all_strategy_orders_and_verify(
+    symbol: str,
+    category: str,
+    *,
+    order_manager: BybitOrderManager,
+    max_attempts: int = 5,
+    sleep_seconds: float = 1.0,
+) -> bool:
+    logger.info(
+        "fixed_cycle_exchange_cleanup_started",
+        extra={"symbol": symbol, "category": category},
+    )
+
+    conditional_methods = (
+        "cancel_conditional_orders",
+        "cancel_conditional_order",
+        "cancel_stop_orders",
+        "cancel_stop_order",
+    )
+    if not any(hasattr(order_manager, method) for method in conditional_methods):
+        logger.info(
+            "fixed_cycle_exchange_cleanup_conditional_cancel_unavailable",
+            extra={"symbol": symbol, "category": category},
+        )
+
+    for attempt in range(1, max_attempts + 1):
+        order_manager.cancel_all_orders(symbol=symbol, category=category)
+        logger.info(
+            "fixed_cycle_exchange_cleanup_cancel_requested",
+            extra={"symbol": symbol, "category": category, "attempt": attempt},
+        )
+        open_orders = order_manager.fetch_open_orders(symbol=symbol, category=category) or []
+        strategy_orders = [order for order in open_orders if _is_fixed_cycle_order(order)]
+        if not strategy_orders:
+            logger.info(
+                "fixed_cycle_exchange_cleanup_verified_empty",
+                extra={
+                    "symbol": symbol,
+                    "category": category,
+                    "attempt": attempt,
+                },
+            )
+            return True
+        if attempt < max_attempts:
+            logger.info(
+                "fixed_cycle_exchange_cleanup_verify_retry",
+                extra={
+                    "symbol": symbol,
+                    "category": category,
+                    "attempt": attempt,
+                    "remaining_strategy_orders": len(strategy_orders),
+                },
+            )
+            time.sleep(sleep_seconds)
+
+    logger.error(
+        "fixed_cycle_exchange_cleanup_failed",
+        extra={
+            "symbol": symbol,
+            "category": category,
+            "remaining_attempts": 0,
+        },
+    )
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cancel open fixed-cycle orders on Bybit.")
     parser.add_argument("--symbol", help="Override symbol used for cancellation.")
@@ -72,12 +149,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     manager = BybitOrderManager(api_key=api_key, secret_key=secret_key, base_url=args.base_url)
-    logger.info("cleanup_cancel_all", extra={"symbol": symbol, "category": category})
-    success = manager.cancel_all_orders(symbol=symbol, category=category)
+    success = cleanup_all_strategy_orders_and_verify(
+        symbol,
+        category,
+        order_manager=manager,
+    )
     if success:
-        logger.info("cleanup_cancel_all_success", extra={"symbol": symbol, "category": category})
         return 0
-    logger.error("cleanup_cancel_all_failed", extra={"symbol": symbol, "category": category})
     return 1
 
 

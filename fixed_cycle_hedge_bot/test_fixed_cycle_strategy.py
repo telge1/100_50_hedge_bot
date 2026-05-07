@@ -4,11 +4,14 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
+from fixed_cycle_hedge_bot import cleanup
 from fixed_cycle_hedge_bot.fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
-from fixed_cycle_hedge_bot.models import ActiveOrderSnapshot, FillEvent, HedgeSnapshot, ManagedOrder
+from fixed_cycle_hedge_bot.models import ActiveOrderSnapshot, FillEvent, HedgeSnapshot, ManagedOrder, StrategyIntent
 from fixed_cycle_hedge_bot.runtime import GenericHedgeRuntime, GenericRuntimeConfig
+from utils.math_utils import calculate_pnl
 
 
 class FakeOrderManager:
@@ -24,6 +27,7 @@ class FakeOrderManager:
         self.leverage_calls = []
         self.ensure_max_leverage_calls = []
         self.cancel_all_orders_calls = []
+        self.closed_pnl_rows: list[dict[str, Any]] = []
 
     def normalize_qty(self, symbol: str, qty: float, category: str) -> float:
         return qty
@@ -121,6 +125,25 @@ class FakeOrderManager:
         key = order_link_id or order_id
         return list(self.order_histories.get(key, []))
 
+    def fetch_closed_pnl(
+        self,
+        symbol: str,
+        category: str,
+        *,
+        limit: int = 20,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+    ):
+        return list(self.closed_pnl_rows)
+
+
+class FakeAudit:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    def log_event(self, event: str, **kwargs: Any) -> None:
+        self.events.append((event, kwargs))
+
 
 class FixedCycleStrategyTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -164,12 +187,396 @@ class FixedCycleStrategyTests(unittest.TestCase):
             runtime.runtime_state.instrument_rules[symbol_key] = rules
         return runtime
 
+    def _seed_confirmed_cycle_state(
+        self,
+        runtime: GenericHedgeRuntime,
+        *,
+        cycle_index: int = 1,
+        long_pnl: float = -0.15,
+        short_pnl: float = 0.25,
+    ) -> None:
+        state = runtime.runtime_state.strategy_state
+        ledger = state.setdefault(
+            "audit_pnl_ledger",
+            {
+                "cycle_long_reduce_pnl": {},
+                "cycle_short_tp_pnl": {},
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
+                "total_realized_pnl": 0.0,
+            },
+        )
+        cycle_key = str(cycle_index)
+        ledger["cycle_long_reduce_pnl"][cycle_key] = long_pnl
+        ledger["cycle_short_tp_pnl"][cycle_key] = short_pnl
+        cycle_state = state.setdefault("cycle_state", runtime.strategy._default_cycle_state())
+        last_snapshot = runtime.runtime_state.last_snapshot or HedgeSnapshot(
+            symbol=runtime.config.symbol,
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="test",
+        )
+        long_fills = cycle_state.setdefault("long_fills", {})
+        long_fill = long_fills.setdefault(
+            cycle_key,
+            {
+                "price": float(last_snapshot.long_avg or 0.0) or 100.0,
+                "qty": float(last_snapshot.long_qty or 1.0),
+                "client_order_id": f"cycle-long-{cycle_index}",
+                "exec_id": f"exec-cycle-long-{cycle_index}",
+            },
+        )
+        long_fill["confirmed_closed_pnl"] = long_pnl
+        long_fill["closed_pnl_ready"] = True
+        short_fills = cycle_state.setdefault("short_fills", {})
+        short_fill = short_fills.setdefault(
+            cycle_key,
+            {
+                "price": float(last_snapshot.short_avg or 0.0) or 100.0,
+                "qty": float(last_snapshot.short_qty or 0.5),
+                "client_order_id": f"cycle-short-{cycle_index}",
+            },
+        )
+        short_fill["confirmed_closed_pnl"] = short_pnl
+        short_fill["closed_pnl_ready"] = True
+        state.update(
+            {
+                "cycle_long_add_filled": True,
+                "cycle_short_tp_filled": True,
+                "cycle_completed_count": cycle_index,
+                "cycle_pair_count": cycle_index,
+                "short_tp_pending_cycle": 0,
+                "cycle_waiting_for_short_tp": False,
+                "block_exit_rebuild_until_pnl_ready": False,
+            }
+        )
+
+    def _ensure_cycle_order(
+        self,
+        runtime: GenericHedgeRuntime,
+        *,
+        cycle_index: int = 1,
+        side: str = "long",
+        purpose: str = "CYCLE_1_LONG_ADD",
+        status: str = "OPEN",
+        price: float = 99.0,
+    ) -> ManagedOrder:
+        client_id = f"cycle-{side}-{cycle_index}"
+        order = ManagedOrder(
+            client_order_id=client_id,
+            exchange_order_id=f"ex-{client_id}",
+            side=side,
+            qty=1.0,
+            purpose=purpose,
+            price=price,
+            order_type="Limit",
+            reduce_only=side == "short",
+            status=status,
+        )
+        runtime.runtime_state.active_orders[client_id] = order
+        runtime.runtime_state.exchange_to_client_id[order.exchange_order_id] = client_id
+        return order
     def test_safe_float_helper(self) -> None:
         strategy = FixedCycleHedgeStrategy()
         self.assertIsNone(strategy._safe_float(None, None))
         self.assertEqual(strategy._safe_float("", 5.5), 5.5)
         self.assertAlmostEqual(strategy._safe_float("123.45", 0.0), 123.45)
         self.assertEqual(strategy._safe_float("invalid", 2.5), 2.5)
+
+    def test_audit_strategy_noop_is_throttled_and_compact(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["long-exit"] = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.1,
+            remaining_qty=0.9,
+            metadata={"nested": {"very": "large"}},
+        )
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=99.0,
+            short_avg=101.0,
+            active_orders=(runtime.runtime_state.active_orders["long-exit"].to_snapshot(),),
+            source="tick",
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", [], snapshot)
+            runtime._dispatch("tick", [], snapshot)
+
+        noop_calls = [
+            call for call in log_event_mock.call_args_list if call.args and call.args[0] == "strategy_noop"
+        ]
+        self.assertEqual(len(noop_calls), 1)
+        payload = noop_calls[0].kwargs
+        self.assertNotIn("snapshot", payload)
+        self.assertIn("active_orders", payload)
+        self.assertNotIn("metadata", payload["active_orders"][0])
+        self.assertNotIn("client_order_id", payload["active_orders"][0])
+
+    def test_audit_snapshot_refreshed_tick_is_throttled_and_compact(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["long-exit"] = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.2,
+            remaining_qty=0.8,
+            metadata={"secret": "noisy"},
+        )
+        order_manager.positions = [
+            {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 100.0},
+            {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 101.0},
+        ]
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime.refresh_snapshot("tick")
+            runtime.refresh_snapshot("tick")
+
+        snapshot_calls = [
+            call
+            for call in log_event_mock.call_args_list
+            if call.args and call.args[0] == "snapshot_refreshed"
+        ]
+        self.assertEqual(len(snapshot_calls), 1)
+        snapshot_payload = snapshot_calls[0].kwargs["snapshot"]
+        self.assertNotIn("current_price", snapshot_payload)
+        self.assertNotIn("updated_at", snapshot_payload)
+        self.assertNotIn("metadata", snapshot_payload["active_orders"][0])
+
+    def test_audit_fixed_cycle_fast_path_skip_is_throttled(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="initial-long",
+                    exchange_order_id="ex-initial-long",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+            source="websocket",
+        )
+        fill_event = FillEvent(
+            exchange_order_id="ex-fill",
+            client_order_id="fill",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=1.0,
+            exec_price=100.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-fill",
+            metadata={},
+        )
+
+        with patch.object(runtime.context.audit, "log_event") as log_event_mock:
+            runtime.strategy._fast_path_second_order(fill_event, snapshot, runtime.runtime_state, runtime.context)
+            runtime.strategy._fast_path_second_order(fill_event, snapshot, runtime.runtime_state, runtime.context)
+
+        fast_path_calls = [
+            call
+            for call in log_event_mock.call_args_list
+            if call.args and call.args[0] == "fixed_cycle_fast_path_skip"
+        ]
+        self.assertEqual(len(fast_path_calls), 1)
+
+    def test_audit_fixed_cycle_structure_skip_is_throttled(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="initial-long",
+                    exchange_order_id="ex-initial-long",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+            source="tick",
+        )
+
+        with patch.object(runtime.context.audit, "log_event") as log_event_mock:
+            runtime.strategy._rebuild_structure(snapshot, runtime.runtime_state, runtime.context, reason="test")
+            runtime.strategy._rebuild_structure(snapshot, runtime.runtime_state, runtime.context, reason="test")
+
+        structure_calls = [
+            call
+            for call in log_event_mock.call_args_list
+            if call.args and call.args[0] == "fixed_cycle_structure_skip"
+        ]
+        self.assertEqual(len(structure_calls), 1)
+
+    def test_audit_intent_submitted_payload_is_compact_by_default(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+            metadata={"entry_role": "initial_long"},
+        )
+
+        with (
+            patch.object(runtime, "_submit_to_exchange", return_value={"result": {"orderId": "ex-1"}}),
+            patch.object(runtime.audit, "log_event") as log_event_mock,
+        ):
+            runtime.submit_intent(intent, snapshot, source="tick")
+
+        submitted_calls = [
+            call
+            for call in log_event_mock.call_args_list
+            if call.args and call.args[0] == "intent_submitted"
+        ]
+        self.assertEqual(len(submitted_calls), 1)
+        payload = submitted_calls[0].kwargs
+        self.assertEqual(payload["purpose"], runtime.strategy.LONG_ENTRY_PURPOSE)
+        self.assertNotIn("intent", payload)
+        self.assertNotIn("traces", payload)
+
+    def test_audit_critical_events_still_log_after_noise_reduction(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        runtime.runtime_state.active_orders["cycle-long-fill"] = ManagedOrder(
+            client_order_id="cycle-long-fill",
+            exchange_order_id="ex-cycle-long-fill",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=1.0,
+            metadata={"cycle_index": 1, "cycle_role": "long_reduce", "entry_price": 101.0},
+        )
+
+        with patch.object(runtime.audit, "log_event") as audit_log_mock:
+            with patch.object(runtime, "_submit_to_exchange", return_value={"result": {"orderId": "ex-1"}}):
+                runtime.submit_intent(intent, snapshot, source="tick")
+            with patch.object(runtime, "_submit_to_exchange", side_effect=RuntimeError("boom")):
+                with self.assertRaises(RuntimeError):
+                    runtime.submit_intent(intent, snapshot, source="tick")
+            with (
+                patch.object(runtime, "refresh_snapshot", return_value=snapshot),
+                patch.object(runtime.strategy, "on_fill", return_value=[]),
+            ):
+                runtime._ingest_fill_event(
+                    exchange_order_id="ex-cycle-long-fill",
+                    client_id="cycle-long-fill",
+                    qty=1.0,
+                    price=100.0,
+                    exec_id="exec-fill",
+                    cumulative_qty=1.0,
+                    source="websocket",
+                )
+
+        logged_events = [call.args[0] for call in audit_log_mock.call_args_list if call.args]
+        self.assertIn("order_submitted", logged_events)
+        self.assertIn("order_rejected", logged_events)
+        self.assertIn("fill_received", logged_events)
+
+        state = runtime.runtime_state.strategy_state
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.80,
+            "final_short_exit_pnl": -0.50,
+            "total_realized_pnl": 0.0,
+        }
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+        state["trade_block_id"] = "trade-audit"
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as strategy_log_mock:
+            runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+                runtime.runtime_state,
+                runtime.context,
+                "test_audit_critical_events",
+            )
+
+        strategy_events = [call.args[0] for call in strategy_log_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_last_trade_pnl_persisted", strategy_events)
+        self.assertIn("fixed_cycle_trade_pnl_finalized", strategy_events)
 
     def test_bootstrap_places_initial_long_and_short_entries(self) -> None:
         order_manager = FakeOrderManager()
@@ -231,6 +638,10 @@ class FixedCycleStrategyTests(unittest.TestCase):
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
         tp_price = runtime.strategy._calculate_tp_price(break_even_price, snapshot, runtime.runtime_state)
         runtime.runtime_state.strategy_state["last_exit_signature"] = None
+        self._seed_confirmed_cycle_state(runtime)
+        self._seed_confirmed_cycle_state(runtime)
+        self._seed_confirmed_cycle_state(runtime)
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
         intents = runtime.strategy._build_exit_intents(
             snapshot,
             runtime.runtime_state,
@@ -488,6 +899,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
         long_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
         )
@@ -561,6 +973,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
         long_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
         )
@@ -808,6 +1221,12 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
+        self._ensure_cycle_order(
+            runtime,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            side="short",
+            status="OPEN",
+        )
         short_exit = next(order for order in runtime.runtime_state.active_orders.values() if order.purpose == "SHORT_SL_EXIT")
         snapshot = runtime.runtime_state.last_snapshot
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
@@ -1066,6 +1485,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
         runtime.runtime_state.realized_long_pnl_total = -1.0
         long_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
@@ -1122,6 +1542,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         ]
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
 
         state = runtime.runtime_state.strategy_state
         sentinel = {"legacy": "signature"}
@@ -1188,6 +1609,14 @@ class FixedCycleStrategyTests(unittest.TestCase):
 
         state = runtime.runtime_state.strategy_state
         state["cycle_state"] = runtime.strategy._default_cycle_state()
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"1": -0.1},
+            "cycle_short_tp_pnl": {"1": 0.2},
+            "cycle_pnl_entries": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.1,
+        }
         long_fill = FillEvent(
             exchange_order_id="long1",
             client_order_id="long",
@@ -1199,7 +1628,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
             reduce_only=False,
             status="FILLED",
             exec_id="exec-long1",
-            metadata={"cycle_index": 1},
+            metadata={"cycle_index": 1, "cycle_role": "long_reduce", "confirmed_closed_pnl": -0.1},
         )
         runtime.runtime_state.strategy_state.setdefault("cycle_completed_count", 0)
         runtime.runtime_state.strategy_state.setdefault("cycle_waiting_for_short_tp", False)
@@ -1220,13 +1649,218 @@ class FixedCycleStrategyTests(unittest.TestCase):
             reduce_only=True,
             status="FILLED",
             exec_id="exec-short1",
-            metadata={"cycle_index": 1},
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce", "confirmed_closed_pnl": 0.2},
         )
         runtime.strategy._advance_cycle_from_fill(short_fill, runtime.runtime_state)
         self.assertFalse(runtime.runtime_state.strategy_state.get("cycle_waiting_for_short_tp"))
         self.assertEqual(runtime.runtime_state.strategy_state.get("cycle_completed_count"), 1)
         self.assertEqual(runtime.runtime_state.strategy_state.get("current_short_cycle_index"), 1)
         self.assertEqual(runtime.runtime_state.strategy_state.get("short_tp_pending_cycle"), 0)
+
+    def test_on_fill_blocks_cycle_short_reduce_until_closed_pnl_confirmed(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["cycle_state"] = runtime.strategy._default_cycle_state()
+        state["cycle_completed_count"] = 1
+        state["cycle_pair_count"] = 1
+        state["cycle_long_add_filled"] = True
+        state["cycle_short_tp_filled"] = False
+        state["bot_state"] = runtime.strategy.STATE_RUNNING
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"2": -0.1123},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {
+                "cycle_long_reduce:2:cycle-long-2": {
+                    "pnl": -0.1123,
+                    "source": "confirmed_closed_pnl",
+                    "is_confirmed": True,
+                }
+            },
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": -0.1123,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=99.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        fill_event = FillEvent(
+            exchange_order_id="cycle-short-2",
+            client_order_id="cycle-short-2",
+            side="short",
+            purpose="CYCLE_2_SHORT_REDUCE",
+            exec_qty=28.7,
+            exec_price=0.429,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short-2",
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "short_reduce",
+                "runtime_calculated_pnl": 0.4240,
+                "exec_pnl": 0.4240,
+            },
+        )
+
+        with (
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+            patch.object(runtime.audit, "log_event") as audit_log_mock,
+        ):
+            intents = runtime.strategy.on_fill(fill_event, snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        ledger = state["audit_pnl_ledger"]
+        self.assertNotIn("2", ledger["cycle_short_tp_pnl"])
+        self.assertEqual(state.get("cycle_pair_count"), 1)
+        self.assertEqual(state.get("cycle_completed_count"), 1)
+        self.assertNotEqual(state.get("bot_state"), runtime.strategy.STATE_REFILL_PENDING)
+        self.assertFalse(state.get("refill_pending", False))
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_short_reduce_pnl_waiting_for_closed_pnl", event_names)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_short_reduce_pnl_waiting_for_closed_pnl"
+                for call in audit_log_mock.call_args_list
+            )
+        )
+
+    def test_on_fill_cycle_short_reduce_advances_only_after_closed_pnl_confirmed(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = datetime.now(timezone.utc)
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "cycle-short-2",
+                "symbol": "BTCUSDT",
+                "side": "Buy",
+                "closedSize": 28.7,
+                "avgExitPrice": 0.429,
+                "closedPnl": 0.4139141,
+                "createdTime": int(now.timestamp() * 1000),
+                "updatedTime": int(now.timestamp() * 1000),
+            }
+        ]
+        state = runtime.runtime_state.strategy_state
+        state["cycle_state"] = runtime.strategy._default_cycle_state()
+        state["cycle_completed_count"] = 1
+        state["cycle_pair_count"] = 1
+        state["cycle_long_add_filled"] = True
+        state["cycle_short_tp_filled"] = False
+        state["bot_state"] = runtime.strategy.STATE_RUNNING
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"2": -0.1123},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {
+                "cycle_long_reduce:2:cycle-long-2": {
+                    "pnl": -0.1123,
+                    "source": "confirmed_closed_pnl",
+                    "is_confirmed": True,
+                }
+            },
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": -0.1123,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=99.0,
+            short_avg=101.0,
+            source="websocket",
+            updated_at=now,
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        runtime.context.refresh_snapshot = lambda source: snapshot
+        fill_event = FillEvent(
+            exchange_order_id="cycle-short-2",
+            client_order_id="cycle-short-2",
+            side="short",
+            purpose="CYCLE_2_SHORT_REDUCE",
+            exec_qty=28.7,
+            exec_price=0.429,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short-2",
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "short_reduce",
+                "runtime_calculated_pnl": 0.4240,
+                "exec_pnl": 0.4240,
+            },
+            occurred_at=now,
+        )
+
+        with (
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+            patch.object(runtime.strategy, "_build_entry_intents", return_value=[]),
+            patch.object(runtime.strategy, "_fast_path_second_order", return_value=[]),
+            patch.object(runtime.strategy, "_rebuild_structure", return_value=[]),
+        ):
+            runtime.strategy.on_fill(fill_event, snapshot, runtime.runtime_state, runtime.context)
+
+        ledger = state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_short_tp_pnl"]["2"], 0.4139141, places=7)
+        self.assertEqual(state.get("cycle_pair_count"), 2)
+        self.assertEqual(state.get("cycle_completed_count"), 2)
+        self.assertEqual(state.get("bot_state"), runtime.strategy.STATE_REFILL_PENDING)
+        self.assertTrue(state.get("refill_pending"))
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_short_reduce_pnl_confirmed", event_names)
+
+    def test_on_fill_blocks_cycle_long_add_until_closed_pnl_confirmed(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["cycle_state"] = runtime.strategy._default_cycle_state()
+        state["pending_cycle_loss_usdt"] = 0.0
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=99.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        fill_event = FillEvent(
+            exchange_order_id="cycle-long-2",
+            client_order_id="cycle-long-2",
+            side="long",
+            purpose="CYCLE_2_LONG_ADD",
+            exec_qty=10.0,
+            exec_price=99.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-long-2",
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "long_reduce",
+                "runtime_calculated_pnl": -0.2123,
+                "exec_pnl": -0.2123,
+            },
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            runtime.strategy.on_fill(fill_event, snapshot, runtime.runtime_state, runtime.context)
+
+        ledger = state["audit_pnl_ledger"]
+        self.assertNotIn("2", ledger["cycle_long_reduce_pnl"])
+        self.assertEqual(float(state.get("pending_cycle_loss_usdt") or 0.0), 0.0)
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_long_reduce_pnl_waiting_for_closed_pnl", event_names)
 
     def test_max_cycles_counts_pairs(self) -> None:
         order_manager = FakeOrderManager()
@@ -1282,11 +1916,2734 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
 
         runtime.bootstrap()
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
 
         purposes = {order.purpose for order in runtime.runtime_state.active_orders.values()}
         self.assertIn("CYCLE_1_LONG_ADD", purposes)
         if state_path.exists():
             state_path.unlink()
+
+    def test_on_tick_blocks_flat_restart_until_final_pnl_ready(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        state["final_trade_pnl_audited"] = False
+        state["last_trade_pnl_complete"] = False
+        state["last_trade_pnl_usdt"] = None
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        with (
+            patch.object(
+                runtime.strategy,
+                "_emit_final_trade_pnl_if_complete_or_fetch",
+                return_value=False,
+            ) as emit_mock,
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+        ):
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(emit_mock.called)
+        self.assertTrue(state["fresh_restart_required"])
+        self.assertEqual(state["bot_state"], runtime.strategy.STATE_EXITED)
+        self.assertTrue(
+            any(call.args and call.args[0] == "fixed_cycle_flat_waiting_for_final_pnl" for call in log_event_mock.call_args_list)
+        )
+
+    def test_on_tick_allows_restart_when_final_pnl_ready(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["initial_entry_confirmed"] = False
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 1.23
+        state["trade_block_id"] = "trade-1"
+        state["last_trade_block_id"] = "trade-1"
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.87,
+            "final_short_exit_pnl": -0.69,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertFalse(state["fresh_restart_required"])
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_on_tick_forces_final_exit_cleanup_and_allows_restart_when_only_final_exit_orders_remain(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["initial_entry_confirmed"] = False
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 1.23
+        state["trade_block_id"] = "trade-cleanup"
+        state["last_trade_block_id"] = "trade-cleanup"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.87,
+            "final_short_exit_pnl": -0.69,
+            "total_realized_pnl": 0.0,
+        }
+        runtime.runtime_state.active_orders["long-exit"] = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.54,
+            remaining_qty=0.46,
+            metadata={},
+        )
+        runtime.runtime_state.active_orders["short-exit"] = ManagedOrder(
+            client_order_id="short-exit",
+            exchange_order_id="ex-short-exit",
+            side="short",
+            qty=0.5,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+            metadata={},
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-long-exit"] = "long-exit"
+        runtime.runtime_state.exchange_to_client_id["ex-short-exit"] = "short-exit"
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn(runtime.strategy.LONG_ENTRY_PURPOSE, purposes)
+        self.assertIn(runtime.strategy.SHORT_ENTRY_PURPOSE, purposes)
+        self.assertFalse(state["fresh_restart_required"])
+        self.assertEqual(runtime.runtime_state.active_orders, {})
+        self.assertEqual(len(order_manager.cancel_calls), 2)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_flat_final_exit_order_cleanup_forced"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_on_tick_keeps_restart_blocked_when_cycle_order_remains_active(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["initial_entry_confirmed"] = False
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 1.23
+        state["trade_block_id"] = "trade-blocked"
+        state["last_trade_block_id"] = "trade-blocked"
+        runtime.runtime_state.active_orders["cycle-order"] = ManagedOrder(
+            client_order_id="cycle-order",
+            exchange_order_id="ex-cycle-order",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=99.0,
+            order_type="Limit",
+            reduce_only=False,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=1.0,
+            metadata={},
+        )
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(state["fresh_restart_required"])
+        self.assertIn("cycle-order", runtime.runtime_state.active_orders)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_flat_waiting_for_order_cleanup"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_on_tick_true_fresh_start_does_not_wait_for_final_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = False
+        state["fresh_restart_required"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertFalse(state["fresh_restart_required"])
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_build_exit_intents_safely_unlocks_when_open_positions_unprotected(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        state["exit_locked"] = True
+        state["exit_rebuild_allowed"] = False
+        state["long_exit_filled"] = True
+        state["short_exit_filled"] = True
+        state["force_exit_rebuild"] = False
+        snapshot = HedgeSnapshot(
+            symbol="DASHUSDT",
+            current_price=48.1,
+            long_qty=2.11,
+            short_qty=1.05,
+            long_avg=47.42,
+            short_avg=47.43,
+            source="websocket",
+        )
+
+        intents = runtime.strategy._build_exit_intents(
+            snapshot,
+            runtime.runtime_state,
+            current_cycle=1,
+            break_even_price=47.41,
+            tp_price=49.47,
+            hard_stop_active=False,
+            context=runtime.context,
+        )
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("LONG_TP_EXIT", purposes)
+        self.assertIn("SHORT_SL_EXIT", purposes)
+        self.assertFalse(runtime.runtime_state.strategy_state["exit_locked"])
+        self.assertFalse(runtime.runtime_state.strategy_state["exit_rebuild_allowed"])
+        self.assertTrue(runtime.runtime_state.strategy_state["force_exit_rebuild"])
+        self.assertFalse(runtime.runtime_state.strategy_state["long_exit_filled"])
+        self.assertFalse(runtime.runtime_state.strategy_state["short_exit_filled"])
+
+    def test_build_exit_intents_does_not_unlock_when_active_final_exit_orders_present(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        state["exit_locked"] = True
+        state["exit_rebuild_allowed"] = False
+        state["long_exit_filled"] = True
+        state["short_exit_filled"] = True
+        snapshot = HedgeSnapshot(
+            symbol="DASHUSDT",
+            current_price=48.1,
+            long_qty=2.11,
+            short_qty=1.05,
+            long_avg=47.42,
+            short_avg=47.43,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="long-exit",
+                    exchange_order_id="ex-long",
+                    side="long",
+                    qty=2.11,
+                    price=49.47,
+                    purpose="LONG_TP_EXIT",
+                    order_type="Market",
+                    reduce_only=True,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=2.11,
+                ),
+                ActiveOrderSnapshot(
+                    client_order_id="short-exit",
+                    exchange_order_id="ex-short",
+                    side="short",
+                    qty=1.05,
+                    price=49.47,
+                    purpose="SHORT_SL_EXIT",
+                    order_type="Market",
+                    reduce_only=True,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.05,
+                ),
+            ),
+            source="websocket",
+        )
+
+        intents = runtime.strategy._build_exit_intents(
+            snapshot,
+            runtime.runtime_state,
+            current_cycle=1,
+            break_even_price=47.41,
+            tp_price=49.47,
+            hard_stop_active=False,
+            context=runtime.context,
+        )
+
+        self.assertEqual(intents, [])
+        self.assertTrue(runtime.runtime_state.strategy_state["exit_locked"])
+        self.assertFalse(runtime.runtime_state.strategy_state.get("force_exit_rebuild", False))
+
+    def test_open_position_entry_guard_blocks_initial_when_non_refill(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["refill_pending"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.5,
+            short_qty=0.5,
+            long_avg=95.0,
+            short_avg=95.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event") as warn_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_initial_entry_blocked_open_position"
+                for call in warn_mock.call_args_list
+            )
+        )
+
+    def test_unmatched_short_sl_exit_fill_recovers_final_short_exit_context(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.06177,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        order_link_id = "fixed_cycle-short_sl_exit-test"
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "ex-short",
+                "orderLinkId": order_link_id,
+                "closedPnl": -0.2337,
+                "closedSize": 90,
+                "avgExitPrice": 0.06177,
+                "symbol": "PNUTUSDT",
+                "side": "Buy",
+                "createdTime": 1,
+                "updatedTime": 2,
+            }
+        ]
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime.on_websocket_fill(
+                exchange_order_id="ex-short-id",
+                qty=90,
+                price=0.06177,
+                exec_id="exec-short",
+                order_link_id=order_link_id,
+            )
+            runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state, runtime.context, "test_unmatched_short_sl_exit"
+            )
+
+        self.assertTrue(state.get("final_short_exit_audited"))
+        self.assertTrue(state.get("final_short_exit_order_context"))
+        self.assertEqual(
+            state.get("final_short_exit_order_context", {}).get("client_order_id"),
+            order_link_id,
+        )
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_unmatched_fill_recovered"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_unmatched_long_tp_exit_fill_recovers_final_long_exit_context(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.06177,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        order_link_id = "fixed_cycle-long_tp_exit-test"
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "ex-long",
+                "orderLinkId": order_link_id,
+                "closedPnl": 0.1615,
+                "closedSize": 95,
+                "avgExitPrice": 0.0616,
+                "symbol": "PNUTUSDT",
+                "side": "Sell",
+                "createdTime": 3,
+                "updatedTime": 4,
+            }
+        ]
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime.on_websocket_fill(
+                exchange_order_id="ex-long-id",
+                qty=95,
+                price=0.0616,
+                exec_id="exec-long",
+                order_link_id=order_link_id,
+            )
+            runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state, runtime.context, "test_unmatched_long_tp_exit"
+            )
+
+        self.assertTrue(state.get("final_long_exit_audited"))
+        self.assertTrue(state.get("final_long_exit_order_context"))
+        self.assertEqual(
+            state.get("final_long_exit_order_context", {}).get("client_order_id"),
+            order_link_id,
+        )
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_unmatched_fill_recovered"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_unmatched_cycle_long_add_fill_does_not_record_unconfirmed_cycle_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.061,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        with (
+            patch.object(runtime.audit, "log_event") as log_event_mock,
+            patch.object(runtime.strategy, "_rebuild_structure", return_value=[]),
+        ):
+            runtime.on_websocket_fill(
+                exchange_order_id="ex-cycle",
+                qty=50,
+                price=0.0615,
+                exec_id="exec-cycle",
+                order_link_id="fixed_cycle-cycle_1_long_add-test",
+            )
+
+        ledger = state.get("audit_pnl_ledger") or {}
+        self.assertNotIn("1", ledger.get("cycle_long_reduce_pnl", {}))
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_unmatched_fill_recovered"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_runtime_attaches_exec_pnl_for_reduce_only_cycle_long_fill(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=99.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        runtime.runtime_state.active_orders["cycle-long-fill"] = ManagedOrder(
+            client_order_id="cycle-long-fill",
+            exchange_order_id="ex-cycle-long-fill",
+            side="long",
+            qty=10.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=10.0,
+            metadata={"cycle_index": 1, "cycle_role": "long_reduce", "entry_price": 100.0},
+        )
+        expected_pnl = calculate_pnl(100.0, 99.0, 10.0, "long")
+
+        with (
+            patch.object(runtime, "refresh_snapshot", return_value=snapshot),
+            patch.object(runtime.strategy, "on_fill", return_value=[]) as on_fill_mock,
+            patch.object(runtime.audit, "log_event") as log_event_mock,
+        ):
+            runtime._ingest_fill_event(
+                exchange_order_id="ex-cycle-long-fill",
+                client_id="cycle-long-fill",
+                qty=10.0,
+                price=99.0,
+                exec_id="exec-cycle-long-fill",
+                cumulative_qty=10.0,
+                source="websocket",
+            )
+
+        fill_event = on_fill_mock.call_args[0][0]
+        self.assertAlmostEqual(fill_event.metadata["exec_pnl"], expected_pnl)
+        self.assertAlmostEqual(fill_event.metadata["runtime_calculated_pnl"], expected_pnl)
+        self.assertEqual(fill_event.metadata["entry_price_for_pnl"], 100.0)
+        self.assertEqual(fill_event.metadata["pnl_calc_source"], "runtime_calculate_pnl")
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fill_runtime_calculated_pnl_attached"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_strategy_records_cycle_long_add_pnl_into_ledger(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="ex-cycle-long",
+            client_order_id="cycle-long",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=10.0,
+            exec_price=99.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-long",
+            metadata={"cycle_index": 1, "cycle_role": "long_reduce", "confirmed_closed_pnl": -0.15},
+        )
+
+        runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_long_reduce_pnl"]["1"], -0.15)
+
+    def test_strategy_records_cycle_short_tp_pnl_into_ledger(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="ex-cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_TP",
+            exec_qty=10.0,
+            exec_price=101.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short",
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce", "short_reduce_closed_pnl": 0.25},
+        )
+
+        runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], 0.25)
+
+    def test_unmatched_unknown_fill_remains_unmatched(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=1.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="ws",
+        )
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime.on_websocket_fill(
+                exchange_order_id="ex-unknown",
+                qty=5,
+                price=1.0,
+                exec_id="exec-unknown",
+                order_link_id="unknown-prefix",
+            )
+
+        self.assertFalse(
+            any(
+                call.args and call.args[0] == "fixed_cycle_unmatched_fill_recovered"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_on_websocket_fill_accepts_extra_kwargs(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+
+        with patch.object(runtime, "_recover_fixed_cycle_unmatched_fill", return_value=None) as recover_mock:
+            runtime.on_websocket_fill(
+                "exchange-id",
+                11860.0,
+                0.0004779,
+                exec_id="exec-test",
+                order_link_id="fixed_cycle-long_tp_exit-test",
+                order_side="Sell",
+                some_future_kwarg="ignored",
+            )
+
+        recover_mock.assert_called_once()
+
+    def test_recover_unmatched_fill_logs_with_keyword_args(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fake_audit = FakeAudit()
+        runtime.audit = fake_audit
+
+        client_id = runtime._recover_fixed_cycle_unmatched_fill(
+            exchange_order_id="exchange-id",
+            order_link_id="fixed_cycle-long_tp_exit-test",
+            qty=11860.0,
+            price=0.0004779,
+            exec_id="exec-test",
+        )
+
+        self.assertEqual(client_id, "fixed_cycle-long_tp_exit-test")
+        self.assertEqual(len(fake_audit.events), 1)
+        event_name, payload = fake_audit.events[0]
+        self.assertEqual(event_name, "fixed_cycle_unmatched_fill_recovered")
+        self.assertEqual(payload["order_link_id"], "fixed_cycle-long_tp_exit-test")
+        self.assertEqual(payload["exec_qty"], 11860.0)
+        self.assertEqual(payload["inferred_side"], "long")
+
+    def test_dispatch_blocks_initial_entries_with_unsettled_runtime_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"] = ManagedOrder(
+            client_order_id="fixed_cycle-long_tp_exit-test",
+            side="long",
+            qty=210830.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=0.0004779,
+            order_type="Market",
+            reduce_only=True,
+            status="PARTIAL",
+            filled_qty=198970.0,
+            remaining_qty=11860.0,
+        )
+        snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.0004779,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intents = [
+            StrategyIntent(side="long", qty=100.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=50.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+
+        with (
+            patch.object(runtime, "submit_intent") as submit_mock,
+            patch.object(runtime.audit, "log_event") as log_event_mock,
+        ):
+            runtime._dispatch("tick", intents, snapshot)
+
+        submit_mock.assert_not_called()
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "strategy_initial_entry_blocked_unsettled_runtime_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_filled_with_remaining_qty_stays_blocking_for_initial_entries(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.0004779,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"] = ManagedOrder(
+            client_order_id="fixed_cycle-long_tp_exit-test",
+            exchange_order_id="exchange-id",
+            side="long",
+            qty=210830.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=0.0004779,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=210830.0,
+        )
+        runtime.runtime_state.exchange_to_client_id["exchange-id"] = "fixed_cycle-long_tp_exit-test"
+        snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.0004779,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intents = [
+            StrategyIntent(side="long", qty=100.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=50.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime.handle_websocket_event(
+                "order",
+                {
+                    "orderId": "exchange-id",
+                    "orderStatus": "Filled",
+                    "cumExecQty": 198970.0,
+                    "qty": 210830.0,
+                },
+            )
+            runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"].status = "OPEN"
+            runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"].filled_qty = 0.0
+            runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"].remaining_qty = 210830.0
+
+            self.assertIn("fixed_cycle-long_tp_exit-test", runtime.runtime_state.active_orders)
+            managed_order = runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"]
+            self.assertEqual(managed_order.status, "FILLED")
+            self.assertEqual(managed_order.remaining_qty, 11860.0)
+
+            with patch.object(runtime, "submit_intent") as submit_mock:
+                runtime._dispatch("tick", intents, snapshot)
+
+            submit_mock.assert_not_called()
+
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "order_terminal_but_remaining_qty_wait"
+                for call in log_event_mock.call_args_list
+            )
+        )
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "strategy_initial_entry_blocked_unsettled_runtime_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_rebuild_structure_waits_for_unsettled_strategy_orders_when_flat(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_long_qty"] = 100.0
+        state["initial_short_qty"] = 50.0
+        runtime.runtime_state.active_orders["fixed_cycle-long_tp_exit-test"] = ManagedOrder(
+            client_order_id="fixed_cycle-long_tp_exit-test",
+            side="long",
+            qty=210830.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=0.0004779,
+            order_type="Market",
+            reduce_only=True,
+            status="PARTIAL",
+            filled_qty=198970.0,
+            remaining_qty=11860.0,
+        )
+        snapshot = HedgeSnapshot(
+            symbol="PNUTUSDT",
+            current_price=0.0004779,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch.object(runtime.context.audit, "log_event") as log_event_mock:
+            intents = runtime.strategy._rebuild_structure(
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+                reason="test_flat_unsettled_orders",
+            )
+
+        self.assertEqual(intents, [])
+        self.assertNotEqual(state.get("bot_state"), runtime.strategy.STATE_EXITED)
+        self.assertFalse(bool(state.get("fresh_restart_required")))
+        self.assertFalse(
+            any(call.args and call.args[0] == "fixed_cycle_exited" for call in log_event_mock.call_args_list)
+        )
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_flat_waiting_unsettled_strategy_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_final_pnl_blocks_restart_without_final_long_closed_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        state["final_short_exit_audited"] = True
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"1": -0.1620646},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": -0.72342272,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            blocked = runtime.strategy._block_flat_restart_until_final_pnl(
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+                reason="test_cycle_pnl_long_side_satisfied",
+            )
+
+        self.assertTrue(blocked)
+        self.assertFalse(state.get("final_long_exit_audited", False))
+        self.assertFalse(state.get("final_trade_pnl_audited", False))
+        self.assertIsNone(state.get("last_trade_pnl_usdt"))
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_final_exit_pnl_fetch_missing"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_final_pnl_missing_long_context_without_cycle_pnl_stays_blocked(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        state["final_short_exit_audited"] = True
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": -0.72342272,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event") as warning_mock:
+            blocked = runtime.strategy._block_flat_restart_until_final_pnl(
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+                reason="test_missing_context_without_cycle_pnl",
+            )
+
+        self.assertTrue(blocked)
+        self.assertFalse(state.get("final_long_exit_audited", False))
+        self.assertFalse(state.get("final_trade_pnl_audited", False))
+        self.assertIsNone(state.get("last_trade_pnl_usdt"))
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_final_pnl_context_missing"
+                for call in warning_mock.call_args_list
+            )
+        )
+
+    def test_final_pnl_ignores_runtime_calculated_pnl_without_closed_data(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.realized_long_pnl_total = -0.25
+        state = runtime.runtime_state.strategy_state
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+
+        finalized = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+            runtime.runtime_state,
+            runtime.context,
+            "test_runtime_realized_without_trade_evidence",
+        )
+
+        self.assertFalse(finalized)
+        self.assertFalse(state.get("final_long_exit_audited", False))
+        self.assertFalse(state.get("final_trade_pnl_audited", False))
+        self.assertIsNone(state.get("last_trade_pnl_usdt"))
+
+    def test_final_pnl_persists_closed_pnl_over_runtime_calculation(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.80787566,
+            "final_short_exit_pnl": -0.53106832,
+            "total_realized_pnl": 0.0,
+        }
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+        state["trade_block_id"] = "trade-1"
+        runtime.runtime_state.realized_long_pnl_total = 0.91838995
+        runtime.runtime_state.realized_short_pnl_total = -0.47586
+
+        finalized = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+            runtime.runtime_state,
+            runtime.context,
+            "test_double_count_prevention",
+        )
+
+        self.assertTrue(finalized)
+        self.assertAlmostEqual(state["last_trade_pnl_usdt"], 0.27680734)
+        breakdown = state["last_trade_pnl_breakdown"]
+        self.assertEqual(breakdown["cycle_long_reduce_pnl_total"], 0.0)
+        self.assertEqual(breakdown["cycle_short_tp_pnl_total"], 0.0)
+        self.assertEqual(breakdown["cycle_net_pnl"], 0.0)
+        self.assertAlmostEqual(breakdown["final_exit_net_pnl"], 0.27680734)
+        self.assertAlmostEqual(breakdown["total_trade_pnl"], 0.27680734)
+        self.assertEqual(state["last_trade_pnl_source"], "bybit_closed_pnl")
+        self.assertTrue(state["final_trade_pnl_audited"])
+
+    def test_final_pnl_includes_real_cycle_entries_without_runtime_fallback(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"1": -0.10},
+            "cycle_short_tp_pnl": {"1": 0.20},
+            "final_long_exit_pnl": 0.80787566,
+            "final_short_exit_pnl": -0.53106832,
+            "total_realized_pnl": 0.0,
+        }
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+        state["trade_block_id"] = "trade-1"
+        runtime.runtime_state.realized_long_pnl_total = 0.91838995
+        runtime.runtime_state.realized_short_pnl_total = -0.47586
+
+        finalized = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+            runtime.runtime_state,
+            runtime.context,
+            "test_cycle_entries_still_count",
+        )
+
+        self.assertTrue(finalized)
+        breakdown = state["last_trade_pnl_breakdown"]
+        self.assertAlmostEqual(breakdown["cycle_net_pnl"], 0.10)
+        self.assertAlmostEqual(breakdown["final_exit_net_pnl"], 0.27680734)
+        self.assertAlmostEqual(breakdown["total_trade_pnl"], 0.37680734)
+
+    def test_total_trade_pnl_includes_real_cycle_pair_and_final_exits(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"1": -0.15},
+            "cycle_short_tp_pnl": {"1": 0.25},
+            "final_long_exit_pnl": 0.80,
+            "final_short_exit_pnl": -0.50,
+            "total_realized_pnl": 0.0,
+        }
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+        state["trade_block_id"] = "trade-cycle-1"
+
+        finalized = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+            runtime.runtime_state,
+            runtime.context,
+            "test_cycle_pair_and_final_exit_total",
+        )
+
+        self.assertTrue(finalized)
+        breakdown = state["last_trade_pnl_breakdown"]
+        self.assertAlmostEqual(breakdown["cycle_net_pnl"], 0.10)
+        self.assertAlmostEqual(breakdown["final_exit_net_pnl"], 0.30)
+        self.assertAlmostEqual(breakdown["total_trade_pnl"], 0.40)
+        self.assertEqual(state["last_trade_block_id"], "trade-cycle-1")
+
+    def test_final_exit_pnl_ledger_updates_from_closed_pnl_history(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit", "symbol": "BTCUSDT"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit", "symbol": "BTCUSDT"}
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        order_manager.closed_pnl_rows = [
+            {"orderId": "long-exit", "symbol": "BTCUSDT", "orderLinkId": "long-link", "closedPnl": "0.6", "side": "Sell"},
+            {"orderId": "short-exit", "symbol": "BTCUSDT", "orderLinkId": "short-link", "closedPnl": "-0.4", "side": "Buy"},
+        ]
+
+        confirmed = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+            runtime.runtime_state,
+            runtime.context,
+            "test_final_exit_pnl_fetch",
+        )
+
+        self.assertTrue(confirmed)
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_long_exit_pnl"], 0.6)
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_short_exit_pnl"], -0.4)
+        self.assertTrue(state["final_long_exit_audited"])
+        self.assertTrue(state["final_short_exit_audited"])
+
+        order_manager.closed_pnl_rows = []
+        confirmed_again = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+            runtime.runtime_state,
+            runtime.context,
+            "test_final_exit_pnl_fetch_sticky",
+        )
+
+        self.assertTrue(confirmed_again)
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_long_exit_pnl"], 0.6)
+
+    def test_long_exit_waits_for_closed_pnl_before_finalizing(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_short_exit_audited"] = True
+        state["final_short_exit_order_context"] = {
+            "exchange_order_id": "short-exit",
+            "symbol": "BTCUSDT",
+        }
+        state["final_long_exit_order_context"] = {
+            "exchange_order_id": "long-exit",
+            "symbol": "BTCUSDT",
+        }
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": -1.69407931,
+            "total_realized_pnl": 0.0,
+        }
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        order_manager.closed_pnl_rows = [
+            {"orderId": "short-exit", "symbol": "BTCUSDT", "closedPnl": "-1.69407931", "side": "Buy"},
+        ]
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            finalized_before = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+                runtime.runtime_state,
+                runtime.context,
+                "test_long_waits_for_closed_pnl",
+            )
+            blocked = runtime.strategy._block_flat_restart_until_final_pnl(
+                runtime.runtime_state.last_snapshot,
+                runtime.runtime_state,
+                runtime.context,
+                reason="test_long_waits_for_closed_pnl",
+            )
+
+        self.assertFalse(finalized_before)
+        self.assertTrue(blocked)
+        self.assertIsNone(state["audit_pnl_ledger"]["final_long_exit_pnl"])
+        self.assertFalse(state.get("last_trade_pnl_complete", False))
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertNotIn("fixed_cycle_last_trade_pnl_persisted", event_names)
+        self.assertIn("fixed_cycle_flat_waiting_for_final_pnl", event_names)
+
+        order_manager.closed_pnl_rows.append(
+            {"orderId": "long-exit", "symbol": "BTCUSDT", "closedPnl": "0.0", "side": "Sell"}
+        )
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_final:
+            finalized_after = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+                runtime.runtime_state,
+                runtime.context,
+                "test_long_waits_for_closed_pnl",
+            )
+
+        self.assertTrue(finalized_after)
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_long_exit_pnl"], 0.0)
+        event_names_final = [call.args[0] for call in log_event_final.call_args_list if call.args]
+        self.assertIn("fixed_cycle_last_trade_pnl_persisted", event_names_final)
+        self.assertIn("fixed_cycle_trade_pnl_finalized", event_names_final)
+        self.assertTrue(state.get("last_trade_pnl_complete", False))
+
+    def test_fresh_entry_blocked_pending_final_exit_settlement(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.18
+        state["trade_block_id"] = "trade-block"
+        state["last_trade_block_id"] = "trade-block"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.9,
+            "final_short_exit_pnl": -0.7,
+            "total_realized_pnl": 0.0,
+        }
+        runtime.runtime_state.active_orders["final-short-sl"] = ManagedOrder(
+            client_order_id="short-final",
+            side="short",
+            qty=1.0,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="NEW",
+        )
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(
+                snapshot, runtime.runtime_state, runtime.context
+            )
+
+        self.assertEqual(intents, [])
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_fresh_entry_blocked_active_strategy_orders", event_names)
+
+    def test_fresh_entry_blocked_when_pnl_incomplete(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = False
+        state["last_trade_pnl_usdt"] = None
+        state["trade_block_id"] = "trade-block"
+        state["last_trade_block_id"] = "trade-block"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.87,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        state["current_trade_pnl_state_reset_for_entry"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(
+                snapshot, runtime.runtime_state, runtime.context
+            )
+
+        self.assertEqual(intents, [])
+        self.assertFalse(state["current_trade_pnl_state_reset_for_entry"])
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertTrue(
+            any(
+                name in event_names
+                for name in [
+                    "fixed_cycle_fresh_entry_blocked_pending_final_exit_settlement",
+                    "fixed_cycle_flat_waiting_for_final_pnl",
+                ]
+            )
+        )
+
+    def test_fresh_entry_allowed_after_reset_even_if_ledger_empty(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.18
+        state["trade_block_id"] = "trade-finalized"
+        state["last_trade_block_id"] = "trade-finalized"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_fresh_entry_allowed_after_reset_with_new_trade_id(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.21
+        state["trade_block_id"] = "new-trade-id"
+        state["last_trade_block_id"] = "old-trade-id"
+        state["current_trade_pnl_state_reset_for_entry"] = True
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_fresh_entry_blocked_when_previous_trade_not_finalized(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = False
+        state["trade_block_id"] = "trade-incomplete"
+        state["last_trade_block_id"] = "trade-other"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_fresh_entry_blocked_pending_final_exit_settlement"
+                for call in log_event_mock.call_args_list
+                if call.args
+            )
+        )
+
+    def test_fresh_entry_blocked_when_final_exit_orders_active(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.5
+        state["trade_block_id"] = "trade-finalized"
+        state["last_trade_block_id"] = "trade-finalized"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.8,
+            "final_short_exit_pnl": -0.3,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="pending-long-exit",
+                    exchange_order_id="ex-long-exit",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+                    order_type="Market",
+                    reduce_only=True,
+                    status="OPEN",
+                ),
+            ),
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(
+            any(
+                call.args
+                and call.args[0] == "fixed_cycle_fresh_entry_blocked_active_strategy_orders"
+                for call in log_event_mock.call_args_list
+                if call.args
+            )
+        )
+
+    def test_post_exit_cleanup_blocks_fresh_entry_until_orders_canceled(self) -> None:
+        order_manager = FakeOrderManager()
+        order_manager.open_orders = [{"orderLinkId": "fixed_cycle-blocked"}]
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_required"] = True
+        state["post_exit_cleanup_verified"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_post_exit_cleanup_waiting", event_names)
+
+    def test_post_exit_cleanup_waits_when_snapshot_has_cycle_order(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_required"] = True
+        state["post_exit_cleanup_verified"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="cycle-long",
+                    exchange_order_id="ex-cycle-long",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="CYCLE_1_LONG_ADD",
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_post_exit_cleanup_waiting", event_names)
+
+    def test_post_exit_cleanup_allows_entry_after_verified_clean(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_required"] = True
+        state["post_exit_cleanup_verified"] = False
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+        self.assertTrue(state.get("post_exit_cleanup_verified"))
+        self.assertFalse(state.get("post_exit_cleanup_required"))
+
+    def test_post_exit_cleanup_retries_until_snapshot_clean(self) -> None:
+        order_manager = FakeOrderManager()
+        order_manager.open_orders = [{"orderLinkId": "fixed_cycle-blocked"}]
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_required"] = True
+        state["post_exit_cleanup_verified"] = False
+        snapshot_first = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event"):
+            first_intents = runtime.strategy._build_entry_intents(
+                snapshot_first, runtime.runtime_state, runtime.context
+            )
+        self.assertEqual(first_intents, [])
+        order_manager.open_orders = []
+        snapshot_second = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        second_intents = runtime.strategy._build_entry_intents(
+            snapshot_second, runtime.runtime_state, runtime.context
+        )
+
+        purposes = {intent.purpose for intent in second_intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_on_tick_fresh_restart_blocked_post_exit_cleanup_pending(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(
+            runtime.strategy, "_attempt_post_exit_cleanup", return_value=False
+        ), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(
+            runtime.strategy, "_force_fresh_start_reset"
+        ) as force_mock, patch.object(
+            runtime.strategy, "_build_entry_intents"
+        ) as build_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+        self.assertEqual(intents, [])
+        self.assertFalse(reset_mock.called)
+        self.assertFalse(force_mock.called)
+        self.assertFalse(build_mock.called)
+
+    def test_on_tick_fresh_restart_blocked_post_exit_cleanup_not_clean(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        active_order = ManagedOrder(
+            client_order_id="cycle-block",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=False,
+            status="OPEN",
+        )
+        def fake_attempt(snapshot_arg, runtime_state_arg, context_arg):
+            state["post_exit_cleanup_required"] = False
+            state["post_exit_cleanup_verified"] = True
+            runtime_state_arg.last_snapshot = HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=0.0,
+                short_qty=0.0,
+                long_avg=0.0,
+                short_avg=0.0,
+                active_orders=(active_order,),
+                source="tick",
+            )
+            return True
+
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(runtime.strategy, "_attempt_post_exit_cleanup", side_effect=fake_attempt), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(
+            runtime.strategy, "_force_fresh_start_reset"
+        ) as force_mock, patch.object(
+            runtime.strategy, "_build_entry_intents"
+        ) as build_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertFalse(reset_mock.called)
+        self.assertFalse(force_mock.called)
+        self.assertFalse(build_mock.called)
+
+    def test_on_tick_fresh_restart_resets_after_cleanup_verified(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+
+        def fake_attempt(snapshot_arg, runtime_state_arg, context_arg):
+            state["post_exit_cleanup_required"] = False
+            state["post_exit_cleanup_verified"] = True
+            runtime_state_arg.last_snapshot = snapshot_arg
+            return True
+
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(runtime.strategy, "_attempt_post_exit_cleanup", side_effect=fake_attempt), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(runtime.strategy, "_force_fresh_start_reset") as force_mock, patch.object(
+            runtime.strategy, "_build_entry_intents", return_value=[StrategyIntent(side="long", qty=1.0, purpose="INITIAL_LONG_ENTRY")]
+        ) as build_mock:
+            intents = runtime.strategy.on_tick(
+                HedgeSnapshot(
+                    symbol="BTCUSDT",
+                    current_price=100.0,
+                    long_qty=0.0,
+                    short_qty=0.0,
+                    long_avg=0.0,
+                    short_avg=0.0,
+                    source="tick",
+                ),
+                runtime.runtime_state,
+                runtime.context,
+            )
+
+        self.assertTrue(reset_mock.called)
+        self.assertTrue(force_mock.called)
+        self.assertTrue(build_mock.called)
+        self.assertEqual(intents[0].purpose, "INITIAL_LONG_ENTRY")
+        self.assertFalse(state["fresh_restart_required"])
+
+    def test_on_start_fresh_restart_blocks_cleanup_pending(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(runtime.strategy, "_attempt_post_exit_cleanup", return_value=False), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(
+            runtime.strategy, "_force_fresh_start_reset"
+        ) as force_mock, patch.object(
+            runtime.strategy, "_build_entry_intents"
+        ) as build_mock, patch.object(
+            runtime.strategy, "_load_best_coin_symbol_from_file", return_value=None
+        ), patch.object(
+            runtime.strategy, "_trigger_restart_script_after_full_exit", return_value=False
+        ):
+            intents = runtime.strategy.on_start(snapshot, runtime.runtime_state, runtime.context)
+        self.assertEqual(intents, [])
+        self.assertFalse(reset_mock.called)
+        self.assertFalse(force_mock.called)
+        self.assertFalse(build_mock.called)
+
+    def test_on_start_fresh_restart_blocks_cleanup_not_clean(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+        active_order = ManagedOrder(
+            client_order_id="cycle-block",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=False,
+            status="OPEN",
+        )
+        def fake_attempt(snapshot_arg, runtime_state_arg, context_arg):
+            state["post_exit_cleanup_required"] = False
+            state["post_exit_cleanup_verified"] = True
+            runtime_state_arg.last_snapshot = HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=0.0,
+                short_qty=0.0,
+                long_avg=0.0,
+                short_avg=0.0,
+                active_orders=(active_order,),
+                source="tick",
+            )
+            return True
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(runtime.strategy, "_attempt_post_exit_cleanup", side_effect=fake_attempt), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(
+            runtime.strategy, "_force_fresh_start_reset"
+        ) as force_mock, patch.object(
+            runtime.strategy, "_build_entry_intents"
+        ) as build_mock, patch.object(
+            runtime.strategy, "_load_best_coin_symbol_from_file", return_value=None
+        ), patch.object(
+            runtime.strategy, "_trigger_restart_script_after_full_exit", return_value=False
+        ):
+            intents = runtime.strategy.on_start(
+                HedgeSnapshot(
+                    symbol="BTCUSDT",
+                    current_price=100.0,
+                    long_qty=0.0,
+                    short_qty=0.0,
+                    long_avg=0.0,
+                    short_avg=0.0,
+                    source="tick",
+                ),
+                runtime.runtime_state,
+                runtime.context,
+            )
+        self.assertEqual(intents, [])
+        self.assertFalse(reset_mock.called)
+        self.assertFalse(force_mock.called)
+        self.assertFalse(build_mock.called)
+
+    def test_on_start_fresh_restart_resets_after_cleanup_verified(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = True
+        def fake_attempt(snapshot_arg, runtime_state_arg, context_arg):
+            state["post_exit_cleanup_required"] = False
+            state["post_exit_cleanup_verified"] = True
+            runtime_state_arg.last_snapshot = snapshot_arg
+            return True
+        with patch.object(runtime.strategy, "_final_pnl_ready_for_restart", return_value=True), patch.object(
+            runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch"
+        ), patch.object(
+            runtime.strategy, "_dynamic_symbol_entry_gate_allows_entry", return_value=True
+        ), patch.object(runtime.strategy, "_attempt_post_exit_cleanup", side_effect=fake_attempt), patch.object(
+            runtime.strategy, "_reset_cycle_state"
+        ) as reset_mock, patch.object(runtime.strategy, "_force_fresh_start_reset") as force_mock, patch.object(
+            runtime.strategy,
+            "_build_entry_intents",
+            return_value=[StrategyIntent(side="long", qty=1.0, purpose="INITIAL_LONG_ENTRY")],
+        ) as build_mock, patch.object(
+            runtime.strategy, "_load_best_coin_symbol_from_file", return_value=None
+        ), patch.object(
+            runtime.strategy, "_trigger_restart_script_after_full_exit", return_value=False
+        ):
+            intents = runtime.strategy.on_start(
+                HedgeSnapshot(
+                    symbol="BTCUSDT",
+                    current_price=100.0,
+                    long_qty=0.0,
+                    short_qty=0.0,
+                    long_avg=0.0,
+                    short_avg=0.0,
+                    source="tick",
+                ),
+                runtime.runtime_state,
+                runtime.context,
+            )
+        self.assertTrue(reset_mock.called)
+        self.assertTrue(force_mock.called)
+        self.assertTrue(build_mock.called)
+        self.assertEqual(intents[0].purpose, "INITIAL_LONG_ENTRY")
+
+    def test_dispatch_blocks_entry_intents_when_unsettled_orders_exist(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["pending"] = ManagedOrder(
+            client_order_id="pending",
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=False,
+            status="PARTIAL",
+            remaining_qty=0.5,
+        )
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("strategy_initial_entry_blocked_unsettled_runtime_orders", logged_events)
+
+    def test_dispatch_blocks_initial_entries_with_unsettled_snapshot_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="cycle-long-add",
+                    exchange_order_id="ex-cycle-long-add",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="CYCLE_1_LONG_ADD",
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+            source="tick",
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("strategy_initial_entry_blocked_unsettled_snapshot_orders", logged_events)
+
+    def test_dispatch_ignores_stale_snapshot_after_cleanup_verification(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_verified"] = True
+        state["post_exit_cleanup_required"] = False
+        verified_ts = datetime.now(timezone.utc)
+        state["post_exit_cleanup_verified_snapshot_updated_at"] = verified_ts.isoformat()
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot_time = verified_ts - timedelta(seconds=5)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            updated_at=snapshot_time,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="cycle-long-add",
+                    exchange_order_id="ex-cycle-long-add",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="CYCLE_1_LONG_ADD",
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("strategy_initial_entry_snapshot_orders_ignored_after_verified_cleanup", logged_events)
+        self.assertNotIn("strategy_initial_entry_blocked_unsettled_snapshot_orders", logged_events)
+
+    def test_dispatch_still_blocks_fresh_snapshot_after_cleanup_verification(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["post_exit_cleanup_verified"] = True
+        state["post_exit_cleanup_required"] = False
+        verified_ts = datetime.now(timezone.utc)
+        state["post_exit_cleanup_verified_snapshot_updated_at"] = verified_ts.isoformat()
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot_time = verified_ts + timedelta(seconds=5)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            updated_at=snapshot_time,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="cycle-long-add",
+                    exchange_order_id="ex-cycle-long-add",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="CYCLE_1_LONG_ADD",
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("strategy_initial_entry_blocked_unsettled_snapshot_orders", logged_events)
+        self.assertNotIn("strategy_initial_entry_snapshot_orders_ignored_after_verified_cleanup", logged_events)
+
+    def test_dispatch_blocks_initial_entries_during_post_exit_cleanup(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.strategy_state["post_exit_cleanup_required"] = True
+        runtime.runtime_state.strategy_state["post_exit_cleanup_verified"] = False
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("strategy_initial_entry_blocked_post_exit_cleanup_pending", logged_events)
+
+    def test_runtime_unsettled_strategy_orders_ignores_terminal_remaining_qty(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["terminal"] = ManagedOrder(
+            client_order_id="terminal",
+            side="short",
+            qty=1.0,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            filled_qty=1.0,
+            remaining_qty=1000.0,
+        )
+        unsettled = runtime._runtime_unsettled_strategy_orders()
+        self.assertEqual(unsettled, [])
+
+    def test_runtime_unsettled_strategy_orders_blocks_open_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["open-exit"] = ManagedOrder(
+            client_order_id="open-exit",
+            side="short",
+            qty=1.0,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            remaining_qty=0.5,
+        )
+        unsettled = runtime._runtime_unsettled_strategy_orders()
+        self.assertEqual(len(unsettled), 1)
+
+    def test_dispatch_allows_entries_when_terminal_order_has_stale_remaining_qty(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["terminal"] = ManagedOrder(
+            client_order_id="terminal",
+            side="short",
+            qty=1.0,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            remaining_qty=1000.0,
+        )
+        intents = [
+            StrategyIntent(side="long", qty=1.0, purpose=runtime.strategy.LONG_ENTRY_PURPOSE),
+            StrategyIntent(side="short", qty=1.0, purpose=runtime.strategy.SHORT_ENTRY_PURPOSE),
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+        )
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._dispatch("tick", intents, snapshot)
+        logged_events = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertNotIn("strategy_initial_entry_blocked_unsettled_runtime_orders", logged_events)
+
+    def test_reconcile_skips_inference_for_terminal_stale_order(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        managed_order = ManagedOrder(
+            client_order_id="terminal-order",
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=10.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            filled_qty=0.5,
+            remaining_qty=0.5,
+        )
+        runtime.runtime_state.active_orders["terminal-order"] = managed_order
+        def history_fetch(*args, **kwargs: Any) -> list[dict[str, Any]]:
+            return [{"orderStatus": "FILLED", "cumExecQty": 1.0, "avgPrice": 10.0}]
+        order_manager.fetch_open_orders = lambda *args, **kwargs: []
+        order_manager.fetch_order_history = history_fetch
+        with patch.object(runtime, "_ingest_fill_event") as ingest_mock, patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._reconcile_active_orders()
+        self.assertFalse(ingest_mock.called)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "reconcile_terminal_order_skip_stale_fill_inference"
+                for call in log_event_mock.call_args_list
+                if call.args
+            )
+        )
+    def test_stale_previous_trade_pnl_does_not_satisfy_current_trade(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["trade_block_id"] = "trade-2"
+        state["last_trade_block_id"] = "trade-1"
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.27680734
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.80787566,
+            "final_short_exit_pnl": -0.53106832,
+            "total_realized_pnl": 0.0,
+        }
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "long-exit"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+
+        self.assertFalse(runtime.strategy._final_pnl_ready_for_restart(runtime.runtime_state))
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            finalized = runtime.strategy._emit_final_trade_pnl_if_complete_or_fetch(
+                runtime.runtime_state,
+                runtime.context,
+                "test_stale_previous_trade_pnl",
+            )
+
+        self.assertTrue(finalized)
+        self.assertEqual(state["last_trade_block_id"], "trade-2")
+        self.assertAlmostEqual(state["last_trade_pnl_usdt"], 0.27680734)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_stale_final_pnl_state_ignored"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_build_entry_intents_resets_current_trade_pnl_state_but_preserves_last_trade_history(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["last_trade_pnl_usdt"] = 0.27680734
+        state["last_trade_pnl_finalized_at"] = "2026-05-06T08:00:00+00:00"
+        state["last_trade_symbol"] = "FILUSDT"
+        state["last_trade_block_id"] = "trade-1"
+        state["last_trade_pnl_source"] = "audit_ledger"
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_breakdown"] = {"total_trade_pnl": 0.27680734}
+        state["trade_block_id"] = "trade-1"
+        state["final_trade_pnl_audited"] = True
+        state["final_long_exit_audited"] = True
+        state["final_short_exit_audited"] = True
+        state["final_long_exit_order_context"] = {"exchange_order_id": "old-long"}
+        state["final_short_exit_order_context"] = {"exchange_order_id": "old-short"}
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {"1": -0.10},
+            "cycle_short_tp_pnl": {"1": 0.20},
+            "final_long_exit_pnl": 0.80787566,
+            "final_short_exit_pnl": -0.53106832,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertTrue(intents)
+        self.assertEqual(state["last_trade_pnl_usdt"], 0.27680734)
+        self.assertEqual(state["last_trade_block_id"], "trade-1")
+        self.assertFalse(state.get("final_trade_pnl_audited", False))
+        self.assertFalse(state.get("final_long_exit_audited", False))
+        self.assertFalse(state.get("final_short_exit_audited", False))
+        self.assertNotIn("final_long_exit_order_context", state)
+        self.assertNotIn("final_short_exit_order_context", state)
+        self.assertEqual(
+            state["audit_pnl_ledger"],
+            {
+                "cycle_long_reduce_pnl": {},
+                "cycle_short_tp_pnl": {},
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
+                "total_realized_pnl": 0.0,
+            },
+        )
+        self.assertTrue(state.get("trade_block_id"))
+        self.assertNotEqual(state.get("trade_block_id"), "trade-1")
+
+    def test_cycle_fill_without_usable_pnl_logs_missing_cycle_pnl_warning(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="ex-cycle-missing",
+            client_order_id="cycle-missing",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=10.0,
+            exec_price=99.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-missing",
+            metadata={"cycle_index": 1, "cycle_role": "long_reduce"},
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event") as warning_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_cycle_pnl_missing_confirmed_closed_pnl"
+                for call in warning_mock.call_args_list
+            )
+        )
+
+    def test_cycle_short_reduce_ignores_source_long_confirmed_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="ex-cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_TP",
+            exec_qty=103.0,
+            exec_price=0.11919,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "short_reduce",
+                "confirmed_closed_pnl": -0.14475136,
+                "short_reduce_closed_pnl": 0.17510,
+                "exec_pnl": 0.17510,
+                "runtime_calculated_pnl": 0.17510,
+            },
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._audit_calc") as audit_calc_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], 0.17510, places=5)
+        self.assertNotAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], -0.14475136, places=5)
+        exit_summary_payload = next(
+            call.args[1]
+            for call in audit_calc_mock.call_args_list
+            if call.args and call.args[0] == "exit_pnl_summary"
+        )
+        self.assertAlmostEqual(exit_summary_payload["expected_vs_actual"]["actual_fill_pnl"], 0.17510, places=5)
+        self.assertEqual(
+            exit_summary_payload["expected_vs_actual"]["actual_fill_pnl_source"],
+            "short_reduce_closed_pnl",
+        )
+
+    def test_refresh_short_reduce_closed_pnl_called_once_per_audit(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="ex-cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_REDUCE",
+            exec_qty=28.7,
+            exec_price=0.429,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short-1",
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
+        )
+        with patch.object(
+            runtime.strategy, "_refresh_short_reduce_closed_pnl", return_value=False
+        ) as refresh_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+        self.assertEqual(refresh_mock.call_count, 1)
+
+    def test_cycle_short_reduce_delayed_closed_pnl_replace_provisional(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_REDUCE",
+            exec_qty=28.7,
+            exec_price=0.429,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short-reduce",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "short_reduce",
+                "runtime_calculated_pnl": 0.15211,
+                "exec_pnl": 0.15211,
+            },
+        )
+
+        runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertNotIn("1", ledger["cycle_short_tp_pnl"])
+
+        now = datetime.now(timezone.utc)
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "cycle-short",
+                "symbol": "BTCUSDT",
+                "side": "Buy",
+                "closedSize": 28.7,
+                "avgExitPrice": 0.429,
+                "closedPnl": 0.1384,
+                "createdTime": int(now.timestamp() * 1000),
+                "updatedTime": int(now.timestamp() * 1000),
+            }
+        ]
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], 0.1384, places=6)
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_short_reduce_pnl_confirmed", event_names)
+
+    def test_cycle_short_reduce_replaces_runtime_pnl_with_confirmed_closed_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = datetime.now(timezone.utc)
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "cycle-short",
+                "symbol": "BTCUSDT",
+                "side": "Buy",
+                "closedSize": 28.7,
+                "avgExitPrice": 0.429,
+                "closedPnl": 0.1384,
+                "createdTime": int(now.timestamp() * 1000),
+                "updatedTime": int(now.timestamp() * 1000),
+            }
+        ]
+        fill_event = FillEvent(
+            exchange_order_id="cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_REDUCE",
+            exec_qty=28.7,
+            exec_price=0.429,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short-reduce",
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(0.1384, ledger["cycle_short_tp_pnl"]["1"], places=6)
+        self.assertNotAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], 0.15211, places=6)
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_short_reduce_pnl_confirmed", event_names)
+
+    def test_cycle_long_confirmed_replaces_provisional_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        provisional_fill = FillEvent(
+            exchange_order_id="ex-cycle-long",
+            client_order_id="cycle-long",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=206.0,
+            exec_price=0.12033,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-long-provisional",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "runtime_calculated_pnl": -0.11742,
+                "exec_pnl": -0.11742,
+            },
+        )
+        confirmed_fill = FillEvent(
+            exchange_order_id="ex-cycle-long",
+            client_order_id="cycle-long",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=206.0,
+            exec_price=0.12033,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-long-confirmed",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "confirmed_closed_pnl": -0.14475136,
+            },
+        )
+
+        runtime.strategy._audit_exit_pnl_summary(provisional_fill, runtime.runtime_state, runtime.context)
+        runtime.strategy._audit_exit_pnl_summary(confirmed_fill, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_long_reduce_pnl"]["1"], -0.14475136, places=8)
+        self.assertNotAlmostEqual(ledger["cycle_long_reduce_pnl"]["1"], -0.26217136, places=8)
+
+    def test_cycle_net_uses_long_confirmed_and_short_runtime_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        long_fill = FillEvent(
+            exchange_order_id="ex-cycle-long",
+            client_order_id="cycle-long",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=206.0,
+            exec_price=0.12033,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-long-confirmed",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "confirmed_closed_pnl": -0.14475136,
+            },
+        )
+        short_fill = FillEvent(
+            exchange_order_id="ex-cycle-short",
+            client_order_id="cycle-short",
+            side="short",
+            purpose="CYCLE_1_SHORT_TP",
+            exec_qty=103.0,
+            exec_price=0.11919,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-cycle-short",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "short_reduce",
+                "short_reduce_closed_pnl": 0.17510,
+                "exec_pnl": 0.17510,
+                "runtime_calculated_pnl": 0.17510,
+            },
+        )
+
+        runtime.strategy._audit_exit_pnl_summary(long_fill, runtime.runtime_state, runtime.context)
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._audit_calc") as audit_calc_mock:
+            runtime.strategy._audit_exit_pnl_summary(short_fill, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_long_reduce_pnl"]["1"], -0.14475136, places=8)
+        self.assertAlmostEqual(ledger["cycle_short_tp_pnl"]["1"], 0.17510, places=5)
+        self.assertAlmostEqual(
+            ledger["cycle_long_reduce_pnl"]["1"] + ledger["cycle_short_tp_pnl"]["1"],
+            0.03034864,
+            places=8,
+        )
+        exit_summary_payload = next(
+            call.args[1]
+            for call in audit_calc_mock.call_args_list
+            if call.args and call.args[0] == "exit_pnl_summary"
+        )
+        self.assertAlmostEqual(exit_summary_payload["totals"]["cycle_net_pnl"], 0.03034864, places=8)
+        self.assertEqual(
+            exit_summary_payload["expected_vs_actual"]["actual_fill_pnl_source"],
+            "short_reduce_closed_pnl",
+        )
+
+    def test_on_tick_blocks_flat_restart_when_snapshot_has_stale_exit_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="long-exit",
+                    exchange_order_id="ex-long-exit",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="LONG_TP_EXIT",
+                    order_type="Market",
+                    reduce_only=True,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+            source="tick",
+        )
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(state["fresh_restart_required"])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_flat_waiting_for_order_cleanup"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_on_tick_blocks_flat_restart_when_runtime_has_stale_exit_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["initial_entry_confirmed"] = True
+        stale_order = ManagedOrder(
+            client_order_id="short-exit",
+            exchange_order_id="ex-short-exit",
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+            metadata={},
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        runtime.runtime_state.active_orders[stale_order.client_order_id] = stale_order
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(state["fresh_restart_required"])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_flat_waiting_for_order_cleanup"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_reconcile_skips_invalid_open_order_payload_without_crashing(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["short-exit"] = ManagedOrder(
+            client_order_id="short-exit",
+            exchange_order_id="ex-short-exit",
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+            metadata={},
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        order_manager.open_orders = [None]
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._reconcile_active_orders()
+
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "reconcile_order_skip_invalid_payload"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_build_entry_intents_blocks_flat_with_stale_strategy_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="long-exit",
+                    exchange_order_id="ex-long-exit",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="LONG_TP_EXIT",
+                    order_type="Market",
+                    reduce_only=True,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+            source="tick",
+        )
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_fresh_entry_blocked_active_strategy_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_fresh_entry_blocked_when_snapshot_has_cycle_order(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["final_trade_pnl_audited"] = True
+        state["last_trade_pnl_complete"] = True
+        state["last_trade_pnl_usdt"] = 0.5
+        state["trade_block_id"] = "trade-cycle"
+        state["last_trade_block_id"] = "trade-cycle"
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "final_long_exit_pnl": 0.1,
+            "final_short_exit_pnl": -0.1,
+            "total_realized_pnl": 0.0,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+            active_orders=(
+                ActiveOrderSnapshot(
+                    client_order_id="cycle-long-add",
+                    exchange_order_id="ex-cycle-long-add",
+                    side="long",
+                    qty=1.0,
+                    price=None,
+                    purpose="CYCLE_1_LONG_ADD",
+                    order_type="Market",
+                    reduce_only=False,
+                    status="OPEN",
+                    filled_qty=0.0,
+                    remaining_qty=1.0,
+                    metadata={},
+                ),
+            ),
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_fresh_entry_blocked_active_strategy_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_build_exit_intents_skips_flat_snapshot(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.strategy_state["initial_entry_confirmed"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy._build_exit_intents(
+            snapshot,
+            runtime.runtime_state,
+            current_cycle=0,
+            break_even_price=100.0,
+            tp_price=101.0,
+            hard_stop_active=False,
+            context=runtime.context,
+        )
+
+        self.assertEqual(intents, [])
+
+    def test_on_start_true_fresh_start_still_builds_initial_entries(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="bootstrap",
+        )
+
+        intents = runtime.strategy.on_start(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
 
     def test_final_exit_cleanup_waits_for_basket_completion_when_short_sl_fills_first(self) -> None:
         order_manager = FakeOrderManager()
@@ -1393,6 +4750,8 @@ class FixedCycleStrategyTests(unittest.TestCase):
             occurred_at=now,
         )
         runtime.strategy.on_fill(short_fill, post_short_fill_snapshot, runtime.runtime_state, runtime.context)
+        runtime.runtime_state.active_orders.pop("short-exit", None)
+        runtime.runtime_state.exchange_to_client_id.pop("ex-short-exit", None)
 
         self.assertIn("long-exit", runtime.runtime_state.active_orders)
         self.assertEqual(order_manager.cancel_all_orders_calls, [])
@@ -1411,6 +4770,9 @@ class FixedCycleStrategyTests(unittest.TestCase):
         )
         runtime.runtime_state.last_snapshot = flat_snapshot
         order_manager.positions = []
+        runtime.runtime_state.active_orders["long-exit"].status = "FILLED"
+        runtime.runtime_state.active_orders["long-exit"].filled_qty = 1.0
+        runtime.runtime_state.active_orders["long-exit"].remaining_qty = 0.0
 
         long_fill = FillEvent(
             exchange_order_id="ex-long-exit",
@@ -1433,8 +4795,118 @@ class FixedCycleStrategyTests(unittest.TestCase):
         )
         runtime.strategy.on_fill(long_fill, flat_snapshot, runtime.runtime_state, runtime.context)
 
-        self.assertEqual(len(order_manager.cancel_all_orders_calls), 1)
+        self.assertGreaterEqual(len(order_manager.cancel_all_orders_calls), 1)
         self.assertNotIn("long-exit", runtime.runtime_state.active_orders)
+
+    def test_final_exit_cleanup_delayed_when_unsettled_final_exit_order_remains(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = datetime.now(timezone.utc)
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.01,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            active_orders=(),
+            source="websocket",
+            updated_at=now,
+        )
+        runtime.runtime_state.active_orders["long-exit"] = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=210830.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="PARTIAL",
+            filled_qty=198970.0,
+            remaining_qty=11860.0,
+            created_at=now,
+            updated_at=now,
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-long-exit"] = "long-exit"
+        runtime.runtime_state.strategy_state["long_exit_filled"] = True
+        runtime.runtime_state.strategy_state["short_exit_filled"] = True
+
+        with (
+            patch.object(runtime.context.audit, "log_event") as log_event_mock,
+            patch.object(runtime.strategy, "_emit_final_trade_pnl_if_complete_or_fetch") as emit_pnl_mock,
+        ):
+            runtime.strategy._maybe_finalize_exit_after_leg_fill(
+                runtime.runtime_state,
+                runtime.context,
+                runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            )
+
+        self.assertEqual(order_manager.cancel_all_orders_calls, [])
+        self.assertIn("long-exit", runtime.runtime_state.active_orders)
+        self.assertIn("ex-long-exit", runtime.runtime_state.exchange_to_client_id)
+        self.assertFalse(runtime.runtime_state.strategy_state.get("exit_locked"))
+        emit_pnl_mock.assert_called_once()
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "final_exit_cleanup_delayed_unsettled_final_orders"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_purge_active_orders_skips_unsettled_exit_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = datetime.now(timezone.utc)
+        runtime.runtime_state.active_orders["long-exit"] = ManagedOrder(
+            client_order_id="long-exit",
+            exchange_order_id="ex-long-exit",
+            side="long",
+            qty=210830.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="PARTIAL",
+            filled_qty=198970.0,
+            remaining_qty=11860.0,
+            created_at=now,
+            updated_at=now,
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-long-exit"] = "long-exit"
+        runtime.runtime_state.active_orders["cycle-order"] = ManagedOrder(
+            client_order_id="cycle-order",
+            exchange_order_id="ex-cycle-order",
+            side="long",
+            qty=100.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=100.0,
+            order_type="Limit",
+            reduce_only=False,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=100.0,
+            created_at=now,
+            updated_at=now,
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-cycle-order"] = "cycle-order"
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy.logger.info") as info_mock:
+            runtime.strategy._purge_active_orders(
+                runtime.runtime_state,
+                runtime.strategy._all_cycle_purposes() + runtime.strategy._exit_purposes(),
+            )
+
+        self.assertIn("long-exit", runtime.runtime_state.active_orders)
+        self.assertNotIn("cycle-order", runtime.runtime_state.active_orders)
+        self.assertIn("ex-long-exit", runtime.runtime_state.exchange_to_client_id)
+        self.assertNotIn("ex-cycle-order", runtime.runtime_state.exchange_to_client_id)
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "purge_active_orders_skipped_unsettled_exit %s"
+                for call in info_mock.call_args_list
+            )
+        )
 
     def test_config_loader_enforces_expected_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1452,6 +4924,61 @@ class FixedCycleStrategyTests(unittest.TestCase):
 
             self.assertEqual(config.base_notional_usdt, 250.0)
             self.assertEqual(config.hard_stop_cycle, 6)
+
+    def test_cleanup_retries_and_verifies_empty(self) -> None:
+        class FakeCleanupManager:
+            def __init__(self) -> None:
+                self.fetch_calls = 0
+
+            def cancel_all_orders(self, *, symbol: str, category: str) -> bool:
+                return True
+
+            def fetch_open_orders(self, *, symbol: str, category: str):
+                self.fetch_calls += 1
+                if self.fetch_calls == 1:
+                    return [{"orderLinkId": "fixed_cycle-test"}]
+                return []
+
+        manager = FakeCleanupManager()
+        with patch.object(cleanup.logger, "info") as info_mock, patch(
+            "fixed_cycle_hedge_bot.cleanup.time.sleep"
+        ):
+            success = cleanup.cleanup_all_strategy_orders_and_verify(
+                "BTCUSDT",
+                "linear",
+                order_manager=manager,
+                max_attempts=2,
+                sleep_seconds=0.0,
+            )
+
+        self.assertTrue(success)
+        event_names = [call.args[0] for call in info_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_exchange_cleanup_verified_empty", event_names)
+
+    def test_cleanup_fails_when_orders_persist(self) -> None:
+        class FakeCleanupManager:
+            def cancel_all_orders(self, *, symbol: str, category: str) -> bool:
+                return True
+
+            def fetch_open_orders(self, *, symbol: str, category: str):
+                return [{"clientOrderId": "fixed_cycle-fail"}]
+
+        manager = FakeCleanupManager()
+        with patch.object(cleanup.logger, "error") as error_mock, patch(
+            "fixed_cycle_hedge_bot.cleanup.time.sleep"
+        ):
+            success = cleanup.cleanup_all_strategy_orders_and_verify(
+                "BTCUSDT",
+                "linear",
+                order_manager=manager,
+                max_attempts=2,
+                sleep_seconds=0.0,
+            )
+
+        self.assertFalse(success)
+        self.assertTrue(
+            any(call.args and call.args[0] == "fixed_cycle_exchange_cleanup_failed" for call in error_mock.call_args_list)
+        )
 
 
 

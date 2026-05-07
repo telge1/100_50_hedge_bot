@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
+import re
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -117,7 +119,7 @@ class GenericHedgeRuntime:
                 "status": getattr(order, "status", None),
             }
             for order in snapshot.active_orders
-            if getattr(order, "status", None) not in {"FILLED", "CANCELED", "REJECTED"}
+            if not GenericHedgeRuntime._is_terminal_order_status(getattr(order, "status", None))
         ]
         return {
             "symbol": snapshot.symbol,
@@ -127,6 +129,39 @@ class GenericHedgeRuntime:
             "short_avg": snapshot.short_avg,
             "active_order_count": len(active_orders),
             "active_orders": active_orders,
+        }
+
+    def _compact_order_for_audit(self, order: Any) -> dict[str, Any]:
+        return {
+            "purpose": getattr(order, "purpose", None),
+            "status": getattr(order, "status", None),
+            "side": getattr(order, "side", None),
+            "filled_qty": getattr(order, "filled_qty", None),
+            "remaining_qty": getattr(order, "remaining_qty", None),
+            "qty": getattr(order, "qty", None),
+        }
+
+    def _compact_snapshot_for_audit(self, snapshot: HedgeSnapshot) -> dict[str, Any]:
+        return {
+            "symbol": snapshot.symbol,
+            "source": snapshot.source,
+            "long_qty": snapshot.long_qty,
+            "short_qty": snapshot.short_qty,
+            "long_avg": snapshot.long_avg,
+            "short_avg": snapshot.short_avg,
+            "active_orders": [
+                self._compact_order_for_audit(order)
+                for order in snapshot.active_orders
+                if not self._is_terminal_order_status(getattr(order, "status", None))
+            ],
+        }
+
+    @staticmethod
+    def _verbose_audit_enabled() -> bool:
+        return str(os.environ.get("FIXED_CYCLE_VERBOSE_AUDIT", "")).lower() in {
+            "1",
+            "true",
+            "yes",
         }
 
     def bootstrap(self) -> HedgeSnapshot:
@@ -185,7 +220,7 @@ class GenericHedgeRuntime:
             strategy=self.strategy.name,
             symbol=self.config.symbol,
             category=self.config.category,
-            snapshot=snapshot,
+            snapshot=self._compact_snapshot_for_audit(snapshot),
         )
         if allow_start:
             self._dispatch(
@@ -268,23 +303,35 @@ class GenericHedgeRuntime:
             source=source,
         )
         self.runtime_state.last_snapshot = snapshot
-        should_log_snapshot = True
-        if source in {"tick", "reconcile"}:
-            idle_payload = {
-                "source": source,
-                **self._snapshot_idle_summary(snapshot),
-            }
+        compact_snapshot = self._compact_snapshot_for_audit(snapshot)
+        should_log_snapshot = False
+        if source == "tick":
+            should_log_snapshot = self._should_log_idle_event(
+                "snapshot_refreshed:tick",
+                compact_snapshot,
+                interval_seconds=120.0,
+            )
+        elif source == "reconcile":
+            should_log_snapshot = self._should_log_idle_event(
+                "snapshot_refreshed:reconcile",
+                compact_snapshot,
+                interval_seconds=120.0,
+            )
+        elif source in {"fill", "fixed_cycle_post_fill_rest"}:
             should_log_snapshot = self._should_log_idle_event(
                 f"snapshot_refreshed:{source}",
-                idle_payload,
+                compact_snapshot,
+                interval_seconds=30.0,
             )
-        if should_log_snapshot or source not in {"tick", "reconcile"}:
+        else:
+            should_log_snapshot = True
+        if should_log_snapshot:
             self.audit.log_event(
                 "snapshot_refreshed",
                 strategy=self.strategy.name,
                 source=source,
                 symbol=self.config.symbol,
-                snapshot=snapshot,
+                snapshot=compact_snapshot,
             )
         return snapshot
 
@@ -526,7 +573,7 @@ class GenericHedgeRuntime:
             snapshot,
         )
         normalized_status = managed_order.status
-        if normalized_status in {"CANCELED", "REJECTED"}:
+        if normalized_status in {"CANCELED", "CANCELLED", "REJECTED"}:
             self.audit.log_event(
                 "ws_order_terminal_diagnostics",
                 strategy=self.strategy.name,
@@ -560,8 +607,25 @@ class GenericHedgeRuntime:
                 updated_time=payload.get("updatedTime"),
                 full_payload=payload,
             )
-        if normalized_status in {"CANCELED", "REJECTED", "FILLED"}:
+        if normalized_status in {"CANCELED", "CANCELLED", "REJECTED"}:
             self._finalize_managed_order(client_id, managed_order)
+        elif normalized_status == "FILLED":
+            if float(managed_order.remaining_qty or 0.0) <= 1e-9:
+                self._finalize_managed_order(client_id, managed_order)
+            else:
+                self.audit.log_event(
+                    "order_terminal_but_remaining_qty_wait",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    exchange_order_id=order_id,
+                    purpose=managed_order.purpose,
+                    status=managed_order.status,
+                    filled_qty=managed_order.filled_qty,
+                    remaining_qty=managed_order.remaining_qty,
+                    raw_order_status=payload.get("orderStatus"),
+                    cum_exec_qty=payload.get("cumExecQty"),
+                    qty=payload.get("qty"),
+                )
         self._save_strategy_state()
 
     def on_websocket_fill(
@@ -573,23 +637,60 @@ class GenericHedgeRuntime:
         exec_id: str | None = None,
         cumulative_qty: float | None = None,
         order_link_id: str | None = None,
+        order_side: str | None = None,
+        order_status: str | None = None,
+        **kwargs: Any,
     ) -> None:
+        if kwargs:
+            self.logger.debug(
+                "websocket_fill_extra_kwargs %s",
+                {
+                    "exchange_order_id": exchange_order_id,
+                    "order_link_id": order_link_id,
+                    "exec_id": exec_id,
+                    "extra_keys": sorted(kwargs.keys()),
+                },
+            )
         client_id = (
             self.runtime_state.exchange_to_client_id.get(exchange_order_id)
             or (order_link_id if order_link_id in self.runtime_state.active_orders else None)
         )
         if not client_id:
-            self.audit.log_event(
-                "unmatched_fill",
-                strategy=self.strategy.name,
-                exchange_order_id=exchange_order_id,
-                order_link_id=order_link_id,
-                qty=qty,
-                price=price,
-                exec_id=exec_id,
-                cumulative_qty=cumulative_qty,
-            )
-            return
+            try:
+                client_id = self._recover_fixed_cycle_unmatched_fill(
+                    exchange_order_id=exchange_order_id,
+                    order_link_id=order_link_id,
+                    qty=qty,
+                    price=price,
+                    exec_id=exec_id,
+                )
+            except Exception as exc:
+                self.logger.exception(
+                    "fixed_cycle_unmatched_fill_recovery_failed %s",
+                    {
+                        "exchange_order_id": exchange_order_id,
+                        "order_link_id": order_link_id,
+                        "qty": qty,
+                        "price": price,
+                        "exec_id": exec_id,
+                        "order_side": order_side,
+                        "order_status": order_status,
+                        "error": str(exc),
+                    },
+                )
+                return
+            if not client_id:
+                self.audit.log_event(
+                    "unmatched_fill",
+                    strategy=self.strategy.name,
+                    exchange_order_id=exchange_order_id,
+                    order_link_id=order_link_id,
+                    qty=qty,
+                    price=price,
+                    exec_id=exec_id,
+                    cumulative_qty=cumulative_qty,
+                )
+                return
         self._ingest_fill_event(
             exchange_order_id=exchange_order_id,
             client_id=client_id,
@@ -600,43 +701,213 @@ class GenericHedgeRuntime:
             source="websocket",
         )
 
+    def _infer_fixed_cycle_unmatched_fill(self, order_link_id: str | None) -> dict[str, Any] | None:
+        if not order_link_id:
+            return None
+        normalized = str(order_link_id).lower()
+        prefix = "fixed_cycle-"
+        if not normalized.startswith(prefix):
+            return None
+        candidate = normalized[len(prefix) :]
+        cycle_match = re.match(r"cycle_(\d+)_(.+)", candidate)
+        if cycle_match:
+            cycle_index = int(cycle_match.group(1))
+            role_segment = cycle_match.group(2)
+            purpose = f"CYCLE_{cycle_index}_{role_segment.upper()}"
+            cycle_role = "long_reduce" if "long" in role_segment else "short_reduce"
+            metadata = {
+                "cycle_index": cycle_index,
+                "cycle_role": cycle_role,
+            }
+            return {
+                "purpose": purpose,
+                "side": "long" if "long" in role_segment else "short",
+                "reduce_only": True,
+                "metadata": metadata,
+                "inferred_cycle_index": cycle_index,
+                "inferred_cycle_role": cycle_role,
+            }
+        if candidate.startswith("short_sl_exit"):
+            return {
+                "purpose": self.strategy.SHORT_SL_EXIT_PURPOSE,
+                "side": "short",
+                "reduce_only": True,
+                "metadata": {"exit_type": "short_sl", "exit_mode": "basket_exit"},
+                "inferred_cycle_index": None,
+                "inferred_cycle_role": "short_sl_exit",
+            }
+        if candidate.startswith("long_tp_exit"):
+            return {
+                "purpose": self.strategy.LONG_TP_EXIT_PURPOSE,
+                "side": "long",
+                "reduce_only": True,
+                "metadata": {"exit_type": "long_tp", "exit_mode": "basket_exit"},
+                "inferred_cycle_index": None,
+                "inferred_cycle_role": "long_tp_exit",
+            }
+        return None
+
+    def _recover_fixed_cycle_unmatched_fill(
+        self,
+        exchange_order_id: str,
+        order_link_id: str | None,
+        qty: float,
+        price: float,
+        *,
+        exec_id: str | None = None,
+    ) -> str | None:
+        inference = self._infer_fixed_cycle_unmatched_fill(order_link_id)
+        if not inference:
+            return None
+        client_order_id = order_link_id or exchange_order_id
+        if not client_order_id:
+            return None
+        if client_order_id in self.runtime_state.active_orders:
+            return client_order_id
+        metadata = dict(inference.get("metadata") or {})
+        if order_link_id:
+            metadata.setdefault("order_link_id", order_link_id)
+        metadata.setdefault("unmatched_fill", True)
+        managed_order = ManagedOrder(
+            client_order_id=client_order_id,
+            side=inference["side"],
+            qty=max(qty, 0.0),
+            purpose=inference["purpose"],
+            price=price,
+            order_type="Market",
+            reduce_only=inference["reduce_only"],
+            exchange_order_id=exchange_order_id,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=max(qty, 0.0),
+            metadata=metadata,
+        )
+        self.runtime_state.active_orders[client_order_id] = managed_order
+        if exchange_order_id:
+            self.runtime_state.exchange_to_client_id[exchange_order_id] = client_order_id
+        self.audit.log_event(
+            "fixed_cycle_unmatched_fill_recovered",
+            strategy=self.strategy.name,
+            order_id=exchange_order_id,
+            exchange_order_id=exchange_order_id,
+            order_link_id=order_link_id,
+            inferred_purpose=inference["purpose"],
+            inferred_side=inference["side"],
+            inferred_cycle_index=inference.get("inferred_cycle_index"),
+            inferred_cycle_role=inference.get("inferred_cycle_role"),
+            exec_id=exec_id,
+            exec_qty=qty,
+            exec_price=price,
+        )
+        return client_order_id
+
     def _dispatch(self, source: str, intents: list[StrategyIntent], snapshot: HedgeSnapshot) -> None:
         strategy_state = self.runtime_state.strategy_state
         if not intents:
+            compact_snapshot = self._compact_snapshot_for_audit(snapshot)
             noop_payload = {
                 "source": source,
                 "initial_entry_confirmed": bool(strategy_state.get("initial_entry_confirmed")),
-                "current_long_cycle_index": int(strategy_state.get("current_long_cycle_index") or 0),
-                "current_short_cycle_index": int(strategy_state.get("current_short_cycle_index") or 0),
                 "current_effective_cycle": int(strategy_state.get("current_effective_cycle") or 0),
                 "cycle_waiting_for_short_tp": bool(strategy_state.get("cycle_waiting_for_short_tp")),
                 "pending_long_cycle_index": int(strategy_state.get("pending_long_cycle_index") or 0),
-                **self._snapshot_idle_summary(snapshot),
+                "long_qty": snapshot.long_qty,
+                "short_qty": snapshot.short_qty,
+                "active_orders": compact_snapshot["active_orders"],
             }
-            if self._should_log_idle_event("strategy_noop", noop_payload):
+            if self._should_log_idle_event("strategy_noop", noop_payload, interval_seconds=120.0):
                 self.audit.log_event(
                     "strategy_noop",
                     strategy=self.strategy.name,
-                    source=source,
-                    snapshot=snapshot,
-                    initial_entry_confirmed=bool(strategy_state.get("initial_entry_confirmed")),
-                    current_long_cycle_index=int(strategy_state.get("current_long_cycle_index") or 0),
-                    current_short_cycle_index=int(strategy_state.get("current_short_cycle_index") or 0),
-                    current_effective_cycle=int(strategy_state.get("current_effective_cycle") or 0),
-                    cycle_waiting_for_short_tp=bool(strategy_state.get("cycle_waiting_for_short_tp")),
-                    pending_long_cycle_index=int(strategy_state.get("pending_long_cycle_index") or 0),
+                    **noop_payload,
                 )
             return
         entry_purposes = {self.strategy.LONG_ENTRY_PURPOSE, self.strategy.SHORT_ENTRY_PURPOSE}
         entry_intents = [intent for intent in intents if intent.purpose in entry_purposes]
         if entry_intents:
-            self.audit.log_event(
-                "strategy_initial_entry_dispatched",
-                strategy=self.strategy.name,
-                intent_count=len(entry_intents),
-                snapshot=snapshot,
-                source=source,
-            )
+            unsettled_orders = self._runtime_unsettled_strategy_orders()
+            if unsettled_orders:
+                self.audit.log_event(
+                    "strategy_initial_entry_blocked_unsettled_runtime_orders",
+                    strategy=self.strategy.name,
+                    source=source,
+                    intent_count=len(entry_intents),
+                    unsettled_orders=unsettled_orders,
+                    snapshot=snapshot,
+                )
+                intents = [intent for intent in intents if intent.purpose not in entry_purposes]
+                if not intents:
+                    return
+                entry_intents = []
+            if entry_intents:
+                strategy_state = self.runtime_state.strategy_state
+                if (
+                    strategy_state.get("post_exit_cleanup_required")
+                    and not strategy_state.get("post_exit_cleanup_verified")
+                ):
+                    self.audit.log_event(
+                        "strategy_initial_entry_blocked_post_exit_cleanup_pending",
+                        strategy=self.strategy.name,
+                        source=source,
+                        intent_count=len(entry_intents),
+                        cleanup_attempts=strategy_state.get("post_exit_cleanup_attempts", 0),
+                        snapshot=snapshot,
+                    )
+                    intents = [intent for intent in intents if intent.purpose not in entry_purposes]
+                    if not intents:
+                        return
+                    entry_intents = []
+            if entry_intents:
+                _, snapshot_unsettled_orders = self.strategy._collect_unsettled_strategy_orders(
+                    snapshot, self.runtime_state
+                )
+                if snapshot_unsettled_orders:
+                    strategy_state = self.runtime_state.strategy_state
+                    ignore_snapshot = False
+                    verified_at = strategy_state.get("post_exit_cleanup_verified_snapshot_updated_at")
+                    snapshot_ts = getattr(snapshot, "updated_at", None)
+                    if (
+                        strategy_state.get("post_exit_cleanup_verified")
+                        and not strategy_state.get("post_exit_cleanup_required")
+                        and verified_at
+                        and snapshot_ts
+                    ):
+                        try:
+                            verified_dt = datetime.fromisoformat(verified_at)
+                            if verified_dt.tzinfo is None:
+                                verified_dt = verified_dt.replace(tzinfo=timezone.utc)
+                            if snapshot_ts < verified_dt:
+                                ignore_snapshot = True
+                                self.audit.log_event(
+                                    "strategy_initial_entry_snapshot_orders_ignored_after_verified_cleanup",
+                                    strategy=self.strategy.name,
+                                    source=source,
+                                    snapshot_updated_at=snapshot_ts.isoformat(),
+                                    verified_snapshot_updated_at=verified_dt.isoformat(),
+                                )
+                        except ValueError:
+                            pass
+                    if not ignore_snapshot:
+                        self.audit.log_event(
+                            "strategy_initial_entry_blocked_unsettled_snapshot_orders",
+                            strategy=self.strategy.name,
+                            source=source,
+                            intent_count=len(entry_intents),
+                            unsettled_snapshot_orders=snapshot_unsettled_orders,
+                            snapshot=snapshot,
+                        )
+                        intents = [intent for intent in intents if intent.purpose not in entry_purposes]
+                        if not intents:
+                            return
+                        entry_intents = []
+            if entry_intents:
+                self.audit.log_event(
+                    "strategy_initial_entry_dispatched",
+                    strategy=self.strategy.name,
+                    intent_count=len(entry_intents),
+                    snapshot=snapshot,
+                    source=source,
+                )
         self.logger.debug(
             "strategy_intents_handoff %s",
             {
@@ -657,6 +928,63 @@ class GenericHedgeRuntime:
         )
         for intent in intents:
             self.submit_intent(intent, snapshot, source)
+
+    def _should_audit_order_payload_ready(
+        self,
+        managed_order: ManagedOrder,
+        *,
+        trigger_price: float | None,
+    ) -> bool:
+        purpose = str(managed_order.purpose or "").upper()
+        exit_purposes = {
+            self.strategy.LONG_TP_EXIT_PURPOSE,
+            self.strategy.LONG_SL_EXIT_PURPOSE,
+            self.strategy.SHORT_TP_EXIT_PURPOSE,
+            self.strategy.SHORT_SL_EXIT_PURPOSE,
+            getattr(self.strategy, "SHORT_HARD_STOP_PURPOSE", "SHORT_HARD_STOP_EXIT"),
+        }
+        if self._verbose_audit_enabled():
+            return True
+        return bool(
+            managed_order.reduce_only
+            or trigger_price is not None
+            or managed_order.metadata.get("market_fallback")
+            or purpose in exit_purposes
+        )
+
+    def _log_order_payload_ready(
+        self,
+        managed_order: ManagedOrder,
+        *,
+        trigger_price: float | None,
+        exchange_side: str,
+        reference_price: float,
+        trigger_direction: Any,
+        trigger_by: Any,
+        order_filter: Any,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        if not self._should_audit_order_payload_ready(managed_order, trigger_price=trigger_price):
+            return
+        payload = {
+            "strategy": self.strategy.name,
+            "purpose": managed_order.purpose,
+            "side": managed_order.side,
+            "order_type": managed_order.order_type,
+            "qty": managed_order.qty,
+            "price": managed_order.price,
+            "trigger_price": trigger_price,
+            "reduce_only": managed_order.reduce_only,
+            "order_link_id": managed_order.client_order_id,
+            "exchange_side": exchange_side,
+            "reference_price": reference_price,
+            "trigger_direction": trigger_direction,
+            "trigger_by": trigger_by,
+            "order_filter": order_filter,
+        }
+        if extra:
+            payload.update(extra)
+        self.audit.log_event("order_payload_ready", **payload)
 
     def submit_intent(self, intent: StrategyIntent, snapshot: HedgeSnapshot, source: str) -> str | None:
         submit_price = intent.price if intent.price is not None else snapshot.current_price
@@ -699,12 +1027,35 @@ class GenericHedgeRuntime:
             "new_qty": intent.qty,
         }
         should_log_equivalence_check = True
-        if reason == "no_candidate":
+        no_candidate_default = reason == "no_candidate" and candidate_id is None
+        if no_candidate_default and not self._verbose_audit_enabled():
+            should_log_equivalence_check = self._should_log_idle_event(
+                f"intent_equivalence_check:no_candidate:{source}:{intent.purpose}:{intent.side}",
+                {
+                    "source": source,
+                    "purpose": intent.purpose,
+                    "side": intent.side,
+                    "reason": reason,
+                },
+                interval_seconds=120.0,
+            )
+            if should_log_equivalence_check:
+                self.audit.log_event(
+                    "intent_equivalence_check",
+                    strategy=self.strategy.name,
+                    source=source,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=candidate_id,
+                    result=decision,
+                    reject_reason=reason,
+                )
+        elif reason == "no_candidate":
             should_log_equivalence_check = self._should_log_idle_event(
                 "intent_equivalence_check:no_candidate",
                 equivalence_check_payload,
             )
-        if should_log_equivalence_check:
+        if should_log_equivalence_check and not (no_candidate_default and not self._verbose_audit_enabled()):
             self.audit.log_event(
                 "intent_equivalence_check",
                 strategy=self.strategy.name,
@@ -718,14 +1069,15 @@ class GenericHedgeRuntime:
                 new_trigger_price=intent.trigger_price,
                 new_qty=intent.qty,
             )
-        self.audit.log_event(
-            "intent_replace_decision",
-            strategy=self.strategy.name,
-            purpose=intent.purpose,
-            side=intent.side,
-            decision=decision,
-            reason=reason,
-        )
+        if not (no_candidate_default and not self._verbose_audit_enabled()):
+            self.audit.log_event(
+                "intent_replace_decision",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                side=intent.side,
+                decision=decision,
+                reason=reason,
+            )
         replace_purposes_raw = intent.metadata.get("replace_open_purpose")
         if (
             reason == "no_candidate"
@@ -1048,11 +1400,25 @@ class GenericHedgeRuntime:
             source=source,
             client_order_id=client_id,
             exchange_order_id=exchange_order_id,
-            intent=intent,
+            purpose=intent.purpose,
+            side=intent.side,
+            qty=managed_order.qty,
             normalized_qty=submit_qty,
+            order_type=managed_order.order_type,
+            reduce_only=managed_order.reduce_only,
+            trigger_price=intent.trigger_price,
             submit_notional=submit_notional,
-            traces=trace_dicts(intent.trace),
         )
+        if self._verbose_audit_enabled():
+            self.audit.log_event(
+                "intent_submitted_verbose",
+                strategy=self.strategy.name,
+                source=source,
+                client_order_id=client_id,
+                exchange_order_id=exchange_order_id,
+                intent=intent,
+                traces=trace_dicts(intent.trace),
+            )
         if fallback_reason:
             fallback_event = {
                 "strategy": self.strategy.name,
@@ -1337,8 +1703,13 @@ class GenericHedgeRuntime:
         should_log_equivalence_summary = True
         if final_reason == "no_candidate":
             should_log_equivalence_summary = self._should_log_idle_event(
-                "intent_equivalence_summary:no_candidate",
-                equivalence_summary_payload,
+                f"intent_equivalence_summary:no_candidate:{intent.purpose}:{intent.side}",
+                {
+                    "purpose": intent.purpose,
+                    "side": intent.side,
+                    "final_reason": final_reason,
+                },
+                interval_seconds=120.0,
             )
         if should_log_equivalence_summary:
             self.audit.log_event(
@@ -1440,7 +1811,7 @@ class GenericHedgeRuntime:
         long_qty = float(snapshot.long_qty or 0.0) if snapshot else 0.0
         short_qty = float(snapshot.short_qty or 0.0) if snapshot else 0.0
         for client_id, order in list(self.runtime_state.active_orders.items()):
-            if order.purpose not in purposes_set or order.status in {"FILLED", "CANCELED", "REJECTED"}:
+            if order.purpose not in purposes_set or self._is_terminal_order_status(order.status):
                 continue
             # CRITICAL EXIT PROTECTION GUARD
             if order.purpose == self.strategy.SHORT_SL_EXIT_PURPOSE:
@@ -1509,24 +1880,18 @@ class GenericHedgeRuntime:
         slippage_tolerance_type = managed_order.metadata.get("slippage_tolerance_type")
         slippage_tolerance = self._safe_float(managed_order.metadata.get("slippage_tolerance"), None)
         if force_market_fallback and managed_order.reduce_only:
-            self.audit.log_event(
-                "order_payload_ready",
-                strategy=self.strategy.name,
-                purpose=managed_order.purpose,
-                side=managed_order.side,
-                order_type=managed_order.order_type,
-                qty=managed_order.qty,
-                price=managed_order.price,
+            self._log_order_payload_ready(
+                managed_order,
                 trigger_price=trigger_price,
-                reduce_only=managed_order.reduce_only,
-                order_link_id=managed_order.client_order_id,
                 exchange_side=exchange_side,
                 reference_price=snapshot.current_price,
                 trigger_direction=trigger_direction,
                 trigger_by=trigger_by,
                 order_filter=order_filter,
-                market_fallback=True,
-                fallback_reason=managed_order.metadata.get("market_fallback_reason"),
+                extra={
+                    "market_fallback": True,
+                    "fallback_reason": managed_order.metadata.get("market_fallback_reason"),
+                },
             )
             return self.order_manager.place_reduce_market_order(
                 symbol=self.config.symbol,
@@ -1537,17 +1902,9 @@ class GenericHedgeRuntime:
                 order_link_id=managed_order.client_order_id,
             )
         if managed_order.reduce_only and trigger_price is not None:
-            self.audit.log_event(
-                "order_payload_ready",
-                strategy=self.strategy.name,
-                purpose=managed_order.purpose,
-                side=managed_order.side,
-                order_type=managed_order.order_type,
-                qty=managed_order.qty,
-                price=managed_order.price,
+            self._log_order_payload_ready(
+                managed_order,
                 trigger_price=trigger_price,
-                reduce_only=managed_order.reduce_only,
-                order_link_id=managed_order.client_order_id,
                 exchange_side=exchange_side,
                 reference_price=snapshot.current_price,
                 trigger_direction=trigger_direction,
@@ -1567,17 +1924,9 @@ class GenericHedgeRuntime:
                 close_on_trigger=bool(close_on_trigger) if close_on_trigger is not None else False,
             )
         if exit_api == "short_tp_limit":
-            self.audit.log_event(
-                "order_payload_ready",
-                strategy=self.strategy.name,
-                purpose=managed_order.purpose,
-                side=managed_order.side,
-                order_type=managed_order.order_type,
-                qty=managed_order.qty,
-                price=managed_order.price,
+            self._log_order_payload_ready(
+                managed_order,
                 trigger_price=trigger_price,
-                reduce_only=managed_order.reduce_only,
-                order_link_id=managed_order.client_order_id,
                 exchange_side=exchange_side,
                 reference_price=snapshot.current_price,
                 trigger_direction=trigger_direction,
@@ -1612,17 +1961,9 @@ class GenericHedgeRuntime:
                 slippage_tolerance_type=slippage_tolerance_type,
                 slippage_tolerance=slippage_tolerance,
             )
-            self.audit.log_event(
-                "order_payload_ready",
-                strategy=self.strategy.name,
-                purpose=managed_order.purpose,
-                side=managed_order.side,
-                order_type=managed_order.order_type,
-                qty=managed_order.qty,
-                price=managed_order.price,
+            self._log_order_payload_ready(
+                managed_order,
                 trigger_price=trigger_price,
-                reduce_only=managed_order.reduce_only,
-                order_link_id=managed_order.client_order_id,
                 exchange_side=exchange_side,
                 reference_price=snapshot.current_price,
                 trigger_direction=trigger_direction,
@@ -1631,17 +1972,9 @@ class GenericHedgeRuntime:
             )
             return self.order_manager.place_limit_order(payload)
         if managed_order.reduce_only:
-            self.audit.log_event(
-                "order_payload_ready",
-                strategy=self.strategy.name,
-                purpose=managed_order.purpose,
-                side=managed_order.side,
-                order_type=managed_order.order_type,
-                qty=managed_order.qty,
-                price=managed_order.price,
+            self._log_order_payload_ready(
+                managed_order,
                 trigger_price=trigger_price,
-                reduce_only=managed_order.reduce_only,
-                order_link_id=managed_order.client_order_id,
                 exchange_side=exchange_side,
                 reference_price=snapshot.current_price,
                 trigger_direction=trigger_direction,
@@ -1656,17 +1989,9 @@ class GenericHedgeRuntime:
                 category=self.config.category,
                 order_link_id=managed_order.client_order_id,
             )
-        self.audit.log_event(
-            "order_payload_ready",
-            strategy=self.strategy.name,
-            purpose=managed_order.purpose,
-            side=managed_order.side,
-            order_type=managed_order.order_type,
-            qty=managed_order.qty,
-            price=managed_order.price,
+        self._log_order_payload_ready(
+            managed_order,
             trigger_price=trigger_price,
-            reduce_only=managed_order.reduce_only,
-            order_link_id=managed_order.client_order_id,
             exchange_side=exchange_side,
             reference_price=snapshot.current_price,
             trigger_direction=trigger_direction,
@@ -1809,8 +2134,10 @@ class GenericHedgeRuntime:
                     else 0.0
                 )
             )
+            calculated_pnl = 0.0
             if managed_order.reduce_only and incremental_qty > 0 and entry_price > 0:
-                pnl = calculate_pnl(entry_price, price, incremental_qty, managed_order.side)
+                calculated_pnl = calculate_pnl(entry_price, price, incremental_qty, managed_order.side)
+                pnl = calculated_pnl
                 if managed_order.side == "long":
                     self.runtime_state.realized_long_pnl_total += pnl
                     self.runtime_state.temporary_pnl_by_order[client_id] = (
@@ -1821,6 +2148,19 @@ class GenericHedgeRuntime:
                     self.runtime_state.temporary_pnl_by_order[client_id] = (
                         self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
                     )
+            fill_metadata = {
+                **dict(managed_order.metadata),
+                "fill_source": source,
+            }
+            if managed_order.reduce_only:
+                fill_metadata.update(
+                    {
+                        "runtime_calculated_pnl": calculated_pnl,
+                        "exec_pnl": calculated_pnl,
+                        "entry_price_for_pnl": entry_price,
+                        "pnl_calc_source": "runtime_calculate_pnl",
+                    }
+                )
             fill_event = FillEvent(
                 exchange_order_id=exchange_order_id,
                 client_order_id=client_id,
@@ -1834,13 +2174,29 @@ class GenericHedgeRuntime:
                 cumulative_qty=cumulative_qty,
                 incremental_qty=incremental_qty,
                 exec_id=exec_id,
-                metadata={**dict(managed_order.metadata), "fill_source": source},
+                metadata=fill_metadata,
                 traces=list(managed_order.trace),
             )
             self.runtime_state.processed_fill_cumulative[client_id] = max(
                 processed_qty, managed_order.filled_qty
             )
         with self._lock:
+            if managed_order.reduce_only:
+                self.audit.log_event(
+                    "fill_runtime_calculated_pnl_attached",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    exchange_order_id=exchange_order_id,
+                    purpose=managed_order.purpose,
+                    side=managed_order.side,
+                    reduce_only=managed_order.reduce_only,
+                    exec_qty=qty,
+                    incremental_qty=incremental_qty,
+                    exec_price=price,
+                    entry_price_for_pnl=entry_price,
+                    runtime_calculated_pnl=calculated_pnl,
+                    source=source,
+                )
             self.audit.log_event(
                 "fill_received",
                 strategy=self.strategy.name,
@@ -1861,7 +2217,19 @@ class GenericHedgeRuntime:
                 reason="no_active_orders",
             )
             return
-        open_orders = self.order_manager.fetch_open_orders(self.config.symbol, self.config.category) or []
+        raw_open_orders = self.order_manager.fetch_open_orders(self.config.symbol, self.config.category) or []
+        open_orders: list[dict[str, Any]] = []
+        for raw_order in raw_open_orders:
+            if not isinstance(raw_order, dict):
+                self.audit.log_event(
+                    "reconcile_order_skip_invalid_payload",
+                    strategy=self.strategy.name,
+                    payload_type=type(raw_order).__name__,
+                    payload_repr=repr(raw_order),
+                    source="open_orders",
+                )
+                continue
+            open_orders.append(raw_order)
         open_by_exchange_id = {
             str(order.get("orderId")): order for order in open_orders if order.get("orderId")
         }
@@ -1914,6 +2282,17 @@ class GenericHedgeRuntime:
                 )
                 continue
             history_order = history[0]
+            if not isinstance(history_order, dict):
+                self.audit.log_event(
+                    "reconcile_order_skip_invalid_payload",
+                    strategy=self.strategy.name,
+                    payload_type=type(history_order).__name__,
+                    payload_repr=repr(history_order),
+                    source="history",
+                    client_order_id=client_id,
+                    exchange_order_id=managed_order.exchange_order_id,
+                )
+                continue
             normalized_history_status = self._normalize_order_status(history_order.get("orderStatus"), managed_order.status)
             avg_fill_price = self._history_fill_price(history_order, managed_order.price or 0.0)
             cumulative_qty = float(history_order.get("cumExecQty") or 0.0)
@@ -1928,6 +2307,18 @@ class GenericHedgeRuntime:
                 inferred_fill_price=avg_fill_price,
                 cumulative_qty=cumulative_qty,
             )
+            if self._is_terminal_order_status(managed_order.status):
+                self._normalize_terminal_order_quantities(managed_order)
+                self.audit.log_event(
+                    "reconcile_terminal_order_skip_stale_fill_inference",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    exchange_order_id=managed_order.exchange_order_id,
+                    managed_order=self._managed_order_summary(managed_order),
+                    history_order=self._history_order_summary(history_order),
+                    normalized_history_status=normalized_history_status,
+                )
+                continue
             if normalized_history_status in {"FILLED", "PARTIAL"} and cumulative_qty > managed_order.filled_qty:
                 exec_price = avg_fill_price if avg_fill_price > 0 else float(managed_order.price or 0.0)
                 incremental_qty = max(cumulative_qty - managed_order.filled_qty, 0.0)
@@ -1954,7 +2345,7 @@ class GenericHedgeRuntime:
                 managed_order = self.runtime_state.active_orders.get(client_id)
                 if not managed_order:
                     continue
-            if normalized_history_status in {"CANCELED", "REJECTED"}:
+            if normalized_history_status in {"CANCELED", "CANCELLED", "REJECTED"}:
                 managed_order.status = normalized_history_status
                 managed_order.updated_at = utcnow()
                 self._finalize_managed_order(client_id, managed_order)
@@ -2056,7 +2447,7 @@ class GenericHedgeRuntime:
             "active_orders": [
                 self._managed_order_to_dict(order)
                 for order in self.runtime_state.active_orders.values()
-                if order.status not in {"FILLED", "CANCELED", "REJECTED"}
+                if not self._is_terminal_order_status(order.status)
             ],
         }
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -2118,7 +2509,7 @@ class GenericHedgeRuntime:
             recovered_count += 1
 
         for client_id, order in list(self.runtime_state.active_orders.items()):
-            if order.status in {"FILLED", "CANCELED", "REJECTED"}:
+            if self._is_terminal_order_status(order.status):
                 self.runtime_state.active_orders.pop(client_id, None)
                 if order.exchange_order_id:
                     self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
@@ -2159,7 +2550,7 @@ class GenericHedgeRuntime:
         for client_id, existing in self.runtime_state.active_orders.items():
             if client_id in matched_client_ids:
                 continue
-            if existing.status in {"FILLED", "CANCELED", "REJECTED"}:
+            if self._is_terminal_order_status(existing.status):
                 continue
             score, details = self._score_recovery_match(existing, exchange_order)
             if score > 0:
@@ -2404,7 +2795,62 @@ class GenericHedgeRuntime:
             return "PENDING_SUBMIT"
         return default
 
+    @staticmethod
+    def _is_terminal_order_status(status: Any) -> bool:
+        return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
+
+    def _is_unsettled_strategy_order(self, order: ManagedOrder) -> bool:
+        purpose = str(getattr(order, "purpose", "") or "").upper()
+        status = str(getattr(order, "status", "") or "").upper()
+        remaining_qty = float(getattr(order, "remaining_qty", 0.0) or 0.0)
+
+        strategy_purpose = (
+            purpose
+            in {
+                self.strategy.LONG_ENTRY_PURPOSE,
+                self.strategy.SHORT_ENTRY_PURPOSE,
+                self.strategy.LONG_TP_EXIT_PURPOSE,
+                self.strategy.LONG_SL_EXIT_PURPOSE,
+                self.strategy.SHORT_TP_EXIT_PURPOSE,
+                self.strategy.SHORT_SL_EXIT_PURPOSE,
+                getattr(self.strategy, "SHORT_HARD_STOP_PURPOSE", "SHORT_HARD_STOP_EXIT"),
+            }
+            or purpose.startswith("CYCLE_")
+            or purpose.startswith("REFILL_")
+        )
+        if not strategy_purpose:
+            return False
+
+        if status in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}:
+            return False
+
+        if remaining_qty > 1e-9:
+            return True
+
+        return True
+
+    def _runtime_unsettled_strategy_orders(self) -> list[dict[str, Any]]:
+        result = []
+        for order in self.runtime_state.active_orders.values():
+            if self._is_unsettled_strategy_order(order):
+                result.append(self._managed_order_summary(order))
+        return result
+
+    @staticmethod
+    def _normalize_terminal_order_quantities(managed_order: ManagedOrder) -> None:
+        status = str(managed_order.status or "").upper()
+        qty = float(managed_order.qty or 0.0)
+        filled = float(managed_order.filled_qty or 0.0)
+        remaining = float(managed_order.remaining_qty or 0.0)
+        if status == "FILLED":
+            managed_order.filled_qty = max(filled, qty)
+            managed_order.remaining_qty = 0.0
+        elif status in {"CANCELED", "CANCELLED", "REJECTED"}:
+            managed_order.remaining_qty = 0.0
+            managed_order.filled_qty = min(filled, qty)
+
     def _finalize_managed_order(self, client_id: str, managed_order: ManagedOrder) -> None:
+        self._normalize_terminal_order_quantities(managed_order)
         self.runtime_state.active_orders.pop(client_id, None)
         if managed_order.exchange_order_id:
             self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)

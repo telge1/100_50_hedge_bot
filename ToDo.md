@@ -100,5 +100,31 @@ reset state
 10.000 15   10000/10 =1000
 100.000 150
 
- Wie kann das Dashboard später darauf zugreifen?
-Das Dashboard kann den Inhalt von logs/fixed_cycle_state.json (bzw. die vom Runtime gespeicherten strategy_state-Daten) lesen und dort last_trade_pnl_usdt, last_trade_pnl_breakdown etc. auslesen. Alternativ kann ein API-Endpunkt diese Felder spiegeln, sobald der Helper sie gesetzt hat.
+
+
+
+############### Event-Audit / Self-Healing-Controller ##########################
+
+NORMAL RUNNING:
+- LONG_TP_EXIT muss da sein
+- SHORT_SL_EXIT muss da sein
+- CYCLE_X_LONG_ADD oder CYCLE_X_SHORT_TP muss da sein
+
+FINAL EXIT IN PROGRESS:
+- keine neuen Cycle-Orders setzen
+- keine Initial Entries setzen
+- warten bis beide Exit-Legs und PnL bestätigt sind
+
+REFILL:
+- REFILL_LONG / REFILL_SHORT prüfen
+- keine normalen Cycle-Orders erzwingen
+
+FLAT + PNL NICHT FERTIG:
+- keine Initial Entries
+- PnL holen
+- offene alte Orders bereinigen
+
+
+Nicht nur reagieren, wenn etwas crasht,
+sondern nach jedem Event beweisen:
+"Meine Struktur ist gesund."
