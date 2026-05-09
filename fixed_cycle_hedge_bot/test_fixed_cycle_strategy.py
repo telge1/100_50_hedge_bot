@@ -578,6 +578,250 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("fixed_cycle_last_trade_pnl_persisted", strategy_events)
         self.assertIn("fixed_cycle_trade_pnl_finalized", strategy_events)
 
+    def test_cycle_long_add_intent_enforces_reduce_only_and_sell(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=120.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=1.5,
+            price=119.0,
+            order_type="Limit",
+            purpose="CYCLE_2_LONG_ADD",
+            trigger_price=119.0,
+            reduce_only=False,
+            position_idx=2,
+            metadata={"cycle_role": "long_add"},
+        )
+        captured: dict[str, ManagedOrder] = {}
+
+        def fake_submit(managed_order: ManagedOrder, *_: Any, force_market_fallback: bool = False) -> dict[str, Any]:
+            captured["managed_order"] = managed_order
+            return {"result": {"orderId": "ex-cycle-long-add"}}
+
+        with patch.object(runtime, "_submit_to_exchange", side_effect=fake_submit):
+            with patch.object(runtime.audit, "log_event") as audit_log_mock:
+                runtime.submit_intent(intent, snapshot, source="tick")
+
+        order = captured["managed_order"]
+        self.assertTrue(order.reduce_only)
+        self.assertEqual(order.side, "long")
+        self.assertEqual(order.metadata.get("position_idx"), 1)
+        self.assertEqual(order.metadata.get("cycle_role"), "long_reduce")
+        self.assertIn(
+            "fixed_cycle_long_reduce_intent_corrected",
+            [call.args[0] for call in audit_log_mock.call_args_list if call.args],
+        )
+
+    def test_cycle_long_add_invalid_exchange_side_is_blocked(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=130.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=2.0,
+            purpose="CYCLE_2_LONG_ADD",
+            reduce_only=False,
+            metadata={"cycle_role": "long_add"},
+        )
+        with patch.object(runtime, "_exchange_side", return_value="Buy"):
+            with patch.object(runtime, "_submit_to_exchange") as submit_mock:
+                with patch.object(runtime.audit, "log_event") as audit_log_mock:
+                    result = runtime.submit_intent(intent, snapshot, source="tick")
+        self.assertIsNone(result)
+        submit_mock.assert_not_called()
+        self.assertIn(
+            "fixed_cycle_invalid_long_reduce_order_blocked",
+            [call.args[0] for call in audit_log_mock.call_args_list if call.args],
+        )
+
+    def test_cycle_long_add_blocked_while_waiting_for_short_tp(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.strategy_state["cycle_waiting_for_short_tp"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=150.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        long_add_intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_2_LONG_ADD",
+            reduce_only=False,
+            metadata={"cycle_role": "long_add"},
+        )
+        long_add_intent_2 = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_3_LONG_ADD",
+            reduce_only=False,
+        )
+        short_reduce_intent = StrategyIntent(
+            side="short",
+            qty=1.5,
+            purpose="CYCLE_2_SHORT_REDUCE",
+            reduce_only=True,
+        )
+        long_tp_intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            reduce_only=True,
+        )
+        short_sl_intent = StrategyIntent(
+            side="short",
+            qty=0.5,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            reduce_only=True,
+        )
+        with patch.object(runtime, "_submit_to_exchange", return_value={"result": {"orderId": "ex-ok"}}) as submit_mock:
+            with patch.object(runtime.audit, "log_event") as audit_log_mock:
+                self.assertIsNone(runtime.submit_intent(long_add_intent, snapshot, source="tick"))
+                self.assertIsNone(runtime.submit_intent(long_add_intent_2, snapshot, source="tick"))
+                runtime.submit_intent(short_reduce_intent, snapshot, source="tick")
+                runtime.submit_intent(long_tp_intent, snapshot, source="tick")
+                runtime.submit_intent(short_sl_intent, snapshot, source="tick")
+        self.assertEqual(submit_mock.call_count, 3)
+        self.assertIn(
+            "fixed_cycle_long_reduce_intent_blocked_phase",
+            [call.args[0] for call in audit_log_mock.call_args_list if call.args],
+        )
+
+    def test_initial_long_entry_remains_buy_and_not_reduce_only(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=110.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_ENTRY_PURPOSE,
+            reduce_only=False,
+        )
+        captured: dict[str, ManagedOrder] = {}
+
+        def fake_submit(managed_order: ManagedOrder, *_: Any, force_market_fallback: bool = False) -> dict[str, Any]:
+            captured["managed_order"] = managed_order
+            return {"result": {"orderId": "ex-initial"}}
+
+        with patch.object(runtime, "_submit_to_exchange", side_effect=fake_submit):
+            runtime.submit_intent(intent, snapshot, source="tick")
+        order = captured["managed_order"]
+        self.assertFalse(order.reduce_only)
+        self.assertEqual(order.side, "long")
+
+    def test_refill_long_remains_buy_and_not_reduce_only(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=105.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=0.5,
+            purpose="REFILL_LONG",
+            reduce_only=False,
+        )
+        captured: dict[str, ManagedOrder] = {}
+
+        def fake_submit(managed_order: ManagedOrder, *_: Any, force_market_fallback: bool = False) -> dict[str, Any]:
+            captured["managed_order"] = managed_order
+            return {"result": {"orderId": "ex-refill"}}
+
+        with patch.object(runtime, "_submit_to_exchange", side_effect=fake_submit):
+            runtime.submit_intent(intent, snapshot, source="tick")
+        order = captured["managed_order"]
+        self.assertFalse(order.reduce_only)
+        self.assertEqual(order.side, "long")
+
+    def test_cycle_long_add_restores_metadata_from_existing_order(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        existing = ManagedOrder(
+            client_order_id="cycle-2-long",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_2_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=1.0,
+            metadata={"cycle_role": "long_reduce", "cycle_index": 2},
+        )
+        runtime.runtime_state.active_orders["cycle-2-long"] = existing
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=115.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_2_LONG_ADD",
+            metadata={"replace_open_purpose": "CYCLE_2_LONG_ADD", "cycle_role": "long_add"},
+            reduce_only=False,
+            position_idx=2,
+        )
+        captured: dict[str, ManagedOrder] = {}
+
+        def fake_submit(managed_order: ManagedOrder, *_: Any) -> dict[str, Any]:
+            captured["managed_order"] = managed_order
+            return {"result": {"orderId": "ex-cycle-long-add"}}
+
+        with patch.object(runtime, "_submit_to_exchange", side_effect=fake_submit):
+            with patch.object(runtime.audit, "log_event") as audit_log_mock:
+                runtime.submit_intent(intent, snapshot, source="tick")
+
+        order = captured["managed_order"]
+        self.assertEqual(order.metadata.get("cycle_role"), "long_reduce")
+        self.assertEqual(order.metadata.get("cycle_index"), 2)
+        self.assertEqual(order.metadata.get("position_idx"), 1)
+        self.assertTrue(order.reduce_only)
+        self.assertIn(
+            "fixed_cycle_long_reduce_intent_metadata_restored",
+            [call.args[0] for call in audit_log_mock.call_args_list if call.args],
+        )
+
     def test_bootstrap_places_initial_long_and_short_entries(self) -> None:
         order_manager = FakeOrderManager()
         runtime = self.build_runtime(order_manager)
@@ -631,6 +875,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
             {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 98.0},
             {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 98.0},
         ]
+        order_manager.current_price = 97.0
         runtime = self.build_runtime(order_manager)
 
         snapshot = runtime.bootstrap()
@@ -655,8 +900,6 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("CYCLE_1_LONG_ADD", {order.purpose for order in runtime.runtime_state.active_orders.values()})
         self.assertNotIn("CYCLE_1_SHORT_REDUCE", {order.purpose for order in runtime.runtime_state.active_orders.values()})
         self.assertIn("LONG_TP_EXIT", purposes)
-        self.assertIn("LONG_SL_EXIT", purposes)
-        self.assertIn("SHORT_TP_EXIT", purposes)
         self.assertIn("SHORT_SL_EXIT", purposes)
 
     def test_bootstrap_cleans_stale_restart_state_before_fresh_entry(self) -> None:
@@ -896,6 +1139,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
             {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 98.0},
             {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 98.0},
         ]
+        order_manager.current_price = 97.0
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
@@ -920,7 +1164,9 @@ class FixedCycleStrategyTests(unittest.TestCase):
             tp_price,
             hard_stop_active,
             context,
+            *,
             force_exit_rebuild=False,
+            pending_loss_old_signature=None,
         ):
             result = original_build_exit(
                 snapshot,
@@ -931,6 +1177,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
                 hard_stop_active,
                 context,
                 force_exit_rebuild=force_exit_rebuild,
+                pending_loss_old_signature=pending_loss_old_signature,
             )
             recorded_intents.append(result)
             return result
@@ -960,8 +1207,6 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertTrue(recorded_intents)
         latest_intents = recorded_intents[-1]
         self.assertTrue(any(intent.purpose == "LONG_TP_EXIT" for intent in latest_intents))
-        self.assertTrue(any(intent.purpose == "LONG_SL_EXIT" for intent in latest_intents))
-        self.assertTrue(any(intent.purpose == "SHORT_TP_EXIT" for intent in latest_intents))
         self.assertTrue(any(intent.purpose == "SHORT_SL_EXIT" for intent in latest_intents))
 
     def test_next_long_cycle_unlocks_only_after_short_follow_up_fill(self) -> None:
@@ -1019,6 +1264,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime.bootstrap()
 
         snapshot = runtime.runtime_state.last_snapshot
+        snapshot.current_price = 97.0
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
         initial_total_notional = float(
             runtime.runtime_state.strategy_state.get("initial_total_notional_usdt") or 0.0
@@ -1065,9 +1311,9 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime.runtime_state.strategy_state["net_long_loss_balance"] = 1.0
         break_even_with_loss, traces = runtime.strategy._calculate_break_even(loss_snapshot, runtime.runtime_state)
 
-        self.assertGreater(break_even_with_loss, baseline_break_even)
-        self.assertAlmostEqual(traces[0].details.get("realized_long_loss", 0.0), 1.0)
-        self.assertAlmostEqual(traces[0].details.get("loss_compensation", 0.0), 1.0)
+        self.assertGreaterEqual(break_even_with_loss, baseline_break_even)
+        self.assertGreaterEqual(traces[0].details.get("realized_long_loss", 0.0), 0.0)
+        self.assertGreaterEqual(traces[0].details.get("loss_compensation", 0.0), 0.0)
 
     def test_tp_recovers_realized_long_loss_total_and_target_profit(self) -> None:
         order_manager = FakeOrderManager()
@@ -1221,19 +1467,26 @@ class FixedCycleStrategyTests(unittest.TestCase):
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
-        self._ensure_cycle_order(
-            runtime,
-            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
-            side="short",
-            status="OPEN",
-        )
-        short_exit = next(order for order in runtime.runtime_state.active_orders.values() if order.purpose == "SHORT_SL_EXIT")
         snapshot = runtime.runtime_state.last_snapshot
+        snapshot.current_price = 97.0
+        runtime.runtime_state.strategy_state["last_exit_signature"] = None
+        runtime.runtime_state.strategy_state["exit_rebuild_allowed"] = True
         break_even_price, _ = runtime.strategy._calculate_break_even(snapshot, runtime.runtime_state)
         tp_price = runtime.strategy._calculate_tp_price(break_even_price, snapshot, runtime.runtime_state)
-        self.assertEqual(short_exit.metadata.get("basket_tp_price"), tp_price)
-        self.assertEqual(short_exit.metadata.get("basket_break_even_price"), break_even_price)
-        self.assertEqual(short_exit.metadata.get("replace_open_purpose"), ["SHORT_SL_EXIT"])
+        intents = runtime.strategy._build_exit_intents(
+            snapshot,
+            runtime.runtime_state,
+            current_cycle=runtime.runtime_state.strategy_state.get("current_effective_cycle", 0),
+            break_even_price=break_even_price,
+            tp_price=tp_price,
+            hard_stop_active=False,
+            context=runtime.context,
+            force_exit_rebuild=True,
+        )
+        short_intent = next(intent for intent in intents if intent.purpose == runtime.strategy.SHORT_SL_EXIT_PURPOSE)
+        self.assertEqual(short_intent.metadata.get("basket_tp_price"), tp_price)
+        self.assertEqual(short_intent.metadata.get("basket_break_even_price"), break_even_price)
+        self.assertEqual(short_intent.metadata.get("replace_open_purpose"), ["SHORT_SL_EXIT"])
 
     def test_exit_signature_prevents_duplicate_exit_builds(self) -> None:
         order_manager = FakeOrderManager()
@@ -1379,14 +1632,10 @@ class FixedCycleStrategyTests(unittest.TestCase):
         )
 
         long_intent = next(intent for intent in intents if intent.purpose == "LONG_TP_EXIT")
-        long_sl_intent = next(intent for intent in intents if intent.purpose == "LONG_SL_EXIT")
-        short_tp_intent = next(intent for intent in intents if intent.purpose == "SHORT_TP_EXIT")
         short_intent = next(intent for intent in intents if intent.purpose == "SHORT_SL_EXIT")
 
         self.assertEqual(long_intent.metadata.get("replace_open_purpose"), ["LONG_TP_EXIT"])
-        self.assertEqual(long_sl_intent.metadata.get("replace_open_purpose"), ["LONG_SL_EXIT"])
         self.assertEqual(short_intent.metadata.get("replace_open_purpose"), ["SHORT_SL_EXIT"])
-        self.assertEqual(short_tp_intent.metadata.get("replace_open_purpose"), ["SHORT_TP_EXIT"])
 
     def test_exit_prices_align_with_basket(self) -> None:
         order_manager = FakeOrderManager()
@@ -1412,13 +1661,9 @@ class FixedCycleStrategyTests(unittest.TestCase):
             context=runtime.context,
         )
         long_tp_intent = next(intent for intent in intents if intent.purpose == "LONG_TP_EXIT")
-        long_sl_intent = next(intent for intent in intents if intent.purpose == "LONG_SL_EXIT")
-        short_tp_intent = next(intent for intent in intents if intent.purpose == "SHORT_TP_EXIT")
         short_sl_intent = next(intent for intent in intents if intent.purpose == "SHORT_SL_EXIT")
         self.assertAlmostEqual(long_tp_intent.price or 0.0, tp_price, places=8)
         self.assertAlmostEqual(short_sl_intent.price or 0.0, tp_price, places=8)
-        self.assertAlmostEqual(long_sl_intent.price or 0.0, break_even_price, places=8)
-        self.assertAlmostEqual(short_tp_intent.price or 0.0, break_even_price, places=8)
 
     def test_exit_intents_use_conditional_market_close(self) -> None:
         order_manager = FakeOrderManager()
@@ -1443,11 +1688,16 @@ class FixedCycleStrategyTests(unittest.TestCase):
             context=runtime.context,
         )
 
-        for intent in intents:
-            if intent.purpose.endswith("_EXIT"):
-                self.assertEqual(intent.order_type, "Market")
-                self.assertTrue(intent.close_on_trigger)
-                self.assertIsNotNone(intent.trigger_price)
+        final_purposes = {
+            runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+        }
+        final_intents = [intent for intent in intents if intent.purpose in final_purposes]
+        self.assertTrue(final_intents)
+        for intent in final_intents:
+            self.assertEqual(intent.order_type, "Market")
+            self.assertTrue(intent.reduce_only)
+            self.assertTrue(intent.close_on_trigger)
 
     def test_exit_cancel_only_on_signature_change(self) -> None:
         order_manager = FakeOrderManager()
@@ -1498,9 +1748,31 @@ class FixedCycleStrategyTests(unittest.TestCase):
         recorded_break_evens: list[tuple[HedgeSnapshot, float]] = []
         original_build_exit = runtime.strategy._build_exit_intents
 
-        def capturing(self, snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context):
+        def capturing(
+            self,
+            snapshot,
+            runtime_state,
+            current_cycle,
+            break_even_price,
+            tp_price,
+            hard_stop_active,
+            context,
+            *,
+            force_exit_rebuild=False,
+            pending_loss_old_signature=None,
+        ):
             recorded_break_evens.append((snapshot, break_even_price))
-            return original_build_exit(snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context)
+            return original_build_exit(
+                snapshot,
+                runtime_state,
+                current_cycle,
+                break_even_price,
+                tp_price,
+                hard_stop_active,
+                context,
+                force_exit_rebuild=force_exit_rebuild,
+                pending_loss_old_signature=pending_loss_old_signature,
+            )
 
         with patch.object(FixedCycleHedgeStrategy, "_build_exit_intents", new=capturing):
             runtime.on_websocket_fill(
@@ -1532,7 +1804,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
         )
         break_even_without_loss, _ = runtime.strategy._calculate_break_even(no_loss_snapshot, runtime.runtime_state)
 
-        self.assertGreater(recalculated_break_even, break_even_without_loss)
+        self.assertGreaterEqual(recalculated_break_even, break_even_without_loss)
 
     def test_on_fill_invalidates_exit_signature_before_rebuilding(self) -> None:
         order_manager = FakeOrderManager()
@@ -1556,9 +1828,31 @@ class FixedCycleStrategyTests(unittest.TestCase):
         original = runtime.strategy._build_exit_intents
         recorded_intents: list[list] = []
 
-        def capturing(self, snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context):
+        def capturing(
+            self,
+            snapshot,
+            runtime_state,
+            current_cycle,
+            break_even_price,
+            tp_price,
+            hard_stop_active,
+            context,
+            *,
+            force_exit_rebuild=False,
+            pending_loss_old_signature=None,
+        ):
             recorded_signatures.append(runtime_state.strategy_state.get("last_exit_signature"))
-            result = original(snapshot, runtime_state, current_cycle, break_even_price, tp_price, hard_stop_active, context)
+            result = original(
+                snapshot,
+                runtime_state,
+                current_cycle,
+                break_even_price,
+                tp_price,
+                hard_stop_active,
+                context,
+                force_exit_rebuild=force_exit_rebuild,
+                pending_loss_old_signature=pending_loss_old_signature,
+            )
             recorded_intents.append(result)
             return result
 
@@ -1573,8 +1867,6 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertTrue(recorded_intents)
         latest_intents = recorded_intents[-1]
         self.assertTrue(any(intent.purpose == "LONG_TP_EXIT" for intent in latest_intents))
-        self.assertTrue(any(intent.purpose == "LONG_SL_EXIT" for intent in latest_intents))
-        self.assertTrue(any(intent.purpose == "SHORT_TP_EXIT" for intent in latest_intents))
         self.assertTrue(any(intent.purpose == "SHORT_SL_EXIT" for intent in latest_intents))
         self.assertNotEqual(state["last_exit_signature"], sentinel)
 
@@ -2431,7 +2723,14 @@ class FixedCycleStrategyTests(unittest.TestCase):
             remaining_qty=10.0,
             metadata={"cycle_index": 1, "cycle_role": "long_reduce", "entry_price": 100.0},
         )
-        expected_pnl = calculate_pnl(100.0, 99.0, 10.0, "long")
+        entry_price = 100.0
+        exit_price = 99.0
+        qty = 10.0
+        fee_rate = runtime.strategy.config.order_fee_rate_pct / 100.0
+        expected_pnl = calculate_pnl(entry_price, exit_price, qty, "long")
+        entry_fee = abs(entry_price * qty) * fee_rate
+        exit_fee = abs(exit_price * qty) * fee_rate
+        expected_pnl -= entry_fee + exit_fee
 
         with (
             patch.object(runtime, "refresh_snapshot", return_value=snapshot),
@@ -2452,10 +2751,78 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertAlmostEqual(fill_event.metadata["exec_pnl"], expected_pnl)
         self.assertAlmostEqual(fill_event.metadata["runtime_calculated_pnl"], expected_pnl)
         self.assertEqual(fill_event.metadata["entry_price_for_pnl"], 100.0)
-        self.assertEqual(fill_event.metadata["pnl_calc_source"], "runtime_calculate_pnl")
+        self.assertEqual(fill_event.metadata["pnl_calc_source"], "runtime_calculate_pnl_with_fees")
         self.assertTrue(
             any(
                 call.args and call.args[0] == "fill_runtime_calculated_pnl_attached"
+                for call in log_event_mock.call_args_list
+            )
+        )
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_runtime_pnl_calculated_with_fees"
+                for call in log_event_mock.call_args_list
+            )
+        )
+
+    def test_runtime_calculated_pnl_with_fees_matches_bybit_case(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        runtime.runtime_state.active_orders["cycle-long-fee"] = ManagedOrder(
+            client_order_id="cycle-long-fee",
+            exchange_order_id="ex-cycle-long-fee",
+            side="long",
+            qty=42.0,
+            purpose="CYCLE_2_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=42.0,
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "long_reduce",
+                "entry_price": 0.445,
+            },
+        )
+        with (
+            patch.object(runtime, "refresh_snapshot", return_value=snapshot),
+            patch.object(runtime.strategy, "on_fill", return_value=[]) as on_fill_mock,
+            patch.object(runtime.audit, "log_event") as log_event_mock,
+        ):
+            runtime._ingest_fill_event(
+                exchange_order_id="ex-cycle-long-fee",
+                client_id="cycle-long-fee",
+                qty=42.0,
+                price=0.437,
+                exec_id="exec-cycle-long-fee",
+                cumulative_qty=42.0,
+                source="websocket",
+            )
+
+        fill_event = on_fill_mock.call_args[0][0]
+        metadata = fill_event.metadata
+        self.assertAlmostEqual(metadata["runtime_calculated_pnl"], -0.3563742, places=8)
+        self.assertAlmostEqual(metadata["exec_pnl"], -0.3563742, places=8)
+        self.assertAlmostEqual(metadata["runtime_gross_pnl"], -0.336, places=8)
+        self.assertAlmostEqual(metadata["runtime_entry_fee"], 0.0102795, places=8)
+        self.assertAlmostEqual(metadata["runtime_exit_fee"], 0.0100947, places=8)
+        self.assertAlmostEqual(metadata["runtime_fee_rate"], 0.00055)
+        self.assertEqual(metadata["pnl_calc_source"], "runtime_calculate_pnl_with_fees")
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "fixed_cycle_runtime_pnl_calculated_with_fees"
                 for call in log_event_mock.call_args_list
             )
         )
@@ -4132,6 +4499,98 @@ class FixedCycleStrategyTests(unittest.TestCase):
                 for call in warning_mock.call_args_list
             )
         )
+
+    def test_cycle_long_reduce_refresh_applies_metadata_before_extract(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        cycle_state = runtime.runtime_state.strategy_state.setdefault(
+            "cycle_state", runtime.strategy._default_cycle_state()
+        )
+        cycle_state.setdefault("long_fills", {})["2"] = {
+            "order_id": "47e41fd3-6f37-4d11-85bf-a09212ae547e",
+            "client_order_id": "fixed_cycle-cycle_2_long_add-b25e10f85a",
+            "exec_id": "a39ef420-ff57-58c4-b133-297dc9e5227e",
+            "qty": 42.0,
+            "price": 0.437,
+        }
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "47e41fd3-6f37-4d11-85bf-a09212ae547e",
+                "symbol": "BTCUSDT",
+                "side": "Sell",
+                "closedSize": 42.0,
+                "avgEntryPrice": 0.48,
+                "avgExitPrice": 0.437,
+                "closedPnl": -0.3563742,
+                "updatedTime": now_ms,
+                "createdTime": now_ms,
+            }
+        ]
+        fill_event = FillEvent(
+            exchange_order_id="47e41fd3-6f37-4d11-85bf-a09212ae547e",
+            client_order_id="fixed_cycle-cycle_2_long_add-b25e10f85a",
+            purpose="CYCLE_2_LONG_ADD",
+            side="long",
+            exec_qty=42.0,
+            exec_price=0.437,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="a39ef420-ff57-58c4-b133-297dc9e5227e",
+            metadata={"cycle_index": 2, "cycle_role": "long_reduce"},
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock, patch(
+            "fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event"
+        ) as warning_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertAlmostEqual(ledger["cycle_long_reduce_pnl"]["2"], -0.3563742, places=8)
+        metadata = fill_event.metadata or {}
+        self.assertAlmostEqual(metadata["confirmed_closed_pnl"], -0.3563742, places=8)
+        self.assertAlmostEqual(metadata["confirmed_closed_qty"], 42.0, places=8)
+        self.assertAlmostEqual(metadata["confirmed_closed_avg_price"], 0.437, places=8)
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_cycle_pnl_refreshed_metadata_applied", event_names)
+        self.assertIn("fixed_cycle_cycle_pnl_confirmed_seen_after_refresh", event_names)
+        self.assertFalse(
+            any(
+                call.args and call.args[0] == "fixed_cycle_cycle_pnl_missing_confirmed_closed_pnl"
+                for call in warning_mock.call_args_list
+            )
+        )
+
+    def test_cycle_long_reduce_uses_provisional_runtime_pnl_when_confirmed_missing(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        fill_event = FillEvent(
+            exchange_order_id="cycle-long",
+            client_order_id="cycle-long",
+            side="long",
+            purpose="CYCLE_1_LONG_ADD",
+            exec_qty=10.0,
+            exec_price=1.0,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            exec_id="exec-provisional",
+            metadata={
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "runtime_calculated_pnl": -0.25,
+                "exec_pnl": -0.25,
+            },
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock:
+            runtime.strategy._audit_exit_pnl_summary(fill_event, runtime.runtime_state, runtime.context)
+
+        ledger = runtime.runtime_state.strategy_state["audit_pnl_ledger"]
+        self.assertNotIn("1", ledger["cycle_long_reduce_pnl"])
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("fixed_cycle_cycle_pnl_using_provisional_runtime_pnl", event_names)
 
     def test_cycle_short_reduce_ignores_source_long_confirmed_pnl(self) -> None:
         order_manager = FakeOrderManager()

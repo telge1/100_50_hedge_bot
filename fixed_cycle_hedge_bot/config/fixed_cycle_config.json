@@ -39,6 +39,8 @@
   "order_refresh_cooldown_ms": 750,
   "price_tick_size": 0.0001,
 
+  "final_exit_tick_offset": 0.0,
+
   "trailing_stop_dist": 0.0025,
   "short_tp_fallback_activation_drop_pct": 0.005,
   "short_tp_fallback_stop_offset_pct": 0.0025,

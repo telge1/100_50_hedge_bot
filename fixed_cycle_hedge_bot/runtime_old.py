@@ -1125,56 +1125,8 @@ class GenericHedgeRuntime:
             position_idx=intent.position_idx,
         )
         replace_purposes_raw = intent.metadata.get("replace_open_purpose")
-        replace_purposes: list[str] = []
-        safe_cycle_replacement = False
         if replace_purposes_raw:
-            replace_purposes = (
-                [replace_purposes_raw]
-                if isinstance(replace_purposes_raw, str)
-                else list(replace_purposes_raw)
-            )
-            replacement_order = next(
-                (
-                    order
-                    for order in self.runtime_state.active_orders.values()
-                    if order.purpose in replace_purposes
-                    and not self._is_terminal_order_status(order.status)
-                ),
-                None,
-            )
-            if (
-                replacement_order
-                and replacement_order.purpose.startswith("CYCLE_")
-                and "LONG_ADD" in replacement_order.purpose
-            ):
-                old_cycle_role = intent.metadata.get("cycle_role")
-                old_reduce_only = intent.reduce_only
-                old_position_idx = intent.position_idx
-                cycle_role_value = replacement_order.metadata.get("cycle_role") or "long_reduce"
-                intent.metadata["cycle_role"] = cycle_role_value
-                cycle_index_value = replacement_order.metadata.get("cycle_index")
-                if cycle_index_value is not None:
-                    intent.metadata["cycle_index"] = cycle_index_value
-                intent.reduce_only = True
-                intent.position_idx = 1
-                intent.side = "long"
-                safe_cycle_replacement = bool(
-                    replacement_order.reduce_only and replacement_order.side == "long"
-                )
-                self.audit.log_event(
-                    "fixed_cycle_long_reduce_intent_metadata_restored",
-                    strategy=self.strategy.name,
-                    purpose=intent.purpose,
-                    replaced_purpose=replacement_order.purpose,
-                    old_cycle_role=old_cycle_role,
-                    new_cycle_role=cycle_role_value,
-                    old_reduce_only=old_reduce_only,
-                    new_reduce_only=intent.reduce_only,
-                    old_position_idx=old_position_idx,
-                    new_position_idx=intent.position_idx,
-                    cycle_index=cycle_index_value,
-                    replace_open_purposes=replace_purposes,
-                )
+            replace_purposes = [replace_purposes_raw] if isinstance(replace_purposes_raw, str) else list(replace_purposes_raw)
             replace_context = (
                 {
                     "reason": reason,
@@ -1279,64 +1231,6 @@ class GenericHedgeRuntime:
                     cycle_role=cycle_role,
                 )
         submit_notional = submit_qty * submit_price
-        if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
-            old_reduce_only = intent.reduce_only
-            old_side = intent.side
-            old_position = intent.position_idx
-            old_cycle_role = intent.metadata.get("cycle_role")
-            corrected = False
-            if intent.metadata.get("cycle_role") != "long_reduce":
-                intent.metadata["cycle_role"] = "long_reduce"
-                corrected = True
-            if intent.side != "long":
-                intent.side = "long"
-                corrected = True
-            if not intent.reduce_only:
-                intent.reduce_only = True
-                corrected = True
-            if intent.position_idx != 1:
-                intent.position_idx = 1
-                corrected = True
-            if corrected:
-                self.audit.log_event(
-                    "fixed_cycle_long_reduce_intent_corrected",
-                    strategy=self.strategy.name,
-                    purpose=intent.purpose,
-                    old_reduce_only=old_reduce_only,
-                    new_reduce_only=intent.reduce_only,
-                    old_side=old_side,
-                    new_side=intent.side,
-                    old_position_idx=old_position,
-                    new_position_idx=intent.position_idx,
-                    old_cycle_role=old_cycle_role,
-                    new_cycle_role=intent.metadata.get("cycle_role"),
-                    trigger_price=intent.trigger_price,
-                    qty=intent.qty,
-                )
-        cycle_waiting = bool(self.runtime_state.strategy_state.get("cycle_waiting_for_short_tp"))
-        if (
-            cycle_waiting
-            and intent.purpose.startswith("CYCLE_")
-            and "LONG_ADD" in intent.purpose
-            and not safe_cycle_replacement
-        ):
-            existing_purposes = [
-                order.purpose for order in self.runtime_state.active_orders.values()
-            ]
-            self.audit.log_event(
-                "fixed_cycle_long_reduce_intent_blocked_phase",
-                strategy=self.strategy.name,
-                purpose=intent.purpose,
-                cycle_waiting_for_short_tp=True,
-                reduce_only=intent.reduce_only,
-                side=intent.side,
-                position_idx=intent.position_idx,
-                cycle_role=intent.metadata.get("cycle_role"),
-                qty=intent.qty,
-                trigger_price=intent.trigger_price,
-                active_order_purposes=existing_purposes,
-            )
-            return None
         managed_order = ManagedOrder(
             client_order_id=client_id,
             side=intent.side,
@@ -1362,25 +1256,6 @@ class GenericHedgeRuntime:
             },
             trace=list(intent.trace),
         )
-        if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
-            exchange_side_check = self._exchange_side(intent.side, intent.reduce_only)
-            if (
-                exchange_side_check != "Sell"
-                or not intent.reduce_only
-                or intent.position_idx != 1
-            ):
-                self.audit.log_event(
-                    "fixed_cycle_invalid_long_reduce_order_blocked",
-                    strategy=self.strategy.name,
-                    purpose=intent.purpose,
-                    exchange_side=exchange_side_check,
-                    reduce_only=intent.reduce_only,
-                    position_idx=intent.position_idx,
-                    cycle_role=intent.metadata.get("cycle_role"),
-                    qty=intent.qty,
-                    trigger_price=intent.trigger_price,
-                )
-                return None
         try:
             response = self._submit_to_exchange(
                 managed_order,
@@ -2260,42 +2135,7 @@ class GenericHedgeRuntime:
                 )
             )
             calculated_pnl = 0.0
-            runtime_gross_pnl = None
-            runtime_entry_fee = None
-            runtime_exit_fee = None
-            runtime_fee_rate = None
-            pnl_calc_source = "runtime_calculate_pnl"
             if managed_order.reduce_only and incremental_qty > 0 and entry_price > 0:
-                qty_float = float(incremental_qty)
-                price_value = float(price)
-                fee_rate = float(getattr(self.strategy.config, "order_fee_rate_pct", 0.0)) / 100.0
-                if qty_float > 0:
-                    if managed_order.side.lower() == "long":
-                        gross_pnl = (price_value - entry_price) * qty_float
-                    else:
-                        gross_pnl = (entry_price - price_value) * qty_float
-                    entry_fee = abs(entry_price * qty_float) * fee_rate
-                    exit_fee = abs(price_value * qty_float) * fee_rate
-                    calculated_pnl = gross_pnl - entry_fee - exit_fee
-                    runtime_gross_pnl = gross_pnl
-                    runtime_entry_fee = entry_fee
-                    runtime_exit_fee = exit_fee
-                    runtime_fee_rate = fee_rate
-                    pnl_calc_source = "runtime_calculate_pnl_with_fees"
-                else:
-                    calculated_pnl = calculate_pnl(entry_price, price_value, incremental_qty, managed_order.side)
-                pnl = calculated_pnl
-                if managed_order.side == "long":
-                    self.runtime_state.realized_long_pnl_total += pnl
-                    self.runtime_state.temporary_pnl_by_order[client_id] = (
-                        self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
-                    )
-                else:
-                    self.runtime_state.realized_short_pnl_total += pnl
-                    self.runtime_state.temporary_pnl_by_order[client_id] = (
-                        self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
-                    )
-            elif managed_order.reduce_only:
                 calculated_pnl = calculate_pnl(entry_price, price, incremental_qty, managed_order.side)
                 pnl = calculated_pnl
                 if managed_order.side == "long":
@@ -2308,8 +2148,6 @@ class GenericHedgeRuntime:
                     self.runtime_state.temporary_pnl_by_order[client_id] = (
                         self.runtime_state.temporary_pnl_by_order.get(client_id, 0.0) + pnl
                     )
-            else:
-                pnl = 0.0
             fill_metadata = {
                 **dict(managed_order.metadata),
                 "fill_source": source,
@@ -2320,28 +2158,9 @@ class GenericHedgeRuntime:
                         "runtime_calculated_pnl": calculated_pnl,
                         "exec_pnl": calculated_pnl,
                         "entry_price_for_pnl": entry_price,
-                        "pnl_calc_source": pnl_calc_source,
-                        "runtime_gross_pnl": runtime_gross_pnl,
-                        "runtime_entry_fee": runtime_entry_fee,
-                        "runtime_exit_fee": runtime_exit_fee,
-                        "runtime_fee_rate": runtime_fee_rate,
+                        "pnl_calc_source": "runtime_calculate_pnl",
                     }
                 )
-                if runtime_gross_pnl is not None:
-                    self.audit.log_event(
-                        "fixed_cycle_runtime_pnl_calculated_with_fees",
-                        strategy=self.strategy.name,
-                        purpose=managed_order.purpose,
-                        cycle_role=managed_order.metadata.get("cycle_role"),
-                        entry_price=entry_price,
-                        exit_price=price,
-                        qty=qty,
-                        gross_pnl=runtime_gross_pnl,
-                        entry_fee=runtime_entry_fee,
-                        exit_fee=runtime_exit_fee,
-                        net_pnl=calculated_pnl,
-                        fee_rate=runtime_fee_rate,
-                    )
             fill_event = FillEvent(
                 exchange_order_id=exchange_order_id,
                 client_order_id=client_id,

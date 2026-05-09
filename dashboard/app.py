@@ -17,16 +17,17 @@ import requests
 import asyncio
 import httpx
 import uuid
+import ast
 import json
 import math
 import signal
-from typing import Set, Dict, List, Optional
+from typing import Set, Dict, List, Optional, Any
 import threading
 import re
 import logging
 import sys
 import yaml
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import shutil
 from pathlib import Path
 
@@ -36,10 +37,13 @@ sys.path.insert(0, str(project_root))
 vendor_root = Path(__file__).resolve().parent / "vendor"
 if vendor_root.exists():
     sys.path.insert(0, str(vendor_root))
-# So bot_monitor (and others) use the same project root for data/run PID files
 os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
+CONFIRMED_ORDER_PNL_HISTORY_FILE = project_root / "logs" / "confirmed_order_pnl_history.jsonl"
+DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pnl_history.jsonl"
+
 from utils.auth import authenticate_user, get_user_role
+from dashboard.vendor.core.bybit_order_manager import BybitOrderManager
 from utils.bot_monitor import (
     get_all_bots,
     get_bot_status,
@@ -283,6 +287,695 @@ LIVE_POSITION_CACHE: Dict[str, Dict[str, object]] = {}
 # Separate (faster) cache for live-charts tile grid
 LIVE_GRID_API_MIN_INTERVAL_SECONDS = 2.0
 LIVE_POSITIONS_GRID_CACHE: Dict[str, Dict[str, object]] = {}
+
+LIVE_CHART_STRATEGY_STATE_FILES: Dict[str, Path] = {
+    "Long_bot_1": project_root / "logs" / "fixed_cycle_state.json",
+    "Short_bot_1": project_root / "logs" / "fixed_cycle_state.json",
+}
+
+WALLET_SNAPSHOT_FILES: Dict[str, Path] = {
+    "Long_bot_1": project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json",
+}
+
+
+def _state_file_for_account(account: str) -> Path | None:
+    return LIVE_CHART_STRATEGY_STATE_FILES.get(account)
+
+
+def _wallet_snapshot_file_for_account(account: str) -> Path | None:
+    return WALLET_SNAPSHOT_FILES.get(account)
+
+
+def _load_strategy_state_for_account(account: str) -> dict[str, Any] | None:
+    state_file = _state_file_for_account(account)
+    if not state_file or not state_file.exists():
+        return None
+    try:
+        payload = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        logger.debug(f"[LIVE-CHARTS] Konnte state file {state_file} nicht laden", exc_info=True)
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload.get("strategy_state") or {}
+
+
+def _safe_wallet_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_wallet_snapshot_payload(state: dict[str, Any], account: str) -> dict[str, Any] | None:
+    wallet_current = state.get("wallet_snapshot_current")
+    if not isinstance(wallet_current, dict):
+        return None
+    wallet_previous = state.get("wallet_snapshot_previous") or {}
+    bot_name = str(
+        wallet_current.get("bot_name") or state.get("bot_name") or account
+    )
+    return {
+        "bot_name": bot_name,
+        "symbol": str(wallet_current.get("symbol") or "").upper(),
+        "wallet_snapshot_timestamp_utc3": wallet_current.get("timestamp_utc3"),
+        "wallet_balance_current_usdt": _safe_wallet_float(wallet_current.get("wallet_balance_usdt")),
+        "wallet_balance_previous_usdt": _safe_wallet_float(wallet_previous.get("wallet_balance_usdt")),
+        "last_trade_wallet_profit_usdt": _safe_wallet_float(state.get("last_trade_wallet_profit_usdt")),
+        "last_trade_wallet_profit_source": state.get("last_trade_wallet_profit_source"),
+        "last_trade_wallet_profit_available": bool(state.get("last_trade_wallet_profit_available")),
+        "last_trade_wallet_profit_reason": state.get("last_trade_wallet_profit_reason"),
+        "last_trade_wallet_profit_timestamp_utc3": state.get("last_trade_wallet_profit_timestamp_utc3"),
+    }
+
+
+def _extract_cycle_pnl_entries(state: dict[str, Any]) -> list[dict[str, Any]]:
+    ledger = state.get("audit_pnl_ledger") or {}
+    raw_entries = ledger.get("cycle_pnl_entries") or {}
+    entries = []
+    for entry_key, entry in raw_entries.items():
+        try:
+            fill_type, cycle_index, _ = str(entry_key).split(":", 2)
+        except ValueError:
+            continue
+        entries.append(
+            {
+                "fill_type": fill_type,
+                "cycle_index": cycle_index,
+                "pnl": _safe_wallet_float(entry.get("pnl")) or 0.0,
+                "source": entry.get("source"),
+                "is_confirmed": bool(entry.get("is_confirmed")),
+                "entry_key": entry_key,
+            }
+        )
+    return entries
+
+
+def _extract_final_exit_pnl(state: dict[str, Any]) -> dict[str, Any]:
+    ledger = state.get("audit_pnl_ledger") or {}
+    return {
+        "final_long_exit_pnl": _safe_wallet_float(ledger.get("final_long_exit_pnl")),
+        "final_short_exit_pnl": _safe_wallet_float(ledger.get("final_short_exit_pnl")),
+    }
+
+
+def _load_wallet_snapshot_file(account: str) -> dict[str, Any] | None:
+    snapshot_file = _wallet_snapshot_file_for_account(account)
+    if not snapshot_file or not snapshot_file.exists():
+        return None
+    try:
+        data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+    except Exception:
+        logger.debug(f"[LIVE-CHARTS] Konnte wallet snapshot file {snapshot_file} nicht lesen", exc_info=True)
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _now_utc3_iso() -> str:
+    return datetime.now(timezone(timedelta(hours=3))).isoformat()
+
+
+def _normalize_account(value: str | None) -> str:
+    return str(value or "").strip().lower()
+
+
+def _load_dashboard_closed_pnl_history(account: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    path = DASHBOARD_CLOSED_PNL_HISTORY_FILE
+    file_exists = path.exists()
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    normalized_account = _normalize_account(account)
+    lines: list[str] = []
+    if not file_exists:
+        logger.info(
+            "[dashboard] dashboard_closed_pnl_history_loaded_for_api",
+            {
+                "account": account,
+                "normalized_account": normalized_account,
+                "raw_count": 0,
+                "filtered_count": 0,
+                "file_exists": False,
+                "file_path": str(path),
+            },
+        )
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except Exception:
+        logger.warning("[dashboard] dashboard_closed_pnl_history_load_failed", exc_info=True)
+        return []
+    raw_count = sum(1 for line in lines if line.strip())
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except Exception:
+            logger.warning("[dashboard] dashboard_closed_pnl_history_parse_error", {"line": line})
+            continue
+        if normalized_account:
+            if _normalize_account(payload.get("account")) != normalized_account:
+                continue
+        trade_block_id = payload.get("trade_block_id")
+        if not trade_block_id or trade_block_id in seen:
+            continue
+        seen.add(trade_block_id)
+        entries.append(payload)
+        if len(entries) >= limit:
+            break
+    filtered_count = len(entries)
+    logger.info(
+        "[dashboard] dashboard_closed_pnl_history_loaded_for_api",
+        {
+            "account": account,
+            "normalized_account": normalized_account,
+            "raw_count": raw_count,
+            "filtered_count": filtered_count,
+            "file_exists": file_exists,
+            "file_path": str(path),
+            "reason": "history_loaded",
+        },
+    )
+    if file_exists and raw_count > 0 and filtered_count == 0:
+        logger.info(
+            "[dashboard] dashboard_closed_pnl_history_empty_for_api",
+            {
+                "account": account,
+                "normalized_account": normalized_account,
+                "raw_count": raw_count,
+                "filtered_count": filtered_count,
+                "reason": "account_filter_removed_all",
+            },
+        )
+    return entries
+
+
+def load_confirmed_order_pnl_rows(account: str | None = None) -> list[dict[str, Any]]:
+    file_path = CONFIRMED_ORDER_PNL_HISTORY_FILE
+    file_exists = file_path.exists()
+    raw_count = 0
+    rows_by_key: dict[str, dict[str, Any]] = {}
+    if file_exists:
+        try:
+            for line in file_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                raw_count += 1
+                if not line.strip():
+                    continue
+                try:
+                    payload = json.loads(line)
+                except Exception:
+                    continue
+                if str(payload.get("source") or "") != "bot_confirmed_pnl":
+                    continue
+                exchange_order_id = str(payload.get("exchange_order_id") or "").strip()
+                purpose = str(payload.get("purpose") or "").strip()
+                closed_pnl = payload.get("closed_pnl")
+                if not exchange_order_id or not purpose or closed_pnl is None:
+                    continue
+                try:
+                    normalized_closed_pnl = float(closed_pnl)
+                except (TypeError, ValueError):
+                    continue
+                dedupe_key = str(payload.get("dedupe_key") or f"{exchange_order_id}:{purpose}").strip()
+                timestamp = payload.get("timestamp")
+                rows_by_key[dedupe_key] = {
+                    "orderId": exchange_order_id,
+                    "exchange_order_id": exchange_order_id,
+                    "symbol": payload.get("symbol"),
+                    "closedPnl": normalized_closed_pnl,
+                    "updatedTime": timestamp,
+                    "tradeTime": timestamp,
+                    "createdTime": timestamp,
+                    "purpose": purpose,
+                    "trade_type": purpose,
+                    "source": "bot_confirmed_pnl",
+                    "trade_block_id": payload.get("trade_block_id"),
+                    "cycle_index": payload.get("cycle_index"),
+                    "pnl_scope": payload.get("pnl_scope"),
+                    "dedupe_key": dedupe_key,
+                }
+        except Exception:
+            logger.warning("[dashboard] dashboard_confirmed_order_pnl_rows_load_failed", exc_info=True)
+            rows_by_key = {}
+    logger.info(
+        "[dashboard] dashboard_confirmed_order_pnl_rows_loaded",
+        {
+            "file_path": str(file_path),
+            "file_exists": file_exists,
+            "raw_count": raw_count,
+            "deduped_count": len(rows_by_key),
+            "account": account,
+        },
+    )
+    return list(rows_by_key.values())
+
+
+def _append_dashboard_closed_pnl_history(entry: dict[str, Any]) -> None:
+    path = DASHBOARD_CLOSED_PNL_HISTORY_FILE
+    trade_block_id = entry.get("trade_block_id")
+    if not trade_block_id:
+        return
+    existing_entries = _load_dashboard_closed_pnl_history(limit=1000)
+    ids = {e.get("trade_block_id") for e in existing_entries if e.get("trade_block_id")}
+    if trade_block_id in ids:
+        logger.info("[dashboard] dashboard_closed_pnl_history_duplicate_skipped", {"trade_block_id": trade_block_id})
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        logger.info("[dashboard] dashboard_closed_pnl_history_append", {"trade_block_id": trade_block_id})
+    except Exception:
+        logger.warning("[dashboard] dashboard_closed_pnl_history_append_failed", exc_info=True)
+
+
+def _extract_dict_from_line(line: str, marker: str) -> dict[str, Any] | None:
+    start = line.find("{", line.find(marker))
+    if start == -1:
+        return None
+    depth = 0
+    for idx in range(start, len(line)):
+        ch = line[idx]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                snippet = line[start: idx + 1]
+                try:
+                    return ast.literal_eval(snippet)
+                except Exception:
+                    logger.warning(
+                        "[dashboard] dashboard_closed_pnl_history_parse_error",
+                        {"snippet": snippet},
+                    )
+                    return None
+    return None
+
+
+def _persist_closed_pnl_history_from_runtime_log() -> None:
+    path = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
+    if not path.exists():
+        return
+    seen_ids = {
+        entry.get("trade_block_id")
+        for entry in _load_dashboard_closed_pnl_history(limit=1000)
+        if entry.get("trade_block_id")
+    }
+    events = (
+        "fixed_cycle_last_trade_pnl_persisted",
+        "fixed_cycle_trade_pnl_finalized",
+    )
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                for event in events:
+                    if event not in line:
+                        continue
+                    payload = _extract_dict_from_line(line, event)
+                    if not payload:
+                        continue
+                    trade_block_id = payload.get("trade_block_id")
+                    total_trade_pnl = payload.get("total_trade_pnl")
+                    pnl_complete = payload.get("pnl_complete")
+                    if not trade_block_id or total_trade_pnl is None or not pnl_complete:
+                        continue
+                    if trade_block_id in seen_ids:
+                        continue
+                    seen_ids.add(trade_block_id)
+                    entry = {
+                        "account": "Long_bot_1",
+                        "symbol": payload.get("symbol"),
+                        "trade_block_id": trade_block_id,
+                        "total_trade_pnl": float(total_trade_pnl),
+                        "source": payload.get("source"),
+                        "pnl_complete": bool(pnl_complete),
+                        "finalized_at": payload.get("finalized_at"),
+                        "created_at_utc3": payload.get("updated_at_utc3") or _now_utc3_iso(),
+                    }
+                    breakdown = payload.get("breakdown")
+                    if breakdown is not None:
+                        entry["breakdown"] = breakdown
+                    _append_dashboard_closed_pnl_history(entry)
+    except Exception:
+        logger.warning("[dashboard] dashboard_closed_pnl_history_backfill_failed", exc_info=True)
+
+
+def _load_order_purpose_map_from_runtime_log(limit_lines: int = 10000) -> dict[str, dict[str, Any]]:
+    active_log = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
+    order_purpose_map: dict[str, dict[str, Any]] = {}
+    all_lines: list[str] = []
+    try:
+        rotated_logs = sorted(
+            project_root.glob("logs/fixed_cycle_hedge_runtime.log.*"),
+            key=lambda path: path.stat().st_mtime,
+        )
+    except Exception:
+        rotated_logs = []
+    log_files = rotated_logs + [active_log]
+    for path in log_files:
+        if not path.exists():
+            continue
+        try:
+            all_lines.extend(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+        except Exception:
+            logger.warning(
+                "[dashboard] dashboard_order_purpose_map_log_read_failed",
+                {"file": str(path)},
+                exc_info=True,
+            )
+    if limit_lines > 0 and len(all_lines) > limit_lines:
+        all_lines = all_lines[-limit_lines:]
+    for line in all_lines:
+        if "order_submitted" not in line or "exchange_order_id" not in line or "purpose" not in line:
+            continue
+        start = line.find("{")
+        if start == -1:
+            continue
+        snippet = line[start:]
+        payload: dict[str, Any] | None = None
+        try:
+            loaded = json.loads(snippet)
+            if isinstance(loaded, dict):
+                payload = loaded
+        except Exception:
+            try:
+                loaded = ast.literal_eval(snippet)
+                if isinstance(loaded, dict):
+                    payload = loaded
+            except Exception:
+                payload = None
+        if not payload or payload.get("event") != "order_submitted":
+            continue
+        exchange_order_id = str(payload.get("exchange_order_id") or "").strip()
+        purpose = str(payload.get("purpose") or "").strip()
+        if not exchange_order_id or not purpose:
+            continue
+        order_purpose_map[exchange_order_id] = {
+            "purpose": purpose,
+            "order_link_id": payload.get("order_link_id"),
+            "symbol": payload.get("symbol"),
+            "timestamp": payload.get("timestamp"),
+            "side": payload.get("side"),
+            "qty": payload.get("qty"),
+            "order_type": payload.get("order_type"),
+        }
+    return order_purpose_map
+
+def _build_wallet_snapshot_payload_from_file(data: dict[str, Any], account: str) -> dict[str, Any] | None:
+    raw_snapshot = data.get("wallet_snapshot")
+    if isinstance(raw_snapshot, dict):
+        return raw_snapshot
+    current_wallet = _safe_wallet_float(
+        data.get("current_wallet_usdt") or data.get("wallet_balance_current_usdt")
+    )
+    if current_wallet is None:
+        return None
+    start_wallet = _safe_wallet_float(
+        data.get("start_wallet_usdt")
+        or data.get("next_start_wallet_usdt")
+        or data.get("previous_wallet_usdt")
+        or data.get("wallet_balance_previous_usdt")
+        or data.get("wallet_balance_current_usdt")
+    )
+    previous_wallet = start_wallet
+    raw_profit = data.get("last_trade_profit_usdt")
+    if raw_profit is None:
+        raw_profit = data.get("last_trade_wallet_profit_usdt")
+    profit_value = _safe_wallet_float(raw_profit)
+    source = (
+        data.get("last_trade_profit_source")
+        or data.get("last_trade_wallet_profit_source")
+        or data.get("wallet_metric_used")
+        or data.get("source")
+        or data.get("wallet_balance_source")
+    )
+    timestamp = (
+        data.get("last_trade_profit_timestamp_utc3")
+        or data.get("wallet_snapshot_timestamp_utc3")
+        or data.get("updated_at_utc3")
+    )
+    bot_name = str(data.get("bot_name") or account)
+    symbol = str(data.get("symbol") or "").upper()
+    reason = data.get("last_trade_profit_reason") or data.get("flat_reason") or ""
+    return {
+        "bot_name": bot_name,
+        "symbol": symbol,
+        "wallet_snapshot_timestamp_utc3": timestamp,
+        "wallet_balance_current_usdt": current_wallet,
+        "wallet_balance_previous_usdt": previous_wallet,
+        "wallet_balance_start_usdt": start_wallet,
+        "last_trade_wallet_profit_usdt": profit_value,
+        "last_trade_wallet_profit_source": source,
+        "last_trade_wallet_profit_available": bool(data.get("last_trade_profit_available")),
+        "last_trade_wallet_profit_reason": reason,
+        "last_trade_wallet_profit_timestamp_utc3": timestamp,
+    }
+
+
+def _load_live_wallet_snapshot_for_account(account: str) -> dict[str, Any] | None:
+    state = _load_strategy_state_for_account(account)
+    snapshot = None
+    if state:
+        snapshot = _build_wallet_snapshot_payload(state, account)
+    if snapshot:
+        return snapshot
+    file_data = _load_wallet_snapshot_file(account)
+    if not file_data:
+        return None
+    return _build_wallet_snapshot_payload_from_file(file_data, account)
+
+
+def _fetch_dashboard_bot_pos_qtys() -> tuple[float | None, float | None, str, bool]:
+    try:
+        long_key, long_secret, _, _ = _get_account_keys_by_profile("bot_1")
+    except Exception as exc:
+        logger.warning("fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s", exc, exc_info=True)
+        return None, None, "bybit_positions", True
+    if not long_key or not long_secret:
+        logger.info("fixed_cycle_wallet_start_snapshot_skipped_flat_unknown missing keys")
+        return None, None, "bybit_positions", True
+    try:
+        manager = BybitOrderManager(long_key, long_secret)
+        positions = manager.fetch_positions_direct(timeout=5)
+    except Exception as exc:
+        logger.warning("fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s", exc, exc_info=True)
+        return None, None, "bybit_positions", True
+    long_qty = 0.0
+    short_qty = 0.0
+    for pos in positions:
+        info = pos.get("info") or {}
+        side = (info.get("side") or "").lower()
+        size = float(info.get("size") or 0)
+        if size <= 0:
+            continue
+        if side == "buy":
+            long_qty += size
+        elif side == "sell":
+            short_qty += size
+    return long_qty, short_qty, "bybit_positions", False
+
+
+def _extract_position_qtys(state: dict[str, Any]) -> tuple[float | None, float | None]:
+    snapshot = state.get("snapshot") or {}
+    candidates = [
+        (state.get("long_qty"), state.get("short_qty")),
+        (state.get("long_size"), state.get("short_size")),
+        (snapshot.get("long_qty"), snapshot.get("short_qty")),
+        (snapshot.get("long_size"), snapshot.get("short_size")),
+        (state.get("strategy_state", {}).get("long_qty"), state.get("strategy_state", {}).get("short_qty")),
+    ]
+    for long_val, short_val in candidates:
+        if long_val is None or short_val is None:
+            continue
+        try:
+            return float(long_val), float(short_val)
+        except (TypeError, ValueError):
+            continue
+    return None, None
+
+
+def _is_zero_qty(value: float | None) -> bool:
+    if value is None:
+        return False
+    return abs(value) < 1e-9
+
+
+def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
+    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys()
+    if failed or long_qty is None or short_qty is None:
+        logger.info(
+            "fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s",
+            {"bot": "long_bot_1", "source": source},
+        )
+        return
+    if not (_is_zero_qty(long_qty) and _is_zero_qty(short_qty)):
+        logger.info(
+            "fixed_cycle_wallet_start_snapshot_skipped_not_flat %s",
+            {"bot": "long_bot_1", "long_qty": long_qty, "short_qty": short_qty, "source": source},
+        )
+        return
+    script_path = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
+    python_path = project_root / ".venv" / "bin" / "python"
+    if not script_path.exists():
+        logger.warning("fixed_cycle_wallet_snapshot_script_missing %s", {"path": script_path})
+        return
+    cmd = [
+        str(python_path),
+        str(script_path),
+        "--mode",
+        "start",
+        "--bot-name",
+        "long_bot_1",
+        "--long-qty",
+        str(long_qty),
+        "--short-qty",
+        str(short_qty),
+    ]
+    logger.info("fixed_cycle_wallet_start_snapshot_started %s", {"cmd": cmd})
+    try:
+        result = subprocess.run(cmd, cwd=project_root, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            logger.info(
+                "fixed_cycle_wallet_start_snapshot_written %s",
+                {
+                    "cmd": cmd,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout.strip(),
+                    "stderr": result.stderr.strip(),
+                },
+            )
+            snapshot_file = project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json"
+            snapshot_exists = snapshot_file.exists()
+            snapshot_meta = {}
+            if snapshot_exists:
+                try:
+                    data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+                    snapshot_meta = {
+                        "snapshot_phase": data.get("snapshot_phase"),
+                        "symbol": data.get("symbol"),
+                        "trade_block_id": data.get("trade_block_id"),
+                        "updated_at_utc3": data.get("updated_at_utc3"),
+                    }
+                except Exception:
+                    pass
+            logger.info(
+                "fixed_cycle_wallet_start_snapshot_postcheck",
+                {
+                    "snapshot_file": str(snapshot_file),
+                    "exists": snapshot_exists,
+                    **snapshot_meta,
+                },
+            )
+        else:
+            logger.error(
+                "fixed_cycle_wallet_start_snapshot_failed %s",
+                {
+                    "cmd": cmd,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout.strip(),
+                    "stderr": result.stderr.strip(),
+                },
+            )
+    except subprocess.TimeoutExpired as exc:
+        logger.error(
+            "fixed_cycle_wallet_start_snapshot_failed %s",
+            {"error": str(exc)},
+        )
+        logger.info(
+            "[dashboard] fixed_cycle_wallet_snapshot_start_timeout",
+            {"cmd": cmd, "timeout_seconds": 10},
+        )
+    except Exception as exc:
+        logger.error(
+            "fixed_cycle_wallet_start_snapshot_failed %s",
+            {"error": str(exc)},
+        )
+
+
+def _maybe_run_dashboard_flat_snapshot(project_root: Path) -> None:
+    snapshot_file = project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json"
+    if not snapshot_file.exists():
+        logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_start_snapshot", {"reason": "snapshot_missing"})
+        return
+    try:
+        payload = json.loads(snapshot_file.read_text(encoding="utf-8"))
+    except Exception:
+        logger.warning("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_start_snapshot", {"reason": "parse_failure"})
+        return
+    if payload.get("snapshot_phase") != "start" or not payload.get("start_wallet_usdt"):
+        if payload.get("snapshot_phase") == "flat_exit" and payload.get("last_trade_profit_available"):
+            logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_already_flat_exit", {"snapshot_phase": payload.get("snapshot_phase")})
+            return
+        logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_start_snapshot", {"snapshot_phase": payload.get("snapshot_phase")})
+        return
+    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys()
+    if failed or long_qty is None or short_qty is None:
+        logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_flat", {"reason": "qty_unknown"})
+        return
+    if not (_is_zero_qty(long_qty) and _is_zero_qty(short_qty)):
+        logger.info(
+            "[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_flat",
+            {"long_qty": long_qty, "short_qty": short_qty},
+        )
+        return
+    cmd = [
+        str(project_root / ".venv" / "bin" / "python"),
+        str(project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"),
+        "--mode",
+        "flat",
+        "--bot-name",
+        "long_bot_1",
+        "--long-qty",
+        "0.0",
+        "--short-qty",
+        "0.0",
+    ]
+    logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_started", {"cmd": cmd})
+    try:
+        result = subprocess.run(cmd, cwd=project_root, capture_output=True, text=True, timeout=10)
+        logger.info(
+            "[dashboard] fixed_cycle_wallet_flat_snapshot_written",
+            {
+                "cmd": cmd,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+        )
+    except subprocess.TimeoutExpired as exc:
+        logger.error(
+            "[dashboard] fixed_cycle_wallet_flat_snapshot_timeout",
+            {"error": str(exc)},
+        )
+    except Exception as exc:
+        logger.error(
+            "[dashboard] fixed_cycle_wallet_flat_snapshot_failed",
+            {"error": str(exc)},
+        )
+    finally:
+        if snapshot_file.exists():
+            try:
+                payload = json.loads(snapshot_file.read_text(encoding="utf-8"))
+            except Exception:
+                payload = {}
+            logger.info(
+                "[dashboard] fixed_cycle_wallet_flat_snapshot_postcheck",
+                {
+                    "snapshot_phase": payload.get("snapshot_phase"),
+                    "trade_block_id": payload.get("trade_block_id"),
+                    "start_wallet_usdt": payload.get("start_wallet_usdt"),
+                    "current_wallet_usdt": payload.get("current_wallet_usdt"),
+                    "last_trade_profit_usdt": payload.get("last_trade_profit_usdt"),
+                    "last_trade_profit_available": payload.get("last_trade_profit_available"),
+                    "last_trade_profit_source": payload.get("last_trade_profit_source"),
+                    "updated_at_utc3": payload.get("updated_at_utc3"),
+                },
+            )
 
 def _load_dashboard_config() -> dict:
     """Load dashboard config (config/config.yaml)."""
@@ -5349,8 +6042,16 @@ async def api_get_closed_pnl(
     Get Closed PnL für einen Bybit-Account.
     Unterstützt: main, sub, Long_bot_1, Long_bot_2, Short_bot_1, Short_bot_2.
     """
+    logger.info(
+        "[dashboard] dashboard_closed_pnl_request",
+        {"account": acc if (acc := account.strip().lower() if account else account) else account, "limit": limit},
+    )
     try:
         acc = account.strip()
+        logger.info(
+            "[dashboard] dashboard_closed_pnl_request",
+            {"account": acc, "limit": limit},
+        )
         if acc.lower() in ("main", "sub"):
             acc = acc.lower()
         if acc not in CLOSED_PNL_ACCOUNTS:
@@ -5377,10 +6078,88 @@ async def api_get_closed_pnl(
             margin_balance = await asyncio.to_thread(order_manager.get_account_margin_balance)
         except Exception:
             pass
+        _maybe_run_dashboard_flat_snapshot(project_root)
+        _persist_closed_pnl_history_from_runtime_log()
+        order_purpose_map = _load_order_purpose_map_from_runtime_log(limit_lines=10000)
+        confirmed_rows = load_confirmed_order_pnl_rows(acc)
+        logger.info(
+            "[dashboard] dashboard_order_purpose_map_loaded",
+            {
+                "count": len(order_purpose_map),
+                "sample_order_ids": list(order_purpose_map.keys())[:5],
+                "sample_purposes": [
+                    entry.get("purpose")
+                    for entry in list(order_purpose_map.values())[:5]
+                    if isinstance(entry, dict)
+                ],
+            },
+        )
+        closed_pnl_history = _load_dashboard_closed_pnl_history(account=acc, limit=100)
+        strategy_state = _load_strategy_state_for_account(acc) or {}
+        wallet_snapshot = _build_wallet_snapshot_payload(strategy_state, acc)
+        snapshot_source = "live_state" if wallet_snapshot else None
+        snapshot_file = None
+        if not wallet_snapshot:
+            snapshot_file = _wallet_snapshot_file_for_account(acc)
+            file_snapshot = _load_wallet_snapshot_file(acc)
+            if file_snapshot:
+                wallet_snapshot = _build_wallet_snapshot_payload_from_file(file_snapshot, acc)
+                snapshot_source = "snapshot_file"
+            elif snapshot_file and snapshot_file.exists():
+                try:
+                    wallet_snapshot = json.loads(snapshot_file.read_text(encoding="utf-8"))
+                    snapshot_source = "snapshot_file"
+                except Exception:
+                    logger.warning(
+                        "[dashboard] dashboard_wallet_snapshot_file_parse_failure",
+                        {"account": acc, "file": str(snapshot_file)},
+                    )
+                snapshot_info = wallet_snapshot or {}
+                logger.info(
+                    "[dashboard] dashboard_wallet_snapshot_file_loaded",
+                    {
+                        "account": acc,
+                        "file": str(snapshot_file) if snapshot_file else None,
+                        "snapshot_phase": snapshot_info.get("snapshot_phase"),
+                        "trade_block_id": snapshot_info.get("trade_block_id"),
+                        "start_wallet_usdt": snapshot_info.get("wallet_balance_start_usdt"),
+                        "current_wallet_usdt": snapshot_info.get("wallet_balance_current_usdt"),
+                        "last_trade_profit_usdt": snapshot_info.get("last_trade_wallet_profit_usdt"),
+                        "last_trade_profit_available": snapshot_info.get("last_trade_wallet_profit_available"),
+                    },
+                )
+        snapshot_info = wallet_snapshot or {}
+        snapshot_info = wallet_snapshot or {}
+        if snapshot_source is None:
+            snapshot_source = "fallback_current_wallet"
+            logger.info(
+                "[dashboard] dashboard_wallet_snapshot_file_missing",
+                {"account": acc, "expected_file": str(snapshot_file) if snapshot_file else None},
+            )
+        logger.info(
+            "[dashboard] dashboard_wallet_snapshot_source",
+            {
+                "account": acc,
+                "source": snapshot_source,
+                "wallet_snapshot_present": bool(wallet_snapshot),
+                "last_trade_profit_available": snapshot_info.get("last_trade_wallet_profit_available"),
+                "last_trade_wallet_profit_usdt": snapshot_info.get("last_trade_wallet_profit_usdt"),
+                "wallet_balance_start_usdt": snapshot_info.get("wallet_balance_start_usdt"),
+                "wallet_balance_current_usdt": snapshot_info.get("wallet_balance_current_usdt"),
+            },
+        )
+        cycle_entries = _extract_cycle_pnl_entries(strategy_state)
+        final_exit_pnl = _extract_final_exit_pnl(strategy_state)
         return {
             "success": True,
             "list": records,
+            "confirmed_pnl_rows": confirmed_rows,
+            "order_purpose_map": order_purpose_map,
             "margin_balance": round(margin_balance, 2) if margin_balance is not None else None,
+            "wallet_snapshot": wallet_snapshot,
+            "cycle_pnl_entries": cycle_entries,
+            "final_exit_pnl": final_exit_pnl,
+            "closed_pnl_history": closed_pnl_history,
         }
     except Exception as e:
         logger.error(f"Fehler beim Abrufen der Closed PnL: {e}", exc_info=True)
@@ -7550,6 +8329,7 @@ async def api_run_restart_fixed_cycle_script(user: dict = Depends(require_auth))
     if not script_path.exists():
         logger.error("restart_fixed_cycle.sh missing at %s", script_path)
         return JSONResponse({"success": False, "error": "restart_fixed_cycle.sh not found"}, status_code=400)
+    _maybe_run_dashboard_start_snapshot(project_root)
     return _run_restart_fixed_cycle_script(script_path, project_root)
 
 

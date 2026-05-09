@@ -56,4 +56,5 @@ Thumbs.db
 # Git
 # =========================
 *.swp
-*.swo
+*.swo__pycache__/
+*.pyc

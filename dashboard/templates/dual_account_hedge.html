@@ -88,6 +88,104 @@
                 display: none !important;
             }
         }
+        .wallet-snapshot-panel {
+            margin-top: 20px;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            padding: 16px;
+            background: rgba(2,6,23,0.75);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .wallet-snapshot-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+        }
+        .wallet-snapshot-row span.label {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .wallet-snapshot-row span.value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .wallet-snapshot-panel .wallet-detail-actions {
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+        }
+        .btn-wallet-detail {
+            background: #2563eb;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-wallet-detail:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .wallet-detail-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .wallet-detail-modal.visible {
+            display: flex;
+        }
+        .wallet-detail-modal .modal-content {
+            background: #070b17;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #1f2937;
+            max-width: 520px;
+            width: 90%;
+            color: #e5e7eb;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4);
+            position: relative;
+        }
+        .wallet-detail-modal h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        .wallet-detail-modal .modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: transparent;
+            border: none;
+            color: #e5e7eb;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .wallet-detail-modal .cycle-entry {
+            border-bottom: 1px solid #1f2937;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+        .wallet-detail-modal .cycle-entry:last-child {
+            border-bottom: none;
+        }
+        .wallet-detail-modal .cycle-entry span {
+            display: inline-block;
+            min-width: 120px;
+        }
+        .wallet-detail-modal .final-exit-row {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #1f2937;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -139,6 +237,52 @@
                     <div class="equity-adjusted" id="totalAdjustedEquityWrap">≈ <span class="equity-adjusted-value" id="totalAdjustedEquity">--</span> (Wallet + Unrealised PnL)</div>
                 </div>
             </div>
+            <div class="wallet-snapshot-panel" id="walletSnapshotPanel">
+                <div class="wallet-snapshot-row">
+                    <span class="label">Current Wallet</span>
+                    <span class="value" id="walletSnapshotCurrent">--</span>
+                </div>
+                <div class="wallet-snapshot-row">
+                    <span class="label">Previous Wallet</span>
+                    <span class="value" id="walletSnapshotPrevious">--</span>
+                </div>
+                <div class="wallet-snapshot-row">
+                    <span class="label">Last Trade Profit</span>
+                    <span class="value" id="walletSnapshotProfit">--</span>
+                    <small id="walletSnapshotReason" style="color:#94a3b8;"></small>
+                </div>
+                <div class="wallet-snapshot-row">
+                    <span class="label">Timestamp (UTC+3)</span>
+                    <span class="value" id="walletSnapshotTimestamp">--</span>
+                </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Start Wallet</span>
+                <span class="value" id="walletSnapshotStart">--</span>
+            </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Available Wallet</span>
+                <span class="value" id="walletSnapshotAvailable">--</span>
+            </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Adjusted Equity</span>
+                <span class="value" id="walletSnapshotAdjusted">--</span>
+            </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Profit / Loss</span>
+                <span class="value" id="walletSnapshotProfit">--</span>
+            </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Profit (%)</span>
+                <span class="value" id="walletSnapshotProfitPct">--</span>
+            </div>
+            <div class="wallet-snapshot-row">
+                <span class="label">Source</span>
+                <span class="value" id="walletSnapshotSource">--</span>
+            </div>
+                <div class="wallet-detail-actions">
+                    <button type="button" class="btn-wallet-detail" id="walletDetailBtn" disabled>Details</button>
+                </div>
+            </div>
                     
             <!-- Closed PnL Section -->
             <div class="profit-verlauf-container">
@@ -162,10 +306,27 @@
             </div>
         </div>
     </div>
+    <div class="wallet-detail-modal" id="walletDetailModal">
+        <div class="modal-content">
+            <button class="modal-close" id="walletDetailClose" aria-label="Close">×</button>
+            <h3>Cycle Fill PnL Details</h3>
+            <div id="cycleDetailList">
+                <p class="loading" style="color:#94a3b8;">Keine Daten...</p>
+            </div>
+            <div class="final-exit-row" id="finalExitDetail">
+                <div>Final Long Exit: <span id="finalLongExit">--</span></div>
+                <div>Final Short Exit: <span id="finalShortExit">--</span></div>
+            </div>
+        </div>
+    </div>
     
     <script>
         let lastMainUnrealisedPnl = 0;
         let lastSubUnrealisedPnl = 0;
+        let walletSnapshotData = null;
+        let cyclePnlEntries = [];
+        let finalExitPnl = {};
+        let longBotEquityData = null;
 
         /** Aktuell gewähltes Profil (main, bot_1, bot_2). Aus URL oder Select. */
         function getSelectedProfile() {
@@ -222,6 +383,87 @@
             if (mainEl) mainEl.textContent = fmt(mainAdjusted);
             if (subEl) subEl.textContent = fmt(subAdjusted);
             if (totalEl) totalEl.textContent = fmt(totalAdjusted);
+        }
+
+        function formatWalletSnapshotValue(value) {
+            if (value == null || !Number.isFinite(value)) return '--';
+            return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+        }
+
+        function renderWalletSnapshotPanel(snapshot) {
+            const currentEl = document.getElementById('walletSnapshotCurrent');
+            const previousEl = document.getElementById('walletSnapshotPrevious');
+            const profitEl = document.getElementById('walletSnapshotProfit');
+            const reasonEl = document.getElementById('walletSnapshotReason');
+            const timestampEl = document.getElementById('walletSnapshotTimestamp');
+            const widgetBtn = document.getElementById('walletDetailBtn');
+            if (currentEl) currentEl.textContent = snapshot ? formatWalletSnapshotValue(snapshot.wallet_balance_current_usdt) : '--';
+            if (previousEl) previousEl.textContent = snapshot ? formatWalletSnapshotValue(snapshot.wallet_balance_previous_usdt) : '--';
+            if (profitEl) {
+                if (snapshot) {
+                    const profitState = resolveWalletProfitForDisplay();
+                    profitEl.textContent = profitState.value != null ? profitState.text : 'Kein vorheriger Snapshot';
+                    profitEl.className = profitState.value != null ? profitState.className : 'pnl-zero';
+                } else {
+                    profitEl.textContent = '--';
+                    profitEl.className = 'pnl-zero';
+                }
+            }
+            if (reasonEl) {
+                reasonEl.textContent = snapshot ? (snapshot.last_trade_wallet_profit_reason || '') : '';
+            }
+            if (timestampEl) {
+                timestampEl.textContent = snapshot && snapshot.wallet_snapshot_timestamp_utc3 ? `${snapshot.wallet_snapshot_timestamp_utc3} UTC+3` : '--';
+            }
+            if (widgetBtn) {
+                widgetBtn.disabled = !(snapshot && cyclePnlEntries.length > 0);
+            }
+            const startEl = document.getElementById('walletSnapshotStart');
+            const availableEl = document.getElementById('walletSnapshotAvailable');
+            const adjustedEl = document.getElementById('walletSnapshotAdjusted');
+            const profitPctEl = document.getElementById('walletSnapshotProfitPct');
+            const sourceEl = document.getElementById('walletSnapshotSource');
+            const currentWallet = snapshot?.wallet_balance_current_usdt ?? longBotEquityData?.main_margin_balance ?? null;
+            const startWallet = snapshot?.wallet_balance_previous_usdt ?? snapshot?.wallet_balance_current_usdt ?? longBotEquityData?.main_margin_balance ?? null;
+            const diffProfit = snapshot?.last_trade_wallet_profit_usdt ?? (startWallet != null && currentWallet != null ? currentWallet - startWallet : null);
+            const baseForPct = snapshot?.wallet_balance_previous_usdt ?? startWallet;
+            const profitPct = diffProfit != null && baseForPct ? (diffProfit / baseForPct) * 100 : null;
+            if (startEl) startEl.textContent = startWallet != null ? formatWalletSnapshotValue(startWallet) : '--';
+            if (availableEl) availableEl.textContent = longBotEquityData?.main_available_balance != null ? formatWalletSnapshotValue(longBotEquityData.main_available_balance) : '--';
+            if (adjustedEl) adjustedEl.textContent = longBotEquityData?.main_equity != null ? formatWalletSnapshotValue(longBotEquityData.main_equity) : '--';
+            if (profitPctEl) profitPctEl.textContent = profitPct != null ? `${profitPct.toFixed(2)} %` : '--';
+            const computedSource =
+                snapshot?.source
+                || snapshot?.wallet_balance_source
+                || snapshot?.last_trade_wallet_profit_source
+                || (longBotEquityData ? 'fallback_current_wallet' : '--');
+            if (sourceEl) sourceEl.textContent = snapshot ? computedSource : '--';
+        }
+
+        function renderCycleDetailModal() {
+            const listContainer = document.getElementById('cycleDetailList');
+            if (!listContainer) return;
+            if (!cyclePnlEntries.length) {
+                listContainer.innerHTML = '<p class="loading" style="color:#f97316;">Keine Cycle-Details verfügbar.</p>';
+            } else {
+                listContainer.innerHTML = cyclePnlEntries.map(entry => `
+                    <div class="cycle-entry">
+                        <span>${entry.fill_type}</span>
+                        <span>Cycle ${entry.cycle_index}</span>
+                        <span class="${entry.pnl > 0 ? 'pnl-positive' : entry.pnl < 0 ? 'pnl-negative' : 'pnl-zero'}">${entry.pnl.toFixed(2)} USDT</span>
+                        <span>${entry.is_confirmed ? 'confirmed' : 'pending'}</span>
+                    </div>
+                `).join('');
+            }
+            const longExitEl = document.getElementById('finalLongExit');
+            const shortExitEl = document.getElementById('finalShortExit');
+            if (longExitEl) longExitEl.textContent = formatWalletSnapshotValue(finalExitPnl.final_long_exit_pnl);
+            if (shortExitEl) shortExitEl.textContent = formatWalletSnapshotValue(finalExitPnl.final_short_exit_pnl);
+            document.getElementById('walletDetailModal').classList.add('visible');
+        }
+
+        function closeWalletDetailModal() {
+            document.getElementById('walletDetailModal').classList.remove('visible');
         }
 
         async function loadAllSymbolsUnrealisedPnl() {
@@ -283,10 +525,31 @@
                     document.getElementById('totalAvailableBalance').textContent = totalAv > 0 ? fmt(totalAv) : '--';
                     await loadAllSymbolsUnrealisedPnl();
                     const account = document.getElementById('accountSelect')?.value;
-                    const cache = typeof closedPnlCache !== 'undefined' && closedPnlCache[account];
-                    if (cache && cache.length) renderClosedPnlTable(cache);
+                    const cache = closedPnlCache[account] || [];
+                    const historyCache = closedPnlHistoryCache[account] || [];
+                    if (historyCache.length) {
+                        renderClosedPnlTable(historyCache);
+                    } else if (cache.length) {
+                        renderClosedPnlTable(cache);
+                    }
                 }
             } catch (e) { console.error('loadEquity:', e); }
+        }
+
+        async function ensureLongBotEquityData() {
+            if (longBotEquityData) return longBotEquityData;
+            try {
+                const response = await fetch('/api/hedge/equity?profile=bot_1', { signal: AbortSignal.timeout(20000) });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (data.success) {
+                    longBotEquityData = data;
+                    return longBotEquityData;
+                }
+            } catch (e) {
+                console.warn('ensureLongBotEquityData failed', e);
+            }
+            return longBotEquityData;
         }
 
         function formatTime(ms) {
@@ -303,6 +566,50 @@
             const n = parseFloat(v);
             if (isNaN(n)) return '--';
             return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        }
+
+        function formatWalletProfitDisplay(value) {
+            const n = parseFloat(value);
+            if (!Number.isFinite(n)) return '--';
+            const formatted = Math.abs(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+            if (n > 0) return `+${formatted} USDT`;
+            if (n < 0) return `-${formatted} USDT`;
+            return `${formatted} USDT`;
+        }
+
+        function resolveWalletProfitForDisplay() {
+            const snapshot = walletSnapshotData;
+            if (!snapshot) {
+                return { value: null, text: 'kein Snapshot', className: 'pnl-zero', hasSnapshot: false };
+            }
+            const lastProfitRaw = snapshot.last_trade_wallet_profit_usdt;
+            if (lastProfitRaw != null) {
+                const parsed = Number(lastProfitRaw);
+                if (Number.isFinite(parsed)) {
+                    return {
+                        value: parsed,
+                        text: formatWalletProfitDisplay(parsed),
+                        className: pnlClass(parsed),
+                        hasSnapshot: true,
+                    };
+                }
+            }
+            const prevRaw = snapshot.wallet_balance_previous_usdt;
+            const currentRaw = snapshot.wallet_balance_current_usdt;
+            if (prevRaw != null && currentRaw != null) {
+                const prev = Number(prevRaw);
+                const current = Number(currentRaw);
+                if (Number.isFinite(prev) && Number.isFinite(current)) {
+                    const diff = current - prev;
+                    return {
+                        value: diff,
+                        text: formatWalletProfitDisplay(diff),
+                        className: pnlClass(diff),
+                        hasSnapshot: true,
+                    };
+                }
+            }
+            return { value: null, text: 'kein Snapshot', className: 'pnl-zero', hasSnapshot: true };
         }
 
         function pnlClass(v) {
@@ -331,46 +638,9 @@
         /** Cache: pro Account alle bekannten Einträge (Verlauf bleibt erhalten, neue werden hinzugefügt) */
         const CLOSED_PNL_ACCOUNTS = ['main', 'sub', 'Long_bot_1', 'Short_bot_1', 'Long_bot_2', 'Short_bot_2'];
         let closedPnlCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, []]));
+        let closedPnlHistoryCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, []]));
+        let closedPnlOrderPurposeMapCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, {}]));
         const CLOSED_PNL_CACHE_MAX = 500; // Obergrenze pro Account
-
-        function computeNettoPairs(list) {
-            const TIME_WINDOW_MS = 15 * 60 * 1000; // 15 Minuten (Burn-Zyklus kann mehrere Minuten dauern)
-            const paired = new Set();
-            const nettoByIndex = {};
-            const records = list.map((r, i) => ({
-                ...r,
-                _idx: i,
-                _ts: parseInt(r.updatedTime || r.createdTime || 0, 10),
-                _pnl: parseFloat(r.closedPnl || 0),
-                _side: (r.side || '').toLowerCase()
-            })).sort((a, b) => a._ts - b._ts);
-
-            // Sonderfall: Genau 2 Einträge, gleiches Symbol → immer Gesamt profit berechnen und nur einmal anzeigen
-            if (list.length === 2 && records[0].symbol === records[1].symbol) {
-                const netto = records[0]._pnl + records[1]._pnl;
-                const showInIdx = records[0]._ts <= records[1]._ts ? records[0]._idx : records[1]._idx;
-                nettoByIndex[showInIdx] = netto;
-                return nettoByIndex;
-            }
-
-            for (let i = 0; i < records.length; i++) {
-                if (paired.has(i)) continue;
-                const a = records[i];
-                for (let j = i + 1; j < records.length; j++) {
-                    if (paired.has(j)) continue;
-                    const b = records[j];
-                    if (a.symbol !== b.symbol) continue;
-                    if (b._ts - a._ts > TIME_WINDOW_MS) break;
-                    const netto = a._pnl + b._pnl;
-                    const showInIdx = a._ts <= b._ts ? a._idx : b._idx;
-                    nettoByIndex[showInIdx] = netto;
-                    paired.add(i);
-                    paired.add(j);
-                    break;
-                }
-            }
-            return nettoByIndex;
-        }
 
         /** Aktuellen Wallet-Wert für gewählten Account: DOM (main/sub) oder lastMarginByAccount (Bot-Accounts).
          * Bei Profil bot_1: Long_bot_1/Short_bot_1 werden aus Equity-Karten (main/sub) gelesen. */
@@ -416,43 +686,225 @@
             return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
         }
 
+        function parseClosedPnlValue(row) {
+            const candidate = row.closedPnl ?? row.realisedPnl ?? row.realizedPnl;
+            if (candidate == null) return null;
+            const number = Number(candidate);
+            return Number.isFinite(number) ? number : null;
+        }
+
+        function getBybitClosedPnlTime(row) {
+            return row.updatedTime || row.tradeTime || row.closeTime || row.execTime || row.createdTime || row.finalized_at || 0;
+        }
+
+        function parseRowTimestamp(row) {
+            const candidate = getBybitClosedPnlTime(row);
+            if (candidate == null) return 0;
+            const num = Number(candidate);
+            if (!Number.isNaN(num)) return num;
+            const parsed = Date.parse(candidate);
+            return Number.isNaN(parsed) ? 0 : parsed;
+        }
+
+        function normalizeWalletValue(value) {
+            if (value == null) return null;
+            const num = Number(value);
+            return Number.isFinite(num) ? num : null;
+        }
+
+        function resolveWalletAnchor(snapshot) {
+            const fields = [
+                { key: 'current_wallet_usdt', value: snapshot?.current_wallet_usdt },
+                { key: 'wallet_balance_current_usdt', value: snapshot?.wallet_balance_current_usdt },
+                { key: 'current_wallet', value: snapshot?.current_wallet },
+                { key: 'current_wallet_balance', value: snapshot?.current_wallet_balance },
+                { key: 'current_balance', value: snapshot?.current_balance },
+                { key: 'wallet_balance', value: snapshot?.wallet_balance },
+            ];
+            for (const field of fields) {
+                const normalized = normalizeWalletValue(field.value);
+                if (normalized != null) {
+                    return { value: normalized, source: field.key };
+                }
+            }
+            if (snapshot?.wallet_balance_start_usdt) {
+                const normalized = normalizeWalletValue(snapshot.wallet_balance_start_usdt);
+                if (normalized != null) {
+                    return { value: normalized, source: 'wallet_balance_start_usdt' };
+                }
+            }
+            return { value: null, source: 'unknown' };
+        }
+
+        function buildChronologicalRows(rows, snapshot) {
+            const sorted = [...rows].sort((a, b) => {
+                const ta = parseRowTimestamp(a);
+                const tb = parseRowTimestamp(b);
+                if (ta !== tb) return tb - ta;
+                const idA = (a.orderId || a.execId || a.id || a.tradeId || '').toString();
+                const idB = (b.orderId || b.execId || b.id || b.tradeId || '').toString();
+                return idA.localeCompare(idB);
+            });
+            const anchor = resolveWalletAnchor(snapshot);
+            let runningWallet = Number.isFinite(anchor.value ?? NaN) ? anchor.value : null;
+            sorted.forEach(row => {
+                const pnl = parseClosedPnlValue(row);
+                row.pnl_value = pnl;
+                row.__timestamp = parseRowTimestamp(row);
+                if (runningWallet != null) {
+                    row.wallet_after_trade = runningWallet;
+                    if (Number.isFinite(pnl ?? NaN)) {
+                        runningWallet -= pnl ?? 0;
+                    }
+                } else {
+                    row.wallet_after_trade = null;
+                }
+            });
+            const newestRow = sorted[0];
+            console.debug('closed pnl wallet anchor', {
+                walletAnchor: anchor.value,
+                walletAnchorSource: anchor.source,
+                walletSnapshot: snapshot,
+                newestRow,
+                newestRowWalletAfterTrade: newestRow?.wallet_after_trade,
+            });
+            return sorted;
+        }
+
+        function mergeRawAndConfirmedPnlRows(rawRows, confirmedRows, orderPurposeMap) {
+            const confirmedByOrderId = new Map();
+            const usedConfirmedKeys = new Set();
+            (confirmedRows || []).forEach((row) => {
+                const orderId = String(row.orderId || row.exchange_order_id || '').trim();
+                if (!orderId) return;
+                const dedupeKey = String(row.dedupe_key || `${orderId}:${row.purpose || row.trade_type || ''}`);
+                if (confirmedByOrderId.has(orderId) || usedConfirmedKeys.has(dedupeKey)) {
+                    return;
+                }
+                confirmedByOrderId.set(orderId, row);
+                usedConfirmedKeys.add(dedupeKey);
+            });
+
+            const merged = [];
+            const usedOrderIds = new Set();
+            (rawRows || []).forEach((rawRow) => {
+                const rawOrderId = String(rawRow.orderId || rawRow.exchange_order_id || rawRow.execId || rawRow.tradeId || '').trim();
+                if (rawOrderId && confirmedByOrderId.has(rawOrderId)) {
+                    merged.push(confirmedByOrderId.get(rawOrderId));
+                    usedOrderIds.add(rawOrderId);
+                    return;
+                }
+                merged.push(rawRow);
+                if (rawOrderId) usedOrderIds.add(rawOrderId);
+            });
+
+            confirmedByOrderId.forEach((row, orderId) => {
+                if (usedOrderIds.has(orderId)) return;
+                merged.push(row);
+                usedOrderIds.add(orderId);
+            });
+
+            return merged;
+        }
+
+        function getTradeType(row) {
+            const currentAccount = document.getElementById('accountSelect')?.value || 'main';
+            const orderId = String(row.orderId || row.order_id || row.exchange_order_id || row.id || '').trim();
+            if (row.trade_type) {
+                return row.trade_type;
+            }
+            if (row.purpose) {
+                return row.purpose;
+            }
+            const purposeEntry = closedPnlOrderPurposeMapCache[currentAccount]?.[orderId];
+            if (purposeEntry?.purpose) {
+                return purposeEntry.purpose;
+            }
+            const exchangeOrderEntry = closedPnlOrderPurposeMapCache[currentAccount]?.[String(row.exchange_order_id || '').trim()];
+            if (exchangeOrderEntry?.purpose) {
+                return exchangeOrderEntry.purpose;
+            }
+            const linkId = String(
+                row.orderLinkId ||
+                row.order_link_id ||
+                row.orderLinkID ||
+                row.order_linkId ||
+                ""
+            ).toLowerCase();
+            if (
+                linkId.includes("cycle_1_long_add")
+            ) {
+                return "CYCLE_1_LONG_ADD";
+            }
+            if (
+                linkId.includes("cycle_1_short_tp")
+            ) {
+                return "CYCLE_1_SHORT_TP";
+            }
+            if (
+                linkId.includes("cycle_2_long_add")
+            ) {
+                return "CYCLE_2_LONG_ADD";
+            }
+            if (
+                linkId.includes("cycle_2_short_tp")
+            ) {
+                return "CYCLE_2_SHORT_TP";
+            }
+            if (
+                linkId.includes("long_tp_exit") ||
+                linkId.includes("long-tp-exit") ||
+                linkId.includes("long_tp")
+            ) {
+                return "LONG_TP_EXIT";
+            }
+            if (
+                linkId.includes("short_sl_exit") ||
+                linkId.includes("short-sl-exit") ||
+                linkId.includes("short_sl")
+            ) {
+                return "SHORT_SL_EXIT";
+            }
+            return "Raw PnL";
+        }
+
         function renderClosedPnlTable(list) {
             const content = document.getElementById('closedPnlContent');
             if (!list || list.length === 0) {
                 content.innerHTML = '<div class="loading">Keine Closed-PnL-Einträge.</div>';
                 return;
             }
-            // Immer nach Zeit sortieren (neueste zuerst), gleiche Logik wie Main – damit Sub dieselbe Reihenfolge hat
-            const ts = r => parseInt(r.updatedTime || r.createdTime || 0, 10);
-            list = [...list].sort((a, b) => ts(b) - ts(a));
+            list = [...list].sort((a, b) => {
+                const ta = a.__timestamp ?? parseRowTimestamp(a);
+                const tb = b.__timestamp ?? parseRowTimestamp(b);
+                return tb - ta;
+            });
             const account = document.getElementById('accountSelect')?.value || 'main';
             const walletLabel = 'Wallet (' + (account === 'sub' ? 'Sub' : account === 'main' ? 'Main' : account) + ')';
-            const walletText = getCurrentWalletForAccount(account);
-            const currentWallet = parseWalletToNumber(walletText);
-            const nettoByIndex = computeNettoPairs(list);
-            // Liste neueste zuerst. Wallet genau zu diesem Zeitpunkt = aktueller Wallet − alle PnL die danach realisiert wurden (Zeilen darüber)
-            let cumulativePnlNachher = 0;
-            const rows = list.map((r, i) => {
-                const pnl = parseFloat(r.closedPnl || 0);
-                const walletZuDiesemZeitpunkt = currentWallet != null ? currentWallet - cumulativePnlNachher : null;
-                cumulativePnlNachher += pnl;
-                const netto = nettoByIndex[i];
-                const nettoCell = netto !== undefined
-                    ? `<span class="${pnlClass(netto)}">${formatPnl(netto)}</span>`
-                    : '--';
-                const typ = sideToType(r.side);
-                const walletCellText = formatWalletUsdt(walletZuDiesemZeitpunkt);
+            const rows = list.map((r) => {
+                const time = formatTime(r.__timestamp || parseRowTimestamp(r));
+                const symbol = r.symbol || '--';
+                const tradeId = r.orderId || r.execId || r.tradeId || r.id || '--';
+                const pnlValue = r.pnl_value ?? parseClosedPnlValue(r);
+                const walletValue = r.wallet_after_trade != null ? formatWalletUsdt(r.wallet_after_trade) : '--';
+                const pnlClass = pnlValue > 0 ? 'positive' : pnlValue < 0 ? 'negative' : 'zero';
+                const tradeType = getTradeType(r);
+                console.debug("closed pnl trade type row", {
+                    orderId: r.orderId,
+                    orderLinkId: r.orderLinkId || r.order_link_id,
+                    tradeType,
+                });
                 return `<tr>
-                    <td>${formatTime(r.updatedTime || r.createdTime)}</td>
-                    <td>${r.symbol || '--'}</td>
-                    <td>${typ}</td>
-                    <td><span class="${pnlClass(pnl)}">${formatPnl(pnl)}</span></td>
-                    <td>${nettoCell}</td>
-                    <td class="wallet-cell" title="Wallet-Stand genau zu diesem Zeitpunkt">${walletCellText}</td>
+                    <td>${time}</td>
+                    <td>${symbol}</td>
+                    <td>${tradeId.toString().substr(0, 8)}</td>
+                    <td><span class="pnl-${pnlClass}">${formatWalletProfitDisplay(pnlValue)}</span></td>
+                    <td class="wallet-cell">${walletValue}</td>
+                    <td>${tradeType}</td>
                 </tr>`;
             }).join('');
             content.innerHTML = `<table class="closed-pnl-table">
-                <thead><tr><th>Zeit</th><th>Coin</th><th>Typ</th><th>P&L</th><th>Netto-P&L</th><th>${walletLabel}</th></tr></thead>
+                <thead><tr><th>Zeit</th><th>Coin</th><th>Trade</th><th>P&L</th><th>${walletLabel}</th><th>Trade Typ</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>`;
         }
@@ -475,24 +927,53 @@
                     if (btn) btn.disabled = false;
                     return;
                 }
-                const list = data.list || [];
+                const rawRows = data.list || [];
+                const confirmedRows = data.confirmed_pnl_rows || [];
+                const orderPurposeMap = data.order_purpose_map || {};
+                closedPnlOrderPurposeMapCache[account] = orderPurposeMap;
+                console.debug("closed pnl order purpose map", {
+                    count: Object.keys(orderPurposeMap || {}).length,
+                    sample: Object.entries(orderPurposeMap || {}).slice(0, 5)
+                });
                 if (data.margin_balance != null) lastMarginByAccount[account] = data.margin_balance;
+                walletSnapshotData = data.wallet_snapshot || null;
+                cyclePnlEntries = data.cycle_pnl_entries || [];
+                finalExitPnl = data.final_exit_pnl || {};
+                await ensureLongBotEquityData();
+                renderWalletSnapshotPanel(walletSnapshotData);
                 const seen = new Set(cache.map(r => recordKey(r)));
                 let added = 0;
-                for (const r of list) {
+                for (const r of rawRows) {
                     const key = recordKey(r);
                     if (seen.has(key)) continue;
                     seen.add(key);
                     cache.push(r);
                     added++;
                 }
-                cache.sort((a, b) => (parseInt(b.updatedTime || b.createdTime || 0, 10) - parseInt(a.updatedTime || a.createdTime || 0, 10)));
-                if (cache.length > CLOSED_PNL_CACHE_MAX) cache.splice(CLOSED_PNL_CACHE_MAX);
-                closedPnlCache[account] = cache;
+                const mergedRows = mergeRawAndConfirmedPnlRows(cache, confirmedRows, orderPurposeMap);
+                mergedRows.sort((a, b) => parseRowTimestamp(b) - parseRowTimestamp(a));
+                if (mergedRows.length > CLOSED_PNL_CACHE_MAX) mergedRows.splice(CLOSED_PNL_CACHE_MAX);
+                closedPnlCache[account] = mergedRows;
+                const decoratedRows = buildChronologicalRows(mergedRows, walletSnapshotData);
+                if (decoratedRows.length) {
+                    renderClosedPnlTable(decoratedRows);
+                    return;
+                }
+                const rawHistory = Array.isArray(data.closed_pnl_history) ? data.closed_pnl_history : [];
+                if (rawHistory.length) {
+                    renderClosedPnlTable(rawHistory);
+                    return;
+                }
                 renderClosedPnlTable(cache);
             } catch (e) {
-                if (cache.length === 0) content.innerHTML = `<div class="loading" style="color:#f44336">Netzwerkfehler: ${e.message}</div>`;
-                else renderClosedPnlTable(cache);
+                const fallbackRows = buildChronologicalRows(cache, walletSnapshotData);
+                if (fallbackRows.length) {
+                    renderClosedPnlTable(fallbackRows);
+                } else if (cache.length === 0) {
+                    content.innerHTML = `<div class="loading" style="color:#f44336">Netzwerkfehler: ${e.message}</div>`;
+                } else {
+                    renderClosedPnlTable(cache);
+                }
             } finally {
                 if (document.getElementById('refreshClosedPnlBtn')) document.getElementById('refreshClosedPnlBtn').disabled = false;
             }
@@ -524,6 +1005,16 @@
         // Equity und Closed PnL alle 60s automatisch aktualisieren (Verlauf wird durch Merge ergänzt)
         setInterval(loadEquity, 60000);
         setInterval(loadClosedPnl, 60000);
+        const detailBtn = document.getElementById('walletDetailBtn');
+        if (detailBtn) detailBtn.addEventListener('click', renderCycleDetailModal);
+        const modalClose = document.getElementById('walletDetailClose');
+        if (modalClose) modalClose.addEventListener('click', closeWalletDetailModal);
+        const modal = document.getElementById('walletDetailModal');
+        if (modal) {
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeWalletDetailModal();
+            });
+        }
     </script>
 </body>
 </html>
