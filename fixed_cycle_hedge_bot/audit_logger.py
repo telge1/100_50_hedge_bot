@@ -49,14 +49,21 @@ def _current_timestamp_iso() -> str:
 
 
 class AuditLogger:
-    def __init__(self, logger: logging.Logger, audit_log_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        logger: logging.Logger,
+        audit_log_path: str | Path | None = None,
+        *,
+        extra_fields: dict[str, Any] | None = None,
+    ) -> None:
         self.logger = logger
         self.audit_log_path = Path(audit_log_path) if audit_log_path else None
         if self.audit_log_path:
             self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.extra_fields = dict(extra_fields) if extra_fields else {}
 
     def log_event(self, event: str, **payload: Any) -> None:
-        record = {"event": event, **payload}
+        record = {"event": event, **self.extra_fields, **payload}
         record["timestamp"] = _current_timestamp_iso()
         log_method = self.logger.debug if event in DEBUG_EVENTS else self.logger.info
         log_method("%s %s", event, json.dumps(record, default=_json_default, sort_keys=True))
@@ -64,3 +71,13 @@ class AuditLogger:
             return
         with self.audit_log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, default=_json_default, sort_keys=True) + "\n")
+
+    def update_extra_fields(self, fields: dict[str, Any]) -> None:
+        self.extra_fields.update(fields)
+
+    def set_audit_log_path(self, audit_log_path: str | Path | None) -> None:
+        if audit_log_path:
+            self.audit_log_path = Path(audit_log_path)
+            self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            self.audit_log_path = None

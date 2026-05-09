@@ -11,6 +11,11 @@ from strategy.config_legacy import StrategyConfig
 
 from .registry import STRATEGY_REGISTRY, build_registered_runtime, list_strategy_names
 from .runtime import configure_runtime_logging
+from .fixed_cycle_strategy import (
+    configure_calc_audit_log_file,
+    configure_confirmed_order_pnl_history_file,
+    set_default_bot_name,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,6 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="long_bot_1",
         help="Optionaler Bot-Identifikator (wird z.B. fuer Logs/Audit genutzt).",
     )
+    parser.add_argument(
+        "--calc-audit-log-file",
+        default=None,
+        help="Optionaler Pfad fuer das Calc-Audit-Log.",
+    )
+    parser.add_argument(
+        "--confirmed-pnl-history-file",
+        default=None,
+        help="Optionaler Pfad fuer die confirmed order PnL History.",
+    )
     return parser
 
 
@@ -81,10 +96,25 @@ def build_runtime_from_args(args: argparse.Namespace):
         runtime.config.reconcile_interval_seconds = args.reconcile_interval
     if args.bot_name:
         runtime.config.bot_name = args.bot_name
+        runtime.audit.update_extra_fields({"bot_name": runtime.config.bot_name})
+    if args.calc_audit_log_file:
+        runtime.config.calc_audit_log_file = args.calc_audit_log_file
+    if args.confirmed_pnl_history_file:
+        runtime.config.confirmed_pnl_history_file = args.confirmed_pnl_history_file
+    configure_calc_audit_log_file(
+        args.calc_audit_log_file or runtime.config.calc_audit_log_file
+    )
+    configure_confirmed_order_pnl_history_file(
+        args.confirmed_pnl_history_file
+        or runtime.config.confirmed_pnl_history_file
+        or "logs/confirmed_order_pnl_history.jsonl"
+    )
+    set_default_bot_name(runtime.config.bot_name)
     if args.log_file:
         runtime.config.log_file = args.log_file
     if args.audit_log_file:
         runtime.config.audit_log_file = args.audit_log_file
+        runtime.audit.set_audit_log_path(runtime.config.audit_log_file)
         runtime.audit.audit_log_path = Path(args.audit_log_file)
         runtime.audit.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
     if args.strategy_state_file:

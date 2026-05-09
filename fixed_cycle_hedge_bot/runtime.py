@@ -49,6 +49,8 @@ class GenericRuntimeConfig:
     health_file: str | None = None
     ensure_exchange_ready: bool = True
     bot_name: str = "long_bot_1"
+    calc_audit_log_file: str | None = None
+    confirmed_pnl_history_file: str | None = None
 
 
 class GenericHedgeRuntime:
@@ -68,7 +70,11 @@ class GenericHedgeRuntime:
         self.websocket_client = websocket_client
         self.runtime_state = RuntimeState()
         self.position_manager = PositionManager()
-        self.audit = AuditLogger(self.logger, config.audit_log_file)
+        self.audit = AuditLogger(
+            self.logger,
+            config.audit_log_file,
+            extra_fields={"bot_name": config.bot_name},
+        )
         self.context = StrategyContext(
             audit=self.audit,
             runtime_name=strategy.name,

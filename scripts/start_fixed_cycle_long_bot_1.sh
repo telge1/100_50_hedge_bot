@@ -21,6 +21,8 @@ nohup "${PYTHON}" -m fixed_cycle_hedge_bot.runner \
   --strategy-config-file live_bots/100_50_hedge_bot/long_bot_1/config/fixed_cycle_config.json \
   --strategy-state-file live_bots/100_50_hedge_bot/long_bot_1/state/fixed_cycle_state.json \
   --audit-log-file live_bots/100_50_hedge_bot/long_bot_1/logs/generic_hedge_runtime_audit.jsonl \
+  --calc-audit-log-file live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_calc_audit.log \
+  --confirmed-pnl-history-file live_bots/100_50_hedge_bot/long_bot_1/logs/confirmed_order_pnl_history.jsonl \
   --log-file live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_hedge_runtime.log \
   > live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_runner.stdout.log 2>&1 &
 PID=$!

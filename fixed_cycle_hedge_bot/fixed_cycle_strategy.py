@@ -118,16 +118,42 @@ class FixedCycleHedgeConfig:
 
 logger = logging.getLogger(__name__)
 calc_audit_logger = logging.getLogger("fixed_cycle_calc_audit")
+calc_audit_handler: logging.Handler | None = None
 calc_audit_log_path = Path("logs") / "fixed_cycle_calc_audit.log"
+calc_audit_logger.setLevel(logging.INFO)
+calc_audit_logger.propagate = False
 
-if not calc_audit_logger.handlers:
-    calc_audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(calc_audit_log_path, encoding="utf-8")
+confirmed_order_pnl_history_path = Path("logs") / "confirmed_order_pnl_history.jsonl"
+default_bot_name = "long_bot_1"
+
+
+def configure_calc_audit_log_file(path: str | Path | None) -> None:
+    global calc_audit_log_path, calc_audit_handler
+    target_path = Path(path) if path else Path("logs") / "fixed_cycle_calc_audit.log"
+    calc_audit_log_path = target_path
+    if calc_audit_handler:
+        calc_audit_logger.removeHandler(calc_audit_handler)
+        calc_audit_handler.close()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(target_path, encoding="utf-8")
     handler.setLevel(logging.INFO)
     handler.setFormatter(logging.Formatter("%(message)s"))
     calc_audit_logger.addHandler(handler)
-calc_audit_logger.setLevel(logging.INFO)
-calc_audit_logger.propagate = False
+    calc_audit_handler = handler
+
+
+def configure_confirmed_order_pnl_history_file(path: str | Path | None) -> None:
+    global confirmed_order_pnl_history_path
+    confirmed_order_pnl_history_path = Path(path) if path else Path("logs") / "confirmed_order_pnl_history.jsonl"
+
+
+def set_default_bot_name(name: str | None) -> None:
+    global default_bot_name
+    if name:
+        default_bot_name = name
+
+
+configure_calc_audit_log_file(calc_audit_log_path)
 
 
 def _emit_analyzer_event(logger: logging.Logger, event: str, payload: dict[str, Any]) -> None:
@@ -6555,7 +6581,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
             return
-        path = Path("logs") / "confirmed_order_pnl_history.jsonl"
+        record["bot_name"] = default_bot_name
+        path = confirmed_order_pnl_history_path
         try:
             existing_keys: set[str] = set()
             if path.exists():
