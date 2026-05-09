@@ -289,12 +289,22 @@ LIVE_GRID_API_MIN_INTERVAL_SECONDS = 2.0
 LIVE_POSITIONS_GRID_CACHE: Dict[str, Dict[str, object]] = {}
 
 LIVE_CHART_STRATEGY_STATE_FILES: Dict[str, Path] = {
-    "Long_bot_1": project_root / "logs" / "fixed_cycle_state.json",
+    "Long_bot_1": project_root
+    / "live_bots"
+    / "100_50_hedge_bot"
+    / "long_bot_1"
+    / "state"
+    / "fixed_cycle_state.json",
     "Short_bot_1": project_root / "logs" / "fixed_cycle_state.json",
 }
 
 WALLET_SNAPSHOT_FILES: Dict[str, Path] = {
-    "Long_bot_1": project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json",
+    "Long_bot_1": project_root
+    / "live_bots"
+    / "100_50_hedge_bot"
+    / "long_bot_1"
+    / "snapshots"
+    / "fixed_cycle_wallet_snapshot.json",
 }
 
 
@@ -835,6 +845,24 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
         str(long_qty),
         "--short-qty",
         str(short_qty),
+        "--state-file",
+        str(
+            project_root
+            / "live_bots"
+            / "100_50_hedge_bot"
+            / "long_bot_1"
+            / "state"
+            / "fixed_cycle_state.json"
+        ),
+        "--output-file",
+        str(
+            project_root
+            / "live_bots"
+            / "100_50_hedge_bot"
+            / "long_bot_1"
+            / "snapshots"
+            / "fixed_cycle_wallet_snapshot.json"
+        ),
     ]
     logger.info("fixed_cycle_wallet_start_snapshot_started %s", {"cmd": cmd})
     try:
@@ -849,7 +877,14 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
                     "stderr": result.stderr.strip(),
                 },
             )
-            snapshot_file = project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json"
+            snapshot_file = (
+                project_root
+                / "live_bots"
+                / "100_50_hedge_bot"
+                / "long_bot_1"
+                / "snapshots"
+                / "fixed_cycle_wallet_snapshot.json"
+            )
             snapshot_exists = snapshot_file.exists()
             snapshot_meta = {}
             if snapshot_exists:
@@ -898,7 +933,14 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
 
 
 def _maybe_run_dashboard_flat_snapshot(project_root: Path) -> None:
-    snapshot_file = project_root / "logs" / "fixed_cycle_wallet_snapshot_long_bot_1.json"
+    snapshot_file = (
+        project_root
+        / "live_bots"
+        / "100_50_hedge_bot"
+        / "long_bot_1"
+        / "snapshots"
+        / "fixed_cycle_wallet_snapshot.json"
+    )
     if not snapshot_file.exists():
         logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_start_snapshot", {"reason": "snapshot_missing"})
         return
