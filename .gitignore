@@ -58,3 +58,14 @@ Thumbs.db
 *.swp
 *.swo__pycache__/
 *.pyc
+
+# Bot runtime files
+live_bots/**/state/*.json
+live_bots/**/logs/*.log
+live_bots/**/logs/*.jsonl
+live_bots/**/snapshots/*.json
+live_bots/**/pids/*.pid
+
+# Keep bot registry/config trackable
+!live_bots/**/config/fixed_cycle_config.json
+!live_bots/**/bots.json

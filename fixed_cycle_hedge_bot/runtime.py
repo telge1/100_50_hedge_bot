@@ -48,6 +48,7 @@ class GenericRuntimeConfig:
     strategy_state_file: str | None = None
     health_file: str | None = None
     ensure_exchange_ready: bool = True
+    bot_name: str = "long_bot_1"
 
 
 class GenericHedgeRuntime:

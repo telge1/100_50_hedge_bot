@@ -1,0 +1,16 @@
+{
+  "long_bot_1": {
+    "bot_name": "long_bot_1",
+    "bot_group": "100_50_hedge_bot",
+    "strategy": "fixed_cycle",
+    "config": "live_bots/100_50_hedge_bot/long_bot_1/config/fixed_cycle_config.json",
+    "state": "live_bots/100_50_hedge_bot/long_bot_1/state/fixed_cycle_state.json",
+    "runtime_log": "live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_hedge_runtime.log",
+    "audit_log": "live_bots/100_50_hedge_bot/long_bot_1/logs/generic_hedge_runtime_audit.jsonl",
+    "calc_audit_log": "live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_calc_audit.log",
+    "confirmed_pnl_history": "live_bots/100_50_hedge_bot/long_bot_1/logs/confirmed_order_pnl_history.jsonl",
+    "stdout_log": "live_bots/100_50_hedge_bot/long_bot_1/logs/fixed_cycle_runner.stdout.log",
+    "wallet_snapshot": "live_bots/100_50_hedge_bot/long_bot_1/snapshots/fixed_cycle_wallet_snapshot.json",
+    "pid_file": "live_bots/100_50_hedge_bot/long_bot_1/pids/fixed_cycle_bot.pid"
+  }
+}

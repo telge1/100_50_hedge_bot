@@ -54,6 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optionaler JSON-Pfad fuer strategie-spezifische Konfiguration.",
     )
+    parser.add_argument(
+        "--bot-name",
+        default="long_bot_1",
+        help="Optionaler Bot-Identifikator (wird z.B. fuer Logs/Audit genutzt).",
+    )
     return parser
 
 
@@ -74,6 +79,8 @@ def build_runtime_from_args(args: argparse.Namespace):
         runtime.config.price_poll_interval_seconds = args.price_poll_interval
     if args.reconcile_interval is not None:
         runtime.config.reconcile_interval_seconds = args.reconcile_interval
+    if args.bot_name:
+        runtime.config.bot_name = args.bot_name
     if args.log_file:
         runtime.config.log_file = args.log_file
     if args.audit_log_file:
