@@ -1,0 +1,25 @@
+master:
+  api_key: "PUT_MASTER_API_KEY_HERE"
+  secret_key: "PUT_MASTER_SECRET_KEY_HERE"
+
+sub:
+  api_key: "PUT_SUB_API_KEY_HERE"
+  secret_key: "PUT_SUB_SECRET_KEY_HERE"
+
+bot_2:
+  api_key: "PUT_LONG_BOT_2_API_KEY_HERE"
+  secret_key: "PUT_LONG_BOT_2_SECRET_KEY_HERE"
+
+bot_2_sub:
+  api_key: "PUT_SHORT_BOT_2_API_KEY_HERE"
+  secret_key: "PUT_SHORT_BOT_2_SECRET_KEY_HERE"
+
+profiles:
+  long_bot_1:
+    long_account: master
+  long_bot_2:
+    long_account: bot_2
+  short_bot_1:
+    short_account: sub
+  short_bot_2:
+    short_account: bot_2_sub

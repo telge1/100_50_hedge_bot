@@ -1,0 +1,54 @@
+{
+  "symbol": "KNCUSDT",
+  "category": "linear",
+  "dynamic_symbol_enabled": true,
+  "best_coin_file": "logs/best_coin.json",
+  "best_coin_max_age_minutes": 45,
+  "dynamic_symbol_hold_minutes": 0,
+  "base_notional_usdt": 100.0,
+  "hedge_ratio_short": 0.5,
+  
+  "reduction_pct_per_fill": 25,
+ 
+  "long_fill_distance_pct": 0.5,  
+  "short_fill_distance_pct": 0.15,
+  
+  "tp_profit_target_pct": 0.25,
+  "tp_buffer_pct": 0.0002,
+  
+  "target_profit_usdt": 0.015, 
+ 
+  
+  "restart": false,
+
+
+  "fee_safety_buffer_pct": 0.12,
+  "market_fallback_slippage_type": "Percent",
+  "market_fallback_slippage_value": 0.1,
+  "net_realized_pnl_target": 0.0,
+  "hard_stop_cycle": 10,
+  "hard_stop_pct": 1.0,
+  "max_cycles": 10,
+  "leverage_long": 25.0,
+  "leverage_short": 25.0,
+  "initial_entry_order_type": "Market",
+  "use_reduce_only": true,
+  "rest_poll_after_fill_ms": 250,
+  "ws_enabled": true,
+  
+  "order_refresh_cooldown_ms": 750,
+  "price_tick_size": 0.0001,
+
+  "final_exit_tick_offset": 0.0,
+
+  "trailing_stop_dist": 0.0025,
+  "short_tp_fallback_activation_drop_pct": 0.005,
+  "short_tp_fallback_stop_offset_pct": 0.0025,
+  
+  "short_tp_min_threshold_pct_after_long_reduce": 0.01,
+
+
+  "qty_step": 0.001,
+  "min_order_qty": 0.001,
+  "min_notional_usdt": 5.0
+}
