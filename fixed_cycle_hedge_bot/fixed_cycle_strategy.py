@@ -22,7 +22,18 @@ from .trailing_fallback import (
     update_short_tp_fallback,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
+PER_BOT_CONFIG_ROOT = PROJECT_ROOT / "live_bots"
+
+
+def _is_per_bot_config(path_obj: Path) -> bool:
+    try:
+        relative = path_obj.relative_to(PER_BOT_CONFIG_ROOT)
+    except ValueError:
+        return False
+    parts = relative.parts
+    return len(parts) >= 4 and parts[-2] == "config" and parts[-1] == "fixed_cycle_config.json"
 PNL_VALIDATION_THRESHOLD_USDT = 0.01
 POST_EXIT_CLEANUP_MAX_ATTEMPTS = 5
 CONFIRMED_CLOSED_PNL_RETRY_INITIAL_DELAY_MS = 2000
@@ -104,11 +115,15 @@ class FixedCycleHedgeConfig:
             return cls()
         path_obj = Path(path).resolve()
         expected_path = EXPECTED_CONFIG_PATH.resolve()
-        if enforce_expected_path and path_obj != expected_path:
-            raise ValueError(
-                f"Invalid config path: {path_obj}\n"
-                f"Expected: {expected_path}"
-            )
+        if enforce_expected_path:
+            if not (
+                path_obj == expected_path or _is_per_bot_config(path_obj)
+            ):
+                error_message = (
+                    f"Invalid config path: {path_obj}\n"
+                    f"Expected: {expected_path} or live_bots/*/*/config/fixed_cycle_config.json"
+                )
+                raise ValueError(error_message)
 
         payload = json.loads(path_obj.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
