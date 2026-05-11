@@ -1,0 +1,13 @@
+profiles:
+  long_bot_1:
+    long_account: Long_bot_1
+  long_bot_2:
+    long_account: Long_bot_2
+
+Long_bot_1:
+  api_key: "YOUR_LONG_BOT_1_API_KEY"
+  secret_key: "YOUR_LONG_BOT_1_SECRET_KEY"
+
+Long_bot_2:
+  api_key: "YOUR_LONG_BOT_2_API_KEY"
+  secret_key: "YOUR_LONG_BOT_2_SECRET_KEY"

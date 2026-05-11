@@ -265,6 +265,14 @@ rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.s
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/stop_fixed_cycle.sh
 
+####################################### Multiple Start/Stop Bot #################################################
+
+./live_bots/100_50_hedge_bot/shared_scripts/start_long_bot.sh long_bot_1
+./live_bots/100_50_hedge_bot/shared_scripts/stop_with_cleanup.sh long_bot_1
+
+./live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_3 --with-wrappers
+
+
 ####################################### Dashboard ###############################################################
 
 sudo systemctl daemon-reload
