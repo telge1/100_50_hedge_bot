@@ -92,6 +92,7 @@ class GenericHedgeRuntime:
         self._lock = threading.RLock()
         self._max_leverage_ready_symbols: set[tuple[str, str]] = set()
         self._trailing_fallback = TrailingFallbackManager()
+        self._bootstrap_in_progress = False
 
     def _should_log_idle_event(
         self,
@@ -103,6 +104,7 @@ class GenericHedgeRuntime:
         if cache is None:
             cache = {}
             setattr(self, "_idle_log_cache", cache)
+        self._bootstrap_in_progress = True
         try:
             signature = json.dumps(payload, sort_keys=True, default=str)
         except Exception:
@@ -172,75 +174,125 @@ class GenericHedgeRuntime:
         }
 
     def bootstrap(self) -> HedgeSnapshot:
-        self._load_strategy_state()
-        if self.config.ensure_exchange_ready:
-            self.order_manager.ensure_hedge_mode(self.config.symbol, self.config.category)
-            self.order_manager.ensure_max_leverage(self.config.symbol, self.config.category)
-        self._recover_active_orders_from_exchange()
-        self._ensure_max_leverage_before_trading()
-        snapshot = self.refresh_snapshot("startup")
-        state = self.runtime_state.strategy_state
-        allow_start = True
-        startup_flat_confirmed = False
-        if (
-            snapshot.long_qty <= 0.0
-            and snapshot.short_qty <= 0.0
-            and not snapshot.active_orders
-        ):
-            snapshot, startup_flat_confirmed = self._confirm_startup_flat_snapshot(snapshot)
-        if startup_flat_confirmed:
-            startup_state_cleaned = self.strategy.prepare_for_clean_startup(
-                snapshot,
-                self.runtime_state,
-                self.context,
-            )
-            if startup_state_cleaned:
-                self.logger.info(
-                    "startup_state_cleaned_for_fresh_entry %s",
-                    {
-                        "symbol": self.config.symbol,
+        self._bootstrap_in_progress = True
+        try:
+            self._load_strategy_state()
+            if self.config.ensure_exchange_ready:
+                self.order_manager.ensure_hedge_mode(self.config.symbol, self.config.category)
+                self.order_manager.ensure_max_leverage(self.config.symbol, self.config.category)
+            self._recover_active_orders_from_exchange()
+            self._ensure_max_leverage_before_trading()
+            snapshot = self.refresh_snapshot("startup")
+            state = self.runtime_state.strategy_state
+            allow_start = True
+            startup_flat_confirmed = False
+            startup_flat_confirmation_reason: str | None = None
+            if (
+                snapshot.long_qty <= 0.0
+                and snapshot.short_qty <= 0.0
+                and not snapshot.active_orders
+            ):
+                snapshot, startup_flat_confirmed, startup_flat_confirmation_reason = self._confirm_startup_flat_snapshot(
+                    snapshot
+                )
+                if not startup_flat_confirmed:
+                    allow_start = False
+                    blocked_payload = {
                         "strategy": self.strategy.name,
+                        "symbol": self.config.symbol,
+                        "long_qty": snapshot.long_qty,
+                        "short_qty": snapshot.short_qty,
+                        "active_order_count": len(snapshot.active_orders or ()),
+                        "reason": startup_flat_confirmation_reason or "unknown",
+                        "strategy_state_file": self.config.strategy_state_file,
+                    }
+                    self.logger.warning(
+                        "fixed_cycle_startup_flat_confirmation_failed_start_blocked %s",
+                        blocked_payload,
+                    )
+                    self.audit.log_event(
+                        "fixed_cycle_startup_flat_confirmation_failed_start_blocked",
+                        **blocked_payload,
+                    )
+            if startup_flat_confirmed:
+                self.audit.log_event(
+                    "fixed_cycle_startup_flat_position_detected",
+                    strategy=self.strategy.name,
+                    symbol=self.config.symbol,
+                    long_qty=snapshot.long_qty,
+                    short_qty=snapshot.short_qty,
+                    active_order_count=len(snapshot.active_orders or ()),
+                    strategy_state_file=self.config.strategy_state_file,
+                )
+                startup_state_cleaned = self.strategy.prepare_for_clean_startup(
+                    snapshot,
+                    self.runtime_state,
+                    self.context,
+                )
+                if startup_state_cleaned:
+                    self._save_strategy_state()
+                    self.audit.log_event(
+                        "fixed_cycle_startup_zero_state_reset_persisted",
+                        strategy=self.strategy.name,
+                        symbol=self.config.symbol,
+                        long_qty=snapshot.long_qty,
+                        short_qty=snapshot.short_qty,
+                        active_order_count=len(snapshot.active_orders or ()),
+                        strategy_state_file=self.config.strategy_state_file,
+                    )
+                    self.logger.info(
+                        "startup_state_cleaned_for_fresh_entry %s",
+                        {
+                            "symbol": self.config.symbol,
+                            "strategy": self.strategy.name,
+                            "snapshot_long_qty": snapshot.long_qty,
+                            "snapshot_short_qty": snapshot.short_qty,
+                        },
+                    )
+                conflict, conflict_details = self._startup_state_conflict()
+                if conflict:
+                    self.logger.warning(
+                        "startup_state_indicates_existing_context %s",
+                        conflict_details,
+                    )
+                    block_payload = {
+                        "state_file": self.config.strategy_state_file or "<none>",
+                        "active_orders": [order.client_order_id for order in self.runtime_state.active_orders.values()],
+                        "conflict_details": conflict_details,
                         "snapshot_long_qty": snapshot.long_qty,
                         "snapshot_short_qty": snapshot.short_qty,
-                    },
-                )
-            conflict, conflict_details = self._startup_state_conflict()
-            if conflict:
-                self.logger.warning(
-                    "startup_state_indicates_existing_context %s",
-                    conflict_details,
-                )
-                block_payload = {
-                    "state_file": self.config.strategy_state_file or "<none>",
-                    "active_orders": [order.client_order_id for order in self.runtime_state.active_orders.values()],
-                    "conflict_details": conflict_details,
-                    "snapshot_long_qty": snapshot.long_qty,
-                    "snapshot_short_qty": snapshot.short_qty,
-                }
-                self.logger.warning(
-                    "startup_fresh_entry_blocked_by_state %s",
-                    block_payload,
-                )
-                allow_start = False
-        self.audit.log_event(
-            "runtime_bootstrap",
-            strategy=self.strategy.name,
-            symbol=self.config.symbol,
-            category=self.config.category,
-            snapshot=self._compact_snapshot_for_audit(snapshot),
-        )
-        if allow_start:
-            self._dispatch(
-                "start",
-                self.strategy.on_start(snapshot, self.runtime_state, self.context),
-                snapshot,
+                    }
+                    self.logger.warning(
+                        "startup_fresh_entry_blocked_by_state %s",
+                        block_payload,
+                    )
+                    allow_start = False
+            self.audit.log_event(
+                "runtime_bootstrap",
+                strategy=self.strategy.name,
+                symbol=self.config.symbol,
+                category=self.config.category,
+                snapshot=self._compact_snapshot_for_audit(snapshot),
             )
-        self._save_strategy_state()
+            if allow_start:
+                self._dispatch(
+                    "start",
+                    self.strategy.on_start(snapshot, self.runtime_state, self.context),
+                    snapshot,
+                )
+                self._save_strategy_state()
+        finally:
+            self._bootstrap_in_progress = False
         return snapshot
 
     def start(self) -> None:
-        self._start_websocket()
-        self.bootstrap()
+        self._bootstrap_in_progress = True
+        try:
+            self._start_websocket()
+            self.bootstrap()
+        except Exception:
+            self._bootstrap_in_progress = False
+            raise
         self._start_price_loop()
         self._start_reconcile_loop()
 
@@ -283,6 +335,7 @@ class GenericHedgeRuntime:
                         self._trailing_fallback.reset()
                         self.runtime_state.strategy_state.pop("trailing_active", None)
             self._dispatch("tick", self.strategy.on_tick(snapshot, self.runtime_state, self.context), snapshot)
+            self._save_strategy_state()
             return snapshot
 
     def reconcile_once(self) -> HedgeSnapshot:
@@ -480,7 +533,7 @@ class GenericHedgeRuntime:
     def _confirm_startup_flat_snapshot(
         self,
         initial_snapshot: HedgeSnapshot,
-    ) -> tuple[HedgeSnapshot, bool]:
+    ) -> tuple[HedgeSnapshot, bool, str | None]:
         attempt_payload = {
             "reason": "startup",
             "symbol": self.config.symbol,
@@ -494,6 +547,42 @@ class GenericHedgeRuntime:
         )
         time.sleep(1.0)
         confirm_snapshot = self.refresh_snapshot("startup_confirm")
+        open_order_count = 0
+        try:
+            open_orders = self.order_manager.fetch_open_orders(self.config.symbol, self.config.category) or []
+            open_order_count = len(open_orders)
+        except Exception as exc:
+            payload = {
+                "symbol": self.config.symbol,
+                "error": str(exc),
+            }
+            self.logger.warning(
+                "fixed_cycle_startup_flat_confirmation_open_order_check_failed %s",
+                payload,
+            )
+            self.audit.log_event("fixed_cycle_startup_flat_confirmation_open_order_check_failed", **payload)
+            return confirm_snapshot, False, "open_order_check_failed"
+        if open_order_count > 0:
+            payload = {
+                "symbol": self.config.symbol,
+                "open_order_count": open_order_count,
+                "open_orders": [
+                    {
+                        "orderId": str(order.get("orderId")),
+                        "orderLinkId": str(order.get("orderLinkId")),
+                    }
+                    for order in open_orders
+                ],
+            }
+            self.logger.info(
+                "fixed_cycle_startup_flat_confirmation_rejected_open_orders_found %s",
+                payload,
+            )
+            self.audit.log_event(
+                "fixed_cycle_startup_flat_confirmation_rejected_open_orders_found",
+                **payload,
+            )
+            return confirm_snapshot, False, "open_orders_found"
         confirm_payload = {
             "reason": "startup",
             "symbol": self.config.symbol,
@@ -521,7 +610,7 @@ class GenericHedgeRuntime:
                 "startup_flat_not_confirmed_block_fresh_entry %s",
                 confirm_payload,
             )
-        return confirm_snapshot, confirmed
+        return confirm_snapshot, confirmed, None if confirmed else "non_flat"
 
     def _startup_state_conflict(self) -> tuple[bool, dict[str, Any]]:
         state = self.runtime_state.strategy_state
@@ -754,6 +843,24 @@ class GenericHedgeRuntime:
             }
         return None
 
+    def _startup_flat_reset_guard_active(self) -> bool:
+        return bool(self.runtime_state.strategy_state.get("startup_flat_reset_applied"))
+
+    def _is_stale_purpose_blocked_after_flat_restart(self, purpose: str | None) -> bool:
+        normalized = str(purpose or "").upper()
+        if not normalized:
+            return False
+        final_exit_purposes = {
+            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
+            getattr(self.strategy, "LONG_SL_EXIT_PURPOSE", "LONG_SL_EXIT"),
+            getattr(self.strategy, "SHORT_TP_EXIT_PURPOSE", "SHORT_TP_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+            getattr(self.strategy, "SHORT_HARD_STOP_PURPOSE", "SHORT_HARD_STOP_EXIT"),
+        }
+        if normalized in final_exit_purposes:
+            return True
+        return normalized.startswith("CYCLE_")
+
     def _recover_fixed_cycle_unmatched_fill(
         self,
         exchange_order_id: str,
@@ -765,6 +872,35 @@ class GenericHedgeRuntime:
     ) -> str | None:
         inference = self._infer_fixed_cycle_unmatched_fill(order_link_id)
         if not inference:
+            return None
+        if self._bootstrap_in_progress:
+            self.audit.log_event(
+                "fixed_cycle_blocked_unmatched_fill_during_bootstrap",
+                strategy=self.strategy.name,
+                symbol=self.config.symbol,
+                order_id=exchange_order_id,
+                order_link_id=order_link_id,
+                qty=qty,
+                price=price,
+                reason="bootstrap_in_progress",
+            )
+            return None
+        inferred_purpose = str(inference.get("purpose") or "")
+        if (
+            self._startup_flat_reset_guard_active()
+            and self._is_stale_purpose_blocked_after_flat_restart(inferred_purpose)
+        ):
+            self.audit.log_event(
+                "fixed_cycle_blocked_stale_unmatched_fill_after_flat_restart",
+                strategy=self.strategy.name,
+                symbol=self.config.symbol,
+                order_link_id=order_link_id,
+                inferred_purpose=inferred_purpose,
+                order_id=exchange_order_id,
+                qty=qty,
+                price=price,
+                reason="startup_flat_reset_applied",
+            )
             return None
         client_order_id = order_link_id or exchange_order_id
         if not client_order_id:
@@ -994,6 +1130,26 @@ class GenericHedgeRuntime:
         self.audit.log_event("order_payload_ready", **payload)
 
     def submit_intent(self, intent: StrategyIntent, snapshot: HedgeSnapshot, source: str) -> str | None:
+        if self._startup_flat_reset_guard_active():
+            purpose = str(intent.purpose or "").upper()
+            allowed_initial_entry_purposes = {
+                getattr(self.strategy, "LONG_ENTRY_PURPOSE", "INITIAL_LONG_ENTRY"),
+                getattr(self.strategy, "SHORT_ENTRY_PURPOSE", "INITIAL_SHORT_ENTRY"),
+            }
+            if purpose not in allowed_initial_entry_purposes:
+                if self._is_stale_purpose_blocked_after_flat_restart(purpose) or True:
+                    self.audit.log_event(
+                        "fixed_cycle_blocked_stale_intent_after_flat_restart",
+                        strategy=self.strategy.name,
+                        symbol=self.config.symbol,
+                        purpose=intent.purpose,
+                        side=intent.side,
+                        qty=intent.qty,
+                        trigger_price=intent.trigger_price,
+                        source=source,
+                        order_link_id=(intent.metadata or {}).get("order_link_id"),
+                    )
+                    return None
         submit_price = intent.price if intent.price is not None else snapshot.current_price
         if intent.qty <= 0 or submit_price <= 0:
             self.audit.log_event(

@@ -25,7 +25,8 @@ if [[ ! -d "${BOT_DIR}" ]]; then
   exit 1
 fi
 
-PID_FILE="${BOT_DIR}/pids/fixed_cycle_bot.pid"
+RUN_DIR="${BOT_DIR}/run"
+PID_FILE="${RUN_DIR}/bot.pid"
 CONFIG_FILE="${BOT_DIR}/config/fixed_cycle_config.json"
 STATE_FILE="${BOT_DIR}/state/fixed_cycle_state.json"
 

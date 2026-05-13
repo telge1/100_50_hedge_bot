@@ -272,6 +272,9 @@ rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.s
 
 ./live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_3 --with-wrappers
 
+####################################### Main Bot ################################################################
+
+/home/telgenbuescher/projects/spread_recovery_hedge/fixed_cycle_hedge_bot/fixed_cycle_strategy.py
 
 ####################################### Dashboard ###############################################################
 

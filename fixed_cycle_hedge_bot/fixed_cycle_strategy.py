@@ -139,6 +139,7 @@ calc_audit_logger.setLevel(logging.INFO)
 calc_audit_logger.propagate = False
 
 confirmed_order_pnl_history_path = Path("logs") / "confirmed_order_pnl_history.jsonl"
+cycle_state_file_path_override: Path | None = None
 default_bot_name = "long_bot_1"
 
 
@@ -160,6 +161,11 @@ def configure_calc_audit_log_file(path: str | Path | None) -> None:
 def configure_confirmed_order_pnl_history_file(path: str | Path | None) -> None:
     global confirmed_order_pnl_history_path
     confirmed_order_pnl_history_path = Path(path) if path else Path("logs") / "confirmed_order_pnl_history.jsonl"
+
+
+def configure_cycle_state_file(path: str | Path | None) -> None:
+    global cycle_state_file_path_override
+    cycle_state_file_path_override = Path(path).expanduser().resolve() if path else None
 
 
 def set_default_bot_name(name: str | None) -> None:
@@ -301,6 +307,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _force_fresh_start_reset(self, runtime_state: RuntimeState) -> None:
         state = runtime_state.strategy_state
         preserved_last_trade = self._preserve_last_trade_pnl_fields(state)
+        state["startup_flat_reset_applied"] = False
         state["full_exit_reset_in_progress"] = False
         state["block_exit_rebuild_until_pnl_ready"] = False
         state["force_exit_rebuild"] = False
@@ -350,6 +357,45 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.pop("final_pnl_context_missing_logged", None)
         self._restore_last_trade_pnl_fields(state, preserved_last_trade)
 
+    def _clear_startup_zero_state_residuals(self, runtime_state: RuntimeState) -> None:
+        state = runtime_state.strategy_state
+        keys_to_pop = [
+            "final_trade_pnl_audited",
+            "final_long_exit_audited",
+            "final_short_exit_audited",
+            "final_long_exit_order_context",
+            "final_short_exit_order_context",
+            "final_exit_closed_pnl_signatures",
+            "audit_processed_exit_fill_ids",
+            "audit_completed_cycle_indices",
+            "processed_pnl_exec_ids",
+            "processed_pnl_exec_ids_order",
+            "trade_block_id",
+            "last_trade_block_id",
+            "post_exit_cleanup_required",
+            "post_exit_cleanup_verified",
+            "post_exit_cleanup_in_progress",
+            "post_exit_cleanup_attempts",
+            "post_exit_cleanup_started_at",
+            "post_exit_cleanup_verified_at",
+            "post_exit_cleanup_verified_snapshot_updated_at",
+            "restart_delayed_pending_final_pnl_logged",
+        ]
+        for key in keys_to_pop:
+            state.pop(key, None)
+        for key in list(state.keys()):
+            if key.startswith("last_trade_"):
+                state.pop(key, None)
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {},
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": 0.0,
+        }
+        state["startup_flat_reset_applied"] = True
+
     def prepare_for_clean_startup(
         self,
         snapshot: HedgeSnapshot,
@@ -365,22 +411,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             for order in runtime_state.active_orders.values()
             if order.status not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
         ]
-        has_stale_state = bool(
-            stale_runtime_orders
-            or state.get("initial_entry_confirmed")
-            or state.get("initial_entry_submitted")
-            or int(state.get("cycle_completed_count") or 0) > 0
-            or bool(state.get("cycle_waiting_for_short_tp"))
-            or int(state.get("short_tp_pending_cycle") or 0) > 0
-            or bool(cycle_state.get("trade_active"))
-            or bool(cycle_state.get("long_add_pending"))
-            or bool(cycle_state.get("cycle_waiting_for_short_tp"))
-            or int(cycle_state.get("short_tp_pending_cycle") or 0) > 0
-            or float(state.get("pending_cycle_loss_usdt") or 0.0) > 0.0
-        )
-        if not has_stale_state:
-            return False
-
         stale_details = {
             "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
             "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
@@ -394,7 +424,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "cycle_state_short_tp_pending_cycle": int(cycle_state.get("short_tp_pending_cycle") or 0),
             "stale_runtime_orders": stale_runtime_orders,
         }
-        logger.info("fixed_cycle_clean_startup_reset_begin %s", stale_details)
+        logger.info("fixed_cycle_startup_zero_state_reset_started %s", stale_details)
 
         runtime_state.active_orders.clear()
         runtime_state.exchange_to_client_id.clear()
@@ -406,6 +436,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         self._reset_cycle_state(runtime_state)
         self._force_fresh_start_reset(runtime_state)
+        self._clear_startup_zero_state_residuals(runtime_state)
+        logger.info(
+            "fixed_cycle_startup_zero_state_reset_cleared_old_exit_manifest %s",
+            {
+                "symbol": self.config.symbol,
+                "final_long_exit_order_context_present": bool(state.get("final_long_exit_order_context")),
+                "final_short_exit_order_context_present": bool(state.get("final_short_exit_order_context")),
+                "final_long_exit_audited": bool(state.get("final_long_exit_audited")),
+                "final_short_exit_audited": bool(state.get("final_short_exit_audited")),
+                "final_exit_closed_pnl_signatures": state.get("final_exit_closed_pnl_signatures"),
+                "trade_block_id": state.get("trade_block_id"),
+                "last_trade_block_id": state.get("last_trade_block_id"),
+            },
+        )
+        logger.info(
+            "fixed_cycle_startup_zero_state_reset_cleared_old_intents %s",
+            {
+                "symbol": self.config.symbol,
+                "active_order_count": len(runtime_state.active_orders),
+                "stale_runtime_orders": stale_runtime_orders,
+                "cycle_state": state.get("cycle_state"),
+                "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
+                "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
+            },
+        )
         logger.info(
             "fixed_cycle_restart_state_cleanup_complete %s",
             {
@@ -475,6 +530,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "short_tp_pending_cycle": state.get("short_tp_pending_cycle"),
                 "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
                 "active_order_count": len(runtime_state.active_orders),
+                "startup_flat_reset_applied": bool(state.get("startup_flat_reset_applied")),
             },
         )
         return True
@@ -5473,6 +5529,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["initial_entry_submitted"] = True
             if not previously_confirmed:
                 self._reset_exit_state_for_new_structure(runtime_state, "initial_entry_confirmed")
+            if state.get("startup_flat_reset_applied"):
+                state["startup_flat_reset_applied"] = False
+                _log_event(
+                    "fixed_cycle_startup_flat_reset_guard_lifted_after_initial_entry",
+                    {
+                        "symbol": self.config.symbol,
+                        "long_qty": snapshot.long_qty,
+                        "short_qty": snapshot.short_qty,
+                        "long_avg": snapshot.long_avg,
+                        "short_avg": snapshot.short_avg,
+                    },
+                )
         return confirmed
 
     def _collect_open_initial_entry_orders(self, snapshot: HedgeSnapshot) -> list[dict[str, str | None]]:
@@ -6311,9 +6379,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             or 0.0
         )
         expected_side = self._expected_bybit_closed_pnl_side(long_fill)
-        qty_step = float(rules.get("qty_step") or Decimal("0.0001"))
+        fallback_rules = rules or {}
+        qty_step = float(fallback_rules.get("qty_step") or Decimal("0.0001"))
+        tick_size_candidate = fallback_rules.get("tick_size")
         tick_size = float(
-            rules.get("tick_size") if rules and rules.get("tick_size") else Decimal(str(self.config.price_tick_size or 0.0001))
+            tick_size_candidate
+            if tick_size_candidate
+            else Decimal(str(self.config.price_tick_size or 0.0001))
         )
         qty_tolerance = max(qty_step, expected_qty * 0.001)
         price_tolerance = max(tick_size * 2, expected_fill_price * 0.0005)
@@ -6853,7 +6925,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return f"CYCLE_{cycle_index}_SHORT_REDUCE"
 
     def _cycle_state_file_path(self) -> Path:
-        return Path(__file__).resolve().parent / "state.json"
+        return cycle_state_file_path_override or (Path(__file__).resolve().parent / "state.json")
 
     def _default_cycle_state(self) -> dict:
         return {

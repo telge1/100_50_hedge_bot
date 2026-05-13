@@ -1,0 +1,8 @@
+{
+  "bot_name": "${BOT_NAME}",
+  "status": "running",
+  "updated_at": "2026-05-12T10:32:01.958161+00:00",
+  "symbol": "NEARUSDT",
+  "start_requested": true,
+  "pid": 4095441
+}

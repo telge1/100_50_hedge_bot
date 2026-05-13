@@ -116,6 +116,10 @@
             border-left-color: #f44336;
             background: rgba(244, 67, 54, 0.1);
         }
+        .system-status-item.waiting_for_symbol {
+            border-left-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.12);
+        }
         
         /* Toast Notification System */
         .toast-container {
@@ -289,6 +293,10 @@
         .system-status-indicator.stopped {
             background: #f44336;
             box-shadow: 0 0 12px rgba(244, 67, 54, 0.8);
+        }
+        .system-status-indicator.waiting_for_symbol {
+            background: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
         }
         /* Bot-Übersicht auf einen Blick */
         .bot-overview-bar {
@@ -3643,7 +3651,11 @@
                 if (data.success !== false) {
                     loadBotOverview();
                     const inputSymbol = (document.getElementById('startSymbolInputLong')?.value || document.getElementById('startSymbolInputShort')?.value || '').trim().toUpperCase();
-                    const symbolForStatus = inputSymbol || (currentSymbol || '').trim().toUpperCase();
+                    const focusSymbol = (data.focus_symbol || '').trim().toUpperCase();
+                    const uiCurrentSymbol = (currentSymbol || '').trim().toUpperCase();
+                    const profForStatus = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
+                    const preferFocusSymbol = (profForStatus === 'bot_1' || profForStatus === 'bot_2');
+                    const symbolForStatus = inputSymbol || (preferFocusSymbol ? (focusSymbol || uiCurrentSymbol) : (uiCurrentSymbol || focusSymbol));
                     if (symbolForStatus) {
                         data.bots = data.bots || {};
                         try {
@@ -3743,11 +3755,13 @@
                 }
             }
             
-            // Long-/Short-Bot Status – profil-spezifisch (Main | Bot 1 | Bot 2). URL-Profil zuerst (wichtig bei direktem Laden).
+            // Long-/Short-Bot Status – profil-spezifisch (Main | Bot 1 | Bot 2).
+            // Die aktuelle UI-Auswahl hat Vorrang, damit ein altes ?profile=... in der URL
+            // nicht weiter Requests für das falsche Profil erzeugt.
             const urlProf = new URLSearchParams(window.location.search).get('profile');
-            const prof = (urlProf && ['main','bot_1','bot_2'].includes(urlProf) ? urlProf : null)
+            const prof = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
                 || (currentProfile && ['main','bot_1','bot_2'].includes(currentProfile) ? currentProfile : null)
-                || (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
+                || (urlProf && ['main','bot_1','bot_2'].includes(urlProf) ? urlProf : null)
                 || 'main';
             const profileLabel = prof === 'bot_1' ? 'Bot 1' : prof === 'bot_2' ? 'Bot 2' : 'Main';
             const bots = data.bots || {};
@@ -3760,20 +3774,23 @@
             const symbolForStatus = (data.symbolForStatus || '').trim().toUpperCase();
             const inputSymbol = (document.getElementById('startSymbolInputLong')?.value || document.getElementById('startSymbolInputShort')?.value || '').trim().toUpperCase();
             const uiSymbol = (currentSymbol || '').trim().toUpperCase();
+            const waitingLongSymbol = botSymbols.find(sym => (bots[sym]?.long?.status === 'waiting_for_symbol'));
             const runningLongSymbol = botSymbols.find(sym => (bots[sym]?.long?.running));
             const priceAt = data.price_at || { long: {}, short: {} };
             const priceAtSymbols = new Set([...(Object.keys(priceAt.long || {})), ...(Object.keys(priceAt.short || {}))]);
             if (symbolForStatus) {
                 selectedSymbol = symbolForStatus;
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
-            } else if (uiSymbol) {
-                selectedSymbol = uiSymbol;
-                if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (inputSymbol) {
                 selectedSymbol = inputSymbol;
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
+            } else if (waitingLongSymbol) {
+                selectedSymbol = waitingLongSymbol;
             } else if (runningLongSymbol) {
                 selectedSymbol = runningLongSymbol;
+            } else if (uiSymbol) {
+                selectedSymbol = uiSymbol;
+                if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (priceAtSymbols.size > 0) {
                 selectedSymbol = [...priceAtSymbols][0];
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
@@ -3788,28 +3805,30 @@
             const shortPriceAt = selectedSymbol ? (priceAt.short || {})[selectedSymbol] : null;
 
             // Long Bot Status (mit Start-Button / Price-at-Anzeige)
-            const longBot = selectedBots['long'] || { running: false, status: 'stopped', status_text: '' };
-            let longRunning = longBot.running || false;
-            const longPriceAtActive = !!(longPriceAt && longPriceAt.target_price);
-            const longStatus = longBot.status || (longRunning ? 'running' : 'stopped');
-            let longStatusClass = longStatus;
-            let longIndicatorClass = longStatus;
+            const longBot = selectedBots['long'] || { running: false, status: 'stopped', status_label: '', start_requested: false };
+            let longRunning = !!longBot.running;
+            const isWaiting = longBot.status === 'waiting_for_symbol' && longBot.start_requested;
+            const longBotDescDefault = longRunning
+                ? `läuft${longBot.symbol ? `: ${longBot.symbol}` : ''}`
+                : isWaiting
+                    ? (longBot.symbol && longBot.reserved_by
+                        ? `${longBot.symbol} reserviert von ${longBot.reserved_by}`
+                        : 'wartet auf neuen Coin')
+                    : 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen';
+
+            let longStatusClass = longRunning ? 'running' : isWaiting ? 'waiting_for_symbol' : 'stopped';
+            let longIndicatorClass = longStatusClass;
             
             let longBotButton = '';
-            let longBotDesc = longBot.status_text || (longRunning ? 'Long Bot läuft und wartet auf Positionen' : 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
+            let longBotDesc = longBotDescDefault;
             const longRestartButton = selectedSymbol
                 ? `<button class="btn-service-control btn-service-start" onclick="restartLongBotAutoDetect('${selectedSymbol}', event)" title="Long Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`
                 : `<button class="btn-service-control btn-service-start" onclick="restartLongBotAutoDetect(undefined, event)" title="Long Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`;
             if (selectedSymbol) {
                 if (longRunning) {
                     longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopFixedCycleScript(event)" title="Long Bot stoppen">⏹️ Stop</button> ${longRestartButton}`;
-                    if (!longBot.status_text) {
-                        longBotDesc = 'Long Bot läuft und wartet auf Positionen';
-                    }
-                } else if (longPriceAtActive) {
-                    const triggerLabel = (longPriceAt.trigger || 'below') === 'below' ? '≤' : '≥';
-                    longBotDesc = 'Price-at Bot aktiv – startet bei Preis ' + triggerLabel + ' ' + longPriceAt.target_price;
-                    longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopPriceAtFromStatus('long', '${selectedSymbol}')" title="Start-Preis-Überwachung beenden">⏹️ Stop</button> ${longRestartButton}`;
+                } else if (isWaiting) {
+                    longBotButton = `<button class="btn-service-control btn-service-stop" onclick="stopFixedCycleScript(event)" title="Wartenden Long Bot stoppen">⏹️ Stop</button> ${longRestartButton}`;
                 } else {
                     longBotButton = `<button class="btn-service-control btn-service-start" onclick="startFixedCycleScript(event)" title="Long Bot starten">▶️ Start</button> ${longRestartButton}`;
                 }
@@ -4140,7 +4159,86 @@
             }
         }
 
+        async function stopProfileLongBot(evt, profile) {
+            const btn = (evt && evt.target) ? evt.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Stoppe...';
+            }
+            const botName = profile === 'bot_1' ? 'long_bot_1' : 'long_bot_2';
+            const toastId = 'stop-profile-long';
+            showToast('info', 'Stoppe Long Bot', `Stoppe ${botName} über stop_with_cleanup.sh`, 0, toastId);
+            try {
+                const response = await fetch('/api/scripts/stop-long-bot-with-cleanup', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_name: botName }),
+                });
+                const data = await response.json().catch(() => ({}));
+                removeToast(toastId);
+                if (data.success) {
+                    showToast('success', 'Long Bot gestoppt', data.message || `${botName} wird gestoppt.`, 5000);
+                } else {
+                    showToast('error', 'Stop fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
+                }
+            } catch (error) {
+                removeToast(toastId);
+                showToast('error', 'Stop fehlgeschlagen', error.message || 'Fehler beim Stoppen des Long Bots.', 8000);
+            } finally {
+                await new Promise((r) => setTimeout(r, 500));
+                loadSystemStatus();
+                if (selectedSymbol) await loadBotStatus(selectedSymbol);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '⏹️ Stop';
+                }
+            }
+        }
+
+        async function startProfileLongBot(evt, profile) {
+            const btn = (evt && evt.target) ? evt.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Starte...';
+            }
+            const botName = profile === 'bot_1' ? 'long_bot_1' : 'long_bot_2';
+            const toastId = 'start-profile-long';
+            showToast('info', 'Start Long Bot', `Starte ${botName} über start_long_bot.sh`, 0, toastId);
+            try {
+                const response = await fetch('/api/scripts/start-long-bot', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_name: botName }),
+                });
+                const data = await response.json().catch(() => ({}));
+                removeToast(toastId);
+                if (data.success) {
+                    showToast('success', 'Long Bot gestartet', data.message || `${botName} startet.`, 5000);
+                } else {
+                    showToast('error', 'Start fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
+                }
+            } catch (error) {
+                removeToast(toastId);
+                showToast('error', 'Start fehlgeschlagen', error.message || 'Fehler beim Starten des Long Bots.', 8000);
+            } finally {
+                await new Promise((r) => setTimeout(r, 500));
+                loadSystemStatus();
+                if (selectedSymbol) await loadBotStatus(selectedSymbol);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '▶️ Start';
+                }
+            }
+        }
+
         async function stopFixedCycleScript(evt) {
+            const currentProf = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
+            if (currentProf === 'bot_1' || currentProf === 'bot_2') {
+                await stopProfileLongBot(evt, currentProf);
+                return;
+            }
             lastUserActionTime = Date.now();
             const btn = (evt && evt.target) ? evt.target : null;
             if (btn) {
@@ -4176,6 +4274,11 @@
         }
 
         async function startFixedCycleScript(evt) {
+            const currentProf = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
+            if (currentProf === 'bot_1' || currentProf === 'bot_2') {
+                await startProfileLongBot(evt, currentProf);
+                return;
+            }
             lastUserActionTime = Date.now();
             const btn = (evt && evt.target) ? evt.target : null;
             if (btn) {
@@ -4507,14 +4610,14 @@
             }
             try {
                 const fromUrl = new URLSearchParams(window.location.search).get('profile');
-                const prof = (fromUrl && ['main','bot_1','bot_2'].includes(fromUrl) ? fromUrl : null)
-                    || (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
+                const prof = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
                     || (currentProfile || 'main');
+                const resolvedProf = ['main','bot_1','bot_2'].includes(prof) ? prof : ((fromUrl && ['main','bot_1','bot_2'].includes(fromUrl) ? fromUrl : 'main'));
                 const res = await fetch('/api/hedge/stop-bot-at-price', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ bot_type: botType, symbol, profile: prof })
+                    body: JSON.stringify({ bot_type: botType, symbol, profile: resolvedProf })
                 });
                 const data = await res.json();
                 if (data.success && typeof showToast === 'function') {
@@ -5096,13 +5199,22 @@
             }
             
             try {
-                // Use the existing stop bot endpoint if available, or implement a new one
                 const prof = typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main');
-                const response = await fetch(`/api/hedge/stop-bots/${symbol}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ profile: prof })
-                });
+                let response;
+                if (botType === 'long' && ['bot_1', 'bot_2'].includes(prof)) {
+                    const botName = prof === 'bot_2' ? 'long_bot_2' : 'long_bot_1';
+                    response = await fetch('/api/scripts/stop-long-bot-with-cleanup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bot_name: botName })
+                    });
+                } else {
+                    response = await fetch(`/api/hedge/stop-bots/${symbol}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ profile: prof })
+                    });
+                }
                 const data = await response.json();
                 
                 if (data.success) {
@@ -5319,12 +5431,12 @@
             return 'main';
         }
 
-        /** Profile-Query an API-URL anhängen für profilspezifische Daten. URL-Profil zuerst (wichtig beim direkten Laden mit ?profile=bot_1). */
+        /** Profile-Query an API-URL anhängen für profilspezifische Daten. */
         function addProfileToUrl(url) {
             var fromUrl = new URLSearchParams(window.location.search).get('profile');
-            let p = (fromUrl && ['main','bot_1','bot_2'].includes(fromUrl) ? fromUrl : null)
+            let p = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
                 || (currentProfile && ['main','bot_1','bot_2'].includes(currentProfile) ? currentProfile : null)
-                || (typeof getSelectedProfile === 'function' ? getSelectedProfile() : null)
+                || (fromUrl && ['main','bot_1','bot_2'].includes(fromUrl) ? fromUrl : null)
                 || 'main';
             const sep = url.indexOf('?') >= 0 ? '&' : '?';
             return url + sep + 'profile=' + encodeURIComponent(p || 'main');

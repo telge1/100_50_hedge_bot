@@ -37,29 +37,144 @@ SNAPSHOT_FILE="${BOT_DIR}/snapshots/fixed_cycle_wallet_snapshot.json"
 AUDIT_LOG="${LOG_DIR}/generic_hedge_runtime_audit.jsonl"
 RUNNER_STDOUT="${LOG_DIR}/fixed_cycle_runner.stdout.log"
 
-mkdir -p "${BOT_DIR}/config" "${BOT_DIR}/state" "${BOT_DIR}/logs" "${BOT_DIR}/snapshots" "${BOT_DIR}/pids"
-
 HARD_RESET_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/hard_reset_bot.sh"
 CLEAN_LOGS_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/clean_bot_logs.sh"
+CANCEL_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/cancel_open_orders.sh"
+RUN_DIR="${BOT_DIR}/run"
+PID_FILE="${RUN_DIR}/bot.pid"
+STATUS_FILE="${RUN_DIR}/status.json"
+WAIT_PID_FILE="${RUN_DIR}/start_wait.pid"
+CANCEL_START_FILE="${RUN_DIR}/cancel_start"
+
+mkdir -p "${BOT_DIR}/config" "${BOT_DIR}/state" "${BOT_DIR}/logs" "${BOT_DIR}/snapshots" "${BOT_DIR}/pids" "${RUN_DIR}"
+
+touch "${LOG_DIR}/confirmed_order_pnl_history.jsonl"
+
+write_status_json() {
+  local status="$1"
+  local reason="$2"
+  local symbol="$3"
+  local reserved_by="$4"
+  local start_requested="$5"
+  STATUS_STATUS="${status:-}" \
+  STATUS_REASON="${reason:-}" \
+  STATUS_SYMBOL="${symbol:-}" \
+  STATUS_RESERVED="${reserved_by:-}" \
+  STATUS_REQUESTED="${start_requested:-}" \
+  STARTED_PID="${STARTED_PID:-}" \
+  STATUS_FILE_PATH="${STATUS_FILE}" \
+  BOT_NAME_VALUE="${BOT_NAME}" \
+  python3 <<'PY'
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(os.environ["STATUS_FILE_PATH"])
+path.parent.mkdir(parents=True, exist_ok=True)
+
+data = {
+    "bot_name": os.environ.get("BOT_NAME_VALUE") or "",
+    "status": os.environ.get("STATUS_STATUS") or "unknown",
+    "updated_at": datetime.now(timezone.utc).isoformat()
+}
+symbol_value = os.environ.get("STATUS_SYMBOL") or ""
+if symbol_value:
+    data["symbol"] = symbol_value
+reason_value = os.environ.get("STATUS_REASON") or ""
+if reason_value:
+    data["reason"] = reason_value
+reserved_value = os.environ.get("STATUS_RESERVED") or ""
+if reserved_value:
+    data["reserved_by"] = reserved_value
+start_requested_raw = os.environ.get("STATUS_REQUESTED")
+if start_requested_raw is not None:
+    data["start_requested"] = str(start_requested_raw).lower() in ("1","true","yes")
+else:
+    data["start_requested"] = False
+if data["status"] == "running":
+    pid_value = os.environ.get("STARTED_PID")
+    if pid_value and pid_value.isdigit():
+        data["pid"] = int(pid_value)
+
+path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+}
+
+cleanup_wait_files() {
+  rm -f "${WAIT_PID_FILE}" "${CANCEL_START_FILE}" >/dev/null 2>&1
+}
+
+trap cleanup_wait_files EXIT
+
+is_alive_pid_with_bot_name() {
+  local candidate="$1"
+  local bot_name="$2"
+  if [[ -z "${candidate//[0-9]/}" && -d "/proc/${candidate}" ]]; then
+    local cmdline
+    cmdline="$(tr '\0' ' ' < "/proc/${candidate}/cmdline" 2>/dev/null || true)"
+    if [[ "${cmdline}" == *fixed_cycle_hedge_bot.runner* && "${cmdline}" == *"--bot-name ${bot_name}"* ]]; then
+      return 0
+    fi
+  fi
+  return 1
+}
 
 SIDE="long"
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 
-echo "[${BOT_NAME}] Running hard reset..."
-set +e
- "${HARD_RESET_SCRIPT}" "${BOT_NAME}"
-RESET_CODE=$?
-set -e
-
-echo "[${BOT_NAME}] hard-reset exit code: ${RESET_CODE}"
-
-if [[ "${RESET_CODE}" -ne 0 ]]; then
-  echo "[ERROR] ${BOT_NAME} hard-reset failed (exit_code=${RESET_CODE}); aborting start." >&2
-  exit 1
+mkdir -p "${RUN_DIR}"
+rm -f "${CANCEL_START_FILE}" "${WAIT_PID_FILE}"
+if [[ -f "${PID_FILE}" ]]; then
+  EXISTING_PID="$(cat "${PID_FILE}")"
+  if is_alive_pid_with_bot_name "${EXISTING_PID}" "${BOT_NAME}"; then
+    echo "[${BOT_NAME}] already running (PID=${EXISTING_PID})" >&2
+    exit 0
+  fi
+  rm -f "${PID_FILE}"
 fi
 
-echo "[${BOT_NAME}] Cleaning log files..."
- "${CLEAN_LOGS_SCRIPT}" "${BOT_NAME}"
+mapfile -t WAIT_INFO < <(python3 <<PY
+import json
+from pathlib import Path
+
+bot_name = "${BOT_NAME}"
+best_path = Path("${PROJECT_ROOT}/logs/best_coin.json")
+state_path = Path("${BOT_GROUP_DIR}/state/active_bot_symbols.json")
+symbol = ""
+reason = "no_new_symbol_available"
+reserved_by = ""
+
+if best_path.exists():
+    payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
+    symbol = (payload.get("symbol") or "").upper()
+if symbol:
+    reason = "selected_symbol_reserved"
+    if state_path.exists():
+        state = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+        for other, entry in state.items():
+            if other != bot_name and entry.get("symbol") == symbol and entry.get("status") == "reserved":
+                reserved_by = other
+                break
+    if not reserved_by:
+        reason = "new_symbol_available"
+print(symbol)
+print(reason)
+print(reserved_by)
+PY
+)
+
+WAIT_SYMBOL="${WAIT_INFO[0]:-}"
+WAIT_REASON="${WAIT_INFO[1]:-waiting_for_symbol}"
+WAIT_RESERVED_BY="${WAIT_INFO[2]:-}"
+
+write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
+echo "$$" > "${WAIT_PID_FILE}"
+if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; then
+  echo "[${BOT_NAME}] waiting_for_symbol (${WAIT_REASON})" >&2
+  exit 1
+fi
+cleanup_wait_files
 
 if [[ -f "${PID_FILE}" ]]; then
   OLD_PID="$(cat "${PID_FILE}" 2>/dev/null || true)"
@@ -106,3 +221,17 @@ if ! kill -0 "${PID}" 2>/dev/null; then
 fi
 echo "Fixed-cycle ${BOT_NAME} started via nohup (${RUNNER_STDOUT})"
 echo "Started ${BOT_NAME} with PID=$PID"
+CURRENT_SYMBOL="$(python3 <<PY
+import json
+from pathlib import Path
+
+best_path = Path("${PROJECT_ROOT}/logs/best_coin.json")
+symbol = ""
+if best_path.exists():
+    payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
+    symbol = (payload.get("symbol") or "").upper()
+print(symbol)
+PY
+)"
+STARTED_PID="$PID" write_status_json "running" "" "${CURRENT_SYMBOL}" "" "true"
+unset STARTED_PID

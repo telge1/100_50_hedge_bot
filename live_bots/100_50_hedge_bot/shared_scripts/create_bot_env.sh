@@ -81,6 +81,8 @@ ensure_dir "${BOT_DIR}/pids"
 ensure_dir "${BOT_DIR}/snapshots"
 ensure_dir "${BOT_DIR}/state"
 
+touch "${BOT_DIR}/logs/confirmed_order_pnl_history.jsonl"
+
 # fixed_cycle_config
 if [[ ! -f "${BOT_CONFIG}" ]]; then
   if [[ ! -f "${TEMPLATE_CONFIG}" ]]; then

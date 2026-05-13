@@ -25,8 +25,10 @@ if [[ ! -d "${BOT_DIR}" ]]; then
   exit 1
 fi
 
-PID_FILE="${BOT_DIR}/pids/fixed_cycle_bot.pid"
+RUN_DIR="${BOT_DIR}/run"
+PID_FILE="${RUN_DIR}/bot.pid"
 STATE_FILE="${BOT_DIR}/state/fixed_cycle_state.json"
+CYCLE_STATE_FILE="${BOT_DIR}/state/fixed_cycle_cycle_state.json"
 CONFIG_FILE="${BOT_DIR}/config/fixed_cycle_config.json"
 CONFIG_REL="$(realpath --relative-to="${PROJECT_ROOT}" "${CONFIG_FILE}")"
 STATE_REL="$(realpath --relative-to="${PROJECT_ROOT}" "${STATE_FILE}")"
@@ -74,6 +76,7 @@ if [[ -f "${PID_FILE}" ]]; then
 fi
 
 rm -vf "${STATE_FILE}"
+rm -vf "${CYCLE_STATE_FILE}"
 echo "[${BOT_NAME}] state file removed"
 
 echo "[${BOT_NAME}] exchange cleanup skipped (per-bot hard reset does not cancel global orders)"

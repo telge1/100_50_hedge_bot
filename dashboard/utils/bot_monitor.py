@@ -5,7 +5,7 @@ import subprocess
 import json
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 from .config_manager import load_config
 
 # Try to import psutil for process checking
@@ -69,6 +69,7 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
     import time
     import logging
     logger = logging.getLogger(__name__)
+    prof = (profile or "").strip()
     service_name = f'hedgebot-{bot_type}@{symbol}'
     project_dir = _get_project_root()
     pid_file = project_dir / "logs" / "fixed_cycle_bot.pid"
@@ -113,30 +114,30 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
             return True
 
     # First try systemd service (with one retry after 1s to avoid false "stopped" after dashboard restart)
-    for attempt in range(2):
-        try:
-            result = subprocess.run(
-                ['systemctl', 'is-active', service_name],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            status = (result.stdout or "").strip()
-            if status == 'active':
-                return True
-            if attempt == 0 and status != 'active':
-                time.sleep(0.3)
-                continue
-            break
-        except Exception as e:
-            logger.debug(f"Error checking systemctl status for {service_name} (attempt {attempt + 1}): {e}")
-            if attempt == 0:
-                time.sleep(0.3)
-                continue
-            break
+    if prof not in ("bot_1", "bot_2"):
+        for attempt in range(2):
+            try:
+                result = subprocess.run(
+                    ['systemctl', 'is-active', service_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                status = (result.stdout or "").strip()
+                if status == 'active':
+                    return True
+                if attempt == 0 and status != 'active':
+                    time.sleep(0.3)
+                    continue
+                break
+            except Exception as e:
+                logger.debug(f"Error checking systemctl status for {service_name} (attempt {attempt + 1}): {e}")
+                if attempt == 0:
+                    time.sleep(0.3)
+                    continue
+                break
 
     # Fallback: Check local mode via PID file (nur für main – local_bots_pids.json hat kein Profil)
-    prof = (profile or "").strip()
     if prof not in ("bot_1", "bot_2"):
         try:
             project_dir = _get_project_root()
@@ -237,19 +238,96 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
     return False
 
 
-def get_bot_status(symbol: str, bot_type: str = "long") -> dict:
-    """Get bot status"""
-    running = is_bot_running(symbol, bot_type=bot_type)
-    status = "running" if running else "stopped"
-    status_text = f"{bot_type.capitalize()} Bot läuft" if running else f"{bot_type.capitalize()} Bot gestoppt"
+def _read_bot_status_from_run(bot_name: str) -> dict[str, Any]:
+    project_root = _get_project_root()
+    bot_dir = project_root / "live_bots" / "100_50_hedge_bot" / bot_name
+    pid_path = bot_dir / "run" / "bot.pid"
+    status_path = bot_dir / "run" / "status.json"
+    status_payload = {}
+
+    if status_path.exists():
+        try:
+            status_payload = json.loads(status_path.read_text(encoding="utf-8") or "{}")
+        except Exception:
+            status_payload = {}
+
     return {
-        "symbol": symbol,
+        "bot_dir": bot_dir,
+        "pid_path": pid_path,
+        "status_payload": status_payload,
+    }
+
+
+def _pid_runs_same_bot(pid: int, bot_name: str) -> bool:
+    cmdline_path = Path(f"/proc/{pid}/cmdline")
+    if not cmdline_path.exists():
+        return False
+    try:
+        cmdline = cmdline_path.read_bytes().decode("utf-8").replace("\x00", " ")
+    except Exception:
+        return False
+    return (
+        "fixed_cycle_hedge_bot.runner" in cmdline and f"--bot-name {bot_name}" in cmdline
+    )
+
+
+def get_bot_status(symbol: str, bot_type: str = "long", bot_name: str | None = None) -> dict:
+    if bot_name is None:
+        bot_name = f"{bot_type}_bot_1"
+    bot_info = _read_bot_status_from_run(bot_name)
+    pid_path = bot_info["pid_path"]
+    payload = bot_info["status_payload"]
+
+    running = False
+    pid_value = None
+    if pid_path.exists():
+        try:
+            pid_value = int(pid_path.read_text(encoding="utf-8").strip() or "0")
+        except Exception:
+            pid_value = None
+        if pid_value:
+            running = _pid_runs_same_bot(pid_value, bot_name)
+
+    if running:
+        return {
+            "bot_name": bot_name,
+            "bot_type": bot_type,
+            "symbol": payload.get("symbol") or symbol,
+            "running": True,
+            "start_requested": True,
+            "status": "running",
+            "status_label": f"läuft{'' if not payload.get('symbol') else ': ' + payload.get('symbol')}",
+            "pid": pid_value,
+        }
+
+    payload_status = payload.get("status")
+    start_requested = bool(payload.get("start_requested"))
+    if payload_status == "waiting_for_symbol" and start_requested:
+        return {
+            "bot_name": bot_name,
+            "bot_type": bot_type,
+            "symbol": payload.get("symbol"),
+            "running": False,
+            "status": "waiting_for_symbol",
+            "status_label": payload.get("symbol")
+            and payload.get("reserved_by")
+            and f"{payload.get('symbol')} reserviert von {payload.get('reserved_by')}"
+            or "wartet auf neuen Coin",
+            "reserved_by": payload.get("reserved_by"),
+            "reason": payload.get("reason"),
+            "pid": None,
+            "start_requested": True,
+        }
+
+    return {
+        "bot_name": bot_name,
         "bot_type": bot_type,
-        "running": running,
-        "service_name": f"hedgebot-{bot_type}@{symbol}",
-        "status": status,
-        "status_text": status_text,
-        "pid": None
+        "symbol": payload.get("symbol") or symbol,
+        "running": False,
+        "start_requested": False,
+        "status": "stopped",
+        "status_label": "gestoppt",
+        "pid": None,
     }
 
 

@@ -12,6 +12,7 @@ from strategy.config_legacy import StrategyConfig
 from .registry import STRATEGY_REGISTRY, build_registered_runtime, list_strategy_names
 from .runtime import configure_runtime_logging
 from .fixed_cycle_strategy import (
+    configure_cycle_state_file,
     configure_calc_audit_log_file,
     configure_confirmed_order_pnl_history_file,
     set_default_bot_name,
@@ -109,6 +110,12 @@ def build_runtime_from_args(args: argparse.Namespace):
         or runtime.config.confirmed_pnl_history_file
         or "logs/confirmed_order_pnl_history.jsonl"
     )
+    cycle_state_file = None
+    if args.strategy_state_file:
+        cycle_state_file = str(
+            Path(args.strategy_state_file).resolve().with_name("fixed_cycle_cycle_state.json")
+        )
+    configure_cycle_state_file(cycle_state_file)
     set_default_bot_name(runtime.config.bot_name)
     if args.log_file:
         runtime.config.log_file = args.log_file

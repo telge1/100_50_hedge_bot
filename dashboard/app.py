@@ -41,6 +41,68 @@ os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
 CONFIRMED_ORDER_PNL_HISTORY_FILE = project_root / "logs" / "confirmed_order_pnl_history.jsonl"
 DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pnl_history.jsonl"
+GLOBAL_RUNTIME_LOG_PATH = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
+
+LIVE_BOT_LOGS_ROOT = project_root / "live_bots" / "100_50_hedge_bot"
+ACCOUNT_PNL_PATHS: dict[str, dict[str, Path]] = {
+    "Long_bot_1": {
+        "runtime_log_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_1"
+        / "logs"
+        / "fixed_cycle_hedge_runtime.log",
+        "confirmed_pnl_history_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_1"
+        / "logs"
+        / "confirmed_order_pnl_history.jsonl",
+        "dashboard_closed_pnl_history_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_1"
+        / "logs"
+        / "dashboard_closed_pnl_history.jsonl",
+        "wallet_snapshot_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_1"
+        / "snapshots"
+        / "fixed_cycle_wallet_snapshot.json",
+    },
+    "Long_bot_2": {
+        "runtime_log_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_2"
+        / "logs"
+        / "fixed_cycle_hedge_runtime.log",
+        "confirmed_pnl_history_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_2"
+        / "logs"
+        / "confirmed_order_pnl_history.jsonl",
+        "dashboard_closed_pnl_history_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_2"
+        / "logs"
+        / "dashboard_closed_pnl_history.jsonl",
+        "wallet_snapshot_path": LIVE_BOT_LOGS_ROOT
+        / "long_bot_2"
+        / "snapshots"
+        / "fixed_cycle_wallet_snapshot.json",
+    },
+}
+
+WALLET_SNAPSHOT_FILES: dict[str, Path] = {
+    "Long_bot_1": LIVE_BOT_LOGS_ROOT
+    / "long_bot_1"
+    / "snapshots"
+    / "fixed_cycle_wallet_snapshot.json",
+    "Long_bot_2": LIVE_BOT_LOGS_ROOT
+    / "long_bot_2"
+    / "snapshots"
+    / "fixed_cycle_wallet_snapshot.json",
+}
+
+BOT_STATE_FILES: dict[str, Path] = {
+    "Long_bot_1": LIVE_BOT_LOGS_ROOT / "long_bot_1" / "state" / "fixed_cycle_state.json",
+    "Long_bot_2": LIVE_BOT_LOGS_ROOT / "long_bot_2" / "state" / "fixed_cycle_state.json",
+}
+
+WALLET_SNAPSHOT_TTL_SECONDS = 60
+WALLET_SNAPSHOT_SCRIPT = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
+
+
 
 from utils.auth import authenticate_user, get_user_role
 from dashboard.vendor.core.bybit_order_manager import BybitOrderManager
@@ -298,15 +360,6 @@ LIVE_CHART_STRATEGY_STATE_FILES: Dict[str, Path] = {
     "Short_bot_1": project_root / "logs" / "fixed_cycle_state.json",
 }
 
-WALLET_SNAPSHOT_FILES: Dict[str, Path] = {
-    "Long_bot_1": project_root
-    / "live_bots"
-    / "100_50_hedge_bot"
-    / "long_bot_1"
-    / "snapshots"
-    / "fixed_cycle_wallet_snapshot.json",
-}
-
 
 def _state_file_for_account(account: str) -> Path | None:
     return LIVE_CHART_STRATEGY_STATE_FILES.get(account)
@@ -314,6 +367,79 @@ def _state_file_for_account(account: str) -> Path | None:
 
 def _wallet_snapshot_file_for_account(account: str) -> Path | None:
     return WALLET_SNAPSHOT_FILES.get(account)
+
+
+def _ensure_wallet_snapshot_for_account(account: str) -> None:
+    snapshot_path = _wallet_snapshot_file_for_account(account)
+    state_file = BOT_STATE_FILES.get(account)
+    if not snapshot_path or not state_file:
+        return
+    if snapshot_path.exists():
+        try:
+            age = time.time() - snapshot_path.stat().st_mtime
+            if age < WALLET_SNAPSHOT_TTL_SECONDS:
+                return
+        except OSError:
+            pass
+    if not WALLET_SNAPSHOT_SCRIPT.exists():
+        logger.warning(
+            "[dashboard] wallet_snapshot_script_missing",
+            {"script": str(WALLET_SNAPSHOT_SCRIPT)},
+        )
+        return
+    cmd = [
+        sys.executable,
+        str(WALLET_SNAPSHOT_SCRIPT),
+        "--bot-name",
+        account.lower(),
+        "--state-file",
+        str(state_file),
+        "--output-file",
+        str(snapshot_path),
+        "--mode",
+        "flat",
+    ]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(project_root)
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env, timeout=65)
+        logger.info(
+            "[dashboard] wallet_snapshot_script_executed",
+            {"account": account, "snapshot_file": str(snapshot_path)},
+        )
+    except subprocess.CalledProcessError as exc:
+        logger.warning(
+            "[dashboard] wallet_snapshot_script_failed",
+            {
+                "account": account,
+                "cmd": cmd,
+                "stderr": exc.stderr.decode(errors="ignore") if exc.stderr else None,
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "[dashboard] wallet_snapshot_script_error",
+            {"account": account, "error": str(exc)},
+        )
+
+
+def get_account_pnl_paths(account: str | None) -> dict[str, Path]:
+    key = (account or "").strip()
+    entry = ACCOUNT_PNL_PATHS.get(key)
+    if entry:
+        return entry
+    return {
+        "runtime_log_path": GLOBAL_RUNTIME_LOG_PATH,
+        "confirmed_pnl_history_path": CONFIRMED_ORDER_PNL_HISTORY_FILE,
+        "dashboard_closed_pnl_history_path": DASHBOARD_CLOSED_PNL_HISTORY_FILE,
+        "wallet_snapshot_path": WALLET_SNAPSHOT_FILES.get("Long_bot_1")
+        or project_root
+        / "live_bots"
+        / "100_50_hedge_bot"
+        / "long_bot_1"
+        / "snapshots"
+        / "fixed_cycle_wallet_snapshot.json",
+    }
 
 
 def _load_strategy_state_for_account(account: str) -> dict[str, Any] | None:
@@ -413,9 +539,13 @@ def _normalize_account(value: str | None) -> str:
     return str(value or "").strip().lower()
 
 
-def _load_dashboard_closed_pnl_history(account: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    path = DASHBOARD_CLOSED_PNL_HISTORY_FILE
-    file_exists = path.exists()
+def _load_dashboard_closed_pnl_history(
+    account: str | None = None,
+    path: Path | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    file_path = path or DASHBOARD_CLOSED_PNL_HISTORY_FILE
+    file_exists = file_path.exists()
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()
     normalized_account = _normalize_account(account)
@@ -429,14 +559,18 @@ def _load_dashboard_closed_pnl_history(account: str | None = None, limit: int = 
                 "raw_count": 0,
                 "filtered_count": 0,
                 "file_exists": False,
-                "file_path": str(path),
+                "file_path": str(file_path),
             },
         )
         return []
     try:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except Exception:
-        logger.warning("[dashboard] dashboard_closed_pnl_history_load_failed", exc_info=True)
+        logger.warning(
+            "[dashboard] dashboard_closed_pnl_history_load_failed",
+            {"file_path": str(file_path)},
+            exc_info=True,
+        )
         return []
     raw_count = sum(1 for line in lines if line.strip())
     for line in reversed(lines):
@@ -466,7 +600,7 @@ def _load_dashboard_closed_pnl_history(account: str | None = None, limit: int = 
             "raw_count": raw_count,
             "filtered_count": filtered_count,
             "file_exists": file_exists,
-            "file_path": str(path),
+            "file_path": str(file_path),
             "reason": "history_loaded",
         },
     )
@@ -484,11 +618,15 @@ def _load_dashboard_closed_pnl_history(account: str | None = None, limit: int = 
     return entries
 
 
-def load_confirmed_order_pnl_rows(account: str | None = None) -> list[dict[str, Any]]:
-    file_path = CONFIRMED_ORDER_PNL_HISTORY_FILE
+def load_confirmed_order_pnl_rows(
+    account: str | None = None,
+    path: Path | None = None,
+) -> list[dict[str, Any]]:
+    file_path = path or CONFIRMED_ORDER_PNL_HISTORY_FILE
     file_exists = file_path.exists()
     raw_count = 0
     rows_by_key: dict[str, dict[str, Any]] = {}
+    normalized_account = (account or "").strip().lower()
     if file_exists:
         try:
             for line in file_path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -505,6 +643,9 @@ def load_confirmed_order_pnl_rows(account: str | None = None) -> list[dict[str, 
                 purpose = str(payload.get("purpose") or "").strip()
                 closed_pnl = payload.get("closed_pnl")
                 if not exchange_order_id or not purpose or closed_pnl is None:
+                    continue
+                bot_name = str(payload.get("bot_name") or payload.get("account") or "").strip()
+                if normalized_account and bot_name and bot_name.lower() != normalized_account:
                     continue
                 try:
                     normalized_closed_pnl = float(closed_pnl)
@@ -587,13 +728,18 @@ def _extract_dict_from_line(line: str, marker: str) -> dict[str, Any] | None:
     return None
 
 
-def _persist_closed_pnl_history_from_runtime_log() -> None:
-    path = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
-    if not path.exists():
+def _persist_closed_pnl_history_from_runtime_log(
+    log_path: Path | None = None,
+    output_path: Path | None = None,
+    account_label: str = "Long_bot_1",
+) -> None:
+    log_path = log_path or project_root / "logs" / "fixed_cycle_hedge_runtime.log"
+    output_path = output_path or DASHBOARD_CLOSED_PNL_HISTORY_FILE
+    if not log_path.exists():
         return
     seen_ids = {
         entry.get("trade_block_id")
-        for entry in _load_dashboard_closed_pnl_history(limit=1000)
+        for entry in _load_dashboard_closed_pnl_history(path=output_path, limit=1000)
         if entry.get("trade_block_id")
     }
     events = (
@@ -601,7 +747,7 @@ def _persist_closed_pnl_history_from_runtime_log() -> None:
         "fixed_cycle_trade_pnl_finalized",
     )
     try:
-        with path.open("r", encoding="utf-8", errors="ignore") as f:
+        with log_path.open("r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 for event in events:
                     if event not in line:
@@ -618,7 +764,7 @@ def _persist_closed_pnl_history_from_runtime_log() -> None:
                         continue
                     seen_ids.add(trade_block_id)
                     entry = {
-                        "account": "Long_bot_1",
+                        "account": account_label,
                         "symbol": payload.get("symbol"),
                         "trade_block_id": trade_block_id,
                         "total_trade_pnl": float(total_trade_pnl),
@@ -630,7 +776,20 @@ def _persist_closed_pnl_history_from_runtime_log() -> None:
                     breakdown = payload.get("breakdown")
                     if breakdown is not None:
                         entry["breakdown"] = breakdown
-                    _append_dashboard_closed_pnl_history(entry)
+                    try:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        with output_path.open("a", encoding="utf-8") as f_out:
+                            f_out.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                        logger.info(
+                            "[dashboard] dashboard_closed_pnl_history_append",
+                            {"trade_block_id": trade_block_id, "account": account_label, "path": str(output_path)},
+                        )
+                    except Exception:
+                        logger.warning(
+                            "[dashboard] dashboard_closed_pnl_history_append_failed",
+                            {"trade_block_id": trade_block_id, "account": account_label, "path": str(output_path)},
+                            exc_info=True,
+                        )
     except Exception:
         logger.warning("[dashboard] dashboard_closed_pnl_history_backfill_failed", exc_info=True)
 
@@ -760,9 +919,20 @@ def _load_live_wallet_snapshot_for_account(account: str) -> dict[str, Any] | Non
     return _build_wallet_snapshot_payload_from_file(file_data, account)
 
 
-def _fetch_dashboard_bot_pos_qtys() -> tuple[float | None, float | None, str, bool]:
+def _bot_profile_for_name(bot_name: str) -> str | None:
+    if bot_name == "long_bot_1":
+        return "bot_1"
+    if bot_name == "long_bot_2":
+        return "bot_2"
+    return None
+
+
+def _fetch_dashboard_bot_pos_qtys(bot_name: str) -> tuple[float | None, float | None, str, bool]:
+    profile = _bot_profile_for_name(bot_name)
+    if not profile:
+        return None, None, "unsupported_bot", True
     try:
-        long_key, long_secret, _, _ = _get_account_keys_by_profile("bot_1")
+        long_key, long_secret, _, _ = _get_account_keys_by_profile(profile)
     except Exception as exc:
         logger.warning("fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s", exc, exc_info=True)
         return None, None, "bybit_positions", True
@@ -815,18 +985,18 @@ def _is_zero_qty(value: float | None) -> bool:
     return abs(value) < 1e-9
 
 
-def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
-    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys()
+def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "long_bot_1") -> None:
+    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys(bot_name)
     if failed or long_qty is None or short_qty is None:
         logger.info(
             "fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s",
-            {"bot": "long_bot_1", "source": source},
+            {"bot": bot_name, "source": source},
         )
         return
     if not (_is_zero_qty(long_qty) and _is_zero_qty(short_qty)):
         logger.info(
             "fixed_cycle_wallet_start_snapshot_skipped_not_flat %s",
-            {"bot": "long_bot_1", "long_qty": long_qty, "short_qty": short_qty, "source": source},
+            {"bot": bot_name, "long_qty": long_qty, "short_qty": short_qty, "source": source},
         )
         return
     script_path = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
@@ -840,7 +1010,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
         "--mode",
         "start",
         "--bot-name",
-        "long_bot_1",
+        bot_name,
         "--long-qty",
         str(long_qty),
         "--short-qty",
@@ -850,7 +1020,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
             project_root
             / "live_bots"
             / "100_50_hedge_bot"
-            / "long_bot_1"
+            / bot_name
             / "state"
             / "fixed_cycle_state.json"
         ),
@@ -859,7 +1029,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
             project_root
             / "live_bots"
             / "100_50_hedge_bot"
-            / "long_bot_1"
+            / bot_name
             / "snapshots"
             / "fixed_cycle_wallet_snapshot.json"
         ),
@@ -881,7 +1051,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path) -> None:
                 project_root
                 / "live_bots"
                 / "100_50_hedge_bot"
-                / "long_bot_1"
+                / bot_name
                 / "snapshots"
                 / "fixed_cycle_wallet_snapshot.json"
             )
@@ -955,7 +1125,7 @@ def _maybe_run_dashboard_flat_snapshot(project_root: Path) -> None:
             return
         logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_start_snapshot", {"snapshot_phase": payload.get("snapshot_phase")})
         return
-    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys()
+    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys("long_bot_1")
     if failed or long_qty is None or short_qty is None:
         logger.info("[dashboard] fixed_cycle_wallet_flat_snapshot_skipped_not_flat", {"reason": "qty_unknown"})
         return
@@ -1383,8 +1553,11 @@ def _symbols_from_dashboard_log() -> List[str]:
     return sorted(symbols)
 
 
-def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict):
-    """Mark Long Bot as running when fixed_cycle_hedge_bot.runner is active."""
+def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict, profile: Optional[str] = None):
+    """Mark fixed-cycle Long Bot as running only for the bot_1 profile."""
+    prof = (profile or "").strip().lower()
+    if prof != "bot_1":
+        return
     symbol = get_fixed_cycle_symbol()
     if not symbol:
         return
@@ -1401,6 +1574,28 @@ def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict):
         "pid": pid,
         "service_name": long_entry.get("service_name") or "fixed_cycle_hedge_bot.runner"
     }
+
+
+def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optional[str] = None) -> Optional[str]:
+    """Inject current profile long-bot runtime status from run/status.json for bot_1/bot_2."""
+    prof = (profile or "").strip().lower()
+    if prof not in ("bot_1", "bot_2"):
+        return None
+    try:
+        from utils.bot_monitor import get_bot_status
+
+        bot_name = "long_bot_1" if prof == "bot_1" else "long_bot_2"
+        bot_status = get_bot_status("", bot_type="long", bot_name=bot_name)
+        symbol = str(bot_status.get("symbol") or "").strip().upper()
+        if not symbol:
+            return None
+        if symbol not in bots_by_symbol:
+            bots_by_symbol[symbol] = {}
+        bots_by_symbol[symbol]["long"] = bot_status
+        return symbol
+    except Exception as exc:
+        logger.debug("[SYSTEM-STATUS] Profil-Long-Status konnte nicht injiziert werden: %s", exc)
+        return None
 
 
 def _inject_fixed_cycle_overview_entry(bots_list: list[dict], prof_key: str):
@@ -4483,25 +4678,25 @@ async def api_get_hedge_bot_status(
 ):
     """Get bot status for both long and short bots for a symbol"""
     try:
-        from utils.bot_monitor import is_bot_running
+        from utils.bot_monitor import get_bot_status
 
         prof = (profile or "").strip().lower()
         prof = prof if prof in ("main", "bot_1", "bot_2") else None
+        if prof == "bot_1":
+            long_bot_name = "long_bot_1"
+        elif prof == "bot_2":
+            long_bot_name = "long_bot_2"
+        else:
+            long_bot_name = "long_bot_1"
 
-        long_running = is_bot_running(symbol, bot_type="long", profile=prof)
-        short_running = is_bot_running(symbol, bot_type="short", profile=prof)
-        
+        long_status = get_bot_status(symbol, bot_type="long", bot_name=long_bot_name)
+        short_status = get_bot_status(symbol, bot_type="short", bot_name="short_bot_1")
+
         return {
             "success": True,
             "symbol": symbol,
-            "long_bot": {
-                "running": long_running,
-                "service_name": f"hedgebot-long@{symbol}"
-            },
-            "short_bot": {
-                "running": short_running,
-                "service_name": f"hedgebot-short@{symbol}"
-            }
+            "long_bot": long_status,
+            "short_bot": short_status,
         }
     except Exception as e:
         logger.error(f"Error getting bot status for {symbol}: {e}", exc_info=True)
@@ -4509,8 +4704,8 @@ async def api_get_hedge_bot_status(
             "success": False,
             "error": str(e),
             "symbol": symbol,
-            "long_bot": {"running": False},
-            "short_bot": {"running": False}
+            "long_bot": {"running": False, "status": "stopped"},
+            "short_bot": {"running": False, "status": "stopped"},
         }
 
 
@@ -6108,6 +6303,7 @@ async def api_get_closed_pnl(
             category="linear",
             limit=limit,
         )
+        paths = get_account_pnl_paths(acc)
         def _closed_pnl_time(r):
             t = r.get("updatedTime") or r.get("createdTime") or 0
             try:
@@ -6120,10 +6316,21 @@ async def api_get_closed_pnl(
             margin_balance = await asyncio.to_thread(order_manager.get_account_margin_balance)
         except Exception:
             pass
-        _maybe_run_dashboard_flat_snapshot(project_root)
-        _persist_closed_pnl_history_from_runtime_log()
+        if acc == "Long_bot_1":
+            _maybe_run_dashboard_flat_snapshot(project_root)
+        runtime_log_path = paths.get("runtime_log_path")
+        dashboard_history_path = paths.get("dashboard_closed_pnl_history_path")
+        if runtime_log_path and runtime_log_path.exists():
+            _persist_closed_pnl_history_from_runtime_log(
+                log_path=runtime_log_path,
+                output_path=dashboard_history_path,
+                account_label=acc,
+            )
         order_purpose_map = _load_order_purpose_map_from_runtime_log(limit_lines=10000)
-        confirmed_rows = load_confirmed_order_pnl_rows(acc)
+        confirmed_rows = load_confirmed_order_pnl_rows(
+            account=acc,
+            path=paths.get("confirmed_pnl_history_path"),
+        )
         logger.info(
             "[dashboard] dashboard_order_purpose_map_loaded",
             {
@@ -6136,12 +6343,21 @@ async def api_get_closed_pnl(
                 ],
             },
         )
-        closed_pnl_history = _load_dashboard_closed_pnl_history(account=acc, limit=100)
+        closed_pnl_history = _load_dashboard_closed_pnl_history(
+            account=acc,
+            path=dashboard_history_path,
+            limit=100,
+        )
         strategy_state = _load_strategy_state_for_account(acc) or {}
         wallet_snapshot = _build_wallet_snapshot_payload(strategy_state, acc)
         snapshot_source = "live_state" if wallet_snapshot else None
         snapshot_file = None
         if not wallet_snapshot:
+            logger.info(
+                "[dashboard] wallet_snapshot_missing_before_ensure",
+                {"account": acc, "snapshot_path": str(_wallet_snapshot_file_for_account(acc) or "")},
+            )
+            _ensure_wallet_snapshot_for_account(acc)
             snapshot_file = _wallet_snapshot_file_for_account(acc)
             file_snapshot = _load_wallet_snapshot_file(acc)
             if file_snapshot:
@@ -7957,7 +8173,8 @@ async def api_get_system_status(
         except Exception as e:
             logger.debug(f"[SYSTEM-STATUS] Konnte Symbole mit Positionen nicht abrufen (optional): {e}")
         
-        _ensure_fixed_cycle_long_bot_status(bots_by_symbol)
+        _ensure_fixed_cycle_long_bot_status(bots_by_symbol, profile=profile)
+        focus_symbol = _inject_profile_long_bot_runtime_status(bots_by_symbol, profile=profile)
         logger.info(f"[SYSTEM-STATUS] Finale bots_by_symbol vor Response: {len(bots_by_symbol)} Symbole, Details: {bots_by_symbol}")
         
         # Price-at (Start-Preis-Bot) State – profilspezifisch.
@@ -7977,6 +8194,7 @@ async def api_get_system_status(
             "bots": bots_by_symbol,
             "total_bots": len(all_bots),
             "price_at": price_at,
+            "focus_symbol": focus_symbol,
         }
         
         logger.info(f"[SYSTEM-STATUS] Status-Abfrage erfolgreich: {len(result.get('services', {}))} Services, {len(bots_by_symbol)} Symbole mit Bots, {result.get('total_bots', 0)} laufende Bots")
@@ -8373,6 +8591,142 @@ async def api_run_restart_fixed_cycle_script(user: dict = Depends(require_auth))
         return JSONResponse({"success": False, "error": "restart_fixed_cycle.sh not found"}, status_code=400)
     _maybe_run_dashboard_start_snapshot(project_root)
     return _run_restart_fixed_cycle_script(script_path, project_root)
+
+
+def _is_valid_long_bot_name(bot_name: str) -> bool:
+    return bool(re.match(r"^long_bot_[0-9]+$", bot_name or ""))
+
+
+def _run_shared_long_bot_script(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
+    logger.info(
+        "%s_script_begin %s",
+        script_label,
+        {"script_path": str(script_path), "bot_name": bot_name},
+    )
+    if not script_path.exists():
+        logger.error("%s missing at %s", script_label, script_path)
+        return {"success": False, "error": f"{script_label} not found"}
+
+    try:
+        result = subprocess.run(
+            [str(script_path), bot_name],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={**os.environ, "PYTHONPATH": str(project_root)},
+        )
+        if result.returncode == 0:
+            logger.info(
+                "%s_script_success %s",
+                script_label,
+                {"bot_name": bot_name, "stdout": result.stdout.strip()},
+            )
+            return {
+                "success": True,
+                "message": f"{script_label} executed for {bot_name}",
+                "stdout": result.stdout,
+            }
+        logger.warning(
+            "%s_script_failed %s",
+            script_label,
+            {
+                "bot_name": bot_name,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            },
+        )
+        return {
+            "success": False,
+            "error": result.stderr or f"Return code {result.returncode}",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    except subprocess.TimeoutExpired:
+        logger.error("%s timed out for %s", script_label, bot_name)
+        return {"success": False, "error": f"{script_label} timed out"}
+    except Exception as exc:
+        logger.error("%s failed for %s: %s", script_label, bot_name, exc, exc_info=True)
+        return {"success": False, "error": str(exc)}
+
+
+def _start_shared_long_bot_script_async(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
+    logger.info(
+        "%s_script_begin_async %s",
+        script_label,
+        {"script_path": str(script_path), "bot_name": bot_name},
+    )
+    if not script_path.exists():
+        logger.error("%s missing at %s", script_label, script_path)
+        return {"success": False, "error": f"{script_label} not found"}
+
+    launcher_log = (
+        project_root
+        / "live_bots"
+        / "100_50_hedge_bot"
+        / bot_name
+        / "logs"
+        / f"{script_label}_launcher.log"
+    )
+    launcher_log.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(launcher_log, "a", encoding="utf-8") as log_handle:
+            process = subprocess.Popen(
+                [str(script_path), bot_name],
+                cwd=str(project_root),
+                stdout=log_handle,
+                stderr=log_handle,
+                start_new_session=True,
+                env={**os.environ, "PYTHONPATH": str(project_root)},
+            )
+        logger.info(
+            "%s_script_spawned %s",
+            script_label,
+            {"bot_name": bot_name, "pid": process.pid, "launcher_log": str(launcher_log)},
+        )
+        return {
+            "success": True,
+            "message": f"{script_label} started for {bot_name}",
+            "pid": process.pid,
+            "launcher_log": str(launcher_log),
+        }
+    except Exception as exc:
+        logger.error("%s spawn failed for %s: %s", script_label, bot_name, exc, exc_info=True)
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/api/scripts/start-long-bot")
+@app.post("/dashboard/api/scripts/start-long-bot")
+async def api_run_start_long_bot_script(
+    user: dict = Depends(require_auth),
+    body: Optional[dict] = Body(None),
+):
+    bot_name = (body or {}).get("bot_name") if body else None
+    if not isinstance(bot_name, str) or not _is_valid_long_bot_name(bot_name):
+        return JSONResponse({"success": False, "error": "Invalid bot_name"}, status_code=400)
+    project_root = Path(__file__).resolve().parent.parent
+    _maybe_run_dashboard_start_snapshot(project_root, bot_name)
+    script_path = (
+        project_root / "live_bots" / "100_50_hedge_bot" / "shared_scripts" / "start_long_bot.sh"
+    )
+    return _start_shared_long_bot_script_async(script_path, bot_name, "start_long_bot", project_root)
+
+
+@app.post("/api/scripts/stop-long-bot-with-cleanup")
+@app.post("/dashboard/api/scripts/stop-long-bot-with-cleanup")
+async def api_run_stop_long_bot_cleanup_script(
+    user: dict = Depends(require_auth),
+    body: Optional[dict] = Body(None),
+):
+    bot_name = (body or {}).get("bot_name") if body else None
+    if not isinstance(bot_name, str) or not _is_valid_long_bot_name(bot_name):
+        return JSONResponse({"success": False, "error": "Invalid bot_name"}, status_code=400)
+    project_root = Path(__file__).resolve().parent.parent
+    script_path = (
+        project_root / "live_bots" / "100_50_hedge_bot" / "shared_scripts" / "stop_with_cleanup.sh"
+    )
+    return _run_shared_long_bot_script(script_path, bot_name, "stop_with_cleanup", project_root)
 
 
 if __name__ == "__main__":
