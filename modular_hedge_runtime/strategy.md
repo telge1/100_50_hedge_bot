@@ -284,9 +284,27 @@ sudo systemctl restart dashboard
 
 sudo systemctl status dashboard
 
+####################################### Add Bot ###################################################################
+
+ live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_5 --with-wrappers
+
+ ./live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_6 --with-wrappers --register-dashboard
+
+
+[block_marker] bot_restart timestamp=... symbol=<Symbol>
+
+####################################### Watchdog ##################################################################
+
+python live_bots/100_50_hedge_bot/shared_scripts/safety_order_watchdog.py --dry-run --once
+python live_bots/100_50_hedge_bot/shared_scripts/safety_order_watchdog.py --loop --interval 30
+
+
+
+
 ################################## Coin Scanner ###################################################################
 
 sudo systemctl stop coin_scanner.timer
+
 sudo systemctl stop coin_scanner.service
 
 sudo systemctl daemon-reload

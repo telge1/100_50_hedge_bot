@@ -58,9 +58,10 @@ fi
 
 STOP_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/stop_bot.sh"
 CANCEL_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/cancel_open_orders.sh"
+CLOSE_POSITIONS_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/close_open_positions.sh"
 HARD_RESET_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/hard_reset_bot.sh"
 
-for script in "${STOP_SCRIPT}" "${CANCEL_SCRIPT}" "${HARD_RESET_SCRIPT}"; do
+for script in "${STOP_SCRIPT}" "${CANCEL_SCRIPT}" "${CLOSE_POSITIONS_SCRIPT}" "${HARD_RESET_SCRIPT}"; do
   if [[ ! -x "${script}" ]]; then
     echo "Error: ${script} not executable" >&2
     exit 1
@@ -69,7 +70,7 @@ done
 
 echo "[${BOT_NAME}] WARNING: this will stop the bot process before cleaning."
 echo "[${BOT_NAME}] WARNING: this will cancel all open exchange orders for the detected symbol."
-echo "[${BOT_NAME}] WARNING: this will NOT close positions."
+echo "[${BOT_NAME}] WARNING: this will close open positions using reduce-only market orders."
 echo "[${BOT_NAME}] WARNING: local per-bot state/runtime files are cleaned here."
 echo "[${BOT_NAME}] WARNING: logs are NOT cleaned in stop_with_cleanup (only on restart)."
 
@@ -131,6 +132,28 @@ set -e
 
 if [[ ${CANCEL_CODE} -ne 0 ]]; then
   echo "[ERROR] ${BOT_NAME} cancel open orders failed (exit_code=${CANCEL_CODE})" >&2
+  exit 1
+fi
+
+CLOSE_CODE=0
+set +e
+"${CLOSE_POSITIONS_SCRIPT}" "${BOT_NAME}"
+CLOSE_CODE=$?
+set -e
+
+if [[ ${CLOSE_CODE} -ne 0 ]]; then
+  echo "[ERROR] ${BOT_NAME} close positions failed (exit_code=${CLOSE_CODE})" >&2
+  exit 1
+fi
+
+CANCEL_CODE_SECOND=0
+set +e
+"${CANCEL_SCRIPT}" "${BOT_NAME}"
+CANCEL_CODE_SECOND=$?
+set -e
+
+if [[ ${CANCEL_CODE_SECOND} -ne 0 ]]; then
+  echo "[ERROR] ${BOT_NAME} cancel open orders (second pass) failed (exit_code=${CANCEL_CODE_SECOND})" >&2
   exit 1
 fi
 

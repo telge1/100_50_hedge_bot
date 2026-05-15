@@ -245,6 +245,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     LONG_SL_EXIT_PURPOSE = "LONG_SL_EXIT"
     SHORT_TP_EXIT_PURPOSE = "SHORT_TP_EXIT"
     SHORT_SL_EXIT_PURPOSE = "SHORT_SL_EXIT"
+    LONG_TP_EXIT_RECOVERY_PURPOSE = "LONG_TP_EXIT_RECOVERY"
+    SHORT_SL_EXIT_RECOVERY_PURPOSE = "SHORT_SL_EXIT_RECOVERY"
     SHORT_HARD_STOP_PURPOSE = "SHORT_HARD_STOP_EXIT"
 
     def __init__(self, config: FixedCycleHedgeConfig | None = None) -> None:
@@ -342,6 +344,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["short_tp_fallback_state"] = None
         state["short_tp_fallback_order_context"] = None
         state["pending_cycle_loss_usdt"] = 0.0
+        state["short_exit_recovery_submitted"] = False
+        state["long_exit_recovery_submitted"] = False
+        state["exit_recovery_marker"] = False
         state["pending_loss_updated_in_fill"] = False
         state["pending_loss_exit_old_signature"] = None
         state["pending_loss_exit_rebuild_reason"] = None
@@ -380,6 +385,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "post_exit_cleanup_verified_at",
             "post_exit_cleanup_verified_snapshot_updated_at",
             "restart_delayed_pending_final_pnl_logged",
+            "short_exit_recovery_submitted",
+            "long_exit_recovery_submitted",
+            "exit_recovery_marker",
         ]
         for key in keys_to_pop:
             state.pop(key, None)
@@ -2684,9 +2692,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             purpose
             in {
                 FixedCycleHedgeStrategy.LONG_TP_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.LONG_TP_EXIT_RECOVERY_PURPOSE,
                 FixedCycleHedgeStrategy.LONG_SL_EXIT_PURPOSE,
                 FixedCycleHedgeStrategy.SHORT_TP_EXIT_PURPOSE,
                 FixedCycleHedgeStrategy.SHORT_SL_EXIT_PURPOSE,
+                FixedCycleHedgeStrategy.SHORT_SL_EXIT_RECOVERY_PURPOSE,
                 FixedCycleHedgeStrategy.SHORT_HARD_STOP_PURPOSE,
             }
             and status not in {"FILLED", "CANCELED", "CANCELLED", "REJECTED"}
@@ -2762,9 +2772,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 self.LONG_ENTRY_PURPOSE,
                 self.SHORT_ENTRY_PURPOSE,
                 self.LONG_TP_EXIT_PURPOSE,
+                self.LONG_TP_EXIT_RECOVERY_PURPOSE,
                 self.LONG_SL_EXIT_PURPOSE,
                 self.SHORT_TP_EXIT_PURPOSE,
                 self.SHORT_SL_EXIT_PURPOSE,
+                self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
                 self.SHORT_HARD_STOP_PURPOSE,
                 "REFILL_LONG",
                 "REFILL_SHORT",
@@ -2778,9 +2790,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         reduce_only = bool(getattr(order, "reduce_only", False))
         final_exit_purposes = {
             self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
             self.LONG_SL_EXIT_PURPOSE,
             self.SHORT_TP_EXIT_PURPOSE,
             self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
             self.SHORT_HARD_STOP_PURPOSE,
             "FINAL_LONG_EXIT",
             "FINAL_SHORT_EXIT",
@@ -2901,6 +2915,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["force_exit_rebuild"] = False
         state["long_exit_filled"] = False
         state["short_exit_filled"] = False
+        state["short_exit_recovery_submitted"] = False
+        state["long_exit_recovery_submitted"] = False
+        state["exit_recovery_marker"] = False
         state.pop("flat_waiting_order_cleanup_logged", None)
         _log_event(
             "fixed_cycle_flat_final_exit_order_cleanup_forced",
@@ -2976,6 +2993,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["force_exit_rebuild"] = True
         state["long_exit_filled"] = False
         state["short_exit_filled"] = False
+        state["short_exit_recovery_submitted"] = False
+        state["long_exit_recovery_submitted"] = False
+        state["exit_recovery_marker"] = False
         now_ms = int(time.time() * 1000)
         state.setdefault("unprotected_open_position_first_seen_ms", now_ms)
         should_log = (
@@ -5175,7 +5195,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext | None = None,
     ) -> None:
         purpose = fill_event.purpose or ""
-        exit_purposes = {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+        exit_purposes = {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+            self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+        }
         is_exit_fill = fill_event.status == "FILLED" and purpose in exit_purposes
 
         state = runtime_state.strategy_state
@@ -5362,9 +5387,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             self._try_complete_cycle_pair_after_confirmed_pnl(
                 runtime_state, cycle_index, fill_event.purpose
             )
-        if fill_event.purpose == self.LONG_TP_EXIT_PURPOSE and order_fully_completed:
+        if fill_event.purpose in {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+        } and order_fully_completed:
             state["long_exit_filled"] = True
-            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "LONG_TP_EXIT")
+            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, fill_event.purpose)
         if (
             fill_event.purpose == self.SHORT_TP_EXIT_PURPOSE
             and order_fully_completed
@@ -5372,18 +5400,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["short_exit_filled"] = True
             self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "SHORT_TP_EXIT")
             state["exit_rebuild_allowed"] = True
-        if fill_event.purpose == self.SHORT_SL_EXIT_PURPOSE and order_fully_completed:
+        if fill_event.purpose in {
+            self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+        } and order_fully_completed:
             state["short_exit_filled"] = True
-            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, "SHORT_SL_EXIT")
+            self._maybe_finalize_exit_after_leg_fill(runtime_state, context, fill_event.purpose)
         state["current_effective_cycle"] = max(
             int(state.get("current_short_cycle_index") or 0),
             int(state.get("cycle_completed_count") or 0),
         )
 
-        exit_purposes = {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+        exit_purposes = {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+            self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+        }
         exit_orders_open = (
             snapshot.has_open_purpose(self.LONG_TP_EXIT_PURPOSE)
+            or snapshot.has_open_purpose(self.LONG_TP_EXIT_RECOVERY_PURPOSE)
             or snapshot.has_open_purpose(self.SHORT_SL_EXIT_PURPOSE)
+            or snapshot.has_open_purpose(self.SHORT_SL_EXIT_RECOVERY_PURPOSE)
         ) if snapshot else False
         block_closed_marker = bool(state.get("block_closed_marker_emitted"))
         if (
@@ -7072,9 +7110,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             }
         )
         if (
-            reason == self.SHORT_SL_EXIT_PURPOSE
+            reason in {self.SHORT_SL_EXIT_PURPOSE, self.SHORT_SL_EXIT_RECOVERY_PURPOSE}
             and long_qty > 0
             and self.LONG_TP_EXIT_PURPOSE not in active_order_purposes
+            and self.LONG_TP_EXIT_RECOVERY_PURPOSE not in active_order_purposes
         ):
             logger.warning(
                 "final_exit_missing_opposite_long_exit %s",
@@ -7086,9 +7125,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
         if (
-            reason in {self.LONG_TP_EXIT_PURPOSE, self.LONG_SL_EXIT_PURPOSE}
+            reason
+            in {
+                self.LONG_TP_EXIT_PURPOSE,
+                self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+                self.LONG_SL_EXIT_PURPOSE,
+            }
             and short_qty > 0
             and self.SHORT_SL_EXIT_PURPOSE not in active_order_purposes
+            and self.SHORT_SL_EXIT_RECOVERY_PURPOSE not in active_order_purposes
         ):
             logger.warning(
                 "final_exit_missing_opposite_short_exit %s",
@@ -7111,9 +7156,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 if str(order.get("purpose") or "").upper()
                 in {
                     self.LONG_TP_EXIT_PURPOSE,
+                    self.LONG_TP_EXIT_RECOVERY_PURPOSE,
                     self.LONG_SL_EXIT_PURPOSE,
                     self.SHORT_TP_EXIT_PURPOSE,
                     self.SHORT_SL_EXIT_PURPOSE,
+                    self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
                     self.SHORT_HARD_STOP_PURPOSE,
                 }
             ]
@@ -7847,6 +7894,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["exit_locked"] = False
         state["long_exit_filled"] = False
         state["short_exit_filled"] = False
+        state["short_exit_recovery_submitted"] = False
+        state["long_exit_recovery_submitted"] = False
+        state["exit_recovery_marker"] = False
         state["force_exit_rebuild"] = True
         logger.info(
             "exit_state_reset_for_new_structure",
@@ -8384,6 +8434,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["processed_pnl_exec_ids_order"] = []
         state["long_exit_filled"] = False
         state["short_exit_filled"] = False
+        state["short_exit_recovery_submitted"] = False
+        state["long_exit_recovery_submitted"] = False
+        state["exit_recovery_marker"] = False
         state["exit_locked"] = False
         state.pop("flat_waiting_order_cleanup_logged", None)
         state.pop("flat_waiting_final_pnl_logged", None)
@@ -8446,10 +8499,76 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _exit_purposes(self) -> list[str]:
         return [
             self.LONG_TP_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
             self.LONG_SL_EXIT_PURPOSE,
             self.SHORT_TP_EXIT_PURPOSE,
             self.SHORT_SL_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
         ]
+
+    @staticmethod
+    def _safe_recovery_qty(value: Decimal | float | str | int | None) -> float:
+        if value in (None, ""):
+            return 0.0
+        try:
+            return float(Decimal(str(value)))
+        except Exception:
+            return 0.0
+
+    def _recover_purpose_from_order_update(self, payload: dict[str, Any]) -> str:
+        candidates = [
+            payload.get("orderLinkId"),
+            payload.get("order_link_id"),
+            payload.get("clientOrderId"),
+            payload.get("client_order_id"),
+        ]
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if not text:
+                continue
+            upper = text.upper()
+            if "SHORT_SL_EXIT_RECOVERY" in upper:
+                return self.SHORT_SL_EXIT_RECOVERY_PURPOSE
+            if "LONG_TP_EXIT_RECOVERY" in upper:
+                return self.LONG_TP_EXIT_RECOVERY_PURPOSE
+            if "SHORT_SL_EXIT" in upper:
+                return self.SHORT_SL_EXIT_PURPOSE
+            if "LONG_TP_EXIT" in upper:
+                return self.LONG_TP_EXIT_PURPOSE
+        return ""
+
+    def _build_force_exit_recovery_intent(
+        self,
+        *,
+        side: str,
+        qty: Decimal | float | str,
+        symbol: str,
+        purpose: str,
+        reason: str,
+        source_order_id: str | None = None,
+        source_order_link_id: str | None = None,
+    ) -> StrategyIntent:
+        runtime_side = "short" if str(side or "").strip().lower() == "short" else "long"
+        position_idx = 2 if runtime_side == "short" else 1
+        normalized_qty = self._safe_recovery_qty(qty)
+        return StrategyIntent(
+            side=runtime_side,
+            qty=normalized_qty,
+            purpose=purpose,
+            order_type="Market",
+            reduce_only=True,
+            close_on_trigger=True,
+            position_idx=position_idx,
+            metadata={
+                "recovery_force": True,
+                "reason": reason,
+                "symbol": symbol,
+                "source_order_id": source_order_id,
+                "source_order_link_id": source_order_link_id,
+                "original_exit_cancelled": True,
+                "position_idx": position_idx,
+            },
+        )
 
     def on_order_update(
         self,
@@ -8458,4 +8577,166 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
         context: StrategyContext,
     ) -> list[StrategyIntent]:
+        payload_data = payload if isinstance(payload, dict) else {}
+        status = str(payload_data.get("orderStatus") or "").upper()
+        if status not in {"CANCELED", "CANCELLED", "REJECTED"}:
+            return []
+
+        source_order_id = str(payload_data.get("orderId") or "").strip() or None
+        source_order_link_id = str(
+            payload_data.get("orderLinkId")
+            or payload_data.get("order_link_id")
+            or payload_data.get("clientOrderId")
+            or payload_data.get("client_order_id")
+            or ""
+        ).strip() or None
+        purpose = self._recover_purpose_from_order_update(payload_data)
+        if not purpose and source_order_id:
+            for order in runtime_state.active_orders.values():
+                if str(getattr(order, "exchange_order_id", "") or "").strip() == source_order_id:
+                    purpose = str(getattr(order, "purpose", "") or "").strip().upper()
+                    break
+        if purpose not in {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_PURPOSE,
+            self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+            self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+        }:
+            return []
+
+        current_snapshot = snapshot or runtime_state.last_snapshot
+        state = runtime_state.strategy_state
+        long_qty = float(current_snapshot.long_qty or 0.0) if current_snapshot else float(state.get("open_long_qty") or 0.0)
+        short_qty = float(current_snapshot.short_qty or 0.0) if current_snapshot else float(state.get("open_short_qty") or 0.0)
+
+        if purpose in {self.SHORT_SL_EXIT_PURPOSE, self.SHORT_SL_EXIT_RECOVERY_PURPOSE}:
+            if short_qty <= 0:
+                _log_event(
+                    "fixed_cycle_short_exit_force_market_recovery_not_needed",
+                    {
+                        "symbol": self.config.symbol,
+                        "side": "short",
+                        "qty": short_qty,
+                        "purpose": self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+                        "original_purpose": purpose,
+                        "source_order_id": source_order_id,
+                        "source_order_link_id": source_order_link_id,
+                        "reason": status,
+                        "exit_locked": bool(state.get("exit_locked")),
+                        "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                    },
+                )
+                return []
+            if state.get("short_exit_recovery_submitted"):
+                _log_event(
+                    "fixed_cycle_short_exit_force_market_recovery_skipped_duplicate",
+                    {
+                        "symbol": self.config.symbol,
+                        "side": "short",
+                        "qty": short_qty,
+                        "purpose": self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+                        "original_purpose": purpose,
+                        "source_order_id": source_order_id,
+                        "source_order_link_id": source_order_link_id,
+                        "reason": status,
+                        "exit_locked": bool(state.get("exit_locked")),
+                        "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                    },
+                )
+                return []
+            state["exit_rebuild_allowed"] = True
+            state["exit_locked"] = False
+            state["exit_recovery_marker"] = True
+            state["short_exit_recovery_submitted"] = True
+            intent = self._build_force_exit_recovery_intent(
+                side="short",
+                qty=short_qty,
+                symbol=self.config.symbol,
+                purpose=self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+                reason=status,
+                source_order_id=source_order_id,
+                source_order_link_id=source_order_link_id,
+            )
+            _log_warning_event(
+                "fixed_cycle_short_exit_force_market_recovery",
+                {
+                    "symbol": self.config.symbol,
+                    "side": "short",
+                    "qty": short_qty,
+                    "purpose": self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+                    "original_purpose": purpose,
+                    "source_order_id": source_order_id,
+                    "source_order_link_id": source_order_link_id,
+                    "reason": status,
+                    "exit_locked": bool(state.get("exit_locked")),
+                    "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                },
+            )
+            return [intent]
+
+        if purpose in {self.LONG_TP_EXIT_PURPOSE, self.LONG_TP_EXIT_RECOVERY_PURPOSE}:
+            if long_qty <= 0:
+                _log_event(
+                    "fixed_cycle_long_exit_force_market_recovery_not_needed",
+                    {
+                        "symbol": self.config.symbol,
+                        "side": "long",
+                        "qty": long_qty,
+                        "purpose": self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+                        "original_purpose": purpose,
+                        "source_order_id": source_order_id,
+                        "source_order_link_id": source_order_link_id,
+                        "reason": status,
+                        "exit_locked": bool(state.get("exit_locked")),
+                        "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                    },
+                )
+                return []
+            if state.get("long_exit_recovery_submitted"):
+                _log_event(
+                    "fixed_cycle_long_exit_force_market_recovery_skipped_duplicate",
+                    {
+                        "symbol": self.config.symbol,
+                        "side": "long",
+                        "qty": long_qty,
+                        "purpose": self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+                        "original_purpose": purpose,
+                        "source_order_id": source_order_id,
+                        "source_order_link_id": source_order_link_id,
+                        "reason": status,
+                        "exit_locked": bool(state.get("exit_locked")),
+                        "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                    },
+                )
+                return []
+            state["exit_rebuild_allowed"] = True
+            state["exit_locked"] = False
+            state["exit_recovery_marker"] = True
+            state["long_exit_recovery_submitted"] = True
+            intent = self._build_force_exit_recovery_intent(
+                side="long",
+                qty=long_qty,
+                symbol=self.config.symbol,
+                purpose=self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+                reason=status,
+                source_order_id=source_order_id,
+                source_order_link_id=source_order_link_id,
+            )
+            _log_warning_event(
+                "fixed_cycle_long_exit_force_market_recovery",
+                {
+                    "symbol": self.config.symbol,
+                    "side": "long",
+                    "qty": long_qty,
+                    "purpose": self.LONG_TP_EXIT_RECOVERY_PURPOSE,
+                    "original_purpose": purpose,
+                    "source_order_id": source_order_id,
+                    "source_order_link_id": source_order_link_id,
+                    "reason": status,
+                    "exit_locked": bool(state.get("exit_locked")),
+                    "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                },
+            )
+            return [intent]
+
         return []

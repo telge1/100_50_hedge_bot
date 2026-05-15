@@ -4,9 +4,15 @@ Bot monitoring utilities
 import subprocess
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional, Tuple, Any
 from .config_manager import load_config
+from .bot_profiles import is_bot_profile
+try:
+    from dashboard.bot_registry import get_bot_profiles, get_bot_paths
+except ImportError:
+    from bot_registry import get_bot_profiles, get_bot_paths
 
 # Try to import psutil for process checking
 try:
@@ -27,9 +33,9 @@ def _get_project_root() -> Path:
 
 def _is_matching_bot_process(symbol: str, bot_type: str, profile: str = None) -> bool:
     """Best-effort process scan fallback for script-started bots.
-    profile: main|None = nur Main-Bot (kein bot_1/bot_2); bot_1|bot_2 = profil-spezifisch.
-    Der Prozess-Scan kann bot_1/bot_2 nicht zuverlässig unterscheiden – daher bei main
-    Prozesse mit 'bot_1' oder 'bot_2' im Cmdline ausschließen."""
+    profile: main|None = nur Main-Bot (kein bot_N); bot_N = profil-spezifisch.
+    Der Prozess-Scan kann bot_N nicht zuverlässig unterscheiden – daher bei main
+    Prozesse mit 'bot_<n>' im Cmdline ausschließen."""
     if not PSUTIL_AVAILABLE:
         return False
     try:
@@ -38,7 +44,7 @@ def _is_matching_bot_process(symbol: str, bot_type: str, profile: str = None) ->
             return False
         script_name = f"{bot_type}_bot.py"
         prof = (profile or "").strip()
-        exclude_bot_profiles = prof not in ("bot_1", "bot_2")  # Bei main: nur Main-Bot zählen
+        exclude_bot_profiles = not is_bot_profile(prof)  # Bei main: nur Main-Bot zählen
         for proc in psutil.process_iter(["cmdline", "status"]):
             try:
                 if proc.info.get("status") in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
@@ -51,8 +57,8 @@ def _is_matching_bot_process(symbol: str, bot_type: str, profile: str = None) ->
                 has_script = any(part.endswith(script_name.upper()) for part in cmd_upper)
                 has_symbol = normalized_symbol in cmd_upper
                 if has_script and has_symbol:
-                    if exclude_bot_profiles and ("BOT_1" in cmd_str or "BOT_2" in cmd_str):
-                        continue  # Das ist bot_1/bot_2 – für Main-Profil nicht zählen
+                    if exclude_bot_profiles and re.search(r"BOT_[0-9]+", cmd_str):
+                        continue  # Das ist bot_N – für Main-Profil nicht zählen
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
@@ -65,15 +71,23 @@ def _is_matching_bot_process(symbol: str, bot_type: str, profile: str = None) ->
 
 def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> bool:
     """Check if bot is running via systemctl or PID file (local mode).
-    profile: bot_1|bot_2 für profil-spezifische PID-Dateien (data/run/long_bot_SYMBOL_bot_1.pid)."""
+    profile: bot_N für profil-spezifische PID-Dateien (data/run/long_bot_SYMBOL_bot_N.pid)."""
     import time
     import logging
     logger = logging.getLogger(__name__)
     prof = (profile or "").strip()
     service_name = f'hedgebot-{bot_type}@{symbol}'
     project_dir = _get_project_root()
+
+    # For registry-backed bot_N long bots, the canonical runtime PID lives in
+    # live_bots/.../long_bot_N/run/bot.pid. Check this before legacy PID flows.
+    runtime_pid, runtime_pid_path = _get_registry_profile_runtime_pid(prof, bot_type)
+    if runtime_pid:
+        logger.debug("Registry runtime PID marks bot as running: %s (%s)", runtime_pid, runtime_pid_path)
+        return True
+
     pid_file = project_dir / "logs" / "fixed_cycle_bot.pid"
-    if pid_file.exists():
+    if not is_bot_profile(prof) and pid_file.exists():
         pid_valid = False
         pid_cmdline = None
         pid_value = None
@@ -114,7 +128,7 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
             return True
 
     # First try systemd service (with one retry after 1s to avoid false "stopped" after dashboard restart)
-    if prof not in ("bot_1", "bot_2"):
+    if not is_bot_profile(prof):
         for attempt in range(2):
             try:
                 result = subprocess.run(
@@ -138,7 +152,7 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
                 break
 
     # Fallback: Check local mode via PID file (nur für main – local_bots_pids.json hat kein Profil)
-    if prof not in ("bot_1", "bot_2"):
+    if not is_bot_profile(prof):
         try:
             project_dir = _get_project_root()
             pid_file = project_dir / "data" / "logs" / "local_bots_pids.json"
@@ -177,12 +191,13 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
         except Exception:
             pass
 
-    # Primary for script-started bots: PID files in data/run (start_long_main.sh / start_short_sub.sh)
+    # Legacy fallback for older/main script-started bots: PID files in data/run.
+    # For bot_N long bots, the canonical location is live_bots/.../run/bot.pid.
     try:
         project_dir = _get_project_root()
         run_dir = project_dir / "data" / "run"
         safe_symbol = ''.join(ch if (ch.isalnum() or ch in "_-") else '_' for ch in str(symbol or "").strip().upper())
-        prof_suffix = f"_{profile}" if (profile or "").strip() in ("bot_1", "bot_2") else ""
+        prof_suffix = f"_{profile}" if is_bot_profile((profile or "").strip()) else ""
         pid_name = f"{bot_type}_bot_{safe_symbol}{prof_suffix}.pid"
         pid_file = run_dir / pid_name
         if pid_file.exists():
@@ -227,8 +242,8 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
     except Exception:
         pass
 
-    # Final fallback: scan running processes (profil-aware – bei main: bot_1/bot_2 ausschließen)
-    if prof not in ("bot_1", "bot_2"):
+    # Final fallback: scan running processes (profil-aware – bei main: bot_N ausschließen)
+    if not is_bot_profile(prof):
         try:
             if _is_matching_bot_process(symbol, bot_type, profile=prof or None):
                 return True
@@ -271,22 +286,157 @@ def _pid_runs_same_bot(pid: int, bot_name: str) -> bool:
     )
 
 
-def get_bot_status(symbol: str, bot_type: str = "long", bot_name: str | None = None) -> dict:
-    if bot_name is None:
-        bot_name = f"{bot_type}_bot_1"
-    bot_info = _read_bot_status_from_run(bot_name)
-    pid_path = bot_info["pid_path"]
-    payload = bot_info["status_payload"]
+def _resolve_profile_bot_record(profile: str | None) -> dict[str, Any] | None:
+    prof = (profile or "").strip().lower()
+    if not is_bot_profile(prof):
+        return None
+    for bot in get_bot_profiles():
+        if str(bot.get("profile") or "").strip().lower() == prof:
+            return bot
+    return None
+
+
+def _resolve_profile_long_bot_name(profile: str | None) -> str | None:
+    bot = _resolve_profile_bot_record(profile)
+    if not bot:
+        return None
+    return str(bot.get("bot_name") or "").strip() or None
+
+
+def _read_pid_cmdline(pid: int) -> str:
+    cmdline_path = Path(f"/proc/{pid}/cmdline")
+    if cmdline_path.exists():
+        try:
+            return cmdline_path.read_bytes().decode("utf-8").replace("\x00", " ")
+        except Exception:
+            return ""
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process(pid)
+            return " ".join(str(part) for part in (process.cmdline() or []))
+        except Exception:
+            return ""
+    return ""
+
+
+def _registry_profile_runtime_info(profile: str | None, bot_type: str) -> dict[str, Any] | None:
+    if (bot_type or "").strip().lower() != "long":
+        return None
+    bot = _resolve_profile_bot_record(profile)
+    if not bot:
+        return None
+    bot_name = str(bot.get("bot_name") or "").strip()
+    if not bot_name:
+        return None
+    paths = get_bot_paths(bot_name)
+    if not paths:
+        return None
+    bot_dir = paths["bot_dir"]
+    return {
+        "bot_name": bot_name,
+        "pid_path": bot_dir / "run" / "bot.pid",
+        "config_path": bot_dir / "config" / "fixed_cycle_config.json",
+        "state_path": paths["state_file"],
+    }
+
+
+def _is_valid_registry_runtime_pid(
+    pid: int,
+    *,
+    bot_name: str,
+    config_path: Path,
+    state_path: Path,
+) -> bool:
+    if not _pid_alive(pid):
+        return False
+    cmdline = _read_pid_cmdline(pid)
+    if not cmdline:
+        return True
+    if "fixed_cycle_hedge_bot.runner" not in cmdline:
+        return False
+    return any(
+        token in cmdline
+        for token in (
+            f"--bot-name {bot_name}",
+            str(config_path),
+            str(state_path),
+        )
+    )
+
+
+def _get_registry_profile_runtime_pid(profile: str | None, bot_type: str) -> Tuple[Optional[int], Optional[Path]]:
+    runtime_info = _registry_profile_runtime_info(profile, bot_type)
+    if not runtime_info:
+        return (None, None)
+    pid_path = runtime_info["pid_path"]
+    if not pid_path.exists():
+        return (None, None)
+    try:
+        pid_raw = pid_path.read_text(encoding="utf-8").strip()
+        if not pid_raw.isdigit():
+            pid_path.unlink(missing_ok=True)
+            return (None, None)
+        pid = int(pid_raw)
+        if _is_valid_registry_runtime_pid(
+            pid,
+            bot_name=runtime_info["bot_name"],
+            config_path=runtime_info["config_path"],
+            state_path=runtime_info["state_path"],
+        ):
+            return (pid, pid_path)
+        pid_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+    return (None, None)
+
+
+def get_bot_status(
+    symbol: str,
+    bot_type: str = "long",
+    bot_name: str | None = None,
+    profile: str | None = None,
+) -> dict:
+    prof = (profile or "").strip()
+    if bot_name is None and bot_type == "long":
+        bot_name = _resolve_profile_long_bot_name(prof)
+
+    payload = {}
+    pid_value = None
+    if bot_name:
+        bot_info = _read_bot_status_from_run(bot_name)
+        pid_path = bot_info["pid_path"]
+        payload = bot_info["status_payload"]
+    else:
+        pid_path = None
 
     running = False
-    pid_value = None
-    if pid_path.exists():
+    stale_pid = False
+    is_valid_pid = False
+    if pid_path and pid_path.exists():
         try:
-            pid_value = int(pid_path.read_text(encoding="utf-8").strip() or "0")
+            pid_raw = pid_path.read_text(encoding="utf-8").strip()
+            pid_value = int(pid_raw) if pid_raw.isdigit() else None
         except Exception:
             pid_value = None
         if pid_value:
-            running = _pid_runs_same_bot(pid_value, bot_name)
+            if _pid_alive(pid_value):
+                cmdline = _read_pid_cmdline(pid_value)
+                if "fixed_cycle_hedge_bot.runner" in cmdline and (bot_name and f"--bot-name {bot_name}" in cmdline):
+                    running = True
+                    is_valid_pid = True
+                else:
+                    stale_pid = True
+            else:
+                stale_pid = True
+        else:
+            stale_pid = True
+
+    if not running:
+        running = is_bot_running(symbol, bot_type=bot_type, profile=prof or None)
+        if running and not is_valid_pid:
+            pid_value, _ = get_bot_pid_from_run_dir(symbol, bot_type, profile=prof or None)
+            is_valid_pid = bool(pid_value)
+            stale_pid = not is_valid_pid
 
     if running:
         return {
@@ -294,6 +444,7 @@ def get_bot_status(symbol: str, bot_type: str = "long", bot_name: str | None = N
             "bot_type": bot_type,
             "symbol": payload.get("symbol") or symbol,
             "running": True,
+            "stale_pid": stale_pid,
             "start_requested": True,
             "status": "running",
             "status_label": f"läuft{'' if not payload.get('symbol') else ': ' + payload.get('symbol')}",
@@ -302,6 +453,10 @@ def get_bot_status(symbol: str, bot_type: str = "long", bot_name: str | None = N
 
     payload_status = payload.get("status")
     start_requested = bool(payload.get("start_requested"))
+    if not running:
+        # kill stale start-requested flag if no valid PID or wait/pid files
+        if not is_valid_pid:
+            start_requested = False
     if payload_status == "waiting_for_symbol" and start_requested:
         return {
             "bot_name": bot_name,
@@ -376,16 +531,37 @@ def find_fixed_cycle_runner_pid() -> Optional[int]:
     return None
 
 
-def get_bot_pid_from_run_dir(symbol: str, bot_type: str) -> Tuple[Optional[int], Optional[Path]]:
+def get_bot_pid_from_run_dir(symbol: str, bot_type: str, profile: str | None = None) -> Tuple[Optional[int], Optional[Path]]:
     """
-    Find a running bot via PID files in data/run.
-    Checks: {bot_type}_bot_{symbol}.pid, {bot_type}_bot_{symbol}_bot_1.pid, {bot_type}_bot_{symbol}_bot_2.pid.
+    Find a running bot via canonical runtime PID first, then legacy data/run fallback.
+    Checks for bot_N long bots: live_bots/.../long_bot_N/run/bot.pid.
+    Checks otherwise: {bot_type}_bot_{symbol}.pid and {bot_type}_bot_{symbol}_bot_<n>.pid.
     Returns (pid, pid_file) if found and process alive, else (None, None).
     """
+    runtime_pid, runtime_pid_path = _get_registry_profile_runtime_pid(profile, bot_type)
+    if runtime_pid:
+        return (runtime_pid, runtime_pid_path)
+
     project_dir = _get_project_root()
     run_dir = project_dir / "data" / "run"
     safe_symbol = "".join(ch if (ch.isalnum() or ch in "_-") else "_" for ch in str(symbol or "").strip().upper())
-    suffixes = ["", "_bot_1", "_bot_2"]
+    prof = (profile or "").strip().lower()
+    if is_bot_profile(prof):
+        suffixes = [f"_{prof}"]
+    else:
+        suffixes = [""]
+        try:
+            suffixes.extend(
+                sorted(
+                    {
+                        pid_path.stem[len(f"{bot_type}_bot_{safe_symbol}"):]
+                        for pid_path in run_dir.glob(f"{bot_type}_bot_{safe_symbol}_bot_*.pid")
+                        if pid_path.stem.startswith(f"{bot_type}_bot_{safe_symbol}_bot_")
+                    }
+                )
+            )
+        except Exception:
+            pass
     for suf in suffixes:
         pid_name = f"{bot_type}_bot_{safe_symbol}{suf}.pid"
         pid_file = run_dir / pid_name

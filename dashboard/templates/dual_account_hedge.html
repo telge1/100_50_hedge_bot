@@ -212,8 +212,9 @@
                 <span style="font-size: 16px; color: #888;">Profil:</span>
                 <select id="profileSelect" class="account-select" title="Account-Paar für Equity und Unrealised PnL">
                     <option value="main">Main / Sub</option>
-                    <option value="bot_1">Long_bot_1 / Short_bot_1</option>
-                    <option value="bot_2">Long_bot_2 / Short_bot_2</option>
+                    {% for bot in bot_profiles %}
+                        <option value="{{ bot.profile }}">{{ bot.long_account }} / {{ bot.short_account }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <!-- Equity Section (Labels dynamisch je Profil) -->
@@ -290,12 +291,9 @@
                     <h2>📋 Closed PnL</h2>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <select id="accountSelect" class="account-select">
-                            <option value="main">Main</option>
-                            <option value="sub">Sub</option>
-                            <option value="Long_bot_1">Long_bot_1</option>
-                            <option value="Short_bot_1">Short_bot_1</option>
-                            <option value="Long_bot_2">Long_bot_2</option>
-                            <option value="Short_bot_2">Short_bot_2</option>
+                            {% for account in dashboard_accounts %}
+                                <option value="{{ account }}">{{ account }}</option>
+                            {% endfor %}
                         </select>
                         <button type="button" id="refreshClosedPnlBtn" class="btn-refresh" title="Daten neu laden">🔄 Refresh</button>
                     </div>
@@ -321,19 +319,30 @@
     </div>
     
     <script>
+        const botProfiles = {{ bot_profiles | tojson }};
+        const closedPnlAccounts = {{ closed_pnl_accounts | tojson }};
+        const botProfileByName = Object.fromEntries(botProfiles.map((b) => [b.profile, b]));
+        const botProfileByAccount = {};
+        botProfiles.forEach((profile) => {
+            botProfileByAccount[profile.long_account] = profile;
+            botProfileByAccount[profile.short_account] = profile;
+        });
+        const validProfileValues = ['main', ...botProfiles.map((p) => p.profile)];
+        const defaultBotProfile = botProfiles.length ? botProfiles[0].profile : 'bot_1';
         let lastMainUnrealisedPnl = 0;
         let lastSubUnrealisedPnl = 0;
         let walletSnapshotData = null;
         let cyclePnlEntries = [];
         let finalExitPnl = {};
         let longBotEquityData = null;
+        let longBotEquityProfile = null;
 
-        /** Aktuell gewähltes Profil (main, bot_1, bot_2). Aus URL oder Select. */
+        /** Aktuell gewähltes Profil (main oder bot_n). Aus URL oder Select. */
         function getSelectedProfile() {
             const fromUrl = new URLSearchParams(window.location.search).get('profile');
-            if (fromUrl && ['main', 'bot_1', 'bot_2'].includes(fromUrl)) return fromUrl;
+            if (fromUrl && validProfileValues.includes(fromUrl)) return fromUrl;
             const sel = document.getElementById('profileSelect');
-            if (sel && sel.value && ['main', 'bot_1', 'bot_2'].includes(sel.value)) return sel.value;
+            if (sel && sel.value && validProfileValues.includes(sel.value)) return sel.value;
             return 'main';
         }
 
@@ -349,12 +358,10 @@
             const p = getSelectedProfile();
             const mainEl = document.getElementById('equityLabelMain');
             const subEl = document.getElementById('equityLabelSub');
-            if (p === 'bot_1') {
-                if (mainEl) mainEl.textContent = '🟢 Long_bot_1';
-                if (subEl) subEl.textContent = '🔴 Short_bot_1';
-            } else if (p === 'bot_2') {
-                if (mainEl) mainEl.textContent = '🟢 Long_bot_2';
-                if (subEl) subEl.textContent = '🔴 Short_bot_2';
+            const profileEntry = botProfileByName[p];
+            if (profileEntry) {
+                if (mainEl) mainEl.textContent = `🟢 ${profileEntry.long_account}`;
+                if (subEl) subEl.textContent = `🔴 ${profileEntry.short_account}`;
             } else {
                 if (mainEl) mainEl.textContent = '🟢 Main Account';
                 if (subEl) subEl.textContent = '🔴 Sub Account';
@@ -423,21 +430,24 @@
             const adjustedEl = document.getElementById('walletSnapshotAdjusted');
             const profitPctEl = document.getElementById('walletSnapshotProfitPct');
             const sourceEl = document.getElementById('walletSnapshotSource');
-            const currentWallet = snapshot?.wallet_balance_current_usdt ?? longBotEquityData?.main_margin_balance ?? null;
-            const startWallet = snapshot?.wallet_balance_previous_usdt ?? snapshot?.wallet_balance_current_usdt ?? longBotEquityData?.main_margin_balance ?? null;
+            const liveCurrentWallet = longBotEquityData?.main_margin_balance ?? null;
+            const currentWallet = liveCurrentWallet ?? snapshot?.wallet_balance_current_usdt ?? null;
+            const startWallet = snapshot?.wallet_balance_start_usdt ?? snapshot?.wallet_balance_previous_usdt ?? snapshot?.wallet_balance_current_usdt ?? liveCurrentWallet ?? null;
             const diffProfit = snapshot?.last_trade_wallet_profit_usdt ?? (startWallet != null && currentWallet != null ? currentWallet - startWallet : null);
             const baseForPct = snapshot?.wallet_balance_previous_usdt ?? startWallet;
+            if (currentEl) currentEl.textContent = currentWallet != null ? formatWalletSnapshotValue(currentWallet) : '--';
             const profitPct = diffProfit != null && baseForPct ? (diffProfit / baseForPct) * 100 : null;
             if (startEl) startEl.textContent = startWallet != null ? formatWalletSnapshotValue(startWallet) : '--';
             if (availableEl) availableEl.textContent = longBotEquityData?.main_available_balance != null ? formatWalletSnapshotValue(longBotEquityData.main_available_balance) : '--';
             if (adjustedEl) adjustedEl.textContent = longBotEquityData?.main_equity != null ? formatWalletSnapshotValue(longBotEquityData.main_equity) : '--';
             if (profitPctEl) profitPctEl.textContent = profitPct != null ? `${profitPct.toFixed(2)} %` : '--';
             const computedSource =
-                snapshot?.source
+                (liveCurrentWallet != null ? 'live_margin_balance' : null)
+                || snapshot?.source
                 || snapshot?.wallet_balance_source
                 || snapshot?.last_trade_wallet_profit_source
                 || (longBotEquityData ? 'fallback_current_wallet' : '--');
-            if (sourceEl) sourceEl.textContent = snapshot ? computedSource : '--';
+            if (sourceEl) sourceEl.textContent = (snapshot || liveCurrentWallet != null) ? computedSource : '--';
         }
 
         function renderCycleDetailModal() {
@@ -523,6 +533,9 @@
                     document.getElementById('subAvailableBalance').textContent = fmt(subAv);
                     const totalAv = (mainAv != null ? Number(mainAv) : 0) + (subAv != null ? Number(subAv) : 0);
                     document.getElementById('totalAvailableBalance').textContent = totalAv > 0 ? fmt(totalAv) : '--';
+                    const currentProfile = getSelectedProfile();
+                    longBotEquityData = data;
+                    longBotEquityProfile = currentProfile;
                     await loadAllSymbolsUnrealisedPnl();
                     const account = document.getElementById('accountSelect')?.value;
                     const cache = closedPnlCache[account] || [];
@@ -536,14 +549,18 @@
             } catch (e) { console.error('loadEquity:', e); }
         }
 
-        async function ensureLongBotEquityData() {
-            if (longBotEquityData) return longBotEquityData;
+        async function ensureLongBotEquityData(profile) {
+            const resolvedProfile = profile || defaultBotProfile;
+            if (longBotEquityData && longBotEquityProfile === resolvedProfile) {
+                return longBotEquityData;
+            }
             try {
-                const response = await fetch('/api/hedge/equity?profile=bot_1', { signal: AbortSignal.timeout(20000) });
+                const response = await fetch(`/api/hedge/equity?profile=${encodeURIComponent(resolvedProfile)}`, { signal: AbortSignal.timeout(20000) });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 if (data.success) {
                     longBotEquityData = data;
+                    longBotEquityProfile = resolvedProfile;
                     return longBotEquityData;
                 }
             } catch (e) {
@@ -636,18 +653,17 @@
         }
 
         /** Cache: pro Account alle bekannten Einträge (Verlauf bleibt erhalten, neue werden hinzugefügt) */
-        const CLOSED_PNL_ACCOUNTS = ['main', 'sub', 'Long_bot_1', 'Short_bot_1', 'Long_bot_2', 'Short_bot_2'];
+        const CLOSED_PNL_ACCOUNTS = closedPnlAccounts;
         let closedPnlCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, []]));
         let closedPnlHistoryCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, []]));
         let closedPnlOrderPurposeMapCache = Object.fromEntries(CLOSED_PNL_ACCOUNTS.map(a => [a, {}]));
         const CLOSED_PNL_CACHE_MAX = 500; // Obergrenze pro Account
 
         /** Aktuellen Wallet-Wert für gewählten Account: DOM (main/sub) oder lastMarginByAccount (Bot-Accounts).
-         * Bei Profil bot_1: Long_bot_1/Short_bot_1 werden aus Equity-Karten (main/sub) gelesen. */
+         * Bei Profil bot_n: Long_bot_n/Short_bot_n werden aus Equity-Karten (main/sub) gelesen. */
         let lastMarginByAccount = {};
         function getCurrentWalletForAccount(account) {
             const acc = account || document.getElementById('accountSelect')?.value;
-            const profile = getSelectedProfile();
             if (acc === 'main') {
                 const el = document.getElementById('mainMarginBalance');
                 return (el && el.textContent) ? el.textContent.trim() : '--';
@@ -656,12 +672,9 @@
                 const el = document.getElementById('subMarginBalance');
                 return (el && el.textContent) ? el.textContent.trim() : '--';
             }
-            if (profile === 'bot_1' && (acc === 'Long_bot_1' || acc === 'Short_bot_1')) {
-                const el = acc === 'Long_bot_1' ? document.getElementById('mainMarginBalance') : document.getElementById('subMarginBalance');
-                return (el && el.textContent) ? el.textContent.trim() : '--';
-            }
-            if (profile === 'bot_2' && (acc === 'Long_bot_2' || acc === 'Short_bot_2')) {
-                const el = acc === 'Long_bot_2' ? document.getElementById('mainMarginBalance') : document.getElementById('subMarginBalance');
+            const profileEntry = botProfileByAccount[acc];
+            if (profileEntry) {
+                const el = acc === profileEntry.long_account ? document.getElementById('mainMarginBalance') : document.getElementById('subMarginBalance');
                 return (el && el.textContent) ? el.textContent.trim() : '--';
             }
             const stored = lastMarginByAccount[acc];
@@ -939,7 +952,7 @@
                 walletSnapshotData = data.wallet_snapshot || null;
                 cyclePnlEntries = data.cycle_pnl_entries || [];
                 finalExitPnl = data.final_exit_pnl || {};
-                await ensureLongBotEquityData();
+                await ensureLongBotEquityData(getSelectedProfile());
                 renderWalletSnapshotPanel(walletSnapshotData);
                 const seen = new Set(cache.map(r => recordKey(r)));
                 let added = 0;

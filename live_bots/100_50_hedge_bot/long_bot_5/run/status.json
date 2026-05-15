@@ -1,0 +1,9 @@
+{
+  "bot_name": "long_bot_5",
+  "status": "stopped",
+  "status_label": "gestoppt",
+  "running": false,
+  "start_requested": false,
+  "symbol": "",
+  "pid": null
+}

@@ -212,12 +212,9 @@
                     <form class="live-chart-symbol-input" method="get" action="/live-charts">
                         <label for="accountSelect">Profil:</label>
                         <select id="accountSelect" name="account">
-                            <option value="main" {% if account == 'main' %}selected{% endif %}>Main</option>
-                            <option value="sub" {% if account == 'sub' %}selected{% endif %}>Sub</option>
-                            <option value="Long_bot_1" {% if account == 'Long_bot_1' %}selected{% endif %}>Long_bot_1</option>
-                            <option value="Short_bot_1" {% if account == 'Short_bot_1' %}selected{% endif %}>Short_bot_1</option>
-                            <option value="Long_bot_2" {% if account == 'Long_bot_2' %}selected{% endif %}>Long_bot_2</option>
-                            <option value="Short_bot_2" {% if account == 'Short_bot_2' %}selected{% endif %}>Short_bot_2</option>
+                            {% for acc in chart_accounts %}
+                                <option value="{{ acc }}" {% if acc == account %}selected{% endif %}>{{ acc }}</option>
+                            {% endfor %}
                         </select>
 
                         <label for="symbolSelect">Symbol:</label>

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,23 +23,32 @@ def now_utc3_iso() -> str:
     return datetime.now(UTC_PLUS_3).isoformat()
 
 
-def _fetch_wallet_snapshot() -> tuple[float | None, str, str, float | None]:
+def _profile_from_bot_name(bot_name: str) -> str:
+    match = re.match(r"^long_bot_(\d+)$", str(bot_name or "").strip().lower())
+    if match:
+        return f"bot_{int(match.group(1))}"
+    return "bot_1"
+
+
+def _fetch_wallet_snapshot(bot_name: str) -> tuple[float | None, str, str, float | None]:
+    profile = _profile_from_bot_name(bot_name)
     _log_event(
         "fixed_cycle_wallet_snapshot_wallet_fetch_start",
         {
-            "profile": "bot_1",
+            "profile": profile,
+            "bot_name": bot_name,
             "timestamp_utc3": now_utc3_iso(),
         },
     )
     try:
-        long_key, long_secret, _, _ = _get_account_keys_by_profile("bot_1")
+        long_key, long_secret, _, _ = _get_account_keys_by_profile(profile)
     except Exception as exc:
         _log(f"Failed to resolve bot keys: {exc}")
         return None, "", "", None
     if not long_key or not long_secret:
         _log_event(
             "fixed_cycle_wallet_snapshot_wallet_keys_missing",
-            {"bot_name": "long_bot_1"},
+            {"bot_name": bot_name, "profile": profile},
         )
         return None, "", "", None
     try:
@@ -415,7 +425,7 @@ def main() -> None:
                 "reason": "start_snapshot_must_refresh_baseline",
             },
         )
-    current_wallet, metric, source, available_wallet = _fetch_wallet_snapshot()
+    current_wallet, metric, source, available_wallet = _fetch_wallet_snapshot(bot_name)
     if current_wallet is None:
         payload = {
             "bot_name": bot_name,

@@ -1,3 +1,6 @@
+66% plastic und 33% sand
+
+
 python run_psrh.py --config path/to/your/config.yaml
 
 

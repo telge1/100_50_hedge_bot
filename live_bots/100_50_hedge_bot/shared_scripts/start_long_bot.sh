@@ -25,6 +25,16 @@ if [[ ! -d "${BOT_DIR}" ]]; then
   exit 1
 fi
 
+STOP_WITH_CLEANUP="${BOT_GROUP_DIR}/shared_scripts/stop_with_cleanup.sh"
+if [[ -x "${STOP_WITH_CLEANUP}" ]]; then
+  "${STOP_WITH_CLEANUP}" "${BOT_NAME}"
+fi
+
+STATE_DIR="${BOT_DIR}/state"
+if [[ -d "${STATE_DIR}" ]]; then
+  rm -f "${STATE_DIR}"/*.json
+fi
+
 if [[ -z "${PYTHON:-}" ]]; then
   PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 fi
@@ -198,6 +208,16 @@ fi
 # refresh creds before launch
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 
+rotate_log() {
+  local file="$1"
+  if [[ -f "${file}" ]]; then
+    mv "${file}" "${file}.prev"
+  fi
+}
+
+rotate_log "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
+rotate_log "${LOG_DIR}/fixed_cycle_calc_audit.log"
+
 nohup "${PYTHON}" -m fixed_cycle_hedge_bot.runner \
   --strategy fixed_cycle \
   --bot-name "${BOT_NAME}" \
@@ -234,4 +254,6 @@ print(symbol)
 PY
 )"
 STARTED_PID="$PID" write_status_json "running" "" "${CURRENT_SYMBOL}" "" "true"
+echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
+echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_calc_audit.log"
 unset STARTED_PID

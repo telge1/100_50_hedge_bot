@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: ${BASH_SOURCE[0]} long_bot_<number> [--start] [--force] [--with-wrappers]" >&2
+  echo "Usage: ${BASH_SOURCE[0]} long_bot_<number> [--start] [--force] [--with-wrappers] [--register-dashboard]" >&2
   exit 1
 }
 
@@ -14,6 +14,7 @@ BOT_NAME=""
 START=false
 FORCE=false
 WITH_WRAPPERS=false
+REGISTER_DASHBOARD=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-wrappers)
       WITH_WRAPPERS=true
+      shift
+      ;;
+    --register-dashboard)
+      REGISTER_DASHBOARD=true
       shift
       ;;
     --*)
@@ -58,6 +63,48 @@ BOT_DIR="${BOT_GROUP_DIR}/${BOT_NAME}"
 TEMPLATE_CONFIG="${BOT_GROUP_DIR}/long_bot_1/config/fixed_cycle_config.json"
 BOT_CONFIG="${BOT_DIR}/config/fixed_cycle_config.json"
 GROUP_CREDENTIALS="${BOT_GROUP_DIR}/config/config.yaml"
+BOT_INDEX="${BOT_NAME#long_bot_}"
+BOT_PROFILE="bot_${BOT_INDEX}"
+LONG_ACCOUNT="Long_bot_${BOT_INDEX}"
+SHORT_ACCOUNT="Short_bot_${BOT_INDEX}"
+
+profile_updated="no"
+
+ensure_config_entries() {
+  if [[ ! -f "${GROUP_CREDENTIALS}" ]]; then
+    return 0
+  fi
+  python3 <<PY
+import sys
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    sys.exit(0)
+
+path = Path("${GROUP_CREDENTIALS}")
+if not path.exists():
+    sys.exit(0)
+
+data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+profiles = data.setdefault("profiles", {})
+if "${BOT_PROFILE}" not in profiles:
+    profiles["${BOT_PROFILE}"] = {
+        "long_account": "${LONG_ACCOUNT}",
+        "short_account": "${SHORT_ACCOUNT}"
+    }
+
+for account in ("${LONG_ACCOUNT}", "${SHORT_ACCOUNT}"):
+    if account not in data:
+        data[account] = {"api_key": "", "secret_key": ""}
+
+path.write_text(yaml.dump(data, default_flow_style=False), encoding="utf-8")
+PY
+  if [[ $? -eq 0 ]]; then
+    profile_updated="yes"
+  fi
+}
 
 # Check bot dir existence
 if [[ -d "${BOT_DIR}" && "${FORCE}" != true ]]; then
@@ -78,10 +125,12 @@ ensure_dir() {
 ensure_dir "${BOT_DIR}/config"
 ensure_dir "${BOT_DIR}/logs"
 ensure_dir "${BOT_DIR}/pids"
+ensure_dir "${BOT_DIR}/run"
 ensure_dir "${BOT_DIR}/snapshots"
 ensure_dir "${BOT_DIR}/state"
 
 touch "${BOT_DIR}/logs/confirmed_order_pnl_history.jsonl"
+touch "${BOT_DIR}/logs/dashboard_closed_pnl_history.jsonl"
 
 # fixed_cycle_config
 if [[ ! -f "${BOT_CONFIG}" ]]; then
@@ -118,7 +167,8 @@ if not path.exists():
 
 cfg = yaml.safe_load(path.read_text()) or {}
 profiles = cfg.get("profiles", {})
-profile = profiles.get(bot)
+profile_name = bot.replace("long_bot_", "bot_", 1)
+profile = profiles.get(profile_name) if isinstance(profiles, dict) else None
 if not profile:
     sys.exit(2)
 account = profile.get("long_account")
@@ -167,10 +217,14 @@ if [[ "${creds_available}" != true ]]; then
   echo "WARNING: ${creds_message}"
   echo "Example profile entry:"
   echo "profiles:"
-  echo "  ${BOT_NAME}:"
-  echo "    long_account: Long_${BOT_NAME#*_}"
+  echo "  ${BOT_PROFILE}:"
+  echo "    long_account: ${LONG_ACCOUNT}"
+  echo "    short_account: ${SHORT_ACCOUNT}"
   echo ""
-  echo "Long_${BOT_NAME#*_}:"
+  echo "${LONG_ACCOUNT}:"
+  echo "  api_key: \"YOUR_API_KEY\""
+  echo "  secret_key: \"YOUR_SECRET_KEY\""
+  echo "${SHORT_ACCOUNT}:"
   echo "  api_key: \"YOUR_API_KEY\""
   echo "  secret_key: \"YOUR_SECRET_KEY\""
   if [[ "${START}" == true ]]; then
@@ -212,6 +266,8 @@ else
   wrappers_created="no"
 fi
 
+ensure_config_entries
+
 summary_dirs="${created_dirs[*]:-none}"
 
 cat <<EOF
@@ -220,6 +276,7 @@ BOT_DIR=${BOT_DIR}
 Directories created: ${summary_dirs}
 fixed_cycle_config.json: ${config_status}
 Credentials: ${creds_note}${creds_profile:+ (${creds_profile})}
+Extra profile entry: ${profile_updated}
 Wrappers created: ${wrappers_created}
 EOF
 
@@ -232,4 +289,18 @@ if [[ "${START}" == true ]]; then
   "${SCRIPT_DIR}/start_long_bot.sh" "${BOT_NAME}"
 else
   echo "To start later: ${SCRIPT_DIR}/start_long_bot.sh ${BOT_NAME}"
+fi
+
+if [[ "${REGISTER_DASHBOARD}" == true ]]; then
+  register_script="${SCRIPT_DIR}/register_bot_dashboard.sh"
+  if [[ ! -x "${register_script}" ]]; then
+    echo "ERROR: register_bot_dashboard.sh missing/executable (${register_script})" >&2
+    exit 1
+  fi
+  echo "Registering bot with dashboard: ${register_script} ${BOT_NAME}"
+  if ! "${register_script}" "${BOT_NAME}"; then
+    echo "ERROR: register_bot_dashboard.sh failed for ${BOT_NAME}" >&2
+    exit 1
+  fi
+  echo "Dashboard registration completed for ${BOT_NAME}"
 fi

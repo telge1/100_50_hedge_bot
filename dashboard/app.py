@@ -44,63 +44,113 @@ DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pn
 GLOBAL_RUNTIME_LOG_PATH = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
 
 LIVE_BOT_LOGS_ROOT = project_root / "live_bots" / "100_50_hedge_bot"
-ACCOUNT_PNL_PATHS: dict[str, dict[str, Path]] = {
-    "Long_bot_1": {
-        "runtime_log_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_1"
-        / "logs"
-        / "fixed_cycle_hedge_runtime.log",
-        "confirmed_pnl_history_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_1"
-        / "logs"
-        / "confirmed_order_pnl_history.jsonl",
-        "dashboard_closed_pnl_history_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_1"
-        / "logs"
-        / "dashboard_closed_pnl_history.jsonl",
-        "wallet_snapshot_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_1"
-        / "snapshots"
-        / "fixed_cycle_wallet_snapshot.json",
-    },
-    "Long_bot_2": {
-        "runtime_log_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_2"
-        / "logs"
-        / "fixed_cycle_hedge_runtime.log",
-        "confirmed_pnl_history_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_2"
-        / "logs"
-        / "confirmed_order_pnl_history.jsonl",
-        "dashboard_closed_pnl_history_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_2"
-        / "logs"
-        / "dashboard_closed_pnl_history.jsonl",
-        "wallet_snapshot_path": LIVE_BOT_LOGS_ROOT
-        / "long_bot_2"
-        / "snapshots"
-        / "fixed_cycle_wallet_snapshot.json",
-    },
-}
-
-WALLET_SNAPSHOT_FILES: dict[str, Path] = {
-    "Long_bot_1": LIVE_BOT_LOGS_ROOT
-    / "long_bot_1"
-    / "snapshots"
-    / "fixed_cycle_wallet_snapshot.json",
-    "Long_bot_2": LIVE_BOT_LOGS_ROOT
-    / "long_bot_2"
-    / "snapshots"
-    / "fixed_cycle_wallet_snapshot.json",
-}
-
-BOT_STATE_FILES: dict[str, Path] = {
-    "Long_bot_1": LIVE_BOT_LOGS_ROOT / "long_bot_1" / "state" / "fixed_cycle_state.json",
-    "Long_bot_2": LIVE_BOT_LOGS_ROOT / "long_bot_2" / "state" / "fixed_cycle_state.json",
-}
+ACCOUNT_PNL_PATHS: dict[str, dict[str, Path]] = {}
+WALLET_SNAPSHOT_FILES: dict[str, Path] = {}
+BOT_STATE_FILES: dict[str, Path] = {}
 
 WALLET_SNAPSHOT_TTL_SECONDS = 60
 WALLET_SNAPSHOT_SCRIPT = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
+
+
+def _get_dashboard_long_bots() -> list[dict[str, Any]]:
+    return get_available_long_bots()
+
+
+def _get_dashboard_profile_entries() -> list[dict[str, str]]:
+    entries = [{"profile": "main", "display_name": "Main"}]
+    entries.extend(
+        {"profile": bot["profile"], "display_name": bot["display_name"]}
+        for bot in _get_dashboard_long_bots()
+    )
+    return entries
+
+
+def _available_profiles() -> list[str]:
+    return [entry["profile"] for entry in _get_dashboard_profile_entries()]
+
+
+def _available_profile_labels() -> dict[str, str]:
+    return {entry["profile"]: entry["display_name"] for entry in _get_dashboard_profile_entries()}
+
+
+def _normalize_dashboard_profile(profile: str | None, *, fallback_to_main: bool = True) -> str | None:
+    return normalize_profile(profile, fallback_to_main=fallback_to_main)
+
+
+def _get_long_bot_by_name(bot_name: str | None) -> dict[str, Any] | None:
+    normalized = str(bot_name or "").strip().lower()
+    for bot in _get_dashboard_long_bots():
+        if bot["bot_name"] == normalized:
+            return bot
+    return None
+
+
+def _get_long_bot_for_profile(profile: str | None) -> dict[str, Any] | None:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized or normalized == "main":
+        return None
+    return get_long_bot_by_profile(normalized)
+
+
+def resolve_profile_to_bot_record(profile: str | None) -> dict[str, Any] | None:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized or normalized == "main":
+        return None
+    for bot in get_bot_profiles():
+        if str(bot.get("profile") or "").strip().lower() == normalized:
+            return bot
+    raise ValueError(f"Unknown bot profile: {profile}")
+
+
+def _is_registry_bot_profile(profile: str | None) -> bool:
+    try:
+        return resolve_profile_to_bot_record(profile) is not None
+    except ValueError:
+        return False
+
+
+def _build_dynamic_wallet_snapshot_files() -> dict[str, Path]:
+    return {bot["account_name"]: Path(bot["wallet_snapshot_file"]) for bot in _get_dashboard_long_bots()}
+
+
+def _build_dynamic_bot_state_files() -> dict[str, Path]:
+    return {bot["account_name"]: Path(bot["state_file"]) for bot in _get_dashboard_long_bots()}
+
+
+def _long_bot_shared_scripts_root() -> Path:
+    return project_root / "live_bots" / "100_50_hedge_bot" / "shared_scripts"
+
+
+def _long_bot_shared_script_path(action: str) -> Path | None:
+    script_map = {
+        "start": _long_bot_shared_scripts_root() / "start_long_bot.sh",
+        "stop": _long_bot_shared_scripts_root() / "stop_bot.sh",
+        "stop_with_cleanup": _long_bot_shared_scripts_root() / "stop_with_cleanup.sh",
+    }
+    return script_map.get(action)
+
+
+def _is_executable_script(path: Path | None) -> bool:
+    return bool(path and path.exists() and os.access(path, os.X_OK))
+
+
+def _validate_long_bot_request(bot_name: str | None) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(bot_name, str) or not re.match(r"^long_bot_[0-9]+$", bot_name or ""):
+        return None, "Invalid bot_name"
+    bot = _get_long_bot_by_name(bot_name)
+    if not bot:
+        return None, "Unknown bot_name"
+    bot_dir = Path(bot["bot_dir"])
+    config_file = Path(bot["config_file"])
+    if not bot_dir.exists() or not bot_dir.is_dir():
+        return None, f"Bot directory missing: {bot_dir}"
+    if not config_file.exists():
+        return None, f"Config missing: {config_file}"
+    return bot, None
+
+
+def _is_discovered_long_bot_name(bot_name: str | None) -> bool:
+    return _get_long_bot_by_name(bot_name) is not None
 
 
 
@@ -133,6 +183,39 @@ from utils.position_info import (
     simulate_tp_profit,
 )
 from utils.notifications import send_ntfy_alert, send_bot_alert
+from dashboard.utils.bot_profiles import (
+    get_available_long_bots,
+    get_long_bot_by_profile,
+    is_bot_profile,
+    normalize_profile,
+    profile_to_account_name,
+    profile_to_long_bot_name,
+)
+try:
+    from dashboard.bot_registry import (
+        get_closed_pnl_accounts,
+        get_bot_paths,
+        get_bot_profiles,
+        get_dashboard_accounts,
+        get_live_charts_accounts,
+        resolve_account,
+    )
+except ImportError:
+    from bot_registry import (
+        get_closed_pnl_accounts,
+        get_bot_paths,
+        get_bot_profiles,
+        get_dashboard_accounts,
+        get_live_charts_accounts,
+        resolve_account,
+    )
+
+
+def _serializable_bot_profiles() -> list[dict[str, Any]]:
+    return [
+        {**profile, "bot_dir": str(profile["bot_dir"])}
+        for profile in get_bot_profiles()
+    ]
 
 # Import BybitOrderManager für Equity-Endpoint (noch nicht auf Master Bot API migriert)
 from core.bybit_order_manager import BybitOrderManager
@@ -350,28 +433,23 @@ LIVE_POSITION_CACHE: Dict[str, Dict[str, object]] = {}
 LIVE_GRID_API_MIN_INTERVAL_SECONDS = 2.0
 LIVE_POSITIONS_GRID_CACHE: Dict[str, Dict[str, object]] = {}
 
-LIVE_CHART_STRATEGY_STATE_FILES: Dict[str, Path] = {
-    "Long_bot_1": project_root
-    / "live_bots"
-    / "100_50_hedge_bot"
-    / "long_bot_1"
-    / "state"
-    / "fixed_cycle_state.json",
-    "Short_bot_1": project_root / "logs" / "fixed_cycle_state.json",
-}
+def _live_chart_strategy_state_files() -> Dict[str, Path]:
+    files = _build_dynamic_bot_state_files()
+    files["Short_bot_1"] = project_root / "logs" / "fixed_cycle_state.json"
+    return files
 
 
 def _state_file_for_account(account: str) -> Path | None:
-    return LIVE_CHART_STRATEGY_STATE_FILES.get(account)
+    return _live_chart_strategy_state_files().get(account)
 
 
 def _wallet_snapshot_file_for_account(account: str) -> Path | None:
-    return WALLET_SNAPSHOT_FILES.get(account)
+    return _build_dynamic_wallet_snapshot_files().get(account)
 
 
 def _ensure_wallet_snapshot_for_account(account: str) -> None:
     snapshot_path = _wallet_snapshot_file_for_account(account)
-    state_file = BOT_STATE_FILES.get(account)
+    state_file = _build_dynamic_bot_state_files().get(account)
     if not snapshot_path or not state_file:
         return
     if snapshot_path.exists():
@@ -424,15 +502,21 @@ def _ensure_wallet_snapshot_for_account(account: str) -> None:
 
 
 def get_account_pnl_paths(account: str | None) -> dict[str, Path]:
-    key = (account or "").strip()
-    entry = ACCOUNT_PNL_PATHS.get(key)
-    if entry:
-        return entry
+    resolved = resolve_account(account)
+    if resolved and resolved["bot_name"]:
+        paths = get_bot_paths(resolved["bot_name"])
+        if paths:
+            return {
+                "runtime_log_path": paths["runtime_log_file"],
+                "confirmed_pnl_history_path": paths["confirmed_order_pnl_history_file"],
+                "dashboard_closed_pnl_history_path": paths["dashboard_closed_pnl_history_file"],
+                "wallet_snapshot_path": paths["snapshot_file"],
+            }
     return {
         "runtime_log_path": GLOBAL_RUNTIME_LOG_PATH,
         "confirmed_pnl_history_path": CONFIRMED_ORDER_PNL_HISTORY_FILE,
         "dashboard_closed_pnl_history_path": DASHBOARD_CLOSED_PNL_HISTORY_FILE,
-        "wallet_snapshot_path": WALLET_SNAPSHOT_FILES.get("Long_bot_1")
+        "wallet_snapshot_path": _build_dynamic_wallet_snapshot_files().get("Long_bot_1")
         or project_root
         / "live_bots"
         / "100_50_hedge_bot"
@@ -920,11 +1004,10 @@ def _load_live_wallet_snapshot_for_account(account: str) -> dict[str, Any] | Non
 
 
 def _bot_profile_for_name(bot_name: str) -> str | None:
-    if bot_name == "long_bot_1":
-        return "bot_1"
-    if bot_name == "long_bot_2":
-        return "bot_2"
-    return None
+    match = re.match(r"^long_bot_(\d+)$", str(bot_name or "").strip().lower())
+    if not match:
+        return None
+    return f"bot_{int(match.group(1))}"
 
 
 def _fetch_dashboard_bot_pos_qtys(bot_name: str) -> tuple[float | None, float | None, str, bool]:
@@ -1190,27 +1273,43 @@ def _maybe_run_dashboard_flat_snapshot(project_root: Path) -> None:
             )
 
 def _load_dashboard_config() -> dict:
-    """Load dashboard config (config/config.yaml)."""
+    """Load dashboard config, preferring the live hedge-bot config."""
     try:
         project_root = Path(__file__).parent.parent
-        config_file = project_root / "config/config.yaml"
-        if config_file.exists():
+        config_candidates = [
+            project_root / "live_bots" / "100_50_hedge_bot" / "config" / "config.yaml",
+            project_root / "config" / "config.yaml",
+        ]
+        for config_file in config_candidates:
+            if not config_file.exists():
+                continue
             import yaml
-            with open(config_file, 'r') as f:
-                return yaml.safe_load(f) or {}
+            with open(config_file, "r", encoding="utf-8") as f:
+                loaded = yaml.safe_load(f) or {}
+            if isinstance(loaded, dict):
+                return loaded
     except Exception:
         return {}
     return {}
 
 def _get_account_keys(account: str) -> tuple[Optional[str], Optional[str]]:
-    """Resolve API keys from config/config.yaml. account: main|sub|Long_bot_1|Long_bot_2|Short_bot_1|Short_bot_2"""
+    """Resolve API keys from config/config.yaml."""
     try:
         config = _load_dashboard_config()
-        bot_accounts = ("Long_bot_1", "Long_bot_2", "Short_bot_1", "Short_bot_2")
+        bot_accounts = tuple(
+            [bot["account_name"] for bot in _get_dashboard_long_bots()]
+            + [f"Short_bot_{bot['bot_number']}" for bot in _get_dashboard_long_bots()]
+        )
         if account in bot_accounts:
             account_cfg = config.get(account) if isinstance(config.get(account), dict) else {}
         elif account == "main":
-            account_cfg = config.get("master") or config.get("main_account") or {}
+            account_cfg = (
+                config.get("master")
+                or config.get("Main_bot")
+                or config.get("main_bot")
+                or config.get("main_account")
+                or {}
+            )
             if not account_cfg:
                 account_cfg = {
                     "api_key": config.get("api_key"),
@@ -1230,10 +1329,11 @@ def _get_account_keys(account: str) -> tuple[Optional[str], Optional[str]]:
 def _get_account_keys_by_profile(profile: str) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
     Keys für Long- und Short-Account eines Profils aus config.yaml.
-    profile: main|bot_1|bot_2. profiles[profile].long_account / short_account -> API-Keys.
+    profile: main|bot_N. profiles[profile].long_account / short_account -> API-Keys.
     Returns: (long_api_key, long_secret, short_api_key, short_secret)
     """
-    if profile not in ("main", "bot_1", "bot_2"):
+    profile = _normalize_dashboard_profile(profile, fallback_to_main=True)
+    if profile not in ("main",) and not is_bot_profile(profile):
         return _get_account_keys("main")[0], _get_account_keys("main")[1], _get_account_keys("sub")[0], _get_account_keys("sub")[1]
     try:
         config = _load_dashboard_config()
@@ -1243,24 +1343,19 @@ def _get_account_keys_by_profile(profile: str) -> tuple[Optional[str], Optional[
             return _get_account_keys("main")[0], _get_account_keys("main")[1], _get_account_keys("sub")[0], _get_account_keys("sub")[1]
         long_name = (prof.get("long_account") or "master").strip()
         short_name = (prof.get("short_account") or "sub").strip()
-        long_cfg = config.get(long_name) if isinstance(config.get(long_name), dict) else {}
-        short_cfg = config.get(short_name) if isinstance(config.get(short_name), dict) else {}
-        la = str((long_cfg or {}).get("api_key") or "").strip()
-        ls = str((long_cfg or {}).get("secret_key") or "").strip()
-        sa = str((short_cfg or {}).get("api_key") or "").strip()
-        ss = str((short_cfg or {}).get("secret_key") or "").strip()
-        if la and ls and sa and ss:
-            return la, ls, sa, ss
-        return _get_account_keys("main")[0], _get_account_keys("main")[1], _get_account_keys("sub")[0], _get_account_keys("sub")[1]
+        la, ls = _get_account_keys(long_name)
+        sa, ss = _get_account_keys(short_name)
+        return la, ls, sa, ss
     except Exception:
         return _get_account_keys("main")[0], _get_account_keys("main")[1], _get_account_keys("sub")[0], _get_account_keys("sub")[1]
 
 def _get_account_keys_for_ws(profile: Optional[str], account: str) -> tuple[Optional[str], Optional[str]]:
     """
-    API-Keys für WebSocket: Bei profile bot_1/bot_2 → main=Long-Account, sub=Short-Account.
+    API-Keys für WebSocket: Bei profile bot_N → main=Long-Account, sub=Short-Account.
     Sonst → klassisch master/sub.
     """
-    if profile and profile in ("bot_1", "bot_2"):
+    profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if profile and is_bot_profile(profile):
         long_key, long_sec, short_key, short_sec = _get_account_keys_by_profile(profile)
         if account == "main":
             return long_key, long_sec
@@ -1554,9 +1649,9 @@ def _symbols_from_dashboard_log() -> List[str]:
 
 
 def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict, profile: Optional[str] = None):
-    """Mark fixed-cycle Long Bot as running only for the bot_1 profile."""
-    prof = (profile or "").strip().lower()
-    if prof != "bot_1":
+    """Mark fixed-cycle Long Bot as running for the selected bot_N profile."""
+    prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not prof or not is_bot_profile(prof):
         return
     symbol = get_fixed_cycle_symbol()
     if not symbol:
@@ -1577,14 +1672,16 @@ def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict, profile: Optional[
 
 
 def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optional[str] = None) -> Optional[str]:
-    """Inject current profile long-bot runtime status from run/status.json for bot_1/bot_2."""
-    prof = (profile or "").strip().lower()
-    if prof not in ("bot_1", "bot_2"):
+    """Inject current profile long-bot runtime status from run/status.json for bot_N."""
+    prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not prof or not is_bot_profile(prof):
         return None
     try:
         from utils.bot_monitor import get_bot_status
 
-        bot_name = "long_bot_1" if prof == "bot_1" else "long_bot_2"
+        bot_name = profile_to_long_bot_name(prof)
+        if not bot_name:
+            return None
         bot_status = get_bot_status("", bot_type="long", bot_name=bot_name)
         symbol = str(bot_status.get("symbol") or "").strip().upper()
         if not symbol:
@@ -2465,11 +2562,20 @@ async def dashboard(request: Request, user: dict = Depends(require_auth)):
     """Dashboard page – uses hedge positions view as main dashboard."""
     symbol_param = request.query_params.get("symbol", "")
     logger.info(f"[Dashboard] GET /dashboard - URL={request.url}, query symbol={symbol_param!r}")
+    available_profiles = _available_profiles()
+    available_profile_labels = _available_profile_labels()
+    long_bots = _get_dashboard_long_bots()
     return HTMLResponse(render_template(
         "hedge_positions.html",
         {
             "request": request,
-            "user": user
+            "user": user,
+            "available_profiles": available_profiles,
+            "available_profile_labels": available_profile_labels,
+            "available_profiles_json": json.dumps(available_profiles),
+            "available_profile_labels_json": json.dumps(available_profile_labels),
+            "long_bots": long_bots,
+            "long_bots_json": json.dumps(long_bots),
         }
     ))
 
@@ -2545,7 +2651,10 @@ async def profit_verlauf(request: Request, user: dict = Depends(require_auth)):
             "request": request,
             "user": user,
             "default_long_notional": default_long_notional,
-            "default_short_notional": default_short_notional
+            "default_short_notional": default_short_notional,
+            "bot_profiles": _serializable_bot_profiles(),
+            "dashboard_accounts": get_dashboard_accounts(),
+            "closed_pnl_accounts": get_closed_pnl_accounts(),
         }
     ))
 
@@ -2874,29 +2983,34 @@ async def api_multi_zyklus_generate(
 
 def _get_profile_labels(profile: str) -> dict:
     """Labels für Main/Sub-Spalten je Profil (Live-Charts Kachel-Ansicht)."""
-    if profile == "bot_1":
-        return {"main_label": "Long_bot_1", "sub_label": "Short_bot_1"}
-    if profile == "bot_2":
-        return {"main_label": "Long_bot_2", "sub_label": "Short_bot_2"}
+    profile = _normalize_dashboard_profile(profile, fallback_to_main=True)
+    if is_bot_profile(profile):
+        account_name = profile_to_account_name(profile) or "Long Bot"
+        bot_number = profile.split("_", 1)[1]
+        return {"main_label": account_name, "sub_label": f"Short_bot_{bot_number}"}
     return {"main_label": "Main (Long)", "sub_label": "Sub (Short)"}
 
 
-LIVE_CHARTS_ACCOUNTS = ("main", "sub", "Long_bot_1", "Short_bot_1", "Long_bot_2", "Short_bot_2")
+LIVE_CHARTS_ACCOUNTS = tuple(get_live_charts_accounts())
 
 
 def _resolve_account_to_profile_and_type(acc: str) -> tuple[str, str, bool]:
     """
-    acc: main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2
+    acc: main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2|Long_bot_3...
     Returns: (profile, bot_type, single_account)
     single_account=True: nur ein Account (z.B. Long_bot_1), kein Main+Sub-Paar
     """
-    if acc in ("Long_bot_1", "Short_bot_1"):
-        return "bot_1", "long" if acc == "Long_bot_1" else "short", True
-    if acc in ("Long_bot_2", "Short_bot_2"):
-        return "bot_2", "long" if acc == "Long_bot_2" else "short", True
-    if acc == "sub":
-        return "main", "short", True  # Sub = Short-Account des Main-Profils
-    return "main", "long", True  # main = Long-Account des Main-Profils
+    resolved = resolve_account(acc)
+    if not resolved:
+        return "main", "long", True
+    if resolved["account"] == "sub":
+        return "main", "short", True
+    if resolved["account"] == "main":
+        return "main", "long", True
+    profile = resolved["profile"]
+    side = resolved["side"]
+    bot_type = "short" if side == "short" else "long"
+    return profile, bot_type, True
 
 
 @app.get("/live-charts", response_class=HTMLResponse)
@@ -3048,6 +3162,8 @@ async def live_charts(
             "available_symbols": active_symbols,
             "burn_levels": burn_levels,
             "exit_levels": exit_levels,
+            "chart_accounts": get_live_charts_accounts(),
+            "bot_profiles": _serializable_bot_profiles(),
             "long_entry_price": long_entry_price,
             "short_entry_price": short_entry_price,
             "short_tp_price": short_tp_price,
@@ -4674,23 +4790,18 @@ async def api_unarchive_symbol(
 async def api_get_hedge_bot_status(
     symbol: str,
     user: dict = Depends(require_auth),
-    profile: Optional[str] = Query(None, description="main|bot_1|bot_2 für Profil-spezifische PID-Prüfung"),
+    profile: Optional[str] = Query(None, description="main|bot_N für Profil-spezifische PID-Prüfung"),
 ):
     """Get bot status for both long and short bots for a symbol"""
     try:
         from utils.bot_monitor import get_bot_status
 
-        prof = (profile or "").strip().lower()
-        prof = prof if prof in ("main", "bot_1", "bot_2") else None
-        if prof == "bot_1":
-            long_bot_name = "long_bot_1"
-        elif prof == "bot_2":
-            long_bot_name = "long_bot_2"
-        else:
-            long_bot_name = "long_bot_1"
+        prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
+        long_bot_entry = resolve_profile_to_bot_record(prof)
+        long_bot_name = long_bot_entry["bot_name"] if long_bot_entry else None
 
-        long_status = get_bot_status(symbol, bot_type="long", bot_name=long_bot_name)
-        short_status = get_bot_status(symbol, bot_type="short", bot_name="short_bot_1")
+        long_status = get_bot_status(symbol, bot_type="long", bot_name=long_bot_name, profile=prof)
+        short_status = get_bot_status(symbol, bot_type="short", profile=prof)
 
         return {
             "success": True,
@@ -4715,8 +4826,22 @@ def _stop_script_bot(symbol: str, bot_type: str, profile: Optional[str] = None) 
     Berücksichtigt Profil (bot_1/bot_2) für profil-spezifische PID-Dateien.
     Returns True wenn gestoppt oder nicht gelaufen, False bei Fehler.
     """
+    profile_record = None
+    try:
+        profile_record = resolve_profile_to_bot_record(profile)
+    except ValueError:
+        profile_record = None
+
+    if profile_record and bot_type == "long":
+        script_path = _long_bot_shared_script_path("stop")
+        if not _is_executable_script(script_path):
+            logger.error("[stop-script-bot] Shared stop script missing: %s", script_path)
+            return False
+        result = _run_long_bot_script(script_path, profile_record["bot_name"], "stop_long_bot", project_root)
+        return bool(result.get("success"))
+
     safe_symbol = "".join(ch if (ch.isalnum() or ch in "_-") else "_" for ch in str(symbol or "").strip().upper())
-    prof_suffix = f"_{profile}" if (profile or "").strip() in ("bot_1", "bot_2") else ""
+    prof_suffix = f"_{profile}" if _is_registry_bot_profile(profile) else ""
     run_dir = project_root / "data" / "run"
     pid_file = run_dir / f"{bot_type}_bot_{safe_symbol}{prof_suffix}.pid"
     lock_file = run_dir / f"{bot_type}_bot_{safe_symbol}{prof_suffix}.lock"
@@ -6148,55 +6273,73 @@ async def api_get_hedge_equity(
 ):
     """Get Main and Sub account equity (bzw. Long/Short-Account des Profils)"""
     try:
-        if profile and profile in ("main", "bot_1", "bot_2"):
+        available_profiles = {"main", *(profile_data["profile"] for profile_data in get_bot_profiles())}
+        if profile and profile in available_profiles and profile != "main":
             main_api_key, main_secret_key, sub_api_key, sub_secret_key = _get_account_keys_by_profile(profile)
         else:
             main_api_key, main_secret_key = _get_account_keys("main")
             sub_api_key, sub_secret_key = _get_account_keys("sub")
-        if not all([main_api_key, main_secret_key, sub_api_key, sub_secret_key]):
+
+        if not any([main_api_key and main_secret_key, sub_api_key and sub_secret_key]):
             return {"success": False, "error": "API-Keys fehlen"}
-        
-        # Create Order Managers
-        main_order_manager = BybitOrderManager(main_api_key, main_secret_key)
-        sub_order_manager = BybitOrderManager(sub_api_key, sub_secret_key)
-        
-        # Get Equity with timeout (30 seconds - Bybit API can be slow)
+
         import asyncio
         try:
-            tasks = [
-                asyncio.to_thread(main_order_manager.get_account_equity),
-                asyncio.to_thread(main_order_manager.get_account_margin_balance),
-                asyncio.to_thread(main_order_manager.get_account_available_balance),
-                asyncio.to_thread(sub_order_manager.get_account_equity),
-                asyncio.to_thread(sub_order_manager.get_account_margin_balance),
-                asyncio.to_thread(sub_order_manager.get_account_available_balance),
-            ]
-            main_equity, main_margin, main_available, sub_equity, sub_margin, sub_available = await asyncio.wait_for(
+            tasks: list[asyncio.Future] = []
+            task_keys: list[tuple[str, str]] = []
+            if main_api_key and main_secret_key:
+                main_order_manager = BybitOrderManager(main_api_key, main_secret_key)
+                tasks.extend([
+                    asyncio.to_thread(main_order_manager.get_account_equity),
+                    asyncio.to_thread(main_order_manager.get_account_margin_balance),
+                    asyncio.to_thread(main_order_manager.get_account_available_balance),
+                ])
+                task_keys.extend([
+                    ("main", "equity"),
+                    ("main", "margin"),
+                    ("main", "available"),
+                ])
+            if sub_api_key and sub_secret_key:
+                sub_order_manager = BybitOrderManager(sub_api_key, sub_secret_key)
+                tasks.extend([
+                    asyncio.to_thread(sub_order_manager.get_account_equity),
+                    asyncio.to_thread(sub_order_manager.get_account_margin_balance),
+                    asyncio.to_thread(sub_order_manager.get_account_available_balance),
+                ])
+                task_keys.extend([
+                    ("sub", "equity"),
+                    ("sub", "margin"),
+                    ("sub", "available"),
+                ])
+
+            values: dict[str, dict[str, Optional[float]]] = {
+                "main": {"equity": None, "margin": None, "available": None},
+                "sub": {"equity": None, "margin": None, "available": None},
+            }
+            results = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
                 timeout=30.0
             )
-            if isinstance(main_equity, Exception):
-                logger.error(f"Fehler beim Abrufen der Main Equity: {main_equity}")
-                main_equity = None
-            if isinstance(sub_equity, Exception):
-                logger.error(f"Fehler beim Abrufen der Sub Equity: {sub_equity}")
-                sub_equity = None
-            if isinstance(main_margin, Exception):
-                logger.error(f"Fehler beim Abrufen der Main Margin Balance: {main_margin}")
-                main_margin = None
-            if isinstance(sub_margin, Exception):
-                logger.error(f"Fehler beim Abrufen der Sub Margin Balance: {sub_margin}")
-                sub_margin = None
-            if isinstance(main_available, Exception):
-                logger.error(f"Fehler beim Abrufen der Main Available Balance: {main_available}")
-                main_available = None
-            if isinstance(sub_available, Exception):
-                logger.error(f"Fehler beim Abrufen der Sub Available Balance: {sub_available}")
-                sub_available = None
+            for result, (side, metric) in zip(results, task_keys):
+                if isinstance(result, Exception):
+                    logger.error("Fehler beim Abrufen der %s %s: %s", side, metric, result)
+                    values[side][metric] = None
+                else:
+                    values[side][metric] = result
         except asyncio.TimeoutError:
             logger.error("Timeout beim Abrufen der Equity")
             return {"success": False, "error": "API-Aufruf dauerte zu lange (Timeout)"}
-        
+
+        main_equity = values["main"]["equity"]
+        main_margin = values["main"]["margin"]
+        main_available = values["main"]["available"]
+        sub_equity = values["sub"]["equity"]
+        sub_margin = values["sub"]["margin"]
+        sub_available = values["sub"]["available"]
+
+        if all(value is None for value in (main_equity, main_margin, main_available, sub_equity, sub_margin, sub_available)):
+            return {"success": False, "error": "Equity-Daten konnten nicht geladen werden"}
+
         total_equity = 0
         if main_equity:
             total_equity += main_equity
@@ -6224,6 +6367,7 @@ async def api_get_hedge_equity(
             "main_available_balance": round(main_available, 2) if main_available is not None else None,
             "sub_available_balance": round(sub_available, 2) if sub_available is not None else None,
             "total_available_balance": round(total_available, 2) if total_available is not None else None,
+            "partial": not bool(sub_api_key and sub_secret_key and main_api_key and main_secret_key),
         }
         
     except Exception as e:
@@ -6266,7 +6410,7 @@ async def api_update_atr_burn(
         raise HTTPException(status_code=500, detail=f"ATR-Update fehlgeschlagen: {e}")
 
 
-CLOSED_PNL_ACCOUNTS = ("main", "sub", "Long_bot_1", "Long_bot_2", "Short_bot_1", "Short_bot_2")
+CLOSED_PNL_ACCOUNTS = tuple(get_closed_pnl_accounts())
 
 
 @app.get("/api/profit-verlauf/closed-pnl")
@@ -6659,13 +6803,20 @@ async def api_start_bot_script(
     bot_type = str(payload.get("bot_type") or "").strip().lower()
     symbol = str(payload.get("symbol") or "").strip().upper()
     size_raw = str(payload.get("size") or "").strip()
-    profile = (payload.get("profile") or "").strip() or None
-    if profile not in ("main", "bot_1", "bot_2"):
-        profile = None
+    profile = _normalize_dashboard_profile((payload.get("profile") or "").strip() or None, fallback_to_main=False)
+    profile_record = resolve_profile_to_bot_record(profile) if _is_registry_bot_profile(profile) else None
     if bot_type not in {"long", "short"}:
         return {"success": False, "error": "bot_type muss 'long' oder 'short' sein"}
     if not symbol:
         return {"success": False, "error": "Symbol fehlt"}
+
+    if profile_record and bot_type == "long":
+        project_root = Path(__file__).resolve().parent.parent
+        _maybe_run_dashboard_start_snapshot(project_root, profile_record["bot_name"])
+        script_path = _long_bot_shared_script_path("start")
+        if not _is_executable_script(script_path):
+            return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
+        return _start_long_bot_script_async(script_path, profile_record["bot_name"], "start_long_bot", project_root)
 
     # (C) Block start if per-symbol config is missing (prevents using wrong global config).
     cfg_path = get_config_path(bot_type=bot_type, symbol=symbol, profile=profile)
@@ -6697,7 +6848,7 @@ async def api_start_bot_script(
             }
 
         # Strikte Config-Only-Policy: Size NUR aus Config, nie aus Payload
-        cfg_profile = profile if profile in ("bot_1", "bot_2") else None
+        cfg_profile = profile if _is_registry_bot_profile(profile) else None
         bot_cfg = load_config(symbol=symbol, bot_type=bot_type, profile=cfg_profile) or {}
         try:
             size_val = float(bot_cfg.get("initial_long_usdt" if bot_type == "long" else "initial_short_usdt", 20))
@@ -6716,7 +6867,7 @@ async def api_start_bot_script(
 
         # start_config.yaml immer passend zum Profil aktualisieren (Main: config/start_config.yaml, Profile: config/<profile>/start_config.yaml)
         start_config_dir = project_root / "config"
-        cfg_profile = profile if profile in ("bot_1", "bot_2") else None
+        cfg_profile = profile if _is_registry_bot_profile(profile) else None
         if cfg_profile:
             start_config_dir = start_config_dir / cfg_profile
         start_config_dir.mkdir(parents=True, exist_ok=True)
@@ -6735,7 +6886,7 @@ async def api_start_bot_script(
         with open(start_config_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(start_data, f, default_flow_style=False, allow_unicode=True)
 
-        if profile and profile in ("bot_1", "bot_2"):
+        if profile and _is_registry_bot_profile(profile):
             script_name = f"start_{bot_type}_bot_{profile[-1]}.sh"
         else:
             script_name = "start_long_main.sh" if bot_type == "long" else "start_short_sub.sh"
@@ -6747,7 +6898,7 @@ async def api_start_bot_script(
         # nicht überschreiben, damit die „Start-Größe“ (z. B. 400) für Auto-Restart erhalten bleibt.
         cmd = [str(script_path), "--restart", "--daemon", symbol, str(size_val)]
         run_env = {**os.environ, "PYTHONPATH": str(project_root)}
-        if profile and profile in ("bot_1", "bot_2"):
+        if profile and _is_registry_bot_profile(profile):
             run_env["HEDGE_PROFILE"] = profile
         subprocess.Popen(
             cmd,
@@ -6790,16 +6941,14 @@ async def api_start_bot_at_price(
     trigger = str((payload.get("trigger") or "").strip().lower() or ("below" if bot_type == "long" else "above"))
     if trigger not in ("above", "below"):
         trigger = "below" if bot_type == "long" else "above"
-    profile = (payload.get("profile") or "").strip() or None
-    if profile not in ("main", "bot_1", "bot_2"):
-        profile = None
+    profile = _normalize_dashboard_profile((payload.get("profile") or "").strip() or None, fallback_to_main=False)
     _project_root = Path(__file__).resolve().parent.parent
     script_path = _project_root / "scripts" / "start_bot_at_price.py"
     if not script_path.exists():
         return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
     _state_file = _project_root / "data" / "state" / "start_bot_at_price.json"
     run_env = {**os.environ, "PYTHONPATH": str(_project_root)}
-    if profile and profile in ("bot_1", "bot_2"):
+    if profile and _is_registry_bot_profile(profile):
         run_env["HEDGE_PROFILE"] = profile
     cmd = [sys.executable, str(script_path), "--bot", bot_type, "--symbol", symbol, "--target-price", str(target_price), "--trigger", trigger]
     try:
@@ -6812,7 +6961,7 @@ async def api_start_bot_at_price(
         )
         try:
             _state_file.parent.mkdir(parents=True, exist_ok=True)
-            prof_key = profile if profile in ("bot_1", "bot_2") else "main"
+            prof_key = profile if _is_registry_bot_profile(profile) else "main"
             existing = _load_price_at_state_all_profiles()
             if prof_key not in existing:
                 existing[prof_key] = {"long": {}, "short": {}}
@@ -7232,6 +7381,17 @@ async def api_bot_start(symbol: str, request: BotActionRequest, user: dict = Dep
     
     try:
         bot_type = request.bot_type
+        profile = _normalize_dashboard_profile(request.profile, fallback_to_main=False)
+        profile_record = resolve_profile_to_bot_record(profile) if _is_registry_bot_profile(profile) else None
+
+        if profile_record and bot_type == "long":
+            project_root = Path(__file__).resolve().parent.parent
+            _maybe_run_dashboard_start_snapshot(project_root, profile_record["bot_name"])
+            script_path = _long_bot_shared_script_path("start")
+            if not _is_executable_script(script_path):
+                return {"success": False, "message": f"Script nicht gefunden: {script_path}"}
+            return _start_long_bot_script_async(script_path, profile_record["bot_name"], "start_long_bot", project_root)
+
         service_name = f'hedgebot-{bot_type}@{symbol}'
 
         # (C) Block start if per-symbol config is missing to avoid using wrong global config.
@@ -7297,15 +7457,23 @@ async def api_bot_stop(symbol: str, request: BotActionRequest, user: dict = Depe
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    prof = (request.profile or "").strip()
-    prof = prof if prof in ("main", "bot_1", "bot_2") else None
+    prof = _normalize_dashboard_profile(request.profile, fallback_to_main=False)
+    profile_record = resolve_profile_to_bot_record(prof) if _is_registry_bot_profile(prof) else None
     
     try:
         bot_type = request.bot_type
         service_name = f'hedgebot-{bot_type}@{symbol}'
         
         # bot_1/bot_2: Script-gestartete Bots haben kein systemctl → direkt _stop_script_bot
-        if prof and prof in ("bot_1", "bot_2"):
+        if profile_record and bot_type == "long":
+            stop_result = await asyncio.to_thread(_stop_script_bot, symbol.strip().upper(), bot_type, prof)
+            await asyncio.sleep(0.2)
+            if stop_result and not await asyncio.to_thread(is_bot_running, symbol, bot_type, prof):
+                send_bot_alert(symbol, "stopped", f"{bot_type.capitalize()} Bot {symbol} ({prof}) wurde gestoppt")
+                _stop_hedge_guardian_if_no_bots()
+                return {"success": True, "message": f"{bot_type.capitalize()} Bot {symbol} stopped"}
+        # bot_N short/main: alter Stop-Pfad bleibt aktiv
+        elif prof and _is_registry_bot_profile(prof):
             await asyncio.to_thread(_stop_script_bot, symbol.strip().upper(), bot_type, prof)
             await asyncio.sleep(0.2)
             if not await asyncio.to_thread(is_bot_running, symbol, bot_type, prof):
@@ -7326,7 +7494,7 @@ async def api_bot_stop(symbol: str, request: BotActionRequest, user: dict = Depe
                 )
         
         # Fallback 1: script-based PID stop (data/run/{long|short}_bot_SYMBOL[_bot_1].pid)
-        prof_suffix = f"_{prof}" if prof in ("bot_1", "bot_2") else ""
+        prof_suffix = f"_{prof}" if _is_registry_bot_profile(prof) else ""
         try:
             safe_symbol = ''.join(ch if (ch.isalnum() or ch in "_-") else '_' for ch in str(symbol))
             run_dir = project_root / "data" / "run"
@@ -8008,7 +8176,7 @@ async def api_get_system_processes(user: dict = Depends(require_auth)):
 @app.get("/api/system/status")
 async def api_get_system_status(
     user: dict = Depends(require_auth),
-    profile: Optional[str] = Query(None, description="main|bot_1|bot_2 – bei bot_1/bot_2: price_at leer (State hat kein Profil)"),
+    profile: Optional[str] = Query(None, description="main|bot_N – bei bot_N: price_at kann leer sein"),
 ):
     """Get status of all system processes (Master Bot, Dashboard, and all bot instances)"""
     # Reset circuit breaker for this endpoint (new endpoint, shouldn't be blocked)
@@ -8178,9 +8346,7 @@ async def api_get_system_status(
         logger.info(f"[SYSTEM-STATUS] Finale bots_by_symbol vor Response: {len(bots_by_symbol)} Symbole, Details: {bots_by_symbol}")
         
         # Price-at (Start-Preis-Bot) State – profilspezifisch.
-        prof_status = (profile or "").strip()
-        if prof_status not in ("main", "bot_1", "bot_2"):
-            prof_status = "main"
+        prof_status = _normalize_dashboard_profile(profile, fallback_to_main=True) or "main"
         try:
             price_at = _load_price_at_state_raw(prof_status)
         except Exception as e:
@@ -8210,9 +8376,7 @@ async def api_get_system_status(
         
         # Don't increment circuit breaker failures for this endpoint (it's new and might have initial issues)
         # Just return the error response. price_at immer mitsenden, damit Start-Preis-Cards weiter angezeigt werden.
-        prof_fb = (profile or "").strip() if profile else "main"
-        if prof_fb not in ("main", "bot_1", "bot_2"):
-            prof_fb = "main"
+        prof_fb = _normalize_dashboard_profile(profile, fallback_to_main=True) or "main"
         try:
             price_at_fallback = _load_price_at_state_raw(prof_fb)
         except Exception:
@@ -8232,24 +8396,21 @@ async def api_get_system_status(
 @app.get("/api/system/all-bots-overview")
 async def api_get_all_bots_overview(user: dict = Depends(require_auth)):
     """
-    Liefert eine kompakte Übersicht aller Bots über alle Profile (main, bot_1, bot_2).
+    Liefert eine kompakte Übersicht aller Bots über alle Profile (main, bot_N).
     Für jeden Bot: Symbol, Profil, Long-Running, Short-Running.
     Nutzbar für "auf einen Blick" Dashboard-Widget.
     """
     try:
         from utils.bot_monitor import is_bot_running
 
-        profiles = [
-            ("main", "Main"),
-            ("bot_1", "Bot 1"),
-            ("bot_2", "Bot 2"),
-        ]
+        profiles = [(entry["profile"], entry["display_name"]) for entry in _get_dashboard_profile_entries()]
         result = {"success": True, "profiles": {}}
 
         for prof_key, prof_label in profiles:
-            symbols = _list_symbols_from_dropdown_config_sources(profile=prof_key if prof_key in ("bot_1", "bot_2") else None)
+            profile_value = prof_key if is_bot_profile(prof_key) else None
+            symbols = _list_symbols_from_dropdown_config_sources(profile=profile_value)
             bots_list = []
-            prof_for_monitor = prof_key if prof_key in ("bot_1", "bot_2") else None
+            prof_for_monitor = profile_value
             for sym in symbols:
                 long_running = is_bot_running(sym, bot_type="long", profile=prof_for_monitor)
                 short_running = is_bot_running(sym, bot_type="short", profile=prof_for_monitor)
@@ -8594,16 +8755,17 @@ async def api_run_restart_fixed_cycle_script(user: dict = Depends(require_auth))
 
 
 def _is_valid_long_bot_name(bot_name: str) -> bool:
-    return bool(re.match(r"^long_bot_[0-9]+$", bot_name or ""))
+    bot, error = _validate_long_bot_request(bot_name)
+    return bot is not None and error is None
 
 
-def _run_shared_long_bot_script(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
+def _run_long_bot_script(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
     logger.info(
         "%s_script_begin %s",
         script_label,
         {"script_path": str(script_path), "bot_name": bot_name},
     )
-    if not script_path.exists():
+    if not _is_executable_script(script_path):
         logger.error("%s missing at %s", script_label, script_path)
         return {"success": False, "error": f"{script_label} not found"}
 
@@ -8651,13 +8813,13 @@ def _run_shared_long_bot_script(script_path: Path, bot_name: str, script_label: 
         return {"success": False, "error": str(exc)}
 
 
-def _start_shared_long_bot_script_async(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
+def _start_long_bot_script_async(script_path: Path, bot_name: str, script_label: str, project_root: Path) -> dict:
     logger.info(
         "%s_script_begin_async %s",
         script_label,
         {"script_path": str(script_path), "bot_name": bot_name},
     )
-    if not script_path.exists():
+    if not _is_executable_script(script_path):
         logger.error("%s missing at %s", script_label, script_path)
         return {"success": False, "error": f"{script_label} not found"}
 
@@ -8693,7 +8855,7 @@ def _start_shared_long_bot_script_async(script_path: Path, bot_name: str, script
         }
     except Exception as exc:
         logger.error("%s spawn failed for %s: %s", script_label, bot_name, exc, exc_info=True)
-        return {"success": False, "error": str(exc)}
+        return {"success": False, "error": str(exc), "launcher_log": str(launcher_log)}
 
 
 @app.post("/api/scripts/start-long-bot")
@@ -8703,14 +8865,57 @@ async def api_run_start_long_bot_script(
     body: Optional[dict] = Body(None),
 ):
     bot_name = (body or {}).get("bot_name") if body else None
-    if not isinstance(bot_name, str) or not _is_valid_long_bot_name(bot_name):
-        return JSONResponse({"success": False, "error": "Invalid bot_name"}, status_code=400)
+    bot, error = _validate_long_bot_request(bot_name)
+    if error:
+        return JSONResponse({"success": False, "error": error}, status_code=400)
     project_root = Path(__file__).resolve().parent.parent
     _maybe_run_dashboard_start_snapshot(project_root, bot_name)
-    script_path = (
-        project_root / "live_bots" / "100_50_hedge_bot" / "shared_scripts" / "start_long_bot.sh"
-    )
-    return _start_shared_long_bot_script_async(script_path, bot_name, "start_long_bot", project_root)
+    script_path = _long_bot_shared_script_path("start")
+    if not _is_executable_script(script_path):
+        return JSONResponse({"success": False, "error": f"Central start script missing: {script_path}"}, status_code=400)
+    return _start_long_bot_script_async(script_path, bot_name, "start_long_bot", project_root)
+
+
+@app.post("/api/scripts/stop-long-bot")
+@app.post("/dashboard/api/scripts/stop-long-bot")
+async def api_run_stop_long_bot_script(
+    user: dict = Depends(require_auth),
+    body: Optional[dict] = Body(None),
+):
+    bot_name = (body or {}).get("bot_name") if body else None
+    bot, error = _validate_long_bot_request(bot_name)
+    if error:
+        return JSONResponse({"success": False, "error": error}, status_code=400)
+    project_root = Path(__file__).resolve().parent.parent
+    script_path = _long_bot_shared_script_path("stop")
+    if not _is_executable_script(script_path):
+        return JSONResponse({"success": False, "error": f"Central stop script missing: {script_path}"}, status_code=400)
+    return _run_long_bot_script(script_path, bot_name, "stop_long_bot", project_root)
+
+
+@app.post("/api/scripts/restart-long-bot")
+@app.post("/dashboard/api/scripts/restart-long-bot")
+async def api_run_restart_long_bot_script(
+    user: dict = Depends(require_auth),
+    body: Optional[dict] = Body(None),
+):
+    bot_name = (body or {}).get("bot_name") if body else None
+    bot, error = _validate_long_bot_request(bot_name)
+    if error:
+        return JSONResponse({"success": False, "error": error}, status_code=400)
+    project_root = Path(__file__).resolve().parent.parent
+    _maybe_run_dashboard_start_snapshot(project_root, bot_name)
+    stop_script = _long_bot_shared_script_path("stop")
+    start_script = _long_bot_shared_script_path("start")
+    if not _is_executable_script(stop_script):
+        return JSONResponse({"success": False, "error": f"Central stop script missing: {stop_script}"}, status_code=400)
+    if not _is_executable_script(start_script):
+        return JSONResponse({"success": False, "error": f"Central start script missing: {start_script}"}, status_code=400)
+    stop_result = _run_long_bot_script(stop_script, bot_name, "restart_long_bot_stop", project_root)
+    if not stop_result.get("success"):
+        return stop_result
+    time.sleep(1)
+    return _start_long_bot_script_async(start_script, bot_name, "restart_long_bot_start", project_root)
 
 
 @app.post("/api/scripts/stop-long-bot-with-cleanup")
@@ -8720,13 +8925,14 @@ async def api_run_stop_long_bot_cleanup_script(
     body: Optional[dict] = Body(None),
 ):
     bot_name = (body or {}).get("bot_name") if body else None
-    if not isinstance(bot_name, str) or not _is_valid_long_bot_name(bot_name):
-        return JSONResponse({"success": False, "error": "Invalid bot_name"}, status_code=400)
+    bot, error = _validate_long_bot_request(bot_name)
+    if error:
+        return JSONResponse({"success": False, "error": error}, status_code=400)
     project_root = Path(__file__).resolve().parent.parent
-    script_path = (
-        project_root / "live_bots" / "100_50_hedge_bot" / "shared_scripts" / "stop_with_cleanup.sh"
-    )
-    return _run_shared_long_bot_script(script_path, bot_name, "stop_with_cleanup", project_root)
+    script_path = _long_bot_shared_script_path("stop_with_cleanup")
+    if not _is_executable_script(script_path):
+        return JSONResponse({"success": False, "error": f"Central cleanup script missing: {script_path}"}, status_code=400)
+    return _run_long_bot_script(script_path, bot_name, "stop_with_cleanup", project_root)
 
 
 if __name__ == "__main__":
