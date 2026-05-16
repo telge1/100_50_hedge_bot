@@ -35,13 +35,20 @@ if [[ ! -f "${CONFIG_FILE}" ]]; then
   exit 1
 fi
 
+export CONFIG_FILE
+export STATE_FILE
+
 SYMBOL_INFO="$(
   "${PYTHON_CMD}" <<'PY'
 import json
+import os
 from pathlib import Path
 
-config_path = Path("${CONFIG_FILE}")
-state_path = Path("${STATE_FILE}")
+config_path = Path(os.environ["CONFIG_FILE"])
+state_path = Path(os.environ["STATE_FILE"])
+
+if not config_path.exists():
+    raise FileNotFoundError(f"CONFIG_FILE does not exist: {config_path}")
 
 symbol = ""
 category = "linear"
@@ -80,6 +87,8 @@ source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "long"
 export TARGET_SYMBOL="${SYMBOL}"
 export TARGET_CATEGORY="${CATEGORY}"
 export BOT_NAME="${BOT_NAME}"
+export PROJECT_ROOT
+export BOT_DIR
 
 ${PYTHON_CMD} <<PY
 import os
@@ -87,7 +96,15 @@ import sys
 import time
 from pathlib import Path
 
-project_root = Path(__file__).resolve().parents[3]
+project_root = Path(os.environ["PROJECT_ROOT"])
+bot_dir = Path(os.environ["BOT_DIR"])
+if not project_root.exists():
+    print(f"PROJECT_ROOT does not exist: {project_root}", file=sys.stderr)
+    sys.exit(1)
+if not bot_dir.exists():
+    print(f"BOT_DIR does not exist: {bot_dir}", file=sys.stderr)
+    sys.exit(1)
+
 sys.path.insert(0, str(project_root))
 
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
@@ -125,14 +142,13 @@ def fetch_qty():
 def close(side_label, qty):
     request_side = "Sell" if side_label == "long" else "Buy"
     position_idx = 1 if side_label == "long" else 2
-    order_link_id = f"safety-close-{bot_name}-{side_label}-{int(time.time()*1000)%100000}"
     resp = om.place_reduce_market_order(
         symbol=symbol,
         side=request_side,
         qty=qty,
         position_idx=position_idx,
         category=category,
-        order_link_id=order_link_id,
+        order_link_id=None,
     )
     if not resp:
         print(f"Failed to submit reduce-only order for {side_label}", file=sys.stderr)

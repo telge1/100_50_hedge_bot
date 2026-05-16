@@ -219,46 +219,6 @@ def fetch_positions(order_manager: BybitOrderManager, symbol: str, category: str
     return long_qty, short_qty
 
 
-def close_position(
-    order_manager: BybitOrderManager,
-    symbol: str,
-    category: str,
-    qty: float,
-    profile_name: str,
-    side_label: str,
-    dry_run: bool,
-) -> dict[str, Any]:
-    if qty <= 0:
-        return {"status": "skipped_zero_qty"}
-    long_side = side_label == "long"
-    request_side = "Sell" if long_side else "Buy"
-    position_idx = 1 if long_side else 2
-    normalized = order_manager.normalize_qty(symbol, qty, category)
-    if normalized <= 0:
-        return {"status": "skipped_zero_after_normalize"}
-    base_order_id = f"safety_watchdog-{profile_name}-{side_label}"
-    for attempt in range(1, 3):
-        if dry_run:
-            return {"status": "dry-run", "attempt": attempt}
-        order_link_id = f"{base_order_id}-{int(time.time() * 1000)}-{attempt}"
-        response = order_manager.place_reduce_market_order(
-            symbol=symbol,
-            side=request_side,
-            qty=normalized,
-            position_idx=position_idx,
-            category=category,
-            order_link_id=order_link_id,
-        )
-        if response:
-            return {
-                "status": "submitted",
-                "attempt": attempt,
-                "order_link_id": order_link_id,
-            }
-        time.sleep(1)
-    return {"status": "failed_after_retries", "attempts": 2}
-
-
 def kill_bot_process(bot_name: str, logger: logging.Logger, dry_run: bool) -> dict[str, Any]:
     if dry_run:
         return {"status": "dry-run"}
@@ -434,6 +394,20 @@ def handle_profile(
             )
             return
 
+        if missing_groups and attempt_idx < len(RETRY_DELAYS) - 1:
+            write_debug_event(
+                logger,
+                "waiting_for_missing_orders",
+                {
+                    "profile_name": profile_name,
+                    "bot_name": bot_name,
+                    "symbol": symbol,
+                    "next_attempt": attempt_idx + 2,
+                    "delay": RETRY_DELAYS[attempt_idx + 1],
+                },
+            )
+            continue
+
     if not fetched_once:
         logger.warning("Unable to fetch orders for %s; skipping safety action", profile_name)
         return
@@ -483,47 +457,14 @@ def handle_profile(
         },
     )
 
-    if long_qty > 0:
-        actions.append("close_long")
-        results["close_long"] = close_position(
-            order_manager, symbol, category, long_qty, profile_name, "long", dry_run
-        )
-        write_debug_event(
-            logger,
-            "safety_action_result",
-            {
-                "action": "close_long",
-                "result": results["close_long"],
-                "profile_name": profile_name,
-                "bot_name": bot_name,
-                "symbol": symbol,
-            },
-        )
-    if short_qty > 0:
-        actions.append("close_short")
-        results["close_short"] = close_position(
-            order_manager, symbol, category, short_qty, profile_name, "short", dry_run
-        )
-        write_debug_event(
-            logger,
-            "safety_action_result",
-            {
-                "action": "close_short",
-                "result": results["close_short"],
-                "profile_name": profile_name,
-                "bot_name": bot_name,
-                "symbol": symbol,
-            },
-        )
-
-    actions.append("kill_bot")
-    results["kill_bot"] = kill_bot_process(bot_name, logger, dry_run)
+    actions.append("stop_with_cleanup")
+    results["stop_with_cleanup"] = kill_bot_process(bot_name, logger, dry_run)
     write_debug_event(
         logger,
         "safety_action_result",
         {
-            "action": "kill_bot",
-            "result": results["kill_bot"],
+            "action": "stop_with_cleanup",
+            "result": results["stop_with_cleanup"],
             "profile_name": profile_name,
             "bot_name": bot_name,
             "symbol": symbol,

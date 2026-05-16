@@ -40,12 +40,23 @@ cleanup_run_pid() {
 }
 trap cleanup_run_pid EXIT
 
-"${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/active_bot_symbols.py" \
+echo "[${BOT_NAME}] state_file=${STATE_FILE} lock_file=${LOCK_FILE}"
+echo "[${BOT_NAME}] running cleanup_stale_symbol_reservations before reservation"
+ "${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/cleanup_stale_symbol_reservations.py" \
+  --state-file "${STATE_FILE}" \
+  --lock-file "${LOCK_FILE}" \
+  --bot-group-dir "${BOT_GROUP_DIR}" \
+  --log-prefix "${BOT_NAME}" \
+|| echo "[${BOT_NAME}] cleanup_stale_symbol_reservations failed; continuing" >&2
+
+ "${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/active_bot_symbols.py" \
   reserve \
   --bot-name "${BOT_NAME}" \
   --best-coin-file "${BEST_COIN_FILE}" \
   --state-file "${STATE_FILE}" \
   --lock-file "${LOCK_FILE}" \
+  --bot-group-dir "${BOT_GROUP_DIR}" \
+  --cleanup-script "${BOT_GROUP_DIR}/shared_scripts/cleanup_stale_symbol_reservations.py" \
   --poll-seconds "${POLL_SECONDS}" \
   --timeout-seconds "${TIMEOUT_SECONDS}" \
   --source "start_long_bot" \

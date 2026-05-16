@@ -117,6 +117,31 @@ cleanup_wait_files() {
 
 trap cleanup_wait_files EXIT
 
+ensure_wait_pid_clean() {
+  if [[ ! -f "${WAIT_PID_FILE}" ]]; then
+    return
+  fi
+  EXISTING_WAIT_PID="$(cat "${WAIT_PID_FILE}" 2>/dev/null || true)"
+  if [[ -z "${EXISTING_WAIT_PID}" || ! "${EXISTING_WAIT_PID}" =~ ^[0-9]+$ ]]; then
+    rm -f "${WAIT_PID_FILE}"
+    return
+  fi
+  if kill -0 "${EXISTING_WAIT_PID}" 2>/dev/null; then
+    echo "[${BOT_NAME}] stopping stale waiter PID=${EXISTING_WAIT_PID}" >&2
+    kill "${EXISTING_WAIT_PID}" 2>/dev/null || true
+    for i in {1..5}; do
+      if ! kill -0 "${EXISTING_WAIT_PID}" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    if kill -0 "${EXISTING_WAIT_PID}" 2>/dev/null; then
+      kill -KILL "${EXISTING_WAIT_PID}" 2>/dev/null || true
+    fi
+  fi
+  rm -f "${WAIT_PID_FILE}" "${CANCEL_START_FILE}"
+}
+
 is_alive_pid_with_bot_name() {
   local candidate="$1"
   local bot_name="$2"
@@ -177,6 +202,15 @@ PY
 WAIT_SYMBOL="${WAIT_INFO[0]:-}"
 WAIT_REASON="${WAIT_INFO[1]:-waiting_for_symbol}"
 WAIT_RESERVED_BY="${WAIT_INFO[2]:-}"
+
+ensure_wait_pid_clean
+
+echo "[${BOT_NAME}] capturing start wallet if missing"
+if ! python3 "${BOT_GROUP_DIR}/watchdog/wallet_refill_watchdog.py" \
+  --capture-start-wallet \
+  --bot-name "${BOT_NAME}"; then
+  echo "[${BOT_NAME}] WARNING: wallet capture failed" >&2
+fi
 
 write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
 echo "$$" > "${WAIT_PID_FILE}"

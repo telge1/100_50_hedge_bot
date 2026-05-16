@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import subprocess
 import fcntl
 import os
 import sys
@@ -17,6 +18,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bot-name", required=True)
     parser.add_argument("--state-file", required=True, type=Path)
     parser.add_argument("--lock-file", required=True, type=Path)
+    parser.add_argument("--bot-group-dir", type=Path)
+    parser.add_argument("--cleanup-script", type=Path)
     parser.add_argument("command", choices=["reserve", "release"])
     parser.add_argument("--best-coin-file", type=Path)
     parser.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
@@ -73,6 +76,32 @@ def _unlock_file(fd):
     fcntl.flock(fd, fcntl.LOCK_UN)
 
 
+def _run_cleanup(args: argparse.Namespace, state_path: Path, lock_path: Path, bot_name: str) -> None:
+    script_path = args.cleanup_script
+    bot_group_dir = args.bot_group_dir
+    if not script_path or not bot_group_dir:
+        return
+    if not script_path.exists():
+        print(f"[{bot_name}] cleanup script missing: {script_path}", flush=True)
+        return
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--state-file",
+        str(state_path),
+        "--lock-file",
+        str(lock_path),
+        "--bot-group-dir",
+        str(bot_group_dir),
+        "--log-prefix",
+        bot_name,
+    ]
+    try:
+        subprocess.run(cmd, timeout=90, check=False)
+    except Exception as exc:
+        print(f"[{bot_name}] cleanup script execution failed: {exc}", flush=True)
+
+
 def reserve_symbol(args: argparse.Namespace) -> int:
     bot_name = args.bot_name
     if not _validate_bot_name(bot_name):
@@ -90,6 +119,10 @@ def reserve_symbol(args: argparse.Namespace) -> int:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a+", encoding="utf-8") as lock_fd:
         while True:
+            _run_cleanup(args, state_path, lock_path, bot_name)
+            if args.cleanup_script:
+                print(f"[{bot_name}] reservation_cleanup_before_reserve_done", flush=True)
+
             if deadline and time.monotonic() >= deadline:
                 print(
                     f"[{bot_name}] timed out after waiting {timeout_seconds:.0f}s for a free symbol",
@@ -128,8 +161,11 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                         )
                         occupying_bot = None
                     else:
+                        occupant_meta = state.get(occupying_bot, {})
+                        occupant_pid = occupant_meta.get("pid")
+                        occupant_source = occupant_meta.get("source")
                         print(
-                            f"[{bot_name}] best_coin {symbol} already reserved by {occupying_bot}; waiting...",
+                            f"[{bot_name}] reservation_blocked_by_live_bot occupant={occupying_bot} symbol={symbol} pid={occupant_pid} source={occupant_source} state={state_path}",
                             flush=True,
                         )
                 if not occupying_bot:

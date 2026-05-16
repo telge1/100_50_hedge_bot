@@ -252,6 +252,43 @@ class BybitOrderManager:
         )
         return True
 
+    def fetch_wallet_balance(self, account_type: str = "UNIFIED", coin: str = "USDT") -> tuple[float | None, str | None]:
+        params = {"accountType": account_type.upper()}
+        if coin:
+            params["coin"] = coin.upper()
+        data = self._get("/v5/account/wallet-balance", params)
+        if not data:
+            return None, None
+        result = data.get("result") or {}
+        entries = result.get("list") or []
+        for entry in entries:
+            for field_name, metric in (
+                ("totalMarginBalance", "total_margin_balance"),
+                ("totalEquity", "total_equity"),
+                ("totalWalletBalance", "total_wallet_balance"),
+            ):
+                value = entry.get(field_name)
+                if value is None:
+                    continue
+                try:
+                    return float(value), metric
+                except (TypeError, ValueError):
+                    continue
+            coin_value = entry.get("coin")
+            if isinstance(coin_value, list):
+                coin_value = coin_value[0] if coin_value else None
+            if coin_value and coin and str(coin_value).upper() != coin.upper():
+                continue
+            for field_name in ("walletBalance", "equity", "availableBalance"):
+                value = entry.get(field_name)
+                if value is None:
+                    continue
+                try:
+                    return float(value), field_name
+                except (TypeError, ValueError):
+                    continue
+        return None, None
+
     def place_limit_order(self, payload: OrderPayload) -> Mapping[str, Any] | None:
         return self._post("/v5/order/create", payload.to_json())
 

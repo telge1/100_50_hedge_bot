@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from typing import Any, Mapping
 from urllib.parse import urlencode
 
@@ -77,7 +77,14 @@ class BybitOrderManager:
         ).hexdigest()
         return signature, timestamp
 
-    def _post(self, path: str, body: str, timeout: int = 10) -> Mapping[str, Any] | None:
+    def _post(
+        self,
+        path: str,
+        body: str,
+        timeout: int = 10,
+        *,
+        allow_ret_codes: tuple[int, ...] | None = None,
+    ) -> Mapping[str, Any] | None:
         signature, timestamp = self._sign(body)
         headers = {
             "Content-Type": "application/json",
@@ -94,9 +101,11 @@ class BybitOrderManager:
                 logger.warning("Bybit POST %s failed %s – %s", path, resp.status_code, resp.text[:200])
                 return None
             data = resp.json()
-            if data.get("retCode") != 0:
+            ret_code = data.get("retCode") or 0
+            allowed_ret = {0} if allow_ret_codes is None else set(allow_ret_codes)
+            if ret_code not in allowed_ret:
                 logger.warning(
-                    "Bybit POST %s returned %s %s", path, data.get("retCode"), data.get("retMsg")
+                    "Bybit POST %s returned %s %s", path, ret_code, data.get("retMsg")
                 )
                 return None
             return data
@@ -168,7 +177,7 @@ class BybitOrderManager:
                 "sellLeverage": str(sell_leverage),
             }
         )
-        result = self._post("/v5/position/set-leverage", body)
+        result = self._post("/v5/position/set-leverage", body, allow_ret_codes=(0, 110043))
         logger.info(
             "Leverage update finished",
             extra={
@@ -219,6 +228,31 @@ class BybitOrderManager:
                 extra={"symbol": symbol.upper(), "category": category},
             )
             return False
+        max_leverage_decimal = Decimal(str(max_leverage))
+        current_leverages = self._current_leverages(symbol, category)
+        if current_leverages:
+            leverage_set = set(current_leverages)
+            if len(leverage_set) == 1 and next(iter(leverage_set)) == max_leverage_decimal:
+                logger.info(
+                    "Max leverage already set on all positions",
+                    extra={
+                        "symbol": symbol.upper(),
+                        "category": category,
+                        "max_leverage": str(max_leverage_decimal),
+                        "current_leverage": str(max_leverage_decimal),
+                    },
+                )
+                self._max_leverage_cache.add(cache_key)
+                return True
+            logger.info(
+                "Leverage entries differ from target",
+                extra={
+                    "symbol": symbol.upper(),
+                    "category": category,
+                    "requested": str(max_leverage_decimal),
+                    "current_values": [str(value) for value in sorted(leverage_set)],
+                },
+            )
         logger.info(
             "Setting exchange leverage to max for %s",
             symbol.upper(),
@@ -236,6 +270,19 @@ class BybitOrderManager:
             extra={"symbol": symbol.upper(), "category": category, "max_leverage": max_leverage},
         )
         return True
+
+    def _current_leverages(self, symbol: str, category: str = "linear") -> list[Decimal]:
+        positions = self.fetch_positions(symbol=symbol, category=category)
+        decimal_leverages: list[Decimal] = []
+        for pos in positions:
+            leverage = pos.get("leverage")
+            if leverage is None:
+                continue
+            try:
+                decimal_leverages.append(Decimal(str(leverage)))
+            except InvalidOperation:
+                continue
+        return decimal_leverages
 
     def place_limit_order(self, payload: OrderPayload) -> Mapping[str, Any] | None:
         return self._post("/v5/order/create", payload.to_json())

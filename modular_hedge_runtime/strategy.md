@@ -296,10 +296,16 @@ sudo systemctl status dashboard
 ####################################### Watchdog ##################################################################
 
 python live_bots/100_50_hedge_bot/shared_scripts/safety_order_watchdog.py --dry-run --once
-python live_bots/100_50_hedge_bot/shared_scripts/safety_order_watchdog.py --loop --interval 30
+python3 live_bots/100_50_hedge_bot/watchdog/safety_order_watchdog.py --loop --interval 10
 
+cd /home/telgenbuescher/projects/spread_recovery_hedge
+PYTHONPATH=. python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py --loop --interval 10
 
+####################################### Wallet Captcher ###########################################################
 
+python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py \
+  --capture-start-wallet \
+  --bot-name long_bot_1
 
 ################################## Coin Scanner ###################################################################
 
