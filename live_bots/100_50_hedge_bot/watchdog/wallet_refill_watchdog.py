@@ -22,6 +22,10 @@ CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 LOG_PATH = BOT_ROOT / "logs" / "wallet_refill_watchdog.log"
 JSON_LOG_PATH = BOT_ROOT / "logs" / "wallet_refill_watchdog.jsonl"
 WATCHER_NAME = "wallet_refill_watchdog"
+DEFAULT_REFILL_THRESHOLD_PCT = 50
+DEFAULT_CASHOUT_PROFIT_TRIGGER_PCT = 50
+DEFAULT_CASHOUT_PROFIT_SHARE_PCT = 50
+MIN_START_WALLET_USDT = 0.01
 
 
 def setup_logger() -> logging.Logger:
@@ -170,19 +174,32 @@ def capture_start_wallet(
         logger.warning("[%s] unable to fetch wallet for capture", bot_name)
         write_json_event("wallet_fetch_failed", {"bot_name": bot_name, "symbol": symbol})
         return
+    refill_threshold_pct = guard.get("refill_threshold_pct", guard.get("threshold_pct", DEFAULT_REFILL_THRESHOLD_PCT))
+    refill_threshold_wallet = balance * (refill_threshold_pct / 100.0)
+    cashout_trigger_wallet = balance * (1 + DEFAULT_CASHOUT_PROFIT_TRIGGER_PCT / 100.0)
+    for legacy in ("threshold_pct", "threshold_wallet_usdt"):
+        guard.pop(legacy, None)
     guard.update(
         {
             "bot_name": bot_name,
             "symbol": symbol,
             "start_wallet_usdt": balance,
             "current_wallet_usdt": balance,
-            "threshold_pct": 50,
-            "threshold_wallet_usdt": balance * 0.5,
             "wallet_metric_used": metric,
+            "refill_threshold_pct": refill_threshold_pct,
+            "refill_threshold_wallet_usdt": refill_threshold_wallet,
             "refill_required": False,
             "refill_amount_usdt": 0.0,
+            "cashout_profit_trigger_pct": DEFAULT_CASHOUT_PROFIT_TRIGGER_PCT,
+            "cashout_trigger_wallet_usdt": cashout_trigger_wallet,
+            "cashout_profit_share_pct": DEFAULT_CASHOUT_PROFIT_SHARE_PCT,
+            "profit_usdt": 0.0,
+            "cashout_required": False,
+            "cashout_amount_usdt": 0.0,
             "last_refill_at": None,
+            "last_cashout_at": None,
             "refill_count": 0,
+            "cashout_count": 0,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -208,32 +225,84 @@ def monitor_wallet(
         write_json_event("wallet_fetch_failed", {"bot_name": bot_name, "symbol": symbol})
         return
     start_wallet = float(guard["start_wallet_usdt"])
-    threshold_pct = guard.get("threshold_pct", 50)
-    threshold_wallet = start_wallet * (threshold_pct / 100.0)
-    refill_required = balance <= threshold_wallet
-    refill_amount = max(0.0, start_wallet - balance)
+    now = datetime.now(timezone.utc).isoformat()
     guard.update(
         {
             "current_wallet_usdt": balance,
-            "threshold_wallet_usdt": threshold_wallet,
+            "wallet_metric_used": metric,
+            "updated_at": now,
+        }
+    )
+    if start_wallet < MIN_START_WALLET_USDT:
+        write_wallet_guard(path, guard)
+        write_json_event(
+            "wallet_skipped_invalid_start_wallet",
+            {
+                "bot_name": bot_name,
+                "symbol": symbol,
+                "start_wallet_usdt": start_wallet,
+                "current_wallet_usdt": balance,
+                "wallet_metric_used": metric,
+                "runner_active": runner_active,
+            },
+        )
+        if not runner_active:
+            write_json_event(
+                "wallet_monitoring_without_active_runner",
+                {
+                    "bot_name": bot_name,
+                    "symbol": symbol,
+                    "current_wallet_usdt": balance,
+                    "refill_threshold_wallet_usdt": guard.get("refill_threshold_wallet_usdt"),
+                },
+            )
+        return
+    refill_threshold_pct = guard.get("refill_threshold_pct", guard.get("threshold_pct", DEFAULT_REFILL_THRESHOLD_PCT))
+    refill_threshold_wallet = start_wallet * (refill_threshold_pct / 100.0)
+    refill_required = balance <= refill_threshold_wallet
+    refill_amount = max(0.0, start_wallet - balance)
+    cashout_profit_trigger_pct = guard.get("cashout_profit_trigger_pct", DEFAULT_CASHOUT_PROFIT_TRIGGER_PCT)
+    cashout_profit_share_pct = guard.get("cashout_profit_share_pct", DEFAULT_CASHOUT_PROFIT_SHARE_PCT)
+    cashout_trigger_wallet = start_wallet * (1 + cashout_profit_trigger_pct / 100.0)
+    profit_usdt = max(0.0, balance - start_wallet)
+    cashout_required = balance >= cashout_trigger_wallet
+    cashout_amount = profit_usdt * (cashout_profit_share_pct / 100.0) if cashout_required else 0.0
+    for legacy in ("threshold_pct", "threshold_wallet_usdt"):
+        guard.pop(legacy, None)
+    guard.update(
+        {
+            "current_wallet_usdt": balance,
+            "refill_threshold_pct": refill_threshold_pct,
+            "refill_threshold_wallet_usdt": refill_threshold_wallet,
             "refill_required": refill_required,
             "refill_amount_usdt": refill_amount,
+            "cashout_profit_trigger_pct": cashout_profit_trigger_pct,
+            "cashout_trigger_wallet_usdt": cashout_trigger_wallet,
+            "cashout_profit_share_pct": cashout_profit_share_pct,
+            "profit_usdt": profit_usdt,
+            "cashout_required": cashout_required,
+            "cashout_amount_usdt": cashout_amount,
             "wallet_metric_used": metric,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
     write_wallet_guard(path, guard)
-    write_json_event(
-        "wallet_check",
-        {
-            "bot_name": bot_name,
-            "symbol": symbol,
-            "current_wallet_usdt": balance,
-            "threshold_wallet_usdt": threshold_wallet,
-            "refill_required": refill_required,
-            "runner_active": runner_active,
-        },
-    )
+    common_payload = {
+        "bot_name": bot_name,
+        "symbol": symbol,
+        "current_wallet_usdt": balance,
+        "start_wallet_usdt": start_wallet,
+        "wallet_metric_used": metric,
+        "refill_threshold_wallet_usdt": refill_threshold_wallet,
+        "refill_required": refill_required,
+        "refill_amount_usdt": refill_amount,
+        "cashout_trigger_wallet_usdt": cashout_trigger_wallet,
+        "profit_usdt": profit_usdt,
+        "cashout_required": cashout_required,
+        "cashout_amount_usdt": cashout_amount,
+        "runner_active": runner_active,
+    }
+    write_json_event("wallet_check", common_payload)
     if not runner_active:
         write_json_event(
             "wallet_monitoring_without_active_runner",
@@ -241,7 +310,7 @@ def monitor_wallet(
                 "bot_name": bot_name,
                 "symbol": symbol,
                 "current_wallet_usdt": balance,
-                "threshold_wallet_usdt": threshold_wallet,
+                "refill_threshold_wallet_usdt": refill_threshold_wallet,
             },
         )
     if refill_required:
@@ -263,6 +332,20 @@ def monitor_wallet(
                 "runner_active": runner_active,
             },
         )
+    if cashout_required:
+        cashout_payload = {
+            "bot_name": bot_name,
+            "symbol": symbol,
+            "start_wallet_usdt": start_wallet,
+            "current_wallet_usdt": balance,
+            "profit_usdt": profit_usdt,
+            "cashout_amount_usdt": cashout_amount,
+            "cashout_profit_trigger_pct": cashout_profit_trigger_pct,
+            "cashout_profit_share_pct": cashout_profit_share_pct,
+            "runner_active": runner_active,
+        }
+        write_json_event("wallet_cashout_required", cashout_payload)
+        write_json_event("wallet_cashout_skipped_phase1_no_transfer", cashout_payload)
 
 
 def main() -> None:
@@ -289,8 +372,6 @@ def main() -> None:
             if args.capture_start_wallet:
                 capture_start_wallet(bot_name, order_manager, symbol, logger, args.reset_start_wallet)
             runner_active = is_bot_runner_active(bot_name)
-            if not runner_active:
-                write_json_event("wallet_skipped_not_active", {"bot_name": bot_name, "symbol": symbol})
             monitor_wallet(bot_name, order_manager, symbol, logger, runner_active)
 
     if args.capture_start_wallet:
