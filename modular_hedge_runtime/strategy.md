@@ -260,6 +260,18 @@ rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.s
 
 ./start_fixed_cycle.sh
 
+################################## Coin Scanner ###################################################################
+
+sudo systemctl stop coin_scanner.timer
+
+sudo systemctl stop coin_scanner.service
+
+sudo systemctl daemon-reload
+sudo systemctl start coin_scanner.service
+sudo systemctl start coin_scanner.timer
+
+udo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
+
 ####################################### Start/Stop Bot ##########################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
@@ -303,19 +315,24 @@ PYTHONPATH=. python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.
 
 ####################################### Wallet Captcher ###########################################################
 
+live_bots/100_50_hedge_bot/shared_scripts/start_hedge_guard_watchers.sh
+live_bots/100_50_hedge_bot/shared_scripts/stop_hedge_guard_watchers.sh
+
+cd ~/projects/spread_recovery_hedge
+
 python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py \
-  --capture-start-wallet \
-  --bot-name long_bot_1
+  --loop \
+  --interval 30 \
+  --enable-transfer \
+  --no-transfer-dry-run \
+  --transfer-config-file config/config.yaml \
+  --transfer-coin USDT \
+  --min-transfer-amount 1 \
+  --transfer-cooldown-seconds 600 \
+  --rebaseline-on-start \
+  --reset-transfer-cooldown-on-start
 
-################################## Coin Scanner ###################################################################
 
-sudo systemctl stop coin_scanner.timer
-
-sudo systemctl stop coin_scanner.service
-
-sudo systemctl daemon-reload
-sudo systemctl start coin_scanner.service
-sudo systemctl start coin_scanner.timer
 
 ###################################################################################################################
 

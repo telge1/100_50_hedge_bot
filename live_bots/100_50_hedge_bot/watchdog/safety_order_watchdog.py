@@ -22,6 +22,10 @@ BOT_ROOT = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot"
 CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog.log"
 DEBUG_LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog_debug.jsonl"
+SIGNIFICANT_DEBUG_EVENTS = {
+    "safety_action_required",
+    "safety_action_result",
+}
 STOP_SCRIPT = BOT_ROOT / "shared_scripts" / "stop_with_cleanup.sh"
 RETRY_DELAYS = [0.0, 2.0, 2.0, 3.0]
 
@@ -42,6 +46,8 @@ def setup_logger() -> logging.Logger:
 
 
 def write_debug_event(logger: logging.Logger, event_name: str, payload: dict[str, Any]) -> None:
+    if event_name not in SIGNIFICANT_DEBUG_EVENTS:
+        return
     try:
         DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         entry = {"timestamp": datetime.now().astimezone().isoformat(), "event": event_name, **payload}

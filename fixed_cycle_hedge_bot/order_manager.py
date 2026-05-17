@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_DOWN
 from typing import Any, Mapping
@@ -288,6 +289,85 @@ class BybitOrderManager:
                 except (TypeError, ValueError):
                     continue
         return None, None
+
+    def _format_transfer_amount(self, amount: Decimal) -> str:
+        quantized = amount.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+        text = format(quantized, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text or "0"
+
+    def create_universal_transfer(
+        self,
+        coin: str,
+        amount: str | float,
+        from_member_id: str,
+        to_member_id: str,
+        from_account_type: str,
+        to_account_type: str,
+        transfer_id: str | None = None,
+    ) -> dict[str, Any]:
+        transfer_id = transfer_id or str(uuid.uuid4())
+        coin_upper = coin.upper()
+        decimal_amount = Decimal(str(amount))
+        formatted_amount = self._format_transfer_amount(decimal_amount)
+        payload = {
+            "transferId": transfer_id,
+            "coin": coin_upper,
+            "amount": formatted_amount,
+            "fromMemberId": from_member_id,
+            "toMemberId": to_member_id,
+            "fromAccountType": from_account_type.upper(),
+            "toAccountType": to_account_type.upper(),
+        }
+        body = json.dumps(payload)
+        signature, timestamp = self._sign(body)
+        headers = {
+            "Content-Type": "application/json",
+            "X-BAPI-API-KEY": self.api_key,
+            "X-BAPI-SIGN": signature,
+            "X-BAPI-SIGN-TYPE": "2",
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": self.recv_window,
+        }
+        url = f"{self.base_url}/v5/asset/transfer/universal-transfer"
+        try:
+            response = self._session.post(url, headers=headers, data=body, timeout=10)
+        except Exception as exc:
+            logger.exception("Universal transfer request failed", exc_info=exc)
+            return {
+                "ok": False,
+                "error": str(exc),
+                "transfer_id": transfer_id,
+                "raw_response": None,
+            }
+        try:
+            data = response.json()
+        except ValueError:
+            data = {"http_status": response.status_code, "text": response.text}
+        raw_response = data
+        if response.status_code != 200:
+            return {
+                "ok": False,
+                "error": f"HTTP {response.status_code}",
+                "transfer_id": transfer_id,
+                "raw_response": raw_response,
+            }
+        if data.get("retCode") != 0:
+            return {
+                "ok": False,
+                "error": f"{data.get('retCode')} {data.get('retMsg')}",
+                "transfer_id": transfer_id,
+                "raw_response": raw_response,
+            }
+        result = (data.get("result") or {}).copy()
+        status = result.get("status") or "STATUS_UNKNOWN"
+        return {
+            "ok": True,
+            "transfer_id": transfer_id,
+            "status": status,
+            "raw_response": raw_response,
+        }
 
     def place_limit_order(self, payload: OrderPayload) -> Mapping[str, Any] | None:
         return self._post("/v5/order/create", payload.to_json())

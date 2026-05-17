@@ -1,8 +1,8 @@
 {
-  "bot_name": "${BOT_NAME}",
+  "bot_name": "long_bot_2",
   "status": "running",
-  "updated_at": "2026-05-12T10:32:01.958161+00:00",
-  "symbol": "NEARUSDT",
+  "updated_at": "2026-05-17T09:01:51.024744+00:00",
+  "symbol": "ONDOUSDT",
   "start_requested": true,
-  "pid": 4095441
+  "pid": 1175436
 }

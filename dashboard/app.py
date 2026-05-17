@@ -30,6 +30,7 @@ import yaml
 from datetime import datetime, timezone, timedelta
 import shutil
 from pathlib import Path
+import subprocess
 
 # Add parent directory to path for imports
 project_root = Path(__file__).resolve().parent.parent
@@ -44,6 +45,10 @@ DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pn
 GLOBAL_RUNTIME_LOG_PATH = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
 
 LIVE_BOT_LOGS_ROOT = project_root / "live_bots" / "100_50_hedge_bot"
+WATCHER_SCRIPT_ROOT = LIVE_BOT_LOGS_ROOT / "shared_scripts"
+START_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "start_hedge_guard_watchers.sh"
+STOP_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "stop_hedge_guard_watchers.sh"
+WATCHERS_STATUS_FILE = LIVE_BOT_LOGS_ROOT / "run" / "hedge_guard_watchers_status.json"
 ACCOUNT_PNL_PATHS: dict[str, dict[str, Path]] = {}
 WALLET_SNAPSHOT_FILES: dict[str, Path] = {}
 BOT_STATE_FILES: dict[str, Path] = {}
@@ -7881,6 +7886,93 @@ async def api_hedge_guardian_start(body: dict = Body(default={}), user: dict = D
     except Exception as e:
         logger.exception("Hedge Guardian Start: %s", e)
         return {"success": False, "message": str(e)}
+
+
+def _read_watcher_info(pid_file: Path, keyword: str) -> dict[str, Any]:
+    info = {"status": "stopped", "pid": None}
+    if not pid_file.exists():
+        return info
+    try:
+        pid = int(pid_file.read_text().strip())
+    except Exception:
+        pid_file.unlink(missing_ok=True)
+        return info
+    proc_path = Path("/proc") / str(pid)
+    if not proc_path.exists():
+        pid_file.unlink(missing_ok=True)
+        return info
+    try:
+        cmdline = proc_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+    except Exception:
+        pid_file.unlink(missing_ok=True)
+        return info
+    if keyword not in cmdline:
+        pid_file.unlink(missing_ok=True)
+        return info
+    info["status"] = "running"
+    info["pid"] = pid
+    return info
+
+
+def _read_status_file() -> dict[str, Any] | None:
+    if not WATCHERS_STATUS_FILE.exists():
+        return None
+    try:
+        data = json.loads(WATCHERS_STATUS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    watchers = data.get("watchers") or {}
+    if not watchers:
+        return None
+    return {
+        "status": data.get("status") or "stopped",
+        "watchers": {
+            "safety_order_watchdog": watchers.get("safety_order_watchdog", {"status": "stopped", "pid": None}),
+            "wallet_refill_watchdog": watchers.get("wallet_refill_watchdog", {"status": "stopped", "pid": None}),
+        },
+        "ok": True,
+    }
+
+
+def _hedge_guard_watchers_status() -> dict[str, Any]:
+    status_data = _read_status_file()
+    if status_data:
+        return status_data
+    safety = _read_watcher_info(LIVE_BOT_LOGS_ROOT / "run" / "safety_order_watchdog.pid", "safety_order_watchdog.py")
+    wallet = _read_watcher_info(LIVE_BOT_LOGS_ROOT / "run" / "wallet_refill_watchdog.pid", "wallet_refill_watchdog.py")
+    running = sum(1 for entry in (safety, wallet) if entry["status"] == "running")
+    overall = "stopped"
+    if running == 2:
+        overall = "running"
+    elif running == 1:
+        overall = "partial"
+    return {"ok": True, "status": overall, "watchers": {"safety_order_watchdog": safety, "wallet_refill_watchdog": wallet}}
+
+
+@app.get("/api/hedge-guard-watchers/status")
+def api_hedge_guard_watchers_status():
+    return _hedge_guard_watchers_status()
+
+
+def _run_hedge_guard_script(script_path: Path) -> dict[str, Any]:
+    if not script_path.exists():
+        return {"ok": False, "error": f"script missing: {script_path}"}
+    try:
+        subprocess.run([str(script_path)], cwd=str(project_root), check=True)
+        return _hedge_guard_watchers_status()
+    except subprocess.CalledProcessError as exc:
+        logger.error("Hedge guard watcher script failed: %s", exc)
+        return {"ok": False, "error": str(exc)}
+
+
+@app.post("/api/hedge-guard-watchers/start")
+def api_hedge_guard_watchers_start():
+    return _run_hedge_guard_script(START_WATCHERS_SCRIPT)
+
+
+@app.post("/api/hedge-guard-watchers/stop")
+def api_hedge_guard_watchers_stop():
+    return _run_hedge_guard_script(STOP_WATCHERS_SCRIPT)
 
 
 @app.post("/api/services/{service_key}/restart")

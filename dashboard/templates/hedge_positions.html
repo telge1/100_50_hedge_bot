@@ -94,10 +94,46 @@
             color: #cbd5f5;
             max-width: 480px;
         }
-        .system-status-grid {
+        .processes-panel {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .process-list-output {
+            margin: 0;
+            padding: 10px;
+            background: #1e1e1e;
+            color: #ddd;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 12px;
+            max-height: 360px;
+            min-height: 120px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+            scrollbar-gutter: stable;
+        }
+        .system-status-grid-wrapper {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
+            align-items: stretch;
+        }
+        .system-status-card {
+            display: contents;
+        }
+        .system-status-grid {
+            display: contents;
+        }
+        .system-status-grid-wrapper .system-status-item,
+        .system-status-grid-wrapper .hedge-guard-card,
+        .system-status-grid-wrapper .loading {
+            width: 100%;
+            box-sizing: border-box;
         }
         .system-status-item {
             background: rgba(255, 255, 255, 0.05);
@@ -297,6 +333,62 @@
         .system-status-indicator.waiting_for_symbol {
             background: #f59e0b;
             box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+        }
+        .hedge-guard-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 10px;
+            border: 2px solid #d1d5db;
+            transition: background 0.2s, border-color 0.2s;
+            background: #1f2937;
+            min-height: 120px;
+            flex: 1;
+        }
+        .system-status-card .hedge-guard-card {
+            width: 100%;
+        }
+        .hedge-guard-card.running {
+            border-color: #16a34a;
+            background: rgba(22, 163, 74, 0.1);
+        }
+        .hedge-guard-card.stopped {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.08);
+        }
+        .hedge-guard-card.partial {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.12);
+        }
+        .hedge-guard-card-main {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .hedge-guard-card-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hedge-guard-card-status-text {
+            font-size: 0.95rem;
+            color: #d1d5db;
+            margin: 0;
+        }
+
+        .hedge-guard-card-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .hedge-guard-card-details {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+            color: #d1d5db;
         }
         /* Bot-Übersicht auf einen Blick */
         .bot-overview-bar {
@@ -1573,8 +1665,30 @@
                     </div>
                 </div>
                 <div id="preFlightCheckResult" class="mobile-view-overview" data-mobile-view="overview" style="margin-bottom: 15px; padding: 12px; padding-right: 40px; border-radius: 6px; display: none; position: relative;"></div>
-                <div class="system-status-grid mobile-view-overview" id="systemStatusGrid" data-mobile-view="overview">
-                    <div class="loading">Lade System-Status...</div>
+                <div class="system-status-grid-wrapper mobile-view-overview" data-mobile-view="overview">
+                    <div class="system-status-card">
+                        <div id="hedgeGuardCard" class="hedge-guard-card stopped">
+                            <div class="hedge-guard-card-main">
+                                <div class="hedge-guard-card-title-row">
+                                    <div class="system-status-name">
+                                        <span id="hedgeGuardStatusIndicator" class="system-status-indicator stopped"></span>
+                                        <span>Hedge Guard Watchdogs</span>
+                                    </div>
+                                </div>
+                                <div id="hedgeGuardStatusText" class="hedge-guard-card-status-text">Status wird geladen...</div>
+                            </div>
+                            <div class="hedge-guard-card-actions">
+                                <button id="hedgeGuardStartBtn" class="btn-service-control btn-service-start" type="button" onclick="startHedgeGuardWatchers()">▶️ Start</button>
+                                <button id="hedgeGuardStopBtn" class="btn-service-control btn-service-stop" type="button" onclick="stopHedgeGuardWatchers()">⏹️ Stopp</button>
+                            </div>
+                            <div id="hedgeGuardStatusDetails" class="hedge-guard-card-details"></div>
+                        </div>
+                    </div>
+                    <div class="system-status-card">
+                        <div class="system-status-grid" id="systemStatusGrid">
+                            <div class="loading">Lade System-Status...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1612,7 +1726,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="processesPanel" style="display: none; margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid #444;">
+                <div id="processesPanel" class="processes-panel" style="display: none;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
                         <strong style="color: #fff;">Laufende Prozesse (ps aux | grep .py)</strong>
                         <span style="display: flex; gap: 8px;">
@@ -1620,7 +1734,7 @@
                             <button type="button" onclick="toggleProcessesPanel()" style="background: #555; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">Ausblenden</button>
                         </span>
                     </div>
-                    <pre id="processesOutput" style="margin: 0; padding: 10px; background: #1e1e1e; color: #ddd; border: 1px solid #555; border-radius: 4px; font-size: 12px; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all;">Lade...</pre>
+                    <pre id="processesOutput" class="process-list-output">Lade...</pre>
                 </div>
                 
                 <div id="controlPanelContainer"></div>
@@ -2873,7 +2987,12 @@
                     pre.textContent = data.error || 'Fehler beim Laden der Prozessliste';
                     if (typeof showToast === 'function') showToast('error', 'Prozesse', data.error || 'Fehler', 4000);
                 } else {
-                    pre.textContent = data.output || '(keine Ausgabe)';
+                    const formatOutput = (text) => {
+                        if (!text) return '';
+                        return text.split('\n').map(line => line).join('\n\n');
+                    };
+                    const formatted = formatOutput(data.output || '');
+                    pre.textContent = formatted || '(keine Ausgabe)';
                 }
             } catch (e) {
                 const msg = (e && e.message) ? e.message : 'Netzwerkfehler';
@@ -3759,32 +3878,24 @@
             
             // Services (Master Bot, Hedge Guard, Dashboard)
             const services = data.services || {};
-            const serviceOrder = ['master', 'hedge_guard', 'dashboard'];
+            const serviceOrder = ['master', 'dashboard'];
             
             for (const serviceKey of serviceOrder) {
                 const service = services[serviceKey];
                 if (!service) continue;
                 
                 const isRunning = service.active || false;
-                const statusClass = isRunning ? 'running' : 'stopped';
-                const indicatorClass = isRunning ? 'running' : 'stopped';
+                let statusClass = isRunning ? 'running' : 'stopped';
+                let indicatorClass = isRunning ? 'running' : 'stopped';
                 
                 // Master Bot & Hedge Guard: Restart-Button (startet automatisch, wenn nicht läuft)
                 let actionButton = '';
                 if (serviceKey === 'master') {
                     actionButton = `<button class="btn-service-control btn-service-stop" onclick="stopService('${serviceKey}')">⏹️ Stop</button>`;
-                } else if (serviceKey === 'hedge_guard') {
-                    actionButton = `<button class="btn-service-control" type="button" id="hedgeGuardActionsBtn" onclick="document.getElementById('hedgeGuardDropdown').classList.toggle('show'); event.stopPropagation();">⋮ Aktionen</button><div id="hedgeGuardDropdown" class="dropdown-content"><a href="#" onclick="toggleHedgeGuardCardHidden(); return false">Ausblenden</a><a href="#" onclick="restartService('hedge_guard'); return false">Alle neu starten</a></div>`;
                 } else {
                     actionButton = isRunning 
                         ? `<button class="btn-service-control btn-service-stop" onclick="stopService('${serviceKey}')">⏹️ Stop</button>`
                         : `<button class="btn-service-control btn-service-start" onclick="startService('${serviceKey}')">▶️ Start</button>`;
-                }
-                if (serviceKey === 'hedge_guard') {
-                    const detailsCollapsed = typeof localStorage !== 'undefined' && localStorage.getItem('hedge_guard_details_collapsed') === 'true';
-                    const collapseLabel = detailsCollapsed ? 'Einblenden' : 'Ausblenden';
-                    actionButton = '<button class="btn-service-control" type="button" id="hedgeGuardActionsBtn" onclick="document.getElementById(\'hedgeGuardDropdown\').classList.toggle(\'show\'); event.stopPropagation();">⋮ Aktionen</button><div id="hedgeGuardDropdown" class="dropdown-content"><a href="#" id="hedgeGuardToggleLink" onclick="toggleHedgeGuardDetails(); return false">' + collapseLabel + '</a><a href="#" onclick="restartService(\'hedge_guard\'); return false">Alle neu starten</a></div>';
-                    html += '<div id="hedgeGuardCard" class="hedge-guard-card">';
                 }
                 html += `
                     <div class="system-status-item ${statusClass}">
@@ -3800,20 +3911,6 @@
                         </div>
                     </div>
                 `;
-                if (serviceKey === 'hedge_guard') {
-                    const detailsCollapsed = typeof localStorage !== 'undefined' && localStorage.getItem('hedge_guard_details_collapsed') === 'true';
-                    const detailsStyle = detailsCollapsed ? ' style="display:none;"' : '';
-                    html += '<div id="hedgeGuardCardDetails" class="hedge-guard-card-details"' + detailsStyle + '>';
-                    const mainS = services['hedge_guard_main'] || {};
-                    const subS = services['hedge_guard_sub'] || {};
-                    const mainActive = !!mainS.active;
-                    const subActive = !!subS.active;
-                    const mainSym = mainS.symbol ? ('Coin: ' + mainS.symbol) : 'Guardian Long (Main)';
-                    const subSym = subS.symbol ? ('Coin: ' + subS.symbol) : 'Guardian Short (Sub)';
-                    html += '<div class="system-status-item ' + (mainActive ? 'running' : 'stopped') + '"><div class="system-status-info"><div class="system-status-name"><span class="system-status-indicator ' + (mainActive ? 'running' : 'stopped') + '"></span>Long (Main)</div><div class="system-status-desc">' + mainSym + '</div></div><div class="system-status-actions">' + (mainActive ? '<button class="btn-service-control btn-service-stop" onclick="stopHedgeGuardian(\'main\')">⏹️ Stop</button>' : '<button class="btn-service-control btn-service-start" onclick="startHedgeGuardian(\'main\')">▶️ Start</button>') + '</div></div>';
-                    html += '<div class="system-status-item ' + (subActive ? 'running' : 'stopped') + '"><div class="system-status-info"><div class="system-status-name"><span class="system-status-indicator ' + (subActive ? 'running' : 'stopped') + '"></span>Short (Sub)</div><div class="system-status-desc">' + subSym + '</div></div><div class="system-status-actions">' + (subActive ? '<button class="btn-service-control btn-service-stop" onclick="stopHedgeGuardian(\'sub\')">⏹️ Stop</button>' : '<button class="btn-service-control btn-service-start" onclick="startHedgeGuardian(\'sub\')">▶️ Start</button>') + '</div></div>';
-                    html += '</div></div>';
-                }
             }
             
             // Long-/Short-Bot Status – profil-spezifisch (Main | Bot 1 | Bot 2).
@@ -3997,6 +4094,9 @@
             }
             
             grid.innerHTML = html;
+            if (typeof loadHedgeGuardWatchersStatus === 'function') {
+                loadHedgeGuardWatchersStatus();
+            }
             
             // Aktualisiere "Beide Bots starten" Button im Header
             const startBothBotsHeaderBtn = document.getElementById('startBothBotsHeaderBtn');
@@ -5242,6 +5342,135 @@
                 if (data.success) { if (typeof showToast === 'function') showToast('success', 'OK', data.message); else alert('✅ ' + data.message); setTimeout(loadSystemStatus, 2000); } else { alert('❌ ' + (data.message || 'Fehler')); }
             } catch (e) { console.error(e); alert('❌ Fehler beim Stoppen'); }
         }
+
+        window._hedgeGuardWatchersState = 'stopped';
+        window._hedgeGuardWatchersStatusData = null;
+
+        const HEDGE_GUARD_WATCHER_LABELS = {
+            safety_order_watchdog: 'Safety Order Watchdog',
+            wallet_refill_watchdog: 'Wallet Refill Watchdog',
+        };
+
+        function updateHedgeGuardCardState(status) {
+            const card = document.getElementById('hedgeGuardCard');
+            if (card) {
+                card.classList.remove('running', 'stopped', 'partial');
+                if (status === 'running') card.classList.add('running');
+                else if (status === 'partial') card.classList.add('partial');
+                else card.classList.add('stopped');
+            }
+            const startBtn = document.getElementById('hedgeGuardStartBtn');
+            const stopBtn = document.getElementById('hedgeGuardStopBtn');
+            if (startBtn) startBtn.disabled = status === 'running';
+            if (stopBtn) stopBtn.disabled = status === 'stopped';
+            if (startBtn && stopBtn) {
+                if (status === 'running') {
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = '';
+                } else if (status === 'stopped') {
+                    startBtn.style.display = '';
+                    stopBtn.style.display = 'none';
+                } else {
+                    startBtn.style.display = '';
+                    stopBtn.style.display = '';
+                }
+            }
+        }
+
+        function renderHedgeGuardWatcherDetails(watchers) {
+            const detailsEl = document.getElementById('hedgeGuardCardDetails');
+            if (!detailsEl) return;
+            if (!watchers || Object.keys(watchers).length === 0) {
+                detailsEl.innerHTML = '<div class="system-status-item stopped"><div class="system-status-info"><div class="system-status-name"><span class="system-status-indicator stopped"></span>Hedge Guard Watchers</div><div class="system-status-desc">Details werden geladen...</div></div></div>';
+                return;
+            }
+            const html = Object.entries(watchers).map(([key, watcher]) => {
+                const label = HEDGE_GUARD_WATCHER_LABELS[key] || key;
+                const status = (watcher && typeof watcher.status === 'string') ? watcher.status : 'stopped';
+                const indicatorClass = status === 'running' ? 'running' : 'stopped';
+                const parts = [];
+                if (watcher && watcher.pid) parts.push(`PID ${watcher.pid}`);
+                if (watcher && watcher.log_file) parts.push(`${watcher.log_file.split('/').pop()}`);
+                const desc = parts.length ? parts.join(' · ') : (status === 'running' ? 'Läuft' : 'Gestoppt');
+                return `<div class="system-status-item ${status === 'running' ? 'running' : 'stopped'}"><div class="system-status-info"><div class="system-status-name"><span class="system-status-indicator ${indicatorClass}"></span>${label}</div><div class="system-status-desc">${desc}</div></div></div>`;
+            }).join('');
+            detailsEl.innerHTML = html;
+        }
+
+        function renderHedgeGuardCardFromStatus(data) {
+            const status = (data && typeof data.status === 'string') ? data.status : window._hedgeGuardWatchersState || 'stopped';
+            window._hedgeGuardWatchersState = status;
+            if (data) {
+                window._hedgeGuardWatchersStatusData = data;
+            }
+            updateHedgeGuardCardState(status);
+            const indicator = document.getElementById('hedgeGuardStatusIndicator');
+            if (indicator) {
+                indicator.classList.remove('running', 'stopped', 'partial');
+                if (status === 'running') indicator.classList.add('running');
+                else if (status === 'partial') indicator.classList.add('partial');
+                else indicator.classList.add('stopped');
+            }
+            const statusTextEl = document.getElementById('hedgeGuardStatusText');
+            if (statusTextEl) {
+                if (status === 'running') statusTextEl.textContent = 'Hedge Guard Watchers laufen';
+                else if (status === 'partial') statusTextEl.textContent = 'Nur ein Watcher läuft';
+                else statusTextEl.textContent = 'Watchers gestoppt';
+            }
+            const watchers = data && data.watchers ? data.watchers : (window._hedgeGuardWatchersStatusData ? window._hedgeGuardWatchersStatusData.watchers : null);
+            renderHedgeGuardWatcherDetails(watchers);
+        }
+
+        async function loadHedgeGuardWatchersStatus() {
+            try {
+                const response = await fetch('/api/hedge-guard-watchers/status', { credentials: 'include' });
+                const data = await response.json();
+                if (response.ok && data.ok) {
+                    renderHedgeGuardCardFromStatus(data);
+                }
+            } catch (error) {
+                console.error('Error loading hedge guard watcher status:', error);
+            }
+        }
+
+        async function startHedgeGuardWatchers() {
+            try {
+                const response = await fetch('/api/hedge-guard-watchers/start', { method: 'POST', credentials: 'include' });
+                const data = await response.json();
+                if (response.ok && data.ok) {
+                    renderHedgeGuardCardFromStatus(data);
+                    if (typeof showToast === 'function') showToast('success', 'Start', 'Hedge Guard Watchers laufen');
+                } else {
+                    alert(`❌ Fehler: ${data.error || 'Start fehlgeschlagen'}`);
+                }
+            } catch (error) {
+                console.error('Error starting hedge guard watchers:', error);
+                alert('❌ Fehler beim Starten der Watcher');
+            } finally {
+                loadHedgeGuardWatchersStatus();
+            }
+        }
+
+        async function stopHedgeGuardWatchers() {
+            try {
+                const response = await fetch('/api/hedge-guard-watchers/stop', { method: 'POST', credentials: 'include' });
+                const data = await response.json();
+                if (response.ok && data.ok) {
+                    renderHedgeGuardCardFromStatus(data);
+                    if (typeof showToast === 'function') showToast('success', 'Stopp', 'Hedge Guard Watchers gestoppt');
+                } else {
+                    alert(`❌ Fehler: ${data.error || 'Stopp fehlgeschlagen'}`);
+                }
+            } catch (error) {
+                console.error('Error stopping hedge guard watchers:', error);
+                alert('❌ Fehler beim Stoppen der Watcher');
+            } finally {
+                loadHedgeGuardWatchersStatus();
+            }
+        }
+
+        loadHedgeGuardWatchersStatus();
+        setInterval(loadHedgeGuardWatchersStatus, 10000);
         async function restartService(serviceName) {
             const displayNames = { hedge_guard: 'Hedge Guard', dashboard: 'Dashboard' };
             const serviceDisplayName = displayNames[serviceName] || serviceName;
