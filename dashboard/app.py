@@ -56,6 +56,11 @@ BOT_STATE_FILES: dict[str, Path] = {}
 WALLET_SNAPSHOT_TTL_SECONDS = 60
 WALLET_SNAPSHOT_SCRIPT = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
 
+LAST_SNAPSHOT_RUN: dict[str, float] = {}
+LAST_SNAPSHOT_LOCK = threading.Lock()
+SNAPSHOT_RUN_TTL_SECONDS = 60
+SNAPSHOT_IN_PROGRESS: set[str] = set()
+
 
 def _get_dashboard_long_bots() -> list[dict[str, Any]]:
     return get_available_long_bots()
@@ -1073,8 +1078,33 @@ def _is_zero_qty(value: float | None) -> bool:
     return abs(value) < 1e-9
 
 
-def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "long_bot_1") -> None:
-    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys(bot_name)
+def _maybe_run_dashboard_start_snapshot(bot_name: str = "long_bot_1", *, project_root: Path | None = None) -> None:
+    normalized_bot = (bot_name or "").strip().lower()
+    if not normalized_bot:
+        return
+    now = time.monotonic()
+    with LAST_SNAPSHOT_LOCK:
+        last = LAST_SNAPSHOT_RUN.get(normalized_bot)
+        if normalized_bot in SNAPSHOT_IN_PROGRESS:
+            logger.info(
+                "fixed_cycle_wallet_start_snapshot_skipped_in_progress",
+                {"bot": normalized_bot},
+            )
+            return
+        if last and now - last < SNAPSHOT_RUN_TTL_SECONDS:
+            logger.info(
+                "fixed_cycle_wallet_start_snapshot_skipped_debounce",
+                {
+                    "bot": normalized_bot,
+                    "ttl_seconds": SNAPSHOT_RUN_TTL_SECONDS,
+                    "age_seconds": now - last,
+                },
+            )
+            return
+        LAST_SNAPSHOT_RUN[normalized_bot] = now
+        SNAPSHOT_IN_PROGRESS.add(normalized_bot)
+
+    long_qty, short_qty, source, failed = _fetch_dashboard_bot_pos_qtys(normalized_bot)
     if failed or long_qty is None or short_qty is None:
         logger.info(
             "fixed_cycle_wallet_start_snapshot_skipped_flat_unknown %s",
@@ -1087,8 +1117,9 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
             {"bot": bot_name, "long_qty": long_qty, "short_qty": short_qty, "source": source},
         )
         return
-    script_path = project_root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
-    python_path = project_root / ".venv" / "bin" / "python"
+    root = project_root or Path(__file__).resolve().parent.parent
+    script_path = root / "scripts" / "update_fixed_cycle_wallet_snapshot.py"
+    python_path = root / ".venv" / "bin" / "python"
     if not script_path.exists():
         logger.warning("fixed_cycle_wallet_snapshot_script_missing %s", {"path": script_path})
         return
@@ -1105,7 +1136,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
         str(short_qty),
         "--state-file",
         str(
-            project_root
+            root
             / "live_bots"
             / "100_50_hedge_bot"
             / bot_name
@@ -1114,7 +1145,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
         ),
         "--output-file",
         str(
-            project_root
+            root
             / "live_bots"
             / "100_50_hedge_bot"
             / bot_name
@@ -1124,7 +1155,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
     ]
     logger.info("fixed_cycle_wallet_start_snapshot_started %s", {"cmd": cmd})
     try:
-        result = subprocess.run(cmd, cwd=project_root, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(cmd, cwd=root, capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             logger.info(
                 "fixed_cycle_wallet_start_snapshot_written %s",
@@ -1136,7 +1167,7 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
                 },
             )
             snapshot_file = (
-                project_root
+                root
                 / "live_bots"
                 / "100_50_hedge_bot"
                 / bot_name
@@ -1188,6 +1219,9 @@ def _maybe_run_dashboard_start_snapshot(project_root: Path, bot_name: str = "lon
             "fixed_cycle_wallet_start_snapshot_failed %s",
             {"error": str(exc)},
         )
+    finally:
+        with LAST_SNAPSHOT_LOCK:
+            SNAPSHOT_IN_PROGRESS.discard(normalized_bot)
 
 
 def _maybe_run_dashboard_flat_snapshot(project_root: Path) -> None:
@@ -1654,26 +1688,33 @@ def _symbols_from_dashboard_log() -> List[str]:
 
 
 def _ensure_fixed_cycle_long_bot_status(bots_by_symbol: dict, profile: Optional[str] = None):
-    """Mark fixed-cycle Long Bot as running for the selected bot_N profile."""
+    """Inject strict fixed-cycle long-bot status for the selected bot_N profile."""
     prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
     if not prof or not is_bot_profile(prof):
         return
-    symbol = get_fixed_cycle_symbol()
-    if not symbol:
-        return
-    pid = find_fixed_cycle_runner_pid()
-    if symbol not in bots_by_symbol:
-        bots_by_symbol[symbol] = {}
-    long_entry = bots_by_symbol[symbol].get("long", {})
-    running = long_entry.get("running", False) or bool(pid)
-    status_text = long_entry.get("status_text") or ("Long Bot läuft" if running else "Long Bot gestoppt")
-    bots_by_symbol[symbol]["long"] = {
-        "running": running,
-        "status": "running" if running else "stopped",
-        "status_text": status_text,
-        "pid": pid,
-        "service_name": long_entry.get("service_name") or "fixed_cycle_hedge_bot.runner"
-    }
+    try:
+        from utils.bot_monitor import get_bot_status
+
+        bot_name = profile_to_long_bot_name(prof)
+        if not bot_name:
+            return
+        bot_status = get_bot_status("", bot_type="long", bot_name=bot_name, profile=prof)
+        symbol = str(bot_status.get("symbol") or get_fixed_cycle_symbol() or "").strip().upper()
+        if not symbol:
+            return
+        if symbol not in bots_by_symbol:
+            bots_by_symbol[symbol] = {}
+        long_entry = dict(bots_by_symbol[symbol].get("long", {}))
+        if bot_status.get("status_label") and not bot_status.get("status_text"):
+            bot_status["status_text"] = bot_status.get("status_label")
+        merged = {}
+        merged.update(long_entry)
+        merged.update(bot_status)
+        if not merged.get("service_name"):
+            merged["service_name"] = long_entry.get("service_name") or "fixed_cycle_hedge_bot.runner"
+        bots_by_symbol[symbol]["long"] = merged
+    except Exception as exc:
+        logger.debug("[SYSTEM-STATUS] Strict fixed-cycle long status could not be injected: %s", exc)
 
 
 def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optional[str] = None) -> Optional[str]:
@@ -1687,12 +1728,14 @@ def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optio
         bot_name = profile_to_long_bot_name(prof)
         if not bot_name:
             return None
-        bot_status = get_bot_status("", bot_type="long", bot_name=bot_name)
+        bot_status = get_bot_status("", bot_type="long", bot_name=bot_name, profile=prof)
         symbol = str(bot_status.get("symbol") or "").strip().upper()
         if not symbol:
             return None
         if symbol not in bots_by_symbol:
             bots_by_symbol[symbol] = {}
+        if bot_status.get("status_label") and not bot_status.get("status_text"):
+            bot_status["status_text"] = bot_status.get("status_label")
         bots_by_symbol[symbol]["long"] = bot_status
         return symbol
     except Exception as exc:
@@ -1701,23 +1744,59 @@ def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optio
 
 
 def _inject_fixed_cycle_overview_entry(bots_list: list[dict], prof_key: str):
-    """Ensure fixed cycle symbol appears in all-bots overview for Bot 1."""
-    if prof_key != "bot_1":
+    """Ensure bot_N overview uses strict registry-backed long-bot status."""
+    if not is_bot_profile(prof_key):
         return
-    symbol = get_fixed_cycle_symbol()
+    try:
+        from utils.bot_monitor import get_bot_status
+
+        bot_name = profile_to_long_bot_name(prof_key)
+        if not bot_name:
+            return
+        bot_status = get_bot_status("", bot_type="long", bot_name=bot_name, profile=prof_key)
+    except Exception as exc:
+        logger.debug("[ALL-BOTS-OVERVIEW] Strict long status injection failed for %s: %s", prof_key, exc)
+        return
+    symbol = str(bot_status.get("symbol") or get_fixed_cycle_symbol() or "").strip().upper()
     if not symbol:
         return
-    pid = find_fixed_cycle_runner_pid()
-    running = bool(pid)
+    running = bool(bot_status.get("running"))
     for bot in bots_list:
         if bot.get("symbol") == symbol:
-            bot["long"] = bot.get("long") or running
+            bot["long"] = running
             return
     bots_list.insert(0, {
         "symbol": symbol,
         "long": running,
         "short": False
     })
+
+
+def _get_profile_scoped_long_status(symbol: str, profile: Optional[str] = None) -> dict:
+    """Resolve long-bot status strictly for bot_N profiles, generic otherwise."""
+    prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if prof and is_bot_profile(prof):
+        try:
+            from utils.bot_monitor import get_bot_status
+
+            bot_name = profile_to_long_bot_name(prof)
+            if bot_name:
+                bot_status = get_bot_status(symbol, bot_type="long", bot_name=bot_name, profile=prof)
+                if bot_status.get("status_label") and not bot_status.get("status_text"):
+                    bot_status["status_text"] = bot_status.get("status_label")
+                if not bot_status.get("service_name"):
+                    bot_status["service_name"] = "fixed_cycle_hedge_bot.runner"
+                return bot_status
+        except Exception as exc:
+            logger.debug("[SYSTEM-STATUS] Profile-scoped long status fallback for %s failed: %s", prof, exc)
+
+    running = is_bot_running(symbol, bot_type="long", profile=prof or None)
+    return {
+        "running": running,
+        "status": "running" if running else "stopped",
+        "status_text": "Long Bot läuft" if running else "Long Bot gestoppt",
+        "service_name": f"hedgebot-long@{symbol}" if symbol else "hedgebot-long",
+    }
 
 
 def _list_symbols_from_config() -> List[str]:
@@ -2996,9 +3075,6 @@ def _get_profile_labels(profile: str) -> dict:
     return {"main_label": "Main (Long)", "sub_label": "Sub (Short)"}
 
 
-LIVE_CHARTS_ACCOUNTS = tuple(get_live_charts_accounts())
-
-
 def _resolve_account_to_profile_and_type(acc: str) -> tuple[str, str, bool]:
     """
     acc: main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2|Long_bot_3...
@@ -3018,22 +3094,302 @@ def _resolve_account_to_profile_and_type(acc: str) -> tuple[str, str, bool]:
     return profile, bot_type, True
 
 
+def _get_current_live_charts_accounts() -> tuple[str, ...]:
+    return tuple(get_live_charts_accounts())
+
+
+def _normalize_live_charts_account(account: str | None) -> tuple[str, tuple[str, ...]]:
+    accounts = _get_current_live_charts_accounts()
+    acc = (account or "main").strip()
+    if acc.lower() in ("main", "sub"):
+        acc = acc.lower()
+    if acc not in accounts:
+        acc = "main"
+    return acc, accounts
+
+
+def _normalize_symbol_value(value: Any) -> str | None:
+    if not value:
+        return None
+    try:
+        text = str(value).strip()
+    except Exception:
+        return None
+    if not text:
+        return None
+    return text.upper()
+
+
+def _load_json_file(path: Path) -> dict | None:
+    if not path or not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _symbol_from_active_bot_symbols(bot_name: str) -> tuple[str | None, str]:
+    data = _load_json_file(LIVE_BOT_LOGS_ROOT / "state" / "active_bot_symbols.json")
+    if not data:
+        return None, "active_bot_symbols_json"
+    entry = data.get(bot_name) or data.get(bot_name.lower()) or data.get(bot_name.upper())
+    if isinstance(entry, dict):
+        return _normalize_symbol_value(entry.get("symbol")), "active_bot_symbols_json"
+    return None, "active_bot_symbols_json"
+
+
+def _symbol_from_run_status(bot_name: str) -> tuple[str | None, str]:
+    data = _load_json_file(LIVE_BOT_LOGS_ROOT / bot_name / "run" / "status.json")
+    if data:
+        return _normalize_symbol_value(data.get("symbol")), "run_status_json"
+    return None, "run_status_json"
+
+
+def _symbol_from_state_file(account: str) -> tuple[str | None, str]:
+    state_file = _state_file_for_account(account)
+    if not state_file:
+        return None, "fixed_cycle_state_json"
+    data = _load_json_file(state_file)
+    if data:
+        if sym := _normalize_symbol_value(data.get("symbol")):
+            return sym, "fixed_cycle_state_json"
+        for key in ("current_symbol", "trading_symbol"):
+            if sym := _normalize_symbol_value(data.get(key)):
+                return sym, "fixed_cycle_state_json"
+        snapshot = data.get("snapshot") or {}
+        if isinstance(snapshot, dict):
+            if sym := _normalize_symbol_value(snapshot.get("symbol")):
+                return sym, "fixed_cycle_state_json"
+    return None, "fixed_cycle_state_json"
+
+
+def _symbol_from_snapshot(account: str) -> tuple[str | None, str]:
+    snapshot_file = _wallet_snapshot_file_for_account(account)
+    if not snapshot_file:
+        return None, "snapshot_json"
+    data = _load_json_file(snapshot_file)
+    if data:
+        return _normalize_symbol_value(data.get("symbol")), "snapshot_json"
+    return None, "snapshot_json"
+
+
+def _symbol_from_best_coin() -> tuple[str | None, str]:
+    data = _load_json_file(project_root / "logs" / "best_coin.json")
+    if data:
+        return _normalize_symbol_value(data.get("symbol")), "best_coin_json"
+    return None, "best_coin_json"
+
+
+def _fetch_bybit_open_orders(account: str, symbol: str, logger: logging.Logger) -> list[dict[str, Any]] | None:
+    api_key, secret_key = _get_account_keys(account)
+    if not api_key or not secret_key:
+        logger.warning("[LIVE-ORDER-LEVELS] missing credentials", {"account": account})
+        return None
+    try:
+        manager = BybitOrderManager(api_key, secret_key)
+        return manager.fetch_open_orders_direct(symbol, timeout=5)
+    except Exception as exc:
+        logger.warning(
+            "[LIVE-ORDER-LEVELS] Bybit fetch failed",
+            {"account": account, "symbol": symbol, "error": str(exc)},
+        )
+        return None
+
+
+def _get_active_symbol_for_live_charts_account(account: str | None) -> tuple[str | None, str]:
+    acc, _ = _normalize_live_charts_account(account)
+    if not acc.lower().startswith("long_bot_"):
+        return None, "none"
+    bot_name = acc.lower()
+    for getter in (
+        _symbol_from_active_bot_symbols,
+        _symbol_from_run_status,
+    ):
+        symbol, source = getter(bot_name)
+        if symbol:
+            return symbol, source
+    for getter in (
+        _symbol_from_state_file,
+        _symbol_from_snapshot,
+    ):
+        symbol, source = getter(acc)
+        if symbol:
+            return symbol, source
+    return _symbol_from_best_coin()
+
+
+def _load_live_chart_order_levels(account: str | None, symbol: str | None) -> tuple[list[dict[str, Any]], str, str, int]:
+    acc, _ = _normalize_live_charts_account(account)
+    normalized_bot = acc.lower()
+    if not normalized_bot.startswith("long_bot_"):
+        return [], normalized_bot, symbol or "", 0
+    state_file = _state_file_for_account(acc)
+    if not state_file or not state_file.exists():
+        logger.info(
+            "[LIVE-ORDER-LEVELS] state file missing",
+            {"account": acc, "bot_name": normalized_bot, "state_file": str(state_file or "")},
+        )
+        return [], normalized_bot, symbol or "", 0
+    data = _load_json_file(state_file)
+    if not data:
+        logger.warning(
+            "[LIVE-ORDER-LEVELS] state file unreadable",
+            {"account": acc, "bot_name": normalized_bot, "state_file": str(state_file)},
+        )
+        return [], normalized_bot, symbol or "", 0
+    active_orders_raw = data.get("active_orders") or data.get("orders") or []
+    active_orders = list(active_orders_raw.values()) if isinstance(active_orders_raw, dict) else list(active_orders_raw)
+
+    state_lookup: dict[str, dict[str, Any]] = {}
+    for order in active_orders:
+        metadata = order.get("metadata") or {}
+        for key in (
+            str(order.get("client_order_id") or "").strip(),
+            str(order.get("exchange_order_id") or "").strip(),
+            str(order.get("order_id") or "").strip(),
+            str(metadata.get("order_link_id") or "").strip(),
+            str(metadata.get("orderLinkId") or "").strip(),
+        ):
+            if key:
+                state_lookup[key] = order
+
+    symbol_upper = (symbol or "").strip().upper()
+    if not symbol_upper:
+        return [], normalized_bot, symbol or "", 0
+
+    bybit_orders = _fetch_bybit_open_orders(acc, symbol_upper, logger)
+    if bybit_orders is None:
+        logger.warning("[LIVE-ORDER-LEVELS] Bybit order fetch failed", {"account": acc, "symbol": symbol_upper})
+        return [], normalized_bot, symbol or "", 0
+    if not bybit_orders:
+        return [], normalized_bot, symbol or "", 0
+
+    def _role_text(entry: dict[str, Any]) -> str:
+        candidates = [
+            entry.get("purpose"),
+            entry.get("order_type"),
+            entry.get("orderRole"),
+            entry.get("order_role"),
+            entry.get("stop_order_type"),
+            entry.get("client_order_id"),
+            entry.get("clientOrderId"),
+            entry.get("order_link_id"),
+            entry.get("orderLinkId"),
+            (entry.get("metadata") or {}).get("order_role"),
+            (entry.get("metadata") or {}).get("purpose"),
+            (entry.get("metadata") or {}).get("order_type"),
+            (entry.get("metadata") or {}).get("client_order_id"),
+            (entry.get("metadata") or {}).get("clientOrderId"),
+            (entry.get("metadata") or {}).get("order_link_id"),
+            (entry.get("metadata") or {}).get("orderLinkId"),
+        ]
+        return " ".join(filter(None, (str(part) for part in candidates))).lower()
+
+    def _determine_label(role_text: str) -> tuple[str, str, str]:
+        level_type = "final_exit"
+        if any(keyword in role_text for keyword in ["long_add", "cycle_long_add", "long_reduce", "reduce_long", "long_sl"]):
+            level_type = "long_add"
+        elif any(keyword in role_text for keyword in ["short_tp", "cycle_short_tp", "short_take_profit", "take_profit_short", "tp_short", "short_reduce"]):
+            level_type = "short_tp"
+        elif any(keyword in role_text for keyword in ["final_exit", "long_tp_exit", "short_sl_exit", "long_exit", "short_exit", "exit_price"]):
+            level_type = "final_exit"
+        label_map = {"long_add": "Long Add", "short_tp": "Short TP", "final_exit": "Final Exit"}
+        color_map = {"long_add": "#ff3b30", "short_tp": "#00c853", "final_exit": "#ff9800"}
+        return level_type, label_map.get(level_type, "Order"), color_map.get(level_type, "#f97316")
+
+    levels: list[dict[str, Any]] = []
+    debug_orders: list[dict[str, Any]] = []
+    purposes: set[str] = set()
+    for order in bybit_orders:
+        info = order.get("info") or {}
+        side = (info.get("side") or order.get("side") or "").lower()
+        order_link = str(info.get("orderLinkId") or info.get("order_link_id") or "").strip()
+        entry_key = order_link or str(order.get("id") or order.get("orderId") or "").strip()
+        state_entry = state_lookup.get(entry_key)
+        current_role_text = _role_text(state_entry or {"metadata": info, "purpose": info.get("purpose"), "order_type": info.get("orderType")})
+        level_type, label, color = _determine_label(current_role_text)
+        purposes.add(current_role_text)
+        price = float(info.get("triggerPrice") or info.get("tpLimitPrice") or order.get("price") or info.get("price") or 0)
+        if price <= 0:
+            continue
+        price_source = "triggerPrice" if info.get("triggerPrice") else "tpLimitPrice" if info.get("tpLimitPrice") else "price"
+        levels.append(
+            {
+                "price": price,
+                "price_source": price_source,
+                "label": label,
+                "side": side,
+                "color": color,
+                "source": "bybit_open_orders",
+                "level_source": "bybit_open_orders",
+                "order_status": order.get("status") or info.get("orderStatus") or "",
+                "order_id": str(order.get("id") or order.get("orderId") or ""),
+                "exchange_order_id": state_entry.get("exchange_order_id") if state_entry else str(order.get("orderId") or ""),
+                "client_order_id": state_entry.get("client_order_id") if state_entry else order_link,
+                "role_text": current_role_text,
+                "verified_on_bybit": True,
+            }
+        )
+        debug_orders.append(
+            {
+                "client_order_id": levels[-1]["client_order_id"],
+                "role_text": current_role_text,
+                "selected_price": levels[-1]["price"],
+                "price_source": levels[-1]["price_source"],
+                "detected_side": levels[-1]["side"],
+            }
+        )
+
+    logger.debug(
+        "[LIVE-ORDER-LEVELS]",
+        {
+            "account": account,
+            "bot_name": normalized_bot,
+            "symbol": symbol_upper,
+            "state_file": str(state_file),
+            "levels_returned": len(levels),
+            "purposes_found": list(purposes),
+        },
+    )
+    return levels, normalized_bot, symbol or "", len(levels), debug_orders
+
+
+@app.get("/api/live-order-levels")
+async def api_live_order_levels(
+    account: str = Query("main", description="main|sub|Long_bot_N|Short_bot_N"),
+    symbol: str = Query("", description="Symbol, z.B. CHZUSDT"),
+):
+    sym = (symbol or "").strip().upper() or None
+    levels, bot_name, resolved_symbol, count, debug_orders = _load_live_chart_order_levels(account, sym)
+    return JSONResponse(
+        {
+            "ok": True,
+            "account": account,
+            "bot_name": bot_name,
+            "symbol": resolved_symbol,
+            "levels": levels,
+            "count": count,
+            "debug_orders": debug_orders,
+        }
+    )
+
+
 @app.get("/live-charts", response_class=HTMLResponse)
 async def live_charts(
     request: Request,
     user: dict = Depends(require_auth),
     symbol: str = Query("", description="Symbol, z.B. FILUSDT"),
-    account: str = Query("main", description="main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2"),
+    account: str = Query("main", description="main|sub|Long_bot_N|Short_bot_N"),
 ):
     """
     Live Charts Page – zeigt einen Lightweight-Charts-Preis-Chart für ein Symbol
     mit Burn-Levels. Account wählbar: main, sub, Long_bot_1, Short_bot_1, Long_bot_2, Short_bot_2.
     """
-    acc = (account or "main").strip()
-    if acc.lower() in ("main", "sub"):
-        acc = acc.lower()
-    if acc not in LIVE_CHARTS_ACCOUNTS:
-        acc = "main"
+    acc, chart_accounts = _normalize_live_charts_account(account)
 
     profile, bot_type, single_account = _resolve_account_to_profile_and_type(acc)
 
@@ -3045,13 +3401,37 @@ async def live_charts(
     except Exception:
         active_symbols = []
 
-    # Symbol wählen: Query > erstes Symbol
-    sym = (symbol or "").strip().upper()
+    requested_symbol = (symbol or "").strip().upper()
+    resolved_symbol, symbol_source = _get_active_symbol_for_live_charts_account(acc)
+    if requested_symbol:
+        if resolved_symbol and requested_symbol != resolved_symbol:
+            sym = resolved_symbol
+        else:
+            sym = requested_symbol
+    else:
+        sym = resolved_symbol
+    if sym and sym not in active_symbols:
+        active_symbols = [sym] + active_symbols
     if not sym and active_symbols:
         sym = active_symbols[0]
-    if sym and active_symbols and sym not in active_symbols:
-        # Fallback: auf erstes Symbol, wenn das angefragte nicht aktiv ist
-        sym = active_symbols[0]
+
+    symbol_for_log = sym
+    if not symbol_for_log:
+        symbol_for_log = requested_symbol or ""
+
+    logger.debug(
+        "[LIVE-CHARTS] symbols",
+        {
+            "requested_account": account,
+            "normalized_account": acc,
+            "normalized_bot_name": acc.lower(),
+            "requested_symbol": requested_symbol,
+            "resolved_active_symbol": resolved_symbol,
+            "symbol_source": symbol_source,
+            "final_selected_symbol": sym,
+            "available_symbols": active_symbols,
+        },
+    )
 
     burn_levels: list[float] = []
     exit_levels: list[float] = []
@@ -3154,6 +3534,13 @@ async def live_charts(
     else:
         main_label, sub_label = "Main (Long)", "Sub (Short)"
 
+    if acc.startswith("Long_bot_"):
+        threading.Thread(
+            target=_maybe_run_dashboard_start_snapshot,
+            args=(acc.lower(),),
+            daemon=True,
+        ).start()
+
     return HTMLResponse(render_template(
         "live_charts.html",
         {
@@ -3167,7 +3554,7 @@ async def live_charts(
             "available_symbols": active_symbols,
             "burn_levels": burn_levels,
             "exit_levels": exit_levels,
-            "chart_accounts": get_live_charts_accounts(),
+            "chart_accounts": chart_accounts,
             "bot_profiles": _serializable_bot_profiles(),
             "long_entry_price": long_entry_price,
             "short_entry_price": short_entry_price,
@@ -3247,18 +3634,14 @@ async def api_live_klines(
 @app.get("/api/live-positions")
 async def api_live_positions(
     symbol: str = Query(..., description="Bybit Symbol, z.B. FILUSDT"),
-    account: str = Query("main", description="main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2"),
+    account: str = Query("main", description="main|sub|Long_bot_N|Short_bot_N"),
 ):
     """
     Liefert die aktuellen Entry-Preise (Long/Short) und den aktuellen Mark-Preis
-    für ein Symbol. account wählbar: main, sub, Long_bot_1, Short_bot_1, Long_bot_2, Short_bot_2.
+    für ein Symbol. account wählbar: main, sub oder ein Long/Short-Bot.
     """
     sym = (symbol or "").strip().upper()
-    acc = (account or "main").strip()
-    if acc.lower() in ("main", "sub"):
-        acc = acc.lower()
-    if acc not in LIVE_CHARTS_ACCOUNTS:
-        acc = "main"
+    acc, _ = _normalize_live_charts_account(account)
     try:
         live = _get_live_positions_snapshot(acc, sym, profile=None) or {}
 
@@ -3304,7 +3687,7 @@ async def api_live_positions(
 async def api_live_positions_grid(
     user: dict = Depends(require_auth),
     profile: Optional[str] = Query(None, description="Legacy: main|bot_1|bot_2"),
-    account: Optional[str] = Query(None, description="main|sub|Long_bot_1|Short_bot_1|Long_bot_2|Short_bot_2 für Einzelaccount"),
+    account: Optional[str] = Query(None, description="main|sub|Long_bot_N|Short_bot_N für Einzelaccount"),
 ):
     """
     Liefert eine Kachel-Übersicht für Live-Charts.
@@ -3314,19 +3697,8 @@ async def api_live_positions_grid(
         raise HTTPException(status_code=401, detail="Auth required")
 
     project_root = Path(__file__).resolve().parent.parent
-    acc = (account or "main").strip()
-    if acc.lower() in ("main", "sub"):
-        acc = acc.lower()
-    if not acc or acc not in LIVE_CHARTS_ACCOUNTS:
-        acc = "main"
-
-    if acc in LIVE_CHARTS_ACCOUNTS:
-        prof, bot_type, _ = _resolve_account_to_profile_and_type(acc)
-    else:
-        prof = (profile or "main").strip().lower()
-        if prof not in ("main", "bot_1", "bot_2"):
-            prof = "main"
-        bot_type = "long"  # für beide Spalten
+    acc, _ = _normalize_live_charts_account(account)
+    prof, bot_type, _ = _resolve_account_to_profile_and_type(acc)
 
     def _read_levels(sym: str, bt: str, prof_arg: str = "main") -> tuple[list[float], list[float]]:
         """Return (burn_levels_all_cycles, exit_levels)."""
@@ -6817,7 +7189,7 @@ async def api_start_bot_script(
 
     if profile_record and bot_type == "long":
         project_root = Path(__file__).resolve().parent.parent
-        _maybe_run_dashboard_start_snapshot(project_root, profile_record["bot_name"])
+        _maybe_run_dashboard_start_snapshot(profile_record["bot_name"], project_root=project_root)
         script_path = _long_bot_shared_script_path("start")
         if not _is_executable_script(script_path):
             return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
@@ -7391,7 +7763,7 @@ async def api_bot_start(symbol: str, request: BotActionRequest, user: dict = Dep
 
         if profile_record and bot_type == "long":
             project_root = Path(__file__).resolve().parent.parent
-            _maybe_run_dashboard_start_snapshot(project_root, profile_record["bot_name"])
+            _maybe_run_dashboard_start_snapshot(profile_record["bot_name"], project_root=project_root)
             script_path = _long_bot_shared_script_path("start")
             if not _is_executable_script(script_path):
                 return {"success": False, "message": f"Script nicht gefunden: {script_path}"}
@@ -8279,6 +8651,7 @@ async def api_get_system_status(
     
     try:
         logger.debug("[SYSTEM-STATUS] Starte Status-Abfrage...")
+        profile_long_bot_status = None
         
         # Get all services status (Master Bot, Dashboard)
         try:
@@ -8304,10 +8677,10 @@ async def api_get_system_status(
                 bot_type = bot.get("bot_type", "long")
                 if symbol not in bots_by_symbol:
                     bots_by_symbol[symbol] = {}
-                bots_by_symbol[symbol][bot_type] = {
-                    "running": bot.get("running", False),
-                    "service_name": bot.get("service_name", "")
-                }
+                bot_entry = dict(bot)
+                if bot_entry.get("status_label") and not bot_entry.get("status_text"):
+                    bot_entry["status_text"] = bot_entry.get("status_label")
+                bots_by_symbol[symbol][bot_type] = bot_entry
             except Exception as e:
                 logger.warning(f"[SYSTEM-STATUS] Fehler beim Verarbeiten von Bot {bot}: {e}")
                 continue
@@ -8330,11 +8703,14 @@ async def api_get_system_status(
                         
                         # Add bot if not already in list (or update if exists)
                         if bot_type_key not in bots_by_symbol[symbol]:
-                            from utils.bot_monitor import is_bot_running
-                            bots_by_symbol[symbol][bot_type_key] = {
-                                "running": is_bot_running(symbol, bot_type=bot_type_key),
-                                "service_name": f"hedgebot-{bot_type_key}@{symbol}"
-                            }
+                            if bot_type_key == "long":
+                                bots_by_symbol[symbol][bot_type_key] = _get_profile_scoped_long_status(symbol, profile=profile)
+                            else:
+                                from utils.bot_monitor import is_bot_running
+                                bots_by_symbol[symbol][bot_type_key] = {
+                                    "running": is_bot_running(symbol, bot_type=bot_type_key),
+                                    "service_name": f"hedgebot-{bot_type_key}@{symbol}"
+                                }
         except Exception as e:
             logger.debug(f"[SYSTEM-STATUS] Konnte PID-Datei nicht prüfen (optional): {e}")
         
@@ -8362,11 +8738,14 @@ async def api_get_system_status(
                             bots_by_symbol[symbol] = {}
                         
                         if bot_type_key not in bots_by_symbol[symbol]:
-                            from utils.bot_monitor import is_bot_running
-                            bots_by_symbol[symbol][bot_type_key] = {
-                                "running": is_bot_running(symbol, bot_type=bot_type_key),
-                                "service_name": f"hedgebot-{bot_type_key}@{symbol}"
-                            }
+                            if bot_type_key == "long":
+                                bots_by_symbol[symbol][bot_type_key] = _get_profile_scoped_long_status(symbol, profile=profile)
+                            else:
+                                from utils.bot_monitor import is_bot_running
+                                bots_by_symbol[symbol][bot_type_key] = {
+                                    "running": is_bot_running(symbol, bot_type=bot_type_key),
+                                    "service_name": f"hedgebot-{bot_type_key}@{symbol}"
+                                }
                             logger.debug(f"[SYSTEM-STATUS] Bot hinzugefügt: {bot_type_key}@{symbol}, running={bots_by_symbol[symbol][bot_type_key]['running']}")
                 logger.info(f"[SYSTEM-STATUS] Nach Log-Dateien: {len(bots_by_symbol)} Symbole mit Bots")
             
@@ -8383,11 +8762,14 @@ async def api_get_system_status(
                         bots_by_symbol[symbol] = {}
                     
                     if bot_type_key not in bots_by_symbol[symbol]:
-                        from utils.bot_monitor import is_bot_running
-                        bots_by_symbol[symbol][bot_type_key] = {
-                            "running": is_bot_running(symbol, bot_type=bot_type_key),
-                            "service_name": f"hedgebot-{bot_type_key}@{symbol}"
-                        }
+                        if bot_type_key == "long":
+                            bots_by_symbol[symbol][bot_type_key] = _get_profile_scoped_long_status(symbol, profile=profile)
+                        else:
+                            from utils.bot_monitor import is_bot_running
+                            bots_by_symbol[symbol][bot_type_key] = {
+                                "running": is_bot_running(symbol, bot_type=bot_type_key),
+                                "service_name": f"hedgebot-{bot_type_key}@{symbol}"
+                            }
         except Exception as e:
             logger.error(f"[SYSTEM-STATUS] FEHLER beim Extrahieren von Symbolen aus Log/State-Dateien: {e}", exc_info=True)
         
@@ -8417,11 +8799,7 @@ async def api_get_system_status(
                         
                         # Check Long Bot status (even if not running)
                         if 'long' not in bots_by_symbol[symbol]:
-                            from utils.bot_monitor import is_bot_running
-                            bots_by_symbol[symbol]['long'] = {
-                                "running": is_bot_running(symbol, bot_type="long"),
-                                "service_name": f"hedgebot-long@{symbol}"
-                            }
+                            bots_by_symbol[symbol]['long'] = _get_profile_scoped_long_status(symbol, profile=profile)
                         
                         # Check Short Bot status (even if not running)
                         if 'short' not in bots_by_symbol[symbol]:
@@ -8432,6 +8810,25 @@ async def api_get_system_status(
                             }
         except Exception as e:
             logger.debug(f"[SYSTEM-STATUS] Konnte Symbole mit Positionen nicht abrufen (optional): {e}")
+
+        prof = _normalize_dashboard_profile(profile, fallback_to_main=False)
+        if prof and is_bot_profile(prof):
+            try:
+                bot_name = profile_to_long_bot_name(prof)
+                if bot_name:
+                    profile_long_bot_status = get_bot_status(
+                        "",
+                        bot_type="long",
+                        bot_name=bot_name,
+                        profile=prof,
+                    )
+                    if (
+                        profile_long_bot_status.get("status_label")
+                        and not profile_long_bot_status.get("status_text")
+                    ):
+                        profile_long_bot_status["status_text"] = profile_long_bot_status.get("status_label")
+            except Exception as exc:
+                logger.debug("[SYSTEM-STATUS] profile_long_bot_status konnte nicht geladen werden: %s", exc)
         
         _ensure_fixed_cycle_long_bot_status(bots_by_symbol, profile=profile)
         focus_symbol = _inject_profile_long_bot_runtime_status(bots_by_symbol, profile=profile)
@@ -8453,6 +8850,7 @@ async def api_get_system_status(
             "total_bots": len(all_bots),
             "price_at": price_at,
             "focus_symbol": focus_symbol,
+            "profile_long_bot_status": profile_long_bot_status,
         }
         
         logger.info(f"[SYSTEM-STATUS] Status-Abfrage erfolgreich: {len(result.get('services', {}))} Services, {len(bots_by_symbol)} Symbole mit Bots, {result.get('total_bots', 0)} laufende Bots")
@@ -8482,6 +8880,7 @@ async def api_get_system_status(
             "all_services_active": False,
             "total_bots": 0,
             "price_at": price_at_fallback,
+            "profile_long_bot_status": None,
         }, status_code=200)  # Status 200 statt 503, damit Frontend die Fehlermeldung anzeigen kann
 
 
@@ -8504,7 +8903,7 @@ async def api_get_all_bots_overview(user: dict = Depends(require_auth)):
             bots_list = []
             prof_for_monitor = profile_value
             for sym in symbols:
-                long_running = is_bot_running(sym, bot_type="long", profile=prof_for_monitor)
+                long_running = bool(_get_profile_scoped_long_status(sym, profile=prof_for_monitor).get("running"))
                 short_running = is_bot_running(sym, bot_type="short", profile=prof_for_monitor)
                 bots_list.append({
                     "symbol": sym,
@@ -8842,7 +9241,7 @@ async def api_run_restart_fixed_cycle_script(user: dict = Depends(require_auth))
     if not script_path.exists():
         logger.error("restart_fixed_cycle.sh missing at %s", script_path)
         return JSONResponse({"success": False, "error": "restart_fixed_cycle.sh not found"}, status_code=400)
-    _maybe_run_dashboard_start_snapshot(project_root)
+    _maybe_run_dashboard_start_snapshot(project_root=project_root)
     return _run_restart_fixed_cycle_script(script_path, project_root)
 
 
@@ -8961,7 +9360,7 @@ async def api_run_start_long_bot_script(
     if error:
         return JSONResponse({"success": False, "error": error}, status_code=400)
     project_root = Path(__file__).resolve().parent.parent
-    _maybe_run_dashboard_start_snapshot(project_root, bot_name)
+    _maybe_run_dashboard_start_snapshot(bot_name=bot_name, project_root=project_root)
     script_path = _long_bot_shared_script_path("start")
     if not _is_executable_script(script_path):
         return JSONResponse({"success": False, "error": f"Central start script missing: {script_path}"}, status_code=400)
@@ -8996,7 +9395,7 @@ async def api_run_restart_long_bot_script(
     if error:
         return JSONResponse({"success": False, "error": error}, status_code=400)
     project_root = Path(__file__).resolve().parent.parent
-    _maybe_run_dashboard_start_snapshot(project_root, bot_name)
+    _maybe_run_dashboard_start_snapshot(bot_name=bot_name, project_root=project_root)
     stop_script = _long_bot_shared_script_path("stop")
     start_script = _long_bot_shared_script_path("start")
     if not _is_executable_script(stop_script):

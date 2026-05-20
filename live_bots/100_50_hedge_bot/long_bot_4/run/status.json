@@ -1,8 +1,9 @@
 {
   "bot_name": "long_bot_4",
-  "status": "running",
-  "updated_at": "2026-05-17T10:01:48.685536+00:00",
-  "symbol": "PENGUUSDT",
-  "start_requested": true,
-  "pid": 1203344
+  "status": "stopped",
+  "start_requested": false,
+  "pid": null,
+  "symbol": "",
+  "reason": "stale_status_cleanup_no_runner",
+  "updated_at": "2026-05-20T12:57:46.235777+00:00"
 }

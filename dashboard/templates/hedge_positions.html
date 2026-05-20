@@ -3967,7 +3967,10 @@
             const shortPriceAt = selectedSymbol ? (priceAt.short || {})[selectedSymbol] : null;
 
             // Long Bot Status (mit Start-Button / Price-at-Anzeige)
-            const longBot = selectedBots['long'] || { running: false, status: 'stopped', status_label: '', start_requested: false };
+            const profileLongBot = data.profile_long_bot_status || null;
+            const longBot = isProfileBotSelected && profileLongBot
+                ? profileLongBot
+                : (selectedBots['long'] || { running: false, status: 'stopped', status_label: '', start_requested: false });
             let longRunning = !!longBot.running;
             const isWaiting = longBot.status === 'waiting_for_symbol' && longBot.start_requested;
             const longBotDescDefault = longRunning

@@ -123,6 +123,24 @@ def resolve_bot_metadata(bot_name: str, logger: logging.Logger) -> tuple[str, st
     return (symbol.upper(), category or "linear")
 
 
+def load_bot_runtime_state(bot_name: str, logger: logging.Logger) -> dict[str, Any]:
+    state_path = BOT_ROOT / bot_name.lower() / "state" / "fixed_cycle_state.json"
+    if not state_path.exists():
+        return {"path": str(state_path), "strategy_state": {}, "active_orders": []}
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Failed to read strategy state for %s: %s", bot_name, exc, exc_info=False)
+        return {"path": str(state_path), "strategy_state": {}, "active_orders": []}
+    strategy_state = payload.get("strategy_state") if isinstance(payload, dict) else {}
+    active_orders = payload.get("active_orders") if isinstance(payload, dict) else []
+    return {
+        "path": str(state_path),
+        "strategy_state": strategy_state if isinstance(strategy_state, dict) else {},
+        "active_orders": active_orders if isinstance(active_orders, list) else [],
+    }
+
+
 def detect_active_symbol_and_qty(
     order_manager: BybitOrderManager, symbol: str, category: str
 ) -> tuple[str | None, float, float]:
@@ -175,6 +193,8 @@ def summarize_order(order: Mapping[str, Any]) -> dict[str, Any]:
 
     summary = {
         "orderLinkId": safe_str(order.get("orderLinkId") or order.get("order_link_id") or order.get("clientOrderId")),
+        "client_order_id": safe_str(order.get("client_order_id")),
+        "purpose": safe_str(order.get("purpose")),
         "side": safe_str(order.get("side")),
         "qty": safe_float(order.get("qty")),
         "status": safe_str(order.get("orderStatus") or order.get("order_status")),
@@ -192,7 +212,7 @@ def extract_order_signature(order: Mapping[str, Any]) -> str:
 
 
 def classify_order_groups(orders: list[Mapping[str, Any]]) -> tuple[dict[str, bool], list[dict[str, Any]]]:
-    groups = {"long_exit": False, "short_exit": False, "cycle": False}
+    groups = {"long_exit": False, "short_exit": False, "cycle": False, "refill": False}
     summary: list[dict[str, Any]] = []
     for order in orders:
         signature = extract_order_signature(order)
@@ -203,6 +223,8 @@ def classify_order_groups(orders: list[Mapping[str, Any]]) -> tuple[dict[str, bo
             groups["short_exit"] = True
         if "CYCLE_" in signature:
             groups["cycle"] = True
+        if "REFILL_LONG" in signature or "REFILL_SHORT" in signature:
+            groups["refill"] = True
     return groups, summary
 
 
@@ -358,10 +380,11 @@ def handle_profile(
     order_manager = BybitOrderManager(api_key, secret_key)
 
     successful_orders: list[dict[str, Any]] = []
-    groups_present: dict[str, bool] = {"long_exit": False, "short_exit": False, "cycle": False}
+    groups_present: dict[str, bool] = {"long_exit": False, "short_exit": False, "cycle": False, "refill": False}
     fetched_once = False
     missing_groups: list[str] = []
     required_groups = required_groups_for_position(long_qty, short_qty)
+    logged_refill_pending_tolerated = False
 
     for attempt_idx, delay in enumerate(RETRY_DELAYS):
         if attempt_idx > 0:
@@ -371,7 +394,36 @@ def handle_profile(
             logger.warning("Failed to fetch orders for %s (%s)", profile_name, symbol)
             continue
         fetched_once = True
-        groups_present, successful_orders = classify_order_groups(orders)
+        runtime_state_payload = load_bot_runtime_state(bot_name, logger)
+        strategy_state = runtime_state_payload.get("strategy_state") or {}
+        persisted_active_orders = runtime_state_payload.get("active_orders") or []
+        combined_orders = list(orders) + list(persisted_active_orders)
+        groups_present, successful_orders = classify_order_groups(combined_orders)
+        required_groups = required_groups_for_position(long_qty, short_qty)
+        bot_state = str(strategy_state.get("bot_state") or "").upper()
+        refill_pending = bot_state == "REFILL_PENDING" or bool(strategy_state.get("refill_pending"))
+        refill_in_progress = bool(strategy_state.get("refill_in_progress"))
+        refill_state = strategy_state.get("refill_state") or {}
+        if refill_pending:
+            required_groups = [name for name in required_groups if name != "cycle"]
+            if refill_in_progress:
+                required_groups.append("refill")
+                if not groups_present.get("refill"):
+                    logger.warning(
+                        "safety_refill_in_progress_without_orders bot=%s symbol=%s attempt=%s refill_state=%s",
+                        bot_name,
+                        symbol,
+                        attempt_idx + 1,
+                        refill_state,
+                    )
+            elif not logged_refill_pending_tolerated:
+                logger.info(
+                    "safety_refill_pending_cycle_gap_tolerated bot=%s symbol=%s refill_state=%s",
+                    bot_name,
+                    symbol,
+                    refill_state,
+                )
+                logged_refill_pending_tolerated = True
         missing_groups = [name for name in required_groups if not groups_present.get(name)]
         write_debug_event(
             logger,
@@ -386,6 +438,10 @@ def handle_profile(
                 "required_groups": required_groups,
                 "missing_groups": missing_groups,
                 "open_orders_summary": successful_orders,
+                "bot_state": bot_state,
+                "refill_pending": refill_pending,
+                "refill_in_progress": refill_in_progress,
+                "refill_state": refill_state,
             },
         )
         if not missing_groups:

@@ -1,6 +1,7 @@
 """
 Bot monitoring utilities
 """
+import logging
 import subprocess
 import json
 import os
@@ -13,6 +14,8 @@ try:
     from dashboard.bot_registry import get_bot_profiles, get_bot_paths
 except ImportError:
     from bot_registry import get_bot_profiles, get_bot_paths
+
+logger = logging.getLogger(__name__)
 
 # Try to import psutil for process checking
 try:
@@ -402,87 +405,102 @@ def get_bot_status(
 
     payload = {}
     pid_value = None
+    pid_path = None
+
     if bot_name:
         bot_info = _read_bot_status_from_run(bot_name)
         pid_path = bot_info["pid_path"]
         payload = bot_info["status_payload"]
-    else:
-        pid_path = None
+
+    payload_status = payload.get("status")
+    payload_symbol = payload.get("symbol")
+
+    logger.debug("Bot %s status payload=%s", bot_name, payload_status)
 
     running = False
-    stale_pid = False
-    is_valid_pid = False
+    valid_pid = False
+
     if pid_path and pid_path.exists():
         try:
             pid_raw = pid_path.read_text(encoding="utf-8").strip()
             pid_value = int(pid_raw) if pid_raw.isdigit() else None
         except Exception:
             pid_value = None
-        if pid_value:
-            if _pid_alive(pid_value):
-                cmdline = _read_pid_cmdline(pid_value)
-                if "fixed_cycle_hedge_bot.runner" in cmdline and (bot_name and f"--bot-name {bot_name}" in cmdline):
-                    running = True
-                    is_valid_pid = True
-                else:
-                    stale_pid = True
+        if pid_value and _pid_alive(pid_value):
+            cmdline = _read_pid_cmdline(pid_value)
+            if (
+                "fixed_cycle_hedge_bot.runner" in cmdline
+                and bot_name
+                and f"--bot-name {bot_name}" in cmdline
+            ):
+                running = True
+                valid_pid = True
+                logger.debug("Valid PID %s for %s", pid_value, bot_name)
             else:
-                stale_pid = True
+                logger.debug("PID %s cmdline mismatch for %s: %s", pid_value, bot_name, cmdline)
         else:
-            stale_pid = True
+            logger.debug("PID %s not alive for %s", pid_value, bot_name)
+        if not valid_pid and pid_path.exists():
+            try:
+                pid_path.unlink(missing_ok=True)
+                logger.debug("Removed stale PID file %s", pid_path)
+            except Exception:
+                pass
 
-    if not running:
-        running = is_bot_running(symbol, bot_type=bot_type, profile=prof or None)
-        if running and not is_valid_pid:
-            pid_value, _ = get_bot_pid_from_run_dir(symbol, bot_type, profile=prof or None)
-            is_valid_pid = bool(pid_value)
-            stale_pid = not is_valid_pid
+    # For diagnostics only; must not flip running flag if valid_pid=false
+    fallback_running = is_bot_running(symbol, bot_type=bot_type, profile=prof or None)
+    logger.debug("Fallback is_bot_running(%s) => %s", bot_name, fallback_running)
 
-    if running:
+    if payload_status == "stopped" and not valid_pid:
+        logger.debug("Payload status stopped overrides running flag for %s", bot_name)
+        running = False
+    elif valid_pid:
+        running = True
+    else:
+        running = False
+
+    if running and valid_pid:
         return {
             "bot_name": bot_name,
             "bot_type": bot_type,
-            "symbol": payload.get("symbol") or symbol,
+            "symbol": payload_symbol or symbol,
             "running": True,
-            "stale_pid": stale_pid,
+            "stale_pid": False,
             "start_requested": True,
             "status": "running",
-            "status_label": f"läuft{'' if not payload.get('symbol') else ': ' + payload.get('symbol')}",
+            "status_label": f"läuft{'' if not payload_symbol else ': ' + payload_symbol}",
             "pid": pid_value,
+            "status_source": "validated_run_pid",
         }
 
-    payload_status = payload.get("status")
-    start_requested = bool(payload.get("start_requested"))
-    if not running:
-        # kill stale start-requested flag if no valid PID or wait/pid files
-        if not is_valid_pid:
-            start_requested = False
-    if payload_status == "waiting_for_symbol" and start_requested:
+    if payload_status == "waiting_for_symbol" and bool(payload.get("start_requested")):
         return {
             "bot_name": bot_name,
             "bot_type": bot_type,
-            "symbol": payload.get("symbol"),
+            "symbol": payload_symbol,
             "running": False,
             "status": "waiting_for_symbol",
-            "status_label": payload.get("symbol")
+            "status_label": payload_symbol
             and payload.get("reserved_by")
-            and f"{payload.get('symbol')} reserviert von {payload.get('reserved_by')}"
+            and f"{payload_symbol} reserviert von {payload.get('reserved_by')}"
             or "wartet auf neuen Coin",
             "reserved_by": payload.get("reserved_by"),
             "reason": payload.get("reason"),
             "pid": None,
             "start_requested": True,
+            "status_source": "run_status_json_waiting",
         }
 
     return {
         "bot_name": bot_name,
         "bot_type": bot_type,
-        "symbol": payload.get("symbol") or symbol,
+        "symbol": payload_symbol or symbol,
         "running": False,
         "start_requested": False,
         "status": "stopped",
         "status_label": "gestoppt",
         "pid": None,
+        "status_source": "no_valid_runner_pid",
     }
 
 
@@ -673,6 +691,61 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
     """
     bots = []
     found_symbols = set()
+    found_bot_names = set()
+
+    # Registry-backed long_bot_X cards must always come from get_bot_profiles() +
+    # strict get_bot_status(... bot_name=..., profile=...).
+    if bot_type is None or bot_type == "long":
+        for entry in get_bot_profiles():
+            bot_name = str(entry.get("bot_name") or "").strip()
+            profile = str(entry.get("profile") or "").strip()
+            if not bot_name:
+                continue
+            if bot_name in found_bot_names:
+                continue
+            run_info = _read_bot_status_from_run(bot_name)
+            run_payload = run_info.get("status_payload") or {}
+            resolved_symbol = str(run_payload.get("symbol") or "").strip().upper()
+
+            status_info = get_bot_status(
+                symbol=resolved_symbol,
+                bot_type="long",
+                bot_name=bot_name,
+                profile=profile,
+            )
+
+            registry_data = {
+                "bot_name": bot_name,
+                "profile": profile,
+                "label": entry.get("label"),
+                "index": entry.get("index"),
+                "long_account": entry.get("long_account"),
+                "short_account": entry.get("short_account"),
+                "bot_dir": str(entry.get("bot_dir")) if entry.get("bot_dir") is not None else None,
+            }
+            bot_paths = get_bot_paths(bot_name) or {}
+            if bot_paths:
+                registry_data.update(
+                    {
+                        "logs_dir": str(bot_paths.get("logs_dir")) if bot_paths.get("logs_dir") else None,
+                        "state_file": str(bot_paths.get("state_file")) if bot_paths.get("state_file") else None,
+                        "snapshot_file": str(bot_paths.get("snapshot_file")) if bot_paths.get("snapshot_file") else None,
+                    }
+                )
+
+            card = {}
+            card.update(registry_data)
+            card.update(status_info)
+            bots.append(card)
+            found_bot_names.add(bot_name)
+            logger.debug(
+                "Registry bot card resolved: bot_name=%s running=%s status=%s pid=%s source=%s",
+                bot_name,
+                card.get("running"),
+                card.get("status"),
+                card.get("pid"),
+                card.get("status_source"),
+            )
     
     # Get all systemd services (running AND inactive)
     try:
@@ -696,9 +769,10 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
                         service_name = parts[0]
                         if '@' in service_name:
                             symbol = service_name.split('@')[1].split('.')[0]
-                            found_symbols.add(('long', symbol))
                             if (bot_type is None or bot_type == "long"):
-                                bots.append(get_bot_status(symbol, bot_type="long"))
+                                logger.debug("Skipping legacy/systemd long service card for symbol=%s", symbol)
+                                found_symbols.add(('long', symbol))
+                                continue
                 
                 elif 'hedgebot-short@' in line:
                     parts = line.split()
@@ -730,9 +804,10 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
                                 if 'hedgebot-long@' in service_name:
                                     symbol = service_name.split('@')[1].split('.')[0]
                                     if ('long', symbol) not in found_symbols:
-                                        found_symbols.add(('long', symbol))
                                         if (bot_type is None or bot_type == "long"):
-                                            bots.append(get_bot_status(symbol, bot_type="long"))
+                                            logger.debug("Skipping inactive legacy/systemd long service card for symbol=%s", symbol)
+                                            found_symbols.add(('long', symbol))
+                                            continue
                                 elif 'hedgebot-short@' in service_name:
                                     symbol = service_name.split('@')[1].split('.')[0]
                                     if ('short', symbol) not in found_symbols:
@@ -758,6 +833,10 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
                         bot_type_key, symbol = parts
                         if (bot_type is None or bot_type == bot_type_key):
                             if (bot_type_key, symbol) not in found_symbols:
+                                if bot_type_key == "long":
+                                    logger.debug("Skipping local_bots_pids long legacy card for symbol=%s", symbol)
+                                    found_symbols.add((bot_type_key, symbol))
+                                    continue
                                 found_symbols.add((bot_type_key, symbol))
                                 bots.append(get_bot_status(symbol, bot_type=bot_type_key))
         except Exception as e:
@@ -782,6 +861,10 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
 
                     if (bot_type is None or bot_type == bot_type_key):
                         if (bot_type_key, symbol) not in found_symbols:
+                            if bot_type_key == "long":
+                                logger.debug("Skipping data/run long legacy card for symbol=%s", symbol)
+                                found_symbols.add((bot_type_key, symbol))
+                                continue
                             found_symbols.add((bot_type_key, symbol))
                             bots.append(get_bot_status(symbol, bot_type=bot_type_key))
         except Exception:
@@ -816,6 +899,10 @@ def get_all_bots(bot_type: str = None, include_inactive: bool = True) -> list:
                     if not symbol:
                         continue
                     if (bot_type_key, symbol) in found_symbols:
+                        continue
+                    if bot_type_key == "long":
+                        logger.debug("Skipping psutil long legacy card for symbol=%s", symbol)
+                        found_symbols.add((bot_type_key, symbol))
                         continue
                     found_symbols.add((bot_type_key, symbol))
                     bots.append(get_bot_status(symbol, bot_type=bot_type_key))

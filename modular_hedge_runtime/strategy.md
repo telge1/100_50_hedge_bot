@@ -332,9 +332,12 @@ python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py \
   --rebaseline-on-start \
   --reset-transfer-cooldown-on-start
 
+########################################### Reserve coin #############################################################
 
+cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 
-###################################################################################################################
+######################################################################################################################
+
 
 python analyze_hedge_logs.py --mode blocks
 

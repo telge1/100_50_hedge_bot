@@ -54,6 +54,8 @@ class GenericRuntimeConfig:
 
 
 class GenericHedgeRuntime:
+    EXPECTED_EXIT_CANCEL_TIMEOUT_SECONDS = 10.0
+
     def __init__(
         self,
         config: GenericRuntimeConfig,
@@ -1072,6 +1074,116 @@ class GenericHedgeRuntime:
         for intent in intents:
             self.submit_intent(intent, snapshot, source)
 
+    def _dispatch_reconcile_terminal_cancel(
+        self,
+        client_id: str,
+        managed_order: ManagedOrder,
+        history_order: dict[str, Any],
+        normalized_status: str,
+    ) -> None:
+        snapshot = self.runtime_state.last_snapshot or self.refresh_snapshot("reconcile_terminal")
+        payload = {
+            "orderStatus": normalized_status,
+            "orderId": managed_order.exchange_order_id,
+            "orderLinkId": client_id,
+            "qty": managed_order.qty,
+            "side": managed_order.side,
+            "reduceOnly": managed_order.reduce_only,
+            "purpose": managed_order.purpose,
+            "rejectReason": history_order.get("rejectReason"),
+        }
+        intents = self.strategy.on_order_update(payload, snapshot, self.runtime_state, self.context)
+        self._dispatch("order_reconcile", intents, snapshot)
+
+    def _expected_exit_cancel_purposes(self) -> set[str]:
+        return {
+            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+            getattr(self.strategy, "LONG_TP_EXIT_RECOVERY_PURPOSE", "LONG_TP_EXIT_RECOVERY"),
+            getattr(self.strategy, "SHORT_SL_EXIT_RECOVERY_PURPOSE", "SHORT_SL_EXIT_RECOVERY"),
+            "FINAL_LONG_EXIT",
+            "FINAL_SHORT_EXIT",
+        }
+
+    def _register_expected_exit_cancel(
+        self,
+        client_id: str,
+        order: ManagedOrder,
+        replace_context: dict[str, Any] | None,
+    ) -> None:
+        if not replace_context:
+            return
+        if order.purpose not in self._expected_exit_cancel_purposes():
+            return
+        state = self.runtime_state.strategy_state
+        registry = state.setdefault("expected_exit_cancels", [])
+        now = time.monotonic()
+        expires_in_ms = int(self.EXPECTED_EXIT_CANCEL_TIMEOUT_SECONDS * 1000)
+        entry = {
+            "client_order_id": client_id,
+            "exchange_order_id": order.exchange_order_id,
+            "purpose": order.purpose,
+            "reason": replace_context.get("reason") or "replace_open_purpose",
+            "replacement_purpose": replace_context.get("replacement_purpose") or order.purpose,
+            "created_at_monotonic": now,
+            "expires_at_monotonic": now + self.EXPECTED_EXIT_CANCEL_TIMEOUT_SECONDS,
+            "consumed": False,
+        }
+        registry.append(entry)
+        self.audit.log_event(
+            "fixed_cycle_expected_cancel_registered",
+            strategy=self.strategy.name,
+            purpose=entry["purpose"],
+            client_order_id=entry["client_order_id"],
+            exchange_order_id=entry["exchange_order_id"],
+            reason=entry["reason"],
+            replacement_purpose=entry["replacement_purpose"],
+            expires_in_ms=expires_in_ms,
+        )
+
+    def _confirm_expected_exit_cancel_replacement(
+        self,
+        intent: StrategyIntent,
+        client_id: str,
+        exchange_order_id: str | None,
+    ) -> None:
+        if intent.purpose not in self._expected_exit_cancel_purposes():
+            return
+        state = self.runtime_state.strategy_state
+        registry = state.get("expected_exit_cancels")
+        if not isinstance(registry, list) or not registry:
+            return
+        remaining: list[dict[str, Any]] = []
+        consumed_match: dict[str, Any] | None = None
+        fallback_match: dict[str, Any] | None = None
+        for entry in registry:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("replacement_purpose") == intent.purpose:
+                if bool(entry.get("consumed")) and consumed_match is None:
+                    consumed_match = entry
+                    continue
+                if fallback_match is None:
+                    fallback_match = entry
+                    continue
+            remaining.append(entry)
+        confirmed_entry = consumed_match or fallback_match
+        if confirmed_entry is not None:
+            if fallback_match is not None and confirmed_entry is not fallback_match:
+                remaining.append(fallback_match)
+            state["expected_exit_cancels"] = remaining
+            self.audit.log_event(
+                "fixed_cycle_expected_cancel_replacement_confirmed",
+                strategy=self.strategy.name,
+                purpose=confirmed_entry.get("purpose"),
+                client_order_id=confirmed_entry.get("client_order_id"),
+                exchange_order_id=confirmed_entry.get("exchange_order_id"),
+                confirmed_entry_consumed=bool(confirmed_entry.get("consumed")),
+                replacement_purpose=intent.purpose,
+                replacement_client_order_id=client_id,
+                replacement_exchange_order_id=exchange_order_id,
+            )
+
     def _should_audit_order_payload_ready(
         self,
         managed_order: ManagedOrder,
@@ -1276,17 +1388,27 @@ class GenericHedgeRuntime:
         if hasattr(self.strategy, "config"):
             final_symbol_payload["strategy_symbol"] = getattr(self.strategy.config, "symbol", None)
         self.logger.info("final_symbol_used", final_symbol_payload)
-        self.audit.log_event(
-            "intent_submit_started",
-            strategy=self.strategy.name,
-            purpose=intent.purpose,
-            side=intent.side,
-            qty=intent.qty,
-            order_type=intent.order_type,
-            trigger_price=intent.trigger_price,
-            reduce_only=intent.reduce_only,
-            position_idx=intent.position_idx,
-        )
+        emergency_latency_ms = None
+        if intent.purpose in {
+            getattr(self.strategy, "EMERGENCY_FLAT_LONG_PURPOSE", None),
+            getattr(self.strategy, "EMERGENCY_FLAT_SHORT_PURPOSE", None),
+        }:
+            trigger_ts = self.runtime_state.strategy_state.get("emergency_trigger_monotonic")
+            if trigger_ts:
+                emergency_latency_ms = max(0, int((time.monotonic() - trigger_ts) * 1000))
+        intent_event_payload = {
+            "strategy": self.strategy.name,
+            "purpose": intent.purpose,
+            "side": intent.side,
+            "qty": intent.qty,
+            "order_type": intent.order_type,
+            "trigger_price": intent.trigger_price,
+            "reduce_only": intent.reduce_only,
+            "position_idx": intent.position_idx,
+        }
+        if emergency_latency_ms is not None:
+            intent_event_payload["emergency_latency_ms"] = emergency_latency_ms
+        self.audit.log_event("intent_submit_started", **intent_event_payload)
         replace_purposes_raw = intent.metadata.get("replace_open_purpose")
         replace_purposes: list[str] = []
         safe_cycle_replacement = False
@@ -1345,6 +1467,7 @@ class GenericHedgeRuntime:
                     "new_trigger_price": intent.trigger_price,
                     "existing_qty": existing_qty,
                     "new_qty": intent.qty,
+                    "replacement_purpose": intent.purpose,
                 }
                 if reason != "match"
                 else None
@@ -1520,8 +1643,8 @@ class GenericHedgeRuntime:
                 "close_on_trigger": intent.close_on_trigger,
                 "position_idx": intent.position_idx,
                 "order_filter": intent.order_filter,
-                "market_fallback": force_market_fallback,
-                "market_fallback_reason": fallback_reason,
+                "market_fallback": bool(intent.metadata.get("market_fallback")) or force_market_fallback,
+                "market_fallback_reason": intent.metadata.get("fallback_reason") or fallback_reason,
             },
             trace=list(intent.trace),
         )
@@ -1697,6 +1820,7 @@ class GenericHedgeRuntime:
             trigger_price=intent.trigger_price,
             submit_notional=submit_notional,
         )
+        self._confirm_expected_exit_cancel_replacement(intent, client_id, exchange_order_id)
         if self._verbose_audit_enabled():
             self.audit.log_event(
                 "intent_submitted_verbose",
@@ -2126,6 +2250,7 @@ class GenericHedgeRuntime:
                     continue
             canceled = False
             if order.exchange_order_id:
+                self._register_expected_exit_cancel(client_id, order, replace_context)
                 canceled = self.order_manager.cancel_order(
                     order.exchange_order_id,
                     symbol=self.config.symbol,
@@ -2701,6 +2826,12 @@ class GenericHedgeRuntime:
                     history_order=self._history_order_summary(history_order),
                     managed_order=self._managed_order_summary(managed_order),
                     status=normalized_history_status,
+                )
+                self._dispatch_reconcile_terminal_cancel(
+                    client_id,
+                    managed_order,
+                    history_order,
+                    normalized_history_status,
                 )
                 continue
             if normalized_history_status == "PARTIAL":

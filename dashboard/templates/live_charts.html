@@ -211,7 +211,7 @@
                     </div>
                     <form class="live-chart-symbol-input" method="get" action="/live-charts">
                         <label for="accountSelect">Profil:</label>
-                        <select id="accountSelect" name="account">
+                        <select id="accountSelect" name="account" onchange="window.location.href='/live-charts?account=' + encodeURIComponent(this.value)">
                             {% for acc in chart_accounts %}
                                 <option value="{{ acc }}" {% if acc == account %}selected{% endif %}>{{ acc }}</option>
                             {% endfor %}
@@ -615,6 +615,59 @@
                         minMove: 0.00001,
                     },
                 });
+                let orderLevelLines = [];
+
+                function clearOrderLevelLines() {
+                    orderLevelLines.forEach(line => {
+                        try {
+                            candleSeries.removePriceLine(line);
+                        } catch (e) {
+                            logDebug("OrderLine remove failed", String(e));
+                        }
+                    });
+                    orderLevelLines = [];
+                }
+
+                function drawOrderLevels(levels) {
+                    clearOrderLevelLines();
+                    if (!Array.isArray(levels)) return;
+                    levels.forEach(level => {
+                        if (!level || typeof level.price !== 'number' || Number.isNaN(level.price)) {
+                            return;
+                        }
+                        const line = candleSeries.createPriceLine({
+                            price: Number(level.price),
+                            color: level.color || '#f97316',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Solid,
+                            axisLabelVisible: true,
+                            title: level.label || 'Order',
+                        });
+                        orderLevelLines.push(line);
+                    });
+                }
+
+                async function loadOrderLevels() {
+                    if (!symbol || !account) {
+                        clearOrderLevelLines();
+                        return;
+                    }
+                    try {
+                        const url = `/api/live-order-levels?account=${encodeURIComponent(account)}&symbol=${encodeURIComponent(symbol)}`;
+                        const res = await fetch(url, { credentials: 'include' });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok || !data.ok) {
+                            clearOrderLevelLines();
+                            logDebug("Order levels load failed", { url, status: res.status, body: data });
+                            return;
+                        }
+                        drawOrderLevels(data.levels || []);
+                        logDebug("Order levels loaded", { account, symbol, count: data.count });
+                    } catch (e) {
+                        clearOrderLevelLines();
+                        logDebug("Order levels fetch exception", String(e));
+                    }
+                }
                 let klines;
                 try {
                     klines = await fetchKlines();
@@ -666,6 +719,7 @@
                             title: 'Burn ' + (idx + 1),
                         });
                     });
+                    await loadOrderLevels();
                 }
 
                 // Resize-Handling

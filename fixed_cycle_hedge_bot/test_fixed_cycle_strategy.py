@@ -1,5 +1,6 @@
 import logging
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -1133,6 +1134,59 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertEqual(payload["reason"], "unit_test_wait")
         self.assertGreater(payload["seconds_remaining"], 0)
 
+    def test_short_tp_fallback_normal_path_builds_conditional_short_reduce(self) -> None:
+        order_manager = FakeOrderManager()
+        order_manager.positions = [
+            {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 98.0},
+            {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 98.0},
+        ]
+        order_manager.current_price = 150.0
+        runtime = self.build_runtime(order_manager)
+        runtime.bootstrap()
+
+        self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
+        long_cycle_order = next(
+            order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
+        )
+        long_cycle_order.qty = 0.25
+        long_cycle_order.remaining_qty = 0.25
+        long_cycle_order.reduce_only = True
+        long_cycle_order.metadata.update(
+            {
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "entry_price": 100.0,
+            }
+        )
+        order_manager.positions = [
+            {"symbol": "BTCUSDT", "side": "Buy", "size": 0.75, "avgPrice": 100.0},
+            {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 100.0},
+        ]
+
+        runtime.on_websocket_fill(
+            long_cycle_order.exchange_order_id,
+            qty=long_cycle_order.qty,
+            price=99.8,
+            cumulative_qty=long_cycle_order.qty,
+        )
+
+        short_tp_order = next(
+            order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_SHORT_REDUCE"
+        )
+        cycle_order_payload = next(
+            payload
+            for payload in order_manager.market_orders
+            if payload.get("order_link_id") == short_tp_order.client_order_id
+        )
+        self.assertEqual(short_tp_order.order_type, "Market")
+        self.assertIsNotNone(short_tp_order.metadata.get("trigger_price"))
+        self.assertEqual(short_tp_order.metadata.get("trigger_direction"), 2)
+        self.assertEqual(short_tp_order.metadata.get("close_on_trigger"), True)
+        self.assertFalse(short_tp_order.metadata.get("market_fallback"))
+        self.assertIsNone(short_tp_order.metadata.get("fallback_reason"))
+        self.assertIn("trigger_price", cycle_order_payload)
+        self.assertEqual(cycle_order_payload.get("trigger_direction"), 2)
+
     def test_fill_rebuilds_structure_and_advances_cycle_state(self) -> None:
         order_manager = FakeOrderManager()
         order_manager.positions = [
@@ -1146,6 +1200,16 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self._ensure_cycle_order(runtime, purpose="CYCLE_1_LONG_ADD", status="OPEN")
         long_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
+        )
+        long_cycle_order.qty = 0.25
+        long_cycle_order.remaining_qty = 0.25
+        long_cycle_order.reduce_only = True
+        long_cycle_order.metadata.update(
+            {
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "entry_price": 100.0,
+            }
         )
         order_manager.positions = [
             {"symbol": "BTCUSDT", "side": "Buy", "size": 0.75, "avgPrice": 100.0},
@@ -1182,12 +1246,15 @@ class FixedCycleStrategyTests(unittest.TestCase):
             recorded_intents.append(result)
             return result
 
-        with patch.object(FixedCycleHedgeStrategy, "_build_exit_intents", new=capturing):
+        with (
+            patch.object(FixedCycleHedgeStrategy, "_build_exit_intents", new=capturing),
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy.logger.info") as mock_info,
+        ):
             runtime.on_websocket_fill(
                 long_cycle_order.exchange_order_id,
-                qty=0.25,
+                qty=long_cycle_order.qty,
                 price=99.8,
-                cumulative_qty=0.25,
+                cumulative_qty=long_cycle_order.qty,
             )
 
         self.assertEqual(runtime.runtime_state.strategy_state["current_long_cycle_index"], 1)
@@ -1198,12 +1265,32 @@ class FixedCycleStrategyTests(unittest.TestCase):
         short_tp_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_SHORT_REDUCE"
         )
+        fallback_state = runtime.strategy._get_short_tp_fallback_state(runtime.runtime_state)
+        cycle_order_payload = next(
+            payload
+            for payload in order_manager.market_orders
+            if payload.get("order_link_id") == short_tp_order.client_order_id
+        )
         latest_intents = recorded_intents[-1]
-        tp_intent = next(intent for intent in latest_intents if intent.purpose == "LONG_TP_EXIT")
-        expected_short_tp = tp_intent.trigger_price
-        self.assertEqual(short_tp_order.price, expected_short_tp)
-        self.assertEqual(short_tp_order.metadata.get("trigger_price"), expected_short_tp)
-        self.assertGreaterEqual(len(order_manager.cancel_calls), 2)
+        expected_short_tp = runtime.runtime_state.strategy_state.get("last_short_tp_trigger_price")
+        self.assertEqual(short_tp_order.order_type, "Market")
+        self.assertIsNone(short_tp_order.metadata.get("trigger_price"))
+        self.assertIsNone(short_tp_order.metadata.get("trigger_direction"))
+        self.assertIsNone(short_tp_order.metadata.get("close_on_trigger"))
+        self.assertEqual(short_tp_order.metadata.get("market_fallback"), True)
+        self.assertEqual(
+            short_tp_order.metadata.get("fallback_reason"), "short_tp_trigger_already_crossed"
+        )
+        self.assertEqual(short_tp_order.metadata.get("original_trigger_price"), expected_short_tp)
+        self.assertEqual(short_tp_order.metadata.get("current_price"), 97.0)
+        self.assertFalse(fallback_state.active)
+        self.assertNotIn("trigger_price", cycle_order_payload)
+        fallback_start_events = [
+            call.args
+            for call in mock_info.call_args_list
+            if len(call.args) >= 2 and call.args[0] == "%s %s" and call.args[1] == "SHORT_TP_FALLBACK_START"
+        ]
+        self.assertEqual(fallback_start_events, [])
         self.assertTrue(recorded_intents)
         latest_intents = recorded_intents[-1]
         self.assertTrue(any(intent.purpose == "LONG_TP_EXIT" for intent in latest_intents))
@@ -1215,6 +1302,7 @@ class FixedCycleStrategyTests(unittest.TestCase):
             {"symbol": "BTCUSDT", "side": "Buy", "size": 1.0, "avgPrice": 98.0},
             {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 98.0},
         ]
+        order_manager.current_price = 97.0
         runtime = self.build_runtime(order_manager)
         runtime.bootstrap()
 
@@ -1222,35 +1310,81 @@ class FixedCycleStrategyTests(unittest.TestCase):
         long_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_LONG_ADD"
         )
+        long_cycle_order.qty = 0.25
+        long_cycle_order.remaining_qty = 0.25
+        long_cycle_order.reduce_only = True
+        long_cycle_order.metadata.update(
+            {
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "entry_price": 100.0,
+            }
+        )
         order_manager.positions = [
             {"symbol": "BTCUSDT", "side": "Buy", "size": 0.75, "avgPrice": 100.0},
             {"symbol": "BTCUSDT", "side": "Sell", "size": 0.5, "avgPrice": 100.0},
         ]
         runtime.on_websocket_fill(
             long_cycle_order.exchange_order_id,
-            qty=0.25,
+            qty=long_cycle_order.qty,
             price=99.8,
-            cumulative_qty=0.25,
+            cumulative_qty=long_cycle_order.qty,
         )
+        ledger = runtime.runtime_state.strategy_state.setdefault(
+            "audit_pnl_ledger",
+            {
+                "cycle_long_reduce_pnl": {},
+                "cycle_short_tp_pnl": {},
+                "cycle_pnl_entries": {},
+                "final_long_exit_pnl": None,
+                "final_short_exit_pnl": None,
+                "total_realized_pnl": 0.0,
+            },
+        )
+        ledger["cycle_long_reduce_pnl"]["1"] = -0.1
+        ledger["cycle_pnl_entries"][f"cycle_long_reduce:1:{long_cycle_order.client_order_id}"] = {
+            "pnl": -0.1,
+            "source": "confirmed_closed_pnl",
+            "is_confirmed": True,
+        }
 
         short_cycle_order = next(
             order for order in runtime.runtime_state.active_orders.values() if order.purpose == "CYCLE_1_SHORT_REDUCE"
         )
+        short_cycle_order.qty = 0.075
+        short_cycle_order.remaining_qty = 0.075
+        self.assertEqual(short_cycle_order.metadata.get("market_fallback"), True)
+        now = datetime.now(timezone.utc)
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": short_cycle_order.exchange_order_id,
+                "symbol": "BTCUSDT",
+                "side": "Buy",
+                "closedSize": short_cycle_order.qty,
+                "avgExitPrice": 97.5,
+                "closedPnl": 0.2,
+                "createdTime": int(now.timestamp() * 1000),
+                "updatedTime": int(now.timestamp() * 1000),
+            }
+        ]
         order_manager.positions = [
             {"symbol": "BTCUSDT", "side": "Buy", "size": 0.75, "avgPrice": 100.0},
             {"symbol": "BTCUSDT", "side": "Sell", "size": 0.425, "avgPrice": 100.0},
         ]
+        order_manager.current_price = 100.0
         runtime.on_websocket_fill(
             short_cycle_order.exchange_order_id,
-            qty=0.075,
-            price=101.7,
-            cumulative_qty=0.075,
+            qty=short_cycle_order.qty,
+            price=97.5,
+            cumulative_qty=short_cycle_order.qty,
         )
 
         purposes = {order.purpose for order in runtime.runtime_state.active_orders.values()}
         self.assertIn("CYCLE_2_LONG_ADD", purposes)
         self.assertNotIn("CYCLE_1_SHORT_REDUCE", purposes)
+        self.assertFalse(runtime.runtime_state.strategy_state.get("cycle_waiting_for_short_tp"))
         self.assertEqual(runtime.runtime_state.strategy_state.get("cycle_completed_count"), 1)
+        self.assertEqual(runtime.runtime_state.strategy_state.get("cycle_pair_count"), 1)
         self.assertEqual(runtime.runtime_state.strategy_state.get("current_short_cycle_index"), 1)
         self.assertEqual(runtime.runtime_state.strategy_state.get("short_tp_pending_cycle"), 0)
 
@@ -2107,8 +2241,1107 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertEqual(state.get("cycle_completed_count"), 2)
         self.assertEqual(state.get("bot_state"), runtime.strategy.STATE_REFILL_PENDING)
         self.assertTrue(state.get("refill_pending"))
+        self.assertFalse(state.get("refill_in_progress"))
         event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
         self.assertIn("fixed_cycle_short_reduce_pnl_confirmed", event_names)
+        self.assertIn("fixed_cycle_refill_triggered", event_names)
+
+    def test_on_tick_builds_refill_intents_when_pending_without_refill_state(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["refill_pending"] = True
+        state["refill_in_progress"] = False
+        state["refill_state"] = {}
+        state["initial_long_qty"] = 1.0
+        state["initial_short_qty"] = 0.5
+        state["cycle_completed_count"] = 2
+        state["cycle_pair_count"] = 2
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.5,
+            short_qty=0.25,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual({intent.purpose for intent in intents}, {"REFILL_LONG", "REFILL_SHORT"})
+        self.assertTrue(state.get("refill_in_progress"))
+        self.assertEqual(state.get("refill_state", {}).get("expected_purposes"), ["REFILL_LONG", "REFILL_SHORT"])
+
+    def test_on_tick_resets_stale_refill_flags_and_rebuilds_refill(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["refill_pending"] = True
+        state["refill_in_progress"] = True
+        state["refill_state"] = {
+            "REQUESTED": True,
+            "expected_purposes": ["REFILL_LONG", "REFILL_SHORT"],
+            "created_at_ms": 123,
+        }
+        state["initial_long_qty"] = 1.0
+        state["initial_short_qty"] = 0.5
+        state["cycle_completed_count"] = 2
+        state["cycle_pair_count"] = 2
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.5,
+            short_qty=0.25,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="tick",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event") as warning_log:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual({intent.purpose for intent in intents}, {"REFILL_LONG", "REFILL_SHORT"})
+        self.assertTrue(state.get("refill_in_progress"))
+        self.assertEqual(state.get("refill_state", {}).get("expected_purposes"), ["REFILL_LONG", "REFILL_SHORT"])
+        warning_names = [call.args[0] for call in warning_log.call_args_list if call.args]
+        self.assertIn("fixed_cycle_refill_stale_state_reset", warning_names)
+
+    def test_rebuild_structure_skips_exit_fallback_while_refill_pending(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["refill_pending"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="tick",
+        )
+
+        with (
+            patch.object(runtime.strategy, "_build_downside_cycle_intents", return_value=[]),
+            patch.object(runtime.strategy, "_build_exit_intents", return_value=[]) as build_exit_mock,
+        ):
+            intents = runtime.strategy._rebuild_structure(snapshot, runtime.runtime_state, runtime.context, reason="test_refill_pending")
+
+        self.assertEqual(intents, [])
+        build_exit_mock.assert_not_called()
+
+    def test_rebuild_structure_defers_exit_until_second_pair_short_reduce_completes(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["bot_state"] = runtime.strategy.STATE_RUNNING
+        state["initial_entry_confirmed"] = True
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
+        state["cycle_pair_count"] = 1
+        state["cycle_completed_count"] = 1
+        state["current_long_cycle_index"] = 2
+        state["current_short_cycle_index"] = 1
+        state["pending_long_cycle_index"] = 2
+        state["short_tp_pending_cycle"] = 2
+        state["cycle_waiting_for_short_tp"] = True
+        state["cycle_long_add_filled"] = True
+        state["pending_cycle_loss_usdt"] = 1.2345
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.5,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="tick",
+        )
+        expected_downside = [
+            StrategyIntent(
+                side="short",
+                qty=0.5,
+                purpose=runtime.strategy._cycle_purpose("short", 2),
+            )
+        ]
+
+        with (
+            patch.object(runtime.strategy, "_build_downside_cycle_intents", return_value=expected_downside),
+            patch.object(runtime.strategy, "_build_exit_intents", return_value=[]) as build_exit_mock,
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+        ):
+            intents = runtime.strategy._rebuild_structure(
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+                reason="test_pending_second_pair_short_reduce",
+            )
+
+        self.assertEqual(intents, expected_downside)
+        build_exit_mock.assert_not_called()
+        self.assertIn(
+            "fixed_cycle_exit_deferred_pending_second_pair_short_reduce",
+            [call.args[0] for call in log_event_mock.call_args_list if call.args],
+        )
+
+    def test_on_order_update_clears_stale_refill_flags_for_terminal_refill_order(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["refill_pending"] = True
+        state["refill_in_progress"] = True
+        state["refill_state"] = {
+            "REQUESTED": True,
+            "expected_purposes": ["REFILL_LONG"],
+            "created_at_ms": 123,
+        }
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.5,
+            short_qty=0.25,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+
+        runtime.strategy.on_order_update(
+            {
+                "orderStatus": "Rejected",
+                "orderLinkId": "fixed_cycle-refill_long-test",
+                "orderId": "ex-refill-long-test",
+            },
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertFalse(state.get("refill_in_progress"))
+        self.assertEqual(state.get("refill_state"), {})
+
+    def test_exchange_cancelled_short_exit_triggers_immediate_close(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=1.0,
+            long_avg=100.0,
+            short_avg=102.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-test",
+            "orderId": "cancelled-short",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        intent = intents[0]
+        self.assertEqual(intent.purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+        self.assertEqual(intent.qty, snapshot.short_qty)
+        self.assertTrue(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+        self.assertEqual(runtime.runtime_state.strategy_state.get("emergency_exit_attempts"), 1)
+
+    def test_ec_no_immediate_qty_to_fill_triggers_emergency_exit(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=2.0,
+            short_qty=0.0,
+            long_avg=99.5,
+            short_avg=0.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Rejected",
+            "orderLinkId": "fixed_cycle-long_tp_exit-test",
+            "orderId": "rejected-long",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        intent = intents[0]
+        self.assertEqual(intent.purpose, runtime.strategy.EMERGENCY_FLAT_LONG_PURPOSE)
+        self.assertEqual(intent.qty, snapshot.long_qty)
+        self.assertTrue(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+
+    def test_long_exit_filled_short_exit_cancelled_closes_remaining_short(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=99.0,
+            long_qty=0.0,
+            short_qty=0.75,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Canceled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-other",
+            "orderId": "cancelled-short-two",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+        self.assertEqual(intents[0].qty, snapshot.short_qty)
+
+    def test_fresh_restart_blocked_until_emergency_flat(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        state = runtime.runtime_state.strategy_state
+        state["emergency_flat_required"] = True
+        state["emergency_exit_attempts"] = 2
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="rest",
+        )
+
+        with patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event:
+            intents = runtime.strategy._build_entry_intents(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertIn(
+            "fixed_cycle_fresh_entry_blocked_emergency_flat",
+            [call.args[0] for call in log_event.call_args_list if call.args],
+        )
+
+    def test_emergency_market_close_has_no_trigger_fields(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.5,
+            long_qty=1.0,
+            short_qty=0.0,
+            long_avg=99.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-long_tp_exit-test",
+            "orderId": "emergency-trigger",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        intent = intents[0]
+        self.assertFalse(intent.close_on_trigger)
+        self.assertIsNone(intent.trigger_price)
+        self.assertIsNone(intent.trigger_direction)
+
+    def test_emergency_close_qty_is_normalized_or_uses_safe_recovery_qty(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        strategy = runtime.strategy
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.5,
+            long_qty=Decimal("1.2345"),
+            short_qty=0.0,
+            long_avg=99.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-long_tp_exit-test-qty",
+            "orderId": "emergency-qty",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        intents = strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        normalized_expected = strategy._safe_recovery_qty(snapshot.long_qty)
+        self.assertEqual(intents[0].qty, normalized_expected)
+
+    def test_duplicate_cancel_does_not_submit_duplicate_emergency_close(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.5,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-test-dupe",
+            "orderId": "emergency-dupe",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        first_intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+        second_intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(first_intents), 1)
+        self.assertEqual(len(second_intents), 0)
+
+    def test_reconciled_cancelled_short_exit_triggers_emergency_close(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=0.75,
+            long_avg=0.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        order = ManagedOrder(
+            client_order_id="fixed_cycle-short_sl_exit-reconcile",
+            side="short",
+            qty=0.75,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            exchange_order_id="ex-reconcile-short",
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.75,
+        )
+        runtime.runtime_state.active_orders[order.client_order_id] = order
+        history_order = {
+            "orderId": order.exchange_order_id,
+            "orderLinkId": order.client_order_id,
+            "orderStatus": "Cancelled",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        with patch.object(runtime, "_dispatch") as dispatch_mock:
+            runtime._dispatch_reconcile_terminal_cancel(
+                order.client_order_id,
+                order,
+                history_order,
+                "CANCELLED",
+            )
+
+        state = runtime.runtime_state.strategy_state
+        self.assertTrue(state.get("emergency_flat_required"))
+        dispatched_intents = dispatch_mock.call_args[0][1]
+        self.assertEqual(len(dispatched_intents), 1)
+        self.assertEqual(dispatched_intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+
+    def test_final_exit_missing_opposite_short_exit_closes_short_immediately(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=102.0,
+            long_qty=0.0,
+            short_qty=0.6,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        state = runtime.runtime_state.strategy_state
+        state["long_exit_filled"] = True
+        state["short_exit_filled"] = False
+
+        runtime.strategy._maybe_finalize_exit_after_leg_fill(
+            runtime.runtime_state,
+            runtime.context,
+            runtime.strategy.LONG_TP_EXIT_PURPOSE,
+        )
+
+        self.assertTrue(state.get("emergency_flat_required"))
+        intents = runtime.strategy._maybe_handle_emergency_exit_tick(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+        self.assertTrue(intents)
+
+    def test_long_exit_filled_short_exit_reconcile_cancel_does_not_wait_for_ws(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=0.5,
+            long_avg=0.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        order = ManagedOrder(
+            client_order_id="fixed_cycle-short_sl_exit-reconcile-2",
+            side="short",
+            qty=0.5,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            exchange_order_id="ex-reconcile-short-2",
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+        )
+        runtime.runtime_state.active_orders[order.client_order_id] = order
+        history_order = {
+            "orderId": order.exchange_order_id,
+            "orderLinkId": order.client_order_id,
+            "orderStatus": "Cancelled",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        with patch.object(runtime, "_dispatch") as dispatch_mock:
+            runtime._dispatch_reconcile_terminal_cancel(
+                order.client_order_id,
+                order,
+                history_order,
+                "CANCELLED",
+            )
+
+        self.assertTrue(dispatch_mock.called)
+        self.assertTrue(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+
+    def test_reconcile_cancel_path_does_not_wait_for_on_tick(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=0.5,
+            long_avg=0.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        order = ManagedOrder(
+            client_order_id="fixed_cycle-short_sl_exit-reconcile-3",
+            side="short",
+            qty=0.5,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            exchange_order_id="ex-reconcile-short-3",
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.5,
+        )
+        runtime.runtime_state.active_orders[order.client_order_id] = order
+        history_order = {
+            "orderId": order.exchange_order_id,
+            "orderLinkId": order.client_order_id,
+            "orderStatus": "Cancelled",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        runtime._dispatch_reconcile_terminal_cancel(
+            order.client_order_id,
+            order,
+            history_order,
+            "CANCELLED",
+        )
+
+        state = runtime.runtime_state.strategy_state
+        self.assertTrue(state.get("emergency_flat_required"))
+        # Ensure duplicate events don't emit new intents (already handled)
+        intents = runtime.strategy.on_order_update(
+            history_order,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+        self.assertEqual(intents, [])
+
+    def test_manual_deactivated_short_exit_triggers_emergency_close(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=0.5,
+            long_avg=0.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Deactivated",
+            "orderLinkId": "fixed_cycle-short_sl_exit-test-manual",
+            "orderId": "manual-short",
+            "cancelType": "CancelByUser",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+
+    def test_manual_deactivated_long_exit_triggers_emergency_close(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.25,
+            short_qty=0.0,
+            long_avg=99.5,
+            short_avg=0.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Deactivated",
+            "orderLinkId": "fixed_cycle-long_tp_exit-test-manual",
+            "orderId": "manual-long",
+            "cancelType": "CancelByUser",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_LONG_PURPOSE)
+
+    def test_deactivated_exit_order_does_not_crash_source_order_link_id(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.5,
+            short_qty=0.0,
+            long_avg=100.0,
+            short_avg=0.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Deactivated",
+            "orderLinkId": "fixed_cycle-long_tp_exit-test-manual",
+            "orderId": "manual-long",
+            "cancelType": "CancelByUser",
+            "metadata": {"order_link_id": "manual-link"},
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_LONG_PURPOSE)
+
+    def test_deactivated_is_terminal_for_exit_purposes(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.75,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        for purpose in [
+            runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            runtime.strategy.LONG_TP_EXIT_RECOVERY_PURPOSE,
+            runtime.strategy.SHORT_SL_EXIT_RECOVERY_PURPOSE,
+        ]:
+            payload = {
+                "orderStatus": "Deactivated",
+                "orderLinkId": f"fixed_cycle-{purpose.lower()}",
+                "orderId": f"manual-{purpose.lower()}",
+                "cancelType": "CancelByUser",
+            }
+            intents = runtime.strategy.on_order_update(
+                payload,
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+            )
+            self.assertTrue(intents)
+
+    def test_expected_rebuild_cancel_does_not_trigger_emergency(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-expected",
+                "exchange_order_id": "expected-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": 1.0,
+                "expires_at_monotonic": time.monotonic() + 2.0,
+                "consumed": False,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.4,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-expected",
+            "orderId": "expected-exchange-id",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(intents, [])
+        self.assertFalse(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+        self.assertTrue(runtime.runtime_state.strategy_state["expected_exit_cancels"][0]["consumed"])
+
+    def test_bybit_cancel_without_expected_cancel_triggers_emergency(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.4,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-bybit",
+            "orderId": "bybit-exchange-id",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+
+    def test_expected_cancel_replacement_confirmed_clears_guard(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        now = time.monotonic()
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-old",
+                "exchange_order_id": "old-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": now,
+                "expires_at_monotonic": now + 2.0,
+                "consumed": True,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.4,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="tick",
+        )
+        intent = StrategyIntent(
+            side="short",
+            qty=0.4,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            order_type="Market",
+            reduce_only=True,
+            position_idx=2,
+        )
+
+        runtime.submit_intent(intent, snapshot, source="tick")
+
+        self.assertEqual(runtime.runtime_state.strategy_state.get("expected_exit_cancels"), [])
+
+    def test_expected_cancel_replacement_prefers_consumed_entry(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        now = time.monotonic()
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-unconsumed",
+                "exchange_order_id": "unconsumed-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": now,
+                "expires_at_monotonic": now + 10.0,
+                "consumed": False,
+            },
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-consumed",
+                "exchange_order_id": "consumed-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": now,
+                "expires_at_monotonic": now + 10.0,
+                "consumed": True,
+            },
+        ]
+        intent = StrategyIntent(
+            side="short",
+            qty=0.4,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            order_type="Market",
+            reduce_only=True,
+            position_idx=2,
+        )
+
+        with patch.object(runtime.audit, "log_event") as log_event_mock:
+            runtime._confirm_expected_exit_cancel_replacement(
+                intent,
+                client_id="replacement-client-id",
+                exchange_order_id="replacement-exchange-id",
+            )
+
+        remaining = runtime.runtime_state.strategy_state.get("expected_exit_cancels")
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["client_order_id"], "fixed_cycle-short_sl_exit-unconsumed")
+        confirmation_calls = [
+            call for call in log_event_mock.call_args_list
+            if call.args and call.args[0] == "fixed_cycle_expected_cancel_replacement_confirmed"
+        ]
+        self.assertEqual(len(confirmation_calls), 1)
+        self.assertTrue(confirmation_calls[0].kwargs["confirmed_entry_consumed"])
+
+    def test_expected_cancel_replacement_missing_triggers_emergency_after_timeout(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        now = time.monotonic()
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-old",
+                "exchange_order_id": "old-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": now - 5.0,
+                "expires_at_monotonic": now - 1.0,
+                "consumed": True,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.4,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertTrue(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+        self.assertTrue(intents)
+
+    def test_reconcile_cancel_respects_expected_cancel_guard(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        now = time.monotonic()
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-reconcile-guard",
+                "exchange_order_id": "reconcile-guard-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": now,
+                "expires_at_monotonic": now + 2.0,
+                "consumed": False,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=101.0,
+            long_qty=0.0,
+            short_qty=0.75,
+            long_avg=0.0,
+            short_avg=100.0,
+            source="websocket",
+        )
+        runtime.runtime_state.last_snapshot = snapshot
+        order = ManagedOrder(
+            client_order_id="fixed_cycle-short_sl_exit-reconcile-guard",
+            side="short",
+            qty=0.75,
+            purpose=runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            exchange_order_id="reconcile-guard-id",
+            status="OPEN",
+            filled_qty=0.0,
+            remaining_qty=0.75,
+        )
+        history_order = {
+            "orderId": "reconcile-guard-id",
+            "orderLinkId": "fixed_cycle-short_sl_exit-reconcile-guard",
+            "orderStatus": "Cancelled",
+        }
+
+        with patch.object(runtime, "_dispatch") as dispatch_mock:
+            runtime._dispatch_reconcile_terminal_cancel(
+                order.client_order_id,
+                order,
+                history_order,
+                "CANCELLED",
+            )
+
+        dispatched_intents = dispatch_mock.call_args[0][1]
+        self.assertEqual(dispatched_intents, [])
+        self.assertFalse(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+
+    def test_cycle_fill_exit_rebuild_does_not_emergency_flat(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-long_tp_exit-old",
+                "exchange_order_id": "long-tp-old-id",
+                "purpose": runtime.strategy.LONG_TP_EXIT_PURPOSE,
+                "reason": "replace_open_purpose",
+                "replacement_purpose": runtime.strategy.LONG_TP_EXIT_PURPOSE,
+                "created_at_monotonic": time.monotonic(),
+                "expires_at_monotonic": time.monotonic() + 2.0,
+                "consumed": False,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.3,
+            short_qty=0.3,
+            long_avg=99.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Deactivated",
+            "orderLinkId": "fixed_cycle-long_tp_exit-old",
+            "orderId": "long-tp-old-id",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(intents, [])
+        self.assertFalse(runtime.runtime_state.strategy_state.get("emergency_flat_required"))
+
+    def test_expected_cancel_guard_does_not_suppress_wrong_order_id(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        runtime.runtime_state.strategy_state["expected_exit_cancels"] = [
+            {
+                "client_order_id": "fixed_cycle-short_sl_exit-expected",
+                "exchange_order_id": "expected-exchange-id",
+                "purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "reason": "exit_rebuild",
+                "replacement_purpose": runtime.strategy.SHORT_SL_EXIT_PURPOSE,
+                "created_at_monotonic": time.monotonic(),
+                "expires_at_monotonic": time.monotonic() + 2.0,
+                "consumed": False,
+            }
+        ]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.4,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-other",
+            "orderId": "other-exchange-id",
+        }
+
+        intents = runtime.strategy.on_order_update(
+            payload,
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+        )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+
+    def test_complete_refill_clears_pending_cycle_loss_context(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["refill_pending"] = True
+        state["refill_in_progress"] = True
+        state["refill_state"] = {
+            "REQUESTED": True,
+            "expected_purposes": ["REFILL_LONG", "REFILL_SHORT"],
+            "created_at_ms": 123,
+        }
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["cycle_completed_count"] = 2
+        state["cycle_pair_count"] = 2
+        state["pending_cycle_loss_usdt"] = 1.2345
+        state["pending_short_cycle_index"] = 2
+
+        with patch.object(runtime.context.audit, "log_event") as log_event_mock:
+            runtime.strategy._complete_refill(runtime.runtime_state, runtime.context)
+
+        self.assertEqual(state.get("pending_cycle_loss_usdt"), 0.0)
+        self.assertEqual(state.get("pending_short_cycle_index"), 0)
+        self.assertFalse(state.get("refill_pending"))
+        self.assertFalse(state.get("refill_in_progress"))
+        self.assertEqual(state.get("refill_state"), {})
+        self.assertEqual(state.get("bot_state"), runtime.strategy.STATE_RUNNING)
+        self.assertEqual(state.get("cycle_completed_count"), 0)
+        self.assertEqual(state.get("cycle_pair_count"), 0)
+
+    def test_complete_refill_clears_short_tp_fallback_state(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["refill_pending"] = True
+        state["refill_in_progress"] = True
+        state["refill_state"] = {
+            "REQUESTED": True,
+            "expected_purposes": ["REFILL_LONG", "REFILL_SHORT"],
+            "created_at_ms": 123,
+        }
+        state["bot_state"] = runtime.strategy.STATE_REFILL_PENDING
+        state["cycle_completed_count"] = 2
+        state["cycle_pair_count"] = 2
+        state["pending_cycle_loss_usdt"] = 1.2345
+        state["short_tp_fallback_state"] = {
+            "active": True,
+            "original_trigger_price": 99.5,
+            "qty": 0.25,
+            "client_order_id": "fallback-order-1",
+        }
+        state["short_tp_fallback_order_context"] = {
+            "purpose": "CYCLE_1_SHORT_REDUCE",
+            "cycle_index": 1,
+        }
+        state["last_short_tp_trigger_price"] = 98.5
+        state["last_expected_short_tp_net"] = 12.34
+        state["last_short_tp_qty"] = 0.25
+        state["force_short_tp_rebuild"] = True
+        state["pending_loss_updated_in_fill"] = True
+        state["pending_loss_exit_old_signature"] = {"foo": "bar"}
+        state["pending_loss_exit_rebuild_reason"] = "test_reason"
+
+        with patch.object(runtime.context.audit, "log_event") as log_event_mock:
+            runtime.strategy._complete_refill(runtime.runtime_state, runtime.context)
+
+        self.assertIsNone(state.get("short_tp_fallback_state"))
+        self.assertIsNone(state.get("short_tp_fallback_order_context"))
+        self.assertEqual(state.get("last_short_tp_trigger_price"), 0.0)
+        self.assertEqual(state.get("last_expected_short_tp_net"), 0.0)
+        self.assertEqual(state.get("last_short_tp_qty"), 0.0)
+        self.assertFalse(state.get("force_short_tp_rebuild"))
+        self.assertFalse(state.get("pending_loss_updated_in_fill"))
+        self.assertIsNone(state.get("pending_loss_exit_old_signature"))
+        self.assertIsNone(state.get("pending_loss_exit_rebuild_reason"))
+
+        fallback_reset_events = [
+            call.kwargs
+            for call in log_event_mock.call_args_list
+            if call.args
+            and call.args[0] == "fixed_cycle_refill_short_tp_fallback_state_cleared"
+        ]
+        self.assertEqual(len(fallback_reset_events), 1)
+        self.assertEqual(fallback_reset_events[0]["symbol"], runtime.config.symbol)
+        self.assertEqual(fallback_reset_events[0]["cycle_pair_count"], 0)
+        self.assertEqual(fallback_reset_events[0]["cycle_completed_count"], 0)
+        self.assertEqual(
+            fallback_reset_events[0]["short_tp_fallback_state_before"],
+            {
+                "active": True,
+                "original_trigger_price": 99.5,
+                "qty": 0.25,
+                "client_order_id": "fallback-order-1",
+            },
+        )
+        self.assertTrue(
+            fallback_reset_events[0]["short_tp_fallback_order_context_present_before"]
+        )
+        self.assertEqual(fallback_reset_events[0]["pending_cycle_loss_usdt"], 0.0)
+        self.assertEqual(
+            fallback_reset_events[0]["bot_state"], runtime.strategy.STATE_RUNNING
+        )
 
     def test_on_fill_blocks_cycle_long_add_until_closed_pnl_confirmed(self) -> None:
         order_manager = FakeOrderManager()

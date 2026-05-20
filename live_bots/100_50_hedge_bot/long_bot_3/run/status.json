@@ -1,8 +1,9 @@
 {
   "bot_name": "long_bot_3",
-  "status": "running",
-  "updated_at": "2026-05-17T09:31:52.225281+00:00",
-  "symbol": "INJUSDT",
-  "start_requested": true,
-  "pid": 1188807
+  "status": "stopped",
+  "start_requested": false,
+  "pid": null,
+  "symbol": "",
+  "reason": "stale_status_cleanup_no_runner",
+  "updated_at": "2026-05-20T12:57:46.203345+00:00"
 }

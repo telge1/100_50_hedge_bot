@@ -30,12 +30,33 @@ LEGACY_PID_FILE="${BOT_DIR}/pids/fixed_cycle_bot.pid"
 STATUS_FILE="${RUN_DIR}/status.json"
 WAIT_PID_FILE="${RUN_DIR}/start_wait.pid"
 CANCEL_START_FILE="${RUN_DIR}/cancel_start"
+WAIT_SYMBOL=""
+if [[ -f "${STATUS_FILE}" ]]; then
+  WAIT_SYMBOL="$(
+    python3 <<'PY'
+import json
+from pathlib import Path
+
+try:
+    data = json.loads(Path("${STATUS_FILE}").read_text(encoding="utf-8") or "{}")
+    print(data.get("symbol") or "")
+except Exception:
+    print("")
+PY
+  )"
+  WAIT_SYMBOL="${WAIT_SYMBOL//$'\n'/}"
+fi
 
 write_stopped_status() {
+  local reason="${1:-stopped}"
+  local symbol="${2:-}"
   python3 <<PY
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+
+reason = ${reason@Q}
+symbol = ${symbol@Q}
 
 path = Path("${STATUS_FILE}")
 path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,9 +65,11 @@ data = {
     "bot_name": "${BOT_NAME}",
     "status": "stopped",
     "start_requested": False,
+    "pid": None,
+    "symbol": symbol,
+    "reason": reason,
     "updated_at": datetime.now(timezone.utc).isoformat()
 }
-
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 PY
 }
@@ -93,7 +116,7 @@ if [[ -f "${WAIT_PID_FILE}" ]]; then
     fi
   fi
   rm -f "${WAIT_PID_FILE}" "${CANCEL_START_FILE}"
-  write_stopped_status
+  write_stopped_status "waiting_for_symbol_canceled" "${WAIT_SYMBOL}"
   echo "[${BOT_NAME}] releasing symbol reservation..."
   set +e
   "${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/active_bot_symbols.py" \
@@ -184,4 +207,4 @@ if [[ ${RELEASE_CODE} -ne 0 ]]; then
 fi
 
 rm -f "${PID_FILE}" "${LEGACY_PID_FILE}"
-write_stopped_status
+write_stopped_status "stop_with_cleanup_success"

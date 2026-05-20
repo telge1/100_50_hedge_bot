@@ -21,7 +21,6 @@ def _normalize_key(value: str | None) -> str:
     return (value or "").strip().casefold()
 
 
-@lru_cache(maxsize=None)
 def discover_long_bots() -> list[dict[str, Any]]:
     root = get_hedge_bot_root()
     if not root.exists():

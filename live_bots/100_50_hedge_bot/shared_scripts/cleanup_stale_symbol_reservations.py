@@ -92,15 +92,12 @@ def _read_cmdline(pid: int) -> tuple[str | None, str]:
 def _cmdline_matches(cmdline: str, bot_name: str, config_path: Path, state_path: Path) -> bool:
     if "fixed_cycle_hedge_bot.runner" not in cmdline:
         return False
-    if f"--bot-name {bot_name}" in cmdline:
-        return True
-    if str(config_path) in cmdline:
-        return True
-    if str(state_path) in cmdline:
-        return True
-    if bot_name in cmdline:
-        return True
-    return False
+    if f"--bot-name {bot_name}" not in cmdline:
+        return False
+    for token in (str(config_path), str(state_path), bot_name):
+        if token and token in cmdline:
+            return True
+    return True
 
 
 def _get_pid_sources(bot_dir: Path) -> list[Path]:
@@ -167,6 +164,15 @@ def main() -> int:
                     if meta.get("status") != "reserved":
                         continue
                     symbol = meta.get("symbol")
+                    pid_value = meta.get("pid")
+                    if not pid_value:
+                        state.pop(bot_name, None)
+                        changed = True
+                        _log(
+                            prefix,
+                            f"stale_symbol_reservation_removed bot_name={bot_name} symbol={symbol} reason=missing_pid",
+                        )
+                        continue
                     alive, reason = _inspect_bot(bot_name, bot_group_dir)
                     if alive:
                         _log(prefix, f"active_symbol_reservation_kept bot_name={bot_name} symbol={symbol}")
