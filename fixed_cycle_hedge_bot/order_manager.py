@@ -13,6 +13,8 @@ from urllib.parse import urlencode
 
 import requests
 
+from fixed_cycle_hedge_bot.exchange_errors import ExchangeUnavailableError, is_retryable_exchange_error
+
 logger = logging.getLogger("modular_hedge_runtime.order_manager")
 logger.setLevel(logging.INFO)
 
@@ -120,7 +122,14 @@ class BybitOrderManager:
             logger.exception("Bybit POST %s exception", path, exc_info=exc)
             return None
 
-    def _get(self, path: str, params: Mapping[str, Any], timeout: int = 10) -> Mapping[str, Any] | None:
+    def _get(
+        self,
+        path: str,
+        params: Mapping[str, Any],
+        timeout: int = 10,
+        *,
+        raise_on_retryable: bool = False,
+    ) -> Mapping[str, Any] | None:
         query = urlencode({key: value for key, value in params.items() if value is not None})
         signature, timestamp = self._sign(query)
         headers = {
@@ -144,6 +153,8 @@ class BybitOrderManager:
                 return None
             return data
         except Exception as exc:
+            if raise_on_retryable and is_retryable_exchange_error(exc):
+                raise ExchangeUnavailableError(endpoint=path, original_exception=exc) from exc
             logger.exception("Bybit GET %s exception", path, exc_info=exc)
             return None
 
@@ -644,7 +655,7 @@ class BybitOrderManager:
             params["symbol"] = symbol.upper()
         elif settle_coin:
             params["settleCoin"] = settle_coin.upper()
-        data = self._get("/v5/order/realtime", params)
+        data = self._get("/v5/order/realtime", params, raise_on_retryable=True)
         if not data:
             return None
         result = data.get("result") or {}
@@ -666,7 +677,7 @@ class BybitOrderManager:
             params["orderId"] = order_id
         if order_link_id:
             params["orderLinkId"] = order_link_id
-        data = self._get("/v5/order/history", params)
+        data = self._get("/v5/order/history", params, raise_on_retryable=True)
         if not data:
             return None
         result = data.get("result") or {}

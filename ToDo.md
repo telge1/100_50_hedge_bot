@@ -133,6 +133,3 @@ sondern nach jedem Event beweisen:
 "Meine Struktur ist gesund."
 
 
-wir haben ja auf der hauptseite das profil dropdown menu fur die verschiedene bots da haben wir gerade Main Bot 1 und Bot 2 und ich will da jetzt mehr bots hinzufugen konnen mit einnen + wenn ich dadrauf klicke dann erstellen wir ein neues bot profil  wenn wir das profil erstellen dann konnen wir auch gleich die start buttons anpassen also der nachste ware dann fur den Long_bot_3 und 4 usw verstehst du was ich meine 
-
-wie konnen wir das am einfachsten anpassen bitte erstmal nur planen 

@@ -179,7 +179,10 @@ class FillEvent:
             "incremental_qty": self.incremental_qty,
             "exec_id": self.exec_id,
             "metadata": dict(self.metadata),
-            "traces": [trace.to_dict() for trace in self.traces],
+            "traces": [
+                trace.to_dict() if hasattr(trace, "to_dict") else trace
+                for trace in self.traces
+            ],
             "occurred_at": self.occurred_at.isoformat(),
         }
 
@@ -189,6 +192,7 @@ class RuntimeState:
     strategy_state: dict[str, Any] = field(default_factory=dict)
     active_orders: dict[str, ManagedOrder] = field(default_factory=dict)
     exchange_to_client_id: dict[str, str] = field(default_factory=dict)
+    client_to_exchange_id: dict[str, str] = field(default_factory=dict)
     realized_long_pnl_total: float = 0.0
     realized_short_pnl_total: float = 0.0
     last_snapshot: HedgeSnapshot | None = None

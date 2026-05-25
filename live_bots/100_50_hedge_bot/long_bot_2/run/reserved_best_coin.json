@@ -1,0 +1,12 @@
+{
+  "symbol": "ASTERUSDT",
+  "timestamp": "2026-05-24T09:59:13.345061+00:00",
+  "source": "reserved_symbol",
+  "reason": "bot_reservation",
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "symbol": "ASTERUSDT"
+    }
+  ]
+}

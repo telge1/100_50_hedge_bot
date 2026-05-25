@@ -4,6 +4,6 @@
   "start_requested": false,
   "pid": null,
   "symbol": "",
-  "reason": "stale_status_cleanup_no_runner",
-  "updated_at": "2026-05-20T12:57:46.171001+00:00"
+  "reason": "stopped_via_stop_bot",
+  "updated_at": "2026-05-24T19:06:07.485333+00:00"
 }

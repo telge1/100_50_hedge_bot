@@ -40,17 +40,19 @@ if [[ -z "${PYTHON:-}" ]]; then
 fi
 
 CONFIG_FILE="${BOT_DIR}/config/fixed_cycle_config.json"
+RUN_DIR="${BOT_DIR}/run"
+RUNTIME_CONFIG_FILE="${RUN_DIR}/fixed_cycle_config.runtime.json"
 STATE_FILE="${BOT_DIR}/state/fixed_cycle_state.json"
 LOG_DIR="${BOT_DIR}/logs"
 PID_FILE="${BOT_DIR}/pids/fixed_cycle_bot.pid"
 SNAPSHOT_FILE="${BOT_DIR}/snapshots/fixed_cycle_wallet_snapshot.json"
 AUDIT_LOG="${LOG_DIR}/generic_hedge_runtime_audit.jsonl"
 RUNNER_STDOUT="${LOG_DIR}/fixed_cycle_runner.stdout.log"
+RESERVED_BEST_COIN_FILE="${RUN_DIR}/reserved_best_coin.json"
 
 HARD_RESET_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/hard_reset_bot.sh"
 CLEAN_LOGS_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/clean_bot_logs.sh"
 CANCEL_SCRIPT="${BOT_GROUP_DIR}/shared_scripts/cancel_open_orders.sh"
-RUN_DIR="${BOT_DIR}/run"
 PID_FILE="${RUN_DIR}/bot.pid"
 STATUS_FILE="${RUN_DIR}/status.json"
 WAIT_PID_FILE="${RUN_DIR}/start_wait.pid"
@@ -155,6 +157,72 @@ is_alive_pid_with_bot_name() {
   return 1
 }
 
+read_reserved_symbol() {
+  python3 <<PY
+import json
+from pathlib import Path
+
+state_path = Path("${BOT_GROUP_DIR}/state/active_bot_symbols.json")
+bot_name = "${BOT_NAME}"
+symbol = ""
+if state_path.exists():
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        payload = {}
+    entry = payload.get(bot_name) or {}
+    symbol = str(entry.get("symbol") or "").upper()
+print(symbol)
+PY
+}
+
+write_reserved_runtime_files() {
+  local reserved_symbol="$1"
+  if [[ -z "${reserved_symbol}" ]]; then
+    echo "[${BOT_NAME}] ERROR: reserved symbol missing after wait" >&2
+    exit 1
+  fi
+
+  RESERVED_SYMBOL_VALUE="${reserved_symbol}" \
+  SOURCE_CONFIG_FILE="${CONFIG_FILE}" \
+  RUNTIME_CONFIG_FILE_PATH="${RUNTIME_CONFIG_FILE}" \
+  RESERVED_BEST_COIN_FILE_PATH="${RESERVED_BEST_COIN_FILE}" \
+  python3 <<'PY'
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+reserved_symbol = os.environ["RESERVED_SYMBOL_VALUE"]
+source_config = Path(os.environ["SOURCE_CONFIG_FILE"])
+runtime_config = Path(os.environ["RUNTIME_CONFIG_FILE_PATH"])
+reserved_best_coin_file = Path(os.environ["RESERVED_BEST_COIN_FILE_PATH"])
+
+config = json.loads(source_config.read_text(encoding="utf-8"))
+config["symbol"] = reserved_symbol
+config["best_coin_file"] = str(reserved_best_coin_file)
+
+runtime_config.parent.mkdir(parents=True, exist_ok=True)
+runtime_config.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+reserved_best_coin_file.write_text(
+    json.dumps(
+        {
+            "symbol": reserved_symbol,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": "reserved_symbol",
+            "reason": "bot_reservation",
+            "candidate_count": 1,
+            "candidates": [{"symbol": reserved_symbol}],
+        },
+        ensure_ascii=False,
+        indent=2,
+    ),
+    encoding="utf-8",
+)
+PY
+}
+
 SIDE="long"
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 
@@ -220,6 +288,9 @@ if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; 
 fi
 cleanup_wait_files
 
+RESERVED_SYMBOL="$(read_reserved_symbol)"
+write_reserved_runtime_files "${RESERVED_SYMBOL}"
+
 if [[ -f "${PID_FILE}" ]]; then
   OLD_PID="$(cat "${PID_FILE}" 2>/dev/null || true)"
   if [[ -n "${OLD_PID}" ]]; then
@@ -255,7 +326,7 @@ rotate_log "${LOG_DIR}/fixed_cycle_calc_audit.log"
 nohup "${PYTHON}" -m fixed_cycle_hedge_bot.runner \
   --strategy fixed_cycle \
   --bot-name "${BOT_NAME}" \
-  --strategy-config-file "${CONFIG_FILE}" \
+  --strategy-config-file "${RUNTIME_CONFIG_FILE}" \
   --strategy-state-file "${STATE_FILE}" \
   --audit-log-file "${AUDIT_LOG}" \
   --calc-audit-log-file "${LOG_DIR}/fixed_cycle_calc_audit.log" \
@@ -275,18 +346,7 @@ if ! kill -0 "${PID}" 2>/dev/null; then
 fi
 echo "Fixed-cycle ${BOT_NAME} started via nohup (${RUNNER_STDOUT})"
 echo "Started ${BOT_NAME} with PID=$PID"
-CURRENT_SYMBOL="$(python3 <<PY
-import json
-from pathlib import Path
-
-best_path = Path("${PROJECT_ROOT}/logs/best_coin.json")
-symbol = ""
-if best_path.exists():
-    payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
-    symbol = (payload.get("symbol") or "").upper()
-print(symbol)
-PY
-)"
+CURRENT_SYMBOL="${RESERVED_SYMBOL}"
 STARTED_PID="$PID" write_status_json "running" "" "${CURRENT_SYMBOL}" "" "true"
 echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
 echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_calc_audit.log"

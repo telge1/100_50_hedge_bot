@@ -12,6 +12,7 @@ import asyncio
 import aiohttp
 import json
 import os
+import sys
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -23,6 +24,14 @@ CANDLE_LIMIT = 120
 TOP_N = 15
 TEST_NOTIONAL_USDT = 100.0
 VERBOSE = False
+
+MIN_CANDIDATE_SCORE = 6.0
+MAX_CANDIDATE_SPREAD_PCT = 0.03
+MIN_CANDIDATE_DEPTH = 100_000
+MAX_CANDIDATE_BUY_SLIPPAGE = 0.02
+MAX_CANDIDATE_SELL_SLIPPAGE = 0.02
+MAX_BEST_COIN_CANDIDATES = 10
+MAX_CANDIDATE_VOL_SPIKE = 5.0
 
 MIN_24H_VOLUME = 5_000_000
 MAX_SPREAD_PCT = 0.25
@@ -44,6 +53,16 @@ FALLBACK_PARAMS = {
 }
 
 BEST_COIN_FILE = Path("logs") / "best_coin.json"
+
+
+def _normalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for key, value in candidate.items():
+        if isinstance(value, np.generic):
+            normalized[key] = value.item()
+        else:
+            normalized[key] = value
+    return normalized
 
 
 def _write_best_coin_atomic(best_coin: dict[str, Any]) -> None:
@@ -252,6 +271,45 @@ async def run_scan(params):
         return candidates[:TOP_N]
 
 
+def _is_good_candidate(candidate: dict[str, Any]) -> tuple[bool, str]:
+    if not candidate or not isinstance(candidate, dict):
+        return False, "invalid_candidate"
+    symbol = candidate.get("symbol")
+    if not symbol or not isinstance(symbol, str):
+        return False, "missing_symbol"
+    score = candidate.get("score")
+    if score is None or not isinstance(score, (int, float)):
+        return False, "missing_score"
+    if float(score) < MIN_CANDIDATE_SCORE:
+        return False, "score_below_min"
+    vol_spike = candidate.get("vol_spike")
+    if vol_spike is None:
+        return False, "missing_vol_spike"
+    if float(vol_spike) > MAX_CANDIDATE_VOL_SPIKE:
+        return False, "vol_spike_too_high"
+    spread = candidate.get("spread") or candidate.get("spread_pct")
+    if spread is None:
+        return False, "missing_spread"
+    if float(spread) > MAX_CANDIDATE_SPREAD_PCT:
+        return False, "spread_too_high"
+    depth = candidate.get("depth")
+    if depth is None:
+        return False, "missing_depth"
+    if float(depth) < MIN_CANDIDATE_DEPTH:
+        return False, "depth_too_low"
+    buy_slippage = candidate.get("simulated_buy_slippage")
+    if buy_slippage is None:
+        return False, "missing_buy_slippage"
+    if float(buy_slippage) > MAX_CANDIDATE_BUY_SLIPPAGE:
+        return False, "buy_slippage_too_high"
+    sell_slippage = candidate.get("simulated_sell_slippage")
+    if sell_slippage is None:
+        return False, "missing_sell_slippage"
+    if float(sell_slippage) > MAX_CANDIDATE_SELL_SLIPPAGE:
+        return False, "sell_slippage_too_high"
+    return True, "accepted"
+
+
 async def scan():
     base_params = {
         "move_1m_floor": MIN_MOVE_1M,
@@ -269,7 +327,155 @@ async def scan():
     return await run_scan(FALLBACK_PARAMS)
 
 
+def _build_best_coin_record(
+    coins: list[dict[str, Any]],
+    duration: float,
+) -> dict[str, Any] | None:
+    raw_count = len(coins)
+    accepted: list[dict[str, Any]] = []
+    rejected_summary: dict[str, int] = {}
+    for candidate in coins:
+        good, reason = _is_good_candidate(candidate)
+        if good:
+            accepted.append(candidate)
+        else:
+            rejected_summary[reason] = rejected_summary.get(reason, 0) + 1
+    print(
+        f"🧮 raw_coins={raw_count} accepted={len(accepted)} rejected={sum(rejected_summary.values())} reasons={rejected_summary}"
+    )
+    if not accepted:
+        return {
+            "symbol": "",
+            "score": None,
+            "timestamp": datetime.now(timezone(timedelta(hours=3))).isoformat(),
+            "source": "coin_scanner",
+            "reason": "no_good_candidates",
+            "duration_s": round(duration, 1),
+            "candidate_count": 0,
+            "rejected_count": raw_count,
+            "rejected_summary": rejected_summary,
+        }
+    normalized_candidates = [
+        _normalize_candidate(candidate)
+        for candidate in accepted[: MAX_BEST_COIN_CANDIDATES]
+    ]
+    best = normalized_candidates[0]
+    return {
+        "symbol": best.get("symbol"),
+        "score": best.get("score"),
+        "timestamp": datetime.now(timezone(timedelta(hours=3))).isoformat(),
+        "source": "coin_scanner",
+        "reason": "highest_score",
+        "duration_s": round(duration, 1),
+        "candidate_count": len(normalized_candidates),
+        "rejected_count": sum(rejected_summary.values()),
+        "rejected_summary": rejected_summary,
+        "candidates": normalized_candidates,
+    }
+
+
+def _test_best_coin_record() -> None:
+    sample_coins = [
+        {
+            "symbol": "PROVEUSDT",
+            "score": 18.92,
+            "spread": 0.0283,
+            "depth": 88_099,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.19,
+        },
+        {
+            "symbol": "ASTERUSDT",
+            "score": 12.17,
+            "spread": 0.0144,
+            "depth": 253567.74,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.1,
+        },
+        {
+            "symbol": "ONDOUSDT",
+            "score": 8.19,
+            "spread": 0.0248,
+            "depth": 1_105_896.67,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.02,
+        },
+        {
+            "symbol": "HYPEUSDT",
+            "score": 7.15,
+            "spread": 0.022,
+            "depth": 600_000,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.5,
+        },
+        {
+            "symbol": "DASHUSDT",
+            "score": 6.8,
+            "spread": 0.017,
+            "depth": 850_000,
+            "simulated_buy_slippage": 0.005,
+            "simulated_sell_slippage": 0.005,
+            "vol_spike": 1.0,
+        },
+        {
+            "symbol": "APTUSDT",
+            "score": 6.6,
+            "spread": 0.012,
+            "depth": 200_000,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.3,
+        },
+        {
+            "symbol": "INJUSDT",
+            "score": 6.74,
+            "spread": 0.0202,
+            "depth": 823276.31,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.01,
+        },
+        {
+            "symbol": "JTOUSDT",
+            "score": 6.5,
+            "spread": 0.013,
+            "depth": 510_000,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.2,
+        },
+        {
+            "symbol": "PENGUUSDT",
+            "score": 6.4,
+            "spread": 0.011,
+            "depth": 420_000,
+            "simulated_buy_slippage": 0.01,
+            "simulated_sell_slippage": 0.01,
+            "vol_spike": 0.1,
+        },
+        {
+            "symbol": "ARBUSDT",
+            "score": 14.1,
+            "spread": 0.025,
+            "depth": 1_100_000,
+            "simulated_buy_slippage": 0.015,
+            "simulated_sell_slippage": 0.015,
+            "vol_spike": 16.27,
+        },
+    ]
+    record = _build_best_coin_record(sample_coins, 0.1)
+    print(json.dumps(record, ensure_ascii=False, indent=2))
+
+
 if __name__ == "__main__":
+    if "--test" in sys.argv:
+        _test_best_coin_record()
+        sys.exit(0)
+
     start = time.time()
     coins = asyncio.run(scan())
     print("\n🔥 Beste hedge-taugliche Coins 🔥\n")
@@ -285,16 +491,8 @@ if __name__ == "__main__":
     duration = time.time() - start
     print(f"\n⏱ Laufzeit: {duration:.1f}s")
 
-    if coins:
-        best = coins[0]
-        best_coin_record = {
-            "symbol": best["symbol"],
-            "score": best["score"],
-            "timestamp": datetime.now(timezone(timedelta(hours=3))).isoformat(),
-            "source": "coin_scanner",
-            "reason": "highest_score",
-            "duration_s": round(duration, 1),
-        }
+    best_coin_record = _build_best_coin_record(coins, duration)
+    if best_coin_record:
         _write_best_coin_atomic(best_coin_record)
     else:
         if BEST_COIN_FILE.exists():

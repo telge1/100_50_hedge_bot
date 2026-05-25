@@ -9,7 +9,11 @@ from typing import Any
 from unittest.mock import patch
 
 from fixed_cycle_hedge_bot import cleanup
-from fixed_cycle_hedge_bot.fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
+from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
+    FixedCycleHedgeConfig,
+    FixedCycleHedgeStrategy,
+    FINAL_EXIT_PNL_FETCH_MAX_ATTEMPTS,
+)
 from fixed_cycle_hedge_bot.models import ActiveOrderSnapshot, FillEvent, HedgeSnapshot, ManagedOrder, StrategyIntent
 from fixed_cycle_hedge_bot.runtime import GenericHedgeRuntime, GenericRuntimeConfig
 from utils.math_utils import calculate_pnl
@@ -2539,6 +2543,53 @@ class FixedCycleStrategyTests(unittest.TestCase):
             [call.args[0] for call in log_event.call_args_list if call.args],
         )
 
+    def test_emergency_flat_positions_transition_directly_to_cleanup(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        state = runtime.runtime_state.strategy_state
+        state["emergency_flat_required"] = True
+        state["emergency_exit_reason"] = "manual_cancel"
+        state["emergency_exit_attempts"] = 1
+        runtime.runtime_state.active_orders["cycle-open"] = ManagedOrder(
+            client_order_id="cycle-open",
+            exchange_order_id="ex-cycle-open",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+        )
+        runtime.runtime_state.active_orders["exit-open"] = ManagedOrder(
+            client_order_id="exit-open",
+            exchange_order_id="ex-exit-open",
+            side="long",
+            qty=1.0,
+            purpose=runtime.strategy.LONG_TP_EXIT_PURPOSE,
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="OPEN",
+        )
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="rest",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertEqual(intents, [])
+        self.assertTrue(state.get("fresh_restart_required"))
+        self.assertTrue(state.get("post_exit_cleanup_required"))
+        self.assertFalse(state.get("post_exit_cleanup_verified"))
+        self.assertFalse(state.get("emergency_flat_required"))
+        self.assertEqual(state.get("emergency_exit_reason"), "manual_cancel")
+
     def test_emergency_market_close_has_no_trigger_fields(self) -> None:
         runtime = self.build_runtime(FakeOrderManager())
         snapshot = HedgeSnapshot(
@@ -3483,6 +3534,387 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertTrue(
             any(call.args and call.args[0] == "fixed_cycle_flat_waiting_for_final_pnl" for call in log_event_mock.call_args_list)
         )
+
+    def test_fresh_restart_cleanup_continues_when_final_exit_pnl_missing(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["final_trade_pnl_audited"] = False
+        state["last_trade_pnl_complete"] = False
+        state["last_trade_pnl_usdt"] = None
+        state["final_exit_pnl_fetch_attempts"] = FINAL_EXIT_PNL_FETCH_MAX_ATTEMPTS - 1
+
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch.object(
+            runtime.strategy,
+            "_ensure_final_exit_pnl_from_exchange",
+            return_value=None,
+        ):
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+        self.assertFalse(state.get("fresh_restart_required"))
+        self.assertTrue(state.get("startup_flat_reset_applied"))
+
+    def test_emergency_fresh_restart_does_not_wait_for_final_exit_pnl(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["emergency_flat_cleanup_done"] = True
+        state["emergency_exit_reason"] = "manual_cancel"
+        state["final_trade_pnl_audited"] = False
+        state["last_trade_pnl_complete"] = False
+        state["last_trade_pnl_usdt"] = None
+
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch.object(
+            runtime.strategy,
+            "_ensure_final_exit_pnl_from_exchange",
+            return_value=None,
+        ), patch.object(
+            runtime.strategy,
+            "_ensure_post_exit_cleanup_required",
+            wraps=runtime.strategy._ensure_post_exit_cleanup_required,
+        ) as cleanup_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertNotEqual(intents, [])
+        self.assertTrue(cleanup_mock.called)
+
+    def test_emergency_deferred_pnl_does_not_block_fresh_entry_after_cleanup(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["final_exit_pnl_fetch_deferred_cleanup"] = True
+        state["final_exit_pnl_deferred_allows_fresh_entry"] = True
+        state["final_trade_pnl_audited"] = False
+        state["last_trade_pnl_complete"] = False
+        state["last_trade_pnl_usdt"] = None
+
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch.object(
+            runtime.strategy,
+            "_ensure_final_exit_pnl_from_exchange",
+            return_value=None,
+        ):
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+
+    def test_full_exit_triggers_in_runtime_reset_and_initial_entries(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["post_exit_cleanup_required"] = False
+        state["final_pnl_pending"] = True
+        runtime.runtime_state.active_orders["stale-order"] = ManagedOrder(
+            client_order_id="stale-order",
+            exchange_order_id="ex-stale-order",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-stale-order"] = "stale-order"
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+        self.assertFalse(state.get("fresh_restart_required"))
+        self.assertTrue(state.get("initial_entry_submitted"))
+        self.assertEqual(runtime.runtime_state.active_orders, {})
+        self.assertEqual(runtime.runtime_state.exchange_to_client_id, {})
+
+    def test_emergency_flat_verified_cleanup_runs_in_runtime_reset(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["emergency_flat_required"] = False
+        state["emergency_flat_in_progress"] = True
+        state["emergency_exit_reason"] = "manual_cancel"
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+        self.assertFalse(state.get("emergency_flat_required"))
+        self.assertFalse(state.get("emergency_flat_in_progress"))
+
+    def test_final_pnl_context_missing_flat_allows_internal_restart(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        state["final_pnl_pending"] = True
+        state["final_short_exit_order_context"] = {"exchange_order_id": "short-exit"}
+        state["final_pnl_context_missing_logged"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        purposes = {intent.purpose for intent in intents}
+        self.assertIn("INITIAL_LONG_ENTRY", purposes)
+        self.assertIn("INITIAL_SHORT_ENTRY", purposes)
+        self.assertFalse(state.get("final_pnl_pending"))
+        self.assertNotIn("final_pnl_context_missing_logged", state)
+
+    def test_no_external_restart_for_emergency_or_cleanup(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        with patch.object(runtime.strategy, "_trigger_restart_script_after_full_exit") as restart_mock:
+            intents = runtime.strategy.on_tick(snapshot, runtime.runtime_state, runtime.context)
+
+        self.assertNotEqual(intents, [])
+        self.assertFalse(restart_mock.called)
+
+    def test_exit_order_canceled_without_shell_restart(self) -> None:
+        runtime = self.build_runtime(FakeOrderManager())
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=1.0,
+            long_avg=0.0,
+            short_avg=101.0,
+            source="websocket",
+        )
+        payload = {
+            "orderStatus": "Cancelled",
+            "orderLinkId": "fixed_cycle-short_sl_exit-test-runtime-restart",
+            "orderId": "cancelled-short-runtime-restart",
+            "rejectReason": "EC_NoImmediateQtyToFill",
+        }
+
+        with patch.object(runtime.strategy, "_trigger_restart_script_after_full_exit") as restart_mock:
+            intents = runtime.strategy.on_order_update(
+                payload,
+                snapshot,
+                runtime.runtime_state,
+                runtime.context,
+            )
+
+        self.assertEqual(len(intents), 1)
+        self.assertEqual(intents[0].purpose, runtime.strategy.EMERGENCY_FLAT_SHORT_PURPOSE)
+        self.assertFalse(restart_mock.called)
+
+    def test_refill_gate_cleared_by_verified_flat_reset(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["refill_pending"] = True
+        state["refill_in_progress"] = True
+        state["refill_state"] = {"REQUESTED": True}
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        result = runtime.strategy._perform_verified_flat_runtime_reset(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+            reason="test_refill_gate_reset",
+        )
+
+        self.assertTrue(result)
+        self.assertFalse(state.get("refill_pending"))
+        self.assertFalse(state.get("refill_in_progress"))
+        self.assertEqual(state.get("refill_state"), {})
+
+    def test_expected_cancel_guard_survives_but_reset_clears_pending_expected_cancels(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["expected_exit_cancels"] = [{"purpose": runtime.strategy.LONG_TP_EXIT_PURPOSE}]
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        result = runtime.strategy._perform_verified_flat_runtime_reset(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+            reason="test_expected_cancel_reset",
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(state.get("expected_exit_cancels"), [])
+        self.assertTrue(hasattr(runtime.strategy, "_check_expected_cancel_replacement_timeouts"))
+
+    def test_verified_flat_reset_rejects_non_flat_snapshot(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["fresh_restart_required"] = True
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.0,
+            long_avg=100.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        result = runtime.strategy._perform_verified_flat_runtime_reset(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+            reason="test_non_flat",
+        )
+
+        self.assertFalse(result)
+        self.assertTrue(state.get("fresh_restart_required"))
+
+    def test_verified_flat_reset_rejects_open_exchange_orders(self) -> None:
+        order_manager = FakeOrderManager()
+        order_manager.open_orders = [{"orderStatus": "New", "orderId": "still-open"}]
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        result = runtime.strategy._perform_verified_flat_runtime_reset(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+            reason="test_open_exchange_orders",
+        )
+
+        self.assertFalse(result)
+
+    def test_verified_flat_reset_clears_active_orders_and_exchange_map(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        runtime.runtime_state.active_orders["cycle-open"] = ManagedOrder(
+            client_order_id="cycle-open",
+            exchange_order_id="ex-cycle-open",
+            side="long",
+            qty=1.0,
+            purpose="CYCLE_1_LONG_ADD",
+            price=None,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+        )
+        runtime.runtime_state.exchange_to_client_id["ex-cycle-open"] = "cycle-open"
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+
+        result = runtime.strategy._perform_verified_flat_runtime_reset(
+            snapshot,
+            runtime.runtime_state,
+            runtime.context,
+            reason="test_clear_maps",
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(runtime.runtime_state.active_orders, {})
+        self.assertEqual(runtime.runtime_state.exchange_to_client_id, {})
 
     def test_on_tick_allows_restart_when_final_pnl_ready(self) -> None:
         order_manager = FakeOrderManager()

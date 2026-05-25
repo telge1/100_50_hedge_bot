@@ -33,20 +33,42 @@ def _validate_bot_name(name: str) -> bool:
     return bool(name and name.startswith("long_bot_") and name[9:].isdigit())
 
 
-def _read_best_coin(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8") or "{}")
-    except Exception:
-        return None
-    symbol = payload.get("symbol")
+def _normalize_symbol(symbol: str | None) -> str | None:
     if not symbol or not isinstance(symbol, str):
         return None
     symbol = symbol.strip().upper()
     if not symbol.endswith("USDT"):
         return None
     return symbol
+
+
+def _read_best_coin_candidates(path: Path) -> tuple[list[str], str, int]:
+    if not path.exists():
+        return [], "", 0
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return [], "", 0
+    reason = payload.get("reason") or ""
+    top_symbol = _normalize_symbol(payload.get("symbol"))
+    candidates = payload.get("candidates") or []
+    symbols: list[str] = []
+    seen: set[str] = set()
+
+    def _add(symbol: str | None) -> None:
+        normalized = _normalize_symbol(symbol)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            symbols.append(normalized)
+
+    if reason == "no_good_candidates":
+        return [], reason, len(symbols)
+    _add(top_symbol)
+    if isinstance(candidates, list):
+        for entry in candidates:
+            if isinstance(entry, dict):
+                _add(entry.get("symbol"))
+    return symbols, reason, len(symbols)
 
 
 def _load_state(path: Path) -> dict[str, dict[str, object]]:
@@ -130,45 +152,54 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                 )
                 return 3
 
-            symbol = _read_best_coin(best_coin_path)
-            if not symbol:
-                print(f"[{bot_name}] best_coin.json missing/invalid; waiting...", flush=True)
+            candidate_symbols, reason, candidate_count = _read_best_coin_candidates(best_coin_path)
+            if not candidate_symbols:
+                if reason:
+                    msg = f"{reason}; waiting..."
+                else:
+                    msg = "best_coin.json missing/invalid; waiting..."
+                print(f"[{bot_name}] {msg}", flush=True)
                 time.sleep(poll_seconds)
                 continue
+            symbol_info = f"candidate_count={candidate_count} candidates={candidate_symbols}"
+            print(f"[{bot_name}] evaluating candidates {symbol_info}", flush=True)
 
             _lock_file(lock_fd)
             try:
                 state = _load_state(state_path)
-                occupying_bot = None
+                reserved_by_symbol: dict[str, str] = {}
                 for other_bot, meta in state.items():
-                    if (
-                        other_bot != bot_name
-                        and isinstance(meta, dict)
-                        and meta.get("symbol") == symbol
-                        and meta.get("status") == "reserved"
-                    ):
-                        occupying_bot = other_bot
-                        break
-
-                if occupying_bot:
-                    occupying_symbol = state.get(occupying_bot, {}).get("symbol", "")
-                    if occupying_symbol and occupying_symbol != symbol:
-                        state.pop(occupying_bot, None)
-                        _write_state(state_path, state)
+                    if not isinstance(meta, dict):
+                        continue
+                    status = meta.get("status")
+                    sym = meta.get("symbol")
+                    if status == "reserved" and sym:
+                        reserved_by_symbol[sym] = other_bot
+                current_entry = state.get(bot_name)
+                if current_entry and current_entry.get("status") == "reserved":
+                    current_symbol = current_entry.get("symbol")
+                    if current_symbol in candidate_symbols:
                         print(
-                            f"[{bot_name}] cleared stale reservation of {occupying_bot} ({occupying_symbol})",
+                            f"[{bot_name}] already reserved {current_symbol}; keeping reservation",
                             flush=True,
                         )
-                        occupying_bot = None
-                    else:
-                        occupant_meta = state.get(occupying_bot, {})
-                        occupant_pid = occupant_meta.get("pid")
-                        occupant_source = occupant_meta.get("source")
+                        return 0
+                checked_candidates = 0
+                occupying_bot = None
+                preferred_index = min(int(bot_name.split("_")[-1]) - 1, len(candidate_symbols) - 1)
+                ordered_candidates = candidate_symbols[preferred_index:] + candidate_symbols[:preferred_index]
+                for symbol in ordered_candidates:
+                    checked_candidates += 1
+                    occupant = reserved_by_symbol.get(symbol)
+                    if occupant and occupant != bot_name:
+                        occ_meta = state.get(occupant, {})
+                        occ_pid = occ_meta.get("pid")
+                        occ_source = occ_meta.get("source")
                         print(
-                            f"[{bot_name}] reservation_blocked_by_live_bot occupant={occupying_bot} symbol={symbol} pid={occupant_pid} source={occupant_source} state={state_path}",
+                            f"[{bot_name}] candidate {symbol} blocked by {occupant} pid={occ_pid} source={occ_source}",
                             flush=True,
                         )
-                if not occupying_bot:
+                        continue
                     entry = {
                         "symbol": symbol,
                         "status": "reserved",
@@ -178,8 +209,16 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                     }
                     state[bot_name] = entry
                     _write_state(state_path, state)
-                    print(f"[{bot_name}] reserved {symbol}", flush=True)
+                    print(
+                        f"[{bot_name}] reserved {symbol} (checked={checked_candidates} candidate_count={candidate_count})",
+                        flush=True,
+                    )
                     return 0
+                blocked = ", ".join(candidate_symbols[:checked_candidates])
+                print(
+                    f"[{bot_name}] no free candidate; candidates_checked={checked_candidates} blocked={blocked}",
+                    flush=True,
+                )
             finally:
                 _unlock_file(lock_fd)
 
