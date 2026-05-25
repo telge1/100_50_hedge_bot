@@ -750,6 +750,8 @@ def load_confirmed_order_pnl_rows(
                 rows_by_key[dedupe_key] = {
                     "orderId": exchange_order_id,
                     "exchange_order_id": exchange_order_id,
+                    "orderLinkId": payload.get("client_order_id"),
+                    "order_link_id": payload.get("client_order_id"),
                     "symbol": payload.get("symbol"),
                     "closedPnl": normalized_closed_pnl,
                     "updatedTime": timestamp,
@@ -761,6 +763,7 @@ def load_confirmed_order_pnl_rows(
                     "trade_block_id": payload.get("trade_block_id"),
                     "cycle_index": payload.get("cycle_index"),
                     "pnl_scope": payload.get("pnl_scope"),
+                    "pnl_source": payload.get("pnl_source"),
                     "dedupe_key": dedupe_key,
                 }
         except Exception:
@@ -888,13 +891,16 @@ def _persist_closed_pnl_history_from_runtime_log(
         logger.warning("[dashboard] dashboard_closed_pnl_history_backfill_failed", exc_info=True)
 
 
-def _load_order_purpose_map_from_runtime_log(limit_lines: int = 10000) -> dict[str, dict[str, Any]]:
-    active_log = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
+def _load_order_purpose_map_from_runtime_log(
+    limit_lines: int = 10000,
+    log_path: Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    active_log = log_path or (project_root / "logs" / "fixed_cycle_hedge_runtime.log")
     order_purpose_map: dict[str, dict[str, Any]] = {}
     all_lines: list[str] = []
     try:
         rotated_logs = sorted(
-            project_root.glob("logs/fixed_cycle_hedge_runtime.log.*"),
+            active_log.parent.glob(f"{active_log.name}.*"),
             key=lambda path: path.stat().st_mtime,
         )
     except Exception:
@@ -6847,7 +6853,10 @@ async def api_get_closed_pnl(
                 output_path=dashboard_history_path,
                 account_label=acc,
             )
-        order_purpose_map = _load_order_purpose_map_from_runtime_log(limit_lines=10000)
+        order_purpose_map = _load_order_purpose_map_from_runtime_log(
+            limit_lines=10000,
+            log_path=runtime_log_path,
+        )
         confirmed_rows = load_confirmed_order_pnl_rows(
             account=acc,
             path=paths.get("confirmed_pnl_history_path"),

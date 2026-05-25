@@ -52,6 +52,7 @@ CONFIRMED_CLOSED_PNL_RETRY_INITIAL_DELAY_MS = 2000
 CONFIRMED_CLOSED_PNL_RETRY_INTERVAL_MS = 2000
 CONFIRMED_CLOSED_PNL_WARNING_MS = 30_000
 CONFIRMED_CLOSED_PNL_FINAL_WARNING_MS = 60_000
+CONFIRMED_CLOSED_PNL_PROVISIONAL_FALLBACK_MS = 30_000
 EXPECTED_EXIT_ORDER_CANCEL_TIMEOUT_SECONDS = 10.0
 
 
@@ -1643,6 +1644,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
         refill_pending = bool(state.get("refill_pending"))
         refill_in_progress = bool(state.get("refill_in_progress"))
+        last_refill_completed_cycle_index = int(state.get("last_refill_completed_cycle_index") or 0)
+        completed_cycles = int(state.get("cycle_completed_count") or 0)
+        cycles_since_last_refill = completed_cycles - last_refill_completed_cycle_index
 
         if state.get("emergency_flat_required"):
             expected_next_action = "emergency_flat"
@@ -1650,7 +1654,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             expected_next_action = "refill"
         elif cycle_waiting_for_short_tp or short_tp_pending_cycle > 0:
             expected_next_action = "build_short_followup"
-        elif int(state.get("cycle_completed_count") or 0) >= 2:
+        elif cycles_since_last_refill >= 2:
             expected_next_action = "refill"
         elif long_qty > 0 and short_qty > 0:
             expected_next_action = "rebuild_basket_exits_or_next_cycle"
@@ -1670,7 +1674,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "bot_state": bot_state,
                 "long_qty": long_qty,
                 "short_qty": short_qty,
-                "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
+                "cycle_completed_count": completed_cycles,
                 "cycle_pair_count": int(state.get("cycle_pair_count") or 0),
                 "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
                 "short_tp_pending_cycle": short_tp_pending_cycle,
@@ -1678,6 +1682,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "refill_pending": refill_pending,
                 "refill_in_progress": refill_in_progress,
                 "expected_next_action": expected_next_action,
+                "last_refill_completed_cycle_index": last_refill_completed_cycle_index,
+                "cycles_since_last_refill": cycles_since_last_refill,
             },
         )
 
@@ -2134,10 +2140,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if fill_type not in {"cycle_short_tp", "cycle_long_reduce"}:
                 continue
             if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
-                updated_payload = dict(payload)
-                updated_payload["fill"] = fill_event.to_dict()
-                remaining.append(updated_payload)
-                continue
+                if age_ms >= CONFIRMED_CLOSED_PNL_PROVISIONAL_FALLBACK_MS:
+                    self._maybe_write_provisional_confirmed_cycle_order_pnl(
+                        fill_event,
+                        runtime_state,
+                        fill_type=fill_type,
+                        cycle_index=int(payload.get("cycle_index") or 0),
+                        reason="closed_pnl_retry_provisional_fallback",
+                    )
+                if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                    updated_payload = dict(payload)
+                    updated_payload["fill"] = fill_event.to_dict()
+                    remaining.append(updated_payload)
+                    continue
             exchange_order_id = fill_event.exchange_order_id
             purpose = fill_event.purpose
             self._remove_pending_cycle_closed_pnl_for_order(
@@ -2409,6 +2424,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "metadata_keys": metadata_keys,
                 },
             )
+            if not self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+                self._maybe_write_provisional_confirmed_cycle_order_pnl(
+                    fill_event,
+                    runtime_state,
+                    fill_type=fill_type,
+                    cycle_index=cycle_index,
+                    reason="provisional_runtime_pnl_after_fill_audit",
+                )
         if fill_type in {"cycle_long_reduce", "cycle_short_tp"}:
             self._ensure_confirmed_cycle_pnl_ledger_entry(
                 runtime_state,
@@ -2847,18 +2870,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             current_long_qty = float(snapshot.long_qty or 0.0)
             current_short_qty = float(snapshot.short_qty or 0.0)
 
-            missing_long_qty = max(initial_long_qty - current_long_qty, 0.0)
-            missing_short_qty = max(initial_short_qty - current_short_qty, 0.0)
-            refill_long_qty = (
-                self._normalize_qty(missing_long_qty, runtime_state)
-                if missing_long_qty > 0
-                else 0.0
+            residual = self._apply_refill_dust_residual_filter(
+                self._refill_residual_snapshot_payload(snapshot, runtime_state),
+                runtime_state,
+                reason="refill_qty_calculation",
             )
-            refill_short_qty = (
-                self._normalize_qty(missing_short_qty, runtime_state)
-                if missing_short_qty > 0
-                else 0.0
-            )
+            missing_long_qty = residual["missing_long_qty"]
+            missing_short_qty = residual["missing_short_qty"]
+            refill_long_qty = residual["refill_long_qty"]
+            refill_short_qty = residual["refill_short_qty"]
 
             refill_payload = {
                 "current_price": current_price,
@@ -2875,6 +2895,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "trigger_purpose": state.get("refill_trigger_purpose"),
             }
             _log_event("fixed_cycle_refill_qty_calculated", refill_payload)
+
+            if self._try_complete_refill_after_dust_residual(
+                snapshot,
+                runtime_state,
+                context,
+                reason="refill_qty_calculation_dust_only",
+                residual_payload=refill_payload,
+            ):
+                return []
 
             if current_price <= 0:
                 _log_warning_event(
@@ -2907,10 +2936,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
             intents: list[StrategyIntent] = []
             expected_purposes: list[str] = []
-            state["refill_long_filled"] = missing_long_qty <= 0
-            state["refill_short_filled"] = missing_short_qty <= 0
+            if state.get("refill_completion_pending_reconcile") or state.get("refill_fills_complete"):
+                if not state.get("refill_long_filled"):
+                    state["refill_long_filled"] = missing_long_qty <= 0
+                if not state.get("refill_short_filled"):
+                    state["refill_short_filled"] = missing_short_qty <= 0
+            else:
+                state["refill_long_filled"] = missing_long_qty <= 0
+                state["refill_short_filled"] = missing_short_qty <= 0
 
-            if refill_long_qty > 0:
+            if refill_long_qty > 0 and not self._refill_qty_below_min_notional(
+                refill_long_qty, current_price, runtime_state
+            ):
                 expected_purposes.append("REFILL_LONG")
                 intents.append(
                     StrategyIntent(
@@ -2925,7 +2962,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     )
                 )
 
-            if refill_short_qty > 0:
+            if refill_short_qty > 0 and not self._refill_qty_below_min_notional(
+                refill_short_qty, current_price, runtime_state
+            ):
                 expected_purposes.append("REFILL_SHORT")
                 intents.append(
                     StrategyIntent(
@@ -2941,6 +2980,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
 
             if not intents:
+                if self._try_complete_refill_after_dust_residual(
+                    snapshot,
+                    runtime_state,
+                    context,
+                    reason="refill_intent_build_no_actionable_qty",
+                    residual_payload=refill_payload,
+                ):
+                    return []
                 _log_warning_event(
                     "fixed_cycle_refill_submit_failed",
                     {**refill_payload, "reason": "normalized_qty_zero_or_below_min"},
@@ -5370,7 +5417,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return []
 
         long_fill = (cycle_state.get("long_fills") or {}).get(str(cycle_index)) or {}
-        self._seed_long_fill_closed_pnl_fields(long_fill)
+        self._seed_long_fill_closed_pnl_fields(
+            long_fill,
+            long_fill.get("order_id") or long_fill.get("exchange_order_id"),
+        )
         active_trade_symbol = self._active_trade_symbol(snapshot, runtime_state, payload=long_fill)
         long_fill_price = float(long_fill.get("price") or 0.0)
         original_long_fill_price = long_fill_price
@@ -6461,27 +6511,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return intents
 
         duplicate_exit_blocked = self._guard_duplicate_exit_purposes(snapshot, runtime_state)
-        if duplicate_exit_blocked and not force_exit_rebuild:
+        if duplicate_exit_blocked:
+            active_snapshot_purposes, active_runtime_purposes = self._collect_active_final_exit_purposes(
+                snapshot, runtime_state
+            )
             _log_event(
-                "fixed_cycle_exit_intent_build_skipped",
+                "fixed_cycle_duplicate_exit_rebuild_blocked",
                 {
                     "symbol": snapshot.symbol or self.config.symbol,
-                    "reason": "duplicate_exit_purposes",
+                    "force_exit_rebuild": force_exit_rebuild,
+                    "reason": "duplicate_final_exit_purposes",
+                    "active_runtime_purposes": active_runtime_purposes,
+                    "active_snapshot_purposes": active_snapshot_purposes,
                 },
             )
             return []
-        if duplicate_exit_blocked and force_exit_rebuild:
-            _log_event(
-                "fixed_cycle_stale_exit_orders_cancel_requested",
-                {
-                    "symbol": snapshot.symbol or self.config.symbol,
-                    "reason": "force_exit_rebuild_duplicate_exit_purposes",
-                    "force_exit_rebuild": True,
-                    "long_qty": snapshot.long_qty,
-                    "short_qty": snapshot.short_qty,
-                    "pending_loss_exit_rebuild_reason": state.get("pending_loss_exit_rebuild_reason"),
-                },
-            )
 
         old_signature = pending_loss_old_signature
         exit_rebuild_allowed = state.get("exit_rebuild_allowed", True)
@@ -7066,43 +7110,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "cycle_pair_count": state.get("cycle_pair_count"),
             },
         )
-        if state["cycle_pair_count"] >= 2 or cycle_index >= 2:
-            logger.info("[REFILL-TRIGGER] switching to STATE_REFILL_PENDING")
-            _log_event(
-                "fixed_cycle_refill_triggered",
-                {
-                    "cycle_completed_count": state.get("cycle_completed_count"),
-                    "cycle_pair_count": state.get("cycle_pair_count"),
-                    "initial_long_qty": state.get("initial_long_qty"),
-                    "initial_short_qty": state.get("initial_short_qty"),
-                    "open_long_qty": state.get("open_long_qty"),
-                    "open_short_qty": state.get("open_short_qty"),
-                    "trigger_purpose": trigger_purpose or state.get("refill_trigger_purpose"),
-                },
-            )
-            _log_event(
-                "fixed_cycle_refill_required_after_two_cycles",
-                {
-                    "symbol": self.config.symbol,
-                    "cycle_index": cycle_index,
-                    "cycle_completed_count": state.get("cycle_completed_count"),
-                    "cycle_pair_count": state.get("cycle_pair_count"),
-                    "trigger_purpose": trigger_purpose,
-                },
-            )
-            state["bot_state"] = self.STATE_REFILL_PENDING
-            state["refill_pending"] = True
-            state["refill_required"] = True
-            state["refill_in_progress"] = False
-            state["cycle_block_status"] = "REFILL_REQUIRED"
-            state["refill_long_filled"] = False
-            state["refill_short_filled"] = False
-            state["long_add_pending"] = False
-            state["long_add_rebuild_allowed"] = True
-            state["refill_state"] = {}
-            state["cycle_pair_count"] = int(state.get("cycle_pair_count") or 0) or state.get("cycle_completed_count") or 0
-            state["refill_trigger_cycle_completed_count"] = state.get("cycle_completed_count")
-            state["refill_trigger_purpose"] = trigger_purpose or state.get("refill_trigger_purpose")
+        if bool(state.get("refill_pending")) or bool(state.get("refill_required")):
             return
         self._clear_cycle_followup_state_after_short_reduce(
             runtime_state, cycle_index, followup_before, counts_before, counts_after
@@ -7292,6 +7300,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self,
         runtime_state: RuntimeState,
         context: StrategyContext | None,
+        *,
+        completion_reason: str = "reconcile",
     ) -> None:
         state = runtime_state.strategy_state
         cycle_state = self._ensure_cycle_state(runtime_state)
@@ -7333,10 +7343,46 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         self._reset_exit_state_for_new_structure(runtime_state, "refill_completed")
+        next_long_cycle_number = last_cycle_completed + 1
+        _log_event(
+            "fixed_cycle_refill_flags_cleared",
+            {
+                "symbol": self.config.symbol,
+                "completion_reason": completion_reason,
+                "refill_pending": bool(state.get("refill_pending")),
+                "refill_required": bool(state.get("refill_required")),
+                "refill_in_progress": bool(state.get("refill_in_progress")),
+                "refill_completion_pending_reconcile": bool(
+                    state.get("refill_completion_pending_reconcile")
+                ),
+                "cycle_block_status": state.get("cycle_block_status"),
+                "bot_state": state.get("bot_state"),
+            },
+        )
+        _log_event(
+            "fixed_cycle_post_refill_cycle_continuation_allowed",
+            {
+                "symbol": self.config.symbol,
+                "cycle_completed_count": last_cycle_completed,
+                "cycle_pair_count": last_cycle_pairs,
+                "last_refill_completed_cycle_index": state.get("last_refill_completed_cycle_index"),
+                "next_long_cycle_number": next_long_cycle_number,
+            },
+        )
+        _log_event(
+            "fixed_cycle_post_refill_exit_rebuild_forced",
+            {
+                "symbol": self.config.symbol,
+                "force_exit_rebuild": bool(state.get("force_exit_rebuild")),
+                "exit_rebuild_allowed": bool(state.get("exit_rebuild_allowed")),
+                "exit_locked": bool(state.get("exit_locked")),
+            },
+        )
         _log_event(
             "fixed_cycle_refill_completed_after_reconcile",
             {
                 "symbol": self.config.symbol,
+                "completion_reason": completion_reason,
                 "cycle_completed_count": state.get("cycle_completed_count"),
                 "cycle_pair_count": state.get("cycle_pair_count"),
                 "refill_pending": state.get("refill_pending"),
@@ -7358,6 +7404,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if not state.get("refill_completion_pending_reconcile"):
             return
         if not (state.get("refill_long_filled") and state.get("refill_short_filled")):
+            if state.get("refill_fills_complete") and snapshot:
+                if self._try_complete_refill_after_dust_residual(
+                    snapshot,
+                    runtime_state,
+                    context,
+                    reason=f"{reason}_dust_residual",
+                ):
+                    return
             return
         if state.get("emergency_flat_required") or state.get("full_exit_reset_in_progress"):
             return
@@ -7406,7 +7460,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "reason": reason,
             },
         )
-        self._complete_refill(runtime_state, context)
+        self._complete_refill(runtime_state, context, completion_reason=reason)
     def _advance_cycle_from_fill(
         self,
         fill_event: FillEvent,
@@ -7667,6 +7721,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "weighted_price_sum": weighted_price_sum,
                 "avg_price": avg_price,
                 "client_order_id": fill_event.client_order_id,
+                "order_id": fill_event.exchange_order_id or entry.get("order_id"),
+                "exchange_order_id": fill_event.exchange_order_id or entry.get("exchange_order_id"),
                 "exec_id": fill_event.exec_id,
                 "purpose": fill_event.purpose,
                 "symbol": self._active_trade_symbol(snapshot, runtime_state, fill_event=fill_event),
@@ -7947,6 +8003,155 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
         return confirmed
+
+    def _refill_qty_below_min_notional(
+        self,
+        qty: float,
+        reference_price: float,
+        runtime_state: RuntimeState | None = None,
+    ) -> bool:
+        if qty <= 0:
+            return True
+        if reference_price <= 0:
+            return False
+        normalized = self._normalize_qty(qty, runtime_state)
+        if normalized <= 0:
+            return True
+        return normalized * reference_price < self.config.min_notional_usdt
+
+    def _refill_residual_snapshot_payload(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> dict[str, float]:
+        state = runtime_state.strategy_state
+        current_price = float(snapshot.current_price or 0.0)
+        initial_long_qty = float(state.get("initial_long_qty") or 0.0)
+        initial_short_qty = float(state.get("initial_short_qty") or 0.0)
+        current_long_qty = float(snapshot.long_qty or 0.0)
+        current_short_qty = float(snapshot.short_qty or 0.0)
+        missing_long_qty = max(initial_long_qty - current_long_qty, 0.0)
+        missing_short_qty = max(initial_short_qty - current_short_qty, 0.0)
+        refill_long_qty = (
+            self._normalize_qty(missing_long_qty, runtime_state) if missing_long_qty > 0 else 0.0
+        )
+        refill_short_qty = (
+            self._normalize_qty(missing_short_qty, runtime_state) if missing_short_qty > 0 else 0.0
+        )
+        return {
+            "current_price": current_price,
+            "initial_long_qty": initial_long_qty,
+            "initial_short_qty": initial_short_qty,
+            "current_long_qty": current_long_qty,
+            "current_short_qty": current_short_qty,
+            "missing_long_qty": missing_long_qty,
+            "missing_short_qty": missing_short_qty,
+            "refill_long_qty": refill_long_qty,
+            "refill_short_qty": refill_short_qty,
+        }
+
+    def _apply_refill_dust_residual_filter(
+        self,
+        residual: dict[str, float],
+        runtime_state: RuntimeState,
+        *,
+        reason: str,
+        log_event: bool = True,
+    ) -> dict[str, float]:
+        current_price = residual["current_price"]
+        dust_long = (
+            residual["missing_long_qty"] > 0
+            and self._refill_qty_below_min_notional(
+                residual["missing_long_qty"], current_price, runtime_state
+            )
+        )
+        dust_short = (
+            residual["missing_short_qty"] > 0
+            and self._refill_qty_below_min_notional(
+                residual["missing_short_qty"], current_price, runtime_state
+            )
+        )
+        if not dust_long and not dust_short:
+            return residual
+        ignored: dict[str, float] = {}
+        if dust_long:
+            ignored["missing_long_qty"] = residual["missing_long_qty"]
+            ignored["refill_long_qty"] = residual["refill_long_qty"]
+            residual["missing_long_qty"] = 0.0
+            residual["refill_long_qty"] = 0.0
+        if dust_short:
+            ignored["missing_short_qty"] = residual["missing_short_qty"]
+            ignored["refill_short_qty"] = residual["refill_short_qty"]
+            residual["missing_short_qty"] = 0.0
+            residual["refill_short_qty"] = 0.0
+        if not log_event:
+            return residual
+        _log_event(
+            "fixed_cycle_refill_dust_residual_ignored",
+            {
+                "symbol": self.config.symbol,
+                "reason": reason,
+                "min_notional_usdt": self.config.min_notional_usdt,
+                "current_price": current_price,
+                **ignored,
+                "cycle_completed_count": runtime_state.strategy_state.get("cycle_completed_count"),
+                "cycle_pair_count": runtime_state.strategy_state.get("cycle_pair_count"),
+            },
+        )
+        return residual
+
+    def _refill_residual_is_dust_only(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        residual = self._apply_refill_dust_residual_filter(
+            self._refill_residual_snapshot_payload(snapshot, runtime_state),
+            runtime_state,
+            reason="dust_only_check",
+            log_event=False,
+        )
+        return residual["missing_long_qty"] <= 0 and residual["missing_short_qty"] <= 0
+
+    def _try_complete_refill_after_dust_residual(
+        self,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState,
+        context: StrategyContext | None,
+        *,
+        reason: str,
+        residual_payload: dict[str, Any] | None = None,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        if not (
+            state.get("refill_fills_complete")
+            or state.get("refill_completion_pending_reconcile")
+        ):
+            return False
+        if not snapshot:
+            snapshot = runtime_state.last_snapshot
+        if not snapshot:
+            return False
+        if float(snapshot.long_qty or 0.0) <= 0 or float(snapshot.short_qty or 0.0) <= 0:
+            return False
+        if self._collect_active_refill_order_purposes(snapshot, runtime_state):
+            return False
+        if not self._refill_residual_is_dust_only(snapshot, runtime_state):
+            return False
+        state["refill_long_filled"] = True
+        state["refill_short_filled"] = True
+        _log_event(
+            "fixed_cycle_refill_completed_after_dust_reconcile",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "reason": reason,
+                "cycle_completed_count": state.get("cycle_completed_count"),
+                "cycle_pair_count": state.get("cycle_pair_count"),
+                **(residual_payload or {}),
+            },
+        )
+        self._complete_refill(runtime_state, context, completion_reason="dust_reconcile")
+        return True
 
     def _collect_open_initial_entry_orders(self, snapshot: HedgeSnapshot) -> list[dict[str, str | None]]:
         entry_purposes = {self.LONG_ENTRY_PURPOSE, self.SHORT_ENTRY_PURPOSE}
@@ -9063,6 +9268,83 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         return bool(long_fill["closed_pnl_ready"])
 
+    def _maybe_write_provisional_confirmed_cycle_order_pnl(
+        self,
+        fill_event: FillEvent,
+        runtime_state: RuntimeState,
+        *,
+        fill_type: str,
+        cycle_index: int,
+        reason: str,
+    ) -> bool:
+        if fill_type not in {"cycle_long_reduce", "cycle_short_tp"}:
+            return False
+        if self._has_confirmed_cycle_closed_pnl(fill_event, fill_type):
+            return False
+        metadata = fill_event.metadata or {}
+        provisional_pnl = self._safe_float(metadata.get("runtime_calculated_pnl"), None)
+        pnl_source = "provisional_runtime_calculated_pnl"
+        if provisional_pnl is None:
+            provisional_pnl = self._safe_float(metadata.get("exec_pnl"), None)
+            pnl_source = "provisional_exec_pnl"
+        if provisional_pnl is None:
+            return False
+        exchange_order_id = str(fill_event.exchange_order_id or "").strip()
+        purpose = str(fill_event.purpose or "").strip()
+        if not exchange_order_id or not purpose:
+            return False
+        dedupe_key = f"{exchange_order_id}:{purpose}"
+        written_keys = set(
+            str(value)
+            for value in (runtime_state.strategy_state.get("processed_confirmed_order_keys") or [])
+        )
+        if dedupe_key in written_keys:
+            return True
+        self._merge_cycle_closed_pnl_metadata(
+            fill_event,
+            cycle_index=cycle_index,
+            cycle_role="long_reduce" if fill_type == "cycle_long_reduce" else "short_reduce",
+            confirmed_closed_pnl=float(provisional_pnl),
+            closed_qty=float(fill_event.exec_qty or 0.0) or None,
+            closed_avg_price=float(fill_event.exec_price or 0.0) or None,
+            pnl_source=pnl_source,
+        )
+        fill_event.confirmed_pnl = float(provisional_pnl)
+        self._write_confirmed_order_pnl_history(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "symbol": self._active_trade_symbol(
+                    runtime_state.last_snapshot,
+                    runtime_state,
+                    fill_event=fill_event,
+                ),
+                "exchange_order_id": exchange_order_id,
+                "client_order_id": fill_event.client_order_id,
+                "purpose": purpose,
+                "closed_pnl": float(provisional_pnl),
+                "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                "cycle_index": cycle_index,
+                "pnl_scope": "cycle",
+                "pnl_source": pnl_source,
+                "confirmed_via": reason,
+            },
+            runtime_state=runtime_state,
+        )
+        _log_event(
+            "fixed_cycle_confirmed_order_pnl_written_from_provisional_fallback",
+            {
+                "exchange_order_id": exchange_order_id,
+                "client_order_id": fill_event.client_order_id,
+                "purpose": purpose,
+                "cycle_index": cycle_index,
+                "fill_type": fill_type,
+                "closed_pnl": float(provisional_pnl),
+                "pnl_source": pnl_source,
+                "reason": reason,
+            },
+        )
+        return True
+
     def _write_confirmed_order_pnl_history(
         self,
         payload: dict[str, Any],
@@ -9079,6 +9361,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "trade_block_id": payload.get("trade_block_id"),
             "cycle_index": payload.get("cycle_index"),
             "pnl_scope": payload.get("pnl_scope"),
+            "pnl_source": payload.get("pnl_source"),
+            "confirmed_via": payload.get("confirmed_via"),
         }
         exchange_order_id = str(record.get("exchange_order_id") or "").strip()
         purpose = str(record.get("purpose") or "").strip()

@@ -807,7 +807,17 @@
                     usedOrderIds.add(rawOrderId);
                     return;
                 }
-                merged.push(rawRow);
+                const purposeEntry = rawOrderId ? (orderPurposeMap || {})[rawOrderId] : null;
+                if (purposeEntry?.purpose) {
+                    merged.push({
+                        ...rawRow,
+                        purpose: purposeEntry.purpose,
+                        trade_type: purposeEntry.purpose,
+                        order_link_id: rawRow.orderLinkId || rawRow.order_link_id || purposeEntry.order_link_id,
+                    });
+                } else {
+                    merged.push(rawRow);
+                }
                 if (rawOrderId) usedOrderIds.add(rawOrderId);
             });
 
@@ -844,25 +854,25 @@
                 row.order_linkId ||
                 ""
             ).toLowerCase();
-            if (
-                linkId.includes("cycle_1_long_add")
-            ) {
-                return "CYCLE_1_LONG_ADD";
+            const cycleLongMatch = linkId.match(/cycle_(\d+)_long_add/);
+            if (cycleLongMatch) {
+                return `CYCLE_${cycleLongMatch[1]}_LONG_ADD`;
             }
-            if (
-                linkId.includes("cycle_1_short_tp")
-            ) {
-                return "CYCLE_1_SHORT_TP";
+            const cycleShortTpMatch = linkId.match(/cycle_(\d+)_short_tp/);
+            if (cycleShortTpMatch) {
+                return `CYCLE_${cycleShortTpMatch[1]}_SHORT_TP`;
             }
-            if (
-                linkId.includes("cycle_2_long_add")
-            ) {
-                return "CYCLE_2_LONG_ADD";
+            const cycleShortReduceMatch = linkId.match(/cycle_(\d+)_short_reduce/);
+            if (cycleShortReduceMatch) {
+                return `CYCLE_${cycleShortReduceMatch[1]}_SHORT_REDUCE`;
             }
-            if (
-                linkId.includes("cycle_2_short_tp")
-            ) {
-                return "CYCLE_2_SHORT_TP";
+            const refillLongMatch = linkId.includes("refill_long");
+            if (refillLongMatch) {
+                return "REFILL_LONG";
+            }
+            const refillShortMatch = linkId.includes("refill_short");
+            if (refillShortMatch) {
+                return "REFILL_SHORT";
             }
             if (
                 linkId.includes("long_tp_exit") ||

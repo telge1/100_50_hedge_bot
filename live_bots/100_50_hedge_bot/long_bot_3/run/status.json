@@ -4,6 +4,6 @@
   "start_requested": false,
   "pid": null,
   "symbol": "",
-  "reason": "stop_with_cleanup_success",
-  "updated_at": "2026-05-24T16:32:04.623730+00:00"
+  "reason": "stopped_via_stop_bot",
+  "updated_at": "2026-05-25T16:10:51.170980+00:00"
 }
