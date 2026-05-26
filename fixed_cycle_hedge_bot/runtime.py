@@ -56,6 +56,8 @@ class GenericRuntimeConfig:
 
 class GenericHedgeRuntime:
     EXPECTED_EXIT_CANCEL_TIMEOUT_SECONDS = 10.0
+    PENDING_FINAL_EXIT_SUBMISSIONS_KEY = "pending_final_exit_submissions"
+    PENDING_FINAL_EXIT_MAX_AGE_MS = 60_000
 
     def __init__(
         self,
@@ -336,6 +338,7 @@ class GenericHedgeRuntime:
         self._retry_pending_rest_fills()
         with self._lock:
             snapshot = self.refresh_snapshot("tick")
+            self._clear_pending_final_exit_submissions_if_flat(snapshot, source="tick")
             if self._trailing_fallback.active:
                 self._trailing_fallback.update(snapshot.current_price)
                 if self._trailing_fallback.should_submit():
@@ -371,6 +374,7 @@ class GenericHedgeRuntime:
         with self._lock:
             self._reconcile_active_orders()
             snapshot = self.refresh_snapshot("reconcile")
+            self._clear_pending_final_exit_submissions_if_flat(snapshot, source="reconcile")
             self._dispatch(
                 "reconcile",
                 self.strategy.on_reconcile(snapshot, self.runtime_state, self.context),
@@ -1309,6 +1313,231 @@ class GenericHedgeRuntime:
             payload.update(extra)
         self.audit.log_event("order_payload_ready", **payload)
 
+    def _is_final_exit_purpose(self, purpose: Any) -> bool:
+        purpose_text = str(purpose or "").upper()
+        final_exit_purposes = {
+            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
+            getattr(self.strategy, "LONG_TP_EXIT_RECOVERY_PURPOSE", "LONG_TP_EXIT_RECOVERY"),
+            getattr(self.strategy, "LONG_SL_EXIT_PURPOSE", "LONG_SL_EXIT"),
+            getattr(self.strategy, "SHORT_TP_EXIT_PURPOSE", "SHORT_TP_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_RECOVERY_PURPOSE", "SHORT_SL_EXIT_RECOVERY"),
+            getattr(self.strategy, "SHORT_HARD_STOP_PURPOSE", "SHORT_HARD_STOP_EXIT"),
+            "FINAL_LONG_EXIT",
+            "FINAL_SHORT_EXIT",
+        }
+        return purpose_text in {str(item or "").upper() for item in final_exit_purposes}
+
+    def _pending_final_exit_submissions(self) -> dict[str, dict[str, Any]]:
+        state = self.runtime_state.strategy_state
+        pending = state.get(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY)
+        if not isinstance(pending, dict):
+            pending = {}
+            state[self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY] = pending
+        return pending
+
+    def _build_final_exit_submit_signature(
+        self,
+        *,
+        purpose: Any,
+        qty: Any,
+        trigger_price: Any,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        raw_metadata = metadata if isinstance(metadata, dict) else {}
+        cycle_index_raw = raw_metadata.get("cycle_index")
+        try:
+            cycle_index = int(cycle_index_raw or 0)
+        except (TypeError, ValueError):
+            cycle_index = 0
+        return {
+            "purpose": str(purpose or "").upper(),
+            "symbol": str(self.config.symbol or "").upper(),
+            "qty": float(qty or 0.0),
+            "trigger_price": self._safe_float(trigger_price, None),
+            "basket_tp_price": self._safe_float(raw_metadata.get("basket_tp_price"), None),
+            "basket_break_even_price": self._safe_float(raw_metadata.get("basket_break_even_price"), None),
+            "exit_mode": str(raw_metadata.get("exit_mode") or ""),
+            "exit_type": str(raw_metadata.get("exit_type") or ""),
+            "cycle_index": cycle_index,
+            "trade_block_id": str(self.runtime_state.strategy_state.get("trade_block_id") or ""),
+        }
+
+    def _final_exit_signatures_match(
+        self,
+        left: dict[str, Any],
+        right: dict[str, Any],
+        *,
+        trigger_tol: float,
+        qty_tol: float,
+    ) -> bool:
+        if str(left.get("purpose") or "") != str(right.get("purpose") or ""):
+            return False
+        if str(left.get("symbol") or "") != str(right.get("symbol") or ""):
+            return False
+        if str(left.get("exit_mode") or "") != str(right.get("exit_mode") or ""):
+            return False
+        if str(left.get("exit_type") or "") != str(right.get("exit_type") or ""):
+            return False
+        left_cycle = int(left.get("cycle_index") or 0)
+        right_cycle = int(right.get("cycle_index") or 0)
+        if left_cycle > 0 and right_cycle > 0 and left_cycle != right_cycle:
+            return False
+        left_trade_block = str(left.get("trade_block_id") or "")
+        right_trade_block = str(right.get("trade_block_id") or "")
+        if left_trade_block and right_trade_block and left_trade_block != right_trade_block:
+            return False
+        left_qty = float(left.get("qty") or 0.0)
+        right_qty = float(right.get("qty") or 0.0)
+        if abs(left_qty - right_qty) > qty_tol:
+            return False
+        left_trigger = self._safe_float(left.get("trigger_price"), None)
+        right_trigger = self._safe_float(right.get("trigger_price"), None)
+        if left_trigger is None or right_trigger is None:
+            if left_trigger is not None or right_trigger is not None:
+                return False
+        elif abs(left_trigger - right_trigger) > trigger_tol:
+            return False
+        for key in ("basket_tp_price", "basket_break_even_price"):
+            left_value = self._safe_float(left.get(key), None)
+            right_value = self._safe_float(right.get(key), None)
+            if left_value is None or right_value is None:
+                if left_value is not None or right_value is not None:
+                    return False
+            elif abs(left_value - right_value) > trigger_tol:
+                return False
+        return True
+
+    def _prune_stale_pending_final_exit_submissions(self) -> None:
+        pending = self._pending_final_exit_submissions()
+        if not pending:
+            return
+        now_ms = int(time.time() * 1000)
+        stale_client_ids = [
+            client_id
+            for client_id, entry in pending.items()
+            if (
+                isinstance(entry, dict)
+                and now_ms - int(entry.get("created_at_ms") or 0) > self.PENDING_FINAL_EXIT_MAX_AGE_MS
+            )
+        ]
+        for client_id in stale_client_ids:
+            pending.pop(client_id, None)
+        if not pending:
+            self.runtime_state.strategy_state.pop(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY, None)
+
+    def _register_pending_final_exit_submission(
+        self,
+        *,
+        client_order_id: str,
+        exchange_order_id: str | None,
+        purpose: str,
+        side: str,
+        qty: float,
+        trigger_price: float | None,
+        signature: dict[str, Any],
+        source: str,
+    ) -> None:
+        self._prune_stale_pending_final_exit_submissions()
+        pending = self._pending_final_exit_submissions()
+        pending[client_order_id] = {
+            "client_order_id": client_order_id,
+            "exchange_order_id": exchange_order_id,
+            "purpose": purpose,
+            "side": side,
+            "qty": float(qty or 0.0),
+            "trigger_price": self._safe_float(trigger_price, None),
+            "signature": dict(signature or {}),
+            "source": source,
+            "created_at_ms": int(time.time() * 1000),
+        }
+
+    def _clear_pending_final_exit_submission(
+        self,
+        *,
+        client_order_id: str | None = None,
+        purpose: str | None = None,
+    ) -> None:
+        raw_pending = self.runtime_state.strategy_state.get(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY)
+        if not isinstance(raw_pending, dict) or not raw_pending:
+            return
+        pending = raw_pending
+        if client_order_id:
+            pending.pop(str(client_order_id), None)
+        if purpose:
+            purpose_text = str(purpose or "").upper()
+            removable = [
+                cid
+                for cid, entry in pending.items()
+                if str((entry or {}).get("purpose") or "").upper() == purpose_text
+            ]
+            for cid in removable:
+                pending.pop(cid, None)
+        if not pending:
+            self.runtime_state.strategy_state.pop(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY, None)
+
+    def _find_matching_pending_final_exit_submission(
+        self,
+        intent: StrategyIntent,
+        *,
+        trigger_tol: float,
+        qty_tol: float,
+    ) -> dict[str, Any] | None:
+        self._prune_stale_pending_final_exit_submissions()
+        pending = self._pending_final_exit_submissions()
+        if not pending:
+            return None
+        intent_signature = self._build_final_exit_submit_signature(
+            purpose=intent.purpose,
+            qty=intent.qty,
+            trigger_price=intent.trigger_price,
+            metadata=intent.metadata,
+        )
+        for entry in pending.values():
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("purpose") or "").upper() != str(intent.purpose or "").upper():
+                continue
+            if str(entry.get("side") or "").lower() != str(intent.side or "").lower():
+                continue
+            candidate_signature = entry.get("signature") or {}
+            if not isinstance(candidate_signature, dict):
+                continue
+            if self._final_exit_signatures_match(
+                candidate_signature,
+                intent_signature,
+                trigger_tol=trigger_tol,
+                qty_tol=qty_tol,
+            ):
+                return entry
+        return None
+
+    def _clear_pending_final_exit_submissions_if_flat(
+        self,
+        snapshot: HedgeSnapshot,
+        *,
+        source: str,
+    ) -> None:
+        if snapshot.long_qty > 0.0 or snapshot.short_qty > 0.0:
+            return
+        if GenericHedgeRuntime._has_nonterminal_runtime_orders(self.runtime_state):
+            return
+        if GenericHedgeRuntime._has_nonterminal_snapshot_orders(snapshot):
+            return
+        raw_pending = self.runtime_state.strategy_state.get(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY)
+        if not isinstance(raw_pending, dict) or not raw_pending:
+            return
+        pending_count = len(raw_pending)
+        self.runtime_state.strategy_state.pop(self.PENDING_FINAL_EXIT_SUBMISSIONS_KEY, None)
+        self.audit.log_event(
+            "fixed_cycle_pending_final_exit_submit_guard_cleared",
+            strategy=self.strategy.name,
+            source=source,
+            reason="clean_flat_reset",
+            pending_count=pending_count,
+            symbol=snapshot.symbol,
+        )
+
     def submit_intent(self, intent: StrategyIntent, snapshot: HedgeSnapshot, source: str) -> str | None:
         if self._startup_flat_reset_guard_active():
             purpose = str(intent.purpose or "").upper()
@@ -1399,12 +1628,23 @@ class GenericHedgeRuntime:
             return None
         self._ensure_max_leverage_before_trading()
         equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
-        decision = "reuse" if reason.startswith("match") else "replace"
+        decision = "reuse" if equivalent_order is not None else "replace"
         exit_purposes = set(self.strategy._exit_purposes())
         metadata = intent.metadata or {}
         is_exit_intent = intent.purpose in exit_purposes or str(
             metadata.get("cycle_role") or ""
         ).lower() == "long_reduce"
+        is_final_exit_intent = self._is_final_exit_purpose(intent.purpose)
+        final_exit_signature = (
+            self._build_final_exit_submit_signature(
+                purpose=intent.purpose,
+                qty=intent.qty,
+                trigger_price=intent.trigger_price,
+                metadata=metadata,
+            )
+            if is_final_exit_intent
+            else None
+        )
         equivalence_check_payload = {
             "purpose": intent.purpose,
             "side": intent.side,
@@ -1518,6 +1758,20 @@ class GenericHedgeRuntime:
             )
             return None
         if equivalent_order:
+            if is_final_exit_intent:
+                self.audit.log_event(
+                    "fixed_cycle_duplicate_final_exit_submit_blocked",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    symbol=self.config.symbol,
+                    trigger_price=intent.trigger_price,
+                    qty=intent.qty,
+                    signature=final_exit_signature,
+                    existing_client_order_id=equivalent_order.client_order_id,
+                    existing_exchange_order_id=equivalent_order.exchange_order_id,
+                    source=source,
+                    reason=reason,
+                )
             self.audit.log_event(
                 "intent_reuse_existing_order",
                 strategy=self.strategy.name,
@@ -1839,6 +2093,17 @@ class GenericHedgeRuntime:
             },
             trace=list(intent.trace),
         )
+        if is_final_exit_intent and final_exit_signature:
+            self._register_pending_final_exit_submission(
+                client_order_id=managed_order.client_order_id,
+                exchange_order_id=managed_order.exchange_order_id,
+                purpose=managed_order.purpose,
+                side=managed_order.side,
+                qty=managed_order.qty,
+                trigger_price=self._safe_float(managed_order.metadata.get("trigger_price"), None),
+                signature=final_exit_signature,
+                source=source,
+            )
         if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
             exchange_side_check = self._exchange_side(intent.side, intent.reduce_only)
             if (
@@ -1887,6 +2152,8 @@ class GenericHedgeRuntime:
                 error_code=type(exc).__name__,
                 error_message=str(exc),
             )
+            if is_final_exit_intent:
+                self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
             raise
         if not response:
             self.audit.log_event(
@@ -1919,6 +2186,8 @@ class GenericHedgeRuntime:
                 intent=intent,
                 traces=trace_dicts(intent.trace),
             )
+            if is_final_exit_intent:
+                self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
             error_info = getattr(self.order_manager, "last_post_error", None)
             if force_market_fallback:
                 self.audit.log_event(
@@ -1968,8 +2237,12 @@ class GenericHedgeRuntime:
                         error_code=self._long_add_error_code(error_info),
                         error_message=self._long_add_error_message(error_info),
                     )
+                    if is_final_exit_intent:
+                        self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
                     return None
             else:
+                if is_final_exit_intent:
+                    self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
                 return None
         exchange_order_id = ((response.get("result") or {}).get("orderId")) if isinstance(response, dict) else None
         response_code = None
@@ -2004,6 +2277,8 @@ class GenericHedgeRuntime:
         self.runtime_state.active_orders[client_id] = managed_order
         if exchange_order_id:
             self.runtime_state.exchange_to_client_id[exchange_order_id] = client_id
+        if is_final_exit_intent:
+            self._clear_pending_final_exit_submission(client_order_id=client_id)
         self.audit.log_event(
             "intent_submitted",
             strategy=self.strategy.name,
@@ -2149,6 +2424,17 @@ class GenericHedgeRuntime:
         target_trigger = intent.trigger_price or 0.0
         is_long_add = "LONG_ADD" in str(intent.purpose)
         is_exit_order = intent.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
+        is_final_exit_intent = self._is_final_exit_purpose(intent.purpose)
+        final_exit_intent_signature = (
+            self._build_final_exit_submit_signature(
+                purpose=intent.purpose,
+                qty=intent.qty,
+                trigger_price=intent.trigger_price,
+                metadata=intent.metadata,
+            )
+            if is_final_exit_intent
+            else None
+        )
         long_add_qty_tol = max(qty_tol, 50.0)
         exit_trigger_tol = max(price_tol, tick_size * 2)
         last_candidate_id = None
@@ -2253,6 +2539,32 @@ class GenericHedgeRuntime:
             last_candidate_id = order.client_order_id
             last_trigger = existing_trigger
             last_qty = existing_qty
+            if is_final_exit_intent and final_exit_intent_signature is not None:
+                existing_signature = self._build_final_exit_submit_signature(
+                    purpose=order.purpose,
+                    qty=order.qty,
+                    trigger_price=order.metadata.get("trigger_price"),
+                    metadata=order.metadata,
+                )
+                if not self._final_exit_signatures_match(
+                    existing_signature,
+                    final_exit_intent_signature,
+                    trigger_tol=exit_trigger_tol,
+                    qty_tol=qty_tol,
+                ):
+                    last_reason = "final_exit_signature_mismatch"
+                    rejected_count += 1
+                    self.audit.log_event(
+                        "intent_equivalence_reject",
+                        strategy=self.strategy.name,
+                        purpose=intent.purpose,
+                        side=intent.side,
+                        candidate_client_order_id=order.client_order_id,
+                        reason=last_reason,
+                        expected=final_exit_intent_signature,
+                        actual=existing_signature,
+                    )
+                    continue
             self.audit.log_event(
                 "intent_equivalence_candidate",
                 strategy=self.strategy.name,
@@ -2304,6 +2616,52 @@ class GenericHedgeRuntime:
                 )
                 continue
             return order, "match", last_candidate_id, existing_trigger, existing_qty
+        if is_final_exit_intent:
+            pending_candidate = self._find_matching_pending_final_exit_submission(
+                intent,
+                trigger_tol=exit_trigger_tol,
+                qty_tol=qty_tol,
+            )
+            if pending_candidate:
+                pending_client_order_id = str(pending_candidate.get("client_order_id") or "")
+                pending_exchange_order_id = str(pending_candidate.get("exchange_order_id") or "")
+                pending_trigger = self._safe_float(pending_candidate.get("trigger_price"), None)
+                pending_qty = float(pending_candidate.get("qty") or 0.0)
+                self.audit.log_event(
+                    "intent_equivalence_candidate",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=pending_client_order_id,
+                    candidate_exchange_order_id=pending_exchange_order_id,
+                    result="match",
+                    reject_reason="pending_submit_in_progress",
+                    existing_trigger_price=pending_trigger,
+                    new_trigger_price=target_trigger,
+                    existing_qty=pending_qty,
+                    new_qty=intent.qty,
+                )
+                return (
+                    ManagedOrder(
+                        client_order_id=pending_client_order_id,
+                        side=intent.side,
+                        qty=pending_qty or float(intent.qty or 0.0),
+                        purpose=intent.purpose,
+                        price=intent.price,
+                        order_type=intent.order_type,
+                        reduce_only=intent.reduce_only,
+                        exchange_order_id=pending_exchange_order_id or None,
+                        status="PENDING_SUBMIT",
+                        remaining_qty=pending_qty or float(intent.qty or 0.0),
+                        metadata=dict(intent.metadata or {}),
+                        trace=[],
+                    ),
+                    "pending_submit_in_progress",
+                    pending_client_order_id or None,
+                    pending_trigger,
+                    pending_qty,
+                )
+
         final_reason = last_reason if candidate_count > 0 else "no_candidate"
         equivalence_summary_payload = {
             "purpose": intent.purpose,
@@ -2459,6 +2817,10 @@ class GenericHedgeRuntime:
             self.runtime_state.active_orders.pop(client_id, None)
             if order.exchange_order_id:
                 self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
+            self._clear_pending_final_exit_submission(
+                client_order_id=client_id,
+                purpose=order.purpose,
+            )
             self.audit.log_event(
                 "intent_replaced_cancel",
                 strategy=self.strategy.name,
@@ -3681,6 +4043,10 @@ class GenericHedgeRuntime:
                 self.runtime_state.active_orders.pop(client_id, None)
                 if order.exchange_order_id:
                     self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
+                self._clear_pending_final_exit_submission(
+                    client_order_id=client_id,
+                    purpose=order.purpose,
+                )
                 continue
             has_open_match = any(
                 (
@@ -3693,6 +4059,10 @@ class GenericHedgeRuntime:
                 self.runtime_state.active_orders.pop(client_id, None)
                 if order.exchange_order_id:
                     self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
+                self._clear_pending_final_exit_submission(
+                    client_order_id=client_id,
+                    purpose=order.purpose,
+                )
                 self.audit.log_event(
                     "startup_order_recovery_pruned_stale_order",
                     strategy=self.strategy.name,
@@ -4053,6 +4423,10 @@ class GenericHedgeRuntime:
         self.runtime_state.active_orders.pop(client_id, None)
         if managed_order.exchange_order_id:
             self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)
+        self._clear_pending_final_exit_submission(
+            client_order_id=client_id,
+            purpose=managed_order.purpose,
+        )
         self.audit.log_event(
             "order_finalized",
             strategy=self.strategy.name,

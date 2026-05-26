@@ -344,6 +344,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> None:
         runtime_state.strategy_state["short_tp_fallback_state"] = fallback_state.to_dict()
 
+    def _reset_initial_entry_reconcile_state(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        reset_submission_state: bool,
+    ) -> None:
+        state = runtime_state.strategy_state
+        if reset_submission_state:
+            state["initial_entry_submitted"] = False
+            state["initial_entry_confirmed"] = False
+        state["initial_long_entry_reconciled"] = False
+        state["initial_short_entry_reconciled"] = False
+        state["initial_structure_built"] = False
+
     def _clear_short_tp_fallback_order_context(self, runtime_state: RuntimeState) -> None:
         runtime_state.strategy_state.pop("short_tp_fallback_order_context", None)
 
@@ -425,6 +439,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["pending_loss_exit_rebuild_reason"] = None
         state["initial_entry_confirmed"] = False
         state["initial_entry_submitted"] = False
+        self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
         state["current_trade_pnl_state_reset_for_entry"] = False
         state["entry_reference_price"] = 0.0
         state["initial_long_qty"] = 0.0
@@ -506,6 +521,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "total_realized_pnl": 0.0,
             }
         state["startup_flat_reset_applied"] = True
+        self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
 
     def prepare_for_clean_startup(
         self,
@@ -947,6 +963,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state.setdefault("last_structure_refresh_ms", 0)
         state.setdefault("initial_entry_submitted", False)
         state.setdefault("initial_entry_confirmed", False)
+        state.setdefault("initial_long_entry_reconciled", False)
+        state.setdefault("initial_short_entry_reconciled", False)
+        state.setdefault("initial_structure_built", False)
         state.setdefault("initial_entry_retry_count", 0)
         state.setdefault("last_exit_signature", None)
         state.setdefault("net_long_loss_balance", 0.0)
@@ -1013,6 +1032,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 logger.info("fixed_cycle_full_exit_reset_start", {})
                 runtime_state.realized_long_pnl_total = 0.0
                 runtime_state.realized_short_pnl_total = 0.0
+                self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
                 intents = self._build_entry_intents(snapshot, runtime_state, context)
                 if intents:
                     state["initial_entry_submitted"] = True
@@ -1100,6 +1120,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             current_price=snapshot.current_price,
             retry_count=retry_count,
         )
+        self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
         intents = self._build_entry_intents(snapshot, runtime_state, context)
         if intents:
             state["initial_entry_submitted"] = True
@@ -1221,6 +1242,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     return []
 
                 self._maybe_update_symbol_from_best_coin(runtime_state, context, "fresh_restart_tick")
+                self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
                 intents = self._build_entry_intents(snapshot, runtime_state, context)
                 if intents:
                     state["initial_entry_submitted"] = True
@@ -1269,6 +1291,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 current_price=snapshot.current_price,
                 retry_count=retry_count,
             )
+            self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
             intents = self._build_entry_intents(snapshot, runtime_state, context)
             if intents:
                 state["initial_entry_submitted"] = True
@@ -1285,6 +1308,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     runtime_state, self.FINAL_EXIT_MISSING_FRESH_ENTRY_BLOCK_SEC
                 )
             return intents
+
+        if state.get("initial_entry_submitted") and not state.get("initial_structure_built"):
+            return self._maybe_build_initial_structure_once(
+                snapshot,
+                runtime_state,
+                context,
+                purpose=None,
+                source="tick",
+                reason="tick_initial_entry_reconcile",
+                rebuild_reason="initial_entry_complete_tick",
+                allow_build=False,
+            )
 
         if state.get("bot_state") == self.STATE_EXITED:
             return []
@@ -1316,6 +1351,34 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["bot_state"] = self.STATE_RECONCILING_AFTER_FILL
         metadata = fill_event.metadata or {}
         purpose = fill_event.purpose or ""
+        if purpose in {self.LONG_ENTRY_PURPOSE, self.SHORT_ENTRY_PURPOSE}:
+            state["initial_entry_submitted"] = True
+            if purpose == self.LONG_ENTRY_PURPOSE and fill_event.status == "FILLED":
+                state["initial_long_entry_reconciled"] = True
+            if purpose == self.SHORT_ENTRY_PURPOSE and fill_event.status == "FILLED":
+                state["initial_short_entry_reconciled"] = True
+            context.audit.log_event(
+                "fixed_cycle_fill_handling_started",
+                strategy=self.name,
+                fill=fill_event.to_dict(),
+                bot_state=state["bot_state"],
+            )
+            if self.config.rest_poll_after_fill_ms > 0:
+                time.sleep(self.config.rest_poll_after_fill_ms / 1000.0)
+            refreshed_snapshot = (
+                context.refresh_snapshot("fixed_cycle_post_fill_rest") if context.refresh_snapshot else snapshot
+            )
+            self._seed_initial_reference_if_missing(refreshed_snapshot, runtime_state)
+            self._sync_state_from_snapshot(refreshed_snapshot, runtime_state)
+            return self._maybe_build_initial_structure_once(
+                refreshed_snapshot,
+                runtime_state,
+                context,
+                purpose=purpose,
+                source="fill",
+                reason="initial_entry_fill_reconcile",
+                rebuild_reason="initial_entry_complete",
+            )
         try:
             self._audit_exit_pnl_summary(fill_event, runtime_state, context)
         except Exception as exc:  # pragma: no cover - audit must never block
@@ -3153,6 +3216,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         *,
         reason: str,
     ) -> list[StrategyIntent]:
+        state = runtime_state.strategy_state
+        if state.get("initial_entry_submitted") and not state.get("initial_structure_built"):
+            source = "tick" if reason.startswith("tick_") else "reconcile"
+            return self._maybe_build_initial_structure_once(
+                snapshot,
+                runtime_state,
+                context,
+                purpose=None,
+                source=source,
+                reason=reason,
+                rebuild_reason="initial_entry_complete_tick" if source == "tick" else "initial_entry_complete",
+                allow_build=False,
+            )
         now_ms = int(time.time() * 1000)
         last_ms = int(runtime_state.strategy_state.get("last_structure_refresh_ms") or 0)
         if now_ms - last_ms < self.config.order_refresh_cooldown_ms:
@@ -4285,6 +4361,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             ):
                 return []
             self._maybe_update_symbol_from_best_coin(runtime_state, context, "structure_initial_entry")
+            self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
             intents = self._build_entry_intents(snapshot, runtime_state, context)
             if intents:
                 state["dynamic_entry_hold_initialized"] = False
@@ -5569,23 +5646,61 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "long_fill_runtime_filled_qty": long_fill.get("runtime_filled_qty"),
             },
         )
-        confirmed_closed_pnl = self._safe_float(long_fill.get("confirmed_closed_pnl"), None)
-        if confirmed_closed_pnl is None:
-            confirmed_closed_pnl = self._safe_float(long_fill.get("closed_pnl"), None)
         confirmed_closed_qty = self._safe_float(long_fill.get("closed_qty"), None)
         confirmed_closed_avg_price = self._safe_float(long_fill.get("closed_avg_price"), None)
         confirmed_closed_cost = self._safe_float(long_fill.get("closed_cost"), None)
-        provisional_closed_pnl = self._safe_float(long_fill.get("provisional_exec_pnl_total"), None)
-        if provisional_closed_pnl is None:
-            provisional_closed_pnl = self._safe_float(
-                long_fill.get("provisional_runtime_pnl_total"), None
-            )
-        short_followup_pnl = confirmed_closed_pnl
-        short_followup_pnl_source = "confirmed_closed_pnl"
-        if short_followup_pnl is None and provisional_closed_pnl is not None:
-            short_followup_pnl = provisional_closed_pnl
-            short_followup_pnl_source = "provisional_runtime_pnl"
-        elif short_followup_pnl is None:
+        provisional_exec_pnl_total = self._safe_float(
+            long_fill.get("provisional_exec_pnl_total"), None
+        )
+        provisional_runtime_pnl_total = self._safe_float(
+            long_fill.get("provisional_runtime_pnl_total"), None
+        )
+        runtime_calculated_pnl = self._safe_float(long_fill.get("runtime_calculated_pnl"), None)
+        exec_pnl = self._safe_float(long_fill.get("exec_pnl"), None)
+        long_fill_confirmed_closed_pnl = self._safe_float(
+            long_fill.get("confirmed_closed_pnl"), None
+        )
+        long_fill_closed_pnl = self._safe_float(long_fill.get("closed_pnl"), None)
+        confirmed_closed_pnl = long_fill_confirmed_closed_pnl or long_fill_closed_pnl
+        cycle_entry_long_add_confirmed_pnl = self._safe_float(
+            cycle_sequence_entry.get("long_add_confirmed_pnl"), None
+        )
+        cycle_entry_long_reduce_closed_pnl = self._safe_float(
+            cycle_sequence_entry.get("long_reduce_closed_pnl"), None
+        )
+        cycle_entry_long_add_loss_usdt = self._safe_float(
+            cycle_sequence_entry.get("long_add_loss_usdt"), None
+        )
+        short_followup_pnl = None
+        short_followup_pnl_source = None
+        if cycle_entry_long_add_confirmed_pnl is not None:
+            short_followup_pnl = cycle_entry_long_add_confirmed_pnl
+            short_followup_pnl_source = "cycle_entry_long_add_confirmed_pnl"
+        elif cycle_entry_long_reduce_closed_pnl is not None:
+            short_followup_pnl = cycle_entry_long_reduce_closed_pnl
+            short_followup_pnl_source = "cycle_entry_long_reduce_closed_pnl"
+        elif long_fill_confirmed_closed_pnl is not None:
+            short_followup_pnl = long_fill_confirmed_closed_pnl
+            short_followup_pnl_source = "long_fill_confirmed_closed_pnl"
+        elif long_fill_closed_pnl is not None:
+            short_followup_pnl = long_fill_closed_pnl
+            short_followup_pnl_source = "long_fill_closed_pnl"
+        elif cycle_entry_long_add_loss_usdt is not None:
+            short_followup_pnl = -abs(cycle_entry_long_add_loss_usdt)
+            short_followup_pnl_source = "cycle_entry_long_add_loss_usdt"
+        elif provisional_exec_pnl_total is not None:
+            short_followup_pnl = provisional_exec_pnl_total
+            short_followup_pnl_source = "provisional_exec_pnl_total"
+        elif provisional_runtime_pnl_total is not None:
+            short_followup_pnl = provisional_runtime_pnl_total
+            short_followup_pnl_source = "provisional_runtime_pnl_total"
+        elif runtime_calculated_pnl is not None:
+            short_followup_pnl = runtime_calculated_pnl
+            short_followup_pnl_source = "long_fill_runtime_calculated_pnl"
+        elif exec_pnl is not None:
+            short_followup_pnl = exec_pnl
+            short_followup_pnl_source = "long_fill_exec_pnl"
+        else:
             short_followup_pnl = 0.0
             short_followup_pnl_source = "missing_assumed_zero"
         planned_short_tp_qty = self._safe_float(
@@ -5987,6 +6102,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "cycle_index": cycle_index,
                 "symbol": active_trade_symbol,
                 "long_fill_purpose": long_purpose,
+                "cycle_entry_long_add_confirmed_pnl": cycle_entry_long_add_confirmed_pnl,
+                "cycle_entry_long_reduce_closed_pnl": cycle_entry_long_reduce_closed_pnl,
+                "cycle_entry_long_add_loss_usdt": cycle_entry_long_add_loss_usdt,
+                "long_fill_confirmed_closed_pnl": long_fill_confirmed_closed_pnl,
+                "long_fill_closed_pnl": long_fill_closed_pnl,
+                "provisional_exec_pnl_total": provisional_exec_pnl_total,
+                "provisional_runtime_pnl_total": provisional_runtime_pnl_total,
                 "long_loss_usdt": long_loss_usdt,
                 "confirmed_closed_pnl": confirmed_closed_pnl,
                 "short_followup_pnl": short_followup_pnl,
@@ -6493,6 +6615,33 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "hard_stop_active": hard_stop_active,
             "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
         }
+        active_final_exit_purposes, _ = self._collect_active_final_exit_purposes(snapshot, runtime_state)
+        has_both_final_exits = all(
+            purpose in active_final_exit_purposes
+            for purpose in {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+        )
+        if (
+            bool(state.get("initial_structure_built"))
+            and state.get("last_exit_signature") == signature
+            and has_both_final_exits
+            and not force_exit_rebuild
+            and not exit_rebuild_allowed
+        ):
+            _log_event(
+                "fixed_cycle_final_exit_rebuild_skipped_signature_unchanged",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "reason": reason,
+                    "last_exit_signature": state.get("last_exit_signature"),
+                    "new_signature": signature,
+                    "active_final_exit_purposes": active_final_exit_purposes,
+                    "long_qty": snapshot.long_qty,
+                    "short_qty": snapshot.short_qty,
+                    "tp_price": tp_price,
+                    "break_even_price": break_even_price,
+                },
+            )
+            return intents
         if state.get("last_exit_signature") == signature and not force_exit_rebuild:
             context.audit.log_event(
                 "fixed_cycle_exit_skip",
@@ -7765,7 +7914,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 fill_event.metadata = metadata
                 fill_event.confirmed_pnl = confirmed_closed_pnl
                 long_add_loss_usdt = max(-float(confirmed_closed_pnl), 0.0)
+                long_fill["long_reduce_closed_pnl"] = confirmed_closed_pnl
                 long_fill["last_long_add_loss_usdt"] = long_add_loss_usdt
+                cycle_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+                cycle_entry["long_add_confirmed_pnl"] = confirmed_closed_pnl
+                cycle_entry["long_reduce_closed_pnl"] = confirmed_closed_pnl
+                cycle_entry["long_add_loss_usdt"] = long_add_loss_usdt
+                cycle_entry["short_followup_pnl_source"] = "confirmed_closed_pnl"
+                self._persist_cycle_sequence_state(runtime_state)
                 self._add_realized_long_loss(runtime_state, long_add_loss_usdt)
                 _audit_calc(
                     "long_fill_loss_calc",
@@ -7928,6 +8084,137 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             for order in runtime_state.active_orders.values()
         )
 
+    def _collect_active_initial_entry_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> list[dict[str, Any]]:
+        active_orders: list[dict[str, Any]] = []
+        entry_purposes = {self.LONG_ENTRY_PURPOSE, self.SHORT_ENTRY_PURPOSE}
+
+        for order in snapshot.active_orders:
+            purpose = str(getattr(order, "purpose", "") or "")
+            status = str(getattr(order, "status", "") or "")
+            if purpose not in entry_purposes or self._is_terminal_order_status(status):
+                continue
+            active_orders.append(
+                {
+                    "source": "snapshot",
+                    "purpose": purpose,
+                    "status": status,
+                    "client_order_id": getattr(order, "client_order_id", None),
+                    "exchange_order_id": getattr(order, "exchange_order_id", None),
+                }
+            )
+
+        for order in runtime_state.active_orders.values():
+            purpose = str(getattr(order, "purpose", "") or "")
+            status = str(getattr(order, "status", "") or "")
+            if purpose not in entry_purposes or self._is_terminal_order_status(status):
+                continue
+            active_orders.append(
+                {
+                    "source": "runtime_state",
+                    "purpose": purpose,
+                    "status": status,
+                    "client_order_id": getattr(order, "client_order_id", None),
+                    "exchange_order_id": getattr(order, "exchange_order_id", None),
+                }
+            )
+        return active_orders
+
+    def _initial_entry_reconcile_gate_ready(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        return (
+            float(snapshot.long_qty or 0.0) > 0.0
+            and float(snapshot.short_qty or 0.0) > 0.0
+            and bool(state.get("initial_long_entry_reconciled"))
+            and bool(state.get("initial_short_entry_reconciled"))
+            and not self._collect_active_initial_entry_orders(snapshot, runtime_state)
+        )
+
+    def _initial_entry_reconcile_log_payload(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        *,
+        purpose: str | None,
+        source: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        state = runtime_state.strategy_state
+        return {
+            "purpose": purpose,
+            "source": source,
+            "long_qty": float(snapshot.long_qty or 0.0),
+            "short_qty": float(snapshot.short_qty or 0.0),
+            "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
+            "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
+            "initial_long_entry_reconciled": bool(state.get("initial_long_entry_reconciled")),
+            "initial_short_entry_reconciled": bool(state.get("initial_short_entry_reconciled")),
+            "initial_structure_built": bool(state.get("initial_structure_built")),
+            "active_initial_entry_orders": self._collect_active_initial_entry_orders(snapshot, runtime_state),
+            "reason": reason,
+        }
+
+    def _maybe_build_initial_structure_once(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        purpose: str | None,
+        source: str,
+        reason: str,
+        rebuild_reason: str,
+        allow_build: bool = True,
+    ) -> list[StrategyIntent]:
+        state = runtime_state.strategy_state
+        payload = {
+            **self._initial_entry_reconcile_log_payload(
+                snapshot,
+                runtime_state,
+                purpose=purpose,
+                source=source,
+                reason=reason,
+            ),
+            "allow_build": allow_build,
+        }
+        if not self._initial_entry_reconcile_gate_ready(snapshot, runtime_state):
+            _log_event("fixed_cycle_initial_entry_reconcile_gate_wait", payload)
+            return []
+
+        _log_event("fixed_cycle_initial_entry_reconcile_gate_ready", payload)
+        if not allow_build:
+            return []
+
+        if state.get("initial_structure_built"):
+            _log_event("fixed_cycle_initial_structure_build_once_skipped_duplicate", payload)
+            return []
+
+        previously_confirmed = bool(state.get("initial_entry_confirmed"))
+        state["initial_entry_confirmed"] = True
+        state["initial_entry_submitted"] = True
+        if not previously_confirmed:
+            self._reset_exit_state_for_new_structure(runtime_state, "initial_entry_confirmed")
+        intents = self._rebuild_structure(snapshot, runtime_state, context, reason=rebuild_reason)
+        state["initial_structure_built"] = True
+        _log_event(
+            "fixed_cycle_initial_structure_build_once_triggered",
+            {
+                **{
+                    **payload,
+                    "initial_structure_built": True,
+                },
+                "reason": rebuild_reason,
+            },
+        )
+        return intents
+
     def _finalize_initial_entry_orders_from_snapshot(
         self,
         snapshot: HedgeSnapshot,
@@ -7978,12 +8265,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> bool:
         state = runtime_state.strategy_state
         self._finalize_initial_entry_orders_from_snapshot(snapshot, runtime_state)
-        has_open_initial_orders = self._has_open_initial_entry_orders(snapshot, runtime_state)
-        confirmed = (
-            snapshot.long_qty > 0
-            and snapshot.short_qty > 0
-            and not has_open_initial_orders
-        )
+        confirmed = self._initial_entry_reconcile_gate_ready(snapshot, runtime_state)
         previously_confirmed = bool(state.get("initial_entry_confirmed"))
         state["initial_entry_confirmed"] = confirmed
         if confirmed:
@@ -9815,6 +10097,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "short_tp_trigger_price": 0.0,
             "short_tp_reserved_at": 0,
             "short_tp_purpose": None,
+            "long_add_confirmed_pnl": None,
+            "long_reduce_closed_pnl": None,
+            "long_add_loss_usdt": 0.0,
+            "short_followup_pnl_source": None,
             "complete": False,
         }
 
@@ -9840,6 +10126,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "short_tp_trigger_price": float(value.get("short_tp_trigger_price") or 0.0),
                     "short_tp_reserved_at": int(value.get("short_tp_reserved_at") or 0),
                     "short_tp_purpose": value.get("short_tp_purpose"),
+                    "long_add_confirmed_pnl": value.get("long_add_confirmed_pnl"),
+                    "long_reduce_closed_pnl": value.get("long_reduce_closed_pnl"),
+                    "long_add_loss_usdt": float(value.get("long_add_loss_usdt") or 0.0),
+                    "short_followup_pnl_source": value.get("short_followup_pnl_source"),
                     "complete": bool(value.get("complete")),
                 }
             )
@@ -10100,11 +10390,40 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> tuple[int, str | None]:
         purpose_text = str(purpose or "").upper()
         metadata = metadata or {}
+        exit_mode = str(metadata.get("exit_mode") or "").lower()
+        exit_type = str(metadata.get("exit_type") or "").lower()
+        known_final_exit_purposes = {
+            "LONG_TP_EXIT",
+            "LONG_TP_EXIT_RECOVERY",
+            "LONG_SL_EXIT",
+            "SHORT_TP_EXIT",
+            "SHORT_SL_EXIT",
+            "SHORT_SL_EXIT_RECOVERY",
+            "SHORT_HARD_STOP",
+            "SHORT_HARD_STOP_EXIT",
+            "FINAL_LONG_EXIT",
+            "FINAL_SHORT_EXIT",
+        }
         cycle_index = 0
         try:
             cycle_index = int(metadata.get("cycle_index") or 0)
         except (TypeError, ValueError):
             cycle_index = 0
+        if (
+            purpose_text in known_final_exit_purposes
+            or exit_mode == "basket_exit"
+            or exit_type in {"long_tp", "short_sl"}
+        ):
+            _log_event(
+                "fixed_cycle_final_exit_purpose_excluded_from_cycle_normalization",
+                {
+                    "purpose": purpose_text,
+                    "exit_mode": exit_mode,
+                    "exit_type": exit_type,
+                    "cycle_index": cycle_index,
+                },
+            )
+            return 0, None
         if cycle_index <= 0:
             match = re.search(r"CYCLE_(\d+)_", purpose_text)
             if match:
@@ -12025,6 +12344,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["long_exit_recovery_submitted"] = False
         state["exit_recovery_marker"] = False
         state["exit_locked"] = False
+        self._reset_initial_entry_reconcile_state(runtime_state, reset_submission_state=True)
         state.pop("flat_waiting_order_cleanup_logged", None)
         state.pop("flat_waiting_final_pnl_logged", None)
         state.pop("flat_final_pnl_ready_logged", None)

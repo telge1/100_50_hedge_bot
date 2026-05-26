@@ -133,3 +133,7 @@ sondern nach jedem Event beweisen:
 "Meine Struktur ist gesund."
 
 
+Immer erst Cursor analysieren lassen.
+Cursor soll nur den Plan schicken.
+Kein Code ändern.
+Erst wenn der Plan sauber ist, dann gezielt fixen lassen.
