@@ -5,6 +5,8 @@ import logging
 import math
 import os
 import re
+import subprocess
+import sys
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -148,6 +150,101 @@ class GenericHedgeRuntime:
             cache[event_key] = {"signature": signature, "timestamp": now}
             return True
         return False
+
+    def _bot_group_dir(self) -> Path:
+        return Path("live_bots") / "100_50_hedge_bot"
+
+    def _blacklist_file_path(self) -> Path:
+        path = self._bot_group_dir() / "state" / "blacklisted_symbols.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _load_blacklisted_symbols(self) -> dict[str, dict[str, Any]]:
+        path = self._blacklist_file_path()
+        if not path.exists():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+        except Exception:
+            return {}
+        if not isinstance(payload, dict):
+            return {}
+        return payload
+
+    def _write_blacklisted_symbols(self, data: dict[str, dict[str, Any]]) -> None:
+        path = self._blacklist_file_path()
+        tmp_path = path.with_name(f".{path.name}.tmp.{int(time.time() * 1_000)}")
+        tmp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp_path, path)
+
+    def _is_symbol_blacklisted(self, symbol: str) -> tuple[bool, dict[str, Any] | None]:
+        normalized = str(symbol or "").upper()
+        data = self._load_blacklisted_symbols()
+        entry = data.get(normalized)
+        return (entry is not None, entry)
+
+    def _blacklist_symbol(self, symbol: str, reason: str, ret_code: int, ret_msg: str) -> None:
+        normalized = symbol.upper()
+        data = self._load_blacklisted_symbols()
+        data[normalized] = {
+            "reason": reason,
+            "ret_code": ret_code,
+            "ret_msg": ret_msg,
+            "blocked_by": self.config.bot_name,
+            "blocked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._write_blacklisted_symbols(data)
+        payload = {
+            "symbol": normalized,
+            "reason": reason,
+            "ret_code": ret_code,
+            "ret_msg": ret_msg,
+            "bot_name": self.config.bot_name,
+        }
+        self.audit.log_event("fixed_cycle_blacklisted_symbol_added", **payload)
+
+    def _release_dynamic_symbol_reservation(self) -> None:
+        bot_name = self.config.bot_name or "long_bot_1"
+        bot_group_dir = self._bot_group_dir()
+        state_dir = bot_group_dir / "state"
+        state_file = state_dir / "active_bot_symbols.json"
+        lock_file = state_dir / "active_bot_symbols.lock"
+        script_path = bot_group_dir / "shared_scripts" / "active_bot_symbols.py"
+        if not script_path.exists():
+            self.logger.warning(
+                "dynamic_symbol_release_script_missing",
+                {"script": str(script_path)},
+            )
+            return
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--bot-name",
+            bot_name,
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--bot-group-dir",
+            str(bot_group_dir),
+            "--command",
+            "release",
+            "--source",
+            "permission_reject",
+        ]
+        try:
+            subprocess.run(cmd, check=False)
+            payload = {
+                "symbol": self.config.symbol,
+                "bot_name": bot_name,
+                "state_file": str(state_file),
+            }
+            self.audit.log_event("dynamic_symbol_reservation_released_after_reject", **payload)
+        except Exception as exc:
+            self.logger.warning(
+                "dynamic_symbol_reservation_release_failed",
+                {"error": str(exc), "cmd": cmd},
+            )
 
     @staticmethod
     def _snapshot_idle_summary(snapshot: HedgeSnapshot) -> dict[str, Any]:
@@ -907,6 +1004,50 @@ class GenericHedgeRuntime:
             if not GenericHedgeRuntime._is_terminal_order_status(getattr(order, "status", None)):
                 return True
         return False
+
+    def _confirm_post_refill_structure_rebuild_progress(
+        self,
+        *,
+        intent: StrategyIntent,
+        snapshot: HedgeSnapshot,
+        source: str,
+    ) -> None:
+        metadata = dict(intent.metadata or {})
+        if not metadata.get("post_refill_structure_rebuild_required"):
+            return
+        expected_raw = metadata.get("post_refill_expected_purposes") or []
+        expected_purposes = [str(purpose) for purpose in expected_raw if purpose]
+        if not expected_purposes:
+            return
+        state = self.runtime_state.strategy_state
+        confirmed = set(state.get("post_refill_structure_rebuild_confirmed_purposes") or [])
+        if intent.purpose:
+            confirmed.add(str(intent.purpose))
+        state["post_refill_structure_rebuild_confirmed_purposes"] = sorted(confirmed)
+        active_purposes = {
+            str(order.purpose)
+            for order in self.runtime_state.active_orders.values()
+            if order.purpose and not self._is_terminal_order_status(getattr(order, "status", None))
+        }
+        active_purposes.update(
+            str(getattr(order, "purpose", ""))
+            for order in snapshot.active_orders
+            if getattr(order, "purpose", None)
+            and not self._is_terminal_order_status(getattr(order, "status", None))
+        )
+        satisfied = confirmed | active_purposes
+        if all(purpose in satisfied for purpose in expected_purposes):
+            state["post_refill_structure_rebuild_required"] = False
+            state["post_refill_structure_rebuild_confirmed_purposes"] = []
+            self.audit.log_event(
+                "fixed_cycle_post_refill_structure_rebuild_completed",
+                strategy=self.strategy.name,
+                source=source,
+                submitted_or_equivalent_purposes=sorted(confirmed),
+                active_order_purposes=sorted(active_purposes),
+                next_required_purpose=state.get("next_required_purpose"),
+            )
+        self._save_strategy_state()
 
     def _recover_fixed_cycle_unmatched_fill(
         self,
@@ -1722,41 +1863,56 @@ class GenericHedgeRuntime:
                 reason=reason,
             )
         replace_purposes_raw = intent.metadata.get("replace_open_purpose")
+        post_refill_structure_rebuild_required = bool(
+            intent.metadata.get("post_refill_structure_rebuild_required")
+        )
+        open_positions_exist = float(snapshot.long_qty or 0.0) > 0.0 or float(snapshot.short_qty or 0.0) > 0.0
         if (
             reason == "no_candidate"
             and replace_purposes_raw
             and not GenericHedgeRuntime._has_nonterminal_runtime_orders(self.runtime_state)
             and not GenericHedgeRuntime._has_nonterminal_snapshot_orders(snapshot)
         ):
-            skip_reason = (
-                "active_orders_empty_race_condition"
-                if snapshot.active_orders
-                else "no_runtime_orders"
-            )
-            self.audit.log_event(
-                "intent_skip_due_to_empty_snapshot",
-                strategy=self.strategy.name,
-                purpose=intent.purpose,
-                side=intent.side,
-                reason=skip_reason,
-                replace_open_purpose=replace_purposes_raw,
-                runtime_active_order_count=len(self.runtime_state.active_orders),
-                snapshot_active_order_count=len(snapshot.active_orders),
-                nonterminal_runtime_order_count=sum(
-                    1
-                    for order in self.runtime_state.active_orders.values()
-                    if not self._is_terminal_order_status(getattr(order, "status", None))
-                ),
-                nonterminal_snapshot_order_count=sum(
-                    1
-                    for order in snapshot.active_orders
-                    if not self._is_terminal_order_status(getattr(order, "status", None))
-                ),
-                source=source,
-                qty=intent.qty,
-                trigger_price=intent.trigger_price,
-            )
-            return None
+            if post_refill_structure_rebuild_required and open_positions_exist:
+                self.audit.log_event(
+                    "fixed_cycle_post_refill_empty_snapshot_create_new_allowed",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    replace_open_purpose=replace_purposes_raw,
+                    runtime_active_order_count=len(self.runtime_state.active_orders),
+                    snapshot_active_order_count=len(snapshot.active_orders),
+                )
+            else:
+                skip_reason = (
+                    "active_orders_empty_race_condition"
+                    if snapshot.active_orders
+                    else "no_runtime_orders"
+                )
+                self.audit.log_event(
+                    "intent_skip_due_to_empty_snapshot",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    reason=skip_reason,
+                    replace_open_purpose=replace_purposes_raw,
+                    runtime_active_order_count=len(self.runtime_state.active_orders),
+                    snapshot_active_order_count=len(snapshot.active_orders),
+                    nonterminal_runtime_order_count=sum(
+                        1
+                        for order in self.runtime_state.active_orders.values()
+                        if not self._is_terminal_order_status(getattr(order, "status", None))
+                    ),
+                    nonterminal_snapshot_order_count=sum(
+                        1
+                        for order in snapshot.active_orders
+                        if not self._is_terminal_order_status(getattr(order, "status", None))
+                    ),
+                    source=source,
+                    qty=intent.qty,
+                    trigger_price=intent.trigger_price,
+                )
+                return None
         if equivalent_order:
             if is_final_exit_intent:
                 self.audit.log_event(
@@ -1779,6 +1935,11 @@ class GenericHedgeRuntime:
                 side=intent.side,
                 client_order_id=equivalent_order.client_order_id,
                 exchange_order_id=equivalent_order.exchange_order_id,
+            )
+            self._confirm_post_refill_structure_rebuild_progress(
+                intent=intent,
+                snapshot=snapshot,
+                source="equivalent",
             )
             return equivalent_order.client_order_id
 
@@ -2156,6 +2317,15 @@ class GenericHedgeRuntime:
                 self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
             raise
         if not response:
+            error_info = getattr(self.order_manager, "last_post_error", None)
+            if self._should_block_symbol_permission_error(managed_order, error_info):
+                self._handle_symbol_permission_reject(managed_order, error_info)
+                return None
+            error_code = "no_response"
+            error_message = "exchange returned no response"
+            if error_info and error_info.get("retCode"):
+                error_code = f"bybit_{error_info.get('retCode')}"
+                error_message = error_info.get("retMsg") or error_message
             self.audit.log_event(
                 "order_rejected",
                 strategy=self.strategy.name,
@@ -2166,8 +2336,8 @@ class GenericHedgeRuntime:
                 price=managed_order.price,
                 order_link_id=managed_order.client_order_id,
                 status="rejected",
-                error_code="no_response",
-                error_message="exchange returned no response",
+                error_code=error_code,
+                error_message=error_message,
             )
             self.audit.log_event(
                 "intent_submit_failed",
@@ -2175,8 +2345,8 @@ class GenericHedgeRuntime:
                 purpose=managed_order.purpose,
                 side=managed_order.side,
                 reason="no_response",
-                error_code="no_response",
-                error_message="exchange returned no response",
+                error_code=error_code,
+                error_message=error_message,
             )
             self.audit.log_event(
                 "intent_submit_failed",
@@ -2186,9 +2356,6 @@ class GenericHedgeRuntime:
                 intent=intent,
                 traces=trace_dicts(intent.trace),
             )
-            if is_final_exit_intent:
-                self._clear_pending_final_exit_submission(client_order_id=managed_order.client_order_id)
-            error_info = getattr(self.order_manager, "last_post_error", None)
             if force_market_fallback:
                 self.audit.log_event(
                     "long_add_market_fallback_failed",
@@ -2294,6 +2461,16 @@ class GenericHedgeRuntime:
             trigger_price=intent.trigger_price,
             submit_notional=submit_notional,
         )
+        self._mark_refill_intent_registry_submitted(
+            intent=intent,
+            client_order_id=client_id,
+            exchange_order_id=exchange_order_id,
+        )
+        self._confirm_post_refill_structure_rebuild_progress(
+            intent=intent,
+            snapshot=snapshot,
+            source="submitted",
+        )
         self._confirm_expected_exit_cancel_replacement(intent, client_id, exchange_order_id)
         if self._verbose_audit_enabled():
             self.audit.log_event(
@@ -2326,6 +2503,32 @@ class GenericHedgeRuntime:
             self.audit.log_event("long_add_market_fallback_submitted", **fallback_event)
         self._save_strategy_state()
         return client_id
+
+    def _mark_refill_intent_registry_submitted(
+        self,
+        intent: StrategyIntent,
+        client_order_id: str,
+        exchange_order_id: str | None,
+    ) -> None:
+        if intent.purpose not in {"REFILL_LONG", "REFILL_SHORT"}:
+            return
+        state = self.runtime_state.strategy_state
+        registry = state.get("refill_intent_registry") or {}
+        entry = registry.get(intent.purpose)
+        if not entry or entry.get("refill_batch_id") != state.get("refill_batch_id"):
+            return
+        entry["status"] = "SUBMITTED"
+        entry["client_order_id"] = client_order_id
+        if exchange_order_id:
+            entry["exchange_order_id"] = exchange_order_id
+        self.audit.log_event(
+            "fixed_cycle_refill_intent_marked_submitted",
+            strategy=self.strategy.name,
+            purpose=intent.purpose,
+            refill_batch_id=entry.get("refill_batch_id"),
+            client_order_id=client_order_id,
+            exchange_order_id=exchange_order_id,
+        )
 
     def _build_long_add_market_fallback_context(
         self,
@@ -2834,6 +3037,65 @@ class GenericHedgeRuntime:
                 existing_qty=replace_context.get("existing_qty") if replace_context else None,
                 new_qty=replace_context.get("new_qty") if replace_context else None,
             )
+
+    def _should_block_symbol_permission_error(
+        self,
+        managed_order: ManagedOrder,
+        error_info: dict[str, Any] | None,
+    ) -> bool:
+        if not error_info:
+            return False
+        ret_code = int(error_info.get("retCode") or 0)
+        if ret_code != 110126:
+            return False
+        return managed_order.purpose in {
+            self.strategy.LONG_ENTRY_PURPOSE,
+            self.strategy.SHORT_ENTRY_PURPOSE,
+        }
+
+    def _handle_symbol_permission_reject(
+        self,
+        managed_order: ManagedOrder,
+        error_info: dict[str, Any],
+    ) -> None:
+        symbol = str(self.config.symbol or "").upper()
+        ret_code = int(error_info.get("retCode") or 0)
+        ret_msg = str(error_info.get("retMsg") or "")
+        payload = {
+            "symbol": symbol,
+            "bot_name": self.config.bot_name,
+            "purpose": managed_order.purpose,
+            "ret_code": ret_code,
+            "ret_msg": ret_msg,
+        }
+        self.audit.log_event("fixed_cycle_symbol_permission_rejected", **payload)
+        self._blacklist_symbol(
+            symbol,
+            "bybit_110126_required_agreement",
+            ret_code,
+            ret_msg,
+        )
+        self._release_dynamic_symbol_reservation()
+        state = self.runtime_state.strategy_state
+        state["initial_entry_blocked_symbol"] = symbol
+        state["initial_entry_retry_blocked"] = True
+        state["initial_entry_retry_count"] = 0
+        state["initial_entry_submitted"] = False
+        state["dynamic_symbol_reselection_reason"] = "bybit_110126"
+        state["next_dynamic_entry_allowed_at"] = datetime.now(timezone.utc).isoformat()
+        abort_payload = {
+            "symbol": symbol,
+            "purpose": managed_order.purpose,
+            "ret_code": ret_code,
+            "ret_msg": ret_msg,
+        }
+        self.audit.log_event("fixed_cycle_initial_entry_batch_aborted_after_non_retryable_error", **abort_payload)
+        reselect_payload = {
+            "symbol": symbol,
+            "bot_name": self.config.bot_name,
+            "reason": "bybit_110126_required_agreement",
+        }
+        self.audit.log_event("dynamic_symbol_reselect_requested", **reselect_payload)
 
     def _submit_to_exchange(
         self,
@@ -3711,6 +3973,15 @@ class GenericHedgeRuntime:
                             metadata=managed_order.metadata,
                             status="FILLED",
                         )
+                        snapshot = self.runtime_state.last_snapshot
+                        self.strategy._mark_initial_entry_reconciled_from_terminal_order(
+                            self.runtime_state,
+                            snapshot,
+                            purpose=managed_order.purpose,
+                            exchange_order_id=managed_order.exchange_order_id,
+                            client_order_id=managed_order.client_order_id,
+                            source="terminal_fill_reconcile",
+                        )
                     self._finalize_managed_order(client_id, managed_order)
                     continue
                 self.audit.log_event(
@@ -3833,6 +4104,15 @@ class GenericHedgeRuntime:
                     purpose=managed_order.purpose,
                     metadata=managed_order.metadata,
                     status="FILLED",
+                )
+                snapshot = self.runtime_state.last_snapshot
+                self.strategy._mark_initial_entry_reconciled_from_terminal_order(
+                    self.runtime_state,
+                    snapshot,
+                    purpose=managed_order.purpose,
+                    exchange_order_id=managed_order.exchange_order_id,
+                    client_order_id=managed_order.client_order_id,
+                    source="history_terminal_filled",
                 )
                 self._finalize_managed_order(client_id, managed_order)
                 self.audit.log_event(
@@ -4420,6 +4700,19 @@ class GenericHedgeRuntime:
             filled_qty=managed_order.filled_qty,
             remaining_qty=managed_order.remaining_qty,
         )
+        if managed_order.status == "FILLED" and managed_order.purpose in {
+            self.strategy.LONG_ENTRY_PURPOSE,
+            self.strategy.SHORT_ENTRY_PURPOSE,
+        }:
+            snapshot = self.runtime_state.last_snapshot or self.refresh_snapshot("order_finalized")
+            self.strategy._mark_initial_entry_reconciled_from_terminal_order(
+                self.runtime_state,
+                snapshot,
+                purpose=managed_order.purpose,
+                exchange_order_id=managed_order.exchange_order_id,
+                client_order_id=client_id,
+                source="order_finalized",
+            )
         self.runtime_state.active_orders.pop(client_id, None)
         if managed_order.exchange_order_id:
             self.runtime_state.exchange_to_client_id.pop(managed_order.exchange_order_id, None)

@@ -68,6 +68,7 @@ class BybitOrderManager:
         self._session = requests.Session()
         self._instrument_cache: dict[tuple[str, str], Mapping[str, Any]] = {}
         self._max_leverage_cache: set[tuple[str, str]] = set()
+        self.last_post_error: dict[str, Any] | None = None
 
     def _sign(self, body: str) -> str:
         timestamp = str(int(time.time() * 1_000))
@@ -107,7 +108,14 @@ class BybitOrderManager:
                 logger.warning(
                     "Bybit POST %s returned %s %s", path, ret_code, data.get("retMsg")
                 )
+                self.last_post_error = {
+                    "path": path,
+                    "retCode": ret_code,
+                    "retMsg": data.get("retMsg"),
+                    "payload": data,
+                }
                 return None
+            self.last_post_error = None
             return data
         except Exception as exc:
             logger.exception("Bybit POST %s exception", path, exc_info=exc)

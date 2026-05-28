@@ -44,6 +44,9 @@ RUNTIME_BLOCKING_FIELDS_TO_FALSE = [
     "full_exit_reset_in_progress",
     "refill_pending",
     "refill_in_progress",
+    "refill_required",
+    "refill_exit_orders_cancel_required",
+    "refill_completed",
     "final_exit_pnl_deferred_allows_fresh_entry",
 ]
 
@@ -181,7 +184,19 @@ def perform_verified_flat_runtime_reset(
     symbol = snapshot.symbol
     long_qty = float(snapshot.long_qty or 0.0)
     short_qty = float(snapshot.short_qty or 0.0)
+    snapshot_active_orders = _count_nonterminal_snapshot_orders(snapshot)
+    runtime_active_orders = len(runtime_state.active_orders)
     if long_qty > 0.0 or short_qty > 0.0:
+        _log_event(
+            "fixed_cycle_flat_fresh_start_cleanup_skipped_non_flat",
+            {
+                "symbol": symbol,
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+                "active_order_count": runtime_active_orders,
+                "reason": "exchange_not_flat",
+            },
+        )
         _log_reset_skipped(logger, reason="snapshot_not_flat", snapshot=snapshot)
         return False
 
@@ -370,7 +385,10 @@ def perform_verified_flat_runtime_reset(
             "post_exit_cleanup_verified_snapshot_updated_at": None,
             "fresh_restart_required": False,
             "refill_pending": False,
+            "refill_required": False,
             "refill_in_progress": False,
+            "refill_completed": False,
+            "refill_exit_orders_cancel_required": False,
             "refill_long_filled": False,
             "refill_short_filled": False,
             "refill_state": {},

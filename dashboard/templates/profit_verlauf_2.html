@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit-Verlauf 2</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .profit-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .profit-summary-card {
+            background: #1f1f1f;
+            padding: 16px;
+            border-radius: 8px;
+            color: #f5f5f5;
+            border: 1px solid #333;
+        }
+        .profit-trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .profit-trades-table th, .profit-trades-table td {
+            padding: 8px;
+            border: 1px solid #2f2f2f;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .profit-positive { color: #0f0; }
+        .profit-negative { color: #f55; }
+        .detail-row {
+            background: #121212;
+            display: none;
+        }
+        .detail-content {
+            padding: 12px;
+            background: #181818;
+        }
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .detail-table th, .detail-table td {
+            padding: 4px;
+            border: 1px solid #2a2a2a;
+            font-size: 0.85rem;
+        }
+        .details-btn {
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        .refresh-btn {
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        .detail-loaded {
+            display: table-row;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📊 Profit-Verlauf 2</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/profit-verlauf" class="nav-link">Profit-Verlauf</a>
+            <a href="/profit-verlauf_2" class="nav-link active">Profit-Verlauf 2</a>
+        </div>
+        <div class="dashboard-content">
+            <div class="profit-summary-grid">
+                <div class="profit-summary-card">
+                    <div class="summary-label">Total Profit</div>
+                    <div class="summary-value" id="summary-total-profit">{{ summary.total_profit|round(4) }} USDT</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Closed Trades</div>
+                    <div class="summary-value" id="summary-closed-trades">{{ summary.closed_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Open Trades</div>
+                    <div class="summary-value" id="summary-open-trades">{{ summary.open_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winrate</div>
+                    <div class="summary-value" id="summary-winrate">{{ summary.winrate }} %</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winning Trades</div>
+                    <div class="summary-value" id="summary-winning-trades">{{ summary.winning_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Best Bot</div>
+                    <div class="summary-value" id="summary-best-bot">{{ summary.best_bot or '-' }}</div>
+                </div>
+            </div>
+            <div class="profit-toolbar">
+                <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
+            </div>
+            <table class="profit-trades-table">
+                <thead>
+                    <tr>
+                        <th>Bot</th>
+                        <th>Symbol</th>
+                        <th>Start</th>
+                        <th>Ende</th>
+                        <th>Endprofit</th>
+                        <th>Wallet danach</th>
+                        <th>Cycles</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="profit-trades-body">
+                    {% for trade in trades %}
+                    <tr class="trade-row" data-trade-block-id="{{ trade.trade_block_id }}" data-profile="{{ profile }}">
+                        <td>{{ trade.bot_name }}</td>
+                        <td>{{ trade.symbol }}</td>
+                        <td>{{ trade.start_label }}</td>
+                        <td>{{ trade.end_label }}</td>
+                        <td class="{{ 'profit-positive' if trade.profit_usdt and trade.profit_usdt > 0 else ('profit-negative' if trade.profit_usdt and trade.profit_usdt < 0 else '') }}">
+                            {{ trade.profit_usdt }}
+                        </td>
+                        <td>{{ trade.wallet_after or '-' }}</td>
+                        <td>{{ trade.cycle_count }}</td>
+                        <td>{{ 'Closed' if trade.status == 'closed' else 'Open' }}</td>
+                        <td>
+                            <button class="details-btn" data-trade-id="{{ trade.trade_block_id }}">Details</button>
+                        </td>
+                    </tr>
+                    <tr class="detail-row" data-details-for="{{ trade.trade_block_id }}">
+                        <td colspan="9">
+                            <div class="detail-content">
+                                <div class="detail-loader">Lade Details...</div>
+                                <div class="detail-table-wrapper" style="display:none;"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const PROFILE = "{{ profile }}";
+    </script>
+    <script src="/static/js/profit_trades.js"></script>
+</body>
+</html>

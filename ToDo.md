@@ -71,69 +71,97 @@ oder
 👉 Exit früher triggern bei schnellen Rebounds
 
 
-export TEST_SYMBOL=XVGUSDT
-export TEST_CATEGORY=linear
-python fixed_cycle_hedge_bot/test_trailing_long_sl.py
 
 
-ok und der nachste schritt ist  wenn der preis dann um 0.5% fallt ist der aktivierungs preis und dann berechnen wir den stop price also ACTIVATION_DROP_PCT + stop order also in unseren fall ist das die 0.3% die wir dann auf den aktivierungs preis addieren mussen und da setzt wir jetzt mit der halfte der pos size eine stopLoss order also wir hangen sozusagen an unserer position die stopLoss order an also nicht als eine eigenstandige close limit order das ist wichtig weil wenn diese order gefullt wurde dann bekommen wir uber die rest api der position sehen wir dann sofort das die stopLoss order nicht mehr existiert das ist viel sauberer so und wenn der current price um 0.2% weiter fallt dann ist das unser neuer trigger aktivierungs preis wo wir dann wieder den neuen stopLoss price berechnen also +0.3% vom aktivierungs preis und immer so weiter bis der preis zuruck kommt und die order gefullt wurde hast du das verstanden
+########################################################################################################################
 
-ok dann pass das so in den code an und gebe mir dann den kompletten code wieder zuruck als copy and paste 
+./bot_control.sh hard-reset
 
-Damit wird https://dash.immotel.de/dashboard/50_100_hedgebot auf http://127.0.0.1:3000/ weitergeleitet, so wie das Haupt-Dashboard auch.
-Bitte starte danach nginx neu (z. B. sudo systemctl restart nginx oder den entsprechenden Service), damit der neue Link aktiv ist. Sag Bescheid, wenn ich dir noch beim Dashboard-Content oder beim Deployment-Skript helfen soll.
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_hedge_runtime.log && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/generic_hedge_runtime_audit.jsonl && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_calc_audit.log && \
+rm /home/telgenbuescher/projects/spread_recovery_hedge/logs/fixed_cycle_runner.stdout.log
 
+./start_fixed_cycle.sh
 
-sudo systemctl restart dashboard.service
+################################## Coin Scanner ###################################################################
 
-exit fallback market
-reset state 
+sudo systemctl stop coin_scanner.timer
 
+sudo systemctl stop coin_scanner.service
 
+sudo systemctl daemon-reload
+sudo systemctl start coin_scanner.service
+sudo systemctl start coin_scanner.timer
 
-8.36 10:34 1/05
+udo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
 
+####################################### Start/Stop Bot ##########################################################
 
-6.62 12:23
+/home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
+/home/telgenbuescher/projects/spread_recovery_hedge/scripts/stop_fixed_cycle.sh
 
+####################################### Multiple Start/Stop Bot #################################################
 
+./live_bots/100_50_hedge_bot/shared_scripts/start_long_bot.sh long_bot_1
+./live_bots/100_50_hedge_bot/shared_scripts/stop_with_cleanup.sh long_bot_1
 
-100 0.15
-1000 1.50 = 1000/10= 100
-10.000 15   10000/10 =1000
-100.000 150
+./live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_3 --with-wrappers
 
+####################################### Main Bot ################################################################
 
+/home/telgenbuescher/projects/spread_recovery_hedge/fixed_cycle_hedge_bot/fixed_cycle_strategy.py
 
+####################################### Dashboard ###############################################################
 
-############### Event-Audit / Self-Healing-Controller ##########################
+sudo systemctl daemon-reload
+sudo systemctl enable --now dashboard
+sudo systemctl restart dashboard
 
-NORMAL RUNNING:
-- LONG_TP_EXIT muss da sein
-- SHORT_SL_EXIT muss da sein
-- CYCLE_X_LONG_ADD oder CYCLE_X_SHORT_TP muss da sein
+sudo systemctl status dashboard
 
-FINAL EXIT IN PROGRESS:
-- keine neuen Cycle-Orders setzen
-- keine Initial Entries setzen
-- warten bis beide Exit-Legs und PnL bestätigt sind
+####################################### Add Bot ###################################################################
 
-REFILL:
-- REFILL_LONG / REFILL_SHORT prüfen
-- keine normalen Cycle-Orders erzwingen
+ live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_5 --with-wrappers
 
-FLAT + PNL NICHT FERTIG:
-- keine Initial Entries
-- PnL holen
-- offene alte Orders bereinigen
-
-
-Nicht nur reagieren, wenn etwas crasht,
-sondern nach jedem Event beweisen:
-"Meine Struktur ist gesund."
+ ./live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_6 --with-wrappers --register-dashboard
 
 
-Immer erst Cursor analysieren lassen.
-Cursor soll nur den Plan schicken.
-Kein Code ändern.
-Erst wenn der Plan sauber ist, dann gezielt fixen lassen.
+[block_marker] bot_restart timestamp=... symbol=<Symbol>
+
+####################################### Watchdog ##################################################################
+
+python live_bots/100_50_hedge_bot/shared_scripts/safety_order_watchdog.py --dry-run --once
+python3 live_bots/100_50_hedge_bot/watchdog/safety_order_watchdog.py --loop --interval 10
+
+cd /home/telgenbuescher/projects/spread_recovery_hedge
+PYTHONPATH=. python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py --loop --interval 10
+
+####################################### Wallet Captcher ###########################################################
+
+live_bots/100_50_hedge_bot/shared_scripts/start_hedge_guard_watchers.sh
+live_bots/100_50_hedge_bot/shared_scripts/stop_hedge_guard_watchers.sh
+
+cd ~/projects/spread_recovery_hedge
+
+python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py \
+  --loop \
+  --interval 30 \
+  --enable-transfer \
+  --no-transfer-dry-run \
+  --transfer-config-file config/config.yaml \
+  --transfer-coin USDT \
+  --min-transfer-amount 1 \
+  --transfer-cooldown-seconds 600 \
+  --rebaseline-on-start \
+  --reset-transfer-cooldown-on-start
+
+########################################### Reserve coin #############################################################
+
+cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
+
+######################################################################################################################
+
+/home/telgenbuescher/projects/spread_recovery_hedge/modular_hedge_runtime/strategy.md
+
+######################################################################################################################

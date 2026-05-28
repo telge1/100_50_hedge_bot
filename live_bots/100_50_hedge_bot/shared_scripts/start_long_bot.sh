@@ -30,11 +30,6 @@ if [[ -x "${STOP_WITH_CLEANUP}" ]]; then
   "${STOP_WITH_CLEANUP}" "${BOT_NAME}"
 fi
 
-STATE_DIR="${BOT_DIR}/state"
-if [[ -d "${STATE_DIR}" ]]; then
-  rm -f "${STATE_DIR}"/*.json
-fi
-
 if [[ -z "${PYTHON:-}" ]]; then
   PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 fi
@@ -109,8 +104,89 @@ if data["status"] == "running":
     if pid_value and pid_value.isdigit():
         data["pid"] = int(pid_value)
 
+long_qty_env = os.environ.get("STATUS_LONG_QTY")
+if long_qty_env:
+    try:
+        data["long_qty"] = float(long_qty_env)
+    except ValueError:
+        data["long_qty"] = long_qty_env
+short_qty_env = os.environ.get("STATUS_SHORT_QTY")
+if short_qty_env:
+    try:
+        data["short_qty"] = float(short_qty_env)
+    except ValueError:
+        data["short_qty"] = short_qty_env
+open_order_count_env = os.environ.get("STATUS_OPEN_ORDER_COUNT")
+if open_order_count_env:
+    try:
+        data["open_order_count"] = int(open_order_count_env)
+    except ValueError:
+        data["open_order_count"] = open_order_count_env
+
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 PY
+}
+
+exchange_flat_check() {
+  local symbol="$1"
+  local config_file="$2"
+  if [[ -z "${symbol}" || -z "${config_file}" ]]; then
+    echo "[${BOT_NAME}] ERROR: exchange flat check missing symbol/config" >&2
+    return 2
+  fi
+  if [[ ! -f "${config_file}" ]]; then
+    echo "[${BOT_NAME}] ERROR: runtime config not found at ${config_file}" >&2
+    return 2
+  fi
+
+  local payload
+  if ! payload="$(
+    "${PYTHON:-python3}" "${SCRIPT_DIR}/check_exchange_flat.py" \
+      --symbol "${symbol}" \
+      --config "${config_file}" \
+      2>&1
+  )"; then
+    echo "[${BOT_NAME}] ERROR: exchange flat check failed: ${payload}" >&2
+    return 2
+  fi
+
+  export EXCHANGE_FLAT_PAYLOAD="${payload}"
+  mapfile -t flat_values < <(python3 - <<PY
+import json, os, math
+
+payload = json.loads(os.environ["EXCHANGE_FLAT_PAYLOAD"])
+
+def normalize(value, integer=False):
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return "0"
+    if abs(num) < 1e-9:
+        return "0"
+    if integer:
+        return str(int(num))
+    if math.isfinite(num) and num.is_integer():
+        return str(int(num))
+    return str(num)
+
+print(normalize(payload.get("long_qty", 0.0)))
+print(normalize(payload.get("short_qty", 0.0)))
+print(normalize(payload.get("open_order_count", 0), integer=True))
+print(payload.get("flat", False))
+PY
+  )
+  LONG_QTY="${flat_values[0]:-0}"
+  SHORT_QTY="${flat_values[1]:-0}"
+  OPEN_ORDERS="${flat_values[2]:-0}"
+  FLAT_OK="${flat_values[3]:-False}"
+  export STATUS_LONG_QTY="${LONG_QTY}"
+  export STATUS_SHORT_QTY="${SHORT_QTY}"
+  export STATUS_OPEN_ORDER_COUNT="${OPEN_ORDERS}"
+
+  if [[ "${FLAT_OK}" != "True" ]]; then
+    return 1
+  fi
+  return 0
 }
 
 cleanup_wait_files() {
@@ -290,6 +366,35 @@ cleanup_wait_files
 
 RESERVED_SYMBOL="$(read_reserved_symbol)"
 write_reserved_runtime_files "${RESERVED_SYMBOL}"
+
+source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
+
+if ! exchange_flat_check "${RESERVED_SYMBOL}" "${RUNTIME_CONFIG_FILE}"; then
+  write_status_json \
+    "start_blocked" \
+    "exchange_flat_check_failed" \
+    "${RESERVED_SYMBOL}" \
+    "" \
+    "false"
+  exit 1
+fi
+
+if [[ "${STATUS_LONG_QTY:-0}" != "0" ]] || [[ "${STATUS_SHORT_QTY:-0}" != "0" ]] || [[ "${STATUS_OPEN_ORDER_COUNT:-0}" != "0" ]]; then
+  echo "[fixed_cycle_start_preflight_exchange_not_flat_blocked] symbol=${RESERVED_SYMBOL} long_qty=${STATUS_LONG_QTY:-0} short_qty=${STATUS_SHORT_QTY:-0} open_order_count=${STATUS_OPEN_ORDER_COUNT:-0}" >&2
+  write_status_json \
+    "start_blocked" \
+    "exchange_not_flat" \
+    "${RESERVED_SYMBOL}" \
+    "" \
+    "false"
+  exit 1
+fi
+
+echo "[fixed_cycle_start_preflight_exchange_flat_ok] symbol=${RESERVED_SYMBOL} long_qty=${STATUS_LONG_QTY:-0} short_qty=${STATUS_SHORT_QTY:-0} open_order_count=${STATUS_OPEN_ORDER_COUNT:-0}"
+STATE_DIR="${BOT_DIR}/state"
+if [[ -d "${STATE_DIR}" ]]; then
+  rm -f "${STATE_DIR}"/*.json
+fi
 
 if [[ -f "${PID_FILE}" ]]; then
   OLD_PID="$(cat "${PID_FILE}" 2>/dev/null || true)"

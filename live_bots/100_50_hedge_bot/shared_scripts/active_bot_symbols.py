@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 DEFAULT_POLL_SECONDS = 5.0
+BLACKLIST_FILE_NAME = "blacklisted_symbols.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,6 +28,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", default="start_long_bot")
     parser.add_argument("--pid", type=int, default=None)
     return parser.parse_args()
+
+
+def _blacklist_file_path(state_dir: Path) -> Path:
+    path = state_dir / BLACKLIST_FILE_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _load_blacklisted_symbols(state_dir: Path) -> dict[str, dict[str, object]]:
+    path = _blacklist_file_path(state_dir)
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload
 
 
 def _validate_bot_name(name: str) -> bool:
@@ -152,6 +172,7 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                 )
                 return 3
 
+            blacklist = _load_blacklisted_symbols(state_path.parent)
             candidate_symbols, reason, candidate_count = _read_best_coin_candidates(best_coin_path)
             if not candidate_symbols:
                 if reason:
@@ -189,6 +210,14 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                 preferred_index = min(int(bot_name.split("_")[-1]) - 1, len(candidate_symbols) - 1)
                 ordered_candidates = candidate_symbols[preferred_index:] + candidate_symbols[:preferred_index]
                 for symbol in ordered_candidates:
+                    if symbol in blacklist:
+                        entry = blacklist.get(symbol, {})
+                        detail = entry.get("reason") or "blacklisted"
+                        print(
+                            f"[{bot_name}] dynamic_symbol_blacklisted_symbol_skipped symbol={symbol} reason={detail}",
+                            flush=True,
+                        )
+                        continue
                     checked_candidates += 1
                     occupant = reserved_by_symbol.get(symbol)
                     if occupant and occupant != bot_name:

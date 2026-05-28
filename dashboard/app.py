@@ -17,11 +17,10 @@ import requests
 import asyncio
 import httpx
 import uuid
-import ast
 import json
 import math
 import signal
-from typing import Set, Dict, List, Optional, Any
+from typing import Set, Dict, List, Optional, Any, Iterable, Tuple
 import threading
 import re
 import logging
@@ -29,6 +28,7 @@ import sys
 import yaml
 from datetime import datetime, timezone, timedelta
 import shutil
+import ast
 from pathlib import Path
 import subprocess
 
@@ -780,6 +780,76 @@ def load_confirmed_order_pnl_rows(
         },
     )
     return list(rows_by_key.values())
+
+
+def _normalize_confirmed_pnl_row_for_history(row: dict[str, Any]) -> dict[str, Any] | None:
+    if not row:
+        return None
+    order_id = str(row.get("orderId") or row.get("exchange_order_id") or "").strip()
+    if not order_id:
+        return None
+    closed_pnl = row.get("closedPnl")
+    if closed_pnl is None:
+        return None
+    dedupe_key = str(
+        row.get("dedupe_key") or f"{order_id}:{row.get('purpose') or row.get('trade_type') or ''}:{closed_pnl}"
+    ).strip()
+    timestamp = (
+        row.get("timestamp")
+        or row.get("updatedTime")
+        or row.get("tradeTime")
+        or row.get("createdTime")
+        or row.get("finalized_at")
+        or 0
+    )
+    return {
+        "symbol": row.get("symbol"),
+        "orderId": order_id,
+        "exchange_order_id": row.get("exchange_order_id") or order_id,
+        "client_order_id": row.get("orderLinkId") or row.get("order_link_id") or row.get("client_order_id"),
+        "order_link_id": row.get("order_link_id") or row.get("orderLinkId"),
+        "purpose": row.get("purpose") or row.get("trade_type"),
+        "trade_type": row.get("trade_type") or row.get("purpose"),
+        "closedPnl": closed_pnl,
+        "closed_pnl": closed_pnl,
+        "timestamp": timestamp,
+        "trade_block_id": row.get("trade_block_id"),
+        "cycle_index": row.get("cycle_index"),
+        "source": row.get("source") or "confirmed_order_pnl",
+        "dedupe_key": dedupe_key,
+    }
+
+
+def _merge_confirmed_order_pnl_rows_into_history(
+    closed_history: list[dict[str, Any]],
+    confirmed_rows: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], int]:
+    if not confirmed_rows:
+        return [], 0
+    seen_trade_block_ids = {
+        entry.get("trade_block_id")
+        for entry in closed_history
+        if entry.get("trade_block_id")
+    }
+    seen_confirmed_keys: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    duplicates = 0
+    for row in confirmed_rows:
+        normalized = _normalize_confirmed_pnl_row_for_history(row)
+        if normalized is None:
+            continue
+        dedupe_key = normalized.get("dedupe_key")
+        if not dedupe_key:
+            continue
+        if dedupe_key in seen_confirmed_keys:
+            duplicates += 1
+            continue
+        seen_confirmed_keys.add(dedupe_key)
+        tbid = normalized.get("trade_block_id")
+        if tbid and tbid in seen_trade_block_ids:
+            continue
+        merged.append(normalized)
+    return merged, duplicates
 
 
 def _append_dashboard_closed_pnl_history(entry: dict[str, Any]) -> None:
@@ -2746,6 +2816,32 @@ async def profit_verlauf(request: Request, user: dict = Depends(require_auth)):
             "dashboard_accounts": get_dashboard_accounts(),
             "closed_pnl_accounts": get_closed_pnl_accounts(),
         }
+    ))
+
+
+@app.get("/profit-verlauf_2", response_class=HTMLResponse)
+async def profit_verlauf_2(
+    request: Request,
+    profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(require_auth),
+):
+    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
+    normalized = [_normalize_trade_record(evt) for evt in trades]
+    normalized.sort(key=_score_trade_record_end_time, reverse=True)
+    summary = _summarize_trade_blocks(normalized)
+    trade_rows = [_build_profit_trade_summary(record) for record in normalized]
+    return HTMLResponse(render_template(
+        "profit_verlauf_2.html",
+        {
+            "request": request,
+            "user": user,
+            "profile": profile,
+            "summary": summary,
+            "trades": trade_rows,
+            "warnings": warnings,
+            "trade_limit": limit,
+        },
     ))
 
 
@@ -6795,6 +6891,891 @@ async def api_update_atr_burn(
 
 CLOSED_PNL_ACCOUNTS = tuple(get_closed_pnl_accounts())
 
+TRADE_SUMMARY_EVENTS = (
+    "fixed_cycle_last_trade_pnl_persisted",
+    "fixed_cycle_trade_pnl_finalized",
+)
+
+
+def _parse_trade_event_line(line: str, pattern: str) -> dict[str, Any] | None:
+    payload = line.split(pattern, 1)[1] if pattern in line else ""
+    start = payload.find("{")
+    if start == -1:
+        return None
+    json_text = payload[start:]
+    try:
+        data = ast.literal_eval(json_text)
+    except Exception:
+        return None
+    timestamp_str = line[:23]
+    try:
+        parsed = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S,%f")
+        ts = _normalize_dashboard_datetime(parsed) or datetime.now(timezone.utc)
+    except Exception:
+        ts = datetime.now(timezone.utc)
+    data["__ts"] = ts
+    data["__event"] = pattern
+    return data
+
+
+def _collect_trade_events_from_logs(log_paths: list[Path], bot_name: str, profile: str) -> Tuple[list[dict[str, Any]], list[str]]:
+    events: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    scanned = []
+    for log_path in log_paths:
+        if not log_path.exists():
+            warnings.append(f"missing log for {bot_name}: {log_path.name}")
+            continue
+        scanned.append(log_path.name)
+        try:
+            with log_path.open("r", encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    for pattern in TRADE_SUMMARY_EVENTS:
+                        if pattern in line:
+                            event = _parse_trade_event_line(line, pattern)
+                            if event:
+                                event["bot_name"] = bot_name
+                                event["profile"] = profile
+                                events.append(event)
+        except Exception as exc:
+            warnings.append(f"failed reading {log_path.name} for {bot_name}: {exc}")
+    logger.warning(
+        "[profit-summary-scan] profiles=%s bot=%s files=%s events=%s",
+        profile,
+        bot_name,
+        scanned,
+        len(events),
+    )
+    return events, warnings
+
+
+def _discover_all_long_bots() -> list[str]:
+    bots_root = LIVE_BOT_LOGS_ROOT
+    if not bots_root.exists():
+        return []
+    return sorted(
+        child.name for child in bots_root.iterdir() if child.is_dir() and child.name.startswith("long_bot_")
+    )
+
+
+def _bot_entry_from_name(bot_name: str) -> dict[str, Any]:
+    num = "".join(filter(str.isdigit, bot_name))
+    profile = f"bot_{num}" if num else "main"
+    return {"bot_name": bot_name, "profile": profile, "bot_dir": str(LIVE_BOT_LOGS_ROOT / bot_name)}
+
+
+def _gather_trade_log_paths(paths: dict[str, Path | str] | None, bot_name: str) -> list[Path]:
+    log_paths: list[Path] = []
+    if not paths:
+        return log_paths
+    base_raw = paths.get("runtime_log_file")
+    base = Path(str(base_raw)) if base_raw else None
+    if base:
+        log_paths.append(base)
+        log_paths.extend(sorted(base.parent.glob(f"{base.name}.*")))
+        prev = base.with_suffix(base.suffix + ".prev")
+        if prev.exists():
+            log_paths.append(prev)
+    runner_raw = paths.get("runner_stdout_log")
+    runner = Path(str(runner_raw)) if runner_raw else None
+    if not runner and base:
+        runner_candidate = base.parent / "fixed_cycle_runner.stdout.log"
+        runner = runner_candidate
+    if runner and runner.exists():
+        log_paths.append(runner)
+    return log_paths
+
+
+def _build_trade_details(breakdown: dict[str, Any] | None, pnl_source: str | None) -> list[dict[str, Any]]:
+    details: list[dict[str, Any]] = []
+    if not breakdown:
+        return details
+    for cycle_type, prefix in (
+        ("cycle_long_reduce_pnl", "CYCLE_{idx}_LONG_ADD"),
+        ("cycle_short_tp_pnl", "CYCLE_{idx}_SHORT_REDUCE"),
+    ):
+        cycle_map = breakdown.get(cycle_type) or {}
+        if isinstance(cycle_map, dict):
+            for key, pnl_value in sorted(cycle_map.items(), key=lambda kv: str(kv[0])):
+                details.append(
+                    {
+                        "purpose": prefix.format(idx=key),
+                        "pnl": float(pnl_value or 0.0),
+                        "source": pnl_source,
+                    }
+                )
+    if final := breakdown.get("final_long_exit_pnl"):
+        details.append({"purpose": "LONG_TP_EXIT", "pnl": float(final), "source": pnl_source})
+    if final := breakdown.get("final_short_exit_pnl"):
+        details.append({"purpose": "SHORT_SL_EXIT", "pnl": float(final), "source": pnl_source})
+    return details
+
+
+SERVER_TZ = timezone(timedelta(hours=2))
+DASHBOARD_TZ = timezone(timedelta(hours=3))
+
+
+def _normalize_dashboard_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(text)
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _parse_profit_time(value: Any) -> datetime | None:
+    normalized = _normalize_dashboard_datetime(value)
+    if not normalized:
+        return None
+    return normalized.astimezone(SERVER_TZ)
+
+
+def _format_profit_time_label(value: Any) -> str:
+    ts = _parse_profit_time(value)
+    if not ts:
+        return ""
+    return ts.astimezone(DASHBOARD_TZ).strftime("%d.%m.%y, %H:%M:%S")
+
+
+def _get_trade_start_time(record: dict[str, Any]) -> datetime | None:
+    detail_times: list[datetime] = []
+    for detail in record.get("details") or []:
+        for key in ("time", "timestamp", "created_at"):
+            if detail.get(key):
+                dt = _parse_profit_time(detail.get(key))
+                if dt:
+                    detail_times.append(dt)
+    if detail_times:
+        return min(detail_times)
+    for key in ("start_time", "created_at", "timestamp", "__ts"):
+        if record.get(key):
+            dt = _parse_profit_time(record.get(key))
+            if dt:
+                return dt
+    return None
+
+
+def _get_trade_end_time(record: dict[str, Any]) -> datetime | None:
+    if record.get("finalized_at"):
+        dt = _parse_profit_time(record.get("finalized_at"))
+        if dt:
+            return dt
+    if record.get("end_time"):
+        dt = _parse_profit_time(record.get("end_time"))
+        if dt:
+            return dt
+    detail_times: list[datetime] = []
+    for detail in record.get("details") or []:
+        for key in ("time", "timestamp", "created_at"):
+            if detail.get(key):
+                dt = _parse_profit_time(detail.get(key))
+                if dt:
+                    detail_times.append(dt)
+    if detail_times:
+        return max(detail_times)
+    for key in ("timestamp", "__ts"):
+        if record.get(key):
+            dt = _parse_profit_time(record.get(key))
+            if dt:
+                return dt
+    return None
+
+
+def _detail_order_id(detail: dict[str, Any]) -> str:
+    for key in ("order_id", "client_order_id", "exchange_order_id"):
+        value = detail.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _build_profit_trade_summary(
+    record: dict[str, Any], confirmed_start: datetime | None = None
+) -> dict[str, Any]:
+    start_dt = _get_trade_start_time(record)
+    if confirmed_start and (not start_dt or confirmed_start < start_dt):
+        start_dt = confirmed_start
+    end_dt = _get_trade_end_time(record)
+    return {
+        "bot_name": record.get("bot_name"),
+        "symbol": record.get("symbol"),
+        "trade_block_id": record.get("trade_block_id"),
+        "start_time": start_dt.isoformat() if start_dt else None,
+        "end_time": end_dt.isoformat() if end_dt else None,
+        "start_label": _format_profit_time_label(start_dt),
+        "end_label": _format_profit_time_label(end_dt),
+        "profit_usdt": record.get("total_trade_pnl"),
+        "wallet_after": record.get("wallet_after_trade"),
+        "cycle_count": record.get("cycle_count"),
+        "status": record.get("status"),
+    }
+
+
+def _build_profit_trade_detail_rows(record: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    fallback_time = _get_trade_start_time(record) or _get_trade_end_time(record)
+    for detail in record.get("details") or []:
+        time_val = detail.get("time") or detail.get("timestamp") or detail.get("created_at") or fallback_time
+        formatted_time = time_val.isoformat() if isinstance(time_val, datetime) else time_val
+        rows.append(
+            {
+                "time": formatted_time,
+                "time_label": _format_profit_time_label(time_val),
+                "symbol": record.get("symbol"),
+                "order_id": _detail_order_id(detail),
+                "pnl_usdt": detail.get("pnl") or detail.get("pnl_usdt") or detail.get("realized_pnl") or 0.0,
+                "wallet_after": detail.get("wallet_after") or detail.get("wallet_after_trade") or record.get("wallet_after_trade"),
+                "purpose": detail.get("purpose"),
+            }
+        )
+    return rows
+
+
+def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for entry in confirmed_rows:
+        rows.append(
+            {
+                "time": entry.get("timestamp"),
+                "time_label": _format_profit_time_label(entry.get("timestamp")),
+                "symbol": entry.get("symbol") or record.get("symbol"),
+                "order_id": entry.get("exchange_order_id") or entry.get("client_order_id") or "",
+                "pnl_usdt": entry.get("closed_pnl") or 0.0,
+                "wallet_after": None,
+                "purpose": entry.get("purpose"),
+            }
+        )
+    return rows
+
+
+def _collect_history_paths_for_profile(profile: str) -> list[Path]:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized or normalized == "main":
+        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+    entries = []
+    all_profiles = get_bot_profiles()
+    if normalized == "bot_1":
+        entries = all_profiles.copy()
+        existing = {entry["bot_name"] for entry in entries}
+        for bot_name in _discover_all_long_bots():
+            if bot_name not in existing:
+                entries.append(_bot_entry_from_name(bot_name))
+    else:
+        entries = [entry for entry in all_profiles if entry["profile"] == normalized]
+    paths: list[Path] = [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+    for entry in entries:
+        paths_dict = get_bot_paths(entry.get("bot_name"))
+        if not paths_dict:
+            continue
+        dashboard_path = paths_dict.get("dashboard_closed_pnl_history_file")
+        confirmed_path = paths_dict.get("confirmed_order_pnl_history_file")
+        if dashboard_path:
+            paths.append(dashboard_path)
+        if confirmed_path:
+            paths.append(confirmed_path)
+    return paths
+
+
+def _collect_confirmed_history_paths(profile: str) -> list[Path]:
+    resolved = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    paths = []
+    if not resolved or resolved == "main":
+        paths.extend([CONFIRMED_ORDER_PNL_HISTORY_FILE])
+        return paths
+    account_map = _build_dynamic_bot_state_files()
+    for bot_name in map(_bot_entry_from_name, _discover_all_long_bots()):
+        bot_paths = get_bot_paths(bot_name["bot_name"])
+        if bot_paths:
+            confirmed = bot_paths.get("confirmed_order_pnl_history_file")
+            if confirmed:
+                paths.append(confirmed)
+    paths.append(CONFIRMED_ORDER_PNL_HISTORY_FILE)
+    return paths
+
+
+def _collect_confirmed_order_pnl_rows(paths: list[Path]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except Exception:
+                        continue
+                    rows.append(payload)
+        except Exception:
+            continue
+    return rows
+
+
+def _collect_confirmed_trade_start_times(profile: str) -> dict[str, datetime]:
+    paths = _collect_confirmed_history_paths(profile)
+    rows = _collect_confirmed_order_pnl_rows(paths)
+    start_times: dict[str, datetime] = {}
+    for row in rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            continue
+        ts = _normalize_dashboard_datetime(row.get("timestamp"))
+        if not ts:
+            continue
+        existing = start_times.get(tbid)
+        if not existing or ts < existing:
+            start_times[tbid] = ts
+    return start_times
+
+
+def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> list[dict[str, Any]]:
+    filtered = [row for row in rows if row.get("trade_block_id") == trade_block_id]
+    if not filtered:
+        return []
+    seen: set[str] = set()
+    deduped = []
+    for row in filtered:
+        key = f"{row.get('exchange_order_id') or ''}-{row.get('purpose') or ''}"
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    deduped.sort(key=lambda entry: _parse_profit_time(entry.get("timestamp")) or datetime.min)
+    return deduped
+
+
+def _load_confirmed_order_pnl_rows_for_trade(
+    profile: str, trade_block_id: str, bot_name: str | None = None, symbol: str | None = None
+) -> list[dict[str, Any]]:
+    paths = _collect_confirmed_history_paths(profile)
+    rows = _collect_confirmed_order_pnl_rows(paths)
+    candidate = _filter_confirmed_rows(rows, trade_block_id)
+    if symbol:
+        candidate = [row for row in candidate if str(row.get("symbol") or "").upper() == symbol.upper()] or candidate
+    if bot_name:
+        candidate = [
+            row for row in candidate if str(row.get("bot_name") or "").lower() == bot_name.lower()
+        ] or candidate
+    return candidate
+
+
+def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except Exception:
+                        logger.warning("[dashboard] history_line_parse_failed", {"line": line})
+                        continue
+                    entries.append(payload)
+        except Exception:
+            logger.warning("[dashboard] history_file_read_failed", {"path": str(path)}, exc_info=True)
+    return entries
+
+
+def _load_history_trade_events_for_profile(profile: str) -> list[dict[str, Any]]:
+    entries = _load_history_entries_from_paths(_collect_history_paths_for_profile(profile))
+    events: list[dict[str, Any]] = []
+    for entry in entries:
+        tbid = entry.get("trade_block_id") or entry.get("trade_block") or entry.get("tradeId")
+        if not tbid:
+            continue
+        record = dict(entry)
+        ts_val = record.get("finalized_at") or record.get("timestamp") or record.get("__ts") or record.get("created_at")
+        record["__ts"] = _normalize_dashboard_datetime(ts_val) or datetime.now(timezone.utc)
+        record["__event"] = record.get("__event") or record.get("event") or "dashboard_closed_pnl_history"
+        events.append(record)
+    return events
+
+
+def _find_closed_pnl_history_entry(
+    profile: str,
+    trade_block_id: str,
+    bot_name: str | None = None,
+    symbol: str | None = None,
+) -> dict[str, Any] | None:
+    paths = _collect_history_paths_for_profile(profile)
+    best: dict[str, Any] | None = None
+    best_ts: datetime | None = None
+    for entry in _load_history_entries_from_paths(paths):
+        if entry.get("trade_block_id") != trade_block_id:
+            continue
+        if bot_name and str(entry.get("bot_name") or "").lower() != bot_name.lower():
+            continue
+        if symbol and str(entry.get("symbol") or "").upper() != symbol.upper():
+            continue
+        ts_val = entry.get("finalized_at") or entry.get("timestamp") or entry.get("__ts")
+        ts = _parse_profit_time(ts_val)
+        if best is None or (ts and best_ts and ts > best_ts):
+            best = entry
+            best_ts = ts
+        elif best is None:
+            best = entry
+    return best
+
+
+def _merge_trade_history_breakdown(record: dict[str, Any], history_entry: dict[str, Any] | None) -> dict[str, Any]:
+    if not history_entry:
+        return record
+    if not record.get("breakdown") and history_entry.get("breakdown"):
+        record["breakdown"] = history_entry["breakdown"]
+    record.setdefault("pnl_source", record.get("pnl_source") or history_entry.get("source"))
+    record["total_trade_pnl"] = record.get("total_trade_pnl") or history_entry.get("total_trade_pnl")
+    record["finalized_at"] = record.get("finalized_at") or history_entry.get("finalized_at")
+    record["details"] = _build_trade_details(record.get("breakdown"), record.get("pnl_source"))
+    return record
+
+
+def _normalize_trade_record(event: dict[str, Any]) -> dict[str, Any]:
+    breakdown = event.get("breakdown") or {}
+    total_trade_pnl = float(event.get("total_trade_pnl") or event.get("total_trade_profit_usdt") or 0.0)
+    cycle_net = float(breakdown.get("cycle_net_pnl") or event.get("cycle_net_pnl") or 0.0)
+    final_exit_net = float(breakdown.get("final_exit_net_pnl") or event.get("final_exit_net_pnl") or 0.0)
+    final_long = float(breakdown.get("final_long_exit_pnl") or event.get("final_long_exit_pnl") or 0.0)
+    final_short = float(breakdown.get("final_short_exit_pnl") or event.get("final_short_exit_pnl") or 0.0)
+    cycle_count = (
+        len(breakdown.get("cycle_long_reduce_pnl") or {})
+        if isinstance(breakdown.get("cycle_long_reduce_pnl"), dict)
+        else event.get("cycle_count") or 0
+    )
+    pnl_source = event.get("pnl_source") or event.get("source") or "runtime_event"
+    closed_flags = bool(event.get("pnl_complete")) or bool(event.get("last_trade_pnl_complete"))
+    if event.get("finalized_at"):
+        closed_flags = True
+    if str(event.get("__event") or "").strip() in {
+        "fixed_cycle_trade_pnl_finalized",
+        "fixed_cycle_last_trade_pnl_persisted",
+    }:
+        closed_flags = True
+    if event.get("total_trade_pnl") is not None and event.get("trade_block_id"):
+        closed_flags = True
+    status = "closed" if closed_flags else "open"
+    return {
+        "end_time": event.get("finalized_at") or event.get("timestamp") or event["__ts"].isoformat(),
+        "bot_name": event.get("bot_name"),
+        "symbol": event.get("symbol"),
+        "trade_block_id": event.get("trade_block_id"),
+        "short_trade_id": event.get("trade_block_id"),
+        "total_trade_pnl": total_trade_pnl,
+        "cycle_net_pnl": cycle_net,
+        "final_exit_net_pnl": final_exit_net,
+        "final_long_exit_pnl": final_long,
+        "final_short_exit_pnl": final_short,
+        "cycle_count": cycle_count,
+        "pnl_source": pnl_source,
+        "status": status,
+        "details": _build_trade_details(breakdown, pnl_source),
+        "wallet_after_trade": event.get("wallet_after_trade") or event.get("wallet_after"),
+        "start_wallet": event.get("start_wallet"),
+        "start_time": event.get("start_time"),
+        "finalized_at": event.get("finalized_at"),
+        "timestamp": event.get("timestamp"),
+        "created_at": event.get("created_at"),
+        "__ts": event.get("__ts"),
+    }
+
+
+def _event_priority(event: dict[str, Any]) -> tuple[int, int, datetime]:
+    pnl_complete = 1 if bool(event.get("pnl_complete")) else 0
+    is_persisted = 1 if event.get("__event") == "fixed_cycle_last_trade_pnl_persisted" else 0
+    ts_val = event.get("finalized_at") or event.get("timestamp")
+    parsed = _normalize_dashboard_datetime(ts_val)
+    if not parsed:
+        parsed = event.get("__ts")
+    if not parsed:
+        parsed = datetime.now(timezone.utc)
+    return (pnl_complete, is_persisted, parsed)
+
+
+def _resolve_profile_entries(profile: str) -> tuple[list[dict[str, Any]], list[str]]:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized or normalized == "main":
+        return [], [f"unknown profile: {profile}"]
+    entries: list[dict[str, Any]] = []
+    if normalized == "bot_1":
+        entries = get_bot_profiles().copy()
+        existing = {entry["bot_name"] for entry in entries}
+        for bot_name in _discover_all_long_bots():
+            if bot_name not in existing:
+                entries.append(_bot_entry_from_name(bot_name))
+    else:
+        entries = [entry for entry in get_bot_profiles() if entry.get("profile") == normalized]
+    if not entries:
+        return [], [f"profile has no bots configured: {profile}"]
+    return entries, []
+
+
+def _load_trade_blocks_for_profile(profile: str, limit: int) -> Tuple[list[dict[str, Any]], list[str]]:
+    entries, entry_warnings = _resolve_profile_entries(profile)
+    if not entries:
+        return [], entry_warnings
+    warnings: list[str] = entry_warnings.copy()
+    events: list[dict[str, Any]] = []
+    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    for entry in entries:
+        paths = get_bot_paths(entry["bot_name"])
+        if not paths:
+            bot_dir = LIVE_BOT_LOGS_ROOT / entry["bot_name"]
+            warnings.append(f"missing paths for bot {entry['bot_name']}, using fallback dirs")
+            paths = {
+                "runtime_log_file": bot_dir / "logs" / "fixed_cycle_hedge_runtime.log",
+                "runner_stdout_log": bot_dir / "logs" / "fixed_cycle_runner.stdout.log",
+            }
+        log_paths = _gather_trade_log_paths(paths, entry["bot_name"])
+        parsed, bot_warnings = _collect_trade_events_from_logs(log_paths, entry["bot_name"], normalized_profile)
+        warnings.extend(bot_warnings)
+        events.extend(parsed)
+        logger.warning(
+            "[profit-summary-scan] profile=%s bot=%s files=%s events=%s",
+            profile,
+            entry["bot_name"],
+            [str(p) for p in log_paths],
+            len(parsed),
+        )
+    history_events = _load_history_trade_events_for_profile(profile)
+    if history_events:
+        warnings.append(f"loaded {len(history_events)} history events for profile {profile}")
+    events.extend(history_events)
+
+    dedup: dict[str, dict[str, Any]] = {}
+    priority_map: dict[str, tuple[int, int, datetime]] = {}
+    for event in events:
+        key = str(event.get("trade_block_id") or "")
+        if not key:
+            continue
+        existing_priority = priority_map.get(key)
+        current_priority = _event_priority(event)
+        if not existing_priority or current_priority > existing_priority:
+            dedup[key] = event
+            priority_map[key] = current_priority
+    sorted_events = sorted(
+        dedup.values(),
+        key=lambda evt: evt.get("__ts") or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    normalized_trades = [_normalize_trade_record(evt) for evt in sorted_events[:limit]]
+    logger.debug(
+        "[dashboard] profit_summary_dedup_result",
+        {
+            "profile": profile,
+            "bot_count": len(entries),
+            "raw_events": len(events),
+            "deduped_trades": len(normalized_trades),
+        },
+    )
+    return normalized_trades, warnings
+
+
+def _bot_paths_with_fallback(entry: dict[str, Any]) -> dict[str, Path]:
+    bot_name = entry.get("bot_name")
+    if not bot_name:
+        return {}
+    base = get_bot_paths(bot_name) or {}
+    bot_dir = Path(entry.get("bot_dir") or LIVE_BOT_LOGS_ROOT / bot_name)
+    result: dict[str, Path] = {}
+
+    def _resolve(key: str, suffix: str) -> None:
+        value = base.get(key)
+        if value:
+            result[key] = Path(value)
+        else:
+            result[key] = bot_dir / suffix
+
+    _resolve("state_file", "state/fixed_cycle_state.json")
+    _resolve("status_file", "run/status.json")
+    _resolve("confirmed_order_pnl_history_file", "logs/confirmed_order_pnl_history.jsonl")
+    return result
+
+
+def _is_bot_running(status: dict[str, Any] | None) -> bool:
+    if not status:
+        return False
+    return str(status.get("status") or "").strip().lower() == "running"
+
+
+def _normalize_active_orders(payload: dict[str, Any], strategy_state: dict[str, Any]) -> list:
+    cycle_state = strategy_state.get("cycle_state") or {}
+    orders = []
+    for source in (payload, strategy_state, cycle_state):
+        if not isinstance(source, dict):
+            continue
+        for key in ("active_orders", "orders"):
+            raw = source.get(key)
+            if isinstance(raw, dict):
+                orders.extend(raw.values())
+            elif isinstance(raw, list):
+                orders.extend(raw)
+    return [order for order in orders if order]
+
+
+def _safe_int(value: Any) -> int:
+    if value is None or value == "":
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _has_active_trade_state(state: dict[str, Any], strategy_state: dict[str, Any]) -> bool:
+    long_qty = _safe_wallet_float(state.get("long_qty") or strategy_state.get("long_qty"))
+    short_qty = _safe_wallet_float(state.get("short_qty") or strategy_state.get("short_qty"))
+    if (long_qty or 0.0) > 0.0 or (short_qty or 0.0) > 0.0:
+        return True
+    if _normalize_active_orders(state, strategy_state):
+        return True
+    if bool(state.get("initial_entry_submitted")) or bool(strategy_state.get("initial_entry_submitted")):
+        return True
+    cycle_state = strategy_state.get("cycle_state") or {}
+    if bool(strategy_state.get("trade_active")) or bool(cycle_state.get("trade_active")):
+        return True
+    if _safe_int(strategy_state.get("cycle_completed_count")) > 0 or _safe_int(state.get("cycle_completed_count")) > 0:
+        return True
+    return False
+
+
+def _collect_process_rows_for_bot(
+    profile: str, bot_name: str, paths: dict[str, Path]
+) -> tuple[dict[str, Any] | None, str | None]:
+    state = _load_json_file(paths.get("state_file"))
+    if not state:
+        return None, f"state file missing or unreadable for bot {bot_name}"
+    status = _load_json_file(paths.get("status_file"))
+    if not _is_bot_running(status):
+        return None, None
+    strategy_state = state.get("strategy_state") or {}
+    trade_block_id = str(
+        state.get("trade_block_id") or strategy_state.get("trade_block_id") or strategy_state.get("last_trade_block_id") or ""
+    ).strip()
+    if not trade_block_id:
+        return None, f"trade_block_id missing for running bot {bot_name}"
+    if not _has_active_trade_state(state, strategy_state):
+        return None, None
+    symbol = (
+        state.get("symbol")
+        or strategy_state.get("symbol")
+        or (strategy_state.get("cycle_state") or {}).get("symbol")
+        or ""
+    )
+    rows = _load_confirmed_order_pnl_rows_for_trade(profile, trade_block_id, bot_name, symbol)
+    filled_orders: list[dict[str, Any]] = []
+    start_times: list[datetime] = []
+    total_pnl = 0.0
+    max_cycle = 0
+    seen_dedupe: set[str] = set()
+    for row in rows:
+        dedupe_key = row.get("dedupe_key")
+        if not dedupe_key:
+            dedupe_key = f"{row.get('exchange_order_id') or ''}:{row.get('purpose') or ''}"
+        key = str(dedupe_key)
+        if key in seen_dedupe:
+            continue
+        seen_dedupe.add(key)
+        ts = _normalize_dashboard_datetime(row.get("timestamp"))
+        if ts:
+            start_times.append(ts)
+        pnl_value = row.get("closed_pnl") or 0.0
+        try:
+            total_pnl += float(pnl_value)
+        except (TypeError, ValueError):
+            pass
+        cycle_idx = _safe_int(row.get("cycle_index"))
+        if cycle_idx > max_cycle:
+            max_cycle = cycle_idx
+        filled_orders.append(
+            {
+                "time": row.get("timestamp"),
+                "time_label": _format_profit_time_label(row.get("timestamp")),
+                "purpose": row.get("purpose") or row.get("trade_type"),
+                "cycle_index": row.get("cycle_index"),
+                "pnl": pnl_value,
+                "scope": row.get("pnl_scope"),
+                "symbol": row.get("symbol") or symbol,
+                "trade_block_id": trade_block_id,
+                "order_id": row.get("exchange_order_id") or row.get("client_order_id"),
+            }
+        )
+    start_dt = min(start_times) if start_times else None
+    cycle_completed = max(_safe_int(strategy_state.get("cycle_completed_count")), max_cycle)
+    return (
+        {
+            "bot_name": bot_name,
+            "symbol": symbol or "",
+            "trade_block_id": trade_block_id,
+            "start_time": start_dt.isoformat() if start_dt else None,
+            "start_label": _format_profit_time_label(start_dt) if start_dt else "-",
+            "end_label": "-",
+            "end_time": None,
+            "total_trade_pnl": round(total_pnl, 8),
+            "wallet_after": None,
+            "cycle_count": cycle_completed,
+            "status": "in_progress",
+            "is_process": True,
+            "filled_orders": filled_orders,
+        },
+        None,
+    )
+
+
+def _collect_active_bot_process_rows(profile: str) -> tuple[list[dict[str, Any]], list[str]]:
+    entries, entry_warnings = _resolve_profile_entries(profile)
+    warnings: list[str] = entry_warnings.copy()
+    rows: list[dict[str, Any]] = []
+    for entry in entries:
+        bot_name = entry.get("bot_name")
+        if not bot_name:
+            continue
+        paths = _bot_paths_with_fallback(entry)
+        row, warning = _collect_process_rows_for_bot(profile, bot_name, paths)
+        if warning:
+            warnings.append(warning)
+        if row:
+            rows.append(row)
+    return rows, warnings
+
+
+def _score_trade_record_end_time(record: dict[str, Any]) -> datetime:
+    return _get_trade_end_time(record) or datetime.min
+
+
+@app.get("/api/dashboard/profit-trades")
+async def api_profit_trades(
+    profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
+    limit: int = Query(50, ge=1, le=500),
+    user: dict = Depends(require_auth),
+):
+    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
+    normalized = [_normalize_trade_record(evt) for evt in trades]
+    normalized.sort(key=_score_trade_record_end_time, reverse=True)
+    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
+    warnings.extend(process_warnings)
+    running_ids = {
+        row.get("trade_block_id") for row in process_rows if row.get("trade_block_id")
+    }
+    filtered_normalized = [
+        record for record in normalized if record.get("trade_block_id") not in running_ids
+    ]
+    closed_records = [record for record in filtered_normalized if record.get("status") == "closed"]
+    summary = _summarize_trade_blocks(closed_records)
+    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
+    summaries = [
+        _build_profit_trade_summary(
+            record, confirmed_start_times.get(str(record.get("trade_block_id") or ""))
+        )
+        for record in filtered_normalized[:limit]
+    ]
+    existing_ids = {
+        record.get("trade_block_id") for record in filtered_normalized if record.get("trade_block_id")
+    }
+    process_rows.sort(
+        key=lambda row: _normalize_dashboard_datetime(row.get("start_time"))
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    process_summaries = []
+    for row in process_rows:
+        tbid = row.get("trade_block_id")
+        if tbid and tbid in existing_ids:
+            continue
+        process_summaries.append(row)
+    summary["open_trades"] = len(process_summaries)
+    combined = summaries + process_summaries
+    return {
+        "profile": profile,
+        "summary": summary,
+        "count": len(combined),
+        "trades": combined,
+        "warnings": warnings,
+    }
+
+
+@app.get("/api/dashboard/profit-trades/{trade_block_id}/details")
+async def api_profit_trade_details(
+    trade_block_id: str,
+    profile: str = Query("bot_1", description="Bot profile"),
+    user: dict = Depends(require_auth),
+):
+    trades, warnings = _load_trade_blocks_for_profile(profile, limit=500)
+    normalized = [_normalize_trade_record(evt) for evt in trades]
+    match = next((record for record in normalized if record.get("trade_block_id") == trade_block_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
+    bot_name = match.get("bot_name") or ""
+    symbol = match.get("symbol") or ""
+    confirmed_rows = _load_confirmed_order_pnl_rows_for_trade(profile, trade_block_id, bot_name, symbol)
+    if confirmed_rows:
+        rows = _build_confirmed_detail_rows(match, confirmed_rows)
+    else:
+        if not match.get("details"):
+            history_entry = _find_closed_pnl_history_entry(profile, trade_block_id, bot_name, symbol)
+            match = _merge_trade_history_breakdown(match, history_entry)
+        rows = _build_profit_trade_detail_rows(match)
+    return {
+        "profile": profile,
+        "trade_block_id": trade_block_id,
+        "bot_name": match.get("bot_name"),
+        "symbol": match.get("symbol"),
+        "profit_usdt": match.get("total_trade_pnl"),
+        "wallet_after": match.get("wallet_after_trade"),
+        "rows": rows,
+        "warnings": warnings,
+    }
+
+
+def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    trades = list(trades)
+    closed_trades = sum(1 for trade in trades if trade.get("status") == "closed")
+    closed_records = [trade for trade in trades if trade.get("status") == "closed"]
+    total_profit = sum(float(trade.get("total_trade_pnl") or 0.0) for trade in closed_records)
+    winning = sum(
+        1 for trade in closed_records if float(trade.get("total_trade_pnl") or 0.0) > 0
+    )
+    losing = sum(
+        1 for trade in closed_records if float(trade.get("total_trade_pnl") or 0.0) <= 0
+    )
+    winrate = (winning / closed_trades * 100.0) if closed_trades else 0.0
+    best_bot = None
+    best_profit = None
+    for trade in closed_records:
+        pnl = float(trade.get("total_trade_pnl") or 0.0)
+        bot = trade.get("bot_name")
+        if best_profit is None or pnl > best_profit:
+            best_profit = pnl
+            best_bot = bot
+    open_trades = sum(1 for trade in trades if trade.get("status") != "closed")
+    return {
+        "total_profit": round(total_profit, 8),
+        "closed_trades": closed_trades,
+        "winning_trades": winning,
+        "losing_trades": losing,
+        "winrate": round(winrate, 2),
+        "best_bot": best_bot,
+        "open_trades": open_trades,
+    }
+
 
 @app.get("/api/profit-verlauf/closed-pnl")
 async def api_get_closed_pnl(
@@ -6878,6 +7859,28 @@ async def api_get_closed_pnl(
             path=dashboard_history_path,
             limit=100,
         )
+        fast_history_rows, duplicate_count = _merge_confirmed_order_pnl_rows_into_history(
+            closed_pnl_history, confirmed_rows
+        )
+        if fast_history_rows:
+            logger.info(
+                "[dashboard] dashboard_closed_pnl_fast_rows_merged",
+                {
+                    "account": acc,
+                    "added_fast_rows": len(fast_history_rows),
+                    "source": "confirmed_order_pnl",
+                },
+            )
+            closed_pnl_history = closed_pnl_history + fast_history_rows
+            logger.info(
+                "[dashboard] dashboard_confirmed_order_pnl_rows_used",
+                {"account": acc, "fast_rows": len(fast_history_rows)},
+            )
+        if duplicate_count:
+            logger.info(
+                "[dashboard] dashboard_confirmed_order_pnl_duplicate_skipped",
+                {"account": acc, "duplicate_count": duplicate_count},
+            )
         strategy_state = _load_strategy_state_for_account(acc) or {}
         wallet_snapshot = _build_wallet_snapshot_payload(strategy_state, acc)
         snapshot_source = "live_state" if wallet_snapshot else None
@@ -6952,6 +7955,23 @@ async def api_get_closed_pnl(
     except Exception as e:
         logger.error(f"Fehler beim Abrufen der Closed PnL: {e}", exc_info=True)
         return {"success": False, "error": str(e), "list": []}
+
+
+@app.get("/api/profit-summary")
+async def api_profit_summary(
+    profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
+    limit: int = Query(100, ge=1, le=500, description="Number of trades to return"),
+    user: dict = Depends(require_auth),
+):
+    """Return aggregated trade-block summaries grouped by trade_block_id."""
+    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
+    summary = _summarize_trade_blocks(trades)
+    return {
+        "profile": profile,
+        "summary": summary,
+        "trades": trades,
+        "warnings": warnings,
+    }
 
 
 @app.post("/api/hedge/close-positions/{symbol}")
@@ -8990,7 +10010,6 @@ async def api_stop_service(service_name: str, user: dict = Depends(require_auth)
             # WICHTIG: Stoppe zuerst ALLE getrackten Bot-Prozesse aus der PID-Datei
             try:
                 import psutil
-                import json
                 pid_file = "logs/local_bots_pids.json"
                 
                 # Lade PIDs aus der Datei

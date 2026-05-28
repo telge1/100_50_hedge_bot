@@ -1,12 +1,12 @@
 {
-  "symbol": "ONDOUSDT",
-  "timestamp": "2026-05-25T15:42:54.093551+00:00",
+  "symbol": "MUUSDT",
+  "timestamp": "2026-05-27T11:53:39.573570+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "ONDOUSDT"
+      "symbol": "MUUSDT"
     }
   ]
 }
