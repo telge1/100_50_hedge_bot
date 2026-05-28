@@ -5269,52 +5269,48 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             skip_reason = (
                 "trigger_price_non_positive" if trigger_price <= 0 else "long_qty_non_positive"
             )
-            context.audit.log_event(
-                "fixed_cycle_downside_skip",
-                {
-                    "strategy": self.name,
-                    "skip_reason": skip_reason,
-                    "cycle_number": cycle_index,
-                    "side": "long",
-                    "reference_price_used": long_reference,
-                    "raw_trigger_price": raw_trigger_price,
-                    "normalized_trigger_price": trigger_price,
-                    "computed_qty_normalized": long_qty,
-                    "purpose": self._cycle_purpose("long", cycle_index),
-                },
-            )
+            skip_payload = {
+                "strategy": self.name,
+                "skip_reason": skip_reason,
+                "cycle_number": cycle_index,
+                "side": "long",
+                "reference_price_used": long_reference,
+                "raw_trigger_price": raw_trigger_price,
+                "normalized_trigger_price": trigger_price,
+                "computed_qty_normalized": long_qty,
+                "purpose": self._cycle_purpose("long", cycle_index),
+            }
+            context.audit.log_event("fixed_cycle_downside_skip", **skip_payload)
             return None
         purpose = self._cycle_purpose("long", cycle_index)
-        context.audit.log_event(
-            "fixed_cycle_long_reduce_planned",
-            {
-                "strategy": self.name,
-                "cycle_index": cycle_index,
-                "side": "long",
-                "purpose": purpose,
-                "entry_reference_price": entry_reference_price,
-                "distance_pct": long_distance_pct_config,
-                "distance_pct_used": long_distance_pct,
-                "long_fill_price": long_fill_price,
-                "cycle_entry_price": cycle_entry_price,
-                "live_reference_price": reference_price,
-                "final_long_reference": long_reference,
-                "reference_source": reference_source,
-                "reference_cycle_index": reference_cycle_index,
-                "reference_purpose": reference_purpose,
-                "reference_price": reference_price_for_long_add,
-                "long_fill_distance_pct": self.config.long_fill_distance_pct,
-                "trigger_price": trigger_price,
-                "trigger_formula": "final_long_reference * (1 - distance_pct)",
-                "trigger_price_raw": raw_trigger_price,
-                "trigger_price_normalized": trigger_price,
-                "qty_formula": "current_long_qty * reduction_pct_per_fill",
-                "qty_raw": snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill),
-                "qty_normalized": long_qty,
-                "order_type": "Limit",
-                "reduce_only": True,
-            },
-        )
+        long_reduce_payload = {
+            "strategy": self.name,
+            "cycle_index": cycle_index,
+            "side": "long",
+            "purpose": purpose,
+            "entry_reference_price": entry_reference_price,
+            "distance_pct": long_distance_pct_config,
+            "distance_pct_used": long_distance_pct,
+            "long_fill_price": long_fill_price,
+            "cycle_entry_price": cycle_entry_price,
+            "live_reference_price": reference_price,
+            "final_long_reference": long_reference,
+            "reference_source": reference_source,
+            "reference_cycle_index": reference_cycle_index,
+            "reference_purpose": reference_purpose,
+            "reference_price": reference_price_for_long_add,
+            "long_fill_distance_pct": self.config.long_fill_distance_pct,
+            "trigger_price": trigger_price,
+            "trigger_formula": "final_long_reference * (1 - distance_pct)",
+            "trigger_price_raw": raw_trigger_price,
+            "trigger_price_normalized": trigger_price,
+            "qty_formula": "current_long_qty * reduction_pct_per_fill",
+            "qty_raw": snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill),
+            "qty_normalized": long_qty,
+            "order_type": "Limit",
+            "reduce_only": True,
+        }
+        context.audit.log_event("fixed_cycle_long_reduce_planned", **long_reduce_payload)
         self._reserve_cycle_intent_slot(
             runtime_state,
             cycle_index=cycle_index,

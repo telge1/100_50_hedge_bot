@@ -1,12 +1,12 @@
 {
-  "symbol": "RENDERUSDT",
-  "timestamp": "2026-05-28T20:17:51.444377+00:00",
+  "symbol": "NEARUSDT",
+  "timestamp": "2026-05-28T20:48:34.436992+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "RENDERUSDT"
+      "symbol": "NEARUSDT"
     }
   ]
 }
