@@ -465,8 +465,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["refill_required"] = False
         state["refill_in_progress"] = False
         state["refill_exit_orders_cancel_required"] = False
+        state["refill_required"] = False
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
         state["refill_fills_complete"] = False
         state["refill_completion_pending_reconcile"] = False
+        state["refill_completed"] = True
         state["refill_completed"] = False
         state["cycle_block_status"] = None
         state["refill_long_filled"] = False
@@ -1748,12 +1752,32 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "short_qty": refreshed_snapshot.short_qty,
             },
         )
-        self._maybe_complete_refill_after_reconcile(
+        post_refill_rebuild_needed = self._maybe_complete_refill_after_reconcile(
             refreshed_snapshot,
             runtime_state,
             context,
             reason="fill_reconcile",
         )
+        if post_refill_rebuild_needed:
+            post_refill_snapshot = runtime_state.last_snapshot or refreshed_snapshot
+            post_refill_intents = self._rebuild_structure(
+                post_refill_snapshot,
+                runtime_state,
+                context,
+                reason="post_refill_normal_rebuild",
+            )
+            if post_refill_intents:
+                returned_intents += post_refill_intents
+                _log_event(
+                    "fixed_cycle_post_refill_normal_rebuild_triggered",
+                    {
+                        "symbol": self.config.symbol,
+                        "purpose": fill_event.purpose,
+                        "post_refill_intent_count": len(post_refill_intents),
+                        "next_required_purpose": state.get("next_required_purpose"),
+                        "active_cycle_index": state.get("active_cycle_index"),
+                    },
+                )
         return returned_intents
 
     def _log_post_fill_next_action_decision(
@@ -4812,6 +4836,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         downside_intents: list[StrategyIntent] = []
         if not hard_stop_active:
             downside_intents = self._build_downside_cycle_intents(snapshot, runtime_state, context)
+            refill_required = self._cycle_build_block_active(state)
+            _log_event(
+                "fixed_cycle_refill_required_rechecked_after_downside_build",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "refill_required": bool(refill_required),
+                    "refill_pending": bool(state.get("refill_pending")),
+                    "cycle_block_status": state.get("cycle_block_status"),
+                    "cycle_completed_count": state.get("cycle_completed_count"),
+                    "cycle_pair_count": state.get("cycle_pair_count"),
+                    "reason": reason,
+                },
+            )
         pending_loss_updated = bool(state.pop("pending_loss_updated_in_fill", False))
         pending_loss_reason = state.pop("pending_loss_exit_rebuild_reason", None)
         pending_loss_old_signature = state.get("pending_loss_exit_old_signature")
@@ -4903,12 +4940,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "reason": "pending_cycle_loss_rebuild",
                         },
                     )
-        forced_post_refill_intents = self._build_post_refill_cycle_intents(
-            snapshot, runtime_state, context
-        )
-        if forced_post_refill_intents:
-            downside_intents = forced_post_refill_intents[:1]
-            exit_intents = forced_post_refill_intents[1:]
         downside_intents = self._annotate_post_refill_structure_intents(
             runtime_state, downside_intents
         )
@@ -5125,66 +5156,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             metadata["post_refill_expected_purposes"] = expected_purposes
             intent.metadata = metadata
         return intents
-
-    def _build_post_refill_cycle_intents(
-        self,
-        snapshot: HedgeSnapshot,
-        runtime_state: RuntimeState,
-        context: StrategyContext,
-    ) -> list[StrategyIntent] | None:
-        state = runtime_state.strategy_state
-        if not state.get("post_refill_structure_rebuild_required"):
-            return None
-        next_required = str(state.get("next_required_purpose") or "").strip()
-        if not (next_required.startswith("CYCLE_") and next_required.endswith("_LONG_ADD")):
-            return None
-        cycle_parts = next_required.split("_")
-        if len(cycle_parts) < 3:
-            return None
-        try:
-            target_cycle = int(cycle_parts[1])
-        except ValueError:
-            return None
-        intents: list[StrategyIntent] = []
-        # log forced cycle build
-        _log_event(
-            "fixed_cycle_post_refill_cycle_intent_forced",
-            {
-                "symbol": snapshot.symbol or self.config.symbol,
-                "target_cycle": target_cycle,
-                "next_required_purpose": next_required,
-                "active_cycle_index": state.get("active_cycle_index"),
-                "force_exit_rebuild": bool(state.get("force_exit_rebuild")),
-            },
-        )
-        cycle_intent = self._build_cycle_long_add_intent(
-            snapshot, runtime_state, context, cycle_index=target_cycle
-        )
-        if not cycle_intent:
-            _log_event(
-                "fixed_cycle_post_refill_cycle_intent_missing_blocked",
-                {
-                    "symbol": snapshot.symbol or self.config.symbol,
-                    "target_cycle": target_cycle,
-                    "block_reason": "cycle_builder_blocked",
-                    "next_required_purpose": next_required,
-                },
-            )
-            return None
-        intents.append(cycle_intent)
-        # add exits
-        break_even_price = self._calculate_break_even(snapshot, runtime_state)[0]
-        exit_intents = self._build_exit_intents(
-            snapshot,
-            runtime_state,
-            target_cycle,
-            break_even_price,
-            self._calculate_tp_price(break_even_price, snapshot, runtime_state),
-            False,
-            context,
-        )
-        intents.extend(exit_intents)
-        return self._annotate_post_refill_structure_intents(runtime_state, intents)
 
     def _build_cycle_long_add_intent(
         self,
@@ -8551,6 +8522,37 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         self._reset_exit_state_for_new_structure(runtime_state, "refill_completed")
+        completed_cycle_index = int(
+            state.get("last_refill_completed_cycle_index")
+            or state.get("cycle_completed_count")
+            or 0
+        )
+        next_cycle_index = completed_cycle_index + 1
+        next_purpose = self._cycle_purpose("long", next_cycle_index)
+        state["refill_required"] = False
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
+        state["refill_fills_complete"] = False
+        state["refill_completion_pending_reconcile"] = False
+        state["refill_completed"] = True
+        state["long_add_pending"] = False
+        state["cycle_waiting_for_short_tp"] = False
+        state["short_tp_pending_cycle"] = 0
+        state["long_add_rebuild_allowed"] = True
+        state["force_exit_rebuild"] = True
+        state["exit_rebuild_allowed"] = True
+        state["active_cycle_index"] = next_cycle_index
+        state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
+        state["next_required_purpose"] = next_purpose
+        cycle_sequence_state = state.get("cycle_sequence_state") or {}
+        cycle_sequence_state["active_cycle_index"] = next_cycle_index
+        cycle_sequence_state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
+        cycle_sequence_state["next_required_purpose"] = next_purpose
+        state["cycle_sequence_state"] = cycle_sequence_state
+        cycle_state["active_cycle_index"] = next_cycle_index
+        cycle_state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
+        cycle_state["next_required_purpose"] = next_purpose
+        self._persist_cycle_sequence_state(runtime_state)
         state["post_refill_structure_rebuild_required"] = True
         state["post_refill_structure_rebuild_confirmed_purposes"] = []
         next_long_cycle_number = last_cycle_completed + 1
@@ -8618,6 +8620,42 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "refill_short_filled": bool(state.get("refill_short_filled")),
             },
         )
+        _log_event(
+            "fixed_cycle_refill_completed_entry_like_cycle_state",
+            {
+                "completed_cycle_index": completed_cycle_index,
+                "next_cycle_index": next_cycle_index,
+                "next_required_purpose": state.get("next_required_purpose"),
+                "active_cycle_index": state.get("active_cycle_index"),
+                "cycle_step": state.get("cycle_step"),
+                "cycle_sequence_state": state.get("cycle_sequence_state"),
+                "refill_completed": bool(state.get("refill_completed")),
+                "long_add_rebuild_allowed": bool(
+                    state.get("long_add_rebuild_allowed", True)
+                ),
+                "cycle_completed_count": state.get("cycle_completed_count"),
+                "cycle_pair_count": state.get("cycle_pair_count"),
+                "processed_cycle_purposes": list(state.get("processed_cycle_purposes") or []),
+                "completed_cycle_purposes": list(state.get("completed_cycle_purposes") or []),
+            },
+        )
+        if state.get("refill_long_filled") or state.get("refill_short_filled"):
+            _log_event(
+                "fixed_cycle_refill_stale_fill_flags_cleared_after_complete",
+                {
+                    "symbol": self.config.symbol,
+                    "completion_reason": completion_reason,
+                    "refill_long_filled_before_clear": bool(
+                        state.get("refill_long_filled")
+                    ),
+                    "refill_short_filled_before_clear": bool(
+                        state.get("refill_short_filled")
+                    ),
+                    "refill_batch_id": state.get("refill_batch_id"),
+                },
+            )
+        state["refill_long_filled"] = False
+        state["refill_short_filled"] = False
 
     def _maybe_complete_refill_after_reconcile(
         self,
@@ -8626,10 +8664,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext | None,
         *,
         reason: str,
-    ) -> None:
+    ) -> bool:
         state = runtime_state.strategy_state
         if not state.get("refill_completion_pending_reconcile"):
-            return
+            return False
         if not (state.get("refill_long_filled") and state.get("refill_short_filled")):
             if state.get("refill_fills_complete") and snapshot:
                 if self._try_complete_refill_after_dust_residual(
@@ -8638,16 +8676,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     context,
                     reason=f"{reason}_dust_residual",
                 ):
-                    return
-            return
+                    return True
+            return False
         if state.get("emergency_flat_required") or state.get("full_exit_reset_in_progress"):
-            return
+            return False
         if not snapshot:
             snapshot = runtime_state.last_snapshot
         if not snapshot:
-            return
+            return False
         if float(snapshot.long_qty or 0.0) <= 0 or float(snapshot.short_qty or 0.0) <= 0:
-            return
+            return False
         active_refill_purposes = self._collect_active_refill_order_purposes(snapshot, runtime_state)
         if active_refill_purposes:
             active_refill_client_ids = [
@@ -8671,7 +8709,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "short_qty": snapshot.short_qty,
                 },
             )
-            return
+            return False
         _log_event(
             "fixed_cycle_refill_completion_reconcile_ready",
             {
@@ -8688,6 +8726,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         self._complete_refill(runtime_state, context, completion_reason=reason)
+        return True
     def _advance_cycle_from_fill(
         self,
         fill_event: FillEvent,
@@ -8718,7 +8757,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if fill_key in processed and not is_exit_fill:
             return
 
-        if purpose in {"REFILL_LONG", "REFILL_SHORT"}:
+        is_refill_fill = purpose in {"REFILL_LONG", "REFILL_SHORT"}
+        if is_refill_fill:
             refill_state = state.setdefault("refill_state", {})
             _log_event(
                 "fixed_cycle_refill_order_fill_received",
@@ -8759,36 +8799,51 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     )
 
         if state.get("refill_long_filled") and state.get("refill_short_filled"):
-            state["refill_fills_complete"] = True
-            state["refill_completion_pending_reconcile"] = True
-            state["refill_pending"] = True
-            state["refill_in_progress"] = True
-            _log_event(
-                "fixed_cycle_refill_fills_complete_waiting_reconcile",
-                {
-                    "symbol": snapshot.symbol or self.config.symbol,
-                    "refill_pending": state.get("refill_pending"),
-                    "refill_in_progress": state.get("refill_in_progress"),
-                    "refill_long_filled": bool(state.get("refill_long_filled")),
-                    "refill_short_filled": bool(state.get("refill_short_filled")),
-                    "refill_completion_pending_reconcile": True,
-                    "long_qty": getattr(snapshot, "long_qty", None),
-                    "short_qty": getattr(snapshot, "short_qty", None),
-                },
-            )
-            _log_event(
-                "fixed_cycle_refill_completion_deferred",
-                {
-                    "symbol": snapshot.symbol or self.config.symbol,
-                    "reason": "awaiting_state_reconcile",
-                },
-            )
-            state["refill_state"] = {}
-
-            processed.add(fill_key)
-            cycle_state["processed_fill_ids"] = list(processed)
-            self._write_cycle_state(cycle_state)
-            return
+            if not is_refill_fill:
+                _log_event(
+                    "refill_completion_ignored_for_non_refill_fill",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "fill_purpose": purpose,
+                        "fill_status": fill_event.status,
+                        "refill_long_filled": bool(state.get("refill_long_filled")),
+                        "refill_short_filled": bool(state.get("refill_short_filled")),
+                        "refill_completion_pending_reconcile": bool(
+                            state.get("refill_completion_pending_reconcile")
+                        ),
+                        "refill_batch_id": state.get("refill_batch_id"),
+                    },
+                )
+            else:
+                state["refill_fills_complete"] = True
+                state["refill_completion_pending_reconcile"] = True
+                state["refill_pending"] = True
+                state["refill_in_progress"] = True
+                _log_event(
+                    "fixed_cycle_refill_fills_complete_waiting_reconcile",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "refill_pending": state.get("refill_pending"),
+                        "refill_in_progress": state.get("refill_in_progress"),
+                        "refill_long_filled": bool(state.get("refill_long_filled")),
+                        "refill_short_filled": bool(state.get("refill_short_filled")),
+                        "refill_completion_pending_reconcile": True,
+                        "long_qty": getattr(snapshot, "long_qty", None),
+                        "short_qty": getattr(snapshot, "short_qty", None),
+                    },
+                )
+                _log_event(
+                    "fixed_cycle_refill_completion_deferred",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "reason": "awaiting_state_reconcile",
+                    },
+                )
+                state["refill_state"] = {}
+                processed.add(fill_key)
+                cycle_state["processed_fill_ids"] = list(processed)
+                self._write_cycle_state(cycle_state)
+                return
 
         metadata = dict(fill_event.metadata or {})
         cycle_index = int(metadata.get("cycle_index") or 0)
