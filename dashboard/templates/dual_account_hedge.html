@@ -201,8 +201,9 @@
         <div class="dashboard-navigation">
             <a href="/dashboard" class="nav-link">📊 Dashboard</a>
             <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
-            <a href="/profit-verlauf" class="nav-link active">📈 Profit-Verlauf</a>
-            <a href="/multi-zyklus-chart" class="nav-link">📊 Multi Zyklus aus Chart</a>
+            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link active">📈 Profit-Verlauf</a>
+            <a href="https://dash.immotel.de/profit-verlauf_2" class="nav-link">📈 Profit-Verlauf_2</a>
+            <a href="/live-charts" class="nav-link">📈 Live Charts</a>
             <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
         </div>
         
@@ -210,7 +211,7 @@
             <!-- Profil-Auswahl (Main/Sub vs Long_bot_1/Short_bot_1 vs Long_bot_2/Short_bot_2) -->
             <div class="profit-verlauf-header" style="margin-bottom: 15px;">
                 <span style="font-size: 16px; color: #888;">Profil:</span>
-                <select id="profileSelect" class="account-select" title="Account-Paar für Equity und Unrealised PnL">
+                <select id="profileSelect" class="account-select" title="Account-Paar für Equity und Unrealised P   nL">
                     <option value="main">Main / Sub</option>
                     {% for bot in bot_profiles %}
                         <option value="{{ bot.profile }}">{{ bot.long_account }} / {{ bot.short_account }}</option>
