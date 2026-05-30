@@ -4196,6 +4196,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return True
         return self._has_active_order_for_purpose(snapshot, runtime_state, purpose)
 
+    def _mark_exit_orders_stale_after_structure_fill(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        fill_event: FillEvent,
+        cycle_index: int,
+        structure_segment: str,
+    ) -> None:
+        state = runtime_state.strategy_state
+        state["force_exit_rebuild"] = True
+        state["exit_rebuild_allowed"] = True
+        state["exit_orders_stale_after_structure_fill"] = True
+        _log_event(
+            "fixed_cycle_exit_orders_marked_stale_after_structure_fill",
+            {
+                "symbol": self.config.symbol,
+                "purpose": fill_event.purpose,
+                "structure_segment": structure_segment,
+                "cycle_index": cycle_index,
+                "force_exit_rebuild": True,
+                "exit_rebuild_allowed": True,
+            },
+        )
+
     def _block_flat_restart_until_final_pnl(
         self,
         snapshot: HedgeSnapshot,
@@ -4940,6 +4964,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "reason": "pending_cycle_loss_rebuild",
                         },
                     )
+                if exit_intents and state.get("exit_orders_stale_after_structure_fill"):
+                    _log_event(
+                        "fixed_cycle_structure_fill_exit_rebuild_completed",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "force_exit_rebuild": bool(state.get("force_exit_rebuild")),
+                            "exit_orders_stale_after_structure_fill": True,
+                            "exit_purposes": [intent.purpose for intent in exit_intents],
+                        },
+                    )
+                    state["force_exit_rebuild"] = False
+                    state["exit_rebuild_allowed"] = False
+                    state["exit_orders_stale_after_structure_fill"] = False
         downside_intents = self._annotate_post_refill_structure_intents(
             runtime_state, downside_intents
         )
@@ -7292,6 +7329,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "break_even_price": break_even_price,
             },
         )
+        if (
+            state.get("exit_locked")
+            and force_exit_rebuild
+            and state.get("exit_orders_stale_after_structure_fill")
+        ):
+            _log_event(
+                "fixed_cycle_exit_locked_bypassed_due_to_structure_fill_rebuild",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "force_exit_rebuild": force_exit_rebuild,
+                    "exit_orders_stale_after_structure_fill": True,
+                },
+            )
         if not state.get("exit_rebuild_allowed", True) and not force_exit_rebuild:
             active_order_purposes = [getattr(order, "purpose", None) for order in snapshot.active_orders]
             context.audit.log_event(
@@ -8797,6 +8847,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "exchange_order_id": fill_event.exchange_order_id,
                         },
                     )
+                self._mark_exit_orders_stale_after_structure_fill(
+                    runtime_state,
+                    fill_event=fill_event,
+                    cycle_index=cycle_index,
+                    structure_segment="refill",
+                )
 
         if state.get("refill_long_filled") and state.get("refill_short_filled"):
             if not is_refill_fill:
@@ -9085,6 +9141,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if order_fully_completed:
                 state["exit_rebuild_allowed"] = True
                 state["long_add_rebuild_allowed"] = True
+                self._mark_exit_orders_stale_after_structure_fill(
+                    runtime_state,
+                    fill_event=fill_event,
+                    cycle_index=cycle_index,
+                    structure_segment="cycle_long_add",
+                )
         if "_LONG_" in fill_event.purpose:
             state["current_long_cycle_index"] = max(int(state.get("current_long_cycle_index") or 0), cycle_index)
             if (
@@ -9350,6 +9412,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_state["entry_price"] = fill_event.exec_price
             if order_fully_completed and "SHORT_REDUCE" in fill_event.purpose:
                 state["exit_rebuild_allowed"] = True
+                self._mark_exit_orders_stale_after_structure_fill(
+                    runtime_state,
+                    fill_event=fill_event,
+                    cycle_index=cycle_index,
+                    structure_segment="cycle_short_reduce",
+                )
                 self._commit_short_reduce_terminal_fill(
                     runtime_state,
                     cycle_index,

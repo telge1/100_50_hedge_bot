@@ -7679,6 +7679,7 @@ async def api_profit_trades(
         record for record in normalized if record.get("trade_block_id") not in running_ids
     ]
     closed_records = [record for record in filtered_normalized if record.get("status") == "closed"]
+    # _persist_profit_trade_closed_rows(profile, closed_records)
     summary = _summarize_trade_blocks(closed_records)
     confirmed_start_times = _collect_confirmed_trade_start_times(profile)
     summaries = [
@@ -7775,6 +7776,117 @@ def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
         "best_bot": best_bot,
         "open_trades": open_trades,
     }
+
+
+def _load_persisted_keys(path: Path) -> set[str]:
+    keys: set[str] = set()
+    if not path.exists():
+        return keys
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except Exception:
+                    logger.warning("[dashboard] dashboard_profit_trade_persist_skip_invalid_line %s", path)
+                    continue
+                bot = str(data.get("bot_name") or "").lower()
+                symbol = str(data.get("symbol") or "").upper()
+                tbid = str(data.get("trade_block_id") or "")
+                if bot and symbol and tbid:
+                    keys.add(f"{bot}|{symbol}|{tbid}")
+    except Exception as exc:
+        logger.warning("[dashboard] dashboard_profit_trade_persist_failed_read %s %s", path, exc)
+    return keys
+
+
+def _write_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    try:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, ensure_ascii=False))
+            fh.write("\n")
+    except Exception as exc:
+        raise
+
+
+def _persist_profit_trade_closed_rows(profile: str, closed_rows: list[dict[str, Any]]) -> None:
+    if not closed_rows:
+        return
+    project_root = globals().get("project_root") or Path(__file__).resolve().parent.parent
+    global_path = project_root / "logs" / "dashboard_closed_pnl_history.jsonl"
+    per_path_keys: dict[Path, set[str]] = {}
+    for record in closed_rows:
+        bot = record.get("bot_name") or record.get("account")
+        symbol = record.get("symbol")
+        tbid = record.get("trade_block_id")
+        total_pnl = record.get("total_trade_pnl")
+        status = record.get("status") or "closed"
+        if not bot or not symbol or not tbid or total_pnl is None:
+            continue
+        bot_lower = str(bot).lower()
+        symbol_upper = str(symbol).upper()
+        key = f"{bot_lower}|{symbol_upper}|{tbid}"
+        per_bot_path = project_root / "live_bots" / "100_50_hedge_bot" / bot_lower / "logs" / "dashboard_closed_pnl_history.jsonl"
+        targets = [per_bot_path, global_path]
+        written = False
+        for target in targets:
+            if target not in per_path_keys:
+                per_path_keys[target] = _load_persisted_keys(target)
+            if key in per_path_keys[target]:
+                written = True
+                break
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                payload: dict[str, Any] = {
+                    "account": record.get("account") or bot,
+                    "bot_name": bot_lower,
+                    "symbol": symbol_upper,
+                    "trade_block_id": tbid,
+                    "status": status,
+                    "total_trade_pnl": total_pnl,
+                    "source": "dashboard_profit_trades_persist",
+                    "created_at": record.get("created_at") or record.get("created_at_utc3") or "",
+                    "updated_at": record.get("updated_at") or record.get("finalized_at") or "",
+                }
+                for field in (
+                    "start_time",
+                    "end_time",
+                    "finalized_at",
+                    "cycle_count",
+                    "cycle_net_pnl",
+                    "final_exit_net_pnl",
+                    "final_long_exit_pnl",
+                    "final_short_exit_pnl",
+                    "pnl_source",
+                    "breakdown",
+                ):
+                    if record.get(field) is not None:
+                        payload[field] = record.get(field)
+                _write_jsonl(target, payload)
+                per_path_keys[target].add(key)
+                logger.info(
+                    "dashboard_profit_trade_persist_written %s %s",
+                    str(target),
+                    key,
+                )
+                written = True
+                break
+            except Exception as exc:
+                logger.warning(
+                    "dashboard_profit_trade_persist_failed %s %s %s",
+                    str(target),
+                    key,
+                    exc,
+                )
+        if not written:
+            logger.warning(
+                "dashboard_profit_trade_persist_failed no_target_available %s",
+                key,
+            )
+
 
 
 @app.get("/api/profit-verlauf/closed-pnl")
