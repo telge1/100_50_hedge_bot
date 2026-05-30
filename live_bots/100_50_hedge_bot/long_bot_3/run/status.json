@@ -1,9 +1,11 @@
 {
   "bot_name": "long_bot_3",
-  "status": "stopped",
-  "start_requested": false,
-  "pid": null,
-  "symbol": "",
-  "reason": "stopped_via_stop_bot",
-  "updated_at": "2026-05-27T11:58:19.085964+00:00"
+  "status": "running",
+  "updated_at": "2026-05-29T19:02:52.582309+00:00",
+  "symbol": "INJUSDT",
+  "start_requested": true,
+  "pid": 464519,
+  "long_qty": 0.0,
+  "short_qty": 0.0,
+  "open_order_count": 0
 }

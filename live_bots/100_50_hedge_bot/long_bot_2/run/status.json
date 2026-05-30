@@ -1,9 +1,11 @@
 {
   "bot_name": "long_bot_2",
-  "status": "stopped",
-  "start_requested": false,
-  "pid": null,
-  "symbol": "",
-  "reason": "stop_with_cleanup_success",
-  "updated_at": "2026-05-27T13:44:28.715916+00:00"
+  "status": "running",
+  "updated_at": "2026-05-29T19:01:53.255092+00:00",
+  "symbol": "ALGOUSDT",
+  "start_requested": true,
+  "pid": 464032,
+  "long_qty": 0.0,
+  "short_qty": 0.0,
+  "open_order_count": 0
 }

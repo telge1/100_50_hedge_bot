@@ -11781,6 +11781,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["completed_cycle_purposes"] = []
         state["cycle_states"] = {}
         state["sequence_recovery_blocked"] = False
+        state["cycle_completed_count"] = 0
+        state["cycle_pair_count"] = 0
+        state["current_effective_cycle"] = 0
+        state["current_long_cycle_index"] = 0
+        state["current_short_cycle_index"] = 0
+        state["active_cycle_index"] = 1
+        state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
+        state["next_required_purpose"] = self._cycle_purpose("long", 1)
+        state["last_completed_purpose"] = None
+        state["cycle_waiting_for_short_tp"] = False
+        state["short_tp_pending_cycle"] = 0
+        state["long_add_pending"] = False
+        state["short_tp_pending"] = False
+        state["pending_cycle_loss_usdt"] = 0.0
+        state["pending_long_cycle_index"] = 0
+        state["pending_short_cycle_index"] = 0
         state["refill_pending"] = False
         state["refill_required"] = False
         state["refill_in_progress"] = False
@@ -11794,6 +11810,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["last_confirmed_short_fill_price"] = 0.0
         state["last_confirmed_short_fill_cycle_index"] = 0
         state["last_confirmed_short_fill_purpose"] = None
+        state["cycle_state"] = {}
         initialize_cycle_sequence_state(state, self._sequence_config)
         state["post_exit_reset_in_progress"] = True
         self._persist_cycle_sequence_state(runtime_state)

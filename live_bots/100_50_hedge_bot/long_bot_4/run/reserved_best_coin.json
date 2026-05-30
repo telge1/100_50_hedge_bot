@@ -1,12 +1,12 @@
 {
-  "symbol": "CHZUSDT",
-  "timestamp": "2026-05-23T12:30:05.051058+00:00",
+  "symbol": "PENGUUSDT",
+  "timestamp": "2026-05-29T19:05:58.442752+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "CHZUSDT"
+      "symbol": "PENGUUSDT"
     }
   ]
 }
