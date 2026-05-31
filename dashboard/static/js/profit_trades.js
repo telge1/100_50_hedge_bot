@@ -17,6 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const paginationInfo = document.getElementById("trade-pagination-info");
     const sortProfitButton = document.getElementById("trade-sort-profit");
     const sortStatusButton = document.getElementById("trade-sort-status");
+    const profitChartToggle = document.getElementById("profit-chart-toggle");
+    const profitChartPanel = document.getElementById("profit-chart-panel");
+    const profitChartGroupBySelect = document.getElementById("profit-chart-group-by");
+    const profitChartCanvas = document.getElementById("profit-chart-canvas");
+    const profitChartStatus = document.getElementById("profit-chart-status");
     const walletToggle = document.getElementById("summary-wallet-toggle");
     const walletList = document.getElementById("summary-wallet-list");
     let currentTradePage = Number(
@@ -36,6 +41,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentTrades = [];
     let currentSortKey = null;
     let currentSortDirection = "asc";
+    let profitChartVisible = false;
+    let profitChartGroupBy = "day";
+    let profitChartInstance = null;
+    let latestProfitChartData = [];
     if (!Number.isFinite(currentTradePage) || currentTradePage < 0) {
         currentTradePage = 0;
     }
@@ -47,6 +56,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function formatWalletValue(value) {
         return Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)} USDT` : "-";
+    }
+
+    function formatProfitChartValue(value) {
+        return Number.isFinite(Number(value)) ? `${Number(value).toFixed(4)} USDT` : "-";
     }
 
     function getTradeProfitValue(trade) {
@@ -241,6 +254,188 @@ document.addEventListener("DOMContentLoaded", () => {
             nextParams.delete("end_time");
         }
         window.history.replaceState({}, "", `${window.location.pathname}?${nextParams.toString()}`);
+    }
+
+    function buildProfitChartUrl() {
+        const query = new URLSearchParams({
+            profile,
+            group_by: profitChartGroupBy,
+        });
+        if (currentTradeStartFilter) {
+            query.set("start_time", currentTradeStartFilter);
+        }
+        if (currentTradeEndFilter) {
+            query.set("end_time", currentTradeEndFilter);
+        }
+        return `/api/dashboard/profit-trades/chart?${query.toString()}`;
+    }
+
+    function destroyProfitChart() {
+        if (profitChartInstance) {
+            profitChartInstance.destroy();
+            profitChartInstance = null;
+        }
+    }
+
+    function renderProfitChart(chartData) {
+        latestProfitChartData = Array.isArray(chartData) ? chartData : [];
+        destroyProfitChart();
+        if (!profitChartCanvas || !window.Chart) {
+            if (profitChartStatus) {
+                profitChartStatus.textContent = "Chart.js nicht verfügbar";
+            }
+            return;
+        }
+        if (!latestProfitChartData.length) {
+            if (profitChartStatus) {
+                profitChartStatus.textContent = "Keine Chart-Daten verfügbar";
+            }
+            return;
+        }
+        const labels = latestProfitChartData.map((item) => item.label);
+        const values = latestProfitChartData.map((item) => Number(item.profit) || 0);
+        const backgroundColors = values.map((value) =>
+            value >= 0 ? "rgba(34, 197, 94, 0.65)" : "rgba(239, 68, 68, 0.65)",
+        );
+        const borderColors = values.map((value) =>
+            value >= 0 ? "rgba(34, 197, 94, 1)" : "rgba(239, 68, 68, 1)",
+        );
+        const canvasContext = profitChartCanvas.getContext("2d");
+        if (!canvasContext) {
+            if (profitChartStatus) {
+                profitChartStatus.textContent = "Chart-Canvas konnte nicht initialisiert werden";
+            }
+            return;
+        }
+        profitChartInstance = new window.Chart(canvasContext, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "Profit",
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1.5,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(17, 24, 39, 0.95)",
+                        titleColor: "#f5f5f5",
+                        bodyColor: "#f5f5f5",
+                        callbacks: {
+                            label(context) {
+                                const point = latestProfitChartData[context.dataIndex] || {};
+                                return [
+                                    `Profit: ${formatProfitChartValue(point.profit)}`,
+                                    `Trades: ${point.trade_count ?? 0}`,
+                                    `Winning: ${point.winning_trades ?? 0}`,
+                                    `Losing: ${point.losing_trades ?? 0}`,
+                                ];
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: "#d1d5db",
+                        },
+                        grid: {
+                            display: false,
+                        },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: "#d1d5db",
+                            callback(value) {
+                                return `${value} USDT`;
+                            },
+                        },
+                        grid: {
+                            color(context) {
+                                const tickValue = Number(context?.tick?.value);
+                                return tickValue === 0
+                                    ? "rgba(229, 231, 235, 0.45)"
+                                    : "rgba(148, 163, 184, 0.16)";
+                            },
+                            lineWidth(context) {
+                                const tickValue = Number(context?.tick?.value);
+                                return tickValue === 0 ? 2 : 1;
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (profitChartStatus) {
+            profitChartStatus.textContent =
+                `${latestProfitChartData.length} Balken geladen (${profitChartGroupBy === "month" ? "Monatlich" : "Täglich"})`;
+        }
+    }
+
+    async function refreshProfitChart() {
+        if (!profitChartVisible) {
+            return;
+        }
+        if (profitChartStatus) {
+            profitChartStatus.textContent = "Chart wird geladen...";
+        }
+        try {
+            const response = await fetch(buildProfitChartUrl());
+            if (!response.ok) {
+                throw new Error(`Failed to load profit chart (${response.status})`);
+            }
+            const data = await response.json();
+            renderProfitChart(data?.chart || []);
+        } catch (error) {
+            destroyProfitChart();
+            latestProfitChartData = [];
+            if (profitChartStatus) {
+                profitChartStatus.textContent = `Fehler beim Laden des Profit-Charts${error?.message ? `: ${error.message}` : ""}`;
+            }
+            console.error("[profit_trades] chart refresh failed", error);
+        }
+    }
+
+    function setupProfitChartControls() {
+        if (profitChartGroupBySelect) {
+            profitChartGroupBySelect.value = profitChartGroupBy;
+            profitChartGroupBySelect.addEventListener("change", async () => {
+                profitChartGroupBy = profitChartGroupBySelect.value || "day";
+                if (profitChartVisible) {
+                    await refreshProfitChart();
+                }
+            });
+        }
+        if (profitChartToggle && profitChartPanel) {
+            profitChartToggle.addEventListener("click", async () => {
+                profitChartVisible = !profitChartVisible;
+                profitChartPanel.classList.toggle("visible", profitChartVisible);
+                profitChartToggle.textContent = profitChartVisible
+                    ? "Profit Chart ausblenden ▲"
+                    : "Profit Chart anzeigen ▼";
+                if (profitChartVisible) {
+                    await refreshProfitChart();
+                } else {
+                    destroyProfitChart();
+                    latestProfitChartData = [];
+                    if (profitChartStatus) {
+                        profitChartStatus.textContent = "";
+                    }
+                }
+            });
+        }
     }
 
     async function refreshTrades() {
@@ -607,6 +802,9 @@ document.addEventListener("DOMContentLoaded", () => {
             currentTradeEndFilter = endFilterInput?.value || "";
             currentTradePage = 0;
             await refreshTrades();
+            if (profitChartVisible) {
+                await refreshProfitChart();
+            }
         });
     }
 
@@ -617,6 +815,9 @@ document.addEventListener("DOMContentLoaded", () => {
             currentTradePage = 0;
             syncFilterInputs();
             await refreshTrades();
+            if (profitChartVisible) {
+                await refreshProfitChart();
+            }
         });
     }
 
@@ -695,10 +896,14 @@ document.addEventListener("DOMContentLoaded", () => {
         refreshButton.addEventListener("click", async () => {
             console.log("[profit_trades] manual refresh clicked");
             await refreshTrades();
+            if (profitChartVisible) {
+                await refreshProfitChart();
+            }
         });
     }
     syncFilterInputs();
     updateSortButtons();
+    setupProfitChartControls();
     refreshTrades();
     setInterval(refreshTrades, 15000);
 

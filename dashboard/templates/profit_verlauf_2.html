@@ -174,6 +174,57 @@
             min-width: 180px;
             text-align: right;
         }
+        .profit-chart-toggle {
+            cursor: pointer;
+            background: #1f1f1f;
+            color: #f5f5f5;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+        }
+        .profit-chart-toggle:hover {
+            background: #272727;
+        }
+        .profit-chart-panel {
+            display: none;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .profit-chart-panel.visible {
+            display: block;
+        }
+        .profit-chart-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .profit-chart-title {
+            color: #f5f5f5;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .profit-chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .profit-chart-status {
+            color: #bdbdbd;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            min-height: 18px;
+        }
+        .profit-chart-canvas-wrap {
+            position: relative;
+            height: 300px;
+        }
         .detail-loaded {
             display: table-row;
         }
@@ -240,6 +291,25 @@
             <div class="profit-toolbar">
                 <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
                 <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
+            </div>
+            <button class="profit-chart-toggle" id="profit-chart-toggle" type="button">
+                Profit Chart anzeigen ▼
+            </button>
+            <div class="profit-chart-panel" id="profit-chart-panel">
+                <div class="profit-chart-header">
+                    <div class="profit-chart-title">Profit Balkendiagramm</div>
+                    <div class="profit-chart-controls">
+                        <label for="profit-chart-group-by">Gruppierung</label>
+                        <select class="filter-select" id="profit-chart-group-by">
+                            <option value="day">Täglich</option>
+                            <option value="month">Monatlich</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="profit-chart-status" id="profit-chart-status"></div>
+                <div class="profit-chart-canvas-wrap">
+                    <canvas id="profit-chart-canvas"></canvas>
+                </div>
             </div>
             <div class="trade-filter-bar">
                 <div class="filter-field">
@@ -346,6 +416,7 @@
             pageSize: {{ page_size }},
         };
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/js/profit_trades.js"></script>
 </body>
 </html>

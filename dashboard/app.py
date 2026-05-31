@@ -7829,6 +7829,31 @@ async def api_profit_trades(
     }
 
 
+@app.get("/api/dashboard/profit-trades/chart")
+async def api_profit_trades_chart(
+    profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
+    start_time: str | None = Query(None, description="Start datetime filter"),
+    end_time: str | None = Query(None, description="End datetime filter"),
+    group_by: str = Query("day", description="Chart grouping: day or month"),
+    user: dict = Depends(require_auth),
+):
+    normalized_group_by = "month" if str(group_by or "").strip().lower() == "month" else "day"
+    trades, warnings = _build_profit_trade_filtered_rows(
+        profile,
+        limit=500,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    chart_rows = _aggregate_profit_chart_rows(trades, group_by=normalized_group_by)
+    return {
+        "success": True,
+        "profile": profile,
+        "group_by": normalized_group_by,
+        "chart": chart_rows,
+        "warnings": warnings,
+    }
+
+
 @app.get("/api/dashboard/profit-trades/{trade_block_id}/details")
 async def api_profit_trade_details(
     trade_block_id: str,
@@ -7885,6 +7910,110 @@ def _is_closed_trade_status(status: Any) -> bool:
     return str(status or "").strip().lower() == "closed"
 
 
+def _get_trade_chart_datetime(trade: dict[str, Any]) -> datetime | None:
+    if _is_closed_trade_status(trade.get("status")):
+        dt = _normalize_trade_filter_datetime(trade.get("end_time"))
+        if dt:
+            return dt
+    for key in ("start_time", "timestamp", "created_at", "__ts"):
+        dt = _normalize_trade_filter_datetime(trade.get(key))
+        if dt:
+            return dt
+    return None
+
+
+def _build_profit_trade_filtered_rows(
+    profile: str,
+    *,
+    limit: int,
+    start_time: str | None = None,
+    end_time: str | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
+        profile,
+        limit,
+        start_time=start_time,
+        end_time=end_time,
+        page=0,
+        page_size=limit,
+        paginate=False,
+    )
+    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
+    warnings.extend(process_warnings)
+    active_start_dt = _normalize_trade_filter_datetime(start_time)
+    active_end_dt = _normalize_trade_filter_datetime(end_time)
+    filtered_process_rows = _filter_trade_records_by_time(
+        process_rows,
+        start_time=active_start_dt,
+        end_time=active_end_dt,
+    )
+    running_ids = {
+        row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
+    }
+    filtered_base_trades = [
+        record for record in base_trades if record.get("trade_block_id") not in running_ids
+    ]
+    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
+    summary_rows = [
+        _build_profit_trade_summary(
+            record,
+            confirmed_start_times.get(str(record.get("trade_block_id") or "")),
+        )
+        for record in filtered_base_trades
+    ]
+    combined_rows = summary_rows + filtered_process_rows
+    combined_rows.sort(
+        key=lambda trade: _get_trade_filter_datetime(trade)
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return combined_rows, warnings
+
+
+def _aggregate_profit_chart_rows(
+    trades: Iterable[dict[str, Any]],
+    *,
+    group_by: str,
+) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    normalized_group_by = "month" if str(group_by or "").strip().lower() == "month" else "day"
+    for trade in trades:
+        profit = _get_trade_profit_value(trade)
+        if profit is None:
+            continue
+        trade_dt = _get_trade_chart_datetime(trade)
+        if not trade_dt:
+            continue
+        bucket_dt = trade_dt.astimezone(DASHBOARD_TZ)
+        label = (
+            bucket_dt.strftime("%Y-%m")
+            if normalized_group_by == "month"
+            else bucket_dt.strftime("%Y-%m-%d")
+        )
+        bucket = buckets.setdefault(
+            label,
+            {
+                "label": label,
+                "profit": 0.0,
+                "trade_count": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+            },
+        )
+        bucket["profit"] += profit
+        bucket["trade_count"] += 1
+        if profit > 0:
+            bucket["winning_trades"] += 1
+        elif profit < 0:
+            bucket["losing_trades"] += 1
+    chart_rows = sorted(buckets.values(), key=lambda row: row["label"])
+    if len(chart_rows) > 500:
+        chart_rows = chart_rows[-500:]
+    for row in chart_rows:
+        row["profit"] = round(float(row["profit"]), 8)
+    return chart_rows
+
+
 def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trades = list(trades)
     closed_records = [trade for trade in trades if _is_closed_trade_status(trade.get("status"))]
@@ -7926,43 +8055,11 @@ def _build_profit_trade_page(
     page: int = 0,
     page_size: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], list[str]]:
-    base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
+    combined_rows, warnings = _build_profit_trade_filtered_rows(
         profile,
-        limit,
+        limit=limit,
         start_time=start_time,
         end_time=end_time,
-        page=page,
-        page_size=page_size,
-        paginate=False,
-    )
-    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
-    warnings.extend(process_warnings)
-    active_start_dt = _normalize_trade_filter_datetime(start_time)
-    active_end_dt = _normalize_trade_filter_datetime(end_time)
-    filtered_process_rows = _filter_trade_records_by_time(
-        process_rows,
-        start_time=active_start_dt,
-        end_time=active_end_dt,
-    )
-    running_ids = {
-        row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
-    }
-    filtered_base_trades = [
-        record for record in base_trades if record.get("trade_block_id") not in running_ids
-    ]
-    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
-    summary_rows = [
-        _build_profit_trade_summary(
-            record,
-            confirmed_start_times.get(str(record.get("trade_block_id") or "")),
-        )
-        for record in filtered_base_trades
-    ]
-    combined_rows = summary_rows + filtered_process_rows
-    combined_rows.sort(
-        key=lambda trade: _get_trade_filter_datetime(trade)
-        or datetime.min.replace(tzinfo=timezone.utc),
-        reverse=True,
     )
     effective_page_size = page_size or limit
     paged_rows, pagination = _paginate_trade_records(
