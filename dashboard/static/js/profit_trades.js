@@ -10,6 +10,17 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("[profit_trades] refresh button found", !!refreshButton);
     console.log("[profit_trades] trade body found", !!tradeBody);
 
+    function isOpenTrade(trade) {
+        const status = (trade?.status || "").toLowerCase();
+        return (
+            trade?.is_process ||
+            status === "in_progress" ||
+            status === "open" ||
+            status === "running" ||
+            status === "progress"
+        );
+    }
+
     async function refreshTrades() {
         console.log("[profit_trades] refreshTrades started");
         if (!tradeBody) {
@@ -36,15 +47,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 delete cache[key];
             }
             tradeLookup.clear();
-            trades.forEach((trade, idx) => {
+            trades
+                .slice()
+                .sort((a, b) => {
+                    const aOpen = isOpenTrade(a) ? 0 : 1;
+                    const bOpen = isOpenTrade(b) ? 0 : 1;
+                    return aOpen - bOpen;
+                })
+                .forEach((trade, idx) => {
                 const row = document.createElement("tr");
                 row.className = "trade-row";
                 const tradeId = trade.trade_block_id || `trade-${idx}`;
                 tradeLookup.set(tradeId, trade);
                 row.dataset.tradeBlockId = tradeId;
                 row.dataset.profile = profile;
-                const statusValue = (trade.status || "").toLowerCase();
-                const isProcess = trade.is_process || statusValue === "in_progress";
+                const statusValue = String(trade.status || "").toLowerCase();
+                const isProcess = isOpenTrade(trade) || statusValue === "in_progress";
                 const isClosed = statusValue === "closed";
                 const statusLabel = isClosed ? "Closed" : isProcess ? "In Progress" : "Open";
                 const endLabel = isProcess ? "-" : trade.end_label || "-";
@@ -208,66 +226,155 @@ document.addEventListener("DOMContentLoaded", () => {
             return summary;
         };
 
-        if (!trade) {
-            tableWrapper.innerHTML = "<div class='detail-message'>Noch keine gefüllten Orders gefunden.</div>";
-            cache[tradeId] = tableWrapper.innerHTML;
-            return;
-        }
-
-        const orders = Array.isArray(trade.filled_orders) ? trade.filled_orders : [];
-        const headerNode = buildHeader();
-        if (!orders.length) {
-            tableWrapper.innerHTML = "";
-            tableWrapper.appendChild(headerNode);
+        const normalizeList = (value) => (Array.isArray(value) ? value : []);
+        const dedupeOrders = (orders) => {
+            const seen = new Set();
+            const deduped = [];
+            for (const order of orders) {
+                if (!order || typeof order !== "object") continue;
+                const key =
+                    order.order_id ||
+                    order.exchange_order_id ||
+                    order.client_order_id ||
+                    [
+                        order.purpose || "",
+                        order.side || "",
+                        order.qty ?? order.exec_qty ?? "",
+                        order.price ?? order.avg_price ?? order.exec_price ?? order.trigger_price ?? "",
+                    ].join("|");
+                if (seen.has(key)) continue;
+                seen.add(key);
+                deduped.push(order);
+            }
+            return deduped;
+        };
+        const toNumberOrNull = (value) => {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+        const createSectionTitle = (text) => {
+            const title = document.createElement("h4");
+            title.style.margin = "12px 0 8px";
+            title.textContent = text;
+            return title;
+        };
+        const createEmptyMessage = (text) => {
             const empty = document.createElement("div");
             empty.className = "detail-message";
-            empty.textContent = "Noch keine gefüllten Orders gefunden.";
-            tableWrapper.appendChild(empty);
+            empty.textContent = text;
+            return empty;
+        };
+        const renderOrdersTable = (orders, columns) => {
+            const table = document.createElement("table");
+            table.classList.add("detail-table");
+            const thead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+            columns.forEach((title) => {
+                const th = document.createElement("th");
+                th.textContent = title;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            const tbody = document.createElement("tbody");
+            orders.forEach((order) => {
+                const tr = document.createElement("tr");
+                const pnlValue = toNumberOrNull(
+                    order.realized_pnl ?? order.pnl ?? order.pnl_usdt,
+                );
+                const pnlClass =
+                    pnlValue == null
+                        ? ""
+                        : pnlValue > 0
+                            ? "profit-positive"
+                            : pnlValue < 0
+                                ? "profit-negative"
+                                : "";
+                const qty = order.qty ?? order.exec_qty ?? "-";
+                const price =
+                    order.price ??
+                    order.avg_price ??
+                    order.exec_price ??
+                    order.trigger_price ??
+                    "-";
+                const timeValue =
+                    order.time_label ||
+                    order.time ||
+                    order.timestamp ||
+                    order.updated_at ||
+                    "-";
+                tr.innerHTML = `
+                    <td>${timeValue}</td>
+                    <td>${order.purpose || "-"}</td>
+                    <td>${order.side || "-"}</td>
+                    <td>${qty}</td>
+                    <td>${price}</td>
+                    <td class="${pnlClass}">${pnlValue != null ? pnlValue : "-"}</td>
+                    <td>${order.status || order.scope || "-"}</td>
+                    <td>${order.order_id || order.exchange_order_id || order.client_order_id || "-"}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            return table;
+        };
+
+        if (!trade) {
+            tableWrapper.innerHTML = "<div class='detail-message'>Keine aktiven Orders gefunden.</div>";
             cache[tradeId] = tableWrapper.innerHTML;
             return;
         }
 
-        const columns = ["Zeit", "Purpose", "Cycle", "PnL", "Scope"];
-        const table = document.createElement("table");
-        table.classList.add("detail-table");
-        const thead = document.createElement("thead");
-        const hr = document.createElement("tr");
-        columns.forEach((title) => {
-            const th = document.createElement("th");
-            th.textContent = title;
-            hr.appendChild(th);
-        });
-        thead.appendChild(hr);
-        table.appendChild(thead);
-        const tbody = document.createElement("tbody");
-        orders.forEach((order) => {
-            const tr = document.createElement("tr");
-            const timeValue = order.time_label || order.time || "-";
-            const cycleValue = order.cycle_index != null ? order.cycle_index : "-";
-            const pnlRaw = order.pnl;
-            const pnlNumber = Number(pnlRaw);
-            const pnlClass =
-                !Number.isNaN(pnlNumber) && Number.isFinite(pnlNumber)
-                    ? pnlNumber > 0
-                        ? "profit-positive"
-                        : pnlNumber < 0
-                            ? "profit-negative"
-                            : ""
-                    : "";
-            const pnlDisplay = !Number.isNaN(pnlNumber) && Number.isFinite(pnlNumber) ? pnlNumber : "-";
-            tr.innerHTML = `
-                <td>${timeValue}</td>
-                <td>${order.purpose || "-"}</td>
-                <td>${cycleValue}</td>
-                <td class="${pnlClass}">${pnlDisplay}</td>
-                <td>${order.scope || "-"}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
+        const headerNode = buildHeader();
+        const activeOrders = dedupeOrders([
+            ...normalizeList(trade.active_orders),
+            ...normalizeList(trade.open_orders),
+            ...normalizeList(trade.orders),
+        ]);
+        const filledOrders = dedupeOrders([
+            ...normalizeList(trade.filled_orders),
+            ...normalizeList(trade.details),
+        ]);
+
         tableWrapper.innerHTML = "";
         tableWrapper.appendChild(headerNode);
-        tableWrapper.appendChild(table);
+
+        tableWrapper.appendChild(createSectionTitle("Aktive Orders"));
+        if (activeOrders.length) {
+            tableWrapper.appendChild(
+                renderOrdersTable(activeOrders, [
+                    "Zeit",
+                    "Purpose",
+                    "Side",
+                    "Qty",
+                    "Price/Trigger",
+                    "PnL",
+                    "Status",
+                    "Order-ID",
+                ]),
+            );
+        } else {
+            tableWrapper.appendChild(createEmptyMessage("Keine aktiven Orders gefunden"));
+        }
+
+        tableWrapper.appendChild(createSectionTitle("Gefüllte Orders"));
+        if (filledOrders.length) {
+            tableWrapper.appendChild(
+                renderOrdersTable(filledOrders, [
+                    "Zeit",
+                    "Purpose",
+                    "Side",
+                    "Qty",
+                    "Price/Trigger",
+                    "PnL",
+                    "Status",
+                    "Order-ID",
+                ]),
+            );
+        } else {
+            tableWrapper.appendChild(createEmptyMessage("Keine gefüllten Orders gefunden"));
+        }
+
         cache[tradeId] = tableWrapper.innerHTML;
     }
 

@@ -7635,6 +7635,9 @@ def _collect_process_rows_for_bot(
             "status": "in_progress",
             "is_process": True,
             "filled_orders": filled_orders,
+            "active_orders": _normalize_active_orders(state, strategy_state),
+            "open_orders": strategy_state.get("open_orders"),
+            "orders": strategy_state.get("orders"),
         },
         None,
     )
