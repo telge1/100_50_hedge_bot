@@ -18,6 +18,48 @@
             border-radius: 8px;
             color: #f5f5f5;
             border: 1px solid #333;
+            position: relative;
+        }
+        .summary-wallet-toggle {
+            margin-top: 8px;
+            background: #2b2b2b;
+            color: #ddd;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .summary-wallet-toggle:hover {
+            background: #363636;
+        }
+        .summary-wallet-list {
+            position: absolute;
+            top: calc(100% - 8px);
+            left: 16px;
+            right: 16px;
+            background: #151515;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 8px 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            z-index: 5;
+            display: none;
+        }
+        .summary-wallet-list.visible {
+            display: block;
+        }
+        .summary-wallet-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 0.82rem;
+            padding: 4px 0;
+            color: #ddd;
+        }
+        .summary-wallet-empty {
+            font-size: 0.82rem;
+            color: #aaa;
         }
         .profit-trades-table {
             width: 100%;
@@ -109,8 +151,23 @@
                     <div class="summary-value" id="summary-winning-trades">{{ summary.winning_trades }}</div>
                 </div>
                 <div class="profit-summary-card">
-                    <div class="summary-label">Best Bot</div>
-                    <div class="summary-value" id="summary-best-bot">{{ summary.best_bot or '-' }}</div>
+                    <div class="summary-label">Gesamt Wallet</div>
+                    <div class="summary-value" id="summary-total-wallet">
+                        {% if summary.total_wallet_usdt is defined and summary.total_wallet_usdt is not none %}{{ summary.total_wallet_usdt|round(2) }} USDT{% else %}-{% endif %}
+                    </div>
+                    <button class="summary-wallet-toggle" id="summary-wallet-toggle" type="button">Wallets ▼</button>
+                    <div class="summary-wallet-list" id="summary-wallet-list">
+                        {% if summary.bot_wallets %}
+                            {% for wallet in summary.bot_wallets %}
+                            <div class="summary-wallet-item">
+                                <span>{{ wallet.bot_name }}</span>
+                                <span>{% if wallet.wallet_usdt is defined and wallet.wallet_usdt is not none %}{{ wallet.wallet_usdt|round(2) }} USDT{% else %}-{% endif %}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="summary-wallet-empty">Keine Wallet-Daten verfügbar</div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             <div class="profit-toolbar">

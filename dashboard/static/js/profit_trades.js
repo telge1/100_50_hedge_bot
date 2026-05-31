@@ -7,8 +7,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const limit = params.get("limit") || "200";
     const refreshButton = document.getElementById("profit-refresh-btn");
     const lastUpdated = document.getElementById("profit-last-updated");
+    const walletToggle = document.getElementById("summary-wallet-toggle");
+    const walletList = document.getElementById("summary-wallet-list");
     console.log("[profit_trades] refresh button found", !!refreshButton);
     console.log("[profit_trades] trade body found", !!tradeBody);
+
+    function formatWalletValue(value) {
+        return Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)} USDT` : "-";
+    }
 
     function isOpenTrade(trade) {
         const status = (trade?.status || "").toLowerCase();
@@ -389,12 +395,54 @@ document.addEventListener("DOMContentLoaded", () => {
             "summary-open-trades": summary.open_trades != null ? summary.open_trades : "-",
             "summary-winrate": summary.winrate != null ? `${summary.winrate} %` : "-",
             "summary-winning-trades": summary.winning_trades != null ? summary.winning_trades : "-",
-            "summary-best-bot": summary.best_bot || "-",
+            "summary-total-wallet": formatWalletValue(summary.total_wallet_usdt),
         };
         Object.entries(mapping).forEach(([id, text]) => {
             const el = document.getElementById(id);
             if (!el) return;
             el.textContent = text;
+        });
+
+        if (!walletList) {
+            return;
+        }
+        walletList.innerHTML = "";
+        if (!Array.isArray(summary.bot_wallets) || summary.bot_wallets.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "summary-wallet-empty";
+            empty.textContent = "Keine Wallet-Daten verfügbar";
+            walletList.appendChild(empty);
+            return;
+        }
+        summary.bot_wallets.forEach((entry) => {
+            const item = document.createElement("div");
+            item.className = "summary-wallet-item";
+
+            const name = document.createElement("span");
+            name.textContent = entry?.bot_name || "-";
+
+            const value = document.createElement("span");
+            value.textContent = formatWalletValue(entry?.wallet_usdt);
+
+            item.appendChild(name);
+            item.appendChild(value);
+            walletList.appendChild(item);
+        });
+    }
+
+    if (walletToggle && walletList) {
+        walletToggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            walletList.classList.toggle("visible");
+        });
+        document.addEventListener("click", (event) => {
+            if (!walletList.classList.contains("visible")) {
+                return;
+            }
+            if (walletList.contains(event.target) || walletToggle.contains(event.target)) {
+                return;
+            }
+            walletList.classList.remove("visible");
         });
     }
 

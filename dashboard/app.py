@@ -2830,6 +2830,7 @@ async def profit_verlauf_2(
     normalized = [_normalize_trade_record(evt) for evt in trades]
     normalized.sort(key=_score_trade_record_end_time, reverse=True)
     summary = _summarize_trade_blocks(normalized)
+    summary.update(_build_profit_trade_wallet_summary())
     trade_rows = [_build_profit_trade_summary(record) for record in normalized]
     return HTMLResponse(render_template(
         "profit_verlauf_2.html",
@@ -7684,6 +7685,7 @@ async def api_profit_trades(
     closed_records = [record for record in filtered_normalized if record.get("status") == "closed"]
     # _persist_profit_trade_closed_rows(profile, closed_records)
     summary = _summarize_trade_blocks(closed_records)
+    summary.update(_build_profit_trade_wallet_summary())
     confirmed_start_times = _collect_confirmed_trade_start_times(profile)
     summaries = [
         _build_profit_trade_summary(
@@ -7778,6 +7780,53 @@ def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
         "winrate": round(winrate, 2),
         "best_bot": best_bot,
         "open_trades": open_trades,
+    }
+
+
+def _extract_wallet_value(snapshot: dict[str, Any] | None) -> float | None:
+    if not isinstance(snapshot, dict):
+        return None
+    for key in (
+        "available_wallet_usdt",
+        "wallet_balance_current_usdt",
+        "current_wallet_usdt",
+        "wallet_balance_usdt",
+        "margin_balance",
+    ):
+        value = _safe_wallet_float(snapshot.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _build_profit_trade_wallet_summary() -> dict[str, Any]:
+    bot_wallets: list[dict[str, Any]] = []
+    total_wallet_usdt = 0.0
+    has_numeric_wallet = False
+    available_bots = {
+        str(bot.get("bot_name") or "").strip().lower(): bot for bot in _get_dashboard_long_bots()
+    }
+    for bot_number in range(1, 5):
+        bot_name = f"long_bot_{bot_number}"
+        bot = available_bots.get(bot_name, {})
+        account_name = str(bot.get("account_name") or f"Long_bot_{bot_number}").strip()
+        wallet_value = None
+        try:
+            snapshot = _load_live_wallet_snapshot_for_account(account_name)
+            wallet_value = _extract_wallet_value(snapshot)
+        except Exception:
+            logger.warning(
+                "[dashboard] profit_trade_wallet_snapshot_failed",
+                exc_info=True,
+                extra={"bot_name": bot_name, "account_name": account_name},
+            )
+        if wallet_value is not None:
+            total_wallet_usdt += wallet_value
+            has_numeric_wallet = True
+        bot_wallets.append({"bot_name": bot_name, "wallet_usdt": wallet_value})
+    return {
+        "total_wallet_usdt": round(total_wallet_usdt, 8) if has_numeric_wallet else None,
+        "bot_wallets": bot_wallets,
     }
 
 
