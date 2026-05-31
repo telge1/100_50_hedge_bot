@@ -2824,14 +2824,20 @@ async def profit_verlauf_2(
     request: Request,
     profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
     limit: int = Query(50, ge=1, le=200),
+    start_time: str | None = Query(None, description="Start datetime filter"),
+    end_time: str | None = Query(None, description="End datetime filter"),
+    page: int = Query(0, ge=0, description="Zero-based trade page"),
+    page_size: int | None = Query(None, ge=1, le=500, description="Trades per page"),
     user: dict = Depends(require_auth),
 ):
-    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
-    normalized = [_normalize_trade_record(evt) for evt in trades]
-    normalized.sort(key=_score_trade_record_end_time, reverse=True)
-    summary = _summarize_trade_blocks(normalized)
-    summary.update(_build_profit_trade_wallet_summary())
-    trade_rows = [_build_profit_trade_summary(record) for record in normalized]
+    trade_rows, summary, pagination, warnings = _build_profit_trade_page(
+        profile,
+        limit=limit,
+        start_time=start_time,
+        end_time=end_time,
+        page=page,
+        page_size=page_size,
+    )
     return HTMLResponse(render_template(
         "profit_verlauf_2.html",
         {
@@ -2840,6 +2846,11 @@ async def profit_verlauf_2(
             "profile": profile,
             "summary": summary,
             "trades": trade_rows,
+            "pagination": pagination,
+            "filter_start_time": start_time or "",
+            "filter_end_time": end_time or "",
+            "page_size": pagination["page_size"],
+            "trade_page": pagination["page"],
             "warnings": warnings,
             "trade_limit": limit,
         },
@@ -7094,6 +7105,96 @@ def _get_trade_end_time(record: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _normalize_trade_filter_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(text)
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=DASHBOARD_TZ)
+    return dt.astimezone(timezone.utc)
+
+
+def _get_trade_filter_datetime(record: dict[str, Any]) -> datetime | None:
+    for getter in (_get_trade_start_time, _get_trade_end_time):
+        dt = getter(record)
+        if dt:
+            return dt.astimezone(timezone.utc)
+    for key in ("timestamp", "created_at", "__ts"):
+        dt = _normalize_trade_filter_datetime(record.get(key))
+        if dt:
+            return dt
+    return None
+
+
+def _filter_trade_records_by_time(
+    trades: Iterable[dict[str, Any]],
+    *,
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> list[dict[str, Any]]:
+    filter_active = start_time is not None or end_time is not None
+    filtered: list[dict[str, Any]] = []
+    for trade in trades:
+        trade_dt = _get_trade_filter_datetime(trade)
+        if trade_dt is None:
+            if not filter_active:
+                filtered.append(trade)
+            continue
+        if start_time and trade_dt < start_time:
+            continue
+        if end_time and trade_dt > end_time:
+            continue
+        filtered.append(trade)
+    return filtered
+
+
+def _build_trade_pagination(
+    *,
+    page: int,
+    page_size: int,
+    total_filtered_trades: int,
+) -> dict[str, Any]:
+    total_pages = (
+        (total_filtered_trades + page_size - 1) // page_size if page_size > 0 else 0
+    )
+    normalized_page = min(page, max(total_pages - 1, 0)) if total_pages else 0
+    return {
+        "page": normalized_page,
+        "page_size": page_size,
+        "total_filtered_trades": total_filtered_trades,
+        "total_pages": total_pages,
+        "has_prev": normalized_page > 0,
+        "has_next": normalized_page + 1 < total_pages,
+    }
+
+
+def _paginate_trade_records(
+    trades: list[dict[str, Any]],
+    *,
+    page: int,
+    page_size: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    pagination = _build_trade_pagination(
+        page=page,
+        page_size=page_size,
+        total_filtered_trades=len(trades),
+    )
+    start_idx = pagination["page"] * page_size
+    end_idx = start_idx + page_size
+    return trades[start_idx:end_idx], pagination
+
+
 def _detail_order_id(detail: dict[str, Any]) -> str:
     for key in ("order_id", "client_order_id", "exchange_order_id"):
         value = detail.get(key)
@@ -7429,10 +7530,24 @@ def _resolve_profile_entries(profile: str) -> tuple[list[dict[str, Any]], list[s
     return entries, []
 
 
-def _load_trade_blocks_for_profile(profile: str, limit: int) -> Tuple[list[dict[str, Any]], list[str]]:
+def _load_trade_blocks_for_profile(
+    profile: str,
+    limit: int,
+    *,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    page: int = 0,
+    page_size: int | None = None,
+    paginate: bool = True,
+) -> Tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     entries, entry_warnings = _resolve_profile_entries(profile)
     if not entries:
-        return [], entry_warnings
+        effective_page_size = page_size or limit
+        return [], entry_warnings, _build_trade_pagination(
+            page=page,
+            page_size=effective_page_size,
+            total_filtered_trades=0,
+        )
     warnings: list[str] = entry_warnings.copy()
     events: list[dict[str, Any]] = []
     normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
@@ -7472,12 +7587,31 @@ def _load_trade_blocks_for_profile(profile: str, limit: int) -> Tuple[list[dict[
         if not existing_priority or current_priority > existing_priority:
             dedup[key] = event
             priority_map[key] = current_priority
-    sorted_events = sorted(
-        dedup.values(),
-        key=lambda evt: evt.get("__ts") or datetime.min.replace(tzinfo=timezone.utc),
+    effective_page_size = page_size or limit
+    start_dt = _normalize_trade_filter_datetime(start_time)
+    end_dt = _normalize_trade_filter_datetime(end_time)
+    normalized_trades = [_normalize_trade_record(evt) for evt in dedup.values()]
+    filtered_trades = _filter_trade_records_by_time(
+        normalized_trades,
+        start_time=start_dt,
+        end_time=end_dt,
+    )
+    filtered_trades.sort(
+        key=lambda trade: _get_trade_filter_datetime(trade)
+        or datetime.min.replace(tzinfo=timezone.utc),
         reverse=True,
     )
-    normalized_trades = [_normalize_trade_record(evt) for evt in sorted_events[:limit]]
+    pagination = _build_trade_pagination(
+        page=page,
+        page_size=effective_page_size,
+        total_filtered_trades=len(filtered_trades),
+    )
+    if paginate:
+        start_idx = pagination["page"] * effective_page_size
+        end_idx = start_idx + effective_page_size
+        paged_trades = filtered_trades[start_idx:end_idx]
+    else:
+        paged_trades = filtered_trades
     logger.debug(
         "[dashboard] profit_summary_dedup_result",
         {
@@ -7485,9 +7619,10 @@ def _load_trade_blocks_for_profile(profile: str, limit: int) -> Tuple[list[dict[
             "bot_count": len(entries),
             "raw_events": len(events),
             "deduped_trades": len(normalized_trades),
+            "filtered_trades": len(filtered_trades),
         },
     )
-    return normalized_trades, warnings
+    return paged_trades, warnings, pagination
 
 
 def _bot_paths_with_fallback(entry: dict[str, Any]) -> dict[str, Path]:
@@ -7669,51 +7804,27 @@ def _score_trade_record_end_time(record: dict[str, Any]) -> datetime:
 async def api_profit_trades(
     profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
     limit: int = Query(50, ge=1, le=500),
+    start_time: str | None = Query(None, description="Start datetime filter"),
+    end_time: str | None = Query(None, description="End datetime filter"),
+    page: int = Query(0, ge=0, description="Zero-based trade page"),
+    page_size: int | None = Query(None, ge=1, le=500, description="Trades per page"),
     user: dict = Depends(require_auth),
 ):
-    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
-    normalized = [_normalize_trade_record(evt) for evt in trades]
-    normalized.sort(key=_score_trade_record_end_time, reverse=True)
-    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
-    warnings.extend(process_warnings)
-    running_ids = {
-        row.get("trade_block_id") for row in process_rows if row.get("trade_block_id")
-    }
-    filtered_normalized = [
-        record for record in normalized if record.get("trade_block_id") not in running_ids
-    ]
-    closed_records = [record for record in filtered_normalized if record.get("status") == "closed"]
-    # _persist_profit_trade_closed_rows(profile, closed_records)
-    summary = _summarize_trade_blocks(closed_records)
-    summary.update(_build_profit_trade_wallet_summary())
-    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
-    summaries = [
-        _build_profit_trade_summary(
-            record, confirmed_start_times.get(str(record.get("trade_block_id") or ""))
-        )
-        for record in filtered_normalized[:limit]
-    ]
-    existing_ids = {
-        record.get("trade_block_id") for record in filtered_normalized if record.get("trade_block_id")
-    }
-    process_rows.sort(
-        key=lambda row: _normalize_dashboard_datetime(row.get("start_time"))
-        or datetime.min.replace(tzinfo=timezone.utc),
-        reverse=True,
+    trades, summary, pagination, warnings = _build_profit_trade_page(
+        profile,
+        limit=limit,
+        start_time=start_time,
+        end_time=end_time,
+        page=page,
+        page_size=page_size,
     )
-    process_summaries = []
-    for row in process_rows:
-        tbid = row.get("trade_block_id")
-        if tbid and tbid in existing_ids:
-            continue
-        process_summaries.append(row)
-    summary["open_trades"] = len(process_summaries)
-    combined = summaries + process_summaries
     return {
+        "success": True,
         "profile": profile,
         "summary": summary,
-        "count": len(combined),
-        "trades": combined,
+        "count": len(trades),
+        "trades": trades,
+        "pagination": pagination,
         "warnings": warnings,
     }
 
@@ -7724,8 +7835,12 @@ async def api_profit_trade_details(
     profile: str = Query("bot_1", description="Bot profile"),
     user: dict = Depends(require_auth),
 ):
-    trades, warnings = _load_trade_blocks_for_profile(profile, limit=500)
-    normalized = [_normalize_trade_record(evt) for evt in trades]
+    trades, warnings, _pagination = _load_trade_blocks_for_profile(
+        profile,
+        limit=500,
+        paginate=False,
+    )
+    normalized = list(trades)
     match = next((record for record in normalized if record.get("trade_block_id") == trade_block_id), None)
     if not match:
         raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
@@ -7751,27 +7866,46 @@ async def api_profit_trade_details(
     }
 
 
+def _get_trade_profit_value(trade: dict[str, Any]) -> float | None:
+    for key in (
+        "total_trade_pnl",
+        "end_profit",
+        "endprofit",
+        "profit",
+        "pnl",
+        "profit_usdt",
+    ):
+        value = _safe_wallet_float(trade.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _is_closed_trade_status(status: Any) -> bool:
+    return str(status or "").strip().lower() == "closed"
+
+
 def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trades = list(trades)
-    closed_trades = sum(1 for trade in trades if trade.get("status") == "closed")
-    closed_records = [trade for trade in trades if trade.get("status") == "closed"]
-    total_profit = sum(float(trade.get("total_trade_pnl") or 0.0) for trade in closed_records)
-    winning = sum(
-        1 for trade in closed_records if float(trade.get("total_trade_pnl") or 0.0) > 0
-    )
-    losing = sum(
-        1 for trade in closed_records if float(trade.get("total_trade_pnl") or 0.0) <= 0
-    )
+    closed_records = [trade for trade in trades if _is_closed_trade_status(trade.get("status"))]
+    closed_trades = len(closed_records)
+    total_profit = 0.0
+    for trade in trades:
+        pnl = _get_trade_profit_value(trade)
+        if pnl is not None:
+            total_profit += pnl
+    winning = sum(1 for trade in closed_records if (_get_trade_profit_value(trade) or 0.0) > 0)
+    losing = sum(1 for trade in closed_records if (_get_trade_profit_value(trade) or 0.0) <= 0)
     winrate = (winning / closed_trades * 100.0) if closed_trades else 0.0
     best_bot = None
     best_profit = None
     for trade in closed_records:
-        pnl = float(trade.get("total_trade_pnl") or 0.0)
+        pnl = _get_trade_profit_value(trade) or 0.0
         bot = trade.get("bot_name")
         if best_profit is None or pnl > best_profit:
             best_profit = pnl
             best_bot = bot
-    open_trades = sum(1 for trade in trades if trade.get("status") != "closed")
+    open_trades = sum(1 for trade in trades if not _is_closed_trade_status(trade.get("status")))
     return {
         "total_profit": round(total_profit, 8),
         "closed_trades": closed_trades,
@@ -7781,6 +7915,64 @@ def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
         "best_bot": best_bot,
         "open_trades": open_trades,
     }
+
+
+def _build_profit_trade_page(
+    profile: str,
+    *,
+    limit: int,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    page: int = 0,
+    page_size: int | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], list[str]]:
+    base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
+        profile,
+        limit,
+        start_time=start_time,
+        end_time=end_time,
+        page=page,
+        page_size=page_size,
+        paginate=False,
+    )
+    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
+    warnings.extend(process_warnings)
+    active_start_dt = _normalize_trade_filter_datetime(start_time)
+    active_end_dt = _normalize_trade_filter_datetime(end_time)
+    filtered_process_rows = _filter_trade_records_by_time(
+        process_rows,
+        start_time=active_start_dt,
+        end_time=active_end_dt,
+    )
+    running_ids = {
+        row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
+    }
+    filtered_base_trades = [
+        record for record in base_trades if record.get("trade_block_id") not in running_ids
+    ]
+    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
+    summary_rows = [
+        _build_profit_trade_summary(
+            record,
+            confirmed_start_times.get(str(record.get("trade_block_id") or "")),
+        )
+        for record in filtered_base_trades
+    ]
+    combined_rows = summary_rows + filtered_process_rows
+    combined_rows.sort(
+        key=lambda trade: _get_trade_filter_datetime(trade)
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    effective_page_size = page_size or limit
+    paged_rows, pagination = _paginate_trade_records(
+        combined_rows,
+        page=page,
+        page_size=effective_page_size,
+    )
+    summary = _summarize_trade_blocks(paged_rows)
+    summary.update(_build_profit_trade_wallet_summary())
+    return paged_rows, summary, pagination, warnings
 
 
 def _extract_wallet_value(snapshot: dict[str, Any] | None) -> float | None:
@@ -8128,12 +8320,13 @@ async def api_profit_summary(
     user: dict = Depends(require_auth),
 ):
     """Return aggregated trade-block summaries grouped by trade_block_id."""
-    trades, warnings = _load_trade_blocks_for_profile(profile, limit)
+    trades, warnings, pagination = _load_trade_blocks_for_profile(profile, limit)
     summary = _summarize_trade_blocks(trades)
     return {
         "profile": profile,
         "summary": summary,
         "trades": trades,
+        "pagination": pagination,
         "warnings": warnings,
     }
 

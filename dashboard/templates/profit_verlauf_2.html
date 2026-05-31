@@ -72,6 +72,20 @@
             text-align: left;
             font-size: 0.9rem;
         }
+        .table-sort-button {
+            background: transparent;
+            border: none;
+            color: #f5f5f5;
+            font: inherit;
+            cursor: pointer;
+            padding: 0;
+        }
+        .table-sort-button:hover {
+            color: #fff;
+        }
+        .table-sort-button.active {
+            color: #7cc4ff;
+        }
         .profit-positive { color: #0f0; }
         .profit-negative { color: #f55; }
         .detail-row {
@@ -106,6 +120,59 @@
             border: none;
             padding: 6px 10px;
             border-radius: 4px;
+        }
+        .refresh-btn:disabled,
+        .filter-btn:disabled,
+        .filter-select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .trade-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: end;
+            background: #1b1b1b;
+            border: 1px solid #2f2f2f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 165px;
+        }
+        .filter-field label {
+            color: #cfcfcf;
+            font-size: 0.82rem;
+        }
+        .filter-input,
+        .filter-select,
+        .filter-btn {
+            background: #252525;
+            color: #f5f5f5;
+            border: 1px solid #383838;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.9rem;
+        }
+        .filter-btn {
+            cursor: pointer;
+        }
+        .trade-pagination-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .trade-pagination-info {
+            color: #cfcfcf;
+            font-size: 0.85rem;
+            min-width: 180px;
+            text-align: right;
         }
         .detail-loaded {
             display: table-row;
@@ -174,6 +241,49 @@
                 <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
                 <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
             </div>
+            <div class="trade-filter-bar">
+                <div class="filter-field">
+                    <label for="trade-filter-start">Von</label>
+                    <input
+                        class="filter-input"
+                        id="trade-filter-start"
+                        type="datetime-local"
+                        value="{{ filter_start_time }}"
+                    >
+                </div>
+                <div class="filter-field">
+                    <label for="trade-filter-end">Bis</label>
+                    <input
+                        class="filter-input"
+                        id="trade-filter-end"
+                        type="datetime-local"
+                        value="{{ filter_end_time }}"
+                    >
+                </div>
+                <div class="filter-field">
+                    <label for="trade-page-size">Blockgröße</label>
+                    <select class="filter-select" id="trade-page-size">
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <button class="filter-btn" id="trade-filter-apply" type="button">Anwenden</button>
+                <button class="filter-btn" id="trade-filter-reset" type="button">Zurücksetzen</button>
+                <div class="trade-pagination-controls">
+                    <button class="filter-btn" id="trade-page-prev" type="button" {% if not pagination.has_prev %}disabled{% endif %}>Zurück</button>
+                    <button class="filter-btn" id="trade-page-next" type="button" {% if not pagination.has_next %}disabled{% endif %}>Weiter</button>
+                    <span class="trade-pagination-info" id="trade-pagination-info">
+                        {% if pagination.total_filtered_trades %}
+                            {% set start_idx = pagination.page * pagination.page_size + 1 %}
+                            {% set end_idx = pagination.page * pagination.page_size + trades|length %}
+                            Zeige {{ start_idx }}-{{ end_idx }} von {{ pagination.total_filtered_trades }} Trades
+                        {% else %}
+                            Keine Trades
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
             <table class="profit-trades-table">
                 <thead>
                     <tr>
@@ -181,26 +291,35 @@
                         <th>Symbol</th>
                         <th>Start</th>
                         <th>Ende</th>
-                        <th>Endprofit</th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-profit" type="button">
+                                Endprofit
+                            </button>
+                        </th>
                         <th>Wallet danach</th>
                         <th>Cycles</th>
-                        <th>Status</th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-status" type="button">
+                                Status
+                            </button>
+                        </th>
                         <th>Details</th>
                     </tr>
                 </thead>
                 <tbody id="profit-trades-body">
                     {% for trade in trades %}
                     <tr class="trade-row" data-trade-block-id="{{ trade.trade_block_id }}" data-profile="{{ profile }}">
+                        {% set trade_profit = trade.profit_usdt if trade.profit_usdt is not none else trade.total_trade_pnl %}
                         <td>{{ trade.bot_name }}</td>
                         <td>{{ trade.symbol }}</td>
                         <td>{{ trade.start_label }}</td>
                         <td>{{ trade.end_label }}</td>
-                        <td class="{{ 'profit-positive' if trade.profit_usdt and trade.profit_usdt > 0 else ('profit-negative' if trade.profit_usdt and trade.profit_usdt < 0 else '') }}">
-                            {{ trade.profit_usdt }}
+                        <td class="{{ 'profit-positive' if trade_profit and trade_profit > 0 else ('profit-negative' if trade_profit and trade_profit < 0 else '') }}">
+                            {{ trade_profit if trade_profit is not none else '-' }}
                         </td>
                         <td>{{ trade.wallet_after or '-' }}</td>
                         <td>{{ trade.cycle_count }}</td>
-                        <td>{{ 'Closed' if trade.status == 'closed' else 'Open' }}</td>
+                        <td>{{ 'Closed' if trade.status == 'closed' else ('In Progress' if trade.status == 'in_progress' else 'Open') }}</td>
                         <td>
                             <button class="details-btn" data-trade-id="{{ trade.trade_block_id }}">Details</button>
                         </td>
@@ -220,6 +339,12 @@
     </div>
     <script>
         const PROFILE = "{{ profile }}";
+        const INITIAL_TRADE_FILTERS = {
+            startTime: "{{ filter_start_time }}",
+            endTime: "{{ filter_end_time }}",
+            page: {{ trade_page }},
+            pageSize: {{ page_size }},
+        };
     </script>
     <script src="/static/js/profit_trades.js"></script>
 </body>
