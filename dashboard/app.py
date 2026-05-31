@@ -2780,43 +2780,13 @@ async def redirect_dual_account_hedge(request: Request, user: dict = Depends(req
     return RedirectResponse(url="/profit-verlauf", status_code=302)
 
 
-@app.get("/profit-verlauf", response_class=HTMLResponse)
+@app.get("/profit-verlauf")
 async def profit_verlauf(request: Request, user: dict = Depends(require_auth)):
-    """Profit-Verlauf page – Burn- und Exit-Profits (vormals 2-Account Hedge)"""
-    # Load default config values
-    default_config = get_default_config()
-    default_long_notional = default_config.get('initial_long_usdt', 500)
-    default_short_notional = default_config.get('initial_short_usdt', 250)
-    
-    # Try to get config from existing configs
-    try:
-        long_config = load_config(bot_type="long")
-        if long_config:
-            if 'initial_long_usdt' in long_config:
-                default_long_notional = long_config.get('initial_long_usdt', 500)
-    except:
-        pass
-    
-    try:
-        short_config = load_config(bot_type="short")
-        if short_config:
-            if 'initial_short_usdt' in short_config:
-                default_short_notional = short_config.get('initial_short_usdt', 250)
-    except:
-        pass
-    
-    return HTMLResponse(render_template(
-        "dual_account_hedge.html",
-        {
-            "request": request,
-            "user": user,
-            "default_long_notional": default_long_notional,
-            "default_short_notional": default_short_notional,
-            "bot_profiles": _serializable_bot_profiles(),
-            "dashboard_accounts": get_dashboard_accounts(),
-            "closed_pnl_accounts": get_closed_pnl_accounts(),
-        }
-    ))
+    """Redirect die alte Profit-Verlauf URL auf die neue Ansicht"""
+    target_url = "/profit-verlauf_2"
+    if request.url.query:
+        target_url = f"{target_url}?{request.url.query}"
+    return RedirectResponse(url=target_url, status_code=302)
 
 
 @app.get("/profit-verlauf_2", response_class=HTMLResponse)

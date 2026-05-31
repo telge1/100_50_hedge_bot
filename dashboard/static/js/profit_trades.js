@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const paginationInfo = document.getElementById("trade-pagination-info");
     const sortProfitButton = document.getElementById("trade-sort-profit");
     const sortStatusButton = document.getElementById("trade-sort-status");
+    const sortStartButton = document.getElementById("trade-sort-start");
+    const sortEndButton = document.getElementById("trade-sort-end");
     const profitChartToggle = document.getElementById("profit-chart-toggle");
     const profitChartPanel = document.getElementById("profit-chart-panel");
     const profitChartGroupBySelect = document.getElementById("profit-chart-group-by");
@@ -93,6 +95,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return 2;
     }
 
+    function getTradeDateValue(trade, key) {
+        const value = trade?.[key];
+        if (!value) {
+            return null;
+        }
+        const timestamp = Date.parse(value);
+        return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
     function getSortedTrades(trades) {
         const items = Array.isArray(trades) ? trades.slice() : [];
         if (!currentSortKey) {
@@ -122,6 +133,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     ? rightProfit - leftProfit
                     : leftProfit - rightProfit;
             }
+            if (currentSortKey === "start" || currentSortKey === "end") {
+                const key = currentSortKey === "start" ? "start_time" : "end_time";
+                const leftDate = getTradeDateValue(left, key);
+                const rightDate = getTradeDateValue(right, key);
+                if (leftDate == null && rightDate == null) {
+                    return 0;
+                }
+                if (leftDate == null) {
+                    return 1;
+                }
+                if (rightDate == null) {
+                    return -1;
+                }
+                return currentSortDirection === "desc" ? rightDate - leftDate : leftDate - rightDate;
+            }
             return 0;
         });
     }
@@ -137,6 +163,16 @@ document.addEventListener("DOMContentLoaded", () => {
             sortStatusButton.classList.toggle("active", currentSortKey === "status");
             sortStatusButton.textContent =
                 currentSortKey === "status" ? `Status ${indicator}` : "Status";
+        }
+        if (sortStartButton) {
+            sortStartButton.classList.toggle("active", currentSortKey === "start");
+            sortStartButton.textContent =
+                currentSortKey === "start" ? `Start ${indicator}` : "Start";
+        }
+        if (sortEndButton) {
+            sortEndButton.classList.toggle("active", currentSortKey === "end");
+            sortEndButton.textContent =
+                currentSortKey === "end" ? `Ende ${indicator}` : "Ende";
         }
     }
 
@@ -863,6 +899,19 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    if (sortStartButton) {
+        sortStartButton.addEventListener("click", () => {
+            if (currentSortKey === "start") {
+                currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+            } else {
+                currentSortKey = "start";
+                currentSortDirection = "asc";
+            }
+            updateSortButtons();
+            renderTradesTable(getSortedTrades(currentTrades));
+        });
+    }
+
     if (sortProfitButton) {
         sortProfitButton.addEventListener("click", () => {
             if (currentSortKey === "profit") {
@@ -870,6 +919,19 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 currentSortKey = "profit";
                 currentSortDirection = "desc";
+            }
+            updateSortButtons();
+            renderTradesTable(getSortedTrades(currentTrades));
+        });
+    }
+
+    if (sortEndButton) {
+        sortEndButton.addEventListener("click", () => {
+            if (currentSortKey === "end") {
+                currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+            } else {
+                currentSortKey = "end";
+                currentSortDirection = "asc";
             }
             updateSortButtons();
             renderTradesTable(getSortedTrades(currentTrades));
@@ -905,7 +967,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSortButtons();
     setupProfitChartControls();
     refreshTrades();
-    setInterval(refreshTrades, 15000);
+    setInterval(refreshTrades, 300000);
 
     bindDetailButtons();
 });

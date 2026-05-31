@@ -241,8 +241,7 @@
         </div>
         <div class="dashboard-navigation">
             <a href="/dashboard" class="nav-link">Dashboard</a>
-            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link">Profit-Verlauf</a>
-            <a href="https://dash.immotel.de/profit-verlauf_2" class="nav-link active">Profit-Verlauf 2</a>
+            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link active">Profit-Verlauf</a>
             <a href="/live-charts" class="nav-link">Live Charts</a>
             <a href="/price-alert" class="nav-link">Price Alert</a>
         </div>
@@ -359,8 +358,16 @@
                     <tr>
                         <th>Bot</th>
                         <th>Symbol</th>
-                        <th>Start</th>
-                        <th>Ende</th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-start" type="button">
+                                Start
+                            </button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-end" type="button">
+                                Ende
+                            </button>
+                        </th>
                         <th>
                             <button class="table-sort-button" id="trade-sort-profit" type="button">
                                 Endprofit
