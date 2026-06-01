@@ -12453,7 +12453,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if prior_cycle == cycle_index:
                 if (
                     self._cycle_status_blocks_build(entry.get("long_add_status"))
-                    and str(entry.get("short_tp_status") or "NONE").upper() != "FILLED"
+                    and self._get_second_leg_status(entry) != "FILLED"
                 ):
                     return prior_cycle, entry
                 continue
