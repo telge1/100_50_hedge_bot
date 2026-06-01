@@ -6312,7 +6312,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             snapshot,
             runtime_state,
             cycle_index=cycle_index,
-            field_name="short_tp_status",
+            field_name=self._get_second_leg_status_field(),
             purpose=purpose or "",
             cycle_role="short_reduce",
         )
@@ -7176,7 +7176,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self._reserve_cycle_intent_slot(
             runtime_state,
             cycle_index=cycle_index,
-            field_name="short_tp_status",
+            field_name=self._get_second_leg_status_field(),
             normalized_purpose=self._normalize_cycle_purpose(
                 purpose,
                 {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
