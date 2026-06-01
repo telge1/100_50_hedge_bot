@@ -8430,7 +8430,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         entry["short_reduce_fill_price"] = price
         entry["short_reduce_fill_confirmed"] = True
         entry["short_tp_qty"] = qty
-        entry["short_tp_status"] = "FILLED"
+        self._set_second_leg_status(entry, "FILLED")
         entry["short_tp_purpose"] = normalized_purpose
 
         fill_entry["price"] = price
