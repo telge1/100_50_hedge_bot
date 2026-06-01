@@ -9940,8 +9940,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return 0.0
         return normalized
 
+    def _second_leg_pair_purpose(self, cycle_index: int) -> str:
+        return self._get_second_leg_purpose(cycle_index)
+
     def _short_tp_pair_purpose(self, cycle_index: int) -> str:
-        return purpose_mapping.cycle_short_reduce(cycle_index)
+        return self._second_leg_pair_purpose(cycle_index)
 
     def _build_short_tp_pair_intent(
         self,
@@ -9951,7 +9954,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         long_cycle_number: int,
         context: StrategyContext,
     ) -> StrategyIntent | None:
-        purpose = self._short_tp_pair_purpose(long_cycle_number)
+        purpose = self._second_leg_pair_purpose(long_cycle_number)
         if snapshot.has_open_purpose(purpose):
             return None
 
@@ -14511,7 +14514,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         for cycle_index in range(1, self.config.max_cycles + 1):
             purposes.append(self._cycle_purpose("long", cycle_index))
             purposes.append(self._cycle_purpose("short", cycle_index))
-            purposes.append(self._short_tp_pair_purpose(cycle_index))
+            purposes.append(self._second_leg_pair_purpose(cycle_index))
         return purposes
 
     def _exit_purposes(self) -> list[str]:
