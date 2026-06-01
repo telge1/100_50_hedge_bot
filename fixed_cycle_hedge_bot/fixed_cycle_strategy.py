@@ -12055,6 +12055,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             or re.fullmatch(r"CYCLE_\d+_SHORT_TP", normalized)
         )
 
+    def _first_leg_reduce_role(self) -> str:
+        return "long_reduce"
+
+    def _second_leg_reduce_role(self) -> str:
+        return "short_reduce"
+
+    def _first_leg_cycle_pnl_key(self) -> str:
+        return "cycle_long_reduce_pnl"
+
+    def _second_leg_cycle_pnl_key(self) -> str:
+        return "cycle_short_tp_pnl"
+
+    def _first_leg_closed_pnl_field(self) -> str:
+        return "long_reduce_closed_pnl"
+
+    def _second_leg_closed_pnl_field(self) -> str:
+        return "short_reduce_closed_pnl"
+
+    def _second_leg_fill_price_field(self) -> str:
+        return "short_reduce_fill_price"
+
+    def _second_leg_fill_confirmed_field(self) -> str:
+        return "short_reduce_fill_confirmed"
+
     def _clear_cycle_entry_reservation(
         self,
         runtime_state: RuntimeState,
