@@ -12000,7 +12000,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_index, field_name = self._extract_cycle_sequence_target(purpose_text, metadata)
         if cycle_index > 0 and field_name == "long_add_status":
             return self._cycle_purpose("long", cycle_index)
-        if cycle_index > 0 and field_name == "short_tp_status":
+        if cycle_index > 0 and field_name == self._get_second_leg_status_field():
             return self._cycle_purpose("short", cycle_index)
         match = re.search(r"CYCLE_(\d+)_(LONG_ADD|SHORT_REDUCE|SHORT_TP)", purpose_text)
         if match:
@@ -12035,6 +12035,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
     def _set_second_leg_status(self, entry: dict[str, Any], status: str) -> None:
         entry["short_tp_status"] = str(status or "").upper()
+
+    def _get_second_leg_status_field(self) -> str:
+        return "short_tp_status"
+
+    def _get_second_leg_cycle_role(self) -> str:
+        return "short_tp_pair"
+
+    def _get_second_leg_purpose(self, cycle_index: int) -> str:
+        return purpose_mapping.cycle_short_reduce(cycle_index)
+
+    def _is_second_leg_purpose(self, purpose: str) -> bool:
+        normalized = self._normalize_cycle_purpose(purpose)
+        return bool(
+            re.fullmatch(r"CYCLE_\d+_SHORT_REDUCE", normalized)
+            or re.fullmatch(r"CYCLE_\d+_SHORT_TP", normalized)
+        )
 
     def _clear_cycle_entry_reservation(
         self,
@@ -12119,7 +12135,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             purpose,
             {"cycle_index": cycle_index, "cycle_role": cycle_role},
         )
-        target_field = "long_add_status" if cycle_role == "long_reduce" else "short_tp_status"
+        target_field = (
+            "long_add_status"
+            if cycle_role == "long_reduce"
+            else self._get_second_leg_status_field()
+        )
 
         def _matches(order: Any) -> bool:
             metadata = getattr(order, "metadata", None)
@@ -12191,7 +12211,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         status = (
             self._get_second_leg_status(entry)
-            if field_name == "short_tp_status"
+            if field_name == self._get_second_leg_status_field()
             else str(entry.get(field_name) or "NONE").upper()
         )
         prefix = "long_add" if field_name == "long_add_status" else "short_tp"
@@ -12200,7 +12220,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 (runtime_matches + snapshot_matches)[0].get("normalized_status") or "SUBMITTED"
             ).upper()
             if self._cycle_status_blocks_build(matched_status) and matched_status != status:
-                if field_name == "short_tp_status":
+                if field_name == self._get_second_leg_status_field():
                     self._set_second_leg_status(entry, matched_status)
                 else:
                     entry[field_name] = matched_status
@@ -12294,8 +12314,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_role = str(metadata.get("cycle_role") or "").lower()
         if "LONG_ADD" in purpose_text or cycle_role == "long_reduce":
             return cycle_index, "long_add_status"
-        if "SHORT_" in purpose_text or cycle_role in {"short_reduce", "short_tp_pair"}:
-            return cycle_index, "short_tp_status"
+        if "SHORT_" in purpose_text or cycle_role in {"short_reduce", self._get_second_leg_cycle_role()}:
+            return cycle_index, self._get_second_leg_status_field()
         return 0, None
 
     def _mark_cycle_purpose_status(
@@ -12350,7 +12370,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 self._purge_filled_long_add_orders(runtime_state, cycle_index)
         if (
             entry.get("long_add_status") == "FILLED"
-            and entry.get("short_tp_status") == "FILLED"
+            and self._get_second_leg_status(entry) == "FILLED"
             and not bool(entry.get("complete"))
         ):
             entry["complete"] = True
@@ -12459,7 +12479,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 continue
             if not bool(entry.get("complete")) and (
                 self._cycle_status_blocks_build(entry.get("long_add_status"))
-                or self._cycle_status_blocks_build(entry.get("short_tp_status"))
+                or self._cycle_status_blocks_build(self._get_second_leg_status(entry))
             ):
                 return prior_cycle, entry
         return None
@@ -14990,7 +15010,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         long_fills = cycle_state.get("long_fills") or {}
         short_fills = cycle_state.get("short_fills") or {}
-        field_name = "long_add_status" if cycle_role == "long_reduce" else "short_tp_status"
+        field_name = (
+            "long_add_status"
+            if cycle_role == "long_reduce"
+            else self._get_second_leg_status_field()
+        )
         cycle_entry, runtime_matches, snapshot_matches = self._reconcile_cycle_intent_reservation(
             snapshot,
             runtime_state,
