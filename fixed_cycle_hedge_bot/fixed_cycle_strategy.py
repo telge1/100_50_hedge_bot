@@ -14522,8 +14522,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return None
         previous_index = cycle_index - 1
         entry = self._get_cycle_sequence_entry(runtime_state, previous_index)
-        price = float(entry.get("short_reduce_fill_price") or 0.0)
-        confirmed = bool(entry.get("short_reduce_fill_confirmed"))
+        price = float(entry.get(self._second_leg_fill_price_field()) or 0.0)
+        confirmed = bool(entry.get(self._second_leg_fill_confirmed_field()))
         if confirmed and price > 0:
             return price
         return None
