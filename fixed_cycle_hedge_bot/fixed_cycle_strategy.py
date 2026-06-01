@@ -12001,9 +12001,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return self._cycle_purpose("long", cycle_index)
         if cycle_index > 0 and field_name == "short_tp_status":
             return self._cycle_purpose("short", cycle_index)
-        match = re.search(r"CYCLE_(\d+)_(LONG_ADD|SHORT_REDUCE)", purpose_text)
+        match = re.search(r"CYCLE_(\d+)_(LONG_ADD|SHORT_REDUCE|SHORT_TP)", purpose_text)
         if match:
-            return f"CYCLE_{int(match.group(1))}_{match.group(2)}"
+            cycle_suffix = match.group(2)
+            if cycle_suffix == "SHORT_TP":
+                cycle_suffix = "SHORT_REDUCE"
+            return f"CYCLE_{int(match.group(1))}_{cycle_suffix}"
         return purpose_text
 
     def _clear_cycle_entry_reservation(
@@ -14482,7 +14485,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return False
         normalized = purpose.upper()
         return normalized.startswith("CYCLE_") and (
-            "_LONG_ADD" in normalized or "_SHORT_REDUCE" in normalized
+            "_LONG_ADD" in normalized or "_SHORT_REDUCE" in normalized or "_SHORT_TP" in normalized
         )
 
     def _is_refill_mode_active(self, state: dict[str, Any]) -> bool:
