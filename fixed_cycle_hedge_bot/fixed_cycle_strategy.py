@@ -16050,3 +16050,21 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
             },
         )
         return []
+
+    def _build_short_tp_pair_intent(
+        self,
+        snapshot: HedgeSnapshot,
+        state: dict,
+        trigger_price: float,
+        long_cycle_number: int,
+        context: StrategyContext,
+    ) -> StrategyIntent | None:
+        _log_event(
+            "short_strategy_second_leg_intent_pending",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "long_cycle_number": long_cycle_number,
+                "reason": "mirror_short_path_not_implemented",
+            },
+        )
+        return None
