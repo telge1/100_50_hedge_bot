@@ -12030,6 +12030,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _clear_second_leg_waiting_state(self, state: dict[str, Any]) -> None:
         self._set_second_leg_waiting_state(state, waiting=False, cycle_index=0)
 
+    def _get_second_leg_status(self, entry: dict[str, Any]) -> str:
+        return str(entry.get("short_tp_status") or "NONE").upper()
+
+    def _set_second_leg_status(self, entry: dict[str, Any], status: str) -> None:
+        entry["short_tp_status"] = str(status or "").upper()
+
     def _clear_cycle_entry_reservation(
         self,
         runtime_state: RuntimeState,
@@ -12183,14 +12189,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_index=cycle_index,
             cycle_role=cycle_role,
         )
-        status = str(entry.get(field_name) or "NONE").upper()
+        status = (
+            self._get_second_leg_status(entry)
+            if field_name == "short_tp_status"
+            else str(entry.get(field_name) or "NONE").upper()
+        )
         prefix = "long_add" if field_name == "long_add_status" else "short_tp"
         if runtime_matches or snapshot_matches:
             matched_status = str(
                 (runtime_matches + snapshot_matches)[0].get("normalized_status") or "SUBMITTED"
             ).upper()
             if self._cycle_status_blocks_build(matched_status) and matched_status != status:
-                entry[field_name] = matched_status
+                if field_name == "short_tp_status":
+                    self._set_second_leg_status(entry, matched_status)
+                else:
+                    entry[field_name] = matched_status
                 self._persist_cycle_sequence_state(runtime_state)
             return entry, runtime_matches, snapshot_matches
         if status == "INTENT_BUILT":
