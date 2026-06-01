@@ -32,6 +32,7 @@ from .cycle_sequence import (
     initialize_cycle_sequence_state,
     is_attempted_purpose_matching_sequence,
 )
+from . import purpose_mapping
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
@@ -11584,8 +11585,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
     def _cycle_purpose(cls, side: str, cycle_index: int) -> str:
         if side.lower() == "long":
-            return f"CYCLE_{cycle_index}_LONG_ADD"
-        return f"CYCLE_{cycle_index}_SHORT_REDUCE"
+            return purpose_mapping.cycle_long_add(cycle_index)
+        return purpose_mapping.cycle_short_reduce(cycle_index)
 
     @staticmethod
     def _cycle_build_blocking_statuses() -> set[str]:
