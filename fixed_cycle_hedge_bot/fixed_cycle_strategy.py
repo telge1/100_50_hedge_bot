@@ -16085,3 +16085,20 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
             },
         )
         return None
+
+    def _clear_cycle_followup_state_after_short_reduce(
+        self,
+        runtime_state: RuntimeState,
+        cycle_index: int,
+        followup_before: dict[str, Any],
+        counts_before: dict[str, int],
+        counts_after: dict[str, int],
+    ) -> None:
+        _log_event(
+            "short_strategy_clear_cycle_followup_state_pending",
+            {
+                "symbol": self.config.symbol,
+                "cycle_index": cycle_index,
+            },
+        )
+        return None
