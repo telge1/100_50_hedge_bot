@@ -1232,7 +1232,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return False
         purpose = self._cycle_purpose("short", cycle_index)
         entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
-        if self._cycle_status_blocks_build(entry.get("short_tp_status")):
+        if self._cycle_status_blocks_build(self._get_second_leg_status(entry)):
             return True
         normalized_purpose = self._normalize_cycle_purpose(purpose)
         for order in runtime_state.active_orders.values():
