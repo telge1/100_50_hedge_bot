@@ -11,6 +11,14 @@ def cycle_short_reduce(cycle_index: int) -> str:
     return f"CYCLE_{cycle_index}_SHORT_REDUCE"
 
 
+def cycle_short_add(cycle_index: int) -> str:
+    return f"CYCLE_{cycle_index}_SHORT_ADD"
+
+
+def cycle_long_reduce(cycle_index: int) -> str:
+    return f"CYCLE_{cycle_index}_LONG_REDUCE"
+
+
 def normalize_purpose(purpose: object) -> str:
     return str(purpose or "").upper()
 
@@ -23,6 +31,16 @@ def is_cycle_long_add(purpose: object) -> bool:
 def is_cycle_short_reduce(purpose: object) -> bool:
     normalized = normalize_purpose(purpose)
     return normalized.startswith("CYCLE_") and normalized.endswith("_SHORT_REDUCE")
+
+
+def is_cycle_short_add(purpose: object) -> bool:
+    normalized = normalize_purpose(purpose)
+    return normalized.startswith("CYCLE_") and normalized.endswith("_SHORT_ADD")
+
+
+def is_cycle_long_reduce(purpose: object) -> bool:
+    normalized = normalize_purpose(purpose)
+    return normalized.startswith("CYCLE_") and normalized.endswith("_LONG_REDUCE")
 
 
 def is_refill_long(purpose: object) -> bool:
