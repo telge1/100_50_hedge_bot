@@ -15994,3 +15994,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         return None
+
+
+class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
+    """Minimal short-bot skeleton overriding helper names."""
+
+    def _first_leg_reduce_role(self) -> str:
+        return "short_reduce"
+
+    def _second_leg_reduce_role(self) -> str:
+        return "long_reduce"
+
+    def _first_leg_cycle_pnl_key(self) -> str:
+        return "cycle_short_tp_pnl"
+
+    def _second_leg_cycle_pnl_key(self) -> str:
+        return "cycle_long_reduce_pnl"
+
+    def _first_leg_closed_pnl_field(self) -> str:
+        return "short_reduce_closed_pnl"
+
+    def _second_leg_closed_pnl_field(self) -> str:
+        return "long_reduce_closed_pnl"
+
+    def _second_leg_fill_price_field(self) -> str:
+        return "long_reduce_trigger_price"
+
+    def _second_leg_fill_confirmed_field(self) -> str:
+        return "long_reduce_closed_pnl"
+
+    def _get_second_leg_cycle_role(self) -> str:
+        return "long_reduce"
+
+    def _get_second_leg_purpose(self, cycle_index: int) -> str:
+        return purpose_mapping.cycle_short_reduce(cycle_index)
+
+    def _is_second_leg_purpose(self, purpose: str) -> bool:
+        normalized = self._normalize_cycle_purpose(purpose)
+        return bool(
+            re.fullmatch(r"CYCLE_\d+_LONG_ADD", normalized)
+            or re.fullmatch(r"CYCLE_\d+_LONG_REDUCE", normalized)
+        )
