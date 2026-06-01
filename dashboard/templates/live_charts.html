@@ -181,10 +181,45 @@
         .pnl-pos { color: #22c55e; }
         .pnl-neg { color: #ef4444; }
         .muted { color: #9ca3af; }
+        body.embedded-live-chart {
+            background: transparent;
+        }
+        body.embedded-live-chart .dashboard-container {
+            padding: 0;
+        }
+        body.embedded-live-chart .dashboard-header,
+        body.embedded-live-chart .dashboard-navigation {
+            display: none;
+        }
+        body.embedded-live-chart .dashboard-content {
+            padding: 0;
+        }
+        body.embedded-live-chart .live-chart-container {
+            margin-top: 0;
+            padding: 10px 12px 12px;
+            border-radius: 8px;
+            box-shadow: none;
+        }
+        body.embedded-live-chart .live-chart-title {
+            font-size: 16px;
+        }
+        body.embedded-live-chart .live-chart-symbol-input {
+            gap: 8px;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        body.embedded-live-chart .live-chart-symbol-input label,
+        body.embedded-live-chart .live-chart-symbol-input select,
+        body.embedded-live-chart .live-chart-symbol-input button {
+            font-size: 13px;
+        }
+        body.embedded-live-chart #liveChart {
+            height: 420px;
+        }
     </style>
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
 </head>
-<body>
+<body class="{% if embedded %}embedded-live-chart{% endif %}">
     <div class="dashboard-container">
         <div class="dashboard-header">
             <div class="dashboard-title">📈 Live Charts – Multi-Symbol Hedge Bot</div>

@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const profitChartStatus = document.getElementById("profit-chart-status");
     const walletToggle = document.getElementById("summary-wallet-toggle");
     const walletList = document.getElementById("summary-wallet-list");
+    const masterCheckbox = document.getElementById("select-all-trades-checkbox");
+    const removeSelectedButton = document.getElementById("remove-selected-trades-btn");
     let currentTradePage = Number(
         params.get("page") ?? window.INITIAL_TRADE_FILTERS?.page ?? 0,
     );
@@ -47,6 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let profitChartGroupBy = "day";
     let profitChartInstance = null;
     let latestProfitChartData = [];
+    const tradeRowKeyToCheckbox = new Map();
+    const selectedTradeKeys = new Set();
+    const removedTradeKeys = new Set();
     if (!Number.isFinite(currentTradePage) || currentTradePage < 0) {
         currentTradePage = 0;
     }
@@ -71,6 +76,17 @@ document.addEventListener("DOMContentLoaded", () => {
         return profitValue != null && Number.isFinite(Number(profitValue))
             ? Number(profitValue)
             : null;
+    }
+
+    function getTradeRowKey(trade) {
+        const id = String(trade?.trade_block_id || "").trim();
+        if (id) {
+            return id;
+        }
+        const bot = String(trade?.bot_name || trade?.bot || "").trim();
+        const symbol = String(trade?.symbol || "").trim().toUpperCase();
+        const start = String(trade?.start_time || trade?.start_label || "").trim();
+        return `${bot}|${symbol}|${start}`;
     }
 
     function isOpenTrade(trade) {
@@ -176,32 +192,182 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function updateMasterCheckboxState() {
+        if (!masterCheckbox) return;
+        const visibleKeys = Array.from(currentTrades)
+            .map(getTradeRowKey)
+            .filter((key) => key && !removedTradeKeys.has(key));
+        if (!visibleKeys.length) {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = false;
+            return;
+        }
+        const selectedCount = visibleKeys.filter((key) => selectedTradeKeys.has(key)).length;
+        if (selectedCount === visibleKeys.length) {
+            masterCheckbox.checked = true;
+            masterCheckbox.indeterminate = false;
+        } else if (selectedCount === 0) {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = false;
+        } else {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = true;
+        }
+    }
+
+    function updateRemoveButtonState() {
+        if (!removeSelectedButton) return;
+        removeSelectedButton.disabled = selectedTradeKeys.size === 0;
+    }
+
+    function resetSelectionState() {
+        selectedTradeKeys.clear();
+        removedTradeKeys.clear();
+        tradeRowKeyToCheckbox.clear();
+        if (masterCheckbox) {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = false;
+        }
+        updateRemoveButtonState();
+    }
+    
+    function handleRowCheckboxChange(event) {
+        const checkbox = event.currentTarget;
+        const rowKey = checkbox.dataset.tradeKey;
+        if (!rowKey) return;
+        if (checkbox.checked) {
+            selectedTradeKeys.add(rowKey);
+        } else {
+            selectedTradeKeys.delete(rowKey);
+        }
+        updateMasterCheckboxState();
+        updateRemoveButtonState();
+    }
+
+    function handleMasterCheckboxChange(event) {
+        const checked = Boolean(event.target.checked);
+        const visibleRows = Array.from(tradeBody.querySelectorAll("input.trade-row-checkbox[data-trade-key]"));
+        visibleRows.forEach((box) => {
+            const key = box.dataset.tradeKey;
+            if (!key || removedTradeKeys.has(key)) {
+                box.checked = false;
+                return;
+            }
+            box.checked = checked;
+        });
+        selectedTradeKeys.clear();
+        if (checked) {
+            visibleRows.forEach((box) => {
+                const key = box.dataset.tradeKey;
+                if (key && !removedTradeKeys.has(key)) {
+                    selectedTradeKeys.add(key);
+                }
+            });
+        }
+        updateMasterCheckboxState();
+        updateRemoveButtonState();
+    }
+
+    async function removeSelectedTrades() {
+        if (!selectedTradeKeys.size) {
+            return;
+        }
+        const blockIds = [];
+        selectedTradeKeys.forEach((key) => {
+            const checkbox = tradeRowKeyToCheckbox.get(key);
+            const blockId = checkbox?.dataset.tradeBlockId?.trim();
+            if (blockId) {
+                blockIds.push(blockId);
+            }
+        });
+        if (!blockIds.length) {
+            alert("Ausgewählte Trades besitzen keine gültige Trade-ID und können nicht dauerhaft gelöscht werden.");
+            return;
+        }
+        const pendingKeys = Array.from(selectedTradeKeys);
+        pendingKeys.forEach((key) => removedTradeKeys.add(key));
+        selectedTradeKeys.clear();
+        renderTradesTable(getSortedTrades(currentTrades));
+        updateMasterCheckboxState();
+        updateRemoveButtonState();
+        if (removeSelectedButton) {
+            removeSelectedButton.disabled = true;
+        }
+        let response;
+        let payload = null;
+        try {
+            response = await fetch("/api/dashboard/profit-trades/remove", {
+                method: "POST",
+                mode: "same-origin",
+                credentials: "include",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    profile,
+                    trade_block_ids: blockIds,
+                }),
+            });
+            payload = await response.json().catch(() => null);
+            if (!response.ok || !payload?.success) {
+                const message =
+                    payload?.error ||
+                    response?.statusText ||
+                    `HTTP ${response?.status || "??"}`;
+                throw new Error(message);
+            }
+            await refreshTrades();
+        } catch (error) {
+            console.error("[profit_trades] removeSelectedTrades failed", error, payload);
+            pendingKeys.forEach((key) => removedTradeKeys.delete(key));
+            pendingKeys.forEach((key) => selectedTradeKeys.add(key));
+            renderTradesTable(getSortedTrades(currentTrades));
+            updateMasterCheckboxState();
+            updateRemoveButtonState();
+            alert(
+                error?.message ||
+                    "Entfernen der Trades fehlgeschlagen. Die Auswahl wurde zurückgesetzt.",
+            );
+        } finally {
+            if (removeSelectedButton) {
+                removeSelectedButton.disabled = !selectedTradeKeys.size;
+            }
+        }
+    }
+
     function renderTradesTable(trades) {
         tradeBody.innerHTML = "";
+        tradeRowKeyToCheckbox.clear();
         for (const key in cache) {
             delete cache[key];
         }
         tradeLookup.clear();
         if (!Array.isArray(trades) || trades.length === 0) {
             const emptyRow = document.createElement("tr");
-            emptyRow.innerHTML = "<td colspan='9'>Keine Trades im gewählten Filter gefunden.</td>";
+            emptyRow.innerHTML = "<td colspan='10'>Keine Trades im gewählten Filter gefunden.</td>";
             tradeBody.appendChild(emptyRow);
             return;
         }
         trades.forEach((trade, idx) => {
+            const rowKey = getTradeRowKey(trade);
+            if (!rowKey || removedTradeKeys.has(rowKey)) {
+                return;
+            }
             const row = document.createElement("tr");
             row.className = "trade-row";
             const tradeId = trade.trade_block_id || `trade-${idx}`;
             tradeLookup.set(tradeId, trade);
             row.dataset.tradeBlockId = tradeId;
             row.dataset.profile = profile;
-            const statusValue = String(trade.status || "").toLowerCase();
+            row.dataset.tradeRowKey = rowKey;
+                const statusValue = String(trade.status || "").toLowerCase();
             const isProcess = isOpenTrade(trade) || statusValue === "in_progress";
             const isClosed = statusValue === "closed";
             const statusLabel = isClosed ? "Closed" : isProcess ? "In Progress" : "Open";
             const endLabel = isProcess ? "-" : trade.end_label || "-";
             const walletAfter = isProcess ? "-" : trade.wallet_after != null ? trade.wallet_after : "-";
-            const startLabel = trade.start_label || "-";
+                const startLabel = trade.start_label || "-";
             const numericProfit = getTradeProfitValue(trade);
             const profitClass =
                 numericProfit != null
@@ -212,7 +378,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             : ""
                     : "";
             const profitDisplay = numericProfit != null ? numericProfit : "-";
+            const escapedKey = rowKey.replace(/"/g, "&quot;");
+            const blockIdValue = String(trade.trade_block_id || "").replace(/"/g, "&quot;");
+            const checkboxChecked = selectedTradeKeys.has(rowKey) ? "checked" : "";
             row.innerHTML = `
+                    <td>
+                        <input type="checkbox" class="trade-row-checkbox" data-trade-key="${escapedKey}" data-trade-block-id="${blockIdValue}" ${checkboxChecked}>
+                    </td>
                 <td>${trade.bot_name || "-"}</td>
                 <td>${trade.symbol || "-"}</td>
                 <td>${startLabel}</td>
@@ -230,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
             detailRow.className = "detail-row";
             detailRow.dataset.detailsFor = tradeId;
             detailRow.innerHTML = `
-                <td colspan="9">
+                <td colspan="10">
                     <div class="detail-content">
                         <div class="detail-loader">Lade Details...</div>
                         <div class="detail-table-wrapper" style="display:none;"></div>
@@ -238,8 +410,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 </td>
             `;
             tradeBody.appendChild(detailRow);
+            const checkbox = row.querySelector("input.trade-row-checkbox");
+            if (checkbox) {
+                tradeRowKeyToCheckbox.set(rowKey, checkbox);
+                checkbox.addEventListener("change", handleRowCheckboxChange);
+            }
         });
         bindDetailButtons();
+        updateMasterCheckboxState();
+        updateRemoveButtonState();
     }
 
     function syncFilterInputs() {
@@ -480,6 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.warn("[profit_trades] trade body missing");
             return;
         }
+        resetSelectionState();
         syncFilterInputs();
         if (lastUpdated) {
             lastUpdated.textContent = "Lade...";
@@ -633,6 +813,64 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
             return summary;
         };
+        const isLikelyActiveTrade = (tradeValue) => {
+            const status = String(tradeValue?.status || "").trim().toLowerCase();
+            if (!status) {
+                return Boolean(tradeValue?.is_process);
+            }
+            if (status === "closed") {
+                return false;
+            }
+            return (
+                tradeValue?.is_process ||
+                status === "in_progress" ||
+                status === "in progress" ||
+                status === "open" ||
+                status === "running" ||
+                status === "progress"
+            );
+        };
+        const normalizeLiveChartAccount = (botName) => {
+            const raw = String(botName || "").trim();
+            const match = raw.match(/^long_bot_(\d+)$/i);
+            if (match) {
+                return `Long_bot_${match[1]}`;
+            }
+            return raw || null;
+        };
+        const buildLiveChartUrl = (tradeValue, embedded) => {
+            const rawBot =
+                tradeValue?.bot_name ||
+                tradeValue?.bot ||
+                tradeValue?.account ||
+                "";
+            const account = normalizeLiveChartAccount(rawBot);
+            const symbol = String(tradeValue?.symbol || "").trim().toUpperCase();
+            if (!account || !symbol) {
+                return null;
+            }
+            const params = new URLSearchParams({
+                account,
+                symbol,
+            });
+            if (embedded) {
+                params.set("embedded", "1");
+            }
+            return `/live-charts?${params.toString()}`;
+        };
+        const toggleDetailLiveChart = (tradeValue, button, panel, iframe) => {
+            if (!button || !panel || !iframe) {
+                return;
+            }
+            const open = panel.classList.toggle("visible");
+            button.textContent = open ? "Live Charts ausblenden ▲" : "Live Charts anzeigen ▼";
+            if (open && !iframe.src) {
+                const iframeUrl = buildLiveChartUrl(tradeValue, true);
+                if (iframeUrl) {
+                    iframe.src = iframeUrl;
+                }
+            }
+        };
 
         const normalizeList = (value) => (Array.isArray(value) ? value : []);
         const dedupeOrders = (orders) => {
@@ -746,6 +984,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
         tableWrapper.innerHTML = "";
         tableWrapper.appendChild(headerNode);
+
+        if (isLikelyActiveTrade(trade)) {
+            const iframeUrl = buildLiveChartUrl(trade, true);
+            const newTabUrl = buildLiveChartUrl(trade, false);
+            if (iframeUrl && newTabUrl) {
+                const liveChartToggle = document.createElement("button");
+                liveChartToggle.className = "detail-live-chart-toggle";
+                liveChartToggle.type = "button";
+                liveChartToggle.textContent = "Live Charts anzeigen ▼";
+
+                const liveChartPanel = document.createElement("div");
+                liveChartPanel.className = "detail-live-chart-panel";
+
+                const liveChartLink = document.createElement("a");
+                liveChartLink.className = "detail-live-chart-link";
+                liveChartLink.href = newTabUrl;
+                liveChartLink.target = "_blank";
+                liveChartLink.rel = "noopener noreferrer";
+                liveChartLink.textContent = "Live Charts in neuem Tab öffnen";
+
+                const liveChartIframe = document.createElement("iframe");
+                liveChartIframe.className = "detail-live-chart-iframe";
+                liveChartIframe.loading = "lazy";
+                liveChartIframe.referrerPolicy = "same-origin";
+                liveChartIframe.title = `Live Charts ${trade?.symbol || ""}`;
+
+                liveChartPanel.appendChild(liveChartLink);
+                liveChartPanel.appendChild(liveChartIframe);
+
+                liveChartToggle.addEventListener("click", () => {
+                    toggleDetailLiveChart(
+                        trade,
+                        liveChartToggle,
+                        liveChartPanel,
+                        liveChartIframe,
+                    );
+                });
+
+                tableWrapper.appendChild(liveChartToggle);
+                tableWrapper.appendChild(liveChartPanel);
+            }
+        }
 
         tableWrapper.appendChild(createSectionTitle("Aktive Orders"));
         if (activeOrders.length) {
@@ -909,6 +1189,15 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             updateSortButtons();
             renderTradesTable(getSortedTrades(currentTrades));
+        });
+    }
+
+    if (masterCheckbox) {
+        masterCheckbox.addEventListener("change", handleMasterCheckboxChange);
+    }
+    if (removeSelectedButton) {
+        removeSelectedButton.addEventListener("click", () => {
+            void removeSelectedTrades();
         });
     }
 

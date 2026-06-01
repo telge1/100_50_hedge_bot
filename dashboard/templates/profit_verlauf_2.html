@@ -225,6 +225,47 @@
             position: relative;
             height: 300px;
         }
+        .detail-live-chart-toggle {
+            cursor: pointer;
+            background: #242424;
+            color: #f5f5f5;
+            border: 1px solid #363636;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 12px 0 10px;
+        }
+        .detail-live-chart-toggle:hover {
+            background: #2d2d2d;
+        }
+        .detail-live-chart-panel {
+            display: none;
+            background: #121822;
+            border: 1px solid #2a3646;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            overflow: auto;
+        }
+        .detail-live-chart-panel.visible {
+            display: block;
+        }
+        .detail-live-chart-link {
+            display: inline-block;
+            margin-bottom: 8px;
+            color: #7cc4ff;
+        }
+        .detail-live-chart-iframe {
+            width: 100%;
+            height: 520px;
+            border: 1px solid #2f3b4a;
+            border-radius: 8px;
+            background: #0b1220;
+        }
+        @media (max-width: 900px) {
+            .detail-live-chart-iframe {
+                height: 400px;
+            }
+        }
         .detail-loaded {
             display: table-row;
         }
@@ -289,6 +330,7 @@
             </div>
             <div class="profit-toolbar">
                 <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                <button class="refresh-btn" id="remove-selected-trades-btn" type="button" disabled>Entfernen</button>
                 <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
             </div>
             <button class="profit-chart-toggle" id="profit-chart-toggle" type="button">
@@ -356,7 +398,10 @@
             <table class="profit-trades-table">
                 <thead>
                     <tr>
-                        <th>Bot</th>
+                    <th>
+                        <input type="checkbox" id="select-all-trades-checkbox">
+                    </th>
+                    <th>Bot</th>
                         <th>Symbol</th>
                         <th>
                             <button class="table-sort-button" id="trade-sort-start" type="button">
@@ -386,6 +431,7 @@
                 <tbody id="profit-trades-body">
                     {% for trade in trades %}
                     <tr class="trade-row" data-trade-block-id="{{ trade.trade_block_id }}" data-profile="{{ profile }}">
+                        <td><input type="checkbox" disabled></td>
                         {% set trade_profit = trade.profit_usdt if trade.profit_usdt is not none else trade.total_trade_pnl %}
                         <td>{{ trade.bot_name }}</td>
                         <td>{{ trade.symbol }}</td>
@@ -402,7 +448,7 @@
                         </td>
                     </tr>
                     <tr class="detail-row" data-details-for="{{ trade.trade_block_id }}">
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="detail-content">
                                 <div class="detail-loader">Lade Details...</div>
                                 <div class="detail-table-wrapper" style="display:none;"></div>

@@ -42,6 +42,7 @@ os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
 CONFIRMED_ORDER_PNL_HISTORY_FILE = project_root / "logs" / "confirmed_order_pnl_history.jsonl"
 DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pnl_history.jsonl"
+PROFIT_TRADE_REMOVALS_FILE = project_root / "logs" / "dashboard_removed_profit_trades.json"
 GLOBAL_RUNTIME_LOG_PATH = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
 
 LIVE_BOT_LOGS_ROOT = project_root / "live_bots" / "100_50_hedge_bot"
@@ -85,6 +86,102 @@ def _available_profile_labels() -> dict[str, str]:
 
 def _normalize_dashboard_profile(profile: str | None, *, fallback_to_main: bool = True) -> str | None:
     return normalize_profile(profile, fallback_to_main=fallback_to_main)
+
+
+def _normalize_profit_trade_profile(profile: str | None) -> str | None:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if normalized:
+        return normalized
+    if profile:
+        value = str(profile).strip().lower()
+        return value if value else None
+    return None
+
+
+def _load_profit_trade_removal_store() -> dict[str, set[str]]:
+    if not PROFIT_TRADE_REMOVALS_FILE.exists():
+        return {}
+    try:
+        raw = json.loads(PROFIT_TRADE_REMOVALS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        logger.warning(
+            "[dashboard] profit_trade_removals_load_failed",
+            {"path": str(PROFIT_TRADE_REMOVALS_FILE)},
+            exc_info=True,
+        )
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    store: dict[str, set[str]] = {}
+    for key, values in raw.items():
+        if not isinstance(key, str) or not isinstance(values, list):
+            continue
+        normalized_key = key.strip().lower()
+        if not normalized_key:
+            continue
+        entries = {str(item).strip() for item in values if str(item).strip()}
+        if entries:
+            store[normalized_key] = entries
+    return store
+
+
+def _write_profit_trade_removal_store(store: dict[str, set[str]]) -> None:
+    payload: dict[str, list[str]] = {}
+    for key, values in store.items():
+        if not values:
+            continue
+        payload[key] = sorted(values)
+    try:
+        PROFIT_TRADE_REMOVALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = PROFIT_TRADE_REMOVALS_FILE.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(PROFIT_TRADE_REMOVALS_FILE)
+    except Exception:
+        logger.warning(
+            "[dashboard] profit_trade_removals_write_failed",
+            {"path": str(PROFIT_TRADE_REMOVALS_FILE)},
+            exc_info=True,
+        )
+
+
+def _get_removed_trade_ids_for_profile(profile: str | None) -> set[str]:
+    normalized = _normalize_profit_trade_profile(profile)
+    if not normalized:
+        return set()
+    store = _load_profit_trade_removal_store()
+    return set(store.get(normalized, set()))
+
+
+def _persist_removed_profit_trade_ids(profile: str | None, trade_block_ids: Iterable[str]) -> list[str]:
+    normalized = _normalize_profit_trade_profile(profile)
+    if not normalized:
+        return []
+    cleaned = {str(item).strip() for item in trade_block_ids if str(item).strip()}
+    if not cleaned:
+        return []
+    store = _load_profit_trade_removal_store()
+    existing = store.get(normalized, set())
+    merged = existing | cleaned
+    if merged == existing:
+        return sorted(existing)
+    store[normalized] = merged
+    _write_profit_trade_removal_store(store)
+    return sorted(merged)
+
+
+def _filter_trade_records_by_removed_trades(
+    trades: Iterable[dict[str, Any]], profile: str | None
+) -> list[dict[str, Any]]:
+    removed_ids = _get_removed_trade_ids_for_profile(profile)
+    if not removed_ids:
+        return list(trades)
+    filtered: list[dict[str, Any]] = []
+    for trade in trades:
+        trade_id = str(trade.get("trade_block_id") or "").strip()
+        if trade_id and trade_id in removed_ids:
+            continue
+        filtered.append(trade)
+    return filtered
 
 
 def _get_long_bot_by_name(bot_name: str | None) -> dict[str, Any] | None:
@@ -3468,6 +3565,7 @@ async def live_charts(
     user: dict = Depends(require_auth),
     symbol: str = Query("", description="Symbol, z.B. FILUSDT"),
     account: str = Query("main", description="main|sub|Long_bot_N|Short_bot_N"),
+    embedded: bool = Query(False, description="Render compact embedded live chart view"),
 ):
     """
     Live Charts Page – zeigt einen Lightweight-Charts-Preis-Chart für ein Symbol
@@ -3645,6 +3743,7 @@ async def live_charts(
             "short_tp_price": short_tp_price,
             "main_label": main_label,
             "sub_label": sub_label,
+            "embedded": embedded,
         }
     ))
 
@@ -7566,6 +7665,9 @@ def _load_trade_blocks_for_profile(
         start_time=start_dt,
         end_time=end_dt,
     )
+    filtered_trades = _filter_trade_records_by_removed_trades(
+        filtered_trades, normalized_profile or profile
+    )
     filtered_trades.sort(
         key=lambda trade: _get_trade_filter_datetime(trade)
         or datetime.min.replace(tzinfo=timezone.utc),
@@ -7799,6 +7901,30 @@ async def api_profit_trades(
     }
 
 
+@app.post("/api/dashboard/profit-trades/remove")
+async def api_remove_profit_trades(
+    payload: dict = Body(...),
+    user: dict = Depends(require_auth),
+) -> dict[str, Any]:
+    profile = str(payload.get("profile") or "bot_1")
+    trade_block_ids = payload.get("trade_block_ids") or payload.get("tradeBlockIds") or []
+    if not isinstance(trade_block_ids, list):
+        raise HTTPException(status_code=400, detail="trade_block_ids must be a list")
+    cleaned_ids = [str(item).strip() for item in trade_block_ids if str(item).strip()]
+    if not cleaned_ids:
+        raise HTTPException(status_code=400, detail="trade_block_ids cannot be empty")
+    removed_ids = _persist_removed_profit_trade_ids(profile, cleaned_ids)
+    logger.info(
+        "[dashboard] profit_trades_removed",
+        {"profile": profile, "removed_ids": removed_ids},
+    )
+    return {
+        "success": True,
+        "profile": profile,
+        "removed_trade_block_ids": removed_ids,
+    }
+
+
 @app.get("/api/dashboard/profit-trades/chart")
 async def api_profit_trades_chart(
     profile: str = Query("bot_1", description="Bot profile (e.g. bot_1)"),
@@ -7916,6 +8042,9 @@ def _build_profit_trade_filtered_rows(
         process_rows,
         start_time=active_start_dt,
         end_time=active_end_dt,
+    )
+    filtered_process_rows = _filter_trade_records_by_removed_trades(
+        filtered_process_rows, profile
     )
     running_ids = {
         row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
