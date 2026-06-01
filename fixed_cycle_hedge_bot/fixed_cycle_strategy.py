@@ -16035,3 +16035,18 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
             re.fullmatch(r"CYCLE_\d+_LONG_ADD", normalized)
             or re.fullmatch(r"CYCLE_\d+_LONG_REDUCE", normalized)
         )
+
+    def _build_downside_cycle_intents(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> list[StrategyIntent]:
+        _log_event(
+            "short_strategy_downside_cycle_intents_not_implemented",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "reason": "mirror_pending",
+            },
+        )
+        return []
