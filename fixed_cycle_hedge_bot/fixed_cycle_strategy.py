@@ -9941,7 +9941,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return normalized
 
     def _short_tp_pair_purpose(self, cycle_index: int) -> str:
-        return f"CYCLE_{cycle_index}_SHORT_TP"
+        return purpose_mapping.cycle_short_reduce(cycle_index)
 
     def _build_short_tp_pair_intent(
         self,
