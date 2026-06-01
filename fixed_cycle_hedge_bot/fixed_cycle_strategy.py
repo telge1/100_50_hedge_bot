@@ -6317,7 +6317,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_role="short_reduce",
         )
         long_add_status = str(cycle_sequence_entry.get("long_add_status") or "NONE").upper()
-        short_tp_status = str(cycle_sequence_entry.get("short_tp_status") or "NONE").upper()
+        short_tp_status = self._get_second_leg_status(cycle_sequence_entry)
         cycle_long_add_filled = long_add_status in {"FILLED", "PROCESSED"} or self._has_cycle_purpose_already_filled_or_processed(
             runtime_state,
             long_purpose or "",
