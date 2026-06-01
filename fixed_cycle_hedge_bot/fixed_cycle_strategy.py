@@ -12051,6 +12051,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_state["long_add_pending"] = False
         else:
             self._clear_second_leg_waiting_state(state)
+            state["pending_short_cycle_index"] = 0
             cycle_state = self._ensure_cycle_state(runtime_state)
             self._clear_second_leg_waiting_state(cycle_state)
             cycle_state["pending_short_cycle_index"] = 0
