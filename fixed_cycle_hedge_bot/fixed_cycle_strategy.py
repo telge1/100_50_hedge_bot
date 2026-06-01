@@ -7445,7 +7445,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if short_tp_pending_cycle > 0
             else {}
         )
-        short_tp_status = str(short_cycle_entry.get("short_tp_status") or "NONE").upper()
+        short_tp_status = self._get_second_leg_status(short_cycle_entry)
         if waiting_short and short_tp_pending_cycle > 0 and short_pending_purpose:
             short_followup_active = self._short_followup_active_for_cycle(
                 short_tp_pending_cycle, runtime_state, snapshot
