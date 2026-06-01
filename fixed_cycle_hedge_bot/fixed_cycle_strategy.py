@@ -12010,6 +12010,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return f"CYCLE_{int(match.group(1))}_{cycle_suffix}"
         return purpose_text
 
+    def _set_second_leg_pending_cycle(self, state: dict[str, Any], cycle_index: int) -> None:
+        state["short_tp_pending_cycle"] = cycle_index
+
+    def _get_second_leg_pending_cycle(self, state: dict[str, Any]) -> int:
+        return int(state.get("short_tp_pending_cycle") or 0)
+
+    def _set_second_leg_waiting_state(
+        self,
+        state: dict[str, Any],
+        *,
+        waiting: bool,
+        cycle_index: int | None = None,
+    ) -> None:
+        state["cycle_waiting_for_short_tp"] = waiting
+        if cycle_index is not None:
+            self._set_second_leg_pending_cycle(state, cycle_index if waiting else 0)
+
+    def _clear_second_leg_waiting_state(self, state: dict[str, Any]) -> None:
+        self._set_second_leg_waiting_state(state, waiting=False, cycle_index=0)
+
     def _clear_cycle_entry_reservation(
         self,
         runtime_state: RuntimeState,
@@ -12030,12 +12050,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_state = self._ensure_cycle_state(runtime_state)
             cycle_state["long_add_pending"] = False
         else:
-            state["cycle_waiting_for_short_tp"] = False
-            state["short_tp_pending_cycle"] = 0
-            state["pending_short_cycle_index"] = 0
+            self._clear_second_leg_waiting_state(state)
             cycle_state = self._ensure_cycle_state(runtime_state)
-            cycle_state["cycle_waiting_for_short_tp"] = False
-            cycle_state["short_tp_pending_cycle"] = 0
+            self._clear_second_leg_waiting_state(cycle_state)
             cycle_state["pending_short_cycle_index"] = 0
 
     def _reserve_cycle_intent_slot(
@@ -12063,12 +12080,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_state["long_add_pending"] = True
             log_event_name = "fixed_cycle_cycle_long_add_intent_reserved"
         else:
-            state["cycle_waiting_for_short_tp"] = True
-            state["short_tp_pending_cycle"] = cycle_index
-            state["pending_short_cycle_index"] = cycle_index
+            self._set_second_leg_waiting_state(state, waiting=True, cycle_index=cycle_index)
             cycle_state = self._ensure_cycle_state(runtime_state)
-            cycle_state["cycle_waiting_for_short_tp"] = True
-            cycle_state["short_tp_pending_cycle"] = cycle_index
+            self._set_second_leg_waiting_state(cycle_state, waiting=True, cycle_index=cycle_index)
             cycle_state["pending_short_cycle_index"] = cycle_index
             log_event_name = "fixed_cycle_cycle_short_tp_intent_reserved"
         self._persist_cycle_sequence_state(runtime_state)
