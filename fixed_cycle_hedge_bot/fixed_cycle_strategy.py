@@ -32,7 +32,7 @@ from .cycle_sequence import (
     initialize_cycle_sequence_state,
     is_attempted_purpose_matching_sequence,
 )
-from . import purpose_mapping
+from . import direction_config, purpose_mapping
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
@@ -347,10 +347,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             getattr(self.config, "short_exit_reduce_only", None),
         )
         self.realized_long_loss_total = 0.0
+        direction = direction_config.get_direction_config()
         self._sequence_config = CycleSequenceConfig(
             cycle_prefix="CYCLE",
-            first_leg="LONG_ADD",
-            second_leg="SHORT_REDUCE",
+            first_leg=direction.cycle_first_leg,
+            second_leg=direction.cycle_second_leg,
         )
 
     def _get_short_tp_fallback_state(self, runtime_state: RuntimeState) -> ShortTpFallbackState:
