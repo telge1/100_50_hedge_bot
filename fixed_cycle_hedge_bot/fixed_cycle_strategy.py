@@ -16068,3 +16068,20 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
             },
         )
         return None
+
+    def _pending_second_pair_short_reduce_exit_defer_payload(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        *,
+        recent_cycle_fill: bool = False,
+    ) -> dict[str, Any] | None:
+        _log_event(
+            "short_strategy_short_reduce_defer_payload_ignored",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "cycle_index": int(runtime_state.strategy_state.get("short_tp_pending_cycle") or 0),
+                "reason": "mirror_short_path_pending",
+            },
+        )
+        return None
