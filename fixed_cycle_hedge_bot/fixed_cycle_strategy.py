@@ -5800,7 +5800,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         intents.extend(short_intents)
         sequence_state = get_cycle_sequence_state(state, self._sequence_config)
         if long_cycle_number <= self.config.max_cycles:
-            purpose = self._cycle_purpose("long", long_cycle_number)
+            purpose = self._get_first_leg_purpose(long_cycle_number)
             if not is_attempted_purpose_matching_sequence(purpose, sequence_state):
                 _log_event(
                     "fixed_cycle_sequence_purpose_mismatch_blocked",
