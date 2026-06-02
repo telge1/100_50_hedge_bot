@@ -69,6 +69,13 @@ live_bots/**/pids/*.pid
 
 # Bot group credential config (per long-bot group)
 live_bots/100_50_hedge_bot/config/config.yaml
+live_bots/short_hedge_bot/config/config.yaml
+live_bots/short_hedge_bot/**/logs/*.jsonl
+live_bots/short_hedge_bot/**/state/*.json
+live_bots/short_hedge_bot/**/run/*.json
+live_bots/short_hedge_bot/**/run/*.pid
+live_bots/short_hedge_bot/**/pids/*.pid
+live_bots/short_hedge_bot/**/snapshots/*.json
 
 # Keep bot registry/config trackable
 !live_bots/**/config/fixed_cycle_config.json
