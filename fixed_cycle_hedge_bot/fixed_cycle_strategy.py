@@ -618,13 +618,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
             "initial_entry_submitted": bool(state.get("initial_entry_submitted")),
             "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
-            "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
-            "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
+            "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+            "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
             "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
             "cycle_state_trade_active": bool(cycle_state.get("trade_active")),
-            "cycle_state_long_add_pending": bool(cycle_state.get("long_add_pending")),
-            "cycle_state_waiting_for_short_tp": bool(cycle_state.get("cycle_waiting_for_short_tp")),
-            "cycle_state_short_tp_pending_cycle": int(cycle_state.get("short_tp_pending_cycle") or 0),
+            "cycle_state_long_add_pending": self._get_first_leg_pending(state, cycle_state),
+            "cycle_state_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+            "cycle_state_short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
             "stale_runtime_orders": stale_runtime_orders,
         }
         logger.info("fixed_cycle_startup_zero_state_reset_started %s", stale_details)
@@ -665,9 +665,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "symbol": self.config.symbol,
                 "long_add_locked": state.get("long_add_locked"),
-                "long_add_pending": state.get("long_add_pending"),
-                "cycle_waiting_for_short_tp": state.get("cycle_waiting_for_short_tp"),
-                "short_tp_pending_cycle": state.get("short_tp_pending_cycle"),
+            "long_add_pending": self._get_first_leg_pending(state, cycle_state),
+            "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+            "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
                 "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
                 "exit_locked": state.get("exit_locked"),
                 "exit_rebuild_allowed": state.get("exit_rebuild_allowed"),
@@ -688,8 +688,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "symbol": self.config.symbol,
                 "cycle_completed_count": state.get("cycle_completed_count"),
-                "cycle_waiting_for_short_tp": state.get("cycle_waiting_for_short_tp"),
-                "short_tp_pending_cycle": state.get("short_tp_pending_cycle"),
+            "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+            "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
                 "pending_cycle_loss_usdt": state.get("pending_cycle_loss_usdt"),
                 "active_order_count": len(runtime_state.active_orders),
                 "startup_flat_reset_applied": bool(state.get("startup_flat_reset_applied")),
@@ -1795,8 +1795,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         bot_state = state.get("bot_state")
         long_qty = float(getattr(snapshot, "long_qty", 0.0) or 0.0)
         short_qty = float(getattr(snapshot, "short_qty", 0.0) or 0.0)
-        cycle_waiting_for_short_tp = bool(state.get("cycle_waiting_for_short_tp"))
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
+        cycle_waiting_for_short_tp = self._get_second_leg_waiting(state)
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state)
         refill_pending = bool(state.get("refill_pending"))
         refill_in_progress = bool(state.get("refill_in_progress"))
         last_refill_completed_cycle_index = int(state.get("last_refill_completed_cycle_index") or 0)
@@ -4588,8 +4588,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "fixed_cycle_exit_rebuild_not_blocked_by_pending_short_followup",
                 {
                     "symbol": snapshot.symbol or self.config.symbol,
-                    "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
-                    "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
+                    "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
+                    "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
                     "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
                     "reason": "recent_cycle_fill",
                 },
@@ -4605,8 +4605,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         current_short_cycle_index = int(state.get("current_short_cycle_index") or 0)
         pending_long_cycle_index = int(state.get("pending_long_cycle_index") or 0)
         pending_short_cycle_index = int(state.get("pending_short_cycle_index") or 0)
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
-        cycle_waiting_for_short_tp = bool(state.get("cycle_waiting_for_short_tp"))
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
+        cycle_waiting_for_short_tp = self._get_second_leg_waiting(state, cycle_state)
         cycle_long_add_filled = bool(state.get("cycle_long_add_filled"))
         cycle_short_tp_filled = bool(state.get("cycle_short_tp_filled"))
         pending_cycle_loss_usdt = float(state.get("pending_cycle_loss_usdt") or 0.0)
@@ -4723,7 +4723,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "current_long_cycle_index": int(state.get("current_long_cycle_index") or 0),
                 "current_short_cycle_index": int(state.get("current_short_cycle_index") or 0),
                 "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
-                "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
+                "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
                 "initial_entry_confirmed": bool(state.get("initial_entry_confirmed")),
                 "has_no_strategy_orders": has_no_strategy_orders,
                 "active_order_count": len(snapshot.active_orders),
@@ -5556,8 +5556,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
-        cycle_waiting_for_short_tp = bool(state.get("cycle_waiting_for_short_tp"))
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
+        cycle_waiting_for_short_tp = self._get_second_leg_waiting(state)
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state)
         if short_tp_pending_cycle > 0:
             pending_cycle_entry = self._get_cycle_sequence_entry(runtime_state, short_tp_pending_cycle)
             if bool(pending_cycle_entry.get("complete")):
@@ -5637,9 +5637,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_state = self._ensure_cycle_state(runtime_state)
         long_fill_price = self._cycle_state_last_fill_price(cycle_state.get("long_fills") or {})
         short_fill_price = self._cycle_state_last_fill_price(cycle_state.get("short_fills") or {})
-        long_add_pending = bool(state.get("long_add_pending"))
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
-        waiting_for_short_tp = bool(state.get("cycle_waiting_for_short_tp"))
+        long_add_pending = self._get_first_leg_pending(state, cycle_state)
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
+        waiting_for_short_tp = self._get_second_leg_waiting(state, cycle_state)
         if short_tp_pending_cycle > 0:
             pending_cycle_entry = self._get_cycle_sequence_entry(runtime_state, short_tp_pending_cycle)
             if bool(pending_cycle_entry.get("complete")):
@@ -5978,8 +5978,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 long_fill_exists = str(long_cycle_number) in cycle_state_long_fills
                 short_fill_exists = str(long_cycle_number) in cycle_state_short_fills
                 cycle_waiting_for_short_tp_flag = waiting_for_short_tp
-                short_tp_cycle = int(state.get("short_tp_pending_cycle") or 0)
-                cycle_state_waiting = bool(cycle_state.get("cycle_waiting_for_short_tp"))
+                short_tp_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
+                cycle_state_waiting = self._get_second_leg_waiting(state, cycle_state)
                 allow_long_reduce = not (
                     long_fill_exists
                     or self._cycle_status_blocks_build(
@@ -6205,7 +6205,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         self._ensure_cycle_sequence_state(runtime_state)
         cycle_state = self._ensure_cycle_state(runtime_state)
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
         cycle_index = short_tp_pending_cycle
         purpose = self._cycle_purpose("short", cycle_index) if cycle_index > 0 else None
         long_purpose = self._cycle_purpose("long", cycle_index) if cycle_index > 0 else None
@@ -6219,7 +6219,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "fixed_cycle_short_followup_entered_after_long_reduce_fill",
             {
                 "symbol": snapshot.symbol or self.config.symbol,
-                "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
+                "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
                 "short_tp_pending_cycle": short_tp_pending_cycle,
                 "cycle_index": cycle_index,
                 "active_order_purposes": active_order_purposes,
@@ -6256,13 +6256,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_index=cycle_index,
                 purpose=purpose,
                 long_purpose=long_purpose,
-                cycle_waiting_for_short_tp=bool(state.get("cycle_waiting_for_short_tp")),
+                cycle_waiting_for_short_tp=self._get_second_leg_waiting(state),
                 short_tp_pending_cycle=short_tp_pending_cycle,
                 current_long_cycle_index=int(state.get("current_long_cycle_index") or 0),
                 current_short_cycle_index=int(state.get("current_short_cycle_index") or 0),
                 cycle_long_add_filled=bool(state.get("cycle_long_add_filled")),
                 cycle_short_tp_filled=bool(state.get("cycle_short_tp_filled")),
-                long_add_pending=bool(state.get("long_add_pending")),
+                long_add_pending=self._get_first_leg_pending(state, cycle_state),
                 pending_cycle_loss_usdt=float(state.get("pending_cycle_loss_usdt") or 0.0),
                 pending_loss_updated_in_fill=bool(state.get("pending_loss_updated_in_fill")),
                 force_exit_rebuild=bool(state.get("force_exit_rebuild")),
@@ -6301,7 +6301,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if cycle_index <= 0:
             _emit_short_tp_follow_up_skip("cycle_index_non_positive")
             return []
-        cycle_waiting_for_short_tp = bool(state.get("cycle_waiting_for_short_tp"))
+        cycle_waiting_for_short_tp = self._get_second_leg_waiting(state)
         short_followup_pending = cycle_waiting_for_short_tp or (
             short_tp_pending_cycle > 0 and short_tp_pending_cycle == cycle_index
         )
@@ -7414,9 +7414,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
-        waiting_short = bool(state.get("cycle_waiting_for_short_tp"))
-        short_tp_pending_cycle = int(state.get("short_tp_pending_cycle") or 0)
-        long_add_pending = bool(state.get("long_add_pending"))
+        waiting_short = self._get_second_leg_waiting(state)
+        short_tp_pending_cycle = self._get_second_leg_pending_cycle(state)
+        long_add_pending = self._get_first_leg_pending(state, cycle_state)
         if long_add_pending and waiting_short and short_tp_pending_cycle > 0:
             context.audit.log_event(
                 "fixed_cycle_exit_skip",
@@ -8214,10 +8214,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "current_short_cycle_index": max(counts_before["current_short_cycle_index"], cycle_index),
         }
         followup_before = {
-            "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
-            "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
+            "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+            "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
             "pending_short_cycle_index": int(state.get("pending_short_cycle_index") or 0),
-            "long_add_pending": bool(state.get("long_add_pending")),
+            "long_add_pending": self._get_first_leg_pending(state, cycle_state),
             "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
         }
         if not self._cycle_has_confirmed_pair_pnl(runtime_state, cycle_index):
@@ -8319,10 +8319,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             ),
         }
         computed_followup_before = followup_before or {
-            "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
-            "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
+            "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state),
+            "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state),
             "pending_short_cycle_index": int(state.get("pending_short_cycle_index") or 0),
-            "long_add_pending": bool(state.get("long_add_pending")),
+            "long_add_pending": self._get_first_leg_pending(state),
             "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
         }
         state["cycle_long_add_filled"] = False
@@ -8983,10 +8983,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         ),
                     }
                     followup_before_dup = {
-                        "cycle_waiting_for_short_tp": bool(state.get("cycle_waiting_for_short_tp")),
-                        "short_tp_pending_cycle": int(state.get("short_tp_pending_cycle") or 0),
+                        "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+                        "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
                         "pending_short_cycle_index": int(state.get("pending_short_cycle_index") or 0),
-                        "long_add_pending": bool(state.get("long_add_pending")),
+                        "long_add_pending": self._get_first_leg_pending(state, cycle_state),
                         "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
                     }
                     self._force_commit_short_reduce_completion_even_if_duplicate(
@@ -9001,17 +9001,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         reason="duplicate_fill",
                     )
                 else:
-                    waiting_short = bool(state.get("cycle_waiting_for_short_tp"))
-                    short_pending = int(state.get("short_tp_pending_cycle") or 0)
+                    waiting_short = self._get_second_leg_waiting(state, cycle_state)
+                    short_pending = self._get_second_leg_pending_cycle(state, cycle_state)
                     if not waiting_short or short_pending != cycle_index:
-                        state["cycle_waiting_for_short_tp"] = True
-                        state["short_tp_pending_cycle"] = cycle_index
+                        self._set_second_leg_waiting_state(
+                            state, cycle_state, waiting=True, cycle_index=cycle_index
+                        )
+                        self._set_first_leg_pending(state, cycle_state, False)
                         state["pending_short_cycle_index"] = cycle_index
-                        state["long_add_pending"] = False
                         state["cycle_long_add_filled"] = True
                         state["cycle_short_tp_filled"] = False
-                        cycle_state["cycle_waiting_for_short_tp"] = True
-                        cycle_state["short_tp_pending_cycle"] = cycle_index
                         cycle_state["pending_short_cycle_index"] = cycle_index
                         _log_event(
                             "fixed_cycle_duplicate_long_reduce_fill_repaired_missing_short_followup_state",
@@ -9130,8 +9129,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
 
         if "_LONG_" in fill_event.purpose and "LONG_ADD" in fill_event.purpose:
-            state["long_add_pending"] = fill_event.status != "FILLED"
-            cycle_state["long_add_pending"] = state["long_add_pending"]
+            self._set_first_leg_pending(
+                state, cycle_state, fill_event.status != "FILLED"
+            )
             state["cycle_long_add_filled"] = True
             logger.info(
                 "[CYCLE-LONG] purpose=%s status=%s long_flag=%s cycle_count=%s",
@@ -9156,9 +9156,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 and order_fully_completed
                 and cycle_index > 0
             ):
-                state["cycle_waiting_for_short_tp"] = True
+                self._set_second_leg_waiting_state(
+                    state, cycle_state, waiting=True, cycle_index=cycle_index
+                )
                 state["pending_long_cycle_index"] = cycle_index
-                state["short_tp_pending_cycle"] = cycle_index
                 state["pending_short_cycle_index"] = cycle_index
                 _log_event(
                     "fixed_cycle_long_reduce_fill_sets_short_followup_pending",
@@ -9332,9 +9333,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if order_fully_completed:
                 long_index = int(state.get("current_long_cycle_index") or 0)
                 cycle_state["long_cycle_index"] = max(long_index, cycle_index)
-                cycle_state["cycle_waiting_for_short_tp"] = True
+                self._set_second_leg_waiting_state(
+                    state, cycle_state, waiting=True, cycle_index=cycle_index
+                )
                 cycle_state["pending_long_cycle_index"] = cycle_index
-                cycle_state["short_tp_pending_cycle"] = cycle_index
                 if context is not None:
                     self._refresh_long_fill_closed_pnl(
                         cycle_index=cycle_index,
@@ -10776,7 +10778,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> bool:
         self._seed_long_fill_closed_pnl_fields(long_fill)
         order_id = str(long_fill.get("order_id") or "").strip()
-        fetcher = getattr(context.order_manager, "fetch_closed_pnl", None) if context.order_manager else None
+        order_manager = getattr(context, "order_manager", None)
+        fetcher = getattr(order_manager, "fetch_closed_pnl", None) if order_manager else None
         if not order_id and fill_event is not None:
             seeded_order_id = str(fill_event.exchange_order_id or "").strip()
             if seeded_order_id:
@@ -11474,7 +11477,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "added_loss": new_pending - previous_pending,
                         "after": new_pending,
                         "reason": update_reason,
-                        "cycle_index": int(state.get("short_tp_pending_cycle") or 0),
+                        "cycle_index": self._get_second_leg_pending_cycle(state),
                     },
                 )
         else:
@@ -12013,25 +12016,81 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return f"CYCLE_{int(match.group(1))}_{cycle_suffix}"
         return purpose_text
 
-    def _set_second_leg_pending_cycle(self, state: dict[str, Any], cycle_index: int) -> None:
-        state["short_tp_pending_cycle"] = cycle_index
+    def _first_leg_pending_field(self) -> str:
+        return "long_add_pending"
 
-    def _get_second_leg_pending_cycle(self, state: dict[str, Any]) -> int:
-        return int(state.get("short_tp_pending_cycle") or 0)
+    def _second_leg_waiting_flag_field(self) -> str:
+        return "cycle_waiting_for_short_tp"
+
+    def _second_leg_pending_cycle_field(self) -> str:
+        return "short_tp_pending_cycle"
+
+    def _set_first_leg_pending(
+        self,
+        state: dict[str, Any],
+        cycle_state: dict[str, Any] | None,
+        value: bool,
+    ) -> None:
+        field = self._first_leg_pending_field()
+        state[field] = bool(value)
+        if cycle_state is not None:
+            cycle_state[field] = bool(value)
+
+    def _get_first_leg_pending(
+        self, state: dict[str, Any], cycle_state: dict[str, Any] | None = None
+    ) -> bool:
+        field = self._first_leg_pending_field()
+        if field in state:
+            return bool(state.get(field))
+        if cycle_state is not None:
+            return bool(cycle_state.get(field))
+        return False
+
+    def _set_second_leg_pending_cycle(self, state: dict[str, Any], cycle_index: int) -> None:
+        field = self._second_leg_pending_cycle_field()
+        state[field] = cycle_index
+
+    def _get_second_leg_pending_cycle(
+        self, state: dict[str, Any], cycle_state: dict[str, Any] | None = None
+    ) -> int:
+        field = self._second_leg_pending_cycle_field()
+        if field in state:
+            return int(state.get(field) or 0)
+        if cycle_state is not None:
+            return int(cycle_state.get(field) or 0)
+        return 0
 
     def _set_second_leg_waiting_state(
         self,
         state: dict[str, Any],
+        cycle_state: dict[str, Any] | None = None,
         *,
         waiting: bool,
         cycle_index: int | None = None,
     ) -> None:
-        state["cycle_waiting_for_short_tp"] = waiting
+        waiting_field = self._second_leg_waiting_flag_field()
+        pending_field = self._second_leg_pending_cycle_field()
+        state[waiting_field] = waiting
+        if cycle_state is not None:
+            cycle_state[waiting_field] = waiting
         if cycle_index is not None:
-            self._set_second_leg_pending_cycle(state, cycle_index if waiting else 0)
+            pending_value = int(cycle_index if waiting else 0)
+            state[pending_field] = pending_value
+            if cycle_state is not None:
+                cycle_state[pending_field] = pending_value
 
     def _clear_second_leg_waiting_state(self, state: dict[str, Any]) -> None:
         self._set_second_leg_waiting_state(state, waiting=False, cycle_index=0)
+
+    def _get_second_leg_waiting(
+        self, state: dict[str, Any], cycle_state: dict[str, Any] | None = None
+    ) -> bool:
+        waiting_field = self._second_leg_waiting_flag_field()
+        if waiting_field in state:
+            return bool(state.get(waiting_field))
+        if cycle_state is not None:
+            return bool(cycle_state.get(waiting_field))
+        return False
 
     def _get_second_leg_status(self, entry: dict[str, Any]) -> str:
         return str(entry.get("short_tp_status") or "NONE").upper()
@@ -12124,15 +12183,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         entry[f"{prefix}_trigger_price"] = float(trigger_price or 0.0)
         entry[f"{prefix}_reserved_at"] = int(time.time() * 1000)
         entry[f"{prefix}_purpose"] = normalized_purpose
+        cycle_state = self._ensure_cycle_state(runtime_state)
         if field_name == "long_add_status":
-            state["long_add_pending"] = True
-            cycle_state = self._ensure_cycle_state(runtime_state)
-            cycle_state["long_add_pending"] = True
+            self._set_first_leg_pending(state, cycle_state, True)
             log_event_name = "fixed_cycle_cycle_long_add_intent_reserved"
         else:
-            self._set_second_leg_waiting_state(state, waiting=True, cycle_index=cycle_index)
-            cycle_state = self._ensure_cycle_state(runtime_state)
-            self._set_second_leg_waiting_state(cycle_state, waiting=True, cycle_index=cycle_index)
+            self._set_second_leg_waiting_state(
+                state, cycle_state, waiting=True, cycle_index=cycle_index
+            )
             cycle_state["pending_short_cycle_index"] = cycle_index
             log_event_name = "fixed_cycle_cycle_short_tp_intent_reserved"
         self._persist_cycle_sequence_state(runtime_state)
@@ -12291,8 +12349,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_states[cycle_key] = self._default_cycle_sequence_entry()
         return cycle_states[cycle_key]
 
-    @staticmethod
     def _extract_cycle_sequence_target(
+        self,
         purpose: str,
         metadata: dict[str, Any] | None = None,
     ) -> tuple[int, str | None]:
@@ -15050,12 +15108,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             purpose=purpose,
             cycle_role=cycle_role,
         )
-        waiting_short_flag = bool(
-            state.get("cycle_waiting_for_short_tp") or cycle_state.get("cycle_waiting_for_short_tp")
-        )
-        short_tp_pending_state = int(cycle_state.get("short_tp_pending_cycle") or 0)
-        short_tp_pending_state_runtime = int(state.get("short_tp_pending_cycle") or 0)
-        short_tp_pending = short_tp_pending_state_runtime or short_tp_pending_state
+        waiting_short_flag = self._get_second_leg_waiting(state, cycle_state)
+        short_tp_pending = self._get_second_leg_pending_cycle(state, cycle_state)
         waiting_short = waiting_short_flag
         if short_tp_pending:
             pending_entry = self._get_cycle_sequence_entry(runtime_state, short_tp_pending)
@@ -16027,14 +16081,27 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
         return "long_reduce"
 
     def _get_second_leg_purpose(self, cycle_index: int) -> str:
-        return purpose_mapping.cycle_short_reduce(cycle_index)
+        return purpose_mapping.cycle_long_reduce(cycle_index)
 
     def _is_second_leg_purpose(self, purpose: str) -> bool:
         normalized = self._normalize_cycle_purpose(purpose)
+        # Long-add is kept as a legacy alias for short-bot second legs (can drop once no state emits it).
         return bool(
             re.fullmatch(r"CYCLE_\d+_LONG_ADD", normalized)
             or re.fullmatch(r"CYCLE_\d+_LONG_REDUCE", normalized)
         )
+
+    def _first_leg_pending_field(self) -> str:
+        return "short_add_pending"
+
+    def _second_leg_waiting_flag_field(self) -> str:
+        return "cycle_waiting_for_long_reduce"
+
+    def _second_leg_pending_cycle_field(self) -> str:
+        return "long_reduce_pending_cycle"
+
+    def _get_second_leg_status_field(self) -> str:
+        return "long_reduce_status"
 
     def _build_downside_cycle_intents(
         self,
@@ -16076,11 +16143,13 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
         *,
         recent_cycle_fill: bool = False,
     ) -> dict[str, Any] | None:
+        state = runtime_state.strategy_state
+        cycle_state = state.get("cycle_state") or {}
         _log_event(
             "short_strategy_short_reduce_defer_payload_ignored",
             {
                 "symbol": snapshot.symbol or self.config.symbol,
-                "cycle_index": int(runtime_state.strategy_state.get("short_tp_pending_cycle") or 0),
+                "cycle_index": self._get_second_leg_pending_cycle(state, cycle_state),
                 "reason": "mirror_short_path_pending",
             },
         )

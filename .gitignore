@@ -73,3 +73,8 @@ live_bots/100_50_hedge_bot/config/config.yaml
 # Keep bot registry/config trackable
 !live_bots/**/config/fixed_cycle_config.json
 !live_bots/**/bots.json
+
+# Python local environment
+.venv/
+__pycache__/
+*.pyc

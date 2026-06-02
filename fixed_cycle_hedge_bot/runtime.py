@@ -35,6 +35,7 @@ from .exchange_errors import ExchangeUnavailableError, compact_exchange_error
 from .order_manager import BybitOrderManager, OrderPayload
 from .position_manager import PositionManager
 from .trailing_fallback import TrailingFallbackManager
+from . import purpose_mapping
 
 
 @dataclass
@@ -1986,24 +1987,34 @@ class GenericHedgeRuntime:
                 ),
                 None,
             )
-            if (
-                replacement_order
-                and replacement_order.purpose.startswith("CYCLE_")
-                and "LONG_ADD" in replacement_order.purpose
-            ):
+            replacement_requirements = (
+                self._cycle_first_leg_reduce_requirements(replacement_order.purpose)
+                if replacement_order
+                else None
+            )
+            if replacement_order and replacement_requirements:
                 old_cycle_role = intent.metadata.get("cycle_role")
                 old_reduce_only = intent.reduce_only
                 old_position_idx = intent.position_idx
-                cycle_role_value = replacement_order.metadata.get("cycle_role") or "long_reduce"
+                cycle_role_value = (
+                    replacement_order.metadata.get("cycle_role")
+                    or replacement_requirements["cycle_role"]
+                )
                 intent.metadata["cycle_role"] = cycle_role_value
                 cycle_index_value = replacement_order.metadata.get("cycle_index")
                 if cycle_index_value is not None:
                     intent.metadata["cycle_index"] = cycle_index_value
                 intent.reduce_only = True
-                intent.position_idx = 1
-                intent.side = "long"
+                intent.position_idx = int(replacement_requirements["position_idx"])
+                intent.side = str(replacement_requirements["side"])
+                expected_position_idx = int(replacement_requirements["position_idx"])
+                replacement_position_idx = int(
+                    replacement_order.metadata.get("position_idx") or expected_position_idx
+                )
                 safe_cycle_replacement = bool(
-                    replacement_order.reduce_only and replacement_order.side == "long"
+                    replacement_order.reduce_only
+                    and replacement_order.side == replacement_requirements["side"]
+                    and replacement_position_idx == expected_position_idx
                 )
                 self.audit.log_event(
                     "fixed_cycle_long_reduce_intent_metadata_restored",
@@ -2123,24 +2134,28 @@ class GenericHedgeRuntime:
                     available_long_qty=fallback_context["available_long_qty"],
                     cycle_role=cycle_role,
                 )
+        first_leg_requirements = self._cycle_first_leg_reduce_requirements(intent.purpose)
         submit_notional = submit_qty * submit_price
-        if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
+        if first_leg_requirements:
             old_reduce_only = intent.reduce_only
             old_side = intent.side
             old_position = intent.position_idx
             old_cycle_role = intent.metadata.get("cycle_role")
             corrected = False
-            if intent.metadata.get("cycle_role") != "long_reduce":
-                intent.metadata["cycle_role"] = "long_reduce"
+            expected_cycle_role = first_leg_requirements["cycle_role"]
+            expected_side = str(first_leg_requirements["side"])
+            expected_position_idx = int(first_leg_requirements["position_idx"])
+            if intent.metadata.get("cycle_role") != expected_cycle_role:
+                intent.metadata["cycle_role"] = expected_cycle_role
                 corrected = True
-            if intent.side != "long":
-                intent.side = "long"
+            if intent.side != expected_side:
+                intent.side = expected_side
                 corrected = True
             if not intent.reduce_only:
                 intent.reduce_only = True
                 corrected = True
-            if intent.position_idx != 1:
-                intent.position_idx = 1
+            if intent.position_idx != expected_position_idx:
+                intent.position_idx = expected_position_idx
                 corrected = True
             if corrected:
                 self.audit.log_event(
@@ -2166,7 +2181,7 @@ class GenericHedgeRuntime:
         )
         cycle_waiting = cycle_waiting_flag and short_tp_pending_cycle > 0
         blocking_cycle_index = None
-        if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
+        if first_leg_requirements:
             cycle_index = 0
             try:
                 cycle_index = int((intent.metadata or {}).get("cycle_index") or 0)
@@ -2207,8 +2222,7 @@ class GenericHedgeRuntime:
                 blocking_cycle_index = None
         if (
             cycle_waiting
-            and intent.purpose.startswith("CYCLE_")
-            and "LONG_ADD" in intent.purpose
+            and first_leg_requirements
             and not safe_cycle_replacement
         ):
             existing_purposes = [
@@ -2265,12 +2279,15 @@ class GenericHedgeRuntime:
                 signature=final_exit_signature,
                 source=source,
             )
-        if intent.purpose.startswith("CYCLE_") and "LONG_ADD" in intent.purpose:
+        if first_leg_requirements:
             exchange_side_check = self._exchange_side(intent.side, intent.reduce_only)
+            expected_exchange_side = first_leg_requirements["exchange_side"]
+            expected_position_idx = int(first_leg_requirements["position_idx"])
+            expected_cycle_role = first_leg_requirements["cycle_role"]
             if (
-                exchange_side_check != "Sell"
+                exchange_side_check != expected_exchange_side
                 or not intent.reduce_only
-                or intent.position_idx != 1
+                or intent.position_idx != expected_position_idx
             ):
                 self.audit.log_event(
                     "fixed_cycle_invalid_long_reduce_order_blocked",
@@ -2280,6 +2297,9 @@ class GenericHedgeRuntime:
                     reduce_only=intent.reduce_only,
                     position_idx=intent.position_idx,
                     cycle_role=intent.metadata.get("cycle_role"),
+                    expected_exchange_side=expected_exchange_side,
+                    expected_position_idx=expected_position_idx,
+                    expected_cycle_role=expected_cycle_role,
                     qty=intent.qty,
                     trigger_price=intent.trigger_price,
                 )
@@ -2530,6 +2550,29 @@ class GenericHedgeRuntime:
             exchange_order_id=exchange_order_id,
         )
 
+    def _cycle_first_leg_reduce_requirements(
+        self,
+        purpose: object,
+    ) -> dict[str, object] | None:
+        normalized = str(purpose or "").upper()
+        if purpose_mapping.is_cycle_long_add(normalized):
+            return {
+                "side": "long",
+                "position_idx": 1,
+                "reduce_only": True,
+                "cycle_role": "long_reduce",
+                "exchange_side": "Sell",
+            }
+        if purpose_mapping.is_cycle_short_add(normalized):
+            return {
+                "side": "short",
+                "position_idx": 2,
+                "reduce_only": True,
+                "cycle_role": "short_reduce",
+                "exchange_side": "Buy",
+            }
+        return None
+
     def _build_long_add_market_fallback_context(
         self,
         *,
@@ -2625,7 +2668,8 @@ class GenericHedgeRuntime:
         price_tol = tick_size * 3
         qty_tol = (float(self.strategy.config.qty_step or 0.0) or 1e-9) * 2
         target_trigger = intent.trigger_price or 0.0
-        is_long_add = "LONG_ADD" in str(intent.purpose)
+        first_leg_requirements = self._cycle_first_leg_reduce_requirements(intent.purpose)
+        is_first_leg_reduce = first_leg_requirements is not None
         is_exit_order = intent.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
         is_final_exit_intent = self._is_final_exit_purpose(intent.purpose)
         final_exit_intent_signature = (
@@ -2800,7 +2844,7 @@ class GenericHedgeRuntime:
                     actual=existing_trigger,
                 )
                 continue
-            if is_long_add:
+            if is_first_leg_reduce:
                 qty_limit = long_add_qty_tol
             else:
                 qty_limit = qty_tol
