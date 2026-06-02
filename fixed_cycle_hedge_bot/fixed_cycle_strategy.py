@@ -5288,67 +5288,110 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "raw_trigger_price": raw_trigger_price,
                 "normalized_trigger_price": trigger_price,
                 "computed_qty_normalized": long_qty,
-                "purpose": self._cycle_purpose("long", cycle_index),
+                "purpose": self._get_first_leg_purpose(cycle_index),
             }
             context.audit.log_event("fixed_cycle_downside_skip", **skip_payload)
             return None
-        purpose = self._cycle_purpose("long", cycle_index)
-        long_reduce_payload = {
-            "strategy": self.name,
+        purpose = self._get_first_leg_purpose(cycle_index)
+        context.audit.log_event(
+            "fixed_cycle_long_reduce_planned",
+            {
+                "strategy": self.name,
+                "cycle_index": cycle_index,
+                "side": self._get_first_leg_side(),
+                "purpose": purpose,
+                "entry_reference_price": entry_reference_price,
+                "distance_pct": long_distance_pct_config,
+                "distance_pct_used": long_distance_pct,
+                "long_fill_price": long_fill_price,
+                "cycle_entry_price": cycle_entry_price,
+                "live_reference_price": reference_price,
+                "final_long_reference": long_reference,
+                "reference_source": reference_source,
+                "reference_cycle_index": reference_cycle_index,
+                "reference_purpose": reference_purpose,
+                "reference_price": reference_price_for_long_add,
+                "long_fill_distance_pct": self.config.long_fill_distance_pct,
+                "trigger_price": trigger_price,
+                "trigger_formula": "final_long_reference * (1 - distance_pct)",
+                "trigger_price_raw": raw_trigger_price,
+                "trigger_price_normalized": trigger_price,
+                "qty_formula": "current_long_qty * reduction_pct_per_fill",
+                "qty_raw": snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill),
+                "qty_normalized": long_qty,
+                "order_type": "Limit",
+                "reduce_only": True,
+            },
+        )
+        intent = self._create_cycle_first_leg_intent(
+            runtime_state=runtime_state,
+            cycle_index=cycle_index,
+            side=self._get_first_leg_side(),
+            position_idx=self._get_first_leg_position_idx(),
+            role=self._get_first_leg_cycle_role(),
+            purpose=purpose,
+            qty=long_qty,
+            trigger_price=trigger_price,
+            entry_reference_price=entry_reference_price,
+            reference_source=reference_source,
+            reference_cycle_index=reference_cycle_index,
+            reference_purpose=reference_purpose,
+            reference_price=reference_price_for_long_add,
+            replace_open_purpose=purpose
+            if self._should_attach_replace_open_purpose(snapshot, runtime_state, purpose)
+            else None,
+        )
+        return intent
+
+    def _create_cycle_first_leg_intent(
+        self,
+        *,
+        runtime_state: RuntimeState,
+        cycle_index: int,
+        side: str,
+        position_idx: int,
+        role: str,
+        purpose: str,
+        qty: float,
+        trigger_price: float,
+        entry_reference_price: float,
+        reference_source: str,
+        reference_cycle_index: int,
+        reference_purpose: str,
+        reference_price: float,
+        replace_open_purpose: str | None = None,
+        field_name: str = "long_add_status",
+        rebuild_flag_field: str | None = "long_add_rebuild_allowed",
+    ) -> StrategyIntent:
+        state = runtime_state.strategy_state
+        metadata: dict[str, Any] = {
             "cycle_index": cycle_index,
-            "side": "long",
-            "purpose": purpose,
+            "cycle_role": role,
             "entry_reference_price": entry_reference_price,
-            "distance_pct": long_distance_pct_config,
-            "distance_pct_used": long_distance_pct,
-            "long_fill_price": long_fill_price,
-            "cycle_entry_price": cycle_entry_price,
-            "live_reference_price": reference_price,
-            "final_long_reference": long_reference,
             "reference_source": reference_source,
             "reference_cycle_index": reference_cycle_index,
             "reference_purpose": reference_purpose,
-            "reference_price": reference_price_for_long_add,
-            "long_fill_distance_pct": self.config.long_fill_distance_pct,
-            "trigger_price": trigger_price,
-            "trigger_formula": "final_long_reference * (1 - distance_pct)",
-            "trigger_price_raw": raw_trigger_price,
-            "trigger_price_normalized": trigger_price,
-            "qty_formula": "current_long_qty * reduction_pct_per_fill",
-            "qty_raw": snapshot.long_qty * self._pct(self.config.reduction_pct_per_fill),
-            "qty_normalized": long_qty,
-            "order_type": "Limit",
-            "reduce_only": True,
+            "reference_price": reference_price,
         }
-        context.audit.log_event("fixed_cycle_long_reduce_planned", **long_reduce_payload)
+        if replace_open_purpose:
+            metadata["replace_open_purpose"] = replace_open_purpose
+        normalized_purpose = self._normalize_cycle_purpose(
+            purpose,
+            {"cycle_index": cycle_index, "cycle_role": role},
+        )
         self._reserve_cycle_intent_slot(
             runtime_state,
             cycle_index=cycle_index,
-            field_name="long_add_status",
-            normalized_purpose=self._normalize_cycle_purpose(
-                purpose,
-                {
-                    "cycle_index": cycle_index,
-                    "cycle_role": "long_reduce",
-                },
-            ),
-            qty=long_qty,
+            field_name=field_name,
+            normalized_purpose=normalized_purpose,
+            qty=qty,
             trigger_price=trigger_price,
         )
-        metadata: dict[str, Any] = {
-            "cycle_index": cycle_index,
-            "cycle_role": "long_reduce",
-            "entry_reference_price": entry_reference_price,
-            "reference_source": reference_source,
-            "reference_cycle_index": reference_cycle_index,
-            "reference_purpose": reference_purpose,
-            "reference_price": reference_price_for_long_add,
-        }
-        if self._should_attach_replace_open_purpose(snapshot, runtime_state, purpose):
-            metadata["replace_open_purpose"] = purpose
-        intent = StrategyIntent(
-            side="long",
-            qty=long_qty,
+        if rebuild_flag_field:
+            state[rebuild_flag_field] = False
+        return StrategyIntent(
+            side=side,
+            qty=qty,
             purpose=purpose,
             order_type="Market",
             reduce_only=True,
@@ -5356,11 +5399,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_direction=2,
             trigger_by="LastPrice",
             close_on_trigger=True,
-            position_idx=1,
+            position_idx=position_idx,
             metadata=metadata,
         )
-        state["long_add_rebuild_allowed"] = False
-        return intent
 
     def _build_downside_cycle_intents(
         self,
@@ -12004,7 +12045,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         purpose_text = str(purpose or "").upper()
         metadata = metadata or {}
         cycle_index, field_name = self._extract_cycle_sequence_target(purpose_text, metadata)
-        if cycle_index > 0 and field_name == "long_add_status":
+        if cycle_index > 0 and self._is_cycle_first_leg_field(field_name):
             return self._cycle_purpose("long", cycle_index)
         if cycle_index > 0 and field_name == self._get_second_leg_status_field():
             return self._cycle_purpose("short", cycle_index)
@@ -12147,13 +12188,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         new_status: str,
     ) -> None:
         state = runtime_state.strategy_state
-        prefix = "long_add" if field_name == "long_add_status" else "short_tp"
+        prefix = self._cycle_entry_prefix(field_name)
         entry[field_name] = new_status
         entry[f"{prefix}_qty"] = 0.0
         entry[f"{prefix}_trigger_price"] = 0.0
         entry[f"{prefix}_reserved_at"] = 0
         entry[f"{prefix}_purpose"] = None
-        if field_name == "long_add_status":
+        if self._is_cycle_first_leg_field(field_name):
             state["long_add_pending"] = False
             cycle_state = self._ensure_cycle_state(runtime_state)
             cycle_state["long_add_pending"] = False
@@ -12163,6 +12204,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_state = self._ensure_cycle_state(runtime_state)
             self._clear_second_leg_waiting_state(cycle_state)
             cycle_state["pending_short_cycle_index"] = 0
+
+    def _get_first_leg_status_field(self) -> str:
+        return "long_add_status"
+
+    def _cycle_entry_role(self, field_name: str) -> str:
+        return "first_leg" if field_name == self._get_first_leg_status_field() else "second_leg"
+
+    def _cycle_entry_prefix(self, field_name: str) -> str:
+        role = self._cycle_entry_role(field_name)
+        return "long_add" if role == "first_leg" else "short_tp"
+
+    def _is_cycle_first_leg_field(self, field_name: str) -> bool:
+        return self._cycle_entry_role(field_name) == "first_leg"
+
+    def _get_first_leg_side(self) -> str:
+        return "long"
+
+    def _get_first_leg_position_idx(self) -> int:
+        return 1
+
+    def _get_first_leg_cycle_role(self) -> str:
+        return "long_reduce"
+
+    def _get_first_leg_purpose(self, cycle_index: int) -> str:
+        return self._cycle_purpose(self._get_first_leg_side(), cycle_index)
 
     def _reserve_cycle_intent_slot(
         self,
@@ -12176,7 +12242,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> None:
         state = runtime_state.strategy_state
         entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
-        prefix = "long_add" if field_name == "long_add_status" else "short_tp"
+        prefix = self._cycle_entry_prefix(field_name)
         previous_status = str(entry.get(field_name) or "NONE").upper()
         entry[field_name] = "INTENT_BUILT"
         entry[f"{prefix}_qty"] = float(qty or 0.0)
@@ -12184,7 +12250,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         entry[f"{prefix}_reserved_at"] = int(time.time() * 1000)
         entry[f"{prefix}_purpose"] = normalized_purpose
         cycle_state = self._ensure_cycle_state(runtime_state)
-        if field_name == "long_add_status":
+        if self._is_cycle_first_leg_field(field_name):
             self._set_first_leg_pending(state, cycle_state, True)
             log_event_name = "fixed_cycle_cycle_long_add_intent_reserved"
         else:
@@ -12299,7 +12365,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if field_name == self._get_second_leg_status_field()
             else str(entry.get(field_name) or "NONE").upper()
         )
-        prefix = "long_add" if field_name == "long_add_status" else "short_tp"
+        prefix = self._cycle_entry_prefix(field_name)
         if runtime_matches or snapshot_matches:
             matched_status = str(
                 (runtime_matches + snapshot_matches)[0].get("normalized_status") or "SUBMITTED"
@@ -12424,7 +12490,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if normalized_status == "FILLED":
                 event_name = (
                     "fixed_cycle_cycle_long_add_marked_filled"
-                    if field_name == "long_add_status"
+                    if self._is_cycle_first_leg_field(field_name)
                     else "fixed_cycle_cycle_short_tp_marked_filled"
                 )
                 _log_event(
@@ -12451,7 +12517,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
             cycle_index, _ = self._extract_cycle_sequence_target(purpose, metadata)
-            if cycle_index > 0 and field_name == "long_add_status":
+            if cycle_index > 0 and self._is_cycle_first_leg_field(field_name):
                 self._purge_filled_long_add_orders(runtime_state, cycle_index)
         if (
             entry.get("long_add_status") == "FILLED"
