@@ -1,19 +1,27 @@
 .venv/
-node_modules/
+venv/
+env/
 __pycache__/
-.pytest_cache/
+*.pyc
+
+.cursor/
+.git/
+node_modules/
 
 logs/
 **/logs/
-**/*.log
-**/*.jsonl
-
 **/snapshots/
-**/state/
 **/run/
+**/*.pid
+**/*.lock
 
-processed_data/
-split_output/
+*.log
+*.jsonl
+*.csv
 *.parquet
 *.feather
-*.csv
+
+cleanup_backup_*/
+backup_*/
+tmp/
+temp/

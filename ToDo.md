@@ -165,3 +165,23 @@ cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 /home/telgenbuescher/projects/spread_recovery_hedge/modular_hedge_runtime/strategy.md
 
 ######################################################################################################################
+
+SHORT_FIXED_SYMBOL=XRPUSDT bash live_bots/short_hedge_bot/short_bot_1/scripts/start.sh
+
+
+bash live_bots/short_hedge_bot/short_bot_1/scripts/stop_with_cleanup.sh
+
+ok check jetzt wieder warum die cycle und exit orders nicht gestetzt wurden 
+
+/home/telgenbuescher/projects/spread_recovery_hedge
+
+
+
+
+
+
+Wichtig:
+Bitte nichts Neues erfinden.
+Erst den bestehenden Referenz-Long-Bot unter /home/telgenbuescher/projects/spread_recovery_hedge analysieren.
+Dann die dort vorhandene Lösung exakt gespiegelt für den Short-Bot übernehmen.
+Keine neue Architektur, keine neue State-Machine, keine alternativen Regeln.

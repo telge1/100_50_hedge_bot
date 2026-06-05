@@ -151,10 +151,18 @@ exchange_flat_check() {
   fi
 
   export EXCHANGE_FLAT_PAYLOAD="${payload}"
-  mapfile -t flat_values < <(python3 - <<PY
-import json, os, math
+mapfile -t flat_values < <(python3 - <<PY
+import json
+import math
+import os
+import sys
 
-payload = json.loads(os.environ["EXCHANGE_FLAT_PAYLOAD"])
+payload_raw = os.environ.get("EXCHANGE_FLAT_PAYLOAD") or ""
+try:
+    payload = json.loads(payload_raw)
+except json.JSONDecodeError:
+    payload = {}
+    print("[DEBUG] exchange_flat payload invalid or empty, falling back to defaults", file=sys.stderr)
 
 def normalize(value, integer=False):
     try:
@@ -234,6 +242,14 @@ is_alive_pid_with_bot_name() {
 }
 
 read_reserved_symbol() {
+  if [[ -n "${SHORT_SKIP_SYMBOL_RESERVATION:-}" ]]; then
+    if [[ -n "${SHORT_FIXED_SYMBOL:-}" ]]; then
+      echo "${SHORT_FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]'
+    else
+      echo "XRPUSDT"
+    fi
+    return
+  fi
   python3 <<PY
 import json
 from pathlib import Path
@@ -313,54 +329,43 @@ if [[ -f "${PID_FILE}" ]]; then
   rm -f "${PID_FILE}"
 fi
 
-mapfile -t WAIT_INFO < <(python3 <<PY
-import json
-from pathlib import Path
-
-bot_name = "${BOT_NAME}"
-best_path = Path("${PROJECT_ROOT}/logs/best_coin.json")
-state_path = Path("${BOT_GROUP_DIR}/state/active_bot_symbols.json")
-symbol = ""
-reason = "no_new_symbol_available"
-reserved_by = ""
-
-if best_path.exists():
-    payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
-    symbol = (payload.get("symbol") or "").upper()
-if symbol:
-    reason = "selected_symbol_reserved"
-    if state_path.exists():
-        state = json.loads(state_path.read_text(encoding="utf-8") or "{}")
-        for other, entry in state.items():
-            if other != bot_name and entry.get("symbol") == symbol and entry.get("status") == "reserved":
-                reserved_by = other
-                break
-    if not reserved_by:
-        reason = "new_symbol_available"
-print(symbol)
-print(reason)
-print(reserved_by)
-PY
-)
-
-WAIT_SYMBOL="${WAIT_INFO[0]:-}"
-WAIT_REASON="${WAIT_INFO[1]:-waiting_for_symbol}"
-WAIT_RESERVED_BY="${WAIT_INFO[2]:-}"
+WAIT_SYMBOL="${SHORT_FIXED_SYMBOL:-XRPUSDT}"
+WAIT_REASON="forced_symbol"
+WAIT_RESERVED_BY=""
 
 ensure_wait_pid_clean
 
-echo "[${BOT_NAME}] wallet capture skipped: global wallet refill watcher handles this later"
+FIXED_SYMBOL="${SHORT_FIXED_SYMBOL:-}"
+SKIP_SYMBOL_RESERVATION="${SHORT_SKIP_SYMBOL_RESERVATION:-}"
+if [[ -n "${FIXED_SYMBOL}" ]]; then
+  FIXED_SYMBOL="$(echo "${FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]')"
+  echo "[${BOT_NAME}] using forced symbol ${FIXED_SYMBOL}"
+  RESERVED_SYMBOL="${FIXED_SYMBOL}"
+  if [[ -z "${SKIP_SYMBOL_RESERVATION}" ]]; then
+    write_reserved_runtime_files "${RESERVED_SYMBOL}"
+  else
+    echo "[${BOT_NAME}] skipping persistent reservation (SHORT_SKIP_SYMBOL_RESERVATION enabled)"
+  fi
+elif [[ -n "${SKIP_SYMBOL_RESERVATION}" ]]; then
+  RESERVED_SYMBOL="${WAIT_SYMBOL}"
+  if [[ -z "${RESERVED_SYMBOL}" ]]; then
+    RESERVED_SYMBOL="BTCUSDT"
+  fi
+  echo "[${BOT_NAME}] skipping symbol reservation and using ${RESERVED_SYMBOL}"
+else
+  echo "[${BOT_NAME}] wallet capture skipped: global wallet refill watcher handles this later"
 
-write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
-echo "$$" > "${WAIT_PID_FILE}"
-if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; then
-  echo "[${BOT_NAME}] waiting_for_symbol (${WAIT_REASON})" >&2
-  exit 1
+  write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
+  echo "$$" > "${WAIT_PID_FILE}"
+  if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; then
+    echo "[${BOT_NAME}] waiting_for_symbol (${WAIT_REASON})" >&2
+    exit 1
+  fi
+  cleanup_wait_files
+
+  RESERVED_SYMBOL="$(read_reserved_symbol)"
+  write_reserved_runtime_files "${RESERVED_SYMBOL}"
 fi
-cleanup_wait_files
-
-RESERVED_SYMBOL="$(read_reserved_symbol)"
-write_reserved_runtime_files "${RESERVED_SYMBOL}"
 
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 

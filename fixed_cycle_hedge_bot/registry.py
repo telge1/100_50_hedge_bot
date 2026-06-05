@@ -11,7 +11,11 @@ from strategy.config import StrategyConfig
 
 from .basket_exit_strategy import BasketExitConfig, BasketExitHedgeStrategy
 from .dynamic_breakeven_strategy import DynamicBreakevenConfig, DynamicBreakevenHedgeStrategy
-from .fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
+from .fixed_cycle_strategy import (
+    FixedCycleHedgeConfig,
+    FixedCycleHedgeStrategy,
+    ShortFixedCycleHedgeStrategy,
+)
 from .runtime import GenericHedgeRuntime, GenericRuntimeConfig
 
 logger = logging.getLogger(__name__)
@@ -188,6 +192,22 @@ def _build_basket_exit_runtime(base_config: StrategyConfig, strategy_config_path
     return GenericHedgeRuntime(runtime_config, strategy)
 
 
+STRATEGY_CLASS_MAP: dict[str, type[FixedCycleHedgeStrategy]] = {
+    "FixedCycleHedgeStrategy": FixedCycleHedgeStrategy,
+    "ShortFixedCycleHedgeStrategy": ShortFixedCycleHedgeStrategy,
+}
+
+
+def _select_fixed_cycle_strategy_class(name: str) -> type[FixedCycleHedgeStrategy]:
+    cls = STRATEGY_CLASS_MAP.get(name)
+    if cls is None:
+        valid = ", ".join(sorted(STRATEGY_CLASS_MAP.keys()))
+        raise ValueError(
+            f"Unknown fixed-cycle strategy_class '{name}'. Allowed: {valid}"
+        )
+    return cls
+
+
 def _build_fixed_cycle_runtime(base_config: StrategyConfig, strategy_config_path: str | None = None) -> GenericHedgeRuntime:
     strategy_config = FixedCycleHedgeConfig.from_json_file(strategy_config_path)
     applied_symbols = apply_startup_best_coin_symbol(strategy_config)
@@ -212,7 +232,18 @@ def _build_fixed_cycle_runtime(base_config: StrategyConfig, strategy_config_path
         log_file="logs/fixed_cycle_hedge_runtime.log",
         audit_log_file="logs/fixed_cycle_hedge_runtime_audit.jsonl",
     )
-    strategy = FixedCycleHedgeStrategy(strategy_config)
+    strategy_class_name = strategy_config.strategy_class or "FixedCycleHedgeStrategy"
+    strategy_cls = _select_fixed_cycle_strategy_class(strategy_class_name)
+    logger.info(
+        "fixed_cycle_strategy_class_selected",
+        {
+            "strategy": "fixed_cycle",
+            "strategy_class": strategy_class_name,
+            "config_path": strategy_config_path,
+            "default_symbol": runtime_config.symbol,
+        },
+    )
+    strategy = strategy_cls(strategy_config)
     return GenericHedgeRuntime(runtime_config, strategy)
 
 

@@ -1,0 +1,394 @@
+]633;E;echo "===== purpose_mapping.py =====";c0da0a1a-8bd9-424d-b2c6-9cd7980653c9]633;C===== purpose_mapping.py =====
+diff --git a/fixed_cycle_hedge_bot/purpose_mapping.py b/fixed_cycle_hedge_bot/purpose_mapping.py
+index 4a20193..e1588da 100644
+--- a/fixed_cycle_hedge_bot/purpose_mapping.py
++++ b/fixed_cycle_hedge_bot/purpose_mapping.py
+@@ -4,6 +4,8 @@ from __future__ import annotations
+ 
+ 
+ def cycle_long_add(cycle_index: int) -> str:
++    # NOTE: The long cycle naming still uses "_LONG_ADD" even when the runtime
++    # interprets the intent as a long reduce leg (side=Sell, reduce_only=True).
+     return f"CYCLE_{cycle_index}_LONG_ADD"
+ 
+ 
+@@ -12,6 +14,8 @@ def cycle_short_reduce(cycle_index: int) -> str:
+ 
+ 
+ def cycle_short_add(cycle_index: int) -> str:
++    # NOTE: Despite the "_SHORT_ADD" suffix, these purposes represent short
++    # reduce legs in the current runtime (side=Buy, reduce_only=True).
+     return f"CYCLE_{cycle_index}_SHORT_ADD"
+ 
+ 
+@@ -24,6 +28,8 @@ def normalize_purpose(purpose: object) -> str:
+ 
+ 
+ def is_cycle_long_add(purpose: object) -> bool:
++    # NOTE: The intent name ends with "_LONG_ADD" even though the runtime
++    # enforces long reduce semantics for these purposes.
+     normalized = normalize_purpose(purpose)
+     return normalized.startswith("CYCLE_") and normalized.endswith("_LONG_ADD")
+ 
+@@ -34,6 +40,8 @@ def is_cycle_short_reduce(purpose: object) -> bool:
+ 
+ 
+ def is_cycle_short_add(purpose: object) -> bool:
++    # NOTE: Historical naming keeps “_SHORT_ADD” here, but the runtime treats
++    # such intents as short reduce legs.
+     normalized = normalize_purpose(purpose)
+     return normalized.startswith("CYCLE_") and normalized.endswith("_SHORT_ADD")
+ 
+===== registry.py =====
+diff --git a/fixed_cycle_hedge_bot/registry.py b/fixed_cycle_hedge_bot/registry.py
+index 647b949..f47cf5e 100644
+--- a/fixed_cycle_hedge_bot/registry.py
++++ b/fixed_cycle_hedge_bot/registry.py
+@@ -11,7 +11,11 @@ from strategy.config import StrategyConfig
+ 
+ from .basket_exit_strategy import BasketExitConfig, BasketExitHedgeStrategy
+ from .dynamic_breakeven_strategy import DynamicBreakevenConfig, DynamicBreakevenHedgeStrategy
+-from .fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
++from .fixed_cycle_strategy import (
++    FixedCycleHedgeConfig,
++    FixedCycleHedgeStrategy,
++    ShortFixedCycleHedgeStrategy,
++)
+ from .runtime import GenericHedgeRuntime, GenericRuntimeConfig
+ 
+ logger = logging.getLogger(__name__)
+@@ -188,6 +192,22 @@ def _build_basket_exit_runtime(base_config: StrategyConfig, strategy_config_path
+     return GenericHedgeRuntime(runtime_config, strategy)
+ 
+ 
++STRATEGY_CLASS_MAP: dict[str, type[FixedCycleHedgeStrategy]] = {
++    "FixedCycleHedgeStrategy": FixedCycleHedgeStrategy,
++    "ShortFixedCycleHedgeStrategy": ShortFixedCycleHedgeStrategy,
++}
++
++
++def _select_fixed_cycle_strategy_class(name: str) -> type[FixedCycleHedgeStrategy]:
++    cls = STRATEGY_CLASS_MAP.get(name)
++    if cls is None:
++        valid = ", ".join(sorted(STRATEGY_CLASS_MAP.keys()))
++        raise ValueError(
++            f"Unknown fixed-cycle strategy_class '{name}'. Allowed: {valid}"
++        )
++    return cls
++
++
+ def _build_fixed_cycle_runtime(base_config: StrategyConfig, strategy_config_path: str | None = None) -> GenericHedgeRuntime:
+     strategy_config = FixedCycleHedgeConfig.from_json_file(strategy_config_path)
+     applied_symbols = apply_startup_best_coin_symbol(strategy_config)
+@@ -212,7 +232,18 @@ def _build_fixed_cycle_runtime(base_config: StrategyConfig, strategy_config_path
+         log_file="logs/fixed_cycle_hedge_runtime.log",
+         audit_log_file="logs/fixed_cycle_hedge_runtime_audit.jsonl",
+     )
+-    strategy = FixedCycleHedgeStrategy(strategy_config)
++    strategy_class_name = strategy_config.strategy_class or "FixedCycleHedgeStrategy"
++    strategy_cls = _select_fixed_cycle_strategy_class(strategy_class_name)
++    logger.info(
++        "fixed_cycle_strategy_class_selected",
++        {
++            "strategy": "fixed_cycle",
++            "strategy_class": strategy_class_name,
++            "config_path": strategy_config_path,
++            "default_symbol": runtime_config.symbol,
++        },
++    )
++    strategy = strategy_cls(strategy_config)
+     return GenericHedgeRuntime(runtime_config, strategy)
+ 
+ 
+===== runtime.py =====
+diff --git a/fixed_cycle_hedge_bot/runtime.py b/fixed_cycle_hedge_bot/runtime.py
+index d3ca9c9..abae034 100644
+--- a/fixed_cycle_hedge_bot/runtime.py
++++ b/fixed_cycle_hedge_bot/runtime.py
+@@ -1769,6 +1769,23 @@ class GenericHedgeRuntime:
+             )
+             return None
+         self._ensure_max_leverage_before_trading()
++        duplicate_order, duplicate_source = self._find_duplicate_open_cycle_purpose(intent, snapshot)
++        if duplicate_order is not None:
++            existing_status = str(getattr(duplicate_order, "status", None) or "").upper()
++            existing_trigger_price = getattr(duplicate_order, "trigger_price", None)
++            self.audit.log_event(
++                "fixed_cycle_duplicate_open_purpose_submit_blocked",
++                strategy=self.strategy.name,
++                purpose=intent.purpose,
++                intent_qty=intent.qty,
++                intent_trigger_price=intent.trigger_price,
++                existing_client_order_id=getattr(duplicate_order, "client_order_id", None),
++                existing_exchange_order_id=getattr(duplicate_order, "exchange_order_id", None),
++                existing_status=existing_status,
++                existing_trigger_price=existing_trigger_price,
++                source=duplicate_source,
++            )
++            return getattr(duplicate_order, "client_order_id", None)
+         equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
+         decision = "reuse" if equivalent_order is not None else "replace"
+         exit_purposes = set(self.strategy._exit_purposes())
+@@ -2157,6 +2174,10 @@ class GenericHedgeRuntime:
+             if intent.position_idx != expected_position_idx:
+                 intent.position_idx = expected_position_idx
+                 corrected = True
++            # NOTE: This audit hook intentionally renames the intent from "ADD" to
++            # the canonical long/short reduce settings. The name is historical,
++            # so we rewrite `reduce_only` and `side` here to keep the runtime
++            # semantics consistent with a reduce leg.
+             if corrected:
+                 self.audit.log_event(
+                     "fixed_cycle_long_reduce_intent_corrected",
+@@ -2555,7 +2576,17 @@ class GenericHedgeRuntime:
+         purpose: object,
+     ) -> dict[str, object] | None:
+         normalized = str(purpose or "").upper()
+-        if purpose_mapping.is_cycle_long_add(normalized):
++        # NOTE: Historically the Long cycle helpers keep the "_LONG_ADD" suffix,
++        # but the runtime treats these intents as Long reduce/close legs. They end
++        # up as side=Sell, position_idx=1, reduce_only=True. Do not infer that the
++        # name implies a position increase.
++        first_leg_side_getter = getattr(self.strategy, "_get_first_leg_side", None)
++        first_leg_side = (
++            str(first_leg_side_getter() or "long").lower()
++            if callable(first_leg_side_getter)
++            else "long"
++        )
++        if first_leg_side == "long" and purpose_mapping.is_cycle_long_add(normalized):
+             return {
+                 "side": "long",
+                 "position_idx": 1,
+@@ -2563,7 +2594,18 @@ class GenericHedgeRuntime:
+                 "cycle_role": "long_reduce",
+                 "exchange_side": "Sell",
+             }
+-        if purpose_mapping.is_cycle_short_add(normalized):
++        # NOTE: Likewise, the short cycle helper reuses "SHORT_ADD" even though the
++        # runtime treats it as a Short reduce leg (Buy, position_idx=2,
++        # reduce_only=True). This naming is misleading but intentional.
++        if first_leg_side == "short" and purpose_mapping.is_cycle_short_reduce(normalized):
++            return {
++                "side": "short",
++                "position_idx": 2,
++                "reduce_only": True,
++                "cycle_role": "short_reduce",
++                "exchange_side": "Buy",
++            }
++        if first_leg_side == "long" and purpose_mapping.is_cycle_short_add(normalized):
+             return {
+                 "side": "short",
+                 "position_idx": 2,
+@@ -2571,6 +2613,14 @@ class GenericHedgeRuntime:
+                 "cycle_role": "short_reduce",
+                 "exchange_side": "Buy",
+             }
++        if first_leg_side == "short" and purpose_mapping.is_cycle_long_reduce(normalized):
++            return {
++                "side": "long",
++                "position_idx": 1,
++                "reduce_only": True,
++                "cycle_role": "long_reduce",
++                "exchange_side": "Sell",
++            }
+         return None
+ 
+     def _build_long_add_market_fallback_context(
+@@ -4663,6 +4713,32 @@ class GenericHedgeRuntime:
+     def _is_terminal_order_status(status: Any) -> bool:
+         return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
+ 
++    def _find_duplicate_open_cycle_purpose(
++        self, intent: StrategyIntent, snapshot: HedgeSnapshot
++    ) -> tuple[ManagedOrder | None, str | None]:
++        purpose_upper = str(intent.purpose or "").upper()
++        if not purpose_upper.startswith("CYCLE_"):
++            return None, None
++        def _order_status(order: Any) -> str:
++            status = getattr(order, "status", None)
++            if status is None and isinstance(order, dict):
++                status = order.get("status")
++            return str(status or "").upper()
++
++        for order_source, orders in (
++            ("runtime", self.runtime_state.active_orders.values()),
++            ("snapshot", snapshot.active_orders),
++        ):
++            for order in orders:
++                order_purpose = str(getattr(order, "purpose", None) or (order.get("purpose") if isinstance(order, dict) else None) or "").upper()
++                if order_purpose != purpose_upper:
++                    continue
++                status_normalized = self._normalize_order_status(getattr(order, "status", None) if hasattr(order, "status") else order.get("status") if isinstance(order, dict) else None)
++                if self._is_terminal_order_status(status_normalized):
++                    continue
++                return order, order_source
++        return None, None
++
+     def _is_unsettled_strategy_order(self, order: ManagedOrder) -> bool:
+         purpose = str(getattr(order, "purpose", "") or "").upper()
+         status = str(getattr(order, "status", "") or "").upper()
+===== start_short_bot.sh =====
+diff --git a/live_bots/short_hedge_bot/shared_scripts/start_short_bot.sh b/live_bots/short_hedge_bot/shared_scripts/start_short_bot.sh
+index ddae2c3..83f49fd 100755
+--- a/live_bots/short_hedge_bot/shared_scripts/start_short_bot.sh
++++ b/live_bots/short_hedge_bot/shared_scripts/start_short_bot.sh
+@@ -151,10 +151,18 @@ exchange_flat_check() {
+   fi
+ 
+   export EXCHANGE_FLAT_PAYLOAD="${payload}"
+-  mapfile -t flat_values < <(python3 - <<PY
+-import json, os, math
++mapfile -t flat_values < <(python3 - <<PY
++import json
++import math
++import os
++import sys
+ 
+-payload = json.loads(os.environ["EXCHANGE_FLAT_PAYLOAD"])
++payload_raw = os.environ.get("EXCHANGE_FLAT_PAYLOAD") or ""
++try:
++    payload = json.loads(payload_raw)
++except json.JSONDecodeError:
++    payload = {}
++    print("[DEBUG] exchange_flat payload invalid or empty, falling back to defaults", file=sys.stderr)
+ 
+ def normalize(value, integer=False):
+     try:
+@@ -234,6 +242,14 @@ is_alive_pid_with_bot_name() {
+ }
+ 
+ read_reserved_symbol() {
++  if [[ -n "${SHORT_SKIP_SYMBOL_RESERVATION:-}" ]]; then
++    if [[ -n "${SHORT_FIXED_SYMBOL:-}" ]]; then
++      echo "${SHORT_FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]'
++    else
++      echo "XRPUSDT"
++    fi
++    return
++  fi
+   python3 <<PY
+ import json
+ from pathlib import Path
+@@ -313,54 +329,43 @@ if [[ -f "${PID_FILE}" ]]; then
+   rm -f "${PID_FILE}"
+ fi
+ 
+-mapfile -t WAIT_INFO < <(python3 <<PY
+-import json
+-from pathlib import Path
+-
+-bot_name = "${BOT_NAME}"
+-best_path = Path("${PROJECT_ROOT}/logs/best_coin.json")
+-state_path = Path("${BOT_GROUP_DIR}/state/active_bot_symbols.json")
+-symbol = ""
+-reason = "no_new_symbol_available"
+-reserved_by = ""
+-
+-if best_path.exists():
+-    payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
+-    symbol = (payload.get("symbol") or "").upper()
+-if symbol:
+-    reason = "selected_symbol_reserved"
+-    if state_path.exists():
+-        state = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+-        for other, entry in state.items():
+-            if other != bot_name and entry.get("symbol") == symbol and entry.get("status") == "reserved":
+-                reserved_by = other
+-                break
+-    if not reserved_by:
+-        reason = "new_symbol_available"
+-print(symbol)
+-print(reason)
+-print(reserved_by)
+-PY
+-)
+-
+-WAIT_SYMBOL="${WAIT_INFO[0]:-}"
+-WAIT_REASON="${WAIT_INFO[1]:-waiting_for_symbol}"
+-WAIT_RESERVED_BY="${WAIT_INFO[2]:-}"
++WAIT_SYMBOL="${SHORT_FIXED_SYMBOL:-XRPUSDT}"
++WAIT_REASON="forced_symbol"
++WAIT_RESERVED_BY=""
+ 
+ ensure_wait_pid_clean
+ 
+-echo "[${BOT_NAME}] wallet capture skipped: global wallet refill watcher handles this later"
++FIXED_SYMBOL="${SHORT_FIXED_SYMBOL:-}"
++SKIP_SYMBOL_RESERVATION="${SHORT_SKIP_SYMBOL_RESERVATION:-}"
++if [[ -n "${FIXED_SYMBOL}" ]]; then
++  FIXED_SYMBOL="$(echo "${FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]')"
++  echo "[${BOT_NAME}] using forced symbol ${FIXED_SYMBOL}"
++  RESERVED_SYMBOL="${FIXED_SYMBOL}"
++  if [[ -z "${SKIP_SYMBOL_RESERVATION}" ]]; then
++    write_reserved_runtime_files "${RESERVED_SYMBOL}"
++  else
++    echo "[${BOT_NAME}] skipping persistent reservation (SHORT_SKIP_SYMBOL_RESERVATION enabled)"
++  fi
++elif [[ -n "${SKIP_SYMBOL_RESERVATION}" ]]; then
++  RESERVED_SYMBOL="${WAIT_SYMBOL}"
++  if [[ -z "${RESERVED_SYMBOL}" ]]; then
++    RESERVED_SYMBOL="BTCUSDT"
++  fi
++  echo "[${BOT_NAME}] skipping symbol reservation and using ${RESERVED_SYMBOL}"
++else
++  echo "[${BOT_NAME}] wallet capture skipped: global wallet refill watcher handles this later"
++
++  write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
++  echo "$$" > "${WAIT_PID_FILE}"
++  if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; then
++    echo "[${BOT_NAME}] waiting_for_symbol (${WAIT_REASON})" >&2
++    exit 1
++  fi
++  cleanup_wait_files
+ 
+-write_status_json "waiting_for_symbol" "${WAIT_REASON}" "${WAIT_SYMBOL}" "${WAIT_RESERVED_BY}" "true"
+-echo "$$" > "${WAIT_PID_FILE}"
+-if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; then
+-  echo "[${BOT_NAME}] waiting_for_symbol (${WAIT_REASON})" >&2
+-  exit 1
++  RESERVED_SYMBOL="$(read_reserved_symbol)"
++  write_reserved_runtime_files "${RESERVED_SYMBOL}"
+ fi
+-cleanup_wait_files
+-
+-RESERVED_SYMBOL="$(read_reserved_symbol)"
+-write_reserved_runtime_files "${RESERVED_SYMBOL}"
+ 
+ source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
+ 
+===== load_bybit_env.sh =====
+diff --git a/live_bots/short_hedge_bot/shared_scripts/load_bybit_env.sh b/live_bots/short_hedge_bot/shared_scripts/load_bybit_env.sh
+index 8b571c5..0b8799f 100755
+--- a/live_bots/short_hedge_bot/shared_scripts/load_bybit_env.sh
++++ b/live_bots/short_hedge_bot/shared_scripts/load_bybit_env.sh
+@@ -21,7 +21,8 @@ fi
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ BOT_GROUP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+-CONFIG_YAML="${BOT_GROUP_DIR}/config/config.yaml"
++PROJECT_ROOT="$(cd "${BOT_GROUP_DIR}/../.." && pwd)"
++CONFIG_YAML="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/config/config.yaml"
+ 
+ if [[ ! -f "${CONFIG_YAML}" ]]; then
+   echo "ERROR: config file not found at ${CONFIG_YAML}" >&2
+===== fixed_cycle_config.json =====
+diff --git a/live_bots/short_hedge_bot/short_bot_1/config/fixed_cycle_config.json b/live_bots/short_hedge_bot/short_bot_1/config/fixed_cycle_config.json
+index faac19a..3a99fd3 100644
+--- a/live_bots/short_hedge_bot/short_bot_1/config/fixed_cycle_config.json
++++ b/live_bots/short_hedge_bot/short_bot_1/config/fixed_cycle_config.json
+@@ -5,11 +5,11 @@
+   "best_coin_file": "logs/best_coin.json",
+   "best_coin_max_age_minutes": 45,
+   "dynamic_symbol_hold_minutes": 0,
+-  "base_notional_usdt": 100.0,
+-  "hedge_ratio_short": 0.5,
++  "base_notional_usdt": 25.0,
++  "hedge_ratio_short": 2.0,
+   "reduction_pct_per_fill": 25,
+-  "long_fill_distance_pct": 0.5,
+-  "short_fill_distance_pct": 0.15,
++  "long_fill_distance_pct": 0.15,
++  "short_fill_distance_pct": 0.5,
+   "tp_profit_target_pct": 0.25,
+   "tp_buffer_pct": 0.0002,
+   "target_profit_usdt": 0.015,

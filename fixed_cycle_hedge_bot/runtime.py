@@ -21,6 +21,7 @@ from utils.math_utils import calculate_pnl
 
 from .audit_logger import AuditLogger
 from .base import HedgeStrategy, StrategyContext
+from .fixed_cycle_strategy import ShortFixedCycleHedgeStrategy
 from .models import (
     FillEvent,
     HedgeSnapshot,
@@ -1769,10 +1770,33 @@ class GenericHedgeRuntime:
             )
             return None
         self._ensure_max_leverage_before_trading()
+        duplicate_order, duplicate_source = self._find_duplicate_open_cycle_purpose(intent, snapshot)
+        if duplicate_order is not None:
+            existing_status = str(getattr(duplicate_order, "status", None) or "").upper()
+            existing_trigger_price = getattr(duplicate_order, "trigger_price", None)
+            self.audit.log_event(
+                "fixed_cycle_duplicate_open_purpose_submit_blocked",
+                strategy=self.strategy.name,
+                purpose=intent.purpose,
+                intent_qty=intent.qty,
+                intent_trigger_price=intent.trigger_price,
+                existing_client_order_id=getattr(duplicate_order, "client_order_id", None),
+                existing_exchange_order_id=getattr(duplicate_order, "exchange_order_id", None),
+                existing_status=existing_status,
+                existing_trigger_price=existing_trigger_price,
+                source=duplicate_source,
+            )
+            return getattr(duplicate_order, "client_order_id", None)
         equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
         decision = "reuse" if equivalent_order is not None else "replace"
         exit_purposes = set(self.strategy._exit_purposes())
-        metadata = intent.metadata or {}
+        metadata = getattr(intent, "metadata", {}) or {}
+        purpose = getattr(intent, "purpose", None)
+        side = getattr(intent, "side", None)
+        reduce_only = getattr(intent, "reduce_only", False)
+        position_idx = getattr(intent, "position_idx", None)
+        cycle_role = metadata.get("cycle_role")
+        cycle_index = metadata.get("cycle_index")
         is_exit_intent = intent.purpose in exit_purposes or str(
             metadata.get("cycle_role") or ""
         ).lower() == "long_reduce"
@@ -2157,6 +2181,10 @@ class GenericHedgeRuntime:
             if intent.position_idx != expected_position_idx:
                 intent.position_idx = expected_position_idx
                 corrected = True
+            # NOTE: This audit hook intentionally renames the intent from "ADD" to
+            # the canonical long/short reduce settings. The name is historical,
+            # so we rewrite `reduce_only` and `side` here to keep the runtime
+            # semantics consistent with a reduce leg.
             if corrected:
                 self.audit.log_event(
                     "fixed_cycle_long_reduce_intent_corrected",
@@ -2220,10 +2248,21 @@ class GenericHedgeRuntime:
                 )
                 cycle_waiting = False
                 blocking_cycle_index = None
+        allow_short_long_reduce = (
+            isinstance(self.strategy, ShortFixedCycleHedgeStrategy)
+            and short_tp_pending_cycle > 0
+            and purpose
+            == getattr(
+                self.strategy,
+                "_get_second_leg_purpose",
+                lambda idx: None,
+            )(short_tp_pending_cycle)
+        )
         if (
             cycle_waiting
             and first_leg_requirements
             and not safe_cycle_replacement
+            and not allow_short_long_reduce
         ):
             existing_purposes = [
                 order.purpose for order in self.runtime_state.active_orders.values()
@@ -2555,7 +2594,17 @@ class GenericHedgeRuntime:
         purpose: object,
     ) -> dict[str, object] | None:
         normalized = str(purpose or "").upper()
-        if purpose_mapping.is_cycle_long_add(normalized):
+        # NOTE: Historically the Long cycle helpers keep the "_LONG_ADD" suffix,
+        # but the runtime treats these intents as Long reduce/close legs. They end
+        # up as side=Sell, position_idx=1, reduce_only=True. Do not infer that the
+        # name implies a position increase.
+        first_leg_side_getter = getattr(self.strategy, "_get_first_leg_side", None)
+        first_leg_side = (
+            str(first_leg_side_getter() or "long").lower()
+            if callable(first_leg_side_getter)
+            else "long"
+        )
+        if first_leg_side == "long" and purpose_mapping.is_cycle_long_add(normalized):
             return {
                 "side": "long",
                 "position_idx": 1,
@@ -2563,13 +2612,32 @@ class GenericHedgeRuntime:
                 "cycle_role": "long_reduce",
                 "exchange_side": "Sell",
             }
-        if purpose_mapping.is_cycle_short_add(normalized):
+        # NOTE: Likewise, the short cycle helper reuses "SHORT_ADD" even though the
+        # runtime treats it as a Short reduce leg (Buy, position_idx=2,
+        # reduce_only=True). This naming is misleading but intentional.
+        if first_leg_side == "short" and purpose_mapping.is_cycle_short_reduce(normalized):
             return {
                 "side": "short",
                 "position_idx": 2,
                 "reduce_only": True,
                 "cycle_role": "short_reduce",
                 "exchange_side": "Buy",
+            }
+        if first_leg_side == "long" and purpose_mapping.is_cycle_short_add(normalized):
+            return {
+                "side": "short",
+                "position_idx": 2,
+                "reduce_only": True,
+                "cycle_role": "short_reduce",
+                "exchange_side": "Buy",
+            }
+        if first_leg_side == "short" and purpose_mapping.is_cycle_long_reduce(normalized):
+            return {
+                "side": "long",
+                "position_idx": 1,
+                "reduce_only": True,
+                "cycle_role": "long_reduce",
+                "exchange_side": "Sell",
             }
         return None
 
@@ -4662,6 +4730,32 @@ class GenericHedgeRuntime:
     @staticmethod
     def _is_terminal_order_status(status: Any) -> bool:
         return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
+
+    def _find_duplicate_open_cycle_purpose(
+        self, intent: StrategyIntent, snapshot: HedgeSnapshot
+    ) -> tuple[ManagedOrder | None, str | None]:
+        purpose_upper = str(intent.purpose or "").upper()
+        if not purpose_upper.startswith("CYCLE_"):
+            return None, None
+        def _order_status(order: Any) -> str:
+            status = getattr(order, "status", None)
+            if status is None and isinstance(order, dict):
+                status = order.get("status")
+            return str(status or "").upper()
+
+        for order_source, orders in (
+            ("runtime", self.runtime_state.active_orders.values()),
+            ("snapshot", snapshot.active_orders),
+        ):
+            for order in orders:
+                order_purpose = str(getattr(order, "purpose", None) or (order.get("purpose") if isinstance(order, dict) else None) or "").upper()
+                if order_purpose != purpose_upper:
+                    continue
+                status_normalized = self._normalize_order_status(getattr(order, "status", None) if hasattr(order, "status") else order.get("status") if isinstance(order, dict) else None)
+                if self._is_terminal_order_status(status_normalized):
+                    continue
+                return order, order_source
+        return None, None
 
     def _is_unsettled_strategy_order(self, order: ManagedOrder) -> bool:
         purpose = str(getattr(order, "purpose", "") or "").upper()

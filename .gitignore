@@ -85,3 +85,14 @@ live_bots/short_hedge_bot/**/snapshots/*.json
 .venv/
 __pycache__/
 *.pyc
+__pycache__/
+*.pyc
+short_bot_mirror_changes_*.diff
+
+# Local bot runtime state / locks
+live_bots/short_hedge_bot/state/
+live_bots/**/state/*.lock
+live_bots/**/state/active_bot_symbols.json
+
+# Local backup diffs
+short_bot_mirror_changes_*.diff

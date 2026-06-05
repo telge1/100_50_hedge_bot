@@ -21,7 +21,8 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOT_GROUP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CONFIG_YAML="${BOT_GROUP_DIR}/config/config.yaml"
+PROJECT_ROOT="$(cd "${BOT_GROUP_DIR}/../.." && pwd)"
+CONFIG_YAML="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/config/config.yaml"
 
 if [[ ! -f "${CONFIG_YAML}" ]]; then
   echo "ERROR: config file not found at ${CONFIG_YAML}" >&2
