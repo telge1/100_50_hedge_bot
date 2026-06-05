@@ -5415,6 +5415,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext,
     ) -> list[StrategyIntent]:
         state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
         reason = getattr(context, "reason", None) or getattr(context, "trigger_reason", None) or getattr(
             context, "purpose", None
         )
@@ -5680,7 +5681,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         initial_long_qty = float(state.get("initial_long_qty") or 0.0)
         initial_short_qty = float(state.get("initial_short_qty") or 0.0)
         completed_cycles = int(state.get("cycle_completed_count") or 0)
-        cycle_state = self._ensure_cycle_state(runtime_state)
         long_fill_price = self._cycle_state_last_fill_price(cycle_state.get("long_fills") or {})
         short_fill_price = self._cycle_state_last_fill_price(cycle_state.get("short_fills") or {})
         long_add_pending = self._get_first_leg_pending(state, cycle_state)
@@ -6387,9 +6387,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         self._ensure_cycle_sequence_state(runtime_state)
         cycle_state = self._ensure_cycle_state(runtime_state)
+        long_fills = cycle_state.get("long_fills") or {}
+        short_fills = cycle_state.get("short_fills") or {}
+        processed_purposes = {
+            self._normalize_cycle_purpose(item)
+            for item in state.get("processed_cycle_purposes") or []
+            if str(item or "")
+        }
         short_tp_pending_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
         cycle_index = short_tp_pending_cycle
-        purpose = self._cycle_purpose("short", cycle_index) if cycle_index > 0 else None
+        first_leg_purpose = self._get_first_leg_purpose(cycle_index) if cycle_index > 0 else None
+        second_leg_purpose = self._get_second_leg_purpose(cycle_index) if cycle_index > 0 else None
+        purpose = second_leg_purpose
         long_purpose = self._cycle_purpose("long", cycle_index) if cycle_index > 0 else None
         active_order_purposes = [
             getattr(order, "purpose", None)
@@ -6500,27 +6509,49 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         long_add_status = str(cycle_sequence_entry.get("long_add_status") or "NONE").upper()
         short_tp_status = self._get_second_leg_status(cycle_sequence_entry)
+        second_leg_status_field = self._get_second_leg_status_field()
+        entry_status = str(cycle_sequence_entry.get(second_leg_status_field) or "NONE").upper()
+        first_leg_cycle_role = self._get_first_leg_cycle_role()
         cycle_long_add_filled = long_add_status in {"FILLED", "PROCESSED"} or self._has_cycle_purpose_already_filled_or_processed(
             runtime_state,
-            long_purpose or "",
-            {"cycle_index": cycle_index, "cycle_role": "long_reduce"},
+            first_leg_purpose or "",
+            {"cycle_index": cycle_index, "cycle_role": first_leg_cycle_role},
         )
-        if self._has_cycle_purpose_already_filled_or_processed(
-            runtime_state,
-            purpose or "",
-            {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
-        ) or self._cycle_status_blocks_build(short_tp_status):
-            _log_event(
-                "fixed_cycle_duplicate_cycle_purpose_blocked",
-                {
-                    "cycle_index": cycle_index,
-                    "purpose": purpose,
-                    "phase": "short_tp_status",
-                    "reason": "cycle_short_tp_already_processed",
-                },
+        normalized_first_leg_purpose = self._normalize_cycle_purpose(
+            self._get_first_leg_purpose(cycle_index),
+            {"cycle_index": cycle_index, "cycle_role": self._get_first_leg_cycle_role()},
+        )
+        normalized_second_leg_purpose = self._normalize_cycle_purpose(
+            self._get_second_leg_purpose(cycle_index),
+            {
+                "cycle_index": cycle_index,
+                "cycle_role": self._get_second_leg_cycle_role(),
+            },
+        )
+        second_leg_is_long = "LONG" in normalized_second_leg_purpose
+        second_leg_fill_exists = (
+            str(cycle_index) in long_fills if second_leg_is_long else str(cycle_index) in short_fills
+        )
+        second_leg_processed = (
+            normalized_second_leg_purpose in processed_purposes or second_leg_fill_exists
+        )
+        second_leg_reserved = self._cycle_status_blocks_build(entry_status)
+        if second_leg_processed or second_leg_reserved:
+            reason = (
+                "short_reduce_slot_reserved"
+                if entry_status in {
+                    "INTENT_BUILT",
+                    "SUBMITTING",
+                    "SUBMITTED",
+                    "OPEN",
+                    "NEW",
+                    "UNTRIGGERED",
+                    "PARTIALLY_FILLED",
+                }
+                else "cycle_short_tp_already_processed"
             )
             _emit_short_tp_follow_up_skip(
-                "cycle_short_tp_already_processed",
+                reason,
                 cycle_sequence_entry=dict(cycle_sequence_entry),
             )
             return []
@@ -6528,21 +6559,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         pending_before = float(state.get("pending_cycle_loss_usdt") or 0.0)
 
         current_short_cycle_index = int(state.get("current_short_cycle_index") or 0)
+        current_long_cycle_index = int(state.get("current_long_cycle_index") or 0)
         cycle_state_short_index = int(cycle_state.get("short_cycle_index") or 0)
+        cycle_state_long_index = int(cycle_state.get("long_cycle_index") or 0)
+        current_second_leg_index = (
+            current_long_cycle_index if second_leg_is_long else current_short_cycle_index
+        )
+        cycle_state_second_leg_index = (
+            cycle_state_long_index if second_leg_is_long else cycle_state_short_index
+        )
+        skip_reason = (
+            "long_cycle_already_filled" if second_leg_is_long else "short_cycle_already_filled"
+        )
 
-        if max(current_short_cycle_index, cycle_state_short_index) >= cycle_index:
+        if max(current_second_leg_index, cycle_state_second_leg_index) >= cycle_index:
             _emit_short_tp_follow_up_skip(
-                "short_cycle_already_filled",
+                skip_reason,
                 cycle_state_short_index=cycle_state_short_index,
+                cycle_state_long_index=cycle_state_long_index,
+                current_short_cycle_index=current_short_cycle_index,
+                current_long_cycle_index=current_long_cycle_index,
             )
             context.audit.log_event(
                 "fixed_cycle_downside_skip",
                 strategy=self.name,
-                skip_reason="short_cycle_already_filled",
+                skip_reason=skip_reason,
                 cycle_number=cycle_index,
                 purpose=purpose,
+                current_second_leg_cycle_index=current_second_leg_index,
+                cycle_state_second_leg_index=cycle_state_second_leg_index,
                 current_short_cycle_index=current_short_cycle_index,
                 cycle_state_short_index=cycle_state_short_index,
+                current_long_cycle_index=current_long_cycle_index,
+                cycle_state_long_index=cycle_state_long_index,
             )
             return []
 
@@ -6848,7 +6897,133 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             short_followup_pnl_source = "cycle_entry_long_add_loss_usdt"
         else:
             short_followup_pnl = 0.0
-            short_followup_pnl_source = "missing_assumed_zero"
+        short_followup_pnl_source = "missing_assumed_zero"
+        if second_leg_is_long:
+            current_price = float(snapshot.current_price or 0.0)
+            reference_price_candidates = [
+                current_price,
+                float(snapshot.long_avg or 0.0),
+                float(snapshot.short_avg or 0.0),
+                float(cycle_state.get("last_cycle_reference_price") or 0.0),
+                float(long_fill_price or 0.0),
+            ]
+            reference_price = max(reference_price_candidates)
+            current_long_qty = float(snapshot.long_qty or 0.0)
+            initial_long_qty = float(state.get("initial_long_qty") or 0.0)
+            long_qty = self._fixed_long_cycle_qty(
+                initial_long_qty,
+                current_long_qty,
+                reference_price,
+                runtime_state=runtime_state,
+            )
+            if long_qty <= 0:
+                _emit_short_tp_follow_up_skip(
+                    "long_reduce_qty_non_positive",
+                    symbol=active_trade_symbol,
+                    long_reduce_qty=long_reduce_qty,
+                    current_long_qty=current_long_qty,
+                    initial_long_qty=initial_long_qty,
+                    reference_price=reference_price,
+                    reduction_pct_per_fill=self.config.reduction_pct_per_fill,
+                )
+                return []
+            distance_pct_config = self.config.long_fill_distance_pct
+            distance_pct = self._clamp_pct_fraction(self._pct(distance_pct_config))
+            raw_trigger_price = reference_price * (1.0 + distance_pct)
+            trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
+            if trigger_price <= 0:
+                _emit_short_tp_follow_up_skip(
+                    "long_reduce_invalid_trigger_price",
+                    symbol=active_trade_symbol,
+                    trigger_price=trigger_price,
+                    reference_price=reference_price,
+                )
+                return []
+            metadata_long_reduce = {
+                "cycle_index": cycle_index,
+                "purpose": purpose,
+                "reason": "second_leg_long_reduce_cycle_pricing",
+                "reference_price": reference_price,
+                "distance_pct_config": distance_pct_config,
+                "distance_pct_used": distance_pct,
+                "current_price": current_price,
+                "long_fill_price": long_fill_price,
+                "long_reduce_qty_source": long_reduce_qty_source,
+                "trigger_price": trigger_price,
+            }
+            _log_event(
+                "fixed_cycle_second_leg_long_reduce_cycle_pricing",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "purpose": purpose,
+                    "current_price": current_price,
+                    "reference_price": reference_price,
+                    "trigger_price": trigger_price,
+                    "distance_pct": distance_pct_config,
+                    "distance_pct_used": distance_pct,
+                    "long_reduce_qty": long_reduce_qty,
+                    "long_reduce_qty_source": long_reduce_qty_source,
+                    "reason": "second_leg_long_reduce_cycle_pricing",
+                },
+            )
+            gate_allowed, gate_reason, gate_payload = self._can_submit_cycle_intent(
+                runtime_state,
+                snapshot,
+                purpose=purpose,
+                cycle_index=cycle_index,
+                cycle_role="short_reduce",
+            )
+            gate_payload = {
+                **gate_payload,
+                "symbol": snapshot.symbol or self.config.symbol,
+            }
+            if not gate_allowed:
+                gate_payload["reason"] = gate_reason or "short_followup_not_ready"
+                gate_payload["expected_next_action"] = (
+                    gate_payload.get("expected_next_action") or "build_short_followup"
+                )
+                _log_event("fixed_cycle_state_gate_intent_blocked", gate_payload)
+                return []
+            gate_payload["reason"] = "short_followup_allowed"
+            _log_event("fixed_cycle_state_gate_intent_allowed", gate_payload)
+            self._reserve_cycle_intent_slot(
+                runtime_state,
+                cycle_index=cycle_index,
+                field_name=self._get_second_leg_status_field(),
+                normalized_purpose=self._normalize_cycle_purpose(
+                    purpose,
+                    {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
+                ),
+                qty=long_qty,
+                trigger_price=trigger_price,
+            )
+            intent = StrategyIntent(
+                side="long",
+                qty=long_qty,
+                purpose=purpose,
+                order_type="Market",
+                reduce_only=True,
+                trigger_price=trigger_price,
+                trigger_direction=1,
+                trigger_by="LastPrice",
+                close_on_trigger=True,
+                position_idx=1,
+                metadata=metadata_long_reduce,
+            )
+            _log_event(
+                "fixed_cycle_short_followup_intent_built",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "purpose": purpose,
+                    "qty": long_qty,
+                    "trigger_price": trigger_price,
+                    "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+                    "reason": "second_leg_long_reduce_cycle_pricing",
+                },
+            )
+            return [intent]
         planned_short_tp_qty = self._safe_float(
             cycle_sequence_entry.get("short_tp_qty"), None
         )
@@ -8611,7 +8786,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_fills = cycle_state.setdefault("short_fills", {})
         fill_entry = short_fills.setdefault(str(cycle_index), {})
 
-        normalized_purpose = self._cycle_purpose("short", cycle_index)
+        normalized_purpose = self._normalize_cycle_purpose(
+            self._get_second_leg_purpose(cycle_index),
+            {"cycle_index": cycle_index, "cycle_role": self._get_second_leg_cycle_role()},
+        )
 
         price = self._safe_float(avg_price, None)
         if price is None:

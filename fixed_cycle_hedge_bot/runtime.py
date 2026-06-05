@@ -1060,6 +1060,22 @@ class GenericHedgeRuntime:
         *,
         exec_id: str | None = None,
     ) -> str | None:
+        if (
+            (exchange_order_id and exchange_order_id in self.runtime_state.terminal_exchange_ids)
+            or (order_link_id and order_link_id in self.runtime_state.terminal_client_ids)
+            or (exec_id and exec_id in self.runtime_state.terminal_exec_ids)
+        ):
+            self.audit.log_event(
+                "fixed_cycle_reconcile_terminal_order_ignored",
+                strategy=self.strategy.name,
+                exchange_order_id=exchange_order_id,
+                order_link_id=order_link_id,
+                exec_id=exec_id,
+                qty=qty,
+                price=price,
+                reason="terminal_order_already_processed",
+            )
+            return None
         inference = self._infer_fixed_cycle_unmatched_fill(order_link_id)
         if not inference:
             return None
@@ -4867,6 +4883,15 @@ class GenericHedgeRuntime:
             filled_qty=managed_order.filled_qty,
             remaining_qty=managed_order.remaining_qty,
         )
+        self.runtime_state.terminal_client_ids.add(client_id)
+        if managed_order.exchange_order_id:
+            self.runtime_state.terminal_exchange_ids.add(managed_order.exchange_order_id)
+        processed_exec_ids = set(managed_order.metadata.get("processed_exec_ids") or [])
+        processed_exec_ids.update(managed_order.metadata.get("exec_ids") or [])
+        exec_id_attr = getattr(managed_order, "exec_id", None)
+        if exec_id_attr:
+            processed_exec_ids.add(exec_id_attr)
+        self.runtime_state.terminal_exec_ids.update(processed_exec_ids)
 
     @staticmethod
     def _runtime_side_from_exchange(order: dict[str, Any]) -> str:

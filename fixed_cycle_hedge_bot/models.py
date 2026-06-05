@@ -203,6 +203,9 @@ class RuntimeState:
     processed_fill_cumulative: dict[str, float] = field(default_factory=dict)
     instrument_rules: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     instrument_rules_fallback_warned: set[str] = field(default_factory=set)
+    terminal_client_ids: set[str] = field(default_factory=set)
+    terminal_exchange_ids: set[str] = field(default_factory=set)
+    terminal_exec_ids: set[str] = field(default_factory=set)
 
     def next_sequence(self) -> int:
         self.sequence += 1
