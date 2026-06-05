@@ -927,6 +927,7 @@ class GenericHedgeRuntime:
             exec_id=exec_id,
             cumulative_qty=cumulative_qty,
             source="websocket",
+            order_link_id=order_link_id,
         )
 
     def _infer_fixed_cycle_unmatched_fill(self, order_link_id: str | None) -> dict[str, Any] | None:
@@ -2517,6 +2518,10 @@ class GenericHedgeRuntime:
             status="SUBMITTED",
         )
         self.runtime_state.active_orders[client_id] = managed_order
+        self._process_pending_unmatched_fills(
+            client_id=client_id,
+            exchange_order_id=exchange_order_id,
+        )
         if exchange_order_id:
             self.runtime_state.exchange_to_client_id[exchange_order_id] = client_id
         if is_final_exit_intent:
@@ -3770,9 +3775,31 @@ class GenericHedgeRuntime:
         exec_id: str | None,
         cumulative_qty: float | None,
         source: str,
+        order_link_id: str | None = None,
     ) -> None:
         managed_order = self.runtime_state.active_orders.get(client_id)
         if not managed_order:
+            key = order_link_id or exchange_order_id
+            pending_payload = {
+                "exchange_order_id": exchange_order_id,
+                "qty": qty,
+                "price": price,
+                "exec_id": exec_id,
+                "cumulative_qty": cumulative_qty,
+                "source": source,
+                "order_link_id": order_link_id,
+            }
+            if key and self._store_pending_unmatched_fill(key, pending_payload):
+                self.audit.log_event(
+                    "fixed_cycle_pending_unmatched_fill_stored",
+                    strategy=self.strategy.name,
+                    order_link_id=order_link_id,
+                    exchange_order_id=exchange_order_id,
+                    exec_id=exec_id,
+                    qty=qty,
+                    price=price,
+                )
+                return
             processed_qty = self.runtime_state.processed_fill_cumulative.get(client_id, 0.0)
             if processed_qty > 0:
                 self.audit.log_event(
@@ -3927,9 +3954,9 @@ class GenericHedgeRuntime:
                 metadata=fill_metadata,
                 traces=list(managed_order.trace),
             )
-            self.runtime_state.processed_fill_cumulative[client_id] = max(
-                processed_qty, managed_order.filled_qty
-            )
+        self.runtime_state.processed_fill_cumulative[client_id] = max(
+            processed_qty, managed_order.filled_qty
+        )
         with self._lock:
             if managed_order.reduce_only:
                 self.audit.log_event(
@@ -4327,10 +4354,77 @@ class GenericHedgeRuntime:
                 return float(cum_exec_value) / float(cum_exec_qty)
         except (TypeError, ValueError, ZeroDivisionError):
             pass
-        try:
-            return float(history_order.get("price") or fallback_price or 0.0)
-        except (TypeError, ValueError):
-            return 0.0
+
+    def _store_pending_unmatched_fill(
+        self, key: str, payload: dict[str, Any]
+    ) -> bool:
+        with self._lock:
+            pending = self.runtime_state.pending_unmatched_fills.setdefault(key, [])
+            pending.append(payload)
+        return True
+
+    def _process_pending_unmatched_fills(
+        self, client_id: str, exchange_order_id: str | None
+    ) -> None:
+        keys = {client_id}
+        if exchange_order_id:
+            keys.add(exchange_order_id)
+        for key in keys:
+            with self._lock:
+                pending = self.runtime_state.pending_unmatched_fills.pop(key, [])
+            for fill_data in pending:
+                fill_payload = dict(fill_data)
+                fill_payload["client_id"] = client_id
+                self._ingest_fill_event(**fill_payload)
+
+    def _infer_fixed_cycle_unmatched_fill(
+        self,
+        order_link_id: str | None,
+    ) -> dict[str, Any] | None:
+        if not order_link_id:
+            return None
+        normalized = str(order_link_id).lower()
+        prefix = "fixed_cycle-"
+        if not normalized.startswith(prefix):
+            return None
+        candidate = normalized[len(prefix) :]
+        cycle_match = re.match(r"cycle_(\d+)_(.+)", candidate)
+        if cycle_match:
+            cycle_index = int(cycle_match.group(1))
+            role_segment = cycle_match.group(2)
+            purpose = f"CYCLE_{cycle_index}_{role_segment.upper()}"
+            cycle_role = "long_reduce" if "long" in role_segment else "short_reduce"
+            metadata = {
+                "cycle_index": cycle_index,
+                "cycle_role": cycle_role,
+            }
+            return {
+                "purpose": purpose,
+                "side": "long" if "long" in role_segment else "short",
+                "reduce_only": True,
+                "metadata": metadata,
+                "inferred_cycle_index": cycle_index,
+                "inferred_cycle_role": cycle_role,
+            }
+        if candidate.startswith("short_sl_exit"):
+            return {
+                "purpose": self.strategy.SHORT_SL_EXIT_PURPOSE,
+                "side": "short",
+                "reduce_only": True,
+                "metadata": {"exit_type": "short_sl", "exit_mode": "basket_exit"},
+                "inferred_cycle_index": None,
+                "inferred_cycle_role": "short_sl_exit",
+            }
+        if candidate.startswith("long_tp_exit"):
+            return {
+                "purpose": self.strategy.LONG_TP_EXIT_PURPOSE,
+                "side": "long",
+                "reduce_only": True,
+                "metadata": {"exit_type": "long_tp", "exit_mode": "basket_exit"},
+                "inferred_cycle_index": None,
+                "inferred_cycle_role": "long_tp_exit",
+            }
+        return None
 
     def _load_strategy_state(self) -> None:
         if not self.config.strategy_state_file:
