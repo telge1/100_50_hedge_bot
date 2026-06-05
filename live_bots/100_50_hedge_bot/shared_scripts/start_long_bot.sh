@@ -313,7 +313,15 @@ if [[ -f "${PID_FILE}" ]]; then
   rm -f "${PID_FILE}"
 fi
 
-mapfile -t WAIT_INFO < <(python3 <<PY
+if [[ -n "${LONG_FIXED_SYMBOL:-}" ]]; then
+  RESERVED_SYMBOL="$(echo "${LONG_FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]')"
+  echo "[${BOT_NAME}] using forced symbol ${RESERVED_SYMBOL}"
+  LONG_SKIP_SYMBOL_RESERVATION=1
+  write_reserved_runtime_files "${RESERVED_SYMBOL}"
+fi
+
+if [[ -z "${LONG_SKIP_SYMBOL_RESERVATION:-}" ]]; then
+  mapfile -t WAIT_INFO < <(python3 <<PY
 import json
 from pathlib import Path
 
@@ -364,8 +372,11 @@ if ! "${BOT_GROUP_DIR}/shared_scripts/wait_for_unique_symbol.sh" "${BOT_NAME}"; 
 fi
 cleanup_wait_files
 
-RESERVED_SYMBOL="$(read_reserved_symbol)"
-write_reserved_runtime_files "${RESERVED_SYMBOL}"
+  RESERVED_SYMBOL="$(read_reserved_symbol)"
+  write_reserved_runtime_files "${RESERVED_SYMBOL}"
+else
+  echo "[${BOT_NAME}] forced symbol ${RESERVED_SYMBOL} already written"
+fi
 
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 

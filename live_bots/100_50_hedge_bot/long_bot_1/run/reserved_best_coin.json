@@ -1,12 +1,12 @@
 {
-  "symbol": "NEARUSDT",
-  "timestamp": "2026-05-29T19:55:13.841288+00:00",
+  "symbol": "XRPUSDT",
+  "timestamp": "2026-06-05T13:43:23.071566+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "NEARUSDT"
+      "symbol": "XRPUSDT"
     }
   ]
 }

@@ -166,10 +166,13 @@ cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 
 ######################################################################################################################
 
+Short:
 SHORT_FIXED_SYMBOL=XRPUSDT bash live_bots/short_hedge_bot/short_bot_1/scripts/start.sh
-
-
 bash live_bots/short_hedge_bot/short_bot_1/scripts/stop_with_cleanup.sh
+
+Long:
+SHORT_FIXED_SYMBOL=XRPUSDT bash live_bots/100_50_hedge_bot/long_bot_1/scripts/start.sh
+live_bots/100_50_hedge_bot/long_bot_1/scripts/stop_with_cleanup.sh 
 
 ok check jetzt wieder warum die cycle und exit orders nicht gestetzt wurden 
 

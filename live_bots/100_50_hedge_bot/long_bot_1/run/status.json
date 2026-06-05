@@ -1,11 +1,9 @@
 {
   "bot_name": "long_bot_1",
-  "status": "running",
-  "updated_at": "2026-05-29T19:55:15.451964+00:00",
-  "symbol": "NEARUSDT",
-  "start_requested": true,
-  "pid": 481682,
-  "long_qty": 0.0,
-  "short_qty": 0.0,
-  "open_order_count": 0
+  "status": "stopped",
+  "start_requested": false,
+  "pid": null,
+  "symbol": "",
+  "reason": "stop_with_cleanup_success",
+  "updated_at": "2026-06-05T13:47:36.925487+00:00"
 }

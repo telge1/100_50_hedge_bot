@@ -9196,6 +9196,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if fill_key in processed and not is_exit_fill:
             return
 
+        metadata = dict(fill_event.metadata or {})
+        cycle_index = int(metadata.get("cycle_index") or 0)
         is_refill_fill = purpose in {"REFILL_LONG", "REFILL_SHORT"}
         if is_refill_fill:
             refill_state = state.setdefault("refill_state", {})
@@ -9290,8 +9292,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 self._write_cycle_state(cycle_state)
                 return
 
-        metadata = dict(fill_event.metadata or {})
-        cycle_index = int(metadata.get("cycle_index") or 0)
+
         if cycle_index <= 0 and not is_exit_fill:
             return
         fill_type, _ = self._classify_exit_fill_for_audit(fill_event)
