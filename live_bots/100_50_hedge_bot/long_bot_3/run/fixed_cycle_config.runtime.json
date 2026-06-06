@@ -2,7 +2,7 @@
   "symbol": "INJUSDT",
   "category": "linear",
   "dynamic_symbol_enabled": true,
-  "best_coin_file": "/home/telgenbuescher/projects/spread_recovery_hedge/live_bots/100_50_hedge_bot/long_bot_3/run/reserved_best_coin.json",
+  "best_coin_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/live_bots/100_50_hedge_bot/long_bot_3/run/reserved_best_coin.json",
   "best_coin_max_age_minutes": 45,
   "dynamic_symbol_hold_minutes": 0,
   "base_notional_usdt": 100.0,

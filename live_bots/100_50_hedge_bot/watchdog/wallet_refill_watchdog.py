@@ -53,6 +53,45 @@ def setup_logger() -> logging.Logger:
     return logger
 
 
+def _validate_runner_process(bot_name: str, logger: logging.Logger) -> bool:
+    bot_dir = BOT_ROOT / bot_name
+    pid_file = bot_dir / "run" / "bot.pid"
+    reason = None
+    if not pid_file.exists():
+        reason = "no_pid_file"
+    else:
+        try:
+            pid = int(pid_file.read_text().strip())
+        except Exception:
+            reason = "invalid_pid"
+        else:
+            if pid <= 0:
+                reason = "invalid_pid"
+            else:
+                cmd_path = Path(f"/proc/{pid}/cmdline")
+                if not cmd_path.exists():
+                    reason = "pid_not_running"
+                else:
+                    try:
+                        cmdline = cmd_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+                    except Exception:
+                        reason = "cmdline_unreadable"
+                    else:
+                        tokens = [
+                            "fixed_cycle_hedge_bot.runner",
+                            f"--bot-name {bot_name}",
+                            str(PROJECT_ROOT),
+                        ]
+                        for token in tokens:
+                            if token not in cmdline:
+                                reason = f"missing_{token.replace(' ', '_')}"
+                                break
+    if reason:
+        logger.info("watchdog_skip_inactive_bot bot=%s reason=%s", bot_name, reason)
+        return False
+    return True
+
+
 def write_json_event(event: str, payload: dict[str, Any]) -> None:
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -877,6 +916,8 @@ def main() -> None:
             if not api_key or not secret_key:
                 continue
             bot_name = profile_name.lower()
+            if not _validate_runner_process(bot_name, logger):
+                continue
             resolved = resolve_bot_metadata(bot_name, logger)
             if not resolved:
                 continue

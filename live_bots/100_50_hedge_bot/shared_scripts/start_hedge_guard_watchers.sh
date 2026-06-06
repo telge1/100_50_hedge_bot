@@ -40,6 +40,87 @@ write_status() {
 EOF
 }
 
+find_watchdog_pid() {
+  local script_name=$1
+  local pattern="${BOT_ROOT}/watchdog/${script_name}"
+  while read -r pid; do
+    if [ -z "${pid}" ] || [ ! -d "/proc/${pid}" ]; then
+      continue
+    fi
+    local cmdline
+    cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+    if [ -z "${cmdline}" ]; then
+      continue
+    fi
+    if [[ "${cmdline}" == *"/live_bots/100_50_hedge_bot/watchdog/${script_name}"* ]] && [[ "${cmdline}" == *"${PROJECT_ROOT}"* ]]; then
+      echo "${pid}"
+      return 0
+    fi
+  done < <(pgrep -f "${pattern}" 2>/dev/null)
+  return 1
+}
+
+collect_watchdog_pids() {
+  local script_name=$1
+  local pattern="${BOT_ROOT}/watchdog/${script_name}"
+  pgrep -f "${pattern}" 2>/dev/null || true
+}
+
+is_valid_watchdog_pid() {
+  local pid=$1
+  local script_name=$2
+  if [ -z "${pid}" ] || [ ! -d "/proc/${pid}" ]; then
+    return 1
+  fi
+  local cmdline
+  cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)"
+  if [ -z "${cmdline}" ]; then
+    return 1
+  fi
+  [[ "${cmdline}" == *"/live_bots/100_50_hedge_bot/watchdog/${script_name}"* ]] && [[ "${cmdline}" == *"${PROJECT_ROOT}"* ]]
+}
+
+prune_watchdog_pids() {
+  local script_name=$1
+  local keep=""
+  while read -r pid; do
+    if is_valid_watchdog_pid "${pid}" "${script_name}"; then
+      if [ -z "${keep}" ]; then
+        keep="${pid}"
+      else
+        kill "${pid}" 2>/dev/null || true
+      fi
+    fi
+  done < <(collect_watchdog_pids "${script_name}")
+  echo "${keep}"
+}
+
+ensure_pid_file() {
+  local pid_file=$1
+  local script_name=$2
+  if [ -f "${pid_file}" ]; then
+    local existing
+    existing="$(cat "${pid_file}" 2>/dev/null || true)"
+    if is_valid_watchdog_pid "${existing}" "${script_name}"; then
+      return 0
+    fi
+    rm -f "${pid_file}"
+  fi
+  local keep
+  keep="$(prune_watchdog_pids "${script_name}")"
+  if [ -n "${keep}" ]; then
+    echo "${keep}" > "${pid_file}"
+    return 0
+  fi
+  return 1
+}
+
+reconcile_watchdog() {
+  local pid_file=$1
+  local script_name=$2
+  ensure_pid_file "${pid_file}" "${script_name}" >/dev/null || true
+}
+
 start_watcher() {
   local name=$1
   local pid_file=$2
@@ -47,6 +128,9 @@ start_watcher() {
   local expected=$1
   shift
   local cmd=("$@")
+  if ensure_pid_file "${pid_file}" "${expected}"; then
+    return 0
+  fi
   if [ -f "${pid_file}" ]; then
     local existing_pid
     existing_pid="$(cat "${pid_file}")"
@@ -66,11 +150,11 @@ start_watcher() {
   nohup "${cmd[@]}" >> "${log_file}" 2>&1 &
   echo "$!" > "${pid_file}"
 }
-
 start_watcher "safety_order_watchdog" "${SAFETY_PID}" \
   "safety_order_watchdog.py" \
   "${PYTHON_BIN}" "${BOT_ROOT}/watchdog/safety_order_watchdog.py" --loop --interval 30
 sleep 1
+reconcile_watchdog "${SAFETY_PID}" "safety_order_watchdog.py"
 start_watcher "wallet_refill_watchdog" "${WALLET_PID}" \
   "wallet_refill_watchdog.py" \
   "${PYTHON_BIN}" "${BOT_ROOT}/watchdog/wallet_refill_watchdog.py" \
@@ -78,25 +162,16 @@ start_watcher "wallet_refill_watchdog" "${WALLET_PID}" \
     --transfer-config-file config/config.yaml --transfer-coin USDT \
     --min-transfer-amount 1 --transfer-cooldown-seconds 600
 sleep 1
+reconcile_watchdog "${WALLET_PID}" "wallet_refill_watchdog.py"
 
 status_from_pid() {
   local pid_file=$1
   local expected=$2
-  if [ ! -f "${pid_file}" ]; then
+  if ensure_pid_file "${pid_file}" "${expected}"; then
+    echo "running"
+  else
     echo "stopped"
-    return
   fi
-  local pid
-  pid="$(cat "${pid_file}")"
-  if [ -z "${pid}" ] || [ ! -d "/proc/${pid}" ]; then
-    echo "stopped"
-    return
-  fi
-  if ! grep -q "${expected}" "/proc/${pid}/cmdline" 2>/dev/null; then
-    echo "error"
-    return
-  fi
-  echo "running"
 }
 
 safety_status="$(status_from_pid "${SAFETY_PID}" "safety_order_watchdog.py")"

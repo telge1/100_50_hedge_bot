@@ -554,6 +554,67 @@ def _wallet_snapshot_file_for_account(account: str) -> Path | None:
     return _build_dynamic_wallet_snapshot_files().get(account)
 
 
+def _dashboard_account_name_from_bot(bot: dict[str, Any]) -> str:
+    long_account = str(bot.get("long_account") or bot.get("account") or "").strip()
+    if long_account:
+        return long_account
+    bot_name = str(bot.get("bot_name") or "").strip()
+    if bot_name:
+        return bot_name
+    index = bot.get("index")
+    if index is not None:
+        return f"Long_bot_{index}"
+    return ""
+
+
+def _wallet_guard_file_for_account(account: str) -> Path | None:
+    bots = _get_dashboard_long_bots()
+    for bot in bots:
+        guard_account = _dashboard_account_name_from_bot(bot)
+        if not guard_account:
+            continue
+        if guard_account.lower() == account.lower():
+            bot_dir = Path(bot.get("bot_dir") or "")
+            guard_file = bot_dir / "state" / "wallet_guard.json"
+            if guard_file.exists():
+                return guard_file
+    return None
+
+
+def _build_wallet_snapshot_payload_from_guard(data: dict[str, Any], account: str) -> dict[str, Any] | None:
+    current_wallet = _safe_wallet_float(data.get("current_wallet_usdt"))
+    if current_wallet is None:
+        return None
+    start_wallet = _safe_wallet_float(data.get("start_wallet_usdt") or data.get("baseline_wallet_usdt"))
+    if start_wallet is None:
+        start_wallet = current_wallet
+    timestamp = data.get("updated_at") or data.get("timestamp") or data.get("last_snapshot_date")
+    profit = _safe_wallet_float(data.get("profit_usdt"))
+    metric = data.get("wallet_metric_used") or "wallet_guard"
+    guard_bot = str(data.get("bot_name") or account)
+    if guard_bot and guard_bot.strip():
+        guard_bot = guard_bot.strip()
+        if guard_bot.lower() != account.lower():
+            logger.warning(
+                "[dashboard] wallet_guard_account_mismatch",
+                {"account": account, "guard_bot": guard_bot},
+            )
+            return None
+    return {
+        "bot_name": guard_bot,
+        "symbol": str(data.get("symbol") or "").upper(),
+        "wallet_snapshot_timestamp_utc3": timestamp,
+        "wallet_balance_current_usdt": current_wallet,
+        "wallet_balance_previous_usdt": start_wallet,
+        "wallet_balance_start_usdt": start_wallet,
+        "last_trade_wallet_profit_usdt": profit,
+        "last_trade_wallet_profit_source": metric,
+        "last_trade_wallet_profit_available": bool(profit is not None),
+        "last_trade_wallet_profit_reason": "wallet_guard_fallback",
+        "last_trade_wallet_profit_timestamp_utc3": timestamp,
+    }
+
+
 def _ensure_wallet_snapshot_for_account(account: str) -> None:
     snapshot_path = _wallet_snapshot_file_for_account(account)
     state_file = _build_dynamic_bot_state_files().get(account)
@@ -1181,9 +1242,23 @@ def _load_live_wallet_snapshot_for_account(account: str) -> dict[str, Any] | Non
     if snapshot:
         return snapshot
     file_data = _load_wallet_snapshot_file(account)
-    if not file_data:
-        return None
-    return _build_wallet_snapshot_payload_from_file(file_data, account)
+    if file_data:
+        snapshot = _build_wallet_snapshot_payload_from_file(file_data, account)
+        if snapshot:
+            return snapshot
+    guard_path = _wallet_guard_file_for_account(account)
+    if guard_path and guard_path.exists():
+        try:
+            guard_data = json.loads(guard_path.read_text(encoding="utf-8"))
+        except Exception:
+            logger.warning(
+                "[dashboard] wallet_guard_failed_read",
+                {"account": account, "path": str(guard_path)},
+                exc_info=True,
+            )
+            return None
+        return _build_wallet_snapshot_payload_from_guard(guard_data, account)
+    return None
 
 
 def _bot_profile_for_name(bot_name: str) -> str | None:
@@ -2905,6 +2980,7 @@ async def profit_verlauf_2(
         page=page,
         page_size=page_size,
     )
+    bot_profiles = _serializable_bot_profiles()
     return HTMLResponse(render_template(
         "profit_verlauf_2.html",
         {
@@ -2920,6 +2996,7 @@ async def profit_verlauf_2(
             "trade_page": pagination["page"],
             "warnings": warnings,
             "trade_limit": limit,
+            "bot_profiles": bot_profiles,
         },
     ))
 
@@ -8187,31 +8264,47 @@ def _extract_wallet_value(snapshot: dict[str, Any] | None) -> float | None:
     return None
 
 
-def _build_profit_trade_wallet_summary() -> dict[str, Any]:
+def _build_profit_trade_wallet_summary(
+    live_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     bot_wallets: list[dict[str, Any]] = []
     total_wallet_usdt = 0.0
     has_numeric_wallet = False
-    available_bots = {
-        str(bot.get("bot_name") or "").strip().lower(): bot for bot in _get_dashboard_long_bots()
-    }
-    for bot_number in range(1, 5):
-        bot_name = f"long_bot_{bot_number}"
-        bot = available_bots.get(bot_name, {})
-        account_name = str(bot.get("account_name") or f"Long_bot_{bot_number}").strip()
-        wallet_value = None
-        try:
-            snapshot = _load_live_wallet_snapshot_for_account(account_name)
-            wallet_value = _extract_wallet_value(snapshot)
-        except Exception:
-            logger.warning(
-                "[dashboard] profit_trade_wallet_snapshot_failed",
-                exc_info=True,
-                extra={"bot_name": bot_name, "account_name": account_name},
-            )
-        if wallet_value is not None:
-            total_wallet_usdt += wallet_value
+    live_map: dict[str, float | None] = {}
+    if live_summary:
+        long_val = _safe_wallet_float(live_summary.get("main_margin_balance"))
+        short_val = _safe_wallet_float(live_summary.get("sub_margin_balance"))
+        total_val = _safe_wallet_float(live_summary.get("total_margin_balance"))
+        if long_val is not None:
+            live_map["long_bot_1"] = long_val
+            total_wallet_usdt += long_val
             has_numeric_wallet = True
-        bot_wallets.append({"bot_name": bot_name, "wallet_usdt": wallet_value})
+        if short_val is not None:
+            live_map["short_bot_1"] = short_val
+            total_wallet_usdt += short_val
+            has_numeric_wallet = True
+        if total_val is not None:
+            total_wallet_usdt = total_val
+            has_numeric_wallet = True
+    for bot in _get_dashboard_long_bots():
+        bot_name = str(bot.get("bot_name") or "").strip().lower()
+        snapshot_value = None
+        account_name = _dashboard_account_name_from_bot(bot)
+        if account_name:
+            try:
+                snapshot = _load_live_wallet_snapshot_for_account(account_name)
+                snapshot_value = _extract_wallet_value(snapshot)
+            except Exception:
+                logger.warning(
+                    "[dashboard] profit_trade_wallet_snapshot_failed",
+                    exc_info=True,
+                    extra={"bot_name": bot_name, "account_name": account_name},
+                )
+        value = live_map.get(bot_name, snapshot_value)
+        if value is not None and bot_name not in live_map:
+            total_wallet_usdt += value
+            has_numeric_wallet = True
+        bot_wallets.append({"bot_name": bot_name, "wallet_usdt": value})
     return {
         "total_wallet_usdt": round(total_wallet_usdt, 8) if has_numeric_wallet else None,
         "bot_wallets": bot_wallets,

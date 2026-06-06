@@ -2,7 +2,7 @@
 
 set -u
 
-PROJECT_ROOT="/home/telgenbuescher/projects/spread_recovery_hedge"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 
 echo "Running hard reset..."

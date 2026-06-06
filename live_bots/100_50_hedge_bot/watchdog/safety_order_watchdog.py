@@ -45,6 +45,45 @@ def setup_logger() -> logging.Logger:
     return logger
 
 
+def _validate_runner_process(bot_name: str, logger: logging.Logger) -> bool:
+    bot_name = bot_name.lower()
+    pid_file = BOT_ROOT / bot_name / "run" / "bot.pid"
+    reason = None
+    if not pid_file.exists():
+        reason = "no_pid_file"
+    else:
+        try:
+            pid = int(pid_file.read_text().strip())
+        except Exception:
+            reason = "invalid_pid"
+        else:
+            if pid <= 0:
+                reason = "invalid_pid"
+            else:
+                proc_cmd = Path(f"/proc/{pid}/cmdline")
+                if not proc_cmd.exists():
+                    reason = "pid_not_running"
+                else:
+                    try:
+                        cmdline = proc_cmd.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+                    except Exception:
+                        reason = "cmdline_unreadable"
+                    else:
+                        tokens = [
+                            "fixed_cycle_hedge_bot.runner",
+                            f"--bot-name {bot_name}",
+                            str(PROJECT_ROOT),
+                        ]
+                        for token in tokens:
+                            if token not in cmdline:
+                                reason = f"missing_{token.replace(' ', '_')}"
+                                break
+    if reason:
+        logger.info("watchdog_skip_inactive_bot bot=%s reason=%s", bot_name, reason)
+        return False
+    return True
+
+
 def write_debug_event(logger: logging.Logger, event_name: str, payload: dict[str, Any]) -> None:
     if event_name not in SIGNIFICANT_DEBUG_EVENTS:
         return
@@ -309,6 +348,8 @@ def handle_profile(
     if not api_key or not secret_key:
         return
     bot_name = profile_name.lower()
+    if not _validate_runner_process(bot_name, logger):
+        return
     resolved = resolve_bot_metadata(bot_name, logger)
     if not resolved:
         return

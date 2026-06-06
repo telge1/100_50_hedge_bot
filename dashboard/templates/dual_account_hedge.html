@@ -725,6 +725,30 @@
             return Number.isFinite(num) ? num : null;
         }
 
+        function firstValidNumber(...values) {
+            for (const value of values) {
+                if (value == null) continue;
+                const num = Number(value);
+                if (Number.isFinite(num)) {
+                    return num;
+                }
+            }
+            return null;
+        }
+
+        function getTradePrice(row) {
+            return firstValidNumber(
+                row.avgExitPrice,
+                row.avg_exit_price,
+                row.exit_price,
+                row.close_price,
+                row.order_price,
+                row.price,
+                row.avgEntryPrice,
+                row.avg_entry_price
+            );
+        }
+
         function resolveWalletAnchor(snapshot) {
             const fields = [
                 { key: 'current_wallet_usdt', value: snapshot?.current_wallet_usdt },
@@ -750,30 +774,30 @@
         }
 
         function buildChronologicalRows(rows, snapshot) {
-            const sorted = [...rows].sort((a, b) => {
+            const ascending = [...rows].sort((a, b) => {
                 const ta = parseRowTimestamp(a);
                 const tb = parseRowTimestamp(b);
-                if (ta !== tb) return tb - ta;
+                if (ta !== tb) return ta - tb;
                 const idA = (a.orderId || a.execId || a.id || a.tradeId || '').toString();
                 const idB = (b.orderId || b.execId || b.id || b.tradeId || '').toString();
                 return idA.localeCompare(idB);
             });
             const anchor = resolveWalletAnchor(snapshot);
             let runningWallet = Number.isFinite(anchor.value ?? NaN) ? anchor.value : null;
-            sorted.forEach(row => {
+            ascending.forEach(row => {
                 const pnl = parseClosedPnlValue(row);
                 row.pnl_value = pnl;
                 row.__timestamp = parseRowTimestamp(row);
-                if (runningWallet != null) {
+                if (runningWallet != null && Number.isFinite(pnl ?? NaN)) {
+                    runningWallet += pnl ?? 0;
                     row.wallet_after_trade = runningWallet;
-                    if (Number.isFinite(pnl ?? NaN)) {
-                        runningWallet -= pnl ?? 0;
-                    }
+                } else if (runningWallet != null) {
+                    row.wallet_after_trade = runningWallet;
                 } else {
                     row.wallet_after_trade = null;
                 }
             });
-            const newestRow = sorted[0];
+            const newestRow = ascending[ascending.length - 1];
             console.debug('closed pnl wallet anchor', {
                 walletAnchor: anchor.value,
                 walletAnchorSource: anchor.source,
@@ -781,7 +805,12 @@
                 newestRow,
                 newestRowWalletAfterTrade: newestRow?.wallet_after_trade,
             });
-            return sorted;
+            const sortedDescending = [...ascending].sort((a, b) => {
+                const ta = a.__timestamp ?? parseRowTimestamp(a);
+                const tb = b.__timestamp ?? parseRowTimestamp(b);
+                return tb - ta;
+            });
+            return sortedDescending;
         }
 
         function mergeRawAndConfirmedPnlRows(rawRows, confirmedRows, orderPurposeMap) {
@@ -909,7 +938,16 @@
                 const symbol = r.symbol || '--';
                 const tradeId = r.orderId || r.execId || r.tradeId || r.id || '--';
                 const pnlValue = r.pnl_value ?? parseClosedPnlValue(r);
-                const walletValue = r.wallet_after_trade != null ? formatWalletUsdt(r.wallet_after_trade) : '--';
+                const priceValue = getTradePrice(r);
+                const priceDisplay = priceValue != null ? formatWalletUsdt(priceValue) : '--';
+                const walletCandidates = [
+                    normalizeWalletValue(r.wallet_after_trade),
+                    normalizeWalletValue(r.wallet_balance_current_usdt),
+                    normalizeWalletValue(r.wallet_balance_previous_usdt),
+                    normalizeWalletValue(r.wallet_balance_start_usdt),
+                ];
+                const walletCandidate = walletCandidates.find(v => v != null);
+                const walletValue = walletCandidate != null ? formatWalletUsdt(walletCandidate) : '--';
                 const pnlClass = pnlValue > 0 ? 'positive' : pnlValue < 0 ? 'negative' : 'zero';
                 const tradeType = getTradeType(r);
                 console.debug("closed pnl trade type row", {
@@ -921,13 +959,14 @@
                     <td>${time}</td>
                     <td>${symbol}</td>
                     <td>${tradeId.toString().substr(0, 8)}</td>
+                    <td>${priceDisplay}</td>
                     <td><span class="pnl-${pnlClass}">${formatWalletProfitDisplay(pnlValue)}</span></td>
                     <td class="wallet-cell">${walletValue}</td>
                     <td>${tradeType}</td>
                 </tr>`;
             }).join('');
             content.innerHTML = `<table class="closed-pnl-table">
-                <thead><tr><th>Zeit</th><th>Coin</th><th>Trade</th><th>P&L</th><th>${walletLabel}</th><th>Trade Typ</th></tr></thead>
+                <thead><tr><th>Zeit</th><th>Coin</th><th>Trade</th><th>Preis</th><th>P&L</th><th>${walletLabel}</th><th>Trade Typ</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>`;
         }

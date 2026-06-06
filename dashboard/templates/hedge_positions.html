@@ -4001,21 +4001,6 @@
                 longBotDesc = 'Long Bot kann ohne festes Symbol gestartet werden';
             }
             
-            html += `
-                <div class="system-status-item ${longStatusClass}">
-                    <div class="system-status-info">
-                        <div class="system-status-name">
-                            <span class="system-status-indicator ${longIndicatorClass}"></span>
-                            🟢 Long Bot (${profileLabel})
-                        </div>
-                        <div class="system-status-desc">${longBotDesc}</div>
-                    </div>
-                    <div class="system-status-actions">
-                        ${longBotButton}
-                    </div>
-                </div>
-            `;
-            
             // Short Bot Status (mit Start-Button / Price-at-Anzeige)
             const shortBot = selectedBots['short'] || { running: false, status: 'stopped', status_text: '' };
             let shortRunning = shortBot.running || false;
@@ -4068,7 +4053,22 @@
                 shortBotDesc = 'Short Bot kann ohne festes Symbol gestartet werden';
             }
             
-            html += `
+            const longCardHtml = `
+                <div class="system-status-item ${longStatusClass}">
+                    <div class="system-status-info">
+                        <div class="system-status-name">
+                            <span class="system-status-indicator ${longIndicatorClass}"></span>
+                            🟢 Long Bot (${profileLabel})
+                        </div>
+                        <div class="system-status-desc">${longBotDesc}</div>
+                    </div>
+                    <div class="system-status-actions">
+                        ${longBotButton}
+                    </div>
+                </div>
+            `;
+
+            const shortCardHtml = `
                 <div class="system-status-item ${shortStatusClass}">
                     <div class="system-status-info">
                         <div class="system-status-name">
@@ -4080,6 +4080,13 @@
                     <div class="system-status-actions">
                         ${shortBotButton}
                     </div>
+                </div>
+            `;
+
+            html += `
+                <div class="system-status-card">
+                    ${longCardHtml}
+                    ${shortCardHtml}
                 </div>
             `;
             
@@ -4206,13 +4213,24 @@
             const symbolFromInput = symbolInput ? symbolInput.value.trim().toUpperCase() : '';
             const symbol = symbolFromUi || symbolFromInput;
             const selectedProfile = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
+            if (!['long', 'short'].includes(botType)) {
+                if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+                showToast('error', 'Ungültiger Bot-Typ', `Bot-Typ ${botType} wird nicht unterstützt.`, 6000);
+                return;
+            }
             if (botType === 'long' && isBotProfile(selectedProfile)) {
                 await startProfileLongBot(evt, selectedProfile);
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                 return;
             }
             if (!symbol) {
-                await startFixedCycleScript(evt);
+                if (botType === 'long') {
+                    await startFixedCycleScript(evt);
+                } else {
+                    showToast('warning', 'Short Bot benötigt Symbol', 'Bitte ein Symbol auswählen, bevor Sie den Short Bot starten.', 5000);
+                    if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+                    return;
+                }
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                 return;
             }
@@ -4240,7 +4258,9 @@
 
                 if (startPrice != null && startPrice > 0) {
                     const trigger = botType === 'long' ? 'below' : 'above';
-                    const atPriceRes = await fetch('/api/hedge/start-bot-at-price', {
+                const endpointUrl = '/api/hedge/start-bot-at-price';
+                console.log('[BOT START CLICK]', { botType, selectedSymbol: symbol, endpointOrUrl: endpointUrl });
+                const atPriceRes = await fetch(endpointUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
@@ -4260,7 +4280,9 @@
                     return;
                 }
 
-                const response = await fetch(`/api/hedge/start-bot-script`, {
+                const endpointUrl = `/api/hedge/start-bot-script`;
+                console.log('[BOT START CLICK]', { botType, selectedSymbol: symbol, endpointOrUrl: endpointUrl });
+                const response = await fetch(endpointUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -5313,7 +5335,7 @@
         function toggleHedgeGuardDetails() {
             try {
                 const key = 'hedge_guard_details_collapsed';
-                const detailsEl = document.getElementById('hedgeGuardCardDetails');
+                const detailsEl = document.getElementById('hedgeGuardStatusDetails');
                 const linkEl = document.getElementById('hedgeGuardToggleLink');
                 const collapsed = localStorage.getItem(key) === 'true';
                 if (collapsed) {
@@ -5380,7 +5402,7 @@
         }
 
         function renderHedgeGuardWatcherDetails(watchers) {
-            const detailsEl = document.getElementById('hedgeGuardCardDetails');
+            const detailsEl = document.getElementById('hedgeGuardStatusDetails');
             if (!detailsEl) return;
             if (!watchers || Object.keys(watchers).length === 0) {
                 detailsEl.innerHTML = '<div class="system-status-item stopped"><div class="system-status-info"><div class="system-status-name"><span class="system-status-indicator stopped"></span>Hedge Guard Watchers</div><div class="system-status-desc">Details werden geladen...</div></div></div>';

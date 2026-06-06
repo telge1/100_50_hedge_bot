@@ -94,7 +94,7 @@ sudo systemctl daemon-reload
 sudo systemctl start coin_scanner.service
 sudo systemctl start coin_scanner.timer
 
-udo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
+sudo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
 
 ####################################### Start/Stop Bot ##########################################################
 

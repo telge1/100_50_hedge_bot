@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-PROJECT_ROOT="/home/telgenbuescher/projects/spread_recovery_hedge"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON_CMD="${PROJECT_ROOT}/.venv/bin/python"
 BEST_COIN_FILE="${PROJECT_ROOT}/logs/best_coin.json"
 

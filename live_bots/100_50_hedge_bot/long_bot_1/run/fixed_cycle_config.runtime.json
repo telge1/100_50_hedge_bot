@@ -1,5 +1,5 @@
 {
-  "symbol": "XRPUSDT",
+  "symbol": "ENAUSDT",
   "category": "linear",
   "dynamic_symbol_enabled": true,
   "best_coin_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/live_bots/100_50_hedge_bot/long_bot_1/run/reserved_best_coin.json",

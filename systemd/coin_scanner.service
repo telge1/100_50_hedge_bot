@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/telgenbuescher/projects/spread_recovery_hedge
-ExecStart=/home/telgenbuescher/projects/spread_recovery_hedge/.venv/bin/python fixed_cycle_hedge_bot/tools/coin_scanner.py
+WorkingDirectory=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev
+ExecStart=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python fixed_cycle_hedge_bot/tools/coin_scanner.py
 User=telgenbuescher
-StandardOutput=append:/home/telgenbuescher/projects/spread_recovery_hedge/logs/coin_scanner.log
-StandardError=append:/home/telgenbuescher/projects/spread_recovery_hedge/logs/coin_scanner.log
+StandardOutput=append:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/logs/coin_scanner.log
+StandardError=append:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/logs/coin_scanner.log
 
 [Install]
 WantedBy=multi-user.target

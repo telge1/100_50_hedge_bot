@@ -28,6 +28,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const walletList = document.getElementById("summary-wallet-list");
     const masterCheckbox = document.getElementById("select-all-trades-checkbox");
     const removeSelectedButton = document.getElementById("remove-selected-trades-btn");
+    const profitWalletBotProfiles = Array.isArray(window.PROFIT_WALLET_BOT_PROFILES)
+        ? window.PROFIT_WALLET_BOT_PROFILES
+        : [];
+    const profitWalletProfileOrder = (() => {
+        const set = new Set(["main"]);
+        profitWalletBotProfiles.forEach((profile) => {
+            const name = String(profile?.profile || "").trim();
+            if (name) {
+                set.add(name);
+            }
+        });
+        return Array.from(set);
+    })();
+    const profitWalletProfileLookup = profitWalletBotProfiles.reduce((acc, profile) => {
+        if (profile && profile.profile) {
+            acc[profile.profile] = profile;
+        }
+        return acc;
+    }, {});
+    const profitWalletEntries = profitWalletProfileOrder.flatMap((profileKey) => {
+        return [
+            { profileKey, side: "long" },
+            { profileKey, side: "short" },
+        ];
+    });
     let currentTradePage = Number(
         params.get("page") ?? window.INITIAL_TRADE_FILTERS?.page ?? 0,
     );
@@ -62,7 +87,39 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("[profit_trades] trade body found", !!tradeBody);
 
     function formatWalletValue(value) {
-        return Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)} USDT` : "-";
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? `${numeric.toFixed(2)} USDT` : "-";
+    }
+
+    function safeWalletNumber(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function resolveWalletLabel(profile, side) {
+        if (profile === "main") {
+            return side === "short" ? "Sub Account" : "Main Account";
+        }
+        const entry = profitWalletProfileLookup[profile];
+        if (!entry) {
+            const fallback = profile?.toUpperCase() || "";
+            return side === "short" ? `${fallback} Short` : `${fallback} Long`;
+        }
+        if (side === "short") {
+            return entry.short_account || `${entry.bot_name || entry.profile} Short`;
+        }
+        return entry.long_account || `${entry.bot_name || entry.profile} Long`;
+    }
+
+    function firstValidNumber(...values) {
+        for (const value of values) {
+            if (value == null) continue;
+            const numeric = Number(value);
+            if (Number.isFinite(numeric)) {
+                return numeric;
+            }
+        }
+        return null;
     }
 
     function formatProfitChartValue(value) {
@@ -690,6 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentTradePageSize = Number(pagination.page_size || currentTradePageSize);
             }
             updateSummaryCards(data.summary);
+            await refreshLiveWalletSummary();
             updatePaginationControls(pagination, Array.isArray(trades) ? trades.length : 0);
             syncUrlState();
             if (!Array.isArray(trades) || trades.length === 0) {
@@ -707,6 +765,105 @@ document.addEventListener("DOMContentLoaded", () => {
                 lastUpdated.textContent = "Refresh Fehler";
             }
             console.error("[profit_trades] refresh failed", error);
+        }
+    }
+
+    async function loadLiveWalletsFromSystemStatus() {
+        const requests = profitWalletProfileOrder.map(async (targetProfile) => {
+            try {
+                const response = await fetch(`/api/hedge/equity?profile=${encodeURIComponent(targetProfile)}`, {
+                    credentials: "include",
+                });
+                if (!response.ok) {
+                    console.debug(
+                        "[profit_trades] live wallet fetch HTTP error",
+                        targetProfile,
+                        response.status,
+                    );
+                    return null;
+                }
+                const payload = await response.json();
+                if (!payload?.success) {
+                    return null;
+                }
+                return { profile: targetProfile, data: payload };
+            } catch (error) {
+                console.debug("[profit_trades] live wallet fetch failed for profile", targetProfile, error);
+                return null;
+            }
+        });
+        const settled = await Promise.all(requests);
+        return settled.filter(Boolean);
+    }
+
+    function hasLiveWalletValues(entries) {
+        if (!Array.isArray(entries) || !entries.length) {
+            return false;
+        }
+        return entries.some((entry) => {
+            const data = entry?.data;
+            if (!data) return false;
+            return data.main_margin_balance != null || data.sub_margin_balance != null;
+        });
+    }
+
+    function renderLiveWalletSummary(entries) {
+        if (!hasLiveWalletValues(entries)) {
+            return;
+        }
+        const dataByProfile = new Map();
+        entries.forEach((item) => {
+            if (item?.profile && item?.data) {
+                dataByProfile.set(item.profile, item.data);
+            }
+        });
+        const walletItems = profitWalletEntries.map(({ profileKey, side }) => {
+            const data = dataByProfile.get(profileKey);
+            const rawValue =
+                side === "long"
+                    ? data?.main_margin_balance
+                    : data?.sub_margin_balance;
+            return {
+                label: resolveWalletLabel(profileKey, side),
+                value: rawValue != null ? safeWalletNumber(rawValue) : null,
+            };
+        });
+        const numericValues = walletItems.map((entry) => entry.value).filter((v) => v != null);
+        if (!numericValues.length) {
+            return;
+        }
+        const totalWallet = numericValues.reduce((sum, current) => sum + (current ?? 0), 0);
+        console.debug("[profit_trades] resolved dashboard wallet", {
+            profile,
+            entries: walletItems,
+            totalWallet,
+        });
+        if (!walletList) {
+            return;
+        }
+        const totalEl = document.getElementById("summary-total-wallet");
+        if (totalEl) {
+            totalEl.textContent = formatWalletValue(totalWallet);
+        }
+        walletList.innerHTML = "";
+        walletItems.forEach((entry) => {
+            const item = document.createElement("div");
+            item.className = "summary-wallet-item";
+            const name = document.createElement("span");
+            name.textContent = entry.label;
+            const value = document.createElement("span");
+            value.textContent =
+                entry.value != null ? formatWalletValue(entry.value) : "-";
+            item.appendChild(name);
+            item.appendChild(value);
+            walletList.appendChild(item);
+        });
+    }
+
+    async function refreshLiveWalletSummary() {
+        const liveData = await loadLiveWalletsFromSystemStatus();
+        if (liveData) {
+            renderLiveWalletSummary(liveData);
         }
     }
 
