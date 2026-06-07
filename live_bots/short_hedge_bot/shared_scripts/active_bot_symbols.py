@@ -50,10 +50,15 @@ def _load_blacklisted_symbols(state_dir: Path) -> dict[str, dict[str, object]]:
 
 
 def _validate_bot_name(name: str) -> bool:
-    if not name or "_" not in name:
+    if not name or not isinstance(name, str):
         return False
-    prefix, suffix = name.split("_", 1)
-    return prefix in {"long", "short"} and suffix.isdigit()
+
+    parts = name.split("_")
+    if len(parts) != 3:
+        return False
+
+    side, label, number = parts
+    return side in {"long", "short"} and label == "bot" and number.isdigit()
 
 
 def _normalize_symbol(symbol: str | None) -> str | None:

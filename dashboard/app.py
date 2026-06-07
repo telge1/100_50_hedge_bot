@@ -50,6 +50,8 @@ WATCHER_SCRIPT_ROOT = LIVE_BOT_LOGS_ROOT / "shared_scripts"
 START_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "start_hedge_guard_watchers.sh"
 STOP_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "stop_hedge_guard_watchers.sh"
 WATCHERS_STATUS_FILE = LIVE_BOT_LOGS_ROOT / "run" / "hedge_guard_watchers_status.json"
+PAIR_START_SYMBOLS_FILE = LIVE_BOT_LOGS_ROOT / "state" / "pair_start_symbols.json"
+PAIR_START_ALLOWED_PROFILES = {"bot_1", "bot_2", "bot_3"}
 ACCOUNT_PNL_PATHS: dict[str, dict[str, Path]] = {}
 WALLET_SNAPSHOT_FILES: dict[str, Path] = {}
 BOT_STATE_FILES: dict[str, Path] = {}
@@ -78,6 +80,95 @@ def _get_dashboard_profile_entries() -> list[dict[str, str]]:
 
 def _available_profiles() -> list[str]:
     return [entry["profile"] for entry in _get_dashboard_profile_entries()]
+
+
+def _normalize_pair_profile(profile: str | None) -> str | None:
+    if not profile:
+        return None
+    normalized = profile.strip().lower()
+    if normalized in PAIR_START_ALLOWED_PROFILES:
+        return normalized
+    return None
+
+
+def _resolve_pair_bot_names(profile: str) -> tuple[str, str] | None:
+    long_bot = profile_to_long_bot_name(profile)
+    if not long_bot:
+        return None
+    short_bot = long_bot.replace("long_bot_", "short_bot_", 1)
+    if short_bot == long_bot:
+        short_bot = f"short_bot_{profile.split('_')[-1]}"
+    return long_bot, short_bot
+
+
+def _profile_from_short_bot_name(short_bot_name: str | None) -> str | None:
+    if not short_bot_name:
+        return None
+    match = re.match(r"short_bot_(\d+)", short_bot_name.strip().lower())
+    if not match:
+        return None
+    return f"bot_{match.group(1)}"
+
+
+def _load_pair_start_symbols() -> dict[str, dict[str, Any]]:
+    if not PAIR_START_SYMBOLS_FILE.exists():
+        return {}
+    try:
+        with open(PAIR_START_SYMBOLS_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+            if isinstance(data, dict):
+                return data
+    except Exception as exc:
+        logger.warning("[pair-start] failed to read handoff file", exc_info=True)
+    return {}
+
+
+def _write_pair_start_symbol(
+    profile: str, symbol: str, long_bot: str, short_bot: str, *, source: str = "long_bot_start"
+) -> bool:
+    normalized = _normalize_pair_profile(profile)
+    if not normalized or not symbol:
+        return False
+    entry = {
+        "symbol": symbol.upper(),
+        "source": source,
+        "long_bot": long_bot,
+        "short_bot": short_bot,
+        "profile": normalized,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        "used_by_short": False,
+    }
+    data = _load_pair_start_symbols()
+    data[normalized] = entry
+    try:
+        tmp_path = PAIR_START_SYMBOLS_FILE.with_suffix(PAIR_START_SYMBOLS_FILE.suffix + ".tmp")
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(tmp_path, "w", encoding="utf-8") as tmp_fh:
+            json.dump(data, tmp_fh, ensure_ascii=False, indent=2)
+        tmp_path.replace(PAIR_START_SYMBOLS_FILE)
+        logger.info(
+            "pair_handoff_symbol_overwritten %s",
+            {
+                "profile": normalized,
+                "symbol": entry["symbol"],
+                "long_bot": long_bot,
+                "short_bot": short_bot,
+                "path": str(PAIR_START_SYMBOLS_FILE),
+            },
+        )
+        return True
+    except Exception as exc:
+        logger.error(
+            "pair_handoff_symbol_write_failed",
+            exc_info=True,
+            extra={
+                "profile": normalized,
+                "symbol": symbol,
+                "path": str(PAIR_START_SYMBOLS_FILE),
+            },
+        )
+        return False
 
 
 def _available_profile_labels() -> dict[str, str]:
@@ -237,6 +328,18 @@ def _long_bot_shared_script_path(action: str) -> Path | None:
     return script_map.get(action)
 
 
+def _short_bot_shared_scripts_root() -> Path:
+    return project_root / "live_bots" / "short_hedge_bot" / "shared_scripts"
+
+
+def _short_bot_shared_script_path(action: str) -> Path | None:
+    script_map = {
+        "stop": _short_bot_shared_scripts_root() / "stop_bot.sh",
+        "stop_with_cleanup": _short_bot_shared_scripts_root() / "stop_with_cleanup.sh",
+    }
+    return script_map.get(action)
+
+
 def _is_executable_script(path: Path | None) -> bool:
     return bool(path and path.exists() and os.access(path, os.X_OK))
 
@@ -254,6 +357,31 @@ def _validate_long_bot_request(bot_name: str | None) -> tuple[dict[str, Any] | N
     if not config_file.exists():
         return None, f"Config missing: {config_file}"
     return bot, None
+
+
+def _validate_short_bot_request(bot_name: str | None) -> tuple[dict[str, Any] | None, str | None]:
+    normalized = str(bot_name or "").strip().lower()
+    if not re.match(r"^short_bot_[0-9]+$", normalized):
+        return None, "Invalid bot_name"
+    bot_dir = project_root / "live_bots" / "short_hedge_bot" / normalized
+    config_file = bot_dir / "config" / "fixed_cycle_config.json"
+    start_script = bot_dir / "scripts" / "start.sh"
+    stop_script = bot_dir / "scripts" / "stop.sh"
+    if not bot_dir.exists() or not bot_dir.is_dir():
+        return None, f"Bot directory missing: {bot_dir}"
+    if not config_file.exists():
+        return None, f"Config missing: {config_file}"
+    if not start_script.exists():
+        return None, f"Start script missing: {start_script}"
+    if not stop_script.exists():
+        return None, f"Stop script missing: {stop_script}"
+    return {
+        "bot_name": normalized,
+        "bot_dir": str(bot_dir),
+        "config_file": str(config_file),
+        "start_script": str(start_script),
+        "stop_script": str(stop_script),
+    }, None
 
 
 def _is_discovered_long_bot_name(bot_name: str | None) -> bool:
@@ -1989,6 +2117,80 @@ def _inject_profile_long_bot_runtime_status(bots_by_symbol: dict, profile: Optio
     except Exception as exc:
         logger.debug("[SYSTEM-STATUS] Profil-Long-Status konnte nicht injiziert werden: %s", exc)
         return None
+
+
+def _inject_short_bot_run_status(bots_by_symbol: dict) -> None:
+    """Ensure short_bot_X entries from live_bots/short_hedge_bot are exposed."""
+    try:
+        short_root = project_root / "live_bots" / "short_hedge_bot"
+        if not short_root.exists():
+            return
+        logger.info("[SHORT-STATUS-INJECT] scanning root=%s", short_root)
+        for child in short_root.iterdir():
+            if not child.is_dir():
+                continue
+            short_bot_name = child.name
+            if not short_bot_name.startswith("short_bot_"):
+                continue
+            run_info = _read_bot_status_from_run(short_bot_name)
+            status_payload = run_info.get("status_payload") or {}
+            symbol = str(status_payload.get("symbol") or "").strip().upper()
+            if not symbol:
+                continue
+            status_path = run_info.get("status_path")
+            logger.info(
+                "[SHORT-STATUS-INJECT] found %s status_file=%s symbol=%s",
+                short_bot_name,
+                status_path,
+                symbol,
+            )
+            status_entry: dict[str, Any] = {
+                "bot_name": short_bot_name,
+                "bot_type": "short",
+                "symbol": symbol,
+                "running": False,
+                "status": "stopped",
+                "status_text": status_payload.get("status_text") or status_payload.get("status_label") or "",
+                "status_source": "run_status_json",
+            }
+            pid_path = run_info.get("pid_path")
+            pid_val: int | None = None
+            if pid_path and pid_path.exists():
+                try:
+                    pid_raw = pid_path.read_text(encoding="utf-8").strip()
+                    if pid_raw.isdigit():
+                        candidate = int(pid_raw)
+                        if _pid_alive(candidate) and _pid_runs_same_bot(candidate, short_bot_name):
+                            pid_val = candidate
+                            status_entry["running"] = True
+                            status_entry["status"] = status_payload.get("status") or "running"
+                            status_entry["status_source"] = "valid_runner_pid"
+                        else:
+                            status_entry["running"] = False
+                except Exception:
+                    pass
+            if pid_val:
+                status_entry["pid"] = pid_val
+            elif status_payload.get("pid"):
+                status_entry["pid"] = status_payload.get("pid")
+            if not pid_val:
+                status_entry["status"] = status_payload.get("status") or ("running" if status_entry["running"] else "stopped")
+            if symbol not in bots_by_symbol:
+                bots_by_symbol[symbol] = {}
+            bots_by_symbol[symbol]["short"] = status_entry
+            logger.info(
+                "[SHORT-STATUS-INJECT] status symbol=%s running=%s pid=%s",
+                symbol,
+                status_entry["running"],
+                status_entry.get("pid"),
+            )
+            logger.info(
+                "[SHORT-STATUS-INJECT] injected bots_by_symbol[%s].short = %s",
+                symbol,
+                status_entry,
+            )
+    except Exception as exc:
+        logger.debug("[SYSTEM-STATUS] Konnte Short-Bot-Status nicht injizieren: %s", exc)
 
 
 def _inject_fixed_cycle_overview_entry(bots_list: list[dict], prof_key: str):
@@ -8846,6 +9048,21 @@ async def api_start_dual_bots(
         return {"success": False, "error": str(e)}
 
 
+@app.get("/api/hedge/pair-start-symbol")
+async def api_pair_start_symbol(
+    profile: str = Query(..., description="bot profile (bot_1|bot_2|bot_3)"),
+    user: dict = Depends(require_auth),
+):
+    normalized = _normalize_pair_profile(profile)
+    if not normalized:
+        raise HTTPException(status_code=404, detail="Profil nicht unterstützt")
+    data = _load_pair_start_symbols()
+    entry = data.get(normalized)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Kein Pair-Start-Symbol verfügbar")
+    return {"success": True, "profile": normalized, "symbol": entry.get("symbol"), "entry": entry}
+
+
 @app.post("/api/hedge/start-bot-script")
 async def api_start_bot_script(
     payload: dict = Body(...),
@@ -8857,18 +9074,239 @@ async def api_start_bot_script(
     size_raw = str(payload.get("size") or "").strip()
     profile = _normalize_dashboard_profile((payload.get("profile") or "").strip() or None, fallback_to_main=False)
     profile_record = resolve_profile_to_bot_record(profile) if _is_registry_bot_profile(profile) else None
+    project_root = Path(__file__).resolve().parent.parent
     if bot_type not in {"long", "short"}:
         return {"success": False, "error": "bot_type muss 'long' oder 'short' sein"}
     if not symbol:
         return {"success": False, "error": "Symbol fehlt"}
 
+    normalized_symbol = _normalize_symbol_value(symbol)
+    pair_data = _load_pair_start_symbols()
+    pair_entry: dict[str, Any] | None = None
+    if profile:
+        pair_entry = pair_data.get(profile)
+    if not pair_entry and normalized_symbol:
+        pair_entry = next(
+            (
+                entry
+                for entry in pair_data.values()
+                if _normalize_symbol_value(entry.get("symbol")) == normalized_symbol
+            ),
+            None,
+        )
+    short_bot_name: str | None = None
+    if profile_record:
+        short_bot_name = (
+            profile_record.get("short_account")
+            or profile_record.get("bot_name", "").replace("long_bot_", "short_bot_", 1)
+        )
+    if not short_bot_name:
+        short_bot_name = _short_bot_name_from_profile(profile)
+    short_bot_name = short_bot_name.strip().lower() if short_bot_name else None
+    if not pair_entry and short_bot_name:
+        pair_entry = next(
+            (
+                entry
+                for entry in pair_data.values()
+                if str(entry.get("short_bot") or "").strip().lower() == short_bot_name
+            ),
+            None,
+        )
+    if pair_entry and not short_bot_name:
+        short_bot_name = str(pair_entry.get("short_bot") or "").strip().lower()
+    if pair_entry:
+        entry_profile = _normalize_dashboard_profile(pair_entry.get("profile"), fallback_to_main=False)
+        if entry_profile and entry_profile != profile:
+            profile = entry_profile
+            if _is_registry_bot_profile(profile):
+                profile_record = resolve_profile_to_bot_record(profile)
+    if not profile and short_bot_name:
+        derived_profile = _profile_from_short_bot_name(short_bot_name)
+        if derived_profile and _is_registry_bot_profile(derived_profile):
+            profile = derived_profile
+            profile_record = resolve_profile_to_bot_record(profile)
+
     if profile_record and bot_type == "long":
-        project_root = Path(__file__).resolve().parent.parent
         _maybe_run_dashboard_start_snapshot(profile_record["bot_name"], project_root=project_root)
         script_path = _long_bot_shared_script_path("start")
         if not _is_executable_script(script_path):
             return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
         return _start_long_bot_script_async(script_path, profile_record["bot_name"], "start_long_bot", project_root)
+
+    if profile_record and bot_type == "short":
+        profile_key = profile or ""
+        short_index = profile_key.split("_")[-1] if profile_key.startswith("bot_") else ""
+        short_bot_name = f"short_bot_{short_index}" if short_index.isdigit() else None
+        if not short_bot_name:
+            short_bot_name = (profile_record.get("short_account") or profile_record.get("bot_name", "").replace("long_bot_", "short_bot_")).strip().lower()
+        else:
+            short_bot_name = short_bot_name.strip().lower()
+        short_group_root = project_root / "live_bots" / "short_hedge_bot"
+        short_root = short_group_root / short_bot_name
+        config_path = short_root / "config" / "fixed_cycle_config.json"
+        start_script = short_root / "scripts" / "start.sh"
+        if not short_root.exists() or not config_path.exists() or not start_script.exists():
+            missing = []
+            if not short_root.exists():
+                missing.append(str(short_root))
+            if not config_path.exists():
+                missing.append(str(config_path))
+            if not start_script.exists():
+                missing.append(str(start_script))
+            return {
+                "success": False,
+                "error": f"Short profile start path invalid: {', '.join(missing)}",
+                "bot_type": "short",
+                "profile": profile,
+            }
+        entry = pair_entry
+        if not entry:
+            entry = _load_pair_start_symbols().get(profile or "")
+        if not entry:
+            return {
+                "success": False,
+                "error": "Pair start symbol not found",
+                "bot_type": "short",
+                "profile": profile,
+            }
+        handoff_symbol = str((entry.get("symbol") or "").strip().upper())
+        if not handoff_symbol:
+            return {
+                "success": False,
+                "error": "Pair start symbol invalid",
+                "bot_type": "short",
+                "profile": profile,
+            }
+        if str(entry.get("short_bot", "")).strip() != short_bot_name:
+            return {
+                "success": False,
+                "error": "Pair short_bot mismatch",
+                "bot_type": "short",
+                "profile": profile,
+            }
+        run_dir = short_root / "run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        reserved_best_coin_path = run_dir / "reserved_best_coin.json"
+        runtime_config_path = run_dir / "fixed_cycle_config.runtime.json"
+        short_active_state_dir = short_group_root / "state"
+        short_active_state_dir.mkdir(parents=True, exist_ok=True)
+        active_symbols_path = short_active_state_dir / "active_bot_symbols.json"
+        run_timestamp = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+        reserved_data = {
+            "symbol": handoff_symbol,
+            "timestamp": run_timestamp,
+            "source": "pair_handoff_symbol",
+            "reason": "pair_handoff_short_start",
+            "candidate_count": 1,
+            "candidates": [{"symbol": handoff_symbol}],
+        }
+        with open(reserved_best_coin_path, "w", encoding="utf-8") as fh:
+            json.dump(reserved_data, fh, ensure_ascii=False, indent=2)
+        with open(config_path, "r", encoding="utf-8") as cfg_fh:
+            short_cfg = json.load(cfg_fh)
+        short_cfg["symbol"] = handoff_symbol
+        short_cfg["best_coin_file"] = str(reserved_best_coin_path.resolve())
+        short_cfg["bot_name"] = short_bot_name
+        with open(runtime_config_path, "w", encoding="utf-8") as runtime_fh:
+            json.dump(short_cfg, runtime_fh, ensure_ascii=False, indent=2)
+        short_active_state_dir = short_group_root / "state"
+        short_active_state_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(
+            "short_pair_handoff_runtime_write_attempt",
+            {
+                "short_bot": short_bot_name,
+                "symbol": handoff_symbol,
+                "profile": profile,
+                "reserved_best_coin": str(reserved_best_coin_path),
+                "runtime_config": str(runtime_config_path),
+            },
+        )
+        active_data = {}
+        if active_symbols_path.exists():
+            try:
+                with open(active_symbols_path, "r", encoding="utf-8") as fh:
+                    active_data = json.load(fh) or {}
+            except Exception:
+                active_data = {}
+        active_data[short_bot_name] = {
+            "symbol": handoff_symbol,
+            "status": "reserved",
+            "updated_at": run_timestamp,
+            "source": "pair_handoff_short_start",
+        }
+        tmp_path = active_symbols_path.with_suffix(active_symbols_path.suffix + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as tmp_fh:
+            json.dump(active_data, tmp_fh, ensure_ascii=False, indent=2)
+        tmp_path.replace(active_symbols_path)
+        logger.info(
+            "short_pair_handoff_runtime_write_success",
+            {
+                "short_bot": short_bot_name,
+                "symbol": handoff_symbol,
+                "profile": profile,
+                "reserved_best_coin": str(reserved_best_coin_path),
+                "runtime_config": str(runtime_config_path),
+                "active_symbols": str(active_symbols_path),
+            },
+        )
+        # Launch short start script
+        launcher_log = short_root / "logs" / "start_short_bot_launcher.log"
+        launcher_log.parent.mkdir(parents=True, exist_ok=True)
+        env = {**os.environ, "PYTHONPATH": str(project_root)}
+        try:
+            log_handle = open(launcher_log, "a", encoding="utf-8")
+            process = subprocess.Popen(
+                [str(start_script)],
+                cwd=str(project_root),
+                stdout=log_handle,
+                stderr=log_handle,
+                start_new_session=True,
+                env=env,
+            )
+            log_handle.flush()
+            log_handle.close()
+        except Exception as exc:
+            logger.exception("short_pair_handoff_runtime_start_failed", exc_info=True)
+            return {
+                "success": False,
+                "runtime_handoff_written": True,
+                "dry_run_short_profile_start_ready": True,
+                "bot_type": "short",
+                "profile": profile,
+                "short_bot_name": short_bot_name,
+                "symbol": handoff_symbol,
+                "reserved_best_coin_path": str(reserved_best_coin_path),
+                "runtime_config_path": str(runtime_config_path),
+                "active_symbols_path": str(active_symbols_path),
+                "message": f"Short runtime handoff written but start failed: {str(exc)}",
+            }
+        # mark pair_start entry as used
+        normalized_profile = _normalize_pair_profile(profile)
+        if normalized_profile:
+            pair_data = _load_pair_start_symbols()
+            entry = pair_data.get(normalized_profile)
+            if entry:
+                entry["used_by_short"] = True
+                entry["updated_at"] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+                tmp_pair = PAIR_START_SYMBOLS_FILE.with_suffix(PAIR_START_SYMBOLS_FILE.suffix + ".tmp")
+                with open(tmp_pair, "w", encoding="utf-8") as tmp_fh:
+                    json.dump(pair_data, tmp_fh, ensure_ascii=False, indent=2)
+                tmp_pair.replace(PAIR_START_SYMBOLS_FILE)
+        return {
+            "success": True,
+            "runtime_handoff_written": True,
+            "short_profile_start_spawned": True,
+            "bot_type": "short",
+            "profile": profile,
+            "short_bot_name": short_bot_name,
+            "symbol": handoff_symbol,
+            "reserved_best_coin_path": str(reserved_best_coin_path),
+            "runtime_config_path": str(runtime_config_path),
+            "active_symbols_path": str(active_symbols_path),
+            "pid": process.pid,
+            "launcher_log": str(launcher_log),
+            "message": "Short runtime handoff written; start script spawned",
+        }
 
     # (C) Block start if per-symbol config is missing (prevents using wrong global config).
     cfg_path = get_config_path(bot_type=bot_type, symbol=symbol, profile=profile)
@@ -8959,9 +9397,17 @@ async def api_start_bot_script(
             stderr=subprocess.DEVNULL,
             env=run_env
         )
-        # Hedge Guardian mitstarten (main für Long, sub für Short)
         _start_hedge_guardian_after_bots_async("main" if bot_type == "long" else "sub", symbol=symbol)
-        return {"success": True, "symbol": symbol, "bot_type": bot_type, "size": size_val}
+        result = {"success": True, "symbol": symbol, "bot_type": bot_type, "size": size_val}
+        if bot_type == "long":
+            normalized_profile = _normalize_pair_profile(profile)
+            if normalized_profile:
+                bot_names = _resolve_pair_bot_names(normalized_profile)
+                if bot_names:
+                    long_bot_name, short_bot_name = bot_names
+                    if not _write_pair_start_symbol(normalized_profile, symbol, long_bot_name, short_bot_name):
+                        result.setdefault("warnings", []).append("Pair handoff write failed")
+        return result
     except Exception as e:
         logger.error(f"Fehler beim Starten des Bots via Script: {e}", exc_info=True)
         return {"success": False, "error": str(e)}
@@ -9030,7 +9476,16 @@ async def api_start_bot_at_price(
         except Exception as e:
             logger.warning(f"State-Datei beim Start nicht geschrieben: {e}")
         logger.info(f"Start-Bot-at-Price gestartet: {bot_type} {symbol} @ {target_price} ({trigger})")
-        return {"success": True, "message": f"{bot_type.capitalize()}-Bot startet, wenn Preis {trigger} {target_price}.", "symbol": symbol, "bot_type": bot_type}
+        result = {"success": True, "message": f"{bot_type.capitalize()}-Bot startet, wenn Preis {trigger} {target_price}.", "symbol": symbol, "bot_type": bot_type}
+        if bot_type == "long":
+            normalized_profile = _normalize_pair_profile(profile)
+            if normalized_profile:
+                bot_names = _resolve_pair_bot_names(normalized_profile)
+                if bot_names:
+                    long_bot_name, short_bot_name = bot_names
+                    if not _write_pair_start_symbol(normalized_profile, symbol, long_bot_name, short_bot_name):
+                        result.setdefault("warnings", []).append("Pair handoff write failed")
+        return result
     except Exception as e:
         logger.error(f"Fehler beim Starten von start_bot_at_price: {e}", exc_info=True)
         return {"success": False, "error": str(e)}
@@ -10327,6 +10782,7 @@ async def api_get_system_status(
     try:
         logger.debug("[SYSTEM-STATUS] Starte Status-Abfrage...")
         profile_long_bot_status = None
+        profile_short_bot_status = None
         
         # Get all services status (Master Bot, Dashboard)
         try:
@@ -10504,9 +10960,34 @@ async def api_get_system_status(
                         profile_long_bot_status["status_text"] = profile_long_bot_status.get("status_label")
             except Exception as exc:
                 logger.debug("[SYSTEM-STATUS] profile_long_bot_status konnte nicht geladen werden: %s", exc)
+            try:
+                short_bot_name = bot_name.replace("long_bot_", "short_bot_", 1) if bot_name else None
+                if short_bot_name:
+                    profile_short_bot_status = get_bot_status(
+                        "",
+                        bot_type="short",
+                        bot_name=short_bot_name,
+                        profile=prof,
+                    )
+                    if (
+                        profile_short_bot_status.get("status_label")
+                        and not profile_short_bot_status.get("status_text")
+                    ):
+                        profile_short_bot_status["status_text"] = profile_short_bot_status.get("status_label")
+            except Exception as exc:
+                logger.debug("[SYSTEM-STATUS] profile_short_bot_status konnte nicht geladen werden: %s", exc)
         
         _ensure_fixed_cycle_long_bot_status(bots_by_symbol, profile=profile)
         focus_symbol = _inject_profile_long_bot_runtime_status(bots_by_symbol, profile=profile)
+        _inject_short_bot_run_status(bots_by_symbol)
+        if not focus_symbol:
+            focus_symbol = str((profile_short_bot_status or {}).get("symbol") or "").strip().upper() or None
+        if focus_symbol:
+            logger.info(
+                "[SYSTEM-STATUS-FINAL-SHORT] bots_by_symbol[%s].short=%s",
+                focus_symbol,
+                (bots_by_symbol.get(focus_symbol) or {}).get("short"),
+            )
         logger.info(f"[SYSTEM-STATUS] Finale bots_by_symbol vor Response: {len(bots_by_symbol)} Symbole, Details: {bots_by_symbol}")
         
         # Price-at (Start-Preis-Bot) State – profilspezifisch.
@@ -10526,6 +11007,7 @@ async def api_get_system_status(
             "price_at": price_at,
             "focus_symbol": focus_symbol,
             "profile_long_bot_status": profile_long_bot_status,
+            "profile_short_bot_status": profile_short_bot_status,
         }
         
         logger.info(f"[SYSTEM-STATUS] Status-Abfrage erfolgreich: {len(result.get('services', {}))} Services, {len(bots_by_symbol)} Symbole mit Bots, {result.get('total_bots', 0)} laufende Bots")
@@ -10556,6 +11038,7 @@ async def api_get_system_status(
             "total_bots": 0,
             "price_at": price_at_fallback,
             "profile_long_bot_status": None,
+            "profile_short_bot_status": None,
         }, status_code=200)  # Status 200 statt 503, damit Frontend die Fehlermeldung anzeigen kann
 
 
@@ -11038,7 +11521,34 @@ async def api_run_start_long_bot_script(
     script_path = _long_bot_shared_script_path("start")
     if not _is_executable_script(script_path):
         return JSONResponse({"success": False, "error": f"Central start script missing: {script_path}"}, status_code=400)
-    return _start_long_bot_script_async(script_path, bot_name, "start_long_bot", project_root)
+    result = _start_long_bot_script_async(script_path, bot_name, "start_long_bot", project_root)
+    if result.get("success"):
+        profile = (body or {}).get("profile") or ""
+        symbol = str(((body or {}).get("symbol") or "").strip().upper())
+        normalized_profile = _normalize_pair_profile(profile)
+        if normalized_profile and symbol:
+            bot_names = _resolve_pair_bot_names(normalized_profile)
+            if bot_names:
+                long_bot_name, short_bot_name = bot_names
+                logger.info(
+                    "pair_handoff_symbol_write_attempt",
+                    {
+                        "profile": normalized_profile,
+                        "symbol": symbol,
+                        "long_bot": long_bot_name,
+                        "short_bot": short_bot_name,
+                    },
+                )
+                ok = _write_pair_start_symbol(
+                    normalized_profile, symbol, long_bot_name, short_bot_name, source="start_long_bot_script"
+                )
+                if not ok:
+                    result.setdefault("warnings", []).append("Pair handoff write failed")
+            else:
+                result.setdefault("warnings", []).append("Pair handoff skipped: cannot resolve bot names")
+        else:
+            result.setdefault("warnings", []).append("Pair handoff skipped: missing profile or symbol")
+    return result
 
 
 @app.post("/api/scripts/stop-long-bot")
@@ -11056,6 +11566,23 @@ async def api_run_stop_long_bot_script(
     if not _is_executable_script(script_path):
         return JSONResponse({"success": False, "error": f"Central stop script missing: {script_path}"}, status_code=400)
     return _run_long_bot_script(script_path, bot_name, "stop_long_bot", project_root)
+
+
+@app.post("/api/scripts/stop-short-bot")
+@app.post("/dashboard/api/scripts/stop-short-bot")
+async def api_run_stop_short_bot_script(
+    user: dict = Depends(require_auth),
+    body: Optional[dict] = Body(None),
+):
+    bot_name = (body or {}).get("bot_name") if body else None
+    bot, error = _validate_short_bot_request(bot_name)
+    if error:
+        return JSONResponse({"success": False, "error": error}, status_code=400)
+    project_root = Path(__file__).resolve().parent.parent
+    script_path = _short_bot_shared_script_path("stop")
+    if not _is_executable_script(script_path):
+        return JSONResponse({"success": False, "error": f"Central stop script missing: {script_path}"}, status_code=400)
+    return _run_long_bot_script(script_path, str(bot.get("bot_name") or "").strip(), "stop_short_bot", project_root)
 
 
 @app.post("/api/scripts/restart-long-bot")
@@ -11080,7 +11607,35 @@ async def api_run_restart_long_bot_script(
     if not stop_result.get("success"):
         return stop_result
     time.sleep(1)
-    return _start_long_bot_script_async(start_script, bot_name, "restart_long_bot_start", project_root)
+    result = _start_long_bot_script_async(start_script, bot_name, "restart_long_bot_start", project_root)
+    if result.get("success"):
+        profile = (body or {}).get("profile") or ""
+        symbol = str(((body or {}).get("symbol") or "").strip().upper())
+        normalized_profile = _normalize_pair_profile(profile)
+        if normalized_profile and symbol:
+            bot_names = _resolve_pair_bot_names(normalized_profile)
+            if bot_names:
+                long_bot_name, short_bot_name = bot_names
+                logger.info(
+                    "pair_handoff_symbol_write_attempt",
+                    {
+                        "profile": normalized_profile,
+                        "symbol": symbol,
+                        "long_bot": long_bot_name,
+                        "short_bot": short_bot_name,
+                        "source": "restart_long_bot_script",
+                    },
+                )
+                ok = _write_pair_start_symbol(
+                    normalized_profile, symbol, long_bot_name, short_bot_name, source="restart_long_bot_script"
+                )
+                if not ok:
+                    result.setdefault("warnings", []).append("Pair handoff write failed")
+            else:
+                result.setdefault("warnings", []).append("Pair handoff skipped: cannot resolve bot names")
+        else:
+            result.setdefault("warnings", []).append("Pair handoff skipped: missing profile or symbol")
+    return result
 
 
 @app.post("/api/scripts/stop-long-bot-with-cleanup")

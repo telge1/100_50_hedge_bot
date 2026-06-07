@@ -258,7 +258,10 @@ def is_bot_running(symbol: str, bot_type: str = "long", profile: str = None) -> 
 
 def _read_bot_status_from_run(bot_name: str) -> dict[str, Any]:
     project_root = _get_project_root()
-    bot_dir = project_root / "live_bots" / "100_50_hedge_bot" / bot_name
+    if bot_name and bot_name.startswith("short_"):
+        bot_dir = project_root / "live_bots" / "short_hedge_bot" / bot_name
+    else:
+        bot_dir = project_root / "live_bots" / "100_50_hedge_bot" / bot_name
     pid_path = bot_dir / "run" / "bot.pid"
     status_path = bot_dir / "run" / "status.json"
     status_payload = {}
@@ -272,8 +275,30 @@ def _read_bot_status_from_run(bot_name: str) -> dict[str, Any]:
     return {
         "bot_dir": bot_dir,
         "pid_path": pid_path,
+        "status_path": status_path,
         "status_payload": status_payload,
     }
+
+
+def _find_short_bot_by_symbol(symbol: str) -> str | None:
+    normalized = str(symbol or "").strip().upper()
+    if not normalized:
+        return None
+    project_dir = _get_project_root()
+    short_root = project_dir / "live_bots" / "short_hedge_bot"
+    if not short_root.exists():
+        return None
+    for child in short_root.iterdir():
+        if not child.is_dir():
+            continue
+        short_bot_name = child.name
+        if not short_bot_name.startswith("short_bot_"):
+            continue
+        status_payload = _read_bot_status_from_run(short_bot_name).get("status_payload") or {}
+        symbol_value = str(status_payload.get("symbol") or "").strip().upper()
+        if symbol_value and symbol_value == normalized:
+            return short_bot_name
+    return None
 
 
 def _pid_runs_same_bot(pid: int, bot_name: str) -> bool:
@@ -400,8 +425,11 @@ def get_bot_status(
     profile: str | None = None,
 ) -> dict:
     prof = (profile or "").strip()
-    if bot_name is None and bot_type == "long":
-        bot_name = _resolve_profile_long_bot_name(prof)
+    if bot_name is None:
+        if bot_type == "long":
+            bot_name = _resolve_profile_long_bot_name(prof)
+        elif bot_type == "short":
+            bot_name = _find_short_bot_by_symbol(symbol)
 
     payload = {}
     pid_value = None

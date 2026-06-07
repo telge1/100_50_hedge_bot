@@ -1811,6 +1811,18 @@
             return /^bot_\d+$/.test(String(profile || '').trim().toLowerCase()) && isValidProfile(profile);
         }
 
+        function shortBotNameFromProfile(profile) {
+            if (!profile) return null;
+            const match = /^bot_(\d+)$/.exec(String(profile).trim().toLowerCase());
+            return match ? `short_bot_${match[1]}` : null;
+        }
+
+        function profileFromShortBotName(shortBotName) {
+            if (!shortBotName) return null;
+            const match = /^short_bot_(\d+)$/.exec(String(shortBotName).trim().toLowerCase());
+            return match ? `bot_${match[1]}` : null;
+        }
+
         function profileToDisplayName(profile) {
             const normalized = String(profile || '').trim().toLowerCase();
             return AVAILABLE_PROFILE_LABELS[normalized] || (normalized === 'main' ? 'Main' : normalized);
@@ -3810,7 +3822,9 @@
             if (Date.now() - lastUserActionTime < USER_ACTION_GRACE_MS) return;
             clearBotStatusCache();
             try {
-                const response = await fetch(addProfileToUrl('/api/system/status'), { credentials: 'include' });
+                const statusUrl = addProfileToUrl('/api/system/status');
+                console.log('[SYSTEM STATUS FETCH]', { url: statusUrl });
+                const response = await fetch(statusUrl, { credentials: 'include' });
                 
                 if (!response.ok) {
                     console.error('Error loading system status: HTTP', response.status, response.statusText);
@@ -3823,6 +3837,12 @@
                 }
                 
                 const data = await response.json();
+                const enausdtShort = data?.bots?.['ENAUSDT']?.short;
+                console.log('[SYSTEM STATUS RESPONSE]', {
+                    url: statusUrl,
+                    hasShortBot1: enausdtShort?.bot_name === 'short_bot_1',
+                    enausdtShort,
+                });
                 console.log('System status data:', data);
                 console.log('Bots in data:', data.bots);
                 console.log('Number of symbols:', data.bots ? Object.keys(data.bots).length : 0);
@@ -3850,6 +3870,9 @@
                     data.symbolForStatus = symbolForStatus || null;
                     const sanitized = updateBotStatusCache(data);
                     console.log('[BOT-STATUS-REFRESH] sanitized bot payload:', sanitized && sanitized.bots ? Object.keys(sanitized.bots) : []);
+                    console.log('[SYSTEM STATUS SANITIZED]', {
+                        enausdt: sanitized.bots?.['ENAUSDT'],
+                    });
                     displaySystemStatus(sanitized);
                 } else {
                     clearBotStatusCache();
@@ -3922,6 +3945,8 @@
                 || 'main';
             const profileLabel = profileToDisplayName(prof);
             const isProfileBotSelected = isBotProfile(prof);
+            const profileLongBot = data.profile_long_bot_status || null;
+            const profileShortBot = data.profile_short_bot_status || null;
             const bots = data.bots || {};
             console.log('Bots object:', bots);
             const botSymbols = Object.keys(bots);
@@ -3934,6 +3959,10 @@
             const uiSymbol = (currentSymbol || '').trim().toUpperCase();
             const waitingLongSymbol = botSymbols.find(sym => (bots[sym]?.long?.status === 'waiting_for_symbol'));
             const runningLongSymbol = botSymbols.find(sym => (bots[sym]?.long?.running));
+            const runningShortSymbol = botSymbols.find(sym => (bots[sym]?.short?.running));
+            const profileScopedSymbol = isProfileBotSelected
+                ? String(profileLongBot?.symbol || profileShortBot?.symbol || '').trim().toUpperCase()
+                : '';
             const priceAt = data.price_at || { long: {}, short: {} };
             const priceAtSymbols = new Set([...(Object.keys(priceAt.long || {})), ...(Object.keys(priceAt.short || {}))]);
             if (symbolForStatus) {
@@ -3944,8 +3973,13 @@
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (waitingLongSymbol) {
                 selectedSymbol = waitingLongSymbol;
+            } else if (profileScopedSymbol) {
+                selectedSymbol = profileScopedSymbol;
+                if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
             } else if (!isProfileBotSelected && runningLongSymbol) {
                 selectedSymbol = runningLongSymbol;
+            } else if (!isProfileBotSelected && runningShortSymbol) {
+                selectedSymbol = runningShortSymbol;
             } else if (uiSymbol) {
                 selectedSymbol = uiSymbol;
                 if (!bots[selectedSymbol]) bots[selectedSymbol] = {};
@@ -3966,7 +4000,6 @@
             const shortPriceAt = selectedSymbol ? (priceAt.short || {})[selectedSymbol] : null;
 
             // Long Bot Status (mit Start-Button / Price-at-Anzeige)
-            const profileLongBot = data.profile_long_bot_status || null;
             const longBot = isProfileBotSelected && profileLongBot
                 ? profileLongBot
                 : (selectedBots['long'] || { running: false, status: 'stopped', status_label: '', start_requested: false });
@@ -4002,13 +4035,24 @@
             }
             
             // Short Bot Status (mit Start-Button / Price-at-Anzeige)
-            const shortBot = selectedBots['short'] || { running: false, status: 'stopped', status_text: '' };
+            const shortBot = isProfileBotSelected && profileShortBot
+                ? profileShortBot
+                : (selectedBots['short'] || { running: false, status: 'stopped', status_text: '' });
             let shortRunning = shortBot.running || false;
             const shortPriceAtActive = !!(shortPriceAt && shortPriceAt.target_price);
             const shortStatus = shortBot.status || (shortRunning ? 'running' : 'stopped');
             let shortStatusClass = shortStatus;
             let shortIndicatorClass = shortStatus;
-
+            let shortBotDesc = shortBot.status_text || (shortRunning ? 'Short Bot läuft und wartet auf Positionen' : 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
+            const showShortStopButton = !!selectedSymbol && shortRunning;
+            console.log("[SHORT CARD STATUS]", {
+                symbol: selectedSymbol,
+                botEntry: selectedSymbol ? bots?.[selectedSymbol] : null,
+                shortEntry: shortBot,
+                shortRunning,
+                shortStatus,
+                showStopButton: showShortStopButton,
+            });
             const pendingStartActive =
                 pendingFixedCycleStart &&
                 (Date.now() - pendingFixedCycleStartAt < PENDING_FIXED_CYCLE_STATUS_MS);
@@ -4032,7 +4076,6 @@
             }
             
             let shortBotButton = '';
-            let shortBotDesc = shortBot.status_text || (shortRunning ? 'Short Bot läuft und wartet auf Positionen' : 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
             const shortRestartButton = selectedSymbol
                 ? `<button class="btn-service-control btn-service-start" onclick="restartShortBotAutoDetect('${selectedSymbol}', event)" title="Short Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`
                 : `<button class="btn-service-control btn-service-start" onclick="restartShortBotAutoDetect(undefined, event)" title="Short Bot neu starten (Symbol optional, Auto-Detect möglich)">🔁 Restart</button>`;
@@ -4185,8 +4228,14 @@
         
         async function checkBotRunningStatus(symbol, botType) {
             try {
-                const response = await fetch(addProfileToUrl(`/api/hedge/bot-status/${symbol}`));
+                const url = addProfileToUrl(`/api/hedge/bot-status/${symbol}`);
+                const response = await fetch(url);
                 const data = await response.json();
+                console.log("[BOT STATUS API SHORT]", {
+                    url,
+                    response: data,
+                    running: botType === 'long' ? data?.long_bot?.running : data?.short_bot?.running,
+                });
                 
                 if (data.success) {
                     const botStatus = botType === 'long' ? data.long_bot : data.short_bot;
@@ -4196,6 +4245,39 @@
             } catch (error) {
                 console.error('Error checking bot status:', error);
                 return false;
+            }
+        }
+
+        async function fetchPairStartSymbol(profile) {
+            if (!profile || profile === "main") {
+                return null;
+            }
+            try {
+                const response = await fetch(
+                    `/api/hedge/pair-start-symbol?profile=${encodeURIComponent(profile)}`,
+                    { credentials: "include" },
+                );
+                if (!response.ok) {
+                    return null;
+                }
+                const data = await response.json();
+                if (!data || data.success === false) {
+                    return null;
+                }
+                const entry = data.entry || {};
+                const symbolValue = (entry.symbol || data.symbol || '').toString().trim().toUpperCase();
+                if (!symbolValue) {
+                    return null;
+                }
+                return {
+                    ...entry,
+                    symbol: symbolValue,
+                    profile: (entry.profile || data.profile || profile).toString().trim().toLowerCase(),
+                    short_bot: entry.short_bot ? entry.short_bot.toString().trim().toLowerCase() : null,
+                };
+            } catch (error) {
+                console.error("[pair start] fetch failed", error);
+                return null;
             }
         }
         
@@ -4211,7 +4293,7 @@
             const symbolInput = document.getElementById(isLong ? 'startSymbolInputLong' : 'startSymbolInputShort');
             const symbolFromUi = '';
             const symbolFromInput = symbolInput ? symbolInput.value.trim().toUpperCase() : '';
-            const symbol = symbolFromUi || symbolFromInput;
+            let symbol = symbolFromUi || symbolFromInput;
             const selectedProfile = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
             if (!['long', 'short'].includes(botType)) {
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
@@ -4223,16 +4305,57 @@
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                 return;
             }
-            if (!symbol) {
+            let resolvedSymbol = symbol;
+            let resolvedProfile = isBotProfile(selectedProfile) ? selectedProfile.trim().toLowerCase() : null;
+            let shortBotName = shortBotNameFromProfile(resolvedProfile);
+            if (botType === 'short' && !resolvedSymbol) {
+                const entry = await fetchPairStartSymbol(selectedProfile);
+                if (!entry || !entry.symbol) {
+                    if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+                    showToast('error', 'Short Symbol fehlt', 'Kein Hand-off Symbol verfügbar. Bitte starten Sie zuerst den Long Bot.', 6000);
+                    return;
+                }
+                resolvedSymbol = entry.symbol;
+                if (!shortBotName && entry.short_bot) {
+                    shortBotName = entry.short_bot.toString().trim().toLowerCase();
+                }
+                if (!resolvedProfile && entry.profile) {
+                    const normalizedEntryProfile = entry.profile.toString().trim().toLowerCase();
+                    if (isBotProfile(normalizedEntryProfile)) {
+                        resolvedProfile = normalizedEntryProfile;
+                    }
+                }
+                console.log('[SHORT HANDOFF SYMBOL USED]', {
+                    profile: resolvedProfile || selectedProfile,
+                    symbol: resolvedSymbol,
+                    short_bot: shortBotName,
+                    source: 'pair_start_symbol',
+                });
+            }
+            if (!resolvedProfile && shortBotName) {
+                const derivedProfile = profileFromShortBotName(shortBotName);
+                if (derivedProfile && isBotProfile(derivedProfile)) {
+                    resolvedProfile = derivedProfile;
+                }
+            }
+            if (!resolvedSymbol) {
                 if (botType === 'long') {
                     await startFixedCycleScript(evt);
-                } else {
-                    showToast('warning', 'Short Bot benötigt Symbol', 'Bitte ein Symbol auswählen, bevor Sie den Short Bot starten.', 5000);
                     if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                     return;
                 }
                 if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+                showToast('error', 'Short Symbol fehlt', 'Short Bot benötigt ein Symbol (z.B. aus Pair-Handoff).', 6000);
                 return;
+            }
+            symbol = resolvedSymbol;
+            if (botType === 'short') {
+                const shortRunning = await checkBotRunningStatus(symbol, 'short');
+                if (shortRunning) {
+                    if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
+                    showToast('info', 'Short Bot läuft bereits', `Short Bot für ${symbol} ist schon aktiv.`, 5000);
+                    return;
+                }
             }
             const botName = botType.charAt(0).toUpperCase() + botType.slice(1);
             const toastId = `bot-start-${botType}-${symbol}`;
@@ -4282,16 +4405,22 @@
 
                 const endpointUrl = `/api/hedge/start-bot-script`;
                 console.log('[BOT START CLICK]', { botType, selectedSymbol: symbol, endpointOrUrl: endpointUrl });
+                const requestBody = {
+                    bot_type: botType,
+                    symbol,
+                };
+                if (botType === 'short') {
+                    requestBody.profile = resolvedProfile || null;
+                    requestBody.short_bot_name = shortBotName || null;
+                } else {
+                    requestBody.profile = selectedProfile;
+                }
                 const response = await fetch(endpointUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        bot_type: botType,
-                        symbol,
-                        profile: (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'))
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
@@ -4317,7 +4446,12 @@
                     
                     const checkBotStatus = async () => {
                         attempts++;
-                        isRunning = await checkBotRunningStatus(symbol, botType);
+                    isRunning = await checkBotRunningStatus(symbol, botType);
+                    console.log('[SHORT START CHECK]', {
+                        symbol,
+                        attempt: attempts,
+                        running: isRunning,
+                    });
                         
                         // Update status displays
                         await loadSystemStatus();
@@ -4405,6 +4539,51 @@
             }
         }
 
+        async function stopProfileShortBot(evt, profile) {
+            const btn = (evt && evt.target) ? evt.target : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Stoppe...';
+            }
+            const botName = shortBotNameFromProfile(profile);
+            if (!botName) {
+                showToast('error', 'Ungültiges Profil', `Kein Short Bot für Profil ${profile || 'unbekannt'} gefunden.`, 6000);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '⏹️ Stop';
+                }
+                return;
+            }
+            const toastId = 'stop-profile-short';
+            showToast('info', 'Stoppe Short Bot', `Stoppe ${botName} über stop.sh`, 0, toastId);
+            try {
+                const response = await fetch('/api/scripts/stop-short-bot', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_name: botName }),
+                });
+                const data = await response.json().catch(() => ({}));
+                removeToast(toastId);
+                if (data.success) {
+                    showToast('success', 'Short Bot gestoppt', data.message || `${botName} wird gestoppt.`, 5000);
+                } else {
+                    showToast('error', 'Stop fehlgeschlagen', data.error || 'Siehe Logs.', 8000);
+                }
+            } catch (error) {
+                removeToast(toastId);
+                showToast('error', 'Stop fehlgeschlagen', error.message || 'Fehler beim Stoppen des Short Bots.', 8000);
+            } finally {
+                await new Promise((r) => setTimeout(r, 500));
+                loadSystemStatus();
+                if (selectedSymbol) await loadBotStatus(selectedSymbol);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = '⏹️ Stop';
+                }
+            }
+        }
+
         async function startProfileLongBot(evt, profile) {
             const btn = (evt && evt.target) ? evt.target : null;
             if (btn) {
@@ -4422,12 +4601,17 @@
             }
             const toastId = 'start-profile-long';
             showToast('info', 'Start Long Bot', `Starte ${botName} über start.sh`, 0, toastId);
+            const payloadSymbol = (selectedSymbol || currentSymbol || (document.getElementById('coinSelect')?.value || '')).toString().trim().toUpperCase();
             try {
                 const response = await fetch('/api/scripts/start-long-bot', {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bot_name: botName }),
+                    body: JSON.stringify({
+                        bot_name: botName,
+                        profile,
+                        symbol: payloadSymbol,
+                    }),
                 });
                 const data = await response.json().catch(() => ({}));
                 removeToast(toastId);
@@ -4561,7 +4745,7 @@
                         method: 'POST',
                         credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(restartBody),
+                        body: JSON.stringify({ ...restartBody, profile: currentProf, symbol: sym }),
                         signal: ac.signal
                     });
                     const data = await response.json().catch(() => ({}));
@@ -4873,6 +5057,10 @@
                 const prof = (typeof getSelectedProfile === 'function' ? getSelectedProfile() : (currentProfile || 'main'));
                 if (botType === 'long' && isBotProfile(prof)) {
                     await stopProfileLongBot(evt, prof);
+                    return;
+                }
+                if (botType === 'short' && isBotProfile(prof)) {
+                    await stopProfileShortBot(evt, prof);
                     return;
                 }
                 const response = await fetch(`/api/bots/${symbol}/stop`, {
