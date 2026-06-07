@@ -15346,6 +15346,144 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return self.LONG_TP_EXIT_PURPOSE
         return ""
 
+    def _recover_purpose_from_exchange_order(self, order: dict[str, Any]) -> str:
+        recovered = self._recover_purpose_from_order_update(order)
+        if recovered:
+            return recovered
+        candidates = [
+            order.get("orderLinkId"),
+            order.get("order_link_id"),
+            order.get("clientOrderId"),
+            order.get("client_order_id"),
+        ]
+        prefix = f"{self.name}-"
+        recovered_prefix = f"recovered-{self.name}-"
+        for candidate in candidates:
+            client_id = str(candidate or "").strip()
+            if not client_id:
+                continue
+            if client_id.startswith(prefix):
+                remainder = client_id[len(prefix):]
+                if "-" in remainder:
+                    return remainder.rsplit("-", 1)[0].upper()
+            if client_id.startswith(recovered_prefix):
+                remainder = client_id[len(recovered_prefix):]
+                if remainder.startswith("-") and "--" in remainder[1:]:
+                    purpose_part = remainder[1:].split("--", 1)[0]
+                    if purpose_part:
+                        return purpose_part.upper()
+                if "-" in remainder:
+                    return remainder.rsplit("-", 1)[0].upper()
+        return ""
+
+    def _expected_cycle_purpose_for_deactivation_check(
+        self,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState,
+    ) -> str | None:
+        state = runtime_state.strategy_state
+        next_required_purpose = str(state.get("next_required_purpose") or "").strip().upper()
+        if next_required_purpose.startswith("CYCLE_"):
+            return next_required_purpose
+
+        cycle_index = int(state.get("active_cycle_index") or 0)
+        if cycle_index <= 0:
+            cycle_index = int(state.get("current_effective_cycle") or 0)
+        if cycle_index <= 0 and state.get("current_long_cycle_index"):
+            cycle_index = int(state.get("current_long_cycle_index") or 0)
+        if cycle_index <= 0 and state.get("current_short_cycle_index"):
+            cycle_index = int(state.get("current_short_cycle_index") or 0)
+
+        if cycle_index <= 0:
+            _log_event(
+                "fixed_cycle_deactivation_expected_cycle_purpose_unknown",
+                {
+                    "symbol": self.config.symbol,
+                    "state_cycle_index": state.get("active_cycle_index"),
+                    "current_effective_cycle": state.get("current_effective_cycle"),
+                    "current_long_cycle_index": state.get("current_long_cycle_index"),
+                    "current_short_cycle_index": state.get("current_short_cycle_index"),
+                    "cycle_step": state.get("cycle_step"),
+                    "next_required_purpose": next_required_purpose,
+                },
+            )
+            return None
+
+        cycle_step = state.get("cycle_step") or STEP_WAITING_FOR_PAIR_FIRST_LEG
+        if cycle_step == STEP_WAITING_FOR_PAIR_SECOND_LEG:
+            return self._get_second_leg_purpose(cycle_index)
+        return self._get_first_leg_purpose(cycle_index)
+
+    def _verify_structure_intact_before_deactivation_recovery(
+        self,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        purpose: str,
+        order_link_id: str,
+        exchange_order_id: str,
+        reason: str,
+    ) -> tuple[bool, dict[str, Any]]:
+        symbol = context.symbol or self.config.symbol
+        category = context.category or self.config.category
+        order_manager = context.order_manager or self.order_manager
+        expected_cycle_purpose = self._expected_cycle_purpose_for_deactivation_check(
+            snapshot, runtime_state
+        )
+        rest_open_purposes: list[str] = []
+        fetch_error: str | None = None
+
+        if order_manager and symbol:
+            try:
+                open_orders = order_manager.fetch_open_orders(symbol=symbol, category=category) or []
+                for order in open_orders:
+                    if not self._is_fixed_cycle_exchange_order(order):
+                        continue
+                    recovered = self._recover_purpose_from_exchange_order(order)
+                    if recovered:
+                        rest_open_purposes.append(recovered)
+            except Exception as exc:
+                fetch_error = str(exc)
+        else:
+            fetch_error = "fetch_open_orders_unavailable"
+
+        rest_open_purposes = sorted(set(rest_open_purposes))
+        has_cycle_order = bool(
+            expected_cycle_purpose and expected_cycle_purpose in rest_open_purposes
+        )
+        has_long_tp_exit = self.LONG_TP_EXIT_PURPOSE in rest_open_purposes
+        has_short_sl_exit = self.SHORT_SL_EXIT_PURPOSE in rest_open_purposes
+
+        missing_purposes: list[str] = []
+        if not has_cycle_order:
+            missing_purposes.append(expected_cycle_purpose or "CURRENT_CYCLE_ORDER")
+        if not has_long_tp_exit:
+            missing_purposes.append(self.LONG_TP_EXIT_PURPOSE)
+        if not has_short_sl_exit:
+            missing_purposes.append(self.SHORT_SL_EXIT_PURPOSE)
+        if fetch_error:
+            missing_purposes.append("REST_FETCH_FAILED")
+
+        details = {
+            "symbol": symbol,
+            "category": category,
+            "deactivated_purpose": purpose,
+            "order_link_id": order_link_id or None,
+            "exchange_order_id": exchange_order_id or None,
+            "reason": reason,
+            "rest_open_purposes": rest_open_purposes,
+            "expected_cycle_purpose": expected_cycle_purpose,
+            "has_cycle_order": has_cycle_order,
+            "has_long_tp_exit": has_long_tp_exit,
+            "has_short_sl_exit": has_short_sl_exit,
+            "missing_purposes": missing_purposes,
+        }
+        if fetch_error:
+            details["rest_fetch_error"] = fetch_error
+
+        return (not missing_purposes), details
+
     def _build_force_exit_recovery_intent(
         self,
         *,
@@ -16401,8 +16539,41 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
 
+        managed_cycle_deactivation = self._is_cycle_fill_purpose(purpose)
+        managed_exit_deactivation = purpose in self._expected_exit_cancel_purposes()
+        if status == "DEACTIVATED" and (managed_cycle_deactivation or managed_exit_deactivation):
+            structure_intact, structure_details = (
+                self._verify_structure_intact_before_deactivation_recovery(
+                    snapshot,
+                    runtime_state,
+                    context,
+                    purpose=purpose,
+                    order_link_id=source_order_link_id,
+                    exchange_order_id=source_order_id,
+                    reason=reason_upper or status,
+                )
+            )
+            if structure_intact:
+                _log_event(
+                    "fixed_cycle_ws_deactivated_ignored_structure_intact",
+                    structure_details,
+                )
+                return []
+            _log_event(
+                "fixed_cycle_ws_deactivated_structure_missing_orders",
+                {
+                    "symbol": self.config.symbol,
+                    "deactivated_purpose": purpose,
+                    "order_link_id": source_order_link_id or None,
+                    "exchange_order_id": source_order_id or None,
+                    "rest_open_purposes": structure_details.get("rest_open_purposes", []),
+                    "expected_cycle_purpose": structure_details.get("expected_cycle_purpose"),
+                    "missing_purposes": structure_details.get("missing_purposes", []),
+                },
+            )
+
         if (
-            purpose in self._expected_exit_cancel_purposes()
+            purpose in {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
             and status == "DEACTIVATED"
             and not expected_suppressed
         ):

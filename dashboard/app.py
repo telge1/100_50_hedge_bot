@@ -263,11 +263,29 @@ def _persist_removed_profit_trade_ids(profile: str | None, trade_block_ids: Iter
 def _filter_trade_records_by_removed_trades(
     trades: Iterable[dict[str, Any]], profile: str | None
 ) -> list[dict[str, Any]]:
+    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    trades_list = list(trades)
+    long_bot_names = {
+        str(trade.get("bot_name") or "").strip().lower()
+        for trade in trades_list
+        if str(trade.get("bot_name") or "").strip()
+    }
+    if normalized_profile == "bot_1" or any(name.startswith("long_bot_") for name in long_bot_names):
+        logger.info(
+            "profit_verlauf_bot1_preserve_history_rows_skip_process_trade_block_filter",
+            {
+                "profile": profile,
+                "removed_trade_ids": [],
+                "total_trades": len(trades_list),
+                "skipped_filter": True,
+            },
+        )
+        return trades_list
     removed_ids = _get_removed_trade_ids_for_profile(profile)
     if not removed_ids:
-        return list(trades)
+        return trades_list
     filtered: list[dict[str, Any]] = []
-    for trade in trades:
+    for trade in trades_list:
         trade_id = str(trade.get("trade_block_id") or "").strip()
         if trade_id and trade_id in removed_ids:
             continue
