@@ -165,3 +165,11 @@ cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 /home/telgenbuescher/projects/spread_recovery_hedge/modular_hedge_runtime/strategy.md
 
 ######################################################################################################################
+
+~/projects/spread_recovery_hedge aktueller long_bot
+
+cd spread_recovery_hedge_short_dev # short bot new branch
+
+git checkout EMA_Bot
+git branch --show-current
+git status
