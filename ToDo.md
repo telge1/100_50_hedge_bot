@@ -243,3 +243,5 @@ Dann wird Recovery teuer und riskant.
 
 
 Wenn LONG_REDUCE > X% über long_avg:
+
+
