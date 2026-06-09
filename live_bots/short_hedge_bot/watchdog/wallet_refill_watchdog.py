@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
-BOT_ROOT = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot"
+BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
 CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 EXECUTOR_PATH = BOT_ROOT / "watchdog" / "wallet_transfer_executor.py"
 LOG_PATH = BOT_ROOT / "logs" / "wallet_refill_watchdog.log"
@@ -211,7 +211,7 @@ def load_profile_accounts(logger: logging.Logger) -> Mapping[str, dict[str, Any]
     accounts: dict[str, dict[str, Any]] = {}
     for name, data in raw.items():
         profile = str(name).lower()
-        if not profile.startswith("long_bot_"):
+        if not profile.startswith("short_bot_"):
             continue
         if isinstance(data, dict) and "api_key" in data and "secret_key" in data:
             accounts[profile] = data

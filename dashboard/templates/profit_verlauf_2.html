@@ -329,7 +329,14 @@
                 </div>
             </div>
             <div class="profit-toolbar">
-                <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                <div class="refresh-group">
+                    <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                    <label class="refresh-select-label" for="profit-bot-side-select">Bot Seite</label>
+                    <select class="filter-select" id="profit-bot-side-select" name="bot_side">
+                        <option value="long" {% if bot_side == "long" %}selected{% endif %}>Long Bot</option>
+                        <option value="short" {% if bot_side == "short" %}selected{% endif %}>Short Bot</option>
+                    </select>
+                </div>
                 <button class="refresh-btn" id="remove-selected-trades-btn" type="button" disabled>Entfernen</button>
                 <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
             </div>
@@ -468,6 +475,9 @@
             page: {{ trade_page }},
             pageSize: {{ page_size }},
         };
+    </script>
+    <script>
+        window.BOT_SIDE = "{{ bot_side }}";
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>

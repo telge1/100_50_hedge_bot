@@ -20,9 +20,8 @@ from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
 BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
 CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
-LOG_FILENAME = "safety_order_watchdog.log"
-DEBUG_LOG_FILENAME = "safety_order_watchdog_debug.jsonl"
-CURRENT_DEBUG_LOG_PATH: Path | None = None
+LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog.log"
+DEBUG_LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog_debug.jsonl"
 SIGNIFICANT_DEBUG_EVENTS = {
     "safety_action_required",
     "safety_action_result",
@@ -31,24 +30,13 @@ STOP_SCRIPT = BOT_ROOT / "shared_scripts" / "stop_with_cleanup.sh"
 RETRY_DELAYS = [0.0, 2.0, 2.0, 3.0]
 
 
-def _bot_log_paths(bot_name: str | None) -> tuple[Path, Path]:
-    base = BOT_ROOT
-    if bot_name:
-        base = BOT_ROOT / bot_name
-    log_dir = base / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir / LOG_FILENAME, log_dir / DEBUG_LOG_FILENAME
-
-
-def setup_logger(bot_name: str | None) -> logging.Logger:
+def setup_logger() -> logging.Logger:
     logger = logging.getLogger("safety_order_watchdog")
     logger.setLevel(logging.INFO)
     if logger.handlers:
         logger.handlers.clear()
-    log_path, debug_path = _bot_log_paths(bot_name)
-    global CURRENT_DEBUG_LOG_PATH
-    CURRENT_DEBUG_LOG_PATH = debug_path
-    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
     file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(file_handler)
     console_handler = logging.StreamHandler()
@@ -57,15 +45,52 @@ def setup_logger(bot_name: str | None) -> logging.Logger:
     return logger
 
 
+def _validate_runner_process(bot_name: str, logger: logging.Logger) -> bool:
+    bot_name = bot_name.lower()
+    pid_file = BOT_ROOT / bot_name / "run" / "bot.pid"
+    reason = None
+    if not pid_file.exists():
+        reason = "no_pid_file"
+    else:
+        try:
+            pid = int(pid_file.read_text().strip())
+        except Exception:
+            reason = "invalid_pid"
+        else:
+            if pid <= 0:
+                reason = "invalid_pid"
+            else:
+                proc_cmd = Path(f"/proc/{pid}/cmdline")
+                if not proc_cmd.exists():
+                    reason = "pid_not_running"
+                else:
+                    try:
+                        cmdline = proc_cmd.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+                    except Exception:
+                        reason = "cmdline_unreadable"
+                    else:
+                        tokens = [
+                            "fixed_cycle_hedge_bot.runner",
+                            f"--bot-name {bot_name}",
+                            str(PROJECT_ROOT),
+                        ]
+                        for token in tokens:
+                            if token not in cmdline:
+                                reason = f"missing_{token.replace(' ', '_')}"
+                                break
+    if reason:
+        logger.info("watchdog_skip_inactive_bot bot=%s reason=%s", bot_name, reason)
+        return False
+    return True
+
+
 def write_debug_event(logger: logging.Logger, event_name: str, payload: dict[str, Any]) -> None:
     if event_name not in SIGNIFICANT_DEBUG_EVENTS:
         return
-    if not CURRENT_DEBUG_LOG_PATH:
-        return
     try:
-        CURRENT_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         entry = {"timestamp": datetime.now().astimezone().isoformat(), "event": event_name, **payload}
-        with CURRENT_DEBUG_LOG_PATH.open("a", encoding="utf-8") as fh:
+        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as exc:
         logger.warning("Failed to write debug event %s: %s", event_name, exc)
@@ -89,7 +114,6 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--loop", action="store_true", help="Continuous loop with --interval wait")
     parser.add_argument("--interval", type=int, default=60, help="Loop interval in seconds when --loop is set")
     parser.add_argument("--dry-run", action="store_true", help="Log actions but do not cancel/close/kill")
-    parser.add_argument("--bot-name", type=str, help="Short bot name to monitor")
     return parser.parse_args()
 
 
@@ -324,6 +348,8 @@ def handle_profile(
     if not api_key or not secret_key:
         return
     bot_name = profile_name.lower()
+    if not _validate_runner_process(bot_name, logger):
+        return
     resolved = resolve_bot_metadata(bot_name, logger)
     if not resolved:
         return
@@ -565,8 +591,7 @@ def handle_profile(
 
 def main() -> None:
     args = parse_args()
-    target_bot = args.bot_name.lower() if args.bot_name else None
-    logger = setup_logger(target_bot)
+    logger = setup_logger()
     if not args.once and not args.loop:
         args.once = True
 
@@ -574,10 +599,6 @@ def main() -> None:
     while True:
         if first_iteration or args.loop:
             accounts = load_profile_accounts(logger)
-            if target_bot:
-                accounts = {k: v for k, v in accounts.items() if k == target_bot}
-                if not accounts:
-                    logger.warning("No account found for %s", target_bot)
             write_debug_event(
                 logger,
                 "watchdog_iteration_started",
@@ -586,7 +607,6 @@ def main() -> None:
                     "mode": "loop" if args.loop else "once",
                     "interval": args.interval,
                     "account_count": len(accounts),
-                    "target_bot": target_bot,
                 },
             )
             for profile_name, data in accounts.items():

@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("[profit_trades] script loaded");
     const cache = {};
     const tradeLookup = new Map();
     const tradeBody = document.getElementById("profit-trades-body");
@@ -53,6 +54,22 @@ document.addEventListener("DOMContentLoaded", () => {
             { profileKey, side: "short" },
         ];
     });
+    function normalizeBotSide(value) {
+        const normalized = String(value || "").trim().toLowerCase();
+        return normalized === "short" ? "short" : "long";
+    }
+
+    let botSide = normalizeBotSide(params.get("bot_side") || window.BOT_SIDE || "long");
+    function getExpectedBotNameForSide(side) {
+        const normalized = normalizeBotSide(side);
+        const profileIndex = String(profile || "bot_1").replace(/^bot_/, "") || "1";
+        if (normalized === "short") {
+            return `short_bot_${profileIndex}`;
+        }
+        return `long_bot_${profileIndex}`;
+    }
+    let currentBotName = getExpectedBotNameForSide(botSide);
+
     let currentTradePage = Number(
         params.get("page") ?? window.INITIAL_TRADE_FILTERS?.page ?? 0,
     );
@@ -74,17 +91,95 @@ document.addEventListener("DOMContentLoaded", () => {
     let profitChartGroupBy = "day";
     let profitChartInstance = null;
     let latestProfitChartData = [];
-    const tradeRowKeyToCheckbox = new Map();
     const selectedTradeKeys = new Set();
     const removedTradeKeys = new Set();
+    const tradeRowKeyToCheckbox = new Map();
     if (!Number.isFinite(currentTradePage) || currentTradePage < 0) {
         currentTradePage = 0;
     }
     if (!Number.isFinite(currentTradePageSize) || currentTradePageSize <= 0) {
         currentTradePageSize = Number(window.INITIAL_TRADE_FILTERS?.pageSize || 50);
     }
+    loadHiddenTradeKeys();
     console.log("[profit_trades] refresh button found", !!refreshButton);
     console.log("[profit_trades] trade body found", !!tradeBody);
+    const botSideSelect = document.getElementById("profit-bot-side-select");
+    console.log("[profit_trades] botSideSelect", botSideSelect);
+    if (botSideSelect) {
+        botSideSelect.value = botSide;
+        botSideSelect.addEventListener("change", () => {
+            const selectedSide = normalizeBotSide(botSideSelect.value);
+            if (selectedSide === botSide) {
+                return;
+            }
+            botSide = selectedSide;
+            currentBotName = getExpectedBotNameForSide(botSide);
+            currentTradePage = 0;
+            selectedTradeKeys.clear();
+            removedTradeKeys.clear();
+            loadHiddenTradeKeys();
+            console.log("[profit_trades] bot side changed", { botSide, currentBotName });
+            renderTradesTable([]);
+            refreshTrades();
+        });
+    }
+
+    function buildProfitTradeHiddenScopeKey() {
+        const profileKey = profile || "default";
+        const botKey = currentBotName || getExpectedBotNameForSide(botSide) || "default";
+        return `profitVerlaufHiddenRows:${botSide}:${profileKey}:${botKey}`;
+    }
+
+    function buildProfitTradeRowKey(trade) {
+        const safeTrade = trade || {};
+        const rowBotName =
+            safeTrade.bot_name ||
+            safeTrade.bot ||
+            currentBotName ||
+            getExpectedBotNameForSide(botSide) ||
+            "";
+        const parts = [
+            botSide || safeTrade.bot_side || "",
+            profile || safeTrade.profile || "",
+            rowBotName,
+            safeTrade.trade_block_id || safeTrade.order_id || safeTrade.orderId || "",
+            safeTrade.purpose || "",
+            safeTrade.status || "",
+            safeTrade.symbol || "",
+            safeTrade.start_time ||
+                safeTrade.start_label ||
+                safeTrade.timestamp ||
+                safeTrade.last_update ||
+                "",
+        ];
+        return parts.map((value) => String(value || "").trim()).join("|");
+    }
+
+    function loadHiddenTradeKeys() {
+        const scopeKey = buildProfitTradeHiddenScopeKey();
+        const stored = localStorage.getItem(scopeKey);
+        removedTradeKeys.clear();
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((entry) => {
+                        if (entry) {
+                            removedTradeKeys.add(entry);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn("[profit_trades] failed to parse hidden rows", error);
+            }
+        }
+    }
+
+    function persistHiddenTradeKeys() {
+        const scopeKey = buildProfitTradeHiddenScopeKey();
+        const payload = Array.from(removedTradeKeys);
+        localStorage.setItem(scopeKey, JSON.stringify(payload));
+    }
 
     function formatWalletValue(value) {
         const numeric = Number(value);
@@ -136,14 +231,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getTradeRowKey(trade) {
-        const id = String(trade?.trade_block_id || "").trim();
-        if (id) {
-            return id;
-        }
-        const bot = String(trade?.bot_name || trade?.bot || "").trim();
-        const symbol = String(trade?.symbol || "").trim().toUpperCase();
-        const start = String(trade?.start_time || trade?.start_label || "").trim();
-        return `${bot}|${symbol}|${start}`;
+        return buildProfitTradeRowKey(trade);
     }
 
     function isOpenTrade(trade) {
@@ -279,7 +367,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function resetSelectionState() {
         selectedTradeKeys.clear();
-        removedTradeKeys.clear();
         tradeRowKeyToCheckbox.clear();
         if (masterCheckbox) {
             masterCheckbox.checked = false;
@@ -329,20 +416,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!selectedTradeKeys.size) {
             return;
         }
-        const blockIds = [];
-        selectedTradeKeys.forEach((key) => {
-            const checkbox = tradeRowKeyToCheckbox.get(key);
-            const blockId = checkbox?.dataset.tradeBlockId?.trim();
-            if (blockId) {
-                blockIds.push(blockId);
-            }
-        });
-        if (!blockIds.length) {
-            alert("Ausgewählte Trades besitzen keine gültige Trade-ID und können nicht dauerhaft gelöscht werden.");
-            return;
-        }
         const pendingKeys = Array.from(selectedTradeKeys);
         pendingKeys.forEach((key) => removedTradeKeys.add(key));
+        persistHiddenTradeKeys();
         selectedTradeKeys.clear();
         renderTradesTable(getSortedTrades(currentTrades));
         updateMasterCheckboxState();
@@ -350,50 +426,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (removeSelectedButton) {
             removeSelectedButton.disabled = true;
         }
-        let response;
-        let payload = null;
-        try {
-            response = await fetch("/api/dashboard/profit-trades/remove", {
-                method: "POST",
-                mode: "same-origin",
-                credentials: "include",
-                headers: {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    profile,
-                    trade_block_ids: blockIds,
-                }),
-            });
-            payload = await response.json().catch(() => null);
-            if (!response.ok || !payload?.success) {
-                const message =
-                    payload?.error ||
-                    response?.statusText ||
-                    `HTTP ${response?.status || "??"}`;
-                throw new Error(message);
-            }
-            await refreshTrades();
-        } catch (error) {
-            console.error("[profit_trades] removeSelectedTrades failed", error, payload);
-            pendingKeys.forEach((key) => removedTradeKeys.delete(key));
-            pendingKeys.forEach((key) => selectedTradeKeys.add(key));
-            renderTradesTable(getSortedTrades(currentTrades));
-            updateMasterCheckboxState();
-            updateRemoveButtonState();
-            alert(
-                error?.message ||
-                    "Entfernen der Trades fehlgeschlagen. Die Auswahl wurde zurückgesetzt.",
-            );
-        } finally {
-            if (removeSelectedButton) {
-                removeSelectedButton.disabled = !selectedTradeKeys.size;
-            }
-        }
     }
 
     function renderTradesTable(trades) {
+        console.log("[profit_trades] renderTradesTable", Array.isArray(trades) ? trades.length : 0, {
+            botSide,
+            currentBotName,
+        });
+        if (Array.isArray(trades) && trades.length > 0) {
+            const botCandidate = trades[0]?.bot_name || trades[0]?.bot || null;
+            if (botCandidate && botCandidate !== currentBotName) {
+                currentBotName = botCandidate;
+                selectedTradeKeys.clear();
+                loadHiddenTradeKeys();
+            }
+        }
         tradeBody.innerHTML = "";
         tradeRowKeyToCheckbox.clear();
         for (const key in cache) {
@@ -512,6 +559,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function syncUrlState() {
         const nextParams = new URLSearchParams(window.location.search);
+        nextParams.set("bot_side", botSide);
         nextParams.set("profile", profile);
         nextParams.set("page", String(currentTradePage));
         nextParams.set("page_size", String(currentTradePageSize));
@@ -532,6 +580,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const query = new URLSearchParams({
             profile,
             group_by: profitChartGroupBy,
+            bot_side: botSide,
         });
         if (currentTradeStartFilter) {
             query.set("start_time", currentTradeStartFilter);
@@ -727,7 +776,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 limit,
                 page: String(currentTradePage),
                 page_size: String(currentTradePageSize),
+                bot_side: botSide,
             });
+            console.log("[profit_trades] refreshTrades query", query.toString());
             if (currentTradeStartFilter) {
                 query.set("start_time", currentTradeStartFilter);
             }
@@ -747,7 +798,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentTradePageSize = Number(pagination.page_size || currentTradePageSize);
             }
             updateSummaryCards(data.summary);
-            await refreshLiveWalletSummary();
             updatePaginationControls(pagination, Array.isArray(trades) ? trades.length : 0);
             syncUrlState();
             if (!Array.isArray(trades) || trades.length === 0) {
@@ -769,31 +819,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function loadLiveWalletsFromSystemStatus() {
-        const requests = profitWalletProfileOrder.map(async (targetProfile) => {
-            try {
-                const response = await fetch(`/api/hedge/equity?profile=${encodeURIComponent(targetProfile)}`, {
-                    credentials: "include",
-                });
-                if (!response.ok) {
-                    console.debug(
-                        "[profit_trades] live wallet fetch HTTP error",
-                        targetProfile,
-                        response.status,
-                    );
-                    return null;
-                }
-                const payload = await response.json();
-                if (!payload?.success) {
-                    return null;
-                }
-                return { profile: targetProfile, data: payload };
-            } catch (error) {
-                console.debug("[profit_trades] live wallet fetch failed for profile", targetProfile, error);
-                return null;
-            }
+        const targetProfile = profile || "bot_1";
+        const query = new URLSearchParams({
+            profile: targetProfile,
+            bot_side: botSide,
         });
-        const settled = await Promise.all(requests);
-        return settled.filter(Boolean);
+        try {
+            const response = await fetch(`/api/hedge/equity?${query.toString()}`, {
+                credentials: "include",
+            });
+            if (!response.ok) {
+                console.debug(
+                    "[profit_trades] live wallet fetch HTTP error",
+                    targetProfile,
+                    response.status,
+                );
+                return [];
+            }
+            const payload = await response.json();
+            if (!payload?.success) {
+                return [];
+            }
+            return [{ profile: targetProfile, data: payload }];
+        } catch (error) {
+            console.debug("[profit_trades] live wallet fetch failed for profile", targetProfile, error);
+            return [];
+        }
     }
 
     function hasLiveWalletValues(entries) {
@@ -817,7 +868,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 dataByProfile.set(item.profile, item.data);
             }
         });
-        const walletItems = profitWalletEntries.map(({ profileKey, side }) => {
+        const filteredEntries = profitWalletEntries.filter((entry) => entry.side === botSide);
+        if (!filteredEntries.length) {
+            return;
+        }
+        const walletItems = filteredEntries.map(({ profileKey, side }) => {
             const data = dataByProfile.get(profileKey);
             const rawValue =
                 side === "long"
@@ -877,6 +932,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function toggleDetails() {
         const btn = this;
         const tradeId = btn.dataset.tradeId;
+        console.log("[profit_trades] details click", tradeId);
         const trade = tradeLookup.get(tradeId);
         const isProcess = trade?.is_process || (trade?.status || "").toLowerCase() === "in_progress";
         const detailRow = document.querySelector(`[data-details-for="${tradeId}"]`);
@@ -905,7 +961,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         loader.style.display = "";
         tableWrapper.style.display = "none";
-        fetch(`/api/dashboard/profit-trades/${tradeId}/details?profile=${profile}`)
+        fetch(`/api/dashboard/profit-trades/${tradeId}/details?profile=${profile}&bot_side=${encodeURIComponent(botSide)}`)
             .then((response) => response.json())
             .then((data) => {
                 const rows = data.rows || [];
@@ -1253,7 +1309,12 @@ document.addEventListener("DOMContentLoaded", () => {
             walletList.appendChild(empty);
             return;
         }
-        summary.bot_wallets.forEach((entry) => {
+        const allowedPrefix = botSide === "short" ? /^short_bot_/i : /^long_bot_/i;
+        const filteredWallets = summary.bot_wallets.filter((entry) =>
+            allowedPrefix.test(String(entry?.bot_name || "")),
+        );
+        const walletEntriesToRender = filteredWallets.length ? filteredWallets : summary.bot_wallets;
+        walletEntriesToRender.forEach((entry) => {
             const item = document.createElement("div");
             item.className = "summary-wallet-item";
 
@@ -1353,6 +1414,9 @@ document.addEventListener("DOMContentLoaded", () => {
         masterCheckbox.addEventListener("change", handleMasterCheckboxChange);
     }
     if (removeSelectedButton) {
+        removeSelectedButton.textContent = "Ausblenden";
+        removeSelectedButton.title =
+            "Markierte Zeilen nur für diese Ansicht ausblenden, ohne sie serverseitig zu löschen";
         removeSelectedButton.addEventListener("click", () => {
             void removeSelectedTrades();
         });

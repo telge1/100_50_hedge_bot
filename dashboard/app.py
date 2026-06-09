@@ -46,9 +46,12 @@ PROFIT_TRADE_REMOVALS_FILE = project_root / "logs" / "dashboard_removed_profit_t
 GLOBAL_RUNTIME_LOG_PATH = project_root / "logs" / "fixed_cycle_hedge_runtime.log"
 
 LIVE_BOT_LOGS_ROOT = project_root / "live_bots" / "100_50_hedge_bot"
+SHORT_BOT_LOGS_ROOT = project_root / "live_bots" / "short_hedge_bot"
 WATCHER_SCRIPT_ROOT = LIVE_BOT_LOGS_ROOT / "shared_scripts"
-START_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "start_hedge_guard_watchers.sh"
-STOP_WATCHERS_SCRIPT = WATCHER_SCRIPT_ROOT / "stop_hedge_guard_watchers.sh"
+SHORT_WALLET_PID = SHORT_BOT_LOGS_ROOT / "run" / "wallet_refill_watchdog.pid"
+SHORT_WALLET_LOG = SHORT_BOT_LOGS_ROOT / "logs" / "wallet_refill_watchdog.nohup.log"
+START_WATCHERS_SCRIPT = project_root / "live_bots" / "shared_scripts" / "start_all_hedge_guard_watchers.sh"
+STOP_WATCHERS_SCRIPT = project_root / "live_bots" / "shared_scripts" / "stop_all_hedge_guard_watchers.sh"
 WATCHERS_STATUS_FILE = LIVE_BOT_LOGS_ROOT / "run" / "hedge_guard_watchers_status.json"
 PAIR_START_SYMBOLS_FILE = LIVE_BOT_LOGS_ROOT / "state" / "pair_start_symbols.json"
 PAIR_START_ALLOWED_PROFILES = {"bot_1", "bot_2", "bot_3"}
@@ -189,6 +192,11 @@ def _normalize_profit_trade_profile(profile: str | None) -> str | None:
     return None
 
 
+def _normalize_bot_side(bot_side: str | None) -> str:
+    normalized = (bot_side or "").strip().lower()
+    return normalized if normalized in ("short", "long") else "long"
+
+
 def _load_profit_trade_removal_store() -> dict[str, set[str]]:
     if not PROFIT_TRADE_REMOVALS_FILE.exists():
         return {}
@@ -265,12 +273,13 @@ def _filter_trade_records_by_removed_trades(
 ) -> list[dict[str, Any]]:
     normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
     trades_list = list(trades)
+    removed_ids = _get_removed_trade_ids_for_profile(profile)
     long_bot_names = {
         str(trade.get("bot_name") or "").strip().lower()
         for trade in trades_list
         if str(trade.get("bot_name") or "").strip()
     }
-    if normalized_profile == "bot_1" or any(name.startswith("long_bot_") for name in long_bot_names):
+    if not removed_ids and (normalized_profile == "bot_1" or any(name.startswith("long_bot_") for name in long_bot_names)):
         logger.info(
             "profit_verlauf_bot1_preserve_history_rows_skip_process_trade_block_filter",
             {
@@ -281,7 +290,6 @@ def _filter_trade_records_by_removed_trades(
             },
         )
         return trades_list
-    removed_ids = _get_removed_trade_ids_for_profile(profile)
     if not removed_ids:
         return trades_list
     filtered: list[dict[str, Any]] = []
@@ -711,6 +719,18 @@ def _dashboard_account_name_from_bot(bot: dict[str, Any]) -> str:
     if index is not None:
         return f"Long_bot_{index}"
     return ""
+
+
+def _dashboard_account_name_for_side(bot: dict[str, Any], bot_side: str | None) -> str:
+    normalized_side = _normalize_bot_side(bot_side)
+    if normalized_side == "short":
+        short_account = str(bot.get("short_account") or "").strip()
+        if short_account:
+            return short_account
+        index = bot.get("index")
+        if index is not None:
+            return f"Short_bot_{index}"
+    return _dashboard_account_name_from_bot(bot)
 
 
 def _wallet_guard_file_for_account(account: str) -> Path | None:
@@ -3190,15 +3210,18 @@ async def profit_verlauf_2(
     end_time: str | None = Query(None, description="End datetime filter"),
     page: int = Query(0, ge=0, description="Zero-based trade page"),
     page_size: int | None = Query(None, ge=1, le=500, description="Trades per page"),
+    bot_side: str = Query("long", description="bot side filter (long|short)"),
     user: dict = Depends(require_auth),
 ):
-    trade_rows, summary, pagination, warnings = _build_profit_trade_page(
+    bot_side = _normalize_bot_side(bot_side)
+    trade_rows, summary, pagination, warnings, _metadata = _build_profit_trade_page(
         profile,
         limit=limit,
         start_time=start_time,
         end_time=end_time,
         page=page,
         page_size=page_size,
+        bot_side=bot_side,
     )
     bot_profiles = _serializable_bot_profiles()
     return HTMLResponse(render_template(
@@ -3217,6 +3240,7 @@ async def profit_verlauf_2(
             "warnings": warnings,
             "trade_limit": limit,
             "bot_profiles": bot_profiles,
+            "bot_side": bot_side,
         },
     ))
 
@@ -7336,10 +7360,148 @@ def _discover_all_long_bots() -> list[str]:
     )
 
 
+def _discover_all_short_bots() -> list[str]:
+    bots_root = SHORT_BOT_LOGS_ROOT
+    if not bots_root.exists():
+        return []
+    return sorted(
+        child.name for child in bots_root.iterdir() if child.is_dir() and child.name.startswith("short_bot_")
+    )
+
+
 def _bot_entry_from_name(bot_name: str) -> dict[str, Any]:
     num = "".join(filter(str.isdigit, bot_name))
     profile = f"bot_{num}" if num else "main"
     return {"bot_name": bot_name, "profile": profile, "bot_dir": str(LIVE_BOT_LOGS_ROOT / bot_name)}
+
+
+def _profit_trade_profile_from_bot_name(bot_name: str) -> str | None:
+    match = re.search(r"_(\d+)$", str(bot_name or "").strip().lower())
+    if not match:
+        return None
+    return f"bot_{match.group(1)}"
+
+
+def _profit_trade_account_name_from_bot_name(bot_name: str) -> str:
+    normalized = str(bot_name or "").strip().lower()
+    match = re.search(r"_(\d+)$", normalized)
+    if not match:
+        return bot_name
+    index = match.group(1)
+    if normalized.startswith("short_bot_"):
+        return f"Short_bot_{index}"
+    return f"Long_bot_{index}"
+
+
+def _profit_trade_source_from_entry(entry: dict[str, Any], *, side: str) -> dict[str, Any]:
+    bot_name = str(entry.get("bot_name") or "").strip().lower()
+    if side == "short":
+        bot_dir = Path(entry.get("bot_dir") or (SHORT_BOT_LOGS_ROOT / bot_name))
+        return {
+            "profile": entry.get("profile") or _profit_trade_profile_from_bot_name(bot_name),
+            "bot_name": bot_name,
+            "account_name": entry.get("account_name") or _profit_trade_account_name_from_bot_name(bot_name),
+            "side": "short",
+            "bot_dir": bot_dir,
+            "logs_dir": bot_dir / "logs",
+            "state_file": bot_dir / "state" / "fixed_cycle_state.json",
+            "status_file": bot_dir / "run" / "status.json",
+            "runtime_log_file": bot_dir / "logs" / "fixed_cycle_hedge_runtime.log",
+            "runner_stdout_log": bot_dir / "logs" / "fixed_cycle_runner.stdout.log",
+            "dashboard_closed_pnl_history_file": bot_dir / "logs" / "dashboard_closed_pnl_history.jsonl",
+            "confirmed_order_pnl_history_file": bot_dir / "logs" / "confirmed_order_pnl_history.jsonl",
+        }
+
+    bot_dir = Path(entry.get("bot_dir") or (LIVE_BOT_LOGS_ROOT / bot_name))
+    paths = get_bot_paths(bot_name) or {}
+    return {
+        "profile": entry.get("profile") or _profit_trade_profile_from_bot_name(bot_name),
+        "bot_name": bot_name,
+        "account_name": entry.get("long_account") or entry.get("account_name") or _profit_trade_account_name_from_bot_name(bot_name),
+        "side": "long",
+        "bot_dir": bot_dir,
+        "logs_dir": bot_dir / "logs",
+        "state_file": Path(paths.get("state_file")) if paths.get("state_file") else bot_dir / "state" / "fixed_cycle_state.json",
+        "status_file": bot_dir / "run" / "status.json",
+        "runtime_log_file": Path(paths.get("runtime_log_file")) if paths.get("runtime_log_file") else bot_dir / "logs" / "fixed_cycle_hedge_runtime.log",
+        "runner_stdout_log": bot_dir / "logs" / "fixed_cycle_runner.stdout.log",
+        "dashboard_closed_pnl_history_file": Path(paths.get("dashboard_closed_pnl_history_file")) if paths.get("dashboard_closed_pnl_history_file") else bot_dir / "logs" / "dashboard_closed_pnl_history.jsonl",
+        "confirmed_order_pnl_history_file": Path(paths.get("confirmed_order_pnl_history_file")) if paths.get("confirmed_order_pnl_history_file") else bot_dir / "logs" / "confirmed_order_pnl_history.jsonl",
+    }
+
+
+def _get_profit_trade_bot_sources(profile: str, bot_side: str | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized or normalized == "main":
+        return [], [f"unknown profile: {profile}"]
+
+    raw_side = _normalize_bot_side(bot_side)
+    include_long = raw_side != "short"
+    include_short = raw_side == "short"
+    sources: list[dict[str, Any]] = []
+    warnings: list[str] = []
+
+    if include_long:
+        long_entries: list[dict[str, Any]]
+        if normalized == "bot_1":
+            long_entries = get_bot_profiles().copy()
+            existing = {str(entry.get("bot_name") or "").strip().lower() for entry in long_entries}
+            for bot_name in _discover_all_long_bots():
+                if bot_name not in existing:
+                    long_entries.append(_bot_entry_from_name(bot_name))
+        else:
+            long_entries = [entry for entry in get_bot_profiles() if entry.get("profile") == normalized]
+        for entry in long_entries:
+            sources.append(_profit_trade_source_from_entry(entry, side="long"))
+
+    if include_short:
+        short_names = _discover_all_short_bots()
+        if normalized != "bot_1":
+            short_names = [
+                bot_name for bot_name in short_names if _profit_trade_profile_from_bot_name(bot_name) == normalized
+            ]
+        for bot_name in short_names:
+            sources.append(
+                _profit_trade_source_from_entry(
+                    {
+                        "bot_name": bot_name,
+                        "profile": _profit_trade_profile_from_bot_name(bot_name),
+                        "bot_dir": str(SHORT_BOT_LOGS_ROOT / bot_name),
+                        "account_name": _profit_trade_account_name_from_bot_name(bot_name),
+                    },
+                    side="short",
+                )
+            )
+
+    deduped: list[dict[str, Any]] = []
+    seen_bot_names: set[str] = set()
+    for source in sources:
+        bot_name = str(source.get("bot_name") or "").strip().lower()
+        if not bot_name or bot_name in seen_bot_names:
+            continue
+        seen_bot_names.add(bot_name)
+        deduped.append(source)
+
+    logger.info(
+        "[dashboard] profit_trade_sources profile=%s bot_side=%s sources=%s",
+        profile,
+        raw_side,
+        [
+            {
+                "bot_name": source.get("bot_name"),
+                "side": source.get("side"),
+                "state_file": str(source.get("state_file") or ""),
+                "runtime_log_file": str(source.get("runtime_log_file") or ""),
+                "dashboard_closed_pnl_history_file": str(source.get("dashboard_closed_pnl_history_file") or ""),
+                "confirmed_order_pnl_history_file": str(source.get("confirmed_order_pnl_history_file") or ""),
+            }
+            for source in deduped
+        ],
+    )
+
+    if not deduped:
+        warnings.append(f"profile has no bot sources configured: {profile} ({bot_side or 'all'})")
+    return deduped, warnings
 
 
 def _gather_trade_log_paths(paths: dict[str, Path | str] | None, bot_name: str) -> list[Path]:
@@ -7503,6 +7665,25 @@ def _get_trade_filter_datetime(record: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _extract_trade_bot_name(trade: dict[str, Any]) -> str:
+    for key in ("bot_name", "bot", "account", "account_name", "source_bot", "profile_bot_name"):
+        value = trade.get(key)
+        if value:
+            return str(value).strip().lower()
+    return ""
+
+
+def _filter_trades_by_side(trades: Iterable[dict[str, Any]], bot_side: str | None) -> list[dict[str, Any]]:
+    normalized_side = _normalize_bot_side(bot_side)
+    prefix = "short_bot_" if normalized_side == "short" else "long_bot_"
+    filtered: list[dict[str, Any]] = []
+    for trade in trades:
+        bot_name = _extract_trade_bot_name(trade)
+        if bot_name.startswith(prefix):
+            filtered.append(trade)
+    return filtered
+
+
 def _filter_trade_records_by_time(
     trades: Iterable[dict[str, Any]],
     *,
@@ -7628,47 +7809,57 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
     return rows
 
 
-def _collect_history_paths_for_profile(profile: str) -> list[Path]:
+def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None) -> list[Path]:
     normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
     if not normalized or normalized == "main":
         return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
-    entries = []
-    all_profiles = get_bot_profiles()
-    if normalized == "bot_1":
-        entries = all_profiles.copy()
-        existing = {entry["bot_name"] for entry in entries}
-        for bot_name in _discover_all_long_bots():
-            if bot_name not in existing:
-                entries.append(_bot_entry_from_name(bot_name))
-    else:
-        entries = [entry for entry in all_profiles if entry["profile"] == normalized]
+    entries, _warnings = _get_profit_trade_bot_sources(profile, bot_side)
     paths: list[Path] = [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
     for entry in entries:
-        paths_dict = get_bot_paths(entry.get("bot_name"))
-        if not paths_dict:
-            continue
-        dashboard_path = paths_dict.get("dashboard_closed_pnl_history_file")
-        confirmed_path = paths_dict.get("confirmed_order_pnl_history_file")
+        dashboard_path = entry.get("dashboard_closed_pnl_history_file")
+        confirmed_path = entry.get("confirmed_order_pnl_history_file")
         if dashboard_path:
+            dashboard_path = Path(dashboard_path)
+            if not dashboard_path.exists():
+                logger.info(
+                    "[dashboard] profit_trade_history_missing bot_name=%s side=%s path=%s",
+                    entry.get("bot_name"),
+                    entry.get("side"),
+                    str(dashboard_path),
+                )
             paths.append(dashboard_path)
         if confirmed_path:
+            confirmed_path = Path(confirmed_path)
+            if not confirmed_path.exists():
+                logger.info(
+                    "[dashboard] profit_trade_history_missing bot_name=%s side=%s path=%s",
+                    entry.get("bot_name"),
+                    entry.get("side"),
+                    str(confirmed_path),
+                )
             paths.append(confirmed_path)
     return paths
 
 
-def _collect_confirmed_history_paths(profile: str) -> list[Path]:
+def _collect_confirmed_history_paths(profile: str, bot_side: str | None = None) -> list[Path]:
     resolved = _normalize_dashboard_profile(profile, fallback_to_main=False)
-    paths = []
+    paths: list[Path] = []
     if not resolved or resolved == "main":
         paths.extend([CONFIRMED_ORDER_PNL_HISTORY_FILE])
         return paths
-    account_map = _build_dynamic_bot_state_files()
-    for bot_name in map(_bot_entry_from_name, _discover_all_long_bots()):
-        bot_paths = get_bot_paths(bot_name["bot_name"])
-        if bot_paths:
-            confirmed = bot_paths.get("confirmed_order_pnl_history_file")
-            if confirmed:
-                paths.append(confirmed)
+    sources, _warnings = _get_profit_trade_bot_sources(profile, bot_side)
+    for source in sources:
+        confirmed = source.get("confirmed_order_pnl_history_file")
+        if confirmed:
+            confirmed = Path(confirmed)
+            if not confirmed.exists():
+                logger.info(
+                    "[dashboard] profit_trade_history_missing bot_name=%s side=%s path=%s",
+                    source.get("bot_name"),
+                    source.get("side"),
+                    str(confirmed),
+                )
+            paths.append(confirmed)
     paths.append(CONFIRMED_ORDER_PNL_HISTORY_FILE)
     return paths
 
@@ -7678,6 +7869,7 @@ def _collect_confirmed_order_pnl_rows(paths: list[Path]) -> list[dict[str, Any]]
     for path in paths:
         if not path.exists():
             continue
+        path_count = 0
         try:
             with path.open("r", encoding="utf-8", errors="ignore") as fh:
                 for line in fh:
@@ -7689,14 +7881,18 @@ def _collect_confirmed_order_pnl_rows(paths: list[Path]) -> list[dict[str, Any]]
                     except Exception:
                         continue
                     rows.append(payload)
+                    path_count += 1
         except Exception:
             continue
+        logger.info("[dashboard] profit_trade_history_loaded path=%s rows=%s", str(path), path_count)
     return rows
 
 
-def _collect_confirmed_trade_start_times(profile: str) -> dict[str, datetime]:
-    paths = _collect_confirmed_history_paths(profile)
+def _collect_confirmed_trade_start_times(profile: str, bot_side: str | None = None) -> dict[str, datetime]:
+    paths = _collect_confirmed_history_paths(profile, bot_side)
     rows = _collect_confirmed_order_pnl_rows(paths)
+    if bot_side:
+        rows = _filter_trades_by_side(rows, bot_side)
     start_times: dict[str, datetime] = {}
     for row in rows:
         tbid = str(row.get("trade_block_id") or "").strip()
@@ -7728,9 +7924,13 @@ def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> l
 
 
 def _load_confirmed_order_pnl_rows_for_trade(
-    profile: str, trade_block_id: str, bot_name: str | None = None, symbol: str | None = None
+    profile: str,
+    trade_block_id: str,
+    bot_name: str | None = None,
+    symbol: str | None = None,
+    bot_side: str | None = None,
 ) -> list[dict[str, Any]]:
-    paths = _collect_confirmed_history_paths(profile)
+    paths = _collect_confirmed_history_paths(profile, bot_side)
     rows = _collect_confirmed_order_pnl_rows(paths)
     candidate = _filter_confirmed_rows(rows, trade_block_id)
     if symbol:
@@ -7747,6 +7947,7 @@ def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
     for path in paths:
         if not path.exists():
             continue
+        path_count = 0
         try:
             with path.open("r", encoding="utf-8", errors="ignore") as fh:
                 for line in fh:
@@ -7759,13 +7960,16 @@ def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
                         logger.warning("[dashboard] history_line_parse_failed", {"line": line})
                         continue
                     entries.append(payload)
+                    path_count += 1
         except Exception:
             logger.warning("[dashboard] history_file_read_failed", {"path": str(path)}, exc_info=True)
+            continue
+        logger.info("[dashboard] profit_trade_history_loaded path=%s rows=%s", str(path), path_count)
     return entries
 
 
-def _load_history_trade_events_for_profile(profile: str) -> list[dict[str, Any]]:
-    entries = _load_history_entries_from_paths(_collect_history_paths_for_profile(profile))
+def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = None) -> list[dict[str, Any]]:
+    entries = _load_history_entries_from_paths(_collect_history_paths_for_profile(profile, bot_side))
     events: list[dict[str, Any]] = []
     for entry in entries:
         tbid = entry.get("trade_block_id") or entry.get("trade_block") or entry.get("tradeId")
@@ -7776,6 +7980,8 @@ def _load_history_trade_events_for_profile(profile: str) -> list[dict[str, Any]]
         record["__ts"] = _normalize_dashboard_datetime(ts_val) or datetime.now(timezone.utc)
         record["__event"] = record.get("__event") or record.get("event") or "dashboard_closed_pnl_history"
         events.append(record)
+    if bot_side:
+        return _filter_trades_by_side(events, bot_side)
     return events
 
 
@@ -7784,8 +7990,9 @@ def _find_closed_pnl_history_entry(
     trade_block_id: str,
     bot_name: str | None = None,
     symbol: str | None = None,
+    bot_side: str | None = None,
 ) -> dict[str, Any] | None:
-    paths = _collect_history_paths_for_profile(profile)
+    paths = _collect_history_paths_for_profile(profile, bot_side)
     best: dict[str, Any] | None = None
     best_ts: datetime | None = None
     for entry in _load_history_entries_from_paths(paths):
@@ -7878,24 +8085,6 @@ def _event_priority(event: dict[str, Any]) -> tuple[int, int, datetime]:
     return (pnl_complete, is_persisted, parsed)
 
 
-def _resolve_profile_entries(profile: str) -> tuple[list[dict[str, Any]], list[str]]:
-    normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
-    if not normalized or normalized == "main":
-        return [], [f"unknown profile: {profile}"]
-    entries: list[dict[str, Any]] = []
-    if normalized == "bot_1":
-        entries = get_bot_profiles().copy()
-        existing = {entry["bot_name"] for entry in entries}
-        for bot_name in _discover_all_long_bots():
-            if bot_name not in existing:
-                entries.append(_bot_entry_from_name(bot_name))
-    else:
-        entries = [entry for entry in get_bot_profiles() if entry.get("profile") == normalized]
-    if not entries:
-        return [], [f"profile has no bots configured: {profile}"]
-    return entries, []
-
-
 def _load_trade_blocks_for_profile(
     profile: str,
     limit: int,
@@ -7905,8 +8094,9 @@ def _load_trade_blocks_for_profile(
     page: int = 0,
     page_size: int | None = None,
     paginate: bool = True,
+    bot_side: str | None = None,
 ) -> Tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
-    entries, entry_warnings = _resolve_profile_entries(profile)
+    entries, entry_warnings = _get_profit_trade_bot_sources(profile, bot_side)
     if not entries:
         effective_page_size = page_size or limit
         return [], entry_warnings, _build_trade_pagination(
@@ -7918,26 +8108,24 @@ def _load_trade_blocks_for_profile(
     events: list[dict[str, Any]] = []
     normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
     for entry in entries:
-        paths = get_bot_paths(entry["bot_name"])
-        if not paths:
-            bot_dir = LIVE_BOT_LOGS_ROOT / entry["bot_name"]
-            warnings.append(f"missing paths for bot {entry['bot_name']}, using fallback dirs")
-            paths = {
-                "runtime_log_file": bot_dir / "logs" / "fixed_cycle_hedge_runtime.log",
-                "runner_stdout_log": bot_dir / "logs" / "fixed_cycle_runner.stdout.log",
-            }
+        paths = {
+            "runtime_log_file": entry.get("runtime_log_file"),
+            "runner_stdout_log": entry.get("runner_stdout_log"),
+        }
         log_paths = _gather_trade_log_paths(paths, entry["bot_name"])
         parsed, bot_warnings = _collect_trade_events_from_logs(log_paths, entry["bot_name"], normalized_profile)
         warnings.extend(bot_warnings)
         events.extend(parsed)
-        logger.warning(
-            "[profit-summary-scan] profile=%s bot=%s files=%s events=%s",
+        logger.info(
+            "[dashboard] profit_trade_loaded profile=%s bot_side=%s bot_name=%s side=%s files=%s trades=%s",
             profile,
-            entry["bot_name"],
+            bot_side,
+            entry.get("bot_name"),
+            entry.get("side"),
             [str(p) for p in log_paths],
             len(parsed),
         )
-    history_events = _load_history_trade_events_for_profile(profile)
+    history_events = _load_history_trade_events_for_profile(profile, bot_side)
     if history_events:
         warnings.append(f"loaded {len(history_events)} history events for profile {profile}")
     events.extend(history_events)
@@ -8085,7 +8273,13 @@ def _collect_process_rows_for_bot(
         or (strategy_state.get("cycle_state") or {}).get("symbol")
         or ""
     )
-    rows = _load_confirmed_order_pnl_rows_for_trade(profile, trade_block_id, bot_name, symbol)
+    rows = _load_confirmed_order_pnl_rows_for_trade(
+        profile,
+        trade_block_id,
+        bot_name,
+        symbol,
+        bot_side="short" if str(bot_name or "").lower().startswith("short_bot_") else "long",
+    )
     filled_orders: list[dict[str, Any]] = []
     start_times: list[datetime] = []
     total_pnl = 0.0
@@ -8148,8 +8342,8 @@ def _collect_process_rows_for_bot(
     )
 
 
-def _collect_active_bot_process_rows(profile: str) -> tuple[list[dict[str, Any]], list[str]]:
-    entries, entry_warnings = _resolve_profile_entries(profile)
+def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+    entries, entry_warnings = _get_profit_trade_bot_sources(profile, bot_side)
     warnings: list[str] = entry_warnings.copy()
     rows: list[dict[str, Any]] = []
     for entry in entries:
@@ -8177,15 +8371,30 @@ async def api_profit_trades(
     end_time: str | None = Query(None, description="End datetime filter"),
     page: int = Query(0, ge=0, description="Zero-based trade page"),
     page_size: int | None = Query(None, ge=1, le=500, description="Trades per page"),
+    bot_side: str = Query("long", description="Bot side filter"),
     user: dict = Depends(require_auth),
 ):
-    trades, summary, pagination, warnings = _build_profit_trade_page(
+    bot_side = _normalize_bot_side(bot_side)
+    trades, summary, pagination, warnings, metadata = _build_profit_trade_page(
         profile,
         limit=limit,
         start_time=start_time,
         end_time=end_time,
         page=page,
         page_size=page_size,
+        bot_side=bot_side,
+    )
+    actual_page_size = page_size or pagination.get("page_size")
+    logger.info(
+        "[dashboard] profit_trades_request",
+        {
+            "profile": profile,
+            "bot_side": bot_side,
+            "total_records_before_side_filter": metadata.get("total_before_side_filter"),
+            "total_records_after_side_filter": metadata.get("total_after_side_filter"),
+            "page": page,
+            "page_size": actual_page_size,
+        },
     )
     return {
         "success": True,
@@ -8228,19 +8437,24 @@ async def api_profit_trades_chart(
     start_time: str | None = Query(None, description="Start datetime filter"),
     end_time: str | None = Query(None, description="End datetime filter"),
     group_by: str = Query("day", description="Chart grouping: day or month"),
+    bot_side: str = Query("long", description="Bot side filter"),
     user: dict = Depends(require_auth),
 ):
     normalized_group_by = "month" if str(group_by or "").strip().lower() == "month" else "day"
+    normalized_side = _normalize_bot_side(bot_side)
     trades, warnings = _build_profit_trade_filtered_rows(
         profile,
         limit=500,
         start_time=start_time,
         end_time=end_time,
+        bot_side=normalized_side,
     )
-    chart_rows = _aggregate_profit_chart_rows(trades, group_by=normalized_group_by)
+    filtered_trades = _filter_trades_by_side(trades, normalized_side)
+    chart_rows = _aggregate_profit_chart_rows(filtered_trades, group_by=normalized_group_by)
     return {
         "success": True,
         "profile": profile,
+        "bot_side": normalized_side,
         "group_by": normalized_group_by,
         "chart": chart_rows,
         "warnings": warnings,
@@ -8251,25 +8465,41 @@ async def api_profit_trades_chart(
 async def api_profit_trade_details(
     trade_block_id: str,
     profile: str = Query("bot_1", description="Bot profile"),
+    bot_side: str = Query("long", description="Bot side filter"),
     user: dict = Depends(require_auth),
 ):
+    bot_side = _normalize_bot_side(bot_side)
     trades, warnings, _pagination = _load_trade_blocks_for_profile(
         profile,
         limit=500,
         paginate=False,
+        bot_side=bot_side,
     )
+    trades = _filter_trades_by_side(trades, bot_side)
     normalized = list(trades)
     match = next((record for record in normalized if record.get("trade_block_id") == trade_block_id), None)
     if not match:
         raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
     bot_name = match.get("bot_name") or ""
     symbol = match.get("symbol") or ""
-    confirmed_rows = _load_confirmed_order_pnl_rows_for_trade(profile, trade_block_id, bot_name, symbol)
+    confirmed_rows = _load_confirmed_order_pnl_rows_for_trade(
+        profile,
+        trade_block_id,
+        bot_name,
+        symbol,
+        bot_side=bot_side,
+    )
     if confirmed_rows:
         rows = _build_confirmed_detail_rows(match, confirmed_rows)
     else:
         if not match.get("details"):
-            history_entry = _find_closed_pnl_history_entry(profile, trade_block_id, bot_name, symbol)
+            history_entry = _find_closed_pnl_history_entry(
+                profile,
+                trade_block_id,
+                bot_name,
+                symbol,
+                bot_side=bot_side,
+            )
             match = _merge_trade_history_breakdown(match, history_entry)
         rows = _build_profit_trade_detail_rows(match)
     return {
@@ -8321,6 +8551,7 @@ def _build_profit_trade_filtered_rows(
     limit: int,
     start_time: str | None = None,
     end_time: str | None = None,
+    bot_side: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
         profile,
@@ -8330,8 +8561,9 @@ def _build_profit_trade_filtered_rows(
         page=0,
         page_size=limit,
         paginate=False,
+        bot_side=bot_side,
     )
-    process_rows, process_warnings = _collect_active_bot_process_rows(profile)
+    process_rows, process_warnings = _collect_active_bot_process_rows(profile, bot_side)
     warnings.extend(process_warnings)
     active_start_dt = _normalize_trade_filter_datetime(start_time)
     active_end_dt = _normalize_trade_filter_datetime(end_time)
@@ -8349,7 +8581,7 @@ def _build_profit_trade_filtered_rows(
     filtered_base_trades = [
         record for record in base_trades if record.get("trade_block_id") not in running_ids
     ]
-    confirmed_start_times = _collect_confirmed_trade_start_times(profile)
+    confirmed_start_times = _collect_confirmed_trade_start_times(profile, bot_side)
     summary_rows = [
         _build_profit_trade_summary(
             record,
@@ -8450,22 +8682,35 @@ def _build_profit_trade_page(
     end_time: str | None = None,
     page: int = 0,
     page_size: int | None = None,
-) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], list[str]]:
+    bot_side: str = "long",
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    dict[str, Any],
+    list[str],
+    dict[str, int],
+]:
     combined_rows, warnings = _build_profit_trade_filtered_rows(
         profile,
         limit=limit,
         start_time=start_time,
         end_time=end_time,
+        bot_side=bot_side,
     )
+    filtered_rows = _filter_trades_by_side(combined_rows, bot_side)
     effective_page_size = page_size or limit
     paged_rows, pagination = _paginate_trade_records(
-        combined_rows,
+        filtered_rows,
         page=page,
         page_size=effective_page_size,
     )
     summary = _summarize_trade_blocks(paged_rows)
-    summary.update(_build_profit_trade_wallet_summary())
-    return paged_rows, summary, pagination, warnings
+    summary.update(_build_profit_trade_wallet_summary(profile=profile, bot_side=bot_side))
+    metadata = {
+        "total_before_side_filter": len(combined_rows),
+        "total_after_side_filter": len(filtered_rows),
+    }
+    return paged_rows, summary, pagination, warnings, metadata
 
 
 def _extract_wallet_value(snapshot: dict[str, Any] | None) -> float | None:
@@ -8485,46 +8730,71 @@ def _extract_wallet_value(snapshot: dict[str, Any] | None) -> float | None:
 
 
 def _build_profit_trade_wallet_summary(
+    *,
+    profile: str,
+    bot_side: str = "long",
     live_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    normalized_side = _normalize_bot_side(bot_side)
     bot_wallets: list[dict[str, Any]] = []
     total_wallet_usdt = 0.0
     has_numeric_wallet = False
-    live_map: dict[str, float | None] = {}
-    if live_summary:
-        long_val = _safe_wallet_float(live_summary.get("main_margin_balance"))
-        short_val = _safe_wallet_float(live_summary.get("sub_margin_balance"))
-        total_val = _safe_wallet_float(live_summary.get("total_margin_balance"))
-        if long_val is not None:
-            live_map["long_bot_1"] = long_val
-            total_wallet_usdt += long_val
-            has_numeric_wallet = True
-        if short_val is not None:
-            live_map["short_bot_1"] = short_val
-            total_wallet_usdt += short_val
-            has_numeric_wallet = True
-        if total_val is not None:
-            total_wallet_usdt = total_val
-            has_numeric_wallet = True
-    for bot in _get_dashboard_long_bots():
-        bot_name = str(bot.get("bot_name") or "").strip().lower()
-        snapshot_value = None
-        account_name = _dashboard_account_name_from_bot(bot)
-        if account_name:
-            try:
-                snapshot = _load_live_wallet_snapshot_for_account(account_name)
-                snapshot_value = _extract_wallet_value(snapshot)
-            except Exception:
-                logger.warning(
-                    "[dashboard] profit_trade_wallet_snapshot_failed",
-                    exc_info=True,
-                    extra={"bot_name": bot_name, "account_name": account_name},
-                )
-        value = live_map.get(bot_name, snapshot_value)
-        if value is not None and bot_name not in live_map:
-            total_wallet_usdt += value
-            has_numeric_wallet = True
-        bot_wallets.append({"bot_name": bot_name, "wallet_usdt": value})
+
+    def _fetch_wallet(account_label: str, api_key: str | None, secret_key: str | None) -> float | None:
+        if not account_label or not api_key or not secret_key:
+            return None
+        try:
+            manager = BybitOrderManager(api_key, secret_key)
+            return manager.get_account_margin_balance()
+        except Exception:
+            logger.warning(
+                "[dashboard] profit_trade_wallet_live_fetch_failed",
+                exc_info=True,
+                extra={"account": account_label, "bot_side": normalized_side},
+            )
+            return None
+
+    profiles: list[str] = []
+    for bot in get_bot_profiles():
+        profile_name = str(bot.get("profile") or "").strip().lower()
+        if profile_name:
+            profiles.append(profile_name)
+
+    seen_profiles: set[str] = set()
+    for prof in profiles:
+        if prof in seen_profiles:
+            continue
+        seen_profiles.add(prof)
+        long_account = profile_to_account_name(prof)
+        long_key, long_secret, short_key, short_secret = _get_account_keys_by_profile(prof)
+
+        if normalized_side in ("long", ""):
+            wallet_value = _fetch_wallet(long_account or "", long_key, long_secret)
+            if wallet_value is not None:
+                total_wallet_usdt += wallet_value
+                has_numeric_wallet = True
+            if long_account:
+                bot_wallets.append({"bot_name": long_account, "wallet_usdt": wallet_value})
+        if normalized_side in ("short", ""):
+            short_account = f"Short_bot_{prof.split('_')[-1]}" if prof.startswith("bot_") else None
+            wallet_value = _fetch_wallet(short_account or "", short_key, short_secret)
+            if wallet_value is not None:
+                total_wallet_usdt += wallet_value
+                has_numeric_wallet = True
+            if short_account:
+                bot_wallets.append({"bot_name": short_account, "wallet_usdt": wallet_value})
+
+    logger.info(
+        "[dashboard] profit_trade_wallet_summary",
+        {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "wallet_entries": [
+                {"bot_name": entry["bot_name"], "wallet_usdt": entry["wallet_usdt"]}
+                for entry in bot_wallets
+            ],
+        },
+    )
     return {
         "total_wallet_usdt": round(total_wallet_usdt, 8) if has_numeric_wallet else None,
         "bot_wallets": bot_wallets,
@@ -10418,11 +10688,15 @@ def _read_watcher_info(pid_file: Path, keyword: str) -> dict[str, Any]:
         pid_file.unlink(missing_ok=True)
         return info
     proc_path = Path("/proc") / str(pid)
+    cmdline_path = proc_path / "cmdline"
     if not proc_path.exists():
         pid_file.unlink(missing_ok=True)
         return info
+    if not cmdline_path.exists():
+        pid_file.unlink(missing_ok=True)
+        return info
     try:
-        cmdline = proc_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+        cmdline = cmdline_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
     except Exception:
         pid_file.unlink(missing_ok=True)
         return info
@@ -10434,6 +10708,20 @@ def _read_watcher_info(pid_file: Path, keyword: str) -> dict[str, Any]:
     return info
 
 
+def _read_short_wallet_watcher_info() -> dict[str, Any]:
+    info = _read_watcher_info(SHORT_WALLET_PID, "short_hedge_bot/watchdog/wallet_refill_watchdog.py")
+    if info["status"] == "running":
+        info["log_file"] = str(SHORT_WALLET_LOG)
+    return info
+
+
+def _ensure_short_wallet_watcher_entry(watchers: dict[str, Any]) -> dict[str, Any]:
+    if "short_wallet_refill_watchdog" in watchers:
+        return watchers
+    result = dict(watchers)
+    result["short_wallet_refill_watchdog"] = _read_short_wallet_watcher_info()
+    return result
+
 def _read_status_file() -> dict[str, Any] | None:
     if not WATCHERS_STATUS_FILE.exists():
         return None
@@ -10444,12 +10732,17 @@ def _read_status_file() -> dict[str, Any] | None:
     watchers = data.get("watchers") or {}
     if not watchers:
         return None
+    short_entry = watchers.get("short_wallet_refill_watchdog")
+    if not short_entry:
+        short_entry = _read_short_wallet_watcher_info()
+    base_watchers = {
+        "safety_order_watchdog": watchers.get("safety_order_watchdog", {"status": "stopped", "pid": None}),
+        "wallet_refill_watchdog": watchers.get("wallet_refill_watchdog", {"status": "stopped", "pid": None}),
+    }
+    base_watchers = _ensure_short_wallet_watcher_entry(base_watchers)
     return {
         "status": data.get("status") or "stopped",
-        "watchers": {
-            "safety_order_watchdog": watchers.get("safety_order_watchdog", {"status": "stopped", "pid": None}),
-            "wallet_refill_watchdog": watchers.get("wallet_refill_watchdog", {"status": "stopped", "pid": None}),
-        },
+        "watchers": base_watchers,
         "ok": True,
     }
 
@@ -10457,16 +10750,27 @@ def _read_status_file() -> dict[str, Any] | None:
 def _hedge_guard_watchers_status() -> dict[str, Any]:
     status_data = _read_status_file()
     if status_data:
+        status_data["watchers"] = _ensure_short_wallet_watcher_entry(status_data.get("watchers", {}))
         return status_data
     safety = _read_watcher_info(LIVE_BOT_LOGS_ROOT / "run" / "safety_order_watchdog.pid", "safety_order_watchdog.py")
     wallet = _read_watcher_info(LIVE_BOT_LOGS_ROOT / "run" / "wallet_refill_watchdog.pid", "wallet_refill_watchdog.py")
-    running = sum(1 for entry in (safety, wallet) if entry["status"] == "running")
+    short_wallet = _read_short_wallet_watcher_info()
+    watchers = {
+        "safety_order_watchdog": safety,
+        "wallet_refill_watchdog": wallet,
+        "short_wallet_refill_watchdog": short_wallet,
+    }
+    running = sum(1 for entry in watchers.values() if entry["status"] == "running")
     overall = "stopped"
-    if running == 2:
+    if running == len(watchers):
         overall = "running"
-    elif running == 1:
+    elif running > 0:
         overall = "partial"
-    return {"ok": True, "status": overall, "watchers": {"safety_order_watchdog": safety, "wallet_refill_watchdog": wallet}}
+    return {
+        "ok": True,
+        "status": overall,
+        "watchers": watchers,
+    }
 
 
 @app.get("/api/hedge-guard-watchers/status")

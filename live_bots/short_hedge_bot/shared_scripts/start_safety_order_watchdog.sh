@@ -20,13 +20,16 @@ BOT_GROUP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BOT_ROOT="${BOT_GROUP_DIR}/${BOT_NAME}"
 RUN_DIR="${BOT_ROOT}/run"
 LOG_DIR="${BOT_ROOT}/logs"
-PID_FILE="${RUN_DIR}/safety_order_watchdog.pid"
+GROUP_RUN_DIR="${BOT_GROUP_DIR}/run"
+GROUP_LOG_DIR="${BOT_GROUP_DIR}/logs"
+PID_FILE="${GROUP_RUN_DIR}/safety_order_watchdog.pid"
 STATUS_FILE="${RUN_DIR}/safety_order_watchdog.status.json"
-NOHUP_LOG="${LOG_DIR}/safety_order_watchdog.nohup.log"
+GROUP_STATUS_FILE="${GROUP_RUN_DIR}/safety_order_watchdog.status.json"
+NOHUP_LOG="${GROUP_LOG_DIR}/safety_order_watchdog.nohup.log"
 WATCHDOG_SCRIPT="${BOT_GROUP_DIR}/watchdog/safety_order_watchdog.py"
 PYTHON="${PYTHON:-python3}"
 
-mkdir -p "${RUN_DIR}" "${LOG_DIR}"
+mkdir -p "${RUN_DIR}" "${LOG_DIR}" "${GROUP_RUN_DIR}" "${GROUP_LOG_DIR}"
 
 is_process_alive() {
   local pid="$1"
@@ -38,33 +41,50 @@ is_process_alive() {
   fi
   local cmdline
   cmdline="$(ps -p "$pid" -o args= 2>/dev/null || true)"
-  if [[ "$cmdline" == *"safety_order_watchdog.py"* && "$cmdline" == *"${BOT_NAME}"* ]]; then
+  if [[ "$cmdline" == *"safety_order_watchdog.py"* && "$cmdline" == *"${WATCHDOG_SCRIPT}"* ]]; then
     return 0
   fi
   return 1
 }
 
+write_status_files() {
+  local pid_value="$1"
+  local status_value="$2"
+  cat <<JSON > "${STATUS_FILE}"
+{
+  "status": "${status_value}",
+  "pid": ${pid_value},
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "bot": "${BOT_NAME}",
+  "mode": "global_short_watchdog",
+  "log_file": "${NOHUP_LOG}"
+}
+JSON
+  cat <<JSON > "${GROUP_STATUS_FILE}"
+{
+  "status": "${status_value}",
+  "pid": ${pid_value},
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "scope": "all_short_bots",
+  "log_file": "${NOHUP_LOG}"
+}
+JSON
+}
+
 if [[ -f "${PID_FILE}" ]]; then
   EXISTING_PID="$(cat "${PID_FILE}" 2>/dev/null || true)"
   if is_process_alive "${EXISTING_PID}"; then
-    echo "${BOT_NAME} safety watchdog already running (PID=${EXISTING_PID})"
+    write_status_files "${EXISTING_PID}" "running"
+    echo "Short safety watchdog already running (PID=${EXISTING_PID})"
     exit 0
-  else
-    rm -f "${PID_FILE}"
   fi
+  rm -f "${PID_FILE}"
 fi
 
-start_cmd=("${PYTHON}" "${WATCHDOG_SCRIPT}" --loop --bot-name "${BOT_NAME}")
+start_cmd=("${PYTHON}" "${WATCHDOG_SCRIPT}" --loop --interval 30)
 nohup "${start_cmd[@]}" >> "${NOHUP_LOG}" 2>&1 &
 WATCHDOG_PID="$!"
 echo "${WATCHDOG_PID}" > "${PID_FILE}"
-cat <<JSON > "${STATUS_FILE}"
-{
-  "status": "running",
-  "pid": ${WATCHDOG_PID},
-  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "bot": "${BOT_NAME}"
-}
-JSON
+write_status_files "${WATCHDOG_PID}" "running"
 
-echo "Started safety_order_watchdog for ${BOT_NAME} (PID=${WATCHDOG_PID})"
+echo "Started short safety watchdog (PID=${WATCHDOG_PID})"

@@ -456,3 +456,24 @@ STARTED_PID="$PID" write_status_json "running" "" "${CURRENT_SYMBOL}" "" "true"
 echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
 echo "[block_marker] bot_restart timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ") symbol=${CURRENT_SYMBOL}" >> "${LOG_DIR}/fixed_cycle_calc_audit.log"
 unset STARTED_PID
+
+start_short_watchdog() {
+  local watchdog_script="${BOT_GROUP_DIR}/shared_scripts/start_safety_order_watchdog.sh"
+  if [[ -x "${watchdog_script}" ]]; then
+    "${watchdog_script}" "${BOT_NAME}"
+  else
+    echo "[${BOT_NAME}] watchdog start script missing: ${watchdog_script}" >&2
+  fi
+}
+
+start_short_wallet_refill_watchdog() {
+  local watchdog_script="${BOT_GROUP_DIR}/shared_scripts/start_wallet_refill_watchdog.sh"
+  if [[ -x "${watchdog_script}" ]]; then
+    "${watchdog_script}" "${BOT_NAME}"
+  else
+    echo "[${BOT_NAME}] wallet refill watchdog missing: ${watchdog_script}" >&2
+  fi
+}
+
+start_short_watchdog
+start_short_wallet_refill_watchdog

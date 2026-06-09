@@ -159,7 +159,7 @@ start_watcher "wallet_refill_watchdog" "${WALLET_PID}" \
   "wallet_refill_watchdog.py" \
   "${PYTHON_BIN}" "${BOT_ROOT}/watchdog/wallet_refill_watchdog.py" \
     --loop --interval 30 --no-rebaseline-on-start --enable-transfer --no-transfer-dry-run \
-    --transfer-config-file config/config.yaml --transfer-coin USDT \
+    --transfer-config-file "${BOT_ROOT}/config/config.yaml" --transfer-coin USDT \
     --min-transfer-amount 1 --transfer-cooldown-seconds 600
 sleep 1
 reconcile_watchdog "${WALLET_PID}" "wallet_refill_watchdog.py"

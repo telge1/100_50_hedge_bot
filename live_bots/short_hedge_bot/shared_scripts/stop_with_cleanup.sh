@@ -20,10 +20,6 @@ BOT_GROUP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${BOT_GROUP_DIR}/../.." && pwd)"
 BOT_DIR="${BOT_GROUP_DIR}/${BOT_NAME}"
 BOT_SCRIPTS_DIR="${BOT_DIR}/scripts"
-SHORT_WATCHDOG_STOP="${BOT_GROUP_DIR}/shared_scripts/stop_safety_order_watchdog.sh"
-if [[ -x "${SHORT_WATCHDOG_STOP}" ]]; then
-  "${SHORT_WATCHDOG_STOP}" "${BOT_NAME}" || true
-fi
 STATE_DIR="${BOT_GROUP_DIR}/state"
 STATE_FILE="${STATE_DIR}/active_bot_symbols.json"
 LOCK_FILE="${STATE_DIR}/active_bot_symbols.lock"
