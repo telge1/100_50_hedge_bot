@@ -146,6 +146,7 @@ class FixedCycleHedgeConfig:
         allowed_recovery_timings = {
             "before_short_reduce_fill",
             "after_short_reduce_fill",
+            "after_first_leg_reduce_fill",
         }
         if self.recovery_activation_timing not in allowed_recovery_timings:
             raise ValueError(
@@ -5748,20 +5749,49 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         short_tp_pending_cycle, runtime_state, snapshot
                     )
                     if short_followup_active:
+                        cycle_entry = self._get_cycle_sequence_entry(
+                            runtime_state, short_tp_pending_cycle
+                        )
+                        next_required_purpose = str(
+                            state.get("next_required_purpose") or ""
+                        ).upper()
+                        normalized_first_leg_purpose = self._normalize_cycle_purpose(
+                            self._get_first_leg_purpose(short_tp_pending_cycle),
+                            {
+                                "cycle_index": short_tp_pending_cycle,
+                                "cycle_role": self._get_first_leg_cycle_role(),
+                            },
+                        )
+                        normalized_second_leg_purpose = self._normalize_cycle_purpose(
+                            self._get_second_leg_purpose(short_tp_pending_cycle),
+                            {
+                                "cycle_index": short_tp_pending_cycle,
+                                "cycle_role": self._get_second_leg_cycle_role(),
+                            },
+                        )
+                        processed_cycle_purposes = [
+                            str(purpose or "").upper()
+                            for purpose in (state.get("processed_cycle_purposes") or [])
+                        ]
+                        first_leg_processed = (
+                            normalized_first_leg_purpose in processed_cycle_purposes
+                        )
+                        second_leg_processed = (
+                            normalized_second_leg_purpose in processed_cycle_purposes
+                        )
+                        short_tp_status = str(
+                            (cycle_entry.get("short_tp_status") or "NONE")
+                        ).upper()
                         _log_event(
-                            "fixed_cycle_short_followup_already_active_skip_missing_error",
+                            "fixed_cycle_second_leg_pending_skip_rebuild",
                             {
                                 "symbol": snapshot.symbol or self.config.symbol,
-                                "short_tp_pending_cycle": short_tp_pending_cycle,
-                                "short_tp_status": str(
-                                    (
-                                        self._get_cycle_sequence_entry(
-                                            runtime_state, short_tp_pending_cycle
-                                        ).get("short_tp_status")
-                                    )
-                                    or "NONE"
-                                ).upper(),
+                                "pending_cycle": short_tp_pending_cycle,
+                                "short_tp_status": short_tp_status,
                                 "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
+                                "next_required_purpose": next_required_purpose,
+                                "first_leg_processed": first_leg_processed,
+                                "second_leg_processed": second_leg_processed,
                                 "active_runtime_order_purposes": [
                                     order.purpose
                                     for order in runtime_state.active_orders.values()
@@ -5778,6 +5808,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                                         self._cycle_purpose("short", short_tp_pending_cycle)
                                     )
                                 ],
+                                "reason": "waiting_for_second_leg_fill_or_confirmation",
                             },
                         )
                     else:
@@ -7059,8 +7090,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 trigger_price = self._normalize_price(trigger_price, runtime_state)
                 expected_long_reduce_profit = compute_expected_long_reduce_profit(trigger_price)
                 iterations += 1
-
-            if self.config.recovery_activation_timing == "after_short_reduce_fill":
                 _log_event(
                     "fixed_cycle_recovery_activation_timing_selected",
                     {
@@ -7969,6 +7998,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["last_expected_short_tp_net"] = required_net
         state["last_short_tp_trigger_price"] = trigger_price
         state["last_short_tp_qty"] = short_qty
+        if self._maybe_activate_recovery_after_first_leg_fill(
+            snapshot,
+            runtime_state,
+            cycle_index=cycle_index,
+            trigger_price=trigger_price,
+            first_leg_purpose=first_leg_purpose or "",
+            second_leg_purpose=second_leg_purpose or "",
+            first_leg_loss_usdt=long_loss_usdt,
+        ):
+            return []
         realized_net_pnl_total = self._get_realized_net_pnl_total(runtime_state, snapshot)
         logger.debug(
             "short_tp_loss_recovery",
@@ -9207,6 +9246,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> None:
         if cycle_index <= 0:
             return
+        current_purpose = str(trigger_purpose or "")
+        if not self._is_second_leg_purpose(current_purpose):
+            _log_event(
+                "fixed_cycle_second_leg_completion_blocked_non_second_leg",
+                {
+                    "cycle_index": cycle_index,
+                    "purpose": current_purpose or None,
+                    "source": "_try_complete_cycle_pair_after_confirmed_pnl",
+                },
+            )
+            return
         state = runtime_state.strategy_state
         if not (state.get("cycle_long_add_filled") and state.get("cycle_short_tp_filled")):
             return
@@ -9254,6 +9304,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 reason="pending_pair_pnl",
             )
             return
+        _log_event(
+            "fixed_cycle_second_leg_completion_allowed",
+            {
+                "cycle_index": cycle_index,
+                "purpose": current_purpose,
+                "cycle_step": state.get("cycle_step"),
+                "next_required_purpose": state.get("next_required_purpose"),
+                "cycle_pair_count_before": counts_before["cycle_pair_count"],
+                "cycle_pair_count_after": counts_after["cycle_pair_count"],
+                "cycle_completed_count_before": counts_before["cycle_completed_count"],
+                "cycle_completed_count_after": counts_after["cycle_completed_count"],
+            },
+        )
         self._force_commit_short_reduce_completion_even_if_duplicate(
             runtime_state,
             cycle_index,
@@ -9276,6 +9339,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         if bool(state.get("refill_pending")) or bool(state.get("refill_required")):
+            return
+        if not self._is_second_leg_purpose(current_purpose):
+            _log_event(
+                "fixed_cycle_second_leg_completion_blocked_non_second_leg",
+                {
+                    "cycle_index": cycle_index,
+                    "purpose": current_purpose or None,
+                    "source": "_try_complete_cycle_pair_after_confirmed_pnl_clear_followup",
+                },
+            )
             return
         self._clear_cycle_followup_state_after_short_reduce(
             runtime_state, cycle_index, followup_before, counts_before, counts_after
@@ -9312,6 +9385,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         reason: str = "confirmed",
         duplicate: bool = False,
     ) -> None:
+        current_purpose = str(trigger_purpose or (fill_event.purpose if fill_event else "") or "")
+        if not self._is_second_leg_purpose(current_purpose):
+            _log_event(
+                "fixed_cycle_second_leg_completion_blocked_non_second_leg",
+                {
+                    "cycle_index": cycle_index,
+                    "purpose": current_purpose or None,
+                    "source": "_force_commit_short_reduce_completion_even_if_duplicate",
+                    "reason": reason,
+                    "duplicate": duplicate,
+                },
+            )
+            return
         state = runtime_state.strategy_state
         snapshot = runtime_state.last_snapshot
         computed_counts_before = counts_before or {
@@ -9413,6 +9499,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> None:
         if cycle_index <= 0:
             return
+        if source == "force_commit" and fill_event is not None:
+            current_purpose = str(fill_event.purpose or "")
+            if not self._is_second_leg_purpose(current_purpose):
+                _log_event(
+                    "fixed_cycle_second_leg_completion_blocked_non_second_leg",
+                    {
+                        "cycle_index": cycle_index,
+                        "purpose": current_purpose or None,
+                        "source": "fixed_cycle_short_reduce_fill_price_state_set",
+                    },
+                )
+                return
         state = runtime_state.strategy_state
         cycle_state = self._ensure_cycle_state(runtime_state)
         entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
@@ -9939,12 +10037,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     source="fill_event",
                 )
         first_leg_purpose = self._normalize_cycle_purpose(
-            self._cycle_purpose("short", cycle_index),
-            {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
+            self._get_first_leg_purpose(cycle_index),
+            {
+                "cycle_index": cycle_index,
+                "cycle_role": self._get_first_leg_cycle_role(),
+            },
         )
         second_leg_purpose = self._normalize_cycle_purpose(
-            self._cycle_purpose("long", cycle_index),
-            {"cycle_index": cycle_index, "cycle_role": "long_reduce"},
+            self._get_second_leg_purpose(cycle_index),
+            {
+                "cycle_index": cycle_index,
+                "cycle_role": self._get_second_leg_cycle_role(),
+            },
         )
         _, field_name = self._extract_cycle_sequence_target(
             normalized_purpose, {"cycle_index": cycle_index, **metadata}
@@ -10077,6 +10181,32 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     )
                     waiting_short = self._get_second_leg_waiting(state)
                     short_pending = int(self._get_second_leg_pending_cycle(state) or 0)
+                    counts_before_dup = {
+                        "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
+                        "cycle_pair_count": int(state.get("cycle_pair_count") or 0),
+                        "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
+                    }
+                    counts_after_dup = dict(counts_before_dup)
+                    next_required = state.get("next_required_purpose")
+                    last_completed = state.get("last_completed_purpose")
+                    if not next_required:
+                        next_required = self._get_second_leg_purpose(cycle_index)
+                    _log_event(
+                        "fixed_cycle_duplicate_first_leg_ignored_for_pair_completion",
+                        {
+                            "cycle_index": cycle_index,
+                            "purpose": fill_event.purpose,
+                            "next_required_purpose": next_required,
+                            "cycle_pair_count_before": counts_before_dup["cycle_pair_count"],
+                            "cycle_pair_count_after": counts_after_dup["cycle_pair_count"],
+                            "cycle_completed_count_before": counts_before_dup["cycle_completed_count"],
+                            "cycle_completed_count_after": counts_after_dup["cycle_completed_count"],
+                            "current_effective_cycle_before": counts_before_dup["current_effective_cycle"],
+                            "current_effective_cycle_after": counts_after_dup["current_effective_cycle"],
+                            "last_completed_purpose_before": last_completed,
+                            "last_completed_purpose_after": normalized_purpose,
+                        },
+                    )
                     if (
                         short_first_leg_requires_confirmed_pnl
                         and not duplicate_fill_pnl_ready
@@ -10111,6 +10241,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                                 "pending_short_cycle_index": cycle_index,
                             },
                         )
+                    state["active_cycle_index"] = cycle_index
+                    state["cycle_step"] = STEP_WAITING_FOR_PAIR_SECOND_LEG
+                    state["next_required_purpose"] = second_leg_purpose
+                    state["last_completed_purpose"] = normalized_purpose
+                    state["sequence_recovery_blocked"] = False
+                    self._persist_cycle_sequence_state(runtime_state)
                 if is_long_add_fill:
                     fills = cycle_state.setdefault("long_fills", {})
                     existing_long_fill = dict(fills.get(str(cycle_index)) or {})
@@ -11159,6 +11295,35 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         for key in keys:
             state.pop(key, None)
             cycle_state.pop(key, None)
+
+        old_block_status = state.get("cycle_block_status")
+        old_block_reason = state.get("cycle_block_reason")
+        cycle_old_block_status = cycle_state.get("cycle_block_status")
+        cycle_old_block_reason = cycle_state.get("cycle_block_reason")
+        cleaned = False
+        if old_block_status == "RECOVERY_REQUIRED":
+            state.pop("cycle_block_status", None)
+            state.pop("cycle_block_reason", None)
+            cleaned = True
+        if cycle_old_block_status == "RECOVERY_REQUIRED":
+            cycle_state.pop("cycle_block_status", None)
+            cycle_state.pop("cycle_block_reason", None)
+            cleaned = True
+            # prefer logging the state-level reason if already recorded
+            if not old_block_status and cycle_old_block_status:
+                old_block_status = cycle_old_block_status
+                old_block_reason = cycle_old_block_reason
+        if cleaned:
+            payload = {
+                "symbol": self.config.symbol,
+                "old_cycle_block_status": old_block_status,
+                "old_cycle_block_reason": old_block_reason,
+                "recovery_completed_cycle_index": state.get(
+                    "recovery_completed_cycle_index"
+                ),
+                "source": "_clear_recovery_state",
+            }
+            _log_event("fixed_cycle_recovery_block_status_cleared", payload)
         self._write_cycle_state(cycle_state)
 
     def _build_recovery_debug_payload(
@@ -13822,6 +13987,181 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             re.fullmatch(r"CYCLE_\d+_SHORT_REDUCE", normalized)
             or re.fullmatch(r"CYCLE_\d+_SHORT_TP", normalized)
         )
+
+    def _resolve_recovery_activation_role(self) -> str:
+        timing = str(self.config.recovery_activation_timing or "").strip().lower()
+        if timing == "after_first_leg_reduce_fill":
+            return "first_leg"
+        if timing == "after_short_reduce_fill":
+            return "second_leg"
+        return "second_leg"
+
+    def _get_first_leg_fill_price(self, runtime_state: RuntimeState, cycle_index: int) -> float:
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        side = self._get_first_leg_side()
+        fills = cycle_state.get("long_fills" if side == "long" else "short_fills") or {}
+        fill = fills.get(str(cycle_index)) or {}
+        return float(fill.get("price") or 0.0)
+
+    def _maybe_activate_recovery_after_first_leg_fill(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        *,
+        cycle_index: int,
+        trigger_price: float,
+        first_leg_purpose: str,
+        second_leg_purpose: str,
+        first_leg_loss_usdt: float,
+    ) -> bool:
+        activation_role = self._resolve_recovery_activation_role()
+        resolved_trigger_purpose = (
+            first_leg_purpose if activation_role == "first_leg" else second_leg_purpose
+        )
+        _log_event(
+            "fixed_cycle_recovery_activation_role_resolved",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "cycle_index": cycle_index,
+                "bot_side": self.config.side,
+                "activation_timing": self.config.recovery_activation_timing,
+                "trigger_role": activation_role,
+                "trigger_purpose": resolved_trigger_purpose,
+            },
+        )
+        if activation_role != "first_leg":
+            _log_event(
+                "fixed_cycle_recovery_skipped_waiting_for_wrong_leg",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "bot_side": self.config.side,
+                    "activation_timing": self.config.recovery_activation_timing,
+                    "trigger_role": activation_role,
+                    "trigger_purpose": resolved_trigger_purpose,
+                },
+            )
+            return False
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        first_leg_fill_price = self._get_first_leg_fill_price(runtime_state, cycle_index)
+        if first_leg_fill_price <= 0:
+            first_leg_fill_price = float(cycle_state.get("last_cycle_reference_price") or 0.0)
+        distance_pct_signed = (
+            ((trigger_price - first_leg_fill_price) / first_leg_fill_price) * 100.0
+            if first_leg_fill_price > 0
+            else 0.0
+        )
+        distance_pct_abs = abs(distance_pct_signed)
+        threshold_pct = float(self.config.max_post_recovery_long_reduce_distance_pct or 0.0)
+        would_set_recovery_required = distance_pct_abs > threshold_pct
+        _log_event(
+            "fixed_cycle_post_first_leg_recovery_projection",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "cycle_index": cycle_index,
+                "fill_price": first_leg_fill_price,
+                "projected_next_reduce_price": trigger_price,
+                "distance_pct_signed": distance_pct_signed,
+                "distance_pct_abs": distance_pct_abs,
+                "threshold_pct": threshold_pct,
+                "would_set_recovery_required": would_set_recovery_required,
+                "first_leg_loss_usdt": first_leg_loss_usdt,
+            },
+        )
+        if not would_set_recovery_required:
+            return False
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        recovery_completed_cycle_index = int(
+            state.get("recovery_completed_cycle_index")
+            or cycle_state.get("recovery_completed_cycle_index")
+            or 0
+        )
+        active_cycle_index = int(state.get("active_cycle_index") or 0)
+        normalized_next_required_purpose = self._normalize_cycle_purpose(
+            state.get("next_required_purpose") or ""
+        )
+        processed_cycle_purposes = list(state.get("processed_cycle_purposes") or [])
+        normalized_first_leg_purpose = self._normalize_cycle_purpose(
+            first_leg_purpose or "",
+            {
+                "cycle_index": cycle_index,
+                "cycle_role": self._get_first_leg_cycle_role(),
+            },
+        )
+        normalized_second_leg_purpose = self._normalize_cycle_purpose(
+            second_leg_purpose or "",
+            {
+                "cycle_index": cycle_index,
+                "cycle_role": self._get_second_leg_cycle_role(),
+            },
+        )
+        recovery_reactivation_skip = (
+            cycle_index > 0
+            and recovery_completed_cycle_index == cycle_index
+            and active_cycle_index == cycle_index
+            and normalized_next_required_purpose == normalized_second_leg_purpose
+            and normalized_first_leg_purpose in processed_cycle_purposes
+        )
+        if recovery_reactivation_skip:
+            _log_event(
+                "fixed_cycle_recovery_reactivation_skipped_after_completed_refill",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "recovery_completed_cycle_index": recovery_completed_cycle_index,
+                    "active_cycle_index": active_cycle_index,
+                    "next_required_purpose": normalized_next_required_purpose,
+                    "first_leg_purpose": normalized_first_leg_purpose,
+                    "second_leg_purpose": normalized_second_leg_purpose,
+                    "processed_cycle_purposes": processed_cycle_purposes,
+                    "distance_pct_signed": distance_pct_signed,
+                    "distance_pct_abs": distance_pct_abs,
+                    "threshold_pct": threshold_pct,
+                },
+            )
+            return False
+        recovery_fields = {
+            "recovery_required": True,
+            "recovery_activation_timing": "after_first_leg_reduce_fill",
+            "recovery_activation_reason": "post_first_leg_long_reduce_distance_too_wide",
+            "recovery_reference_price": float(first_leg_fill_price or 0.0),
+            "recovery_reference_cycle_index": cycle_index,
+            "recovery_long_reduce_distance_pct": distance_pct_abs,
+            "recovery_required_long_reduce_price": trigger_price,
+            "recovery_confirmed_first_leg_loss_usdt": float(first_leg_loss_usdt or 0.0),
+        }
+        self._set_recovery_required_state(
+            runtime_state,
+            cycle_state,
+            recovery_fields=recovery_fields,
+        )
+        _log_event(
+            "fixed_cycle_recovery_required_state_set",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "cycle_index": cycle_index,
+                "recovery_activation_timing": "after_first_leg_reduce_fill",
+                "recovery_activation_reason": "post_first_leg_long_reduce_distance_too_wide",
+                "recovery_reference_price": float(first_leg_fill_price or 0.0),
+                "long_reduce_price": trigger_price,
+                "long_reduce_distance_pct_from_last_fill": distance_pct_abs,
+                "threshold_pct": threshold_pct,
+                "recovery_required": True,
+            },
+        )
+        _log_event(
+            "fixed_cycle_recovery_required_normal_cycle_blocked",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "cycle_index": cycle_index,
+                "recovery_activation_timing": "after_first_leg_reduce_fill",
+                "recovery_activation_reason": "post_first_leg_long_reduce_distance_too_wide",
+                "recovery_reference_price": float(first_leg_fill_price or 0.0),
+            },
+        )
+        return True
 
     def _first_leg_reduce_role(self) -> str:
         return "long_reduce"
