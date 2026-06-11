@@ -11,7 +11,7 @@
   "reduction_pct_per_fill": 25,
   "long_fill_distance_pct": 0.15,
   
-  "short_fill_distance_pct": 0.15,
+  "short_fill_distance_pct": 0.5,
   
   
   "tp_profit_target_pct": 0.25,
@@ -20,7 +20,7 @@
 
   "recovery_activation_timing": "after_short_reduce_fill",
   "max_pre_recovery_long_reduce_distance_pct": 0.0,
-  "max_post_recovery_long_reduce_distance_pct": 0.05,
+  "max_post_recovery_long_reduce_distance_pct": 3.0,
   
   
   "restart": false,

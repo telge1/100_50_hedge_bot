@@ -25,3 +25,20 @@ cleanup_backup_*/
 backup_*/
 tmp/
 temp/
+
+**/state/*.jsonl
+**/run/*.json
+**/run/*.log
+
+dist/
+build/
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# rotated logs
+*.log.*
+**/*.log.*
+*.log.prev
+**/*.log.prev

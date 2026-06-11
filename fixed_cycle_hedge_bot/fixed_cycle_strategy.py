@@ -6,6 +6,8 @@ import time
 import logging
 import re
 import subprocess
+import sys
+import yaml
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
@@ -4901,6 +4903,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["bot_state"] = self.STATE_EXITED
             context.audit.log_event("fixed_cycle_exited", strategy=self.name, reason=reason, snapshot=snapshot)
             self._reset_after_full_exit_for_next_trade(runtime_state, snapshot, reason=reason)
+            self._ensure_recovery_wallet_baseline(snapshot, runtime_state, context)
             return []
 
         hard_stop_active = current_cycle >= self.config.hard_stop_cycle
@@ -4910,6 +4913,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         state["bot_state"] = self.STATE_HARD_STOP_MODE if hard_stop_active else self.STATE_RESETTING_EXITS
         refill_required = self._cycle_build_block_active(state)
+
+        if (
+            state.get("bot_state") == self.STATE_EXITED
+            and snapshot.long_qty <= 0
+            and snapshot.short_qty <= 0
+        ):
+            _log_event(
+                "fixed_cycle_post_exit_reconcile_short_circuited",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "strategy": self.name,
+                    "reason": "post_exit_snapshot_flat",
+                    "bot_state": state.get("bot_state"),
+                },
+            )
+            return []
 
         if state.get("recovery_required") or cycle_state.get("recovery_required"):
             recovery_payload = {
@@ -4942,6 +4961,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             recovery_actions = self._build_recovery_refill_intents(
                 snapshot, runtime_state, context
             )
+            # Debug-Payload nach möglicher State-Änderung aktualisieren
+            debug_payload = self._build_recovery_debug_payload(
+                runtime_state, snapshot, cycle_state
+            )
             if recovery_actions:
                 _log_event(
                     "fixed_cycle_recovery_refill_intents_built",
@@ -4954,12 +4977,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     {**recovery_payload, **debug_payload},
                 )
                 return []
-            _log_event(
-                "fixed_cycle_recovery_refill_existing_order_detected",
-                {**recovery_payload, **debug_payload},
+            wallet_transfer_pending = bool(state.get("recovery_wallet_transfer_pending"))
+            has_recovery_pending = bool(debug_payload.get("recovery_refill_pending"))
+            has_recovery_orders = bool(
+                debug_payload.get("runtime_recovery_active_orders")
+                or debug_payload.get("snapshot_recovery_active_orders")
             )
+            if has_recovery_pending or has_recovery_orders:
+                _log_event(
+                    "fixed_cycle_recovery_refill_existing_order_detected",
+                    {**recovery_payload, **debug_payload},
+                )
+                _log_event(
+                    "fixed_cycle_recovery_refill_waiting_for_fill",
+                    {**recovery_payload, **debug_payload},
+                )
+                return []
+            if wallet_transfer_pending:
+                _log_event(
+                    "fixed_cycle_recovery_refill_blocked_by_wallet_baseline",
+                    {**recovery_payload, **debug_payload},
+                )
+                return []
             _log_event(
-                "fixed_cycle_recovery_refill_waiting_for_fill",
+                "fixed_cycle_recovery_refill_no_intents_no_orders",
                 {**recovery_payload, **debug_payload},
             )
             return []
@@ -7079,6 +7120,142 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     - (tp * long_reduce_qty * fee_rate)
                 )
 
+            def _evaluate_post_short_reduce_recovery(trigger_price: float) -> bool:
+                short_reduce_fill_price = self._safe_float(
+                    cycle_sequence_entry.get("short_reduce_fill_price"),
+                    None,
+                )
+                if short_reduce_fill_price is None or short_reduce_fill_price <= 0:
+                    short_reduce_fill_price = float(
+                        cycle_state.get("last_confirmed_short_fill_price") or 0.0
+                    )
+                post_distance_pct_from_last_fill = (
+                    ((trigger_price - short_reduce_fill_price) / short_reduce_fill_price) * 100.0
+                    if short_reduce_fill_price and short_reduce_fill_price > 0
+                    else 0.0
+                )
+                if long_entry_price > 0:
+                    post_distance_pct_from_long_avg = (
+                        ((trigger_price - long_entry_price) / long_entry_price) * 100.0
+                    )
+                else:
+                    post_distance_pct_from_long_avg = 0.0
+                recovery_completed_cycle_index = int(
+                    state.get("recovery_completed_cycle_index")
+                    or cycle_state.get("recovery_completed_cycle_index")
+                    or 0
+                )
+                normalized_next_required_purpose = self._normalize_cycle_purpose(
+                    state.get("next_required_purpose") or ""
+                )
+                normalized_first_leg_purpose = self._normalize_cycle_purpose(
+                    first_leg_purpose or "",
+                    {
+                        "cycle_index": cycle_index,
+                        "cycle_role": self._get_first_leg_cycle_role(),
+                    },
+                )
+                recovery_reactivation_skip = (
+                    cycle_index > 0
+                    and int(state.get("active_cycle_index") or 0) == cycle_index
+                    and recovery_completed_cycle_index == cycle_index
+                    and normalized_next_required_purpose == self._normalize_cycle_purpose(
+                        purpose or "",
+                        {
+                            "cycle_index": cycle_index,
+                            "cycle_role": self._get_second_leg_cycle_role(),
+                        },
+                    )
+                    and normalized_first_leg_purpose in processed_purposes
+                )
+                confirmed_short_reduce_loss_for_state = max(
+                    confirmed_short_reduce_loss,
+                    pending_cycle_loss_usdt,
+                )
+                would_set_recovery_required = (
+                    post_distance_pct_from_last_fill
+                    > float(self.config.max_post_recovery_long_reduce_distance_pct or 0.0)
+                )
+                _log_event(
+                    "fixed_cycle_post_short_reduce_projection",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "current_price": float(snapshot.current_price or 0.0),
+                        "long_avg": long_entry_price,
+                        "short_avg": float(snapshot.short_avg or 0.0),
+                        "short_reduce_fill_price": short_reduce_fill_price,
+                        "required_long_reduce_price": trigger_price,
+                        "post_long_reduce_distance_pct_from_last_fill": post_distance_pct_from_last_fill,
+                        "post_long_reduce_distance_pct_from_long_avg": post_distance_pct_from_long_avg,
+                        "max_post_recovery_long_reduce_distance_pct": self.config.max_post_recovery_long_reduce_distance_pct,
+                        "confirmed_short_reduce_loss": confirmed_short_reduce_loss,
+                        "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
+                        "would_set_recovery_required": would_set_recovery_required,
+                    },
+                )
+                if would_set_recovery_required:
+                    if recovery_reactivation_skip:
+                        _log_event(
+                            "fixed_cycle_recovery_reactivation_skipped_after_completed_refill",
+                            {
+                                "symbol": snapshot.symbol or self.config.symbol,
+                                "cycle_index": cycle_index,
+                                "active_cycle_index": state.get("active_cycle_index"),
+                                "next_required_purpose": state.get("next_required_purpose"),
+                                "recovery_completed_cycle_index": recovery_completed_cycle_index,
+                                "processed_cycle_purposes": list(
+                                    state.get("processed_cycle_purposes") or []
+                                ),
+                                "short_reduce_fill_price": short_reduce_fill_price,
+                                "required_long_reduce_price": trigger_price,
+                                "post_long_reduce_distance_pct_from_last_fill": post_distance_pct_from_last_fill,
+                                "threshold_pct": self.config.max_post_recovery_long_reduce_distance_pct,
+                            },
+                        )
+                        return False
+                    recovery_fields = {
+                        "recovery_required": True,
+                        "recovery_activation_timing": "after_short_reduce_fill",
+                        "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
+                        "recovery_reference_price": float(short_reduce_fill_price or 0.0),
+                        "recovery_reference_cycle_index": cycle_index,
+                        "recovery_long_reduce_distance_pct": post_distance_pct_from_last_fill,
+                        "recovery_required_long_reduce_price": trigger_price,
+                        "recovery_confirmed_short_reduce_loss_usdt": confirmed_short_reduce_loss_for_state,
+                    }
+                    self._set_recovery_required_state(
+                        runtime_state,
+                        cycle_state,
+                        recovery_fields=recovery_fields,
+                    )
+                    _log_event(
+                        "fixed_cycle_recovery_required_state_set",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "recovery_activation_timing": "after_short_reduce_fill",
+                            "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
+                            "recovery_reference_price": float(short_reduce_fill_price or 0.0),
+                            "long_reduce_price": trigger_price,
+                            "long_reduce_distance_pct_from_last_fill": post_distance_pct_from_last_fill,
+                            "threshold_pct": self.config.max_post_recovery_long_reduce_distance_pct,
+                            "recovery_required": True,
+                        },
+                    )
+                    _log_event(
+                        "fixed_cycle_recovery_required_normal_cycle_blocked",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "recovery_activation_timing": "after_short_reduce_fill",
+                            "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
+                            "recovery_reference_price": float(short_reduce_fill_price or 0.0),
+                        },
+                    )
+                    return True
+                return False
+
             expected_long_reduce_profit = compute_expected_long_reduce_profit(trigger_price)
             iterations = 0
             while (
@@ -7172,67 +7349,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "would_set_recovery_required": would_set_recovery_required,
                     },
                 )
-                if would_set_recovery_required:
-                    if recovery_reactivation_skip:
-                        _log_event(
-                            "fixed_cycle_recovery_reactivation_skipped_after_completed_refill",
-                            {
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "cycle_index": cycle_index,
-                                "active_cycle_index": state.get("active_cycle_index"),
-                                "next_required_purpose": state.get("next_required_purpose"),
-                                "recovery_completed_cycle_index": recovery_completed_cycle_index,
-                                "processed_cycle_purposes": list(
-                                    state.get("processed_cycle_purposes") or []
-                                ),
-                                "short_reduce_fill_price": short_reduce_fill_price,
-                                "required_long_reduce_price": trigger_price,
-                                "post_long_reduce_distance_pct_from_last_fill": post_distance_pct_from_last_fill,
-                                "threshold_pct": self.config.max_post_recovery_long_reduce_distance_pct,
-                            },
-                        )
-                        would_set_recovery_required = False
-                    else:
-                        recovery_fields = {
-                            "recovery_required": True,
-                            "recovery_activation_timing": "after_short_reduce_fill",
-                            "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
-                            "recovery_reference_price": float(short_reduce_fill_price or 0.0),
-                            "recovery_reference_cycle_index": cycle_index,
-                            "recovery_long_reduce_distance_pct": post_distance_pct_from_last_fill,
-                            "recovery_required_long_reduce_price": trigger_price,
-                            "recovery_confirmed_short_reduce_loss_usdt": confirmed_short_reduce_loss_for_state,
-                        }
-                        self._set_recovery_required_state(
-                            runtime_state,
-                            cycle_state,
-                            recovery_fields=recovery_fields,
-                        )
-                        _log_event(
-                            "fixed_cycle_recovery_required_state_set",
-                            {
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "cycle_index": cycle_index,
-                                "recovery_activation_timing": "after_short_reduce_fill",
-                                "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
-                                "recovery_reference_price": float(short_reduce_fill_price or 0.0),
-                                "long_reduce_price": trigger_price,
-                                "long_reduce_distance_pct_from_last_fill": post_distance_pct_from_last_fill,
-                                "threshold_pct": self.config.max_post_recovery_long_reduce_distance_pct,
-                                "recovery_required": True,
-                            },
-                        )
-                        _log_event(
-                            "fixed_cycle_recovery_required_normal_cycle_blocked",
-                            {
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "cycle_index": cycle_index,
-                                "recovery_activation_timing": "after_short_reduce_fill",
-                                "recovery_activation_reason": "post_short_reduce_long_reduce_distance_too_wide",
-                                "recovery_reference_price": float(short_reduce_fill_price or 0.0),
-                            },
-                        )
-                        return []
+                if _evaluate_post_short_reduce_recovery(trigger_price):
+                    return []
+
+            if _evaluate_post_short_reduce_recovery(trigger_price):
+                return []
 
             _log_event(
                 "fixed_cycle_long_reduce_sized_from_confirmed_loss",
@@ -11326,6 +11447,517 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             _log_event("fixed_cycle_recovery_block_status_cleared", payload)
         self._write_cycle_state(cycle_state)
 
+    # wallet-baseline helpers
+    def _resolve_recovery_wallet_state_paths(self) -> tuple[Path | None, Path | None]:
+        cached = getattr(self, "_cached_recovery_wallet_paths", None)
+        if cached is not None:
+            return cached
+        bot_name = (self.config.bot_name or "").strip()
+        state_dir: Path | None = None
+        profile_dir: Path | None = None
+        if bot_name:
+            for profile_candidate in PER_BOT_CONFIG_ROOT.iterdir():
+                if not profile_candidate.is_dir():
+                    continue
+                candidate = profile_candidate / bot_name
+                if not candidate.is_dir():
+                    continue
+                config_path = candidate / "config" / "fixed_cycle_config.json"
+                if not config_path.exists():
+                    continue
+                state_dir = candidate / "state"
+                state_dir.mkdir(parents=True, exist_ok=True)
+                profile_dir = profile_candidate
+                break
+        self._cached_recovery_wallet_paths = (state_dir, profile_dir)
+        return self._cached_recovery_wallet_paths
+
+    def _recovery_wallet_baseline_path(self) -> Path | None:
+        state_dir, _ = self._resolve_recovery_wallet_state_paths()
+        if not state_dir:
+            return None
+        return state_dir / "recovery_wallet_baseline.json"
+
+    def _wallet_transfer_executor_paths(self) -> tuple[Path | None, Path | None]:
+        _, profile_dir = self._resolve_recovery_wallet_state_paths()
+        if not profile_dir:
+            return None, None
+        executor = profile_dir / "watchdog" / "wallet_transfer_executor.py"
+        json_log = profile_dir / "logs" / "wallet_transfer_executor.jsonl"
+        return (executor if executor.exists() else None, json_log)
+
+    def _resolve_wallet_transfer_config_path(self, profile_dir: Path) -> Path | None:
+        """
+        Resolve the wallet transfer config path in the same way as the wallet_refill_watchdog.
+
+        Priority:
+        - wallet_transfer.transfer_config_file
+        - transfer_config_file
+        - fallback to config/config.yaml under the profile directory
+        """
+        base_config = profile_dir / "config" / "config.yaml"
+        if not base_config.exists():
+            return None
+        try:
+            raw = yaml.safe_load(base_config.read_text(encoding="utf-8")) or {}
+        except Exception:
+            # If parsing fails, fall back to the base config path (no secrets logged)
+            return base_config
+        transfer_section = raw.get("wallet_transfer") or {}
+        override_path = transfer_section.get("transfer_config_file") or raw.get("transfer_config_file")
+        if not override_path:
+            return base_config
+        override_path = Path(str(override_path))
+        if not override_path.is_absolute():
+            override_path = base_config.parent / override_path
+        return override_path
+
+    def _format_transfer_amount_for_executor(self, amount: float) -> str:
+        quantized = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        text = format(quantized, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text or "0"
+
+    def _is_flat_snapshot_for_baseline(
+        self, snapshot: HedgeSnapshot, runtime_state: RuntimeState
+    ) -> bool:
+        long_qty = float(snapshot.long_qty or 0.0)
+        short_qty = float(snapshot.short_qty or 0.0)
+        has_snapshot_orders = bool(snapshot.active_orders)
+        has_runtime_orders = bool(runtime_state.active_orders)
+        return long_qty <= 0.0 and short_qty <= 0.0 and not (has_snapshot_orders or has_runtime_orders)
+
+    def _load_recovery_wallet_baseline(self, path: Path) -> dict[str, Any] | None:
+        if not path.exists():
+            return None
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8") or "{}")
+        except Exception as exc:
+            _log_event(
+                "fixed_cycle_wallet_baseline_invalid",
+                {
+                    "symbol": self.config.symbol,
+                    "bot_name": self.config.bot_name,
+                    "error": str(exc),
+                    "path": str(path),
+                },
+            )
+            return None
+        if not isinstance(raw, dict):
+            _log_event(
+                "fixed_cycle_wallet_baseline_invalid",
+                {
+                    "symbol": self.config.symbol,
+                    "bot_name": self.config.bot_name,
+                    "error": "payload_not_object",
+                    "path": str(path),
+                },
+            )
+            return None
+        return raw
+
+    def _save_recovery_wallet_baseline(self, path: Path, payload: dict[str, Any]) -> None:
+        try:
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as exc:
+            _log_event(
+                "fixed_cycle_wallet_baseline_save_failed",
+                {
+                    "symbol": self.config.symbol,
+                    "bot_name": self.config.bot_name,
+                    "error": str(exc),
+                    "path": str(path),
+                },
+            )
+
+    def _capture_recovery_wallet_baseline(
+        self,
+        trade_block_id: str | None,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        baseline_context: str | None = None,
+    ) -> dict[str, Any] | None:
+        baseline_path = self._recovery_wallet_baseline_path()
+        payload_base = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "trade_block_id": trade_block_id,
+        }
+        _log_event("fixed_cycle_wallet_baseline_capture_started", payload_base)
+        if not baseline_path:
+            _log_event(
+                "fixed_cycle_wallet_baseline_capture_failed",
+                {**payload_base, "reason": "baseline_path_missing"},
+            )
+            return None
+        order_manager = context.order_manager
+        if not order_manager or not hasattr(order_manager, "fetch_wallet_balance"):
+            _log_event(
+                "fixed_cycle_wallet_baseline_capture_failed",
+                {**payload_base, "reason": "order_manager_missing"},
+            )
+            return None
+        balance, metric = order_manager.fetch_wallet_balance(account_type="UNIFIED", coin="USDT")
+        if balance is None or balance <= 0:
+            _log_event(
+                "fixed_cycle_wallet_baseline_capture_failed",
+                {
+                    **payload_base,
+                    "reason": "balance_invalid",
+                    "balance": balance,
+                    "metric": metric,
+                },
+            )
+            return None
+        captured_at = datetime.now(timezone.utc).isoformat()
+        initial_wallet_balance = float(balance)
+        baseline_payload = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "strategy_side": self.config.strategy_side,
+            "captured_at": captured_at,
+            "trade_block_id": trade_block_id,
+            "initial_wallet_balance_usdt": initial_wallet_balance,
+            "total_transferred_recovery_usdt": 0.0,
+            "allocated_wallet_balance_usdt": initial_wallet_balance,
+            "recovery_transfers": [],
+            "wallet_metric": metric,
+        }
+        if baseline_context:
+            baseline_payload["baseline_context"] = baseline_context
+        self._save_recovery_wallet_baseline(baseline_path, baseline_payload)
+        _log_event(
+            "fixed_cycle_wallet_baseline_captured",
+            {
+                **baseline_payload,
+                "path": str(baseline_path),
+            },
+        )
+        if baseline_context == "recovery_active_trade":
+            _log_event(
+                "fixed_cycle_recovery_wallet_baseline_captured_active_trade",
+                {
+                    **baseline_payload,
+                    "path": str(baseline_path),
+                },
+            )
+        return baseline_payload
+
+    def _ensure_recovery_wallet_baseline(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> dict[str, Any] | None:
+        baseline_path = self._recovery_wallet_baseline_path()
+        state = runtime_state.strategy_state
+        trade_block_id = state.get("trade_block_id") or ""
+        baseline = self._load_recovery_wallet_baseline(baseline_path) if baseline_path else None
+        has_flat_snapshot = self._is_flat_snapshot_for_baseline(snapshot, runtime_state)
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        recovery_required = bool(
+            state.get("recovery_required") or cycle_state.get("recovery_required")
+        )
+        if baseline and baseline.get("trade_block_id") == trade_block_id:
+            loaded_for = state.get("recovery_wallet_baseline_loaded_for")
+            if trade_block_id and loaded_for != trade_block_id:
+                _log_event(
+                    "fixed_cycle_wallet_baseline_loaded",
+                    {
+                        "symbol": self.config.symbol,
+                        "bot_name": self.config.bot_name,
+                        "trade_block_id": trade_block_id,
+                        "path": str(baseline_path),
+                        "initial_wallet_balance_usdt": baseline.get("initial_wallet_balance_usdt"),
+                    },
+                )
+                state["recovery_wallet_baseline_loaded_for"] = trade_block_id
+            return baseline
+        if has_flat_snapshot or recovery_required:
+            baseline_context = (
+                "recovery_active_trade" if recovery_required else "start_of_trade_flat"
+            )
+            return self._capture_recovery_wallet_baseline(
+                trade_block_id,
+                snapshot,
+                runtime_state,
+                context,
+                baseline_context=baseline_context,
+            )
+        _log_event(
+            "fixed_cycle_wallet_baseline_missing_active_trade_blocked",
+            {
+                "symbol": self.config.symbol,
+                "bot_name": self.config.bot_name,
+                "trade_block_id": trade_block_id,
+                "has_positions": float(snapshot.long_qty or 0.0) > 0.0
+                or float(snapshot.short_qty or 0.0) > 0.0,
+                "active_runtime_orders": bool(runtime_state.active_orders),
+                "active_snapshot_orders": bool(snapshot.active_orders),
+                "recovery_required": bool(state.get("recovery_required")),
+                "recovery_refill_pending": bool(
+                    state.get("recovery_refill_long_pending")
+                    or state.get("recovery_refill_short_pending")
+                ),
+            },
+        )
+        return None
+
+    def _recovery_wallet_transfer_already_completed(
+        self, baseline: dict[str, Any], cycle_index: int
+    ) -> bool:
+        transfers = baseline.get("recovery_transfers") or []
+        for transfer in transfers:
+            if (
+                int(transfer.get("cycle_index") or 0) == cycle_index
+                and str(transfer.get("status") or "").lower() == "completed"
+            ):
+                return True
+        return False
+
+    def _find_latest_wallet_transfer_success_event(
+        self, log_path: Path | None, start_time: datetime, bot_name: str
+    ) -> dict[str, Any] | None:
+        if not log_path or not log_path.exists():
+            return None
+        entry: dict[str, Any] | None = None
+        try:
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                timestamp_raw = record.get("timestamp")
+                if not timestamp_raw:
+                    continue
+                try:
+                    occurred = datetime.fromisoformat(timestamp_raw)
+                except ValueError:
+                    continue
+                if occurred.tzinfo is None:
+                    occurred = occurred.replace(tzinfo=timezone.utc)
+                if occurred < start_time:
+                    continue
+                if record.get("event") != "wallet_transfer_success":
+                    continue
+                payload = {
+                    key: value
+                    for key, value in record.items()
+                    if key not in {"event", "timestamp"}
+                }
+                if payload.get("bot_name") != bot_name or payload.get("direction") != "refill":
+                    continue
+                entry = payload
+        except Exception:
+            return None
+        return entry
+
+    def _current_recovery_reference_cycle_index(
+        self, runtime_state: RuntimeState
+    ) -> int:
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        for key in ("recovery_reference_cycle_index",):
+            value = int(state.get(key) or cycle_state.get(key) or 0)
+            if value > 0:
+                return value
+        return int(state.get("recovery_reference_cycle_index") or cycle_state.get("recovery_reference_cycle_index") or 0)
+
+    def _execute_recovery_wallet_transfer(
+        self,
+        baseline: dict[str, Any],
+        cycle_index: int,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        transfer_amount_usdt: float,
+    ) -> tuple[bool, str | None]:
+        executor_path, log_path = self._wallet_transfer_executor_paths()
+        _, profile_dir = self._resolve_recovery_wallet_state_paths()
+        config_path: Path | None = self._resolve_wallet_transfer_config_path(profile_dir) if profile_dir else None
+        payload_base = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "cycle_index": cycle_index,
+            "transfer_amount_usdt": transfer_amount_usdt,
+        }
+        if not executor_path or not config_path or not config_path.exists():
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {**payload_base, "reason": "executor_or_config_missing"},
+            )
+            return False, None
+        cmd = [
+            sys.executable,
+            str(executor_path),
+            "--config-file",
+            str(config_path),
+            "--bot-name",
+            self.config.bot_name,
+            "--direction",
+            "refill",
+            "--amount",
+            self._format_transfer_amount_for_executor(transfer_amount_usdt),
+            "--coin",
+            "USDT",
+        ]
+        _log_event("fixed_cycle_recovery_wallet_transfer_started", {**payload_base, "cmd": cmd})
+        start_time = datetime.now(timezone.utc)
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=PROJECT_ROOT,
+            )
+        except Exception as exc:
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {**payload_base, "error": str(exc), "phase": "subprocess"},
+            )
+            return False, None
+        stderr = result.stderr or ""
+        stdout = result.stdout or ""
+        failure = (
+            result.returncode != 0
+            or "ERROR:" in stderr
+            or "Transfer failed" in stderr
+        )
+        if failure:
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {
+                    **payload_base,
+                    "returncode": result.returncode,
+                    "stderr": stderr,
+                    "stdout": stdout,
+                },
+            )
+            return False, None
+        transfer_event = self._find_latest_wallet_transfer_success_event(
+            log_path, start_time, self.config.bot_name
+        )
+        transfer_id = transfer_event.get("transfer_id") if transfer_event else None
+        return True, transfer_id
+
+    def _ensure_recovery_wallet_transfer(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        cycle_index: int,
+    ) -> bool:
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        baseline = self._ensure_recovery_wallet_baseline(snapshot, runtime_state, context)
+        if not baseline:
+            state["recovery_wallet_transfer_pending"] = True
+            _log_event(
+                "fixed_cycle_recovery_refill_blocked_by_wallet_baseline",
+                {
+                    "symbol": self.config.symbol,
+                    "bot_name": self.config.bot_name,
+                    "cycle_index": cycle_index,
+                    "trade_block_id": state.get("trade_block_id"),
+                },
+            )
+            return False
+        if self._recovery_wallet_transfer_already_completed(baseline, cycle_index):
+            state["recovery_wallet_transfer_pending"] = False
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_already_completed",
+                {
+                    "symbol": self.config.symbol,
+                    "bot_name": self.config.bot_name,
+                    "cycle_index": cycle_index,
+                    "trade_block_id": state.get("trade_block_id"),
+                },
+            )
+            return True
+        transfer_required_payload = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "cycle_index": cycle_index,
+            "trade_block_id": state.get("trade_block_id"),
+            "initial_wallet_balance_usdt": baseline.get("initial_wallet_balance_usdt"),
+        }
+        _log_event(
+            "fixed_cycle_recovery_wallet_transfer_required",
+            transfer_required_payload,
+        )
+        transfer_amount_usdt = float(baseline.get("initial_wallet_balance_usdt") or 0.0)
+        if transfer_amount_usdt <= 0:
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {
+                    **transfer_required_payload,
+                    "reason": "invalid_transfer_amount",
+                },
+            )
+            _log_event(
+                "fixed_cycle_recovery_refill_blocked_waiting_for_wallet_transfer",
+                transfer_required_payload,
+            )
+            state["recovery_wallet_transfer_pending"] = True
+            return False
+        success, transfer_id = self._execute_recovery_wallet_transfer(
+            baseline, cycle_index, runtime_state, context, transfer_amount_usdt
+        )
+        if not success:
+            _log_event(
+                "fixed_cycle_recovery_refill_blocked_waiting_for_wallet_transfer",
+                transfer_required_payload,
+            )
+            state["recovery_wallet_transfer_pending"] = True
+            return False
+        state["recovery_wallet_transfer_pending"] = False
+        state["recovery_wallet_transfer_completed"] = True
+        state["recovery_wallet_transfer_cycle_index"] = cycle_index
+        state["recovery_wallet_transfer_amount_usdt"] = transfer_amount_usdt
+        state["recovery_wallet_transfer_id"] = transfer_id
+        state["recovery_wallet_transfer_status"] = "completed"
+        cycle_state["recovery_wallet_transfer_completed"] = True
+        cycle_state["recovery_wallet_transfer_cycle_index"] = cycle_index
+        cycle_state["recovery_wallet_transfer_amount_usdt"] = transfer_amount_usdt
+        cycle_state["recovery_wallet_transfer_id"] = transfer_id
+        cycle_state["recovery_wallet_transfer_status"] = "completed"
+        baseline["total_transferred_recovery_usdt"] = float(
+            baseline.get("total_transferred_recovery_usdt") or 0.0
+        ) + transfer_amount_usdt
+        baseline["allocated_wallet_balance_usdt"] = float(
+            baseline.get("initial_wallet_balance_usdt") or 0.0
+        ) + baseline["total_transferred_recovery_usdt"]
+        transfer_record = {
+            "cycle_index": cycle_index,
+            "amount_usdt": transfer_amount_usdt,
+            "direction": "refill",
+            "transfer_id": transfer_id,
+            "status": "completed",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        baseline_transfers = baseline.get("recovery_transfers")
+        if isinstance(baseline_transfers, list):
+            baseline_transfers.append(transfer_record)
+        else:
+            baseline["recovery_transfers"] = [transfer_record]
+        baseline_path = self._recovery_wallet_baseline_path()
+        if baseline_path:
+            self._save_recovery_wallet_baseline(baseline_path, baseline)
+        _log_event(
+            "fixed_cycle_recovery_wallet_transfer_completed",
+            {
+                **transfer_required_payload,
+                "transfer_id": transfer_id,
+                "total_transferred_recovery_usdt": baseline.get(
+                    "total_transferred_recovery_usdt"
+                ),
+            },
+        )
+        self._write_cycle_state(cycle_state)
+        return True
     def _build_recovery_debug_payload(
         self,
         runtime_state: RuntimeState | None,
@@ -11433,7 +12065,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self,
         snapshot: HedgeSnapshot,
         runtime_state: RuntimeState,
-        _context: StrategyContext,
+        context: StrategyContext,
     ) -> list[StrategyIntent] | None:
         state = runtime_state.strategy_state
         cycle_state = self._ensure_cycle_state(runtime_state)
@@ -11532,6 +12164,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
         if not intents:
             return None
+        recovery_cycle_index = self._current_recovery_reference_cycle_index(runtime_state)
+        if not self._ensure_recovery_wallet_transfer(
+            snapshot, runtime_state, context, recovery_cycle_index
+        ):
+            return []
         self._apply_recovery_refill_state(runtime_state, base_notional, short_notional)
         _log_event(
             "fixed_cycle_recovery_refill_intents_created",

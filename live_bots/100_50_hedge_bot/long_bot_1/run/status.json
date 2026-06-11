@@ -1,9 +1,11 @@
 {
   "bot_name": "long_bot_1",
-  "status": "stopped",
-  "start_requested": false,
-  "pid": null,
-  "symbol": "",
-  "reason": "stopped_via_stop_bot",
-  "updated_at": "2026-06-10T09:39:37.286318+00:00"
+  "status": "running",
+  "updated_at": "2026-06-11T12:20:18.403450+00:00",
+  "symbol": "ENAUSDT",
+  "start_requested": true,
+  "pid": 3712955,
+  "long_qty": 0.0,
+  "short_qty": 0.0,
+  "open_order_count": 0
 }

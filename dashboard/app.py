@@ -7430,7 +7430,87 @@ def _profit_trade_source_from_entry(entry: dict[str, Any], *, side: str) -> dict
     }
 
 
+def _resolve_profit_trade_source(profile: str, bot_side: str | None) -> tuple[dict[str, Any] | None, list[str]]:
+    """
+    Resolve a single profit-trade source for the given (profile, bot_side) pair.
+    Returns (source_dict_or_none, warnings).
+    """
+    warnings: list[str] = []
+    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    if not normalized_profile or normalized_profile == "main":
+        warnings.append(f"unknown profile: {profile}")
+        return None, warnings
+    normalized_side = _normalize_bot_side(bot_side)
+
+    if normalized_side == "long":
+        bot = get_long_bot_by_profile(normalized_profile)
+        if not bot:
+            expected_bot_name = profile_to_long_bot_name(normalized_profile) or f"long_bot_{normalized_profile.split('_')[-1]}"
+            warnings.append(
+                f"bot source not found for profile={profile} bot_side={normalized_side} bot_name={expected_bot_name}"
+            )
+            return None, warnings
+        source = _profit_trade_source_from_entry(bot, side="long")
+        return source, warnings
+
+    # short side
+    match = re.search(r"_(\d+)$", str(normalized_profile or "").strip().lower())
+    if not match:
+        warnings.append(
+            f"invalid bot profile for short side: {profile}"
+        )
+        return None, warnings
+    index = int(match.group(1))
+    bot_name = f"short_bot_{index}"
+    bot_dir = SHORT_BOT_LOGS_ROOT / bot_name
+    if not bot_dir.exists():
+        warnings.append(
+            f"bot source not found for profile={profile} bot_side={normalized_side} bot_name={bot_name}"
+        )
+        return None, warnings
+    entry = {
+        "bot_name": bot_name,
+        "profile": normalized_profile,
+        "bot_dir": str(bot_dir),
+        "account_name": f"Short_bot_{index}",
+    }
+    source = _profit_trade_source_from_entry(entry, side="short")
+    return source, warnings
+
+
 def _get_profit_trade_bot_sources(profile: str, bot_side: str | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+    """
+    Resolve profit-trade sources for a given profile/bot_side.
+    - When bot_side is provided (long|short), return at most one concrete source for that pair.
+    - When bot_side is None, fall back to legacy behaviour (aggregate over configured bots).
+    """
+    # When a concrete bot_side is requested, use the strict resolver.
+    if bot_side is not None:
+        source, warnings = _resolve_profit_trade_source(profile, bot_side)
+        sources: list[dict[str, Any]] = []
+        if source:
+            sources.append(source)
+        logger.info(
+            "[dashboard] profit_trade_sources profile=%s bot_side=%s sources=%s",
+            profile,
+            _normalize_bot_side(bot_side),
+            [
+                {
+                    "bot_name": src.get("bot_name"),
+                    "side": src.get("side"),
+                    "state_file": str(src.get("state_file") or ""),
+                    "runtime_log_file": str(src.get("runtime_log_file") or ""),
+                    "dashboard_closed_pnl_history_file": str(src.get("dashboard_closed_pnl_history_file") or ""),
+                    "confirmed_order_pnl_history_file": str(src.get("confirmed_order_pnl_history_file") or ""),
+                }
+                for src in sources
+            ],
+        )
+        if not sources and not warnings:
+            warnings.append(f"profile has no bot sources configured: {profile} ({bot_side or 'all'})")
+        return sources, warnings
+
+    # Legacy aggregate behaviour when no explicit bot_side is provided.
     normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
     if not normalized or normalized == "main":
         return [], [f"unknown profile: {profile}"]
@@ -7971,6 +8051,16 @@ def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
 def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = None) -> list[dict[str, Any]]:
     entries = _load_history_entries_from_paths(_collect_history_paths_for_profile(profile, bot_side))
     events: list[dict[str, Any]] = []
+
+    expected_bot_name: str | None = None
+    # For concrete long/short views resolve the specific bot_name we expect and
+    # later filter global history files strictly by this bot_name to avoid
+    # mixing trades from multiple bots on the same side.
+    if bot_side:
+        source, _ = _resolve_profit_trade_source(profile, bot_side)
+        if source:
+            expected_bot_name = str(source.get("bot_name") or "").strip().lower()
+
     for entry in entries:
         tbid = entry.get("trade_block_id") or entry.get("trade_block") or entry.get("tradeId")
         if not tbid:
@@ -7979,6 +8069,12 @@ def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = 
         ts_val = record.get("finalized_at") or record.get("timestamp") or record.get("__ts") or record.get("created_at")
         record["__ts"] = _normalize_dashboard_datetime(ts_val) or datetime.now(timezone.utc)
         record["__event"] = record.get("__event") or record.get("event") or "dashboard_closed_pnl_history"
+
+        if expected_bot_name:
+            trade_bot_name = _extract_trade_bot_name(record)
+            if not trade_bot_name or trade_bot_name != expected_bot_name:
+                continue
+
         events.append(record)
     if bot_side:
         return _filter_trades_by_side(events, bot_side)
