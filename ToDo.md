@@ -96,6 +96,10 @@ sudo systemctl start coin_scanner.timer
 
 sudo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
 
+
+sudo systemctl status coin_scanner.service --no-pager
+sudo systemctl status coin_scanner.timer --no-pager
+
 ####################################### Start/Stop Bot ##########################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh

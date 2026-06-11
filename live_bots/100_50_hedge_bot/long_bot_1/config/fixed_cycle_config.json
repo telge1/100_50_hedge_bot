@@ -24,7 +24,7 @@
   
   "recovery_activation_timing": "after_first_leg_reduce_fill",
   "max_pre_recovery_long_reduce_distance_pct": 0.0,
-  "max_post_recovery_long_reduce_distance_pct": 3.0,
+  "max_post_recovery_long_reduce_distance_pct": 3.5,
   
   "restart": false,
   "fee_safety_buffer_pct": 0.12,
