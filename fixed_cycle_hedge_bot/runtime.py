@@ -154,7 +154,29 @@ class GenericHedgeRuntime:
         return False
 
     def _bot_group_dir(self) -> Path:
-        return Path("live_bots") / "100_50_hedge_bot"
+        """
+        Resolve the bot group directory based on the configured bot name / strategy side.
+
+        IMPORTANT:
+        - Use an absolute path rooted at the project root (two levels above this file)
+          so that blacklist/state files are written consistently regardless of the
+          current working directory of the runner process.
+        - This must match the BOT_GROUP_DIR used in shell scripts like
+          live_bots/*_hedge_bot/shared_scripts/*.sh so that
+          blacklisted_symbols.json is shared across runtime and helper scripts.
+        """
+        project_root = Path(__file__).resolve().parents[1]
+
+        # Prefer explicit bot_name if available (e.g. "short_bot_1", "long_bot_1").
+        bot_name = getattr(self.config, "bot_name", None)
+        strategy_side = getattr(self.config, "strategy_side", None)
+
+        # Short-hedge bots live under live_bots/short_hedge_bot
+        if (isinstance(bot_name, str) and bot_name.startswith("short_bot_")) or strategy_side == "short":
+            return project_root / "live_bots" / "short_hedge_bot"
+
+        # Default: long-primary hedge bots
+        return project_root / "live_bots" / "100_50_hedge_bot"
 
     def _blacklist_file_path(self) -> Path:
         path = self._bot_group_dir() / "state" / "blacklisted_symbols.json"
@@ -196,14 +218,25 @@ class GenericHedgeRuntime:
             "blocked_at": datetime.now(timezone.utc).isoformat(),
         }
         self._write_blacklisted_symbols(data)
+        blacklist_path = self._blacklist_file_path()
         payload = {
             "symbol": normalized,
             "reason": reason,
             "ret_code": ret_code,
             "ret_msg": ret_msg,
             "bot_name": self.config.bot_name,
+            "strategy_side": getattr(self.config, "strategy_side", None),
+            "blacklist_path": str(blacklist_path),
+            "blacklist_path_abs": str(blacklist_path.resolve()),
+            "cwd": os.getcwd(),
         }
+        # Event when the symbol is added to the blacklist.
         self.audit.log_event("fixed_cycle_blacklisted_symbol_added", **payload)
+        # Explicit event to debug blacklist file resolution (path + cwd).
+        self.audit.log_event(
+            "fixed_cycle_blacklist_file_resolved",
+            **payload,
+        )
 
     def _release_dynamic_symbol_reservation(self) -> None:
         bot_name = self.config.bot_name or "long_bot_1"
@@ -227,10 +260,9 @@ class GenericHedgeRuntime:
             str(state_file),
             "--lock-file",
             str(lock_file),
+            "release",
             "--bot-group-dir",
             str(bot_group_dir),
-            "--command",
-            "release",
             "--source",
             "permission_reject",
         ]
@@ -240,6 +272,10 @@ class GenericHedgeRuntime:
                 "symbol": self.config.symbol,
                 "bot_name": bot_name,
                 "state_file": str(state_file),
+                "lock_file": str(lock_file),
+                "bot_group_dir": str(bot_group_dir),
+                "script_path": str(script_path),
+                "cwd": os.getcwd(),
             }
             self.audit.log_event("dynamic_symbol_reservation_released_after_reject", **payload)
         except Exception as exc:
@@ -1305,6 +1341,22 @@ class GenericHedgeRuntime:
         )
         for intent in intents:
             self.submit_intent(intent, snapshot, source)
+            # Wenn während der Initial-Entry-Batch ein nicht-retrybarer Symbol-Permission-Fehler
+            # erkannt wurde, weitere Initial-Entry-Intents derselben Batch nicht mehr submitten.
+            state = self.runtime_state.strategy_state
+            if state.get("initial_entry_retry_blocked") and (
+                intent.purpose in {self.strategy.LONG_ENTRY_PURPOSE, self.strategy.SHORT_ENTRY_PURPOSE}
+            ):
+                self.audit.log_event(
+                    "fixed_cycle_initial_entry_batch_loop_stopped_after_permission_reject",
+                    strategy=self.strategy.name,
+                    symbol=self.config.symbol,
+                    bot_name=self.config.bot_name,
+                    blocked_symbol=state.get("initial_entry_blocked_symbol"),
+                    first_failed_purpose=intent.purpose,
+                    source=source,
+                )
+                break
 
     def _dispatch_reconcile_terminal_cancel(
         self,
@@ -3179,7 +3231,8 @@ class GenericHedgeRuntime:
         if not error_info:
             return False
         ret_code = int(error_info.get("retCode") or 0)
-        if ret_code != 110126:
+        # Non-retryable agreement/permission errors for specific contracts
+        if ret_code not in {110123, 110125, 110126}:
             return False
         return managed_order.purpose in {
             self.strategy.LONG_ENTRY_PURPOSE,
@@ -4847,6 +4900,16 @@ class GenericHedgeRuntime:
         purpose_upper = str(intent.purpose or "").upper()
         if not purpose_upper.startswith("CYCLE_"):
             return None, None
+        intent_metadata = getattr(intent, "metadata", {}) or {}
+        staged_intent = bool(intent_metadata.get("is_staged_second_leg_tp"))
+        try:
+            intent_cycle_index = int(intent_metadata.get("cycle_index"))
+        except (TypeError, ValueError):
+            intent_cycle_index = None
+        try:
+            intent_stage_index = int(intent_metadata.get("stage_index"))
+        except (TypeError, ValueError):
+            intent_stage_index = None
         def _order_status(order: Any) -> str:
             status = getattr(order, "status", None)
             if status is None and isinstance(order, dict):
@@ -4858,12 +4921,67 @@ class GenericHedgeRuntime:
             ("snapshot", snapshot.active_orders),
         ):
             for order in orders:
-                order_purpose = str(getattr(order, "purpose", None) or (order.get("purpose") if isinstance(order, dict) else None) or "").upper()
+                # Zweck muss immer übereinstimmen
+                order_purpose = str(
+                    getattr(order, "purpose", None)
+                    or (order.get("purpose") if isinstance(order, dict) else None)
+                    or ""
+                ).upper()
                 if order_purpose != purpose_upper:
                     continue
-                status_normalized = self._normalize_order_status(getattr(order, "status", None) if hasattr(order, "status") else order.get("status") if isinstance(order, dict) else None)
+                status_normalized = self._normalize_order_status(
+                    getattr(order, "status", None)
+                    if hasattr(order, "status")
+                    else order.get("status")
+                    if isinstance(order, dict)
+                    else None
+                )
                 if self._is_terminal_order_status(status_normalized):
                     continue
+
+                order_metadata = (
+                    getattr(order, "metadata", None)
+                    if hasattr(order, "metadata")
+                    else order.get("metadata")
+                    if isinstance(order, dict)
+                    else None
+                ) or {}
+                staged_order = bool(order_metadata.get("is_staged_second_leg_tp"))
+
+                # Für gestagte Second-Leg-TPs: Duplicate nur, wenn dieselbe Stage (cycle_index + stage_index) bereits offen ist.
+                if staged_intent or staged_order:
+                    # Wenn nur eine Seite gestagt ist oder Indizes fehlen, bleiben wir konservativ
+                    # und behandeln dies als Duplicate nach Purpose, um unkontrollierte Mehrfach-Orders zu vermeiden.
+                    try:
+                        order_cycle_index = int(order_metadata.get("cycle_index"))
+                    except (TypeError, ValueError):
+                        order_cycle_index = None
+                    try:
+                        order_stage_index = int(order_metadata.get("stage_index"))
+                    except (TypeError, ValueError):
+                        order_stage_index = None
+
+                    if (
+                        staged_intent
+                        and staged_order
+                        and intent_cycle_index is not None
+                        and order_cycle_index is not None
+                        and intent_stage_index is not None
+                        and order_stage_index is not None
+                    ):
+                        # Duplicate nur bei exakt gleicher Stage
+                        if (
+                            intent_cycle_index == order_cycle_index
+                            and intent_stage_index == order_stage_index
+                        ):
+                            return order, order_source
+                        # Andere Stage desselben Purposes → kein Duplicate
+                        continue
+
+                    # Fallback: Metadaten unvollständig, Duplicate nach Purpose behandeln
+                    return order, order_source
+
+                # Nicht-gestagte Cycle-Orders: wie bisher, ein offener Zweck pro Purpose
                 return order, order_source
         return None, None
 

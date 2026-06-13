@@ -8305,19 +8305,83 @@ def _is_bot_running(status: dict[str, Any] | None) -> bool:
     return str(status.get("status") or "").strip().lower() == "running"
 
 
-def _normalize_active_orders(payload: dict[str, Any], strategy_state: dict[str, Any]) -> list:
+def _normalize_active_orders(payload: dict[str, Any], strategy_state: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Sammle aktive Bot-Orders aus state/strategy_state/cycle_state und normalisiere sie für das Dashboard.
+
+    - Keine Filterung nach alten Exit-Purposes; alle Second-Leg/Cycle-Purposes bleiben sichtbar.
+    - Eine Order gilt als aktiv, wenn Status NICHT terminal ist und remaining_qty > 0.
+    - Wichtige Metadaten wie cycle_index, cycle_role, trigger_direction, Staging-Infos werden nach vorne gezogen.
+    """
     cycle_state = strategy_state.get("cycle_state") or {}
-    orders = []
+    raw_orders: list[dict[str, Any]] = []
     for source in (payload, strategy_state, cycle_state):
         if not isinstance(source, dict):
             continue
         for key in ("active_orders", "orders"):
             raw = source.get(key)
             if isinstance(raw, dict):
-                orders.extend(raw.values())
+                raw_orders.extend([val for val in raw.values() if val])
             elif isinstance(raw, list):
-                orders.extend(raw)
-    return [order for order in orders if order]
+                raw_orders.extend([val for val in raw if val])
+
+    normalized: list[dict[str, Any]] = []
+    for order in raw_orders:
+        if not isinstance(order, dict):
+            continue
+        status_raw = str(order.get("status") or "").strip().lower()
+        if status_raw in {"filled", "canceled", "cancelled", "rejected", "expired"}:
+            continue
+
+        remaining_raw = order.get("remaining_qty")
+        if remaining_raw is None:
+            remaining_raw = order.get("remaining")
+        if remaining_raw is None:
+            remaining_raw = order.get("qty")
+        if remaining_raw is None:
+            remaining_raw = order.get("quantity")
+        if remaining_raw is None:
+            remaining_raw = order.get("amount")
+        remaining_qty = _safe_wallet_float(remaining_raw) or 0.0
+        if remaining_qty <= 0:
+            continue
+
+        metadata = dict(order.get("metadata") or {})
+        created_at = order.get("created_at") or order.get("timestamp") or metadata.get("created_at")
+        time_label = _format_profit_time_label(_normalize_dashboard_datetime(created_at)) if created_at else None
+        trigger_price = (
+            order.get("trigger_price")
+            or metadata.get("trigger_price")
+        )
+
+        normalized.append(
+            {
+                "time": created_at,
+                "time_label": time_label,
+                "purpose": order.get("purpose"),
+                "side": order.get("side"),
+                "status": order.get("status"),
+                "qty": order.get("qty"),
+                "remaining_qty": remaining_qty,
+                "price": order.get("price"),
+                "trigger_price": trigger_price,
+                "order_type": order.get("order_type"),
+                "order_id": order.get("exchange_order_id")
+                or order.get("order_id")
+                or order.get("client_order_id"),
+                "client_order_id": order.get("client_order_id"),
+                "reduce_only": bool(order.get("reduce_only") or metadata.get("reduce_only")),
+                "close_on_trigger": bool(metadata.get("close_on_trigger")),
+                "cycle_index": metadata.get("cycle_index"),
+                "cycle_role": metadata.get("cycle_role"),
+                "trigger_direction": metadata.get("trigger_direction"),
+                "is_staged_second_leg_tp": bool(metadata.get("is_staged_second_leg_tp")),
+                "stage_index": metadata.get("stage_index"),
+                "stage_count": metadata.get("stage_count"),
+            }
+        )
+
+    return normalized
 
 
 def _safe_int(value: Any) -> int:
@@ -8332,17 +8396,48 @@ def _safe_int(value: Any) -> int:
 def _has_active_trade_state(state: dict[str, Any], strategy_state: dict[str, Any]) -> bool:
     long_qty = _safe_wallet_float(state.get("long_qty") or strategy_state.get("long_qty"))
     short_qty = _safe_wallet_float(state.get("short_qty") or strategy_state.get("short_qty"))
-    if (long_qty or 0.0) > 0.0 or (short_qty or 0.0) > 0.0:
-        return True
-    if _normalize_active_orders(state, strategy_state):
-        return True
-    if bool(state.get("initial_entry_submitted")) or bool(strategy_state.get("initial_entry_submitted")):
-        return True
     cycle_state = strategy_state.get("cycle_state") or {}
-    if bool(strategy_state.get("trade_active")) or bool(cycle_state.get("trade_active")):
+    has_position = (long_qty or 0.0) > 0.0 or (short_qty or 0.0) > 0.0
+    active_orders = _normalize_active_orders(state, strategy_state)
+    has_active_orders = bool(active_orders)
+    has_initial_entry_submitted = bool(state.get("initial_entry_submitted")) or bool(
+        strategy_state.get("initial_entry_submitted")
+    )
+    has_trade_active_flag = bool(strategy_state.get("trade_active")) or bool(cycle_state.get("trade_active"))
+    has_cycle_completed_marker = (
+        _safe_int(strategy_state.get("cycle_completed_count")) > 0
+        or _safe_int(state.get("cycle_completed_count")) > 0
+    )
+
+    if has_position or has_active_orders or has_initial_entry_submitted or has_trade_active_flag:
+        logger.info(
+            "[dashboard] profit_trades_active_state_detected",
+            {
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+                "has_position": has_position,
+                "has_active_orders": has_active_orders,
+                "has_initial_entry_submitted": has_initial_entry_submitted,
+                "has_trade_active_flag": has_trade_active_flag,
+                "has_cycle_completed_marker": has_cycle_completed_marker,
+            },
+        )
         return True
-    if _safe_int(strategy_state.get("cycle_completed_count")) > 0 or _safe_int(state.get("cycle_completed_count")) > 0:
-        return True
+
+    if has_cycle_completed_marker:
+        logger.info(
+            "[dashboard] profit_trades_active_state_ignored_historical_marker",
+            {
+                "long_qty": long_qty,
+                "short_qty": short_qty,
+                "has_position": has_position,
+                "has_active_orders": has_active_orders,
+                "has_initial_entry_submitted": has_initial_entry_submitted,
+                "has_trade_active_flag": has_trade_active_flag,
+                "has_cycle_completed_marker": has_cycle_completed_marker,
+            },
+        )
+
     return False
 
 
@@ -8668,9 +8763,7 @@ def _build_profit_trade_filtered_rows(
         start_time=active_start_dt,
         end_time=active_end_dt,
     )
-    filtered_process_rows = _filter_trade_records_by_removed_trades(
-        filtered_process_rows, profile
-    )
+    filtered_process_rows = _filter_trade_records_by_removed_trades(filtered_process_rows, profile)
     running_ids = {
         row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
     }
@@ -8685,6 +8778,44 @@ def _build_profit_trade_filtered_rows(
         )
         for record in filtered_base_trades
     ]
+    # For specific bot/profile views (e.g. bot_1 short side) we want to avoid counting
+    # historical "open" records as active trades when they are no longer associated
+    # with the currently running trade_block_id. Mark those as closed so that the
+    # summary only treats truly active process rows as open.
+    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    normalized_side = _normalize_bot_side(bot_side)
+    if normalized_profile == "bot_1" and normalized_side == "short" and running_ids:
+        adjusted_rows: list[dict[str, Any]] = []
+        for row in summary_rows:
+            tbid = str(row.get("trade_block_id") or "").strip()
+            original_status = row.get("status")
+            status_str = str(original_status or "").strip().lower()
+            if status_str == "open" and (not tbid or tbid not in running_ids):
+                updated = dict(row)
+                updated["status"] = "closed"
+                updated["stale_open_auto_closed"] = True
+                updated["close_reason"] = "stale_open_not_in_current_state"
+                if not updated.get("end_time"):
+                    # Fallback: reuse start_time as end_time if no explicit end timestamp exists.
+                    updated["end_time"] = updated.get("end_time") or updated.get("start_time")
+                logger.info(
+                    "[dashboard] profit_trades_stale_open_auto_closed",
+                    {
+                        "profile": profile,
+                        "bot_side": normalized_side,
+                        "bot_name": row.get("bot_name"),
+                        "trade_block_id": tbid,
+                        "symbol": row.get("symbol"),
+                        "original_status": original_status,
+                        "new_status": updated.get("status"),
+                        "reason": "stale_open_not_in_current_state",
+                        "running_ids": sorted(str(rid) for rid in running_ids),
+                    },
+                )
+                adjusted_rows.append(updated)
+            else:
+                adjusted_rows.append(row)
+        summary_rows = adjusted_rows
     combined_rows = summary_rows + filtered_process_rows
     combined_rows.sort(
         key=lambda trade: _get_trade_filter_datetime(trade)

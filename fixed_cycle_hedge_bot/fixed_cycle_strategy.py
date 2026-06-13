@@ -1371,6 +1371,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             and snapshot.short_qty <= 0
             and not state.get("initial_entry_confirmed")
         ):
+            # Wenn der aktuelle Symbol-Initial-Entry aufgrund eines Permission-Errors geblockt ist,
+            # keine weiteren Initial-Entry-Retries auf diesem Symbol ausführen.
+            blocked_symbol = str(state.get("initial_entry_blocked_symbol") or "").upper()
+            current_symbol = str(self.config.symbol or "").upper()
+            if state.get("initial_entry_retry_blocked") and blocked_symbol and blocked_symbol == current_symbol:
+                context.audit.log_event(
+                    "fixed_cycle_initial_entry_retry_skipped_blocked_symbol",
+                    strategy=self.name,
+                    symbol=current_symbol,
+                    blocked_symbol=blocked_symbol,
+                )
+                return []
             if self._has_open_initial_entry_orders(snapshot, runtime_state):
                 state["initial_entry_submitted"] = True
                 context.audit.log_event(
@@ -1573,45 +1585,43 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     exchange_order_id=fill_event.exchange_order_id,
                     exec_id=fill_event.exec_id,
                 )
-        if (
-            isinstance(purpose, str)
-            and "SHORT" in purpose
-            and metadata.get("cycle_role") == "short_reduce"
-        ):
-            expected = float(state.get("last_expected_short_tp_net") or 0.0)
+        is_staged_second_leg = bool(metadata.get("is_staged_second_leg_tp"))
+        if is_staged_second_leg and metadata.get("second_leg_cycle_role") == self._get_second_leg_cycle_role():
+            # Direction-neutrale Validation für gestagte Second-Leg-TPs
+            expected = float(metadata.get("stage_expected_net") or 0.0)
+            total_required = float(metadata.get("stage_required_net_total") or 0.0)
             actual, actual_source = self._extract_realized_fill_pnl(fill_event, fill_type)
             delta = actual - expected
             delta_pct = (delta / expected) if expected > 0 else 0.0
             filled_price = float(fill_event.exec_price or 0.0)
             filled_qty = float(fill_event.exec_qty or 0.0)
-            expected_qty = float(state.get("last_short_tp_qty") or 0.0)
+
             logger.debug(
-                "short_tp_pnl_validation %s",
+                "staged_second_leg_tp_fill_validation %s",
                 {
                     "expected_profit_usdt": expected,
                     "actual_profit_usdt": actual,
                     "actual_source": actual_source,
                     "delta": delta,
                     "delta_pct": delta_pct,
-                    "trigger_price": state.get("last_short_tp_trigger_price"),
-                    "filled_price": filled_price,
-                    "qty": filled_qty,
+                    "stage_index": metadata.get("stage_index"),
+                    "stage_count": metadata.get("stage_count"),
                     "cycle_index": metadata.get("cycle_index"),
                 },
             )
             _audit_calc(
-                "short_tp_fill_validation",
+                "staged_second_leg_tp_fill_validation",
                 {
                     "cycle_index": metadata.get("cycle_index"),
                     "purpose": purpose,
+                    "stage_index": metadata.get("stage_index"),
+                    "stage_count": metadata.get("stage_count"),
                     "expected_profit_usdt": expected,
                     "actual_profit_usdt": actual,
                     "actual_source": actual_source,
                     "delta": delta,
                     "delta_pct": delta_pct,
-                    "expected_trigger_price": state.get("last_short_tp_trigger_price"),
                     "filled_price": filled_price,
-                    "expected_qty": expected_qty,
                     "filled_qty": filled_qty,
                     "confirmed_pnl": getattr(fill_event, "confirmed_pnl", None),
                     "closed_pnl": metadata.get("closed_pnl"),
@@ -1621,36 +1631,149 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "metadata": metadata,
                 },
             )
-            if abs(delta) > PNL_VALIDATION_THRESHOLD_USDT:
-                logger.warning(
-                    "short_tp_pnl_mismatch",
+            # Kumulative Stage-PnL pro Cycle führen
+            cycle_key = str(metadata.get("cycle_index") or cycle_index or 0)
+            realized_map = state.setdefault("staged_second_leg_tp_realized_net", {})
+            total_before = float(realized_map.get(cycle_key) or 0.0)
+            total_after = total_before + actual
+            realized_map[cycle_key] = total_after
+
+            filled_map = state.setdefault("staged_second_leg_tp_filled_stages", {})
+            filled_list = list(filled_map.get(cycle_key) or [])
+            stage_index = int(metadata.get("stage_index") or 0)
+            if stage_index not in filled_list:
+                filled_list.append(stage_index)
+            filled_map[cycle_key] = filled_list
+
+            remaining_required_net = max(total_required - total_after, 0.0) if total_required else 0.0
+            logger.info(
+                "staged_second_leg_tp_realized_updated",
+                {
+                    "cycle_index": metadata.get("cycle_index"),
+                    "stage_index": stage_index,
+                    "stage_count": metadata.get("stage_count"),
+                    "expected_stage_net": expected,
+                    "actual_stage_net": actual,
+                    "realized_total_net": total_after,
+                    "required_total_net": total_required,
+                    "remaining_required_net": remaining_required_net,
+                },
+            )
+            _audit_calc(
+                "staged_second_leg_tp_realized_updated",
+                {
+                    "cycle_index": metadata.get("cycle_index"),
+                    "stage_index": stage_index,
+                    "stage_count": metadata.get("stage_count"),
+                    "expected_stage_net": expected,
+                    "actual_stage_net": actual,
+                    "realized_total_net": total_after,
+                    "required_total_net": total_required,
+                    "remaining_required_net": remaining_required_net,
+                },
+            )
+
+            # Cycle-Abschluss-Flag nur setzen, wenn alle Stages gefüllt oder Nettoprofit gedeckt ist
+            all_stages_done = int(metadata.get("stage_count") or 0) > 0 and len(filled_list) >= int(
+                metadata.get("stage_count") or 0
+            )
+            completed_by_pnl = total_required > 0 and total_after >= total_required - 1e-8
+            if all_stages_done or completed_by_pnl:
+                state["cycle_short_tp_filled"] = True
+                logger.info(
+                    "staged_second_leg_tp_completed",
                     {
-                        "expected": expected,
-                        "actual": actual,
+                        "cycle_index": metadata.get("cycle_index"),
+                        "stage_count": metadata.get("stage_count"),
+                        "realized_total_net": total_after,
+                        "required_total_net": total_required,
+                    },
+                )
+
+        if (
+            isinstance(purpose, str)
+            and "SHORT" in purpose
+            and metadata.get("cycle_role") == "short_reduce"
+        ):
+            is_staged = bool(metadata.get("is_staged_second_leg_tp"))
+            if not is_staged:
+                expected = float(state.get("last_expected_short_tp_net") or 0.0)
+                total_required = expected
+
+            if not is_staged:
+                actual, actual_source = self._extract_realized_fill_pnl(fill_event, fill_type)
+                delta = actual - expected
+                delta_pct = (delta / expected) if expected > 0 else 0.0
+                filled_price = float(fill_event.exec_price or 0.0)
+                filled_qty = float(fill_event.exec_qty or 0.0)
+                expected_qty = float(state.get("last_short_tp_qty") or 0.0)
+
+                logger.debug(
+                    "short_tp_pnl_validation %s",
+                    {
+                        "expected_profit_usdt": expected,
+                        "actual_profit_usdt": actual,
+                        "actual_source": actual_source,
                         "delta": delta,
                         "delta_pct": delta_pct,
-                        "threshold": PNL_VALIDATION_THRESHOLD_USDT,
-                        "cycle_index": metadata.get("cycle_index"),
                         "trigger_price": state.get("last_short_tp_trigger_price"),
                         "filled_price": filled_price,
                         "qty": filled_qty,
+                        "cycle_index": metadata.get("cycle_index"),
                     },
                 )
                 _audit_calc(
-                    "short_tp_pnl_mismatch",
+                    "short_tp_fill_validation",
                     {
-                        "expected": expected,
-                        "actual": actual,
+                        "cycle_index": metadata.get("cycle_index"),
+                        "purpose": purpose,
+                        "expected_profit_usdt": expected,
+                        "actual_profit_usdt": actual,
+                        "actual_source": actual_source,
                         "delta": delta,
                         "delta_pct": delta_pct,
-                        "threshold": PNL_VALIDATION_THRESHOLD_USDT,
-                        "cycle_index": metadata.get("cycle_index"),
-                        "trigger_price": state.get("last_short_tp_trigger_price"),
+                        "expected_trigger_price": state.get("last_short_tp_trigger_price"),
                         "filled_price": filled_price,
-                        "qty": filled_qty,
+                        "expected_qty": expected_qty,
+                        "filled_qty": filled_qty,
+                        "confirmed_pnl": getattr(fill_event, "confirmed_pnl", None),
+                        "closed_pnl": metadata.get("closed_pnl"),
+                        "exec_price": fill_event.exec_price,
+                        "fee": metadata.get("fee"),
+                        "order_id": fill_event.client_order_id,
+                        "metadata": metadata,
                     },
-                    level=logging.WARNING,
                 )
+                if abs(delta) > PNL_VALIDATION_THRESHOLD_USDT:
+                    logger.warning(
+                        "short_tp_pnl_mismatch",
+                        {
+                            "expected": expected,
+                            "actual": actual,
+                            "delta": delta,
+                            "delta_pct": delta_pct,
+                            "threshold": PNL_VALIDATION_THRESHOLD_USDT,
+                            "cycle_index": metadata.get("cycle_index"),
+                            "trigger_price": state.get("last_short_tp_trigger_price"),
+                            "filled_price": filled_price,
+                            "qty": filled_qty,
+                        },
+                    )
+                    _audit_calc(
+                        "short_tp_pnl_mismatch",
+                        {
+                            "expected": expected,
+                            "actual": actual,
+                            "delta": delta,
+                            "delta_pct": delta_pct,
+                            "threshold": PNL_VALIDATION_THRESHOLD_USDT,
+                            "cycle_index": metadata.get("cycle_index"),
+                            "trigger_price": state.get("last_short_tp_trigger_price"),
+                            "filled_price": filled_price,
+                            "qty": filled_qty,
+                        },
+                        level=logging.WARNING,
+                    )
         if fill_type == "cycle_long_reduce":
             cycle_order_already_confirmed = self._cycle_order_confirmed(
                 runtime_state,
@@ -5823,45 +5946,104 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         short_tp_status = str(
                             (cycle_entry.get("short_tp_status") or "NONE")
                         ).upper()
-                        _log_event(
-                            "fixed_cycle_second_leg_pending_skip_rebuild",
-                            {
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "pending_cycle": short_tp_pending_cycle,
-                                "short_tp_status": short_tp_status,
-                                "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
-                                "next_required_purpose": next_required_purpose,
-                                "first_leg_processed": first_leg_processed,
-                                "second_leg_processed": second_leg_processed,
-                                "active_runtime_order_purposes": [
-                                    order.purpose
-                                    for order in runtime_state.active_orders.values()
-                                    if order.purpose and order.purpose.upper()
-                                    == self._normalize_cycle_purpose(
-                                        self._cycle_purpose("short", short_tp_pending_cycle)
-                                    )
-                                ],
-                                "active_snapshot_order_purposes": [
-                                    order.purpose
-                                    for order in snapshot.active_orders
-                                    if order.purpose and order.purpose.upper()
-                                    == self._normalize_cycle_purpose(
-                                        self._cycle_purpose("short", short_tp_pending_cycle)
-                                    )
-                                ],
-                                "reason": "waiting_for_second_leg_fill_or_confirmation",
-                            },
+                        active_cycle_index = int(state.get("active_cycle_index") or 0)
+                        last_completed_cycle = int(state.get("cycle_completed_count") or 0)
+                        # Stale-Pending-Schutz: Wenn der Pending-Cycle bereits hinter dem aktiven
+                        # Cycle liegt oder als complete markiert ist, darf er den Build des
+                        # nächsten First-Leg-/Second-Leg-Paares nicht mehr blockieren.
+                        is_stale_pending = (
+                            active_cycle_index > short_tp_pending_cycle
+                            or last_completed_cycle >= short_tp_pending_cycle
+                            or bool(cycle_entry.get("complete"))
+                            or second_leg_processed
                         )
+                        if is_stale_pending:
+                            cycle_state = self._ensure_cycle_state(runtime_state)
+                            previous_flags = {
+                                "state_cycle_waiting_for_short_tp": bool(
+                                    state.get("cycle_waiting_for_short_tp")
+                                ),
+                                "state_short_tp_pending_cycle": int(
+                                    state.get("short_tp_pending_cycle") or 0
+                                ),
+                                "state_pending_short_cycle_index": int(
+                                    state.get("pending_short_cycle_index") or 0
+                                ),
+                                "cycle_state_cycle_waiting_for_short_tp": bool(
+                                    cycle_state.get("cycle_waiting_for_short_tp")
+                                ),
+                                "cycle_state_short_tp_pending_cycle": int(
+                                    cycle_state.get("short_tp_pending_cycle") or 0
+                                ),
+                                "cycle_state_pending_short_cycle_index": int(
+                                    cycle_state.get("pending_short_cycle_index") or 0
+                                ),
+                            }
+                            state["cycle_waiting_for_short_tp"] = False
+                            state["short_tp_pending_cycle"] = 0
+                            state["pending_short_cycle_index"] = 0
+                            cycle_state["cycle_waiting_for_short_tp"] = False
+                            cycle_state["short_tp_pending_cycle"] = 0
+                            cycle_state["pending_short_cycle_index"] = 0
+                            self._persist_cycle_sequence_state(runtime_state)
+                            _log_event(
+                                "fixed_cycle_second_leg_pending_state_cleared_as_stale",
+                                {
+                                    "symbol": snapshot.symbol or self.config.symbol,
+                                    "pending_cycle": short_tp_pending_cycle,
+                                    "short_tp_status": short_tp_status,
+                                    "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
+                                    "next_required_purpose": next_required_purpose,
+                                    "first_leg_processed": first_leg_processed,
+                                    "second_leg_processed": second_leg_processed,
+                                    "active_cycle_index": active_cycle_index,
+                                    "cycle_completed_count": last_completed_cycle,
+                                    "previous_flags": previous_flags,
+                                },
+                            )
+                        else:
+                            _log_event(
+                                "fixed_cycle_second_leg_pending_skip_rebuild",
+                                {
+                                    "symbol": snapshot.symbol or self.config.symbol,
+                                    "pending_cycle": short_tp_pending_cycle,
+                                    "short_tp_status": short_tp_status,
+                                    "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
+                                    "next_required_purpose": next_required_purpose,
+                                    "first_leg_processed": first_leg_processed,
+                                    "second_leg_processed": second_leg_processed,
+                                    "active_runtime_order_purposes": [
+                                        order.purpose
+                                        for order in runtime_state.active_orders.values()
+                                        if order.purpose
+                                        and order.purpose.upper()
+                                        == self._normalize_cycle_purpose(
+                                            self._cycle_purpose("short", short_tp_pending_cycle)
+                                        )
+                                    ],
+                                    "active_snapshot_order_purposes": [
+                                        order.purpose
+                                        for order in snapshot.active_orders
+                                        if order.purpose
+                                        and order.purpose.upper()
+                                        == self._normalize_cycle_purpose(
+                                            self._cycle_purpose("short", short_tp_pending_cycle)
+                                        )
+                                    ],
+                                    "reason": "waiting_for_second_leg_fill_or_confirmation",
+                                },
+                            )
+                            return intents
                     else:
                         _log_event(
-                        "fixed_cycle_short_followup_missing_after_downside_rebuild_error",
-                        {
-                            "symbol": snapshot.symbol or self.config.symbol,
-                            "short_tp_pending_cycle": short_tp_pending_cycle,
-                            "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
-                        },
-                    )
-                return intents
+                            "fixed_cycle_short_followup_missing_after_downside_rebuild_error",
+                            {
+                                "symbol": snapshot.symbol or self.config.symbol,
+                                "short_tp_pending_cycle": short_tp_pending_cycle,
+                                "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
+                            },
+                        )
+                    return intents
             context.audit.log_event(
                 "fixed_cycle_downside_skip",
                 strategy=self.name,
@@ -6461,14 +6643,65 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cycle_waiting_for_short_tp_flag = waiting_for_short_tp
                 short_tp_cycle = self._get_second_leg_pending_cycle(state, cycle_state)
                 cycle_state_waiting = self._get_second_leg_waiting(state, cycle_state)
+                active_cycle_index = int(state.get("active_cycle_index") or 0)
+                last_completed_cycle = int(state.get("cycle_completed_count") or 0)
+                cycle_step = str(state.get("cycle_step") or "")
+                if short_tp_cycle > 0:
+                    pending_cycle_entry = self._get_cycle_sequence_entry(
+                        runtime_state, short_tp_cycle
+                    )
+                    stale_pending_second_leg = (
+                        active_cycle_index > short_tp_cycle
+                        or last_completed_cycle >= short_tp_cycle
+                        or bool(pending_cycle_entry.get("complete"))
+                    )
+                    if stale_pending_second_leg:
+                        previous_pending_state = {
+                            "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp_flag,
+                            "short_tp_pending_cycle": short_tp_cycle,
+                            "cycle_state_waiting": cycle_state_waiting,
+                            "active_cycle_index": active_cycle_index,
+                            "cycle_completed_count": last_completed_cycle,
+                            "cycle_step": cycle_step,
+                        }
+                        self._set_second_leg_waiting_state(
+                            state,
+                            cycle_state,
+                            waiting=False,
+                            cycle_index=0,
+                        )
+                        state["pending_short_cycle_index"] = 0
+                        cycle_state["pending_short_cycle_index"] = 0
+                        self._persist_cycle_sequence_state(runtime_state)
+                        _log_event(
+                            "fixed_cycle_duplicate_long_reduce_stale_pending_cleared",
+                            {
+                                "symbol": snapshot.symbol or self.config.symbol,
+                                "pending_cycle": short_tp_cycle,
+                                "active_cycle_index": active_cycle_index,
+                                "cycle_completed_count": last_completed_cycle,
+                                "cycle_step": cycle_step,
+                                "previous_pending_state": previous_pending_state,
+                            },
+                        )
+                        cycle_waiting_for_short_tp_flag = False
+                        short_tp_cycle = 0
+                        cycle_state_waiting = False
+                pending_second_leg_blocks_current_cycle = (
+                    short_tp_cycle > 0
+                    and short_tp_cycle == active_cycle_index
+                    and (
+                        cycle_step == STEP_WAITING_FOR_PAIR_SECOND_LEG
+                        or cycle_waiting_for_short_tp_flag
+                        or cycle_state_waiting
+                    )
+                )
                 allow_long_reduce = not (
                     first_leg_fill_exists
                     or self._cycle_status_blocks_build(
                         cycle_sequence_entry.get(first_leg_status_field)
                     )
-                    or (cycle_waiting_for_short_tp_flag and short_tp_cycle > 0)
-                    or short_tp_cycle == long_cycle_number
-                    or cycle_state_waiting
+                    or pending_second_leg_blocks_current_cycle
                 )
                 guard_payload = {
                     "cycle_index": long_cycle_number,
@@ -6480,6 +6713,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "current_long_cycle_index": int(state.get("current_long_cycle_index") or 0),
                     "current_short_cycle_index": int(state.get("current_short_cycle_index") or 0),
                     "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
+                    "active_cycle_index": active_cycle_index,
+                    "cycle_step": cycle_step,
+                    "pending_second_leg_blocks_current_cycle": (
+                        pending_second_leg_blocks_current_cycle
+                    ),
                     "cycle_sequence_entry": dict(cycle_sequence_entry),
                     "allow_long_reduce": allow_long_reduce,
                     "first_leg_side": first_leg_side,
@@ -7113,11 +7351,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_price = self._normalize_price(trigger_price, runtime_state)
             initial_trigger_price = trigger_price
 
-            def compute_expected_long_reduce_profit(tp: float) -> float:
+            def compute_expected_long_reduce_profit(tp: float, qty: float | None = None) -> float:
+                effective_qty = long_reduce_qty if qty is None else qty
                 return (
-                    (tp - long_entry_price) * long_reduce_qty
-                    - (long_entry_price * long_reduce_qty * fee_rate)
-                    - (tp * long_reduce_qty * fee_rate)
+                    (tp - long_entry_price) * effective_qty
+                    - (long_entry_price * effective_qty * fee_rate)
+                    - (tp * effective_qty * fee_rate)
                 )
 
             def _evaluate_post_short_reduce_recovery(trigger_price: float) -> bool:
@@ -7411,55 +7650,322 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 qty=long_reduce_qty,
                 trigger_price=trigger_price,
             )
-            intent = StrategyIntent(
-                side="long",
-                qty=long_reduce_qty,
-                purpose=purpose,
-                order_type="Market",
-                reduce_only=True,
-                trigger_price=trigger_price,
-                trigger_direction=1,
-                trigger_by="LastPrice",
-                close_on_trigger=True,
-                position_idx=1,
-                metadata={
+
+            # Richtung-neutrale Staging-Entscheidung für Long-Second-Leg (Mirror-Short-Bot)
+            first_leg_fill_price = self._get_first_leg_fill_price(runtime_state, cycle_index)
+            if first_leg_fill_price <= 0:
+                first_leg_fill_price = float(cycle_state.get("last_cycle_reference_price") or 0.0)
+            if first_leg_fill_price > 0 and trigger_price > 0:
+                distance_pct_signed = (
+                    (trigger_price - first_leg_fill_price) / first_leg_fill_price
+                ) * 100.0
+                distance_pct_abs = abs(distance_pct_signed)
+            else:
+                distance_pct_abs = 0.0
+            post_first_leg_recovery_distance_pct = float(
+                self.config.max_post_recovery_long_reduce_distance_pct or 0.0
+            )
+            stage_count = 1
+            if post_first_leg_recovery_distance_pct > 0 and distance_pct_abs > 0:
+                if distance_pct_abs <= 1.5:
+                    stage_count = 2
+                elif distance_pct_abs <= post_first_leg_recovery_distance_pct:
+                    stage_count = 3
+
+            # Staging für Long-Second-Leg: 1–3 Teil-TPs, direction-neutral mit Min-Notional-Validierung.
+            if first_leg_fill_price <= 0 or trigger_price <= 0:
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_invalid_inputs",
+                    symbol=snapshot.symbol or self.config.symbol,
+                    long_fill_price=long_entry_price,
+                    short_qty=long_reduce_qty,
+                    trigger_price=trigger_price,
+                    first_leg_fill_price=first_leg_fill_price,
+                )
+                return []
+
+            symbol, rules, _ = self._resolve_instrument_rules(runtime_state)
+            min_order_qty = float(
+                rules["min_order_qty"]
+                if rules and rules.get("min_order_qty")
+                else float(self.config.min_order_qty or 0.0)
+            )
+            min_notional = float(
+                rules["min_notional"]
+                if rules and rules.get("min_notional")
+                else float(self.config.min_notional_usdt or 0.0)
+            )
+
+            best_plan: list[dict[str, Any]] = []
+            best_stage_count = 0
+
+            def _build_plan(candidate_stage_count: int) -> list[dict[str, Any]]:
+                nonlocal trigger_price, first_leg_fill_price
+                if candidate_stage_count <= 0:
+                    return []
+                # Single-Stage-Plan: eine Stage deckt die gesamte Loss-Recovery.
+                if candidate_stage_count == 1:
+                    stage_trigger_price = self._normalize_price(trigger_price, runtime_state)
+                    normalized_qty = self._normalize_qty(long_reduce_qty, runtime_state)
+                    if normalized_qty <= 0 or stage_trigger_price <= 0:
+                        return []
+                    stage_net = compute_expected_long_reduce_profit(stage_trigger_price, normalized_qty)
+                    return [
+                        {
+                            "index": 0,
+                            "trigger_price": stage_trigger_price,
+                            "qty": normalized_qty,
+                            "expected_net": stage_net,
+                        }
+                    ]
+
+                # Mehrstufiger Plan (2 oder 3 Stages) mit Gewichten/Ratios.
+                if candidate_stage_count == 2:
+                    stage_weights = [0.4, 0.6]
+                    ratios = [0.5, 1.0]
+                else:
+                    stage_weights = [0.2, 0.3, 0.5]
+                    ratios = [1.0 / 3.0, 2.0 / 3.0, 1.0]
+
+                delta = trigger_price - first_leg_fill_price
+                remaining_qty = long_reduce_qty
+                remaining_required_net = required_profit_to_cover_loss
+                stages: list[dict[str, Any]] = []
+                for idx, (weight, ratio) in enumerate(zip(stage_weights, ratios)):
+                    if idx >= candidate_stage_count:
+                        break
+                    stage_required_net = weight * required_profit_to_cover_loss
+                    stage_trigger_price_raw = first_leg_fill_price + ratio * delta
+                    stage_trigger_price = self._normalize_price(stage_trigger_price_raw, runtime_state)
+                    per_unit_net = compute_expected_long_reduce_profit(stage_trigger_price, 1.0)
+                    if per_unit_net <= 0:
+                        break
+                    desired_qty = min(remaining_qty, max(stage_required_net / per_unit_net, 0.0))
+                    if desired_qty <= 0:
+                        break
+                    normalized_qty = self._normalize_qty(desired_qty, runtime_state)
+                    if normalized_qty <= 0:
+                        break
+                    if idx == candidate_stage_count - 1:
+                        normalized_qty = remaining_qty
+
+                    stage_net = compute_expected_long_reduce_profit(stage_trigger_price, normalized_qty)
+                    remaining_qty = max(remaining_qty - normalized_qty, 0.0)
+                    remaining_required_net = max(remaining_required_net - stage_net, 0.0)
+                    stages.append(
+                        {
+                            "index": idx,
+                            "trigger_price": stage_trigger_price,
+                            "qty": normalized_qty,
+                            "expected_net": stage_net,
+                        }
+                    )
+                    if remaining_qty <= 0:
+                        break
+                return stages
+
+            # Kandidaten-Pläne mit fallender Stage-Anzahl prüfen.
+            for candidate_stage_count in range(stage_count, 0, -1):
+                stages = _build_plan(candidate_stage_count)
+                if not stages:
+                    _log_event(
+                        "staged_second_leg_tp_candidate_rejected_min_notional",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "candidate_stage_count": candidate_stage_count,
+                            "reason": "empty_plan",
+                        },
+                    )
+                    continue
+
+                # Min-Notional- und Profit-Validierung.
+                valid = True
+                sum_expected_net = 0.0
+                rejected_stages: list[int] = []
+                for stage in stages:
+                    idx = int(stage.get("index") or 0)
+                    stage_trigger_price = float(stage.get("trigger_price") or 0.0)
+                    stage_qty = float(stage.get("qty") or 0.0)
+                    stage_net = float(stage.get("expected_net") or 0.0)
+                    if stage_qty <= 0 or stage_trigger_price <= 0:
+                        valid = False
+                        rejected_stages.append(idx)
+                        continue
+                    stage_notional = stage_qty * stage_trigger_price
+                    if (min_order_qty > 0 and stage_qty < min_order_qty) or (
+                        min_notional > 0 and stage_notional < min_notional
+                    ):
+                        valid = False
+                        rejected_stages.append(idx)
+                        continue
+                    sum_expected_net += stage_net
+
+                if not valid or sum_expected_net + 1e-8 < required_profit_to_cover_loss:
+                    event_name = (
+                        "staged_second_leg_tp_candidate_rejected_min_notional"
+                        if rejected_stages
+                        else "staged_second_leg_tp_candidate_rejected_insufficient_profit"
+                    )
+                    _log_event(
+                        event_name,
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "candidate_stage_count": candidate_stage_count,
+                            "rejected_stages": rejected_stages,
+                            "sum_expected_net": sum_expected_net,
+                            "required_profit_to_cover_loss": required_profit_to_cover_loss,
+                            "min_order_qty": min_order_qty,
+                            "min_notional": min_notional,
+                            "stages": stages,
+                        },
+                    )
+                    continue
+
+                best_plan = stages
+                best_stage_count = len(stages)
+                if best_stage_count < stage_count:
+                    _log_event(
+                        "staged_second_leg_tp_stage_count_reduced",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "original_stage_count": stage_count,
+                            "final_stage_count": best_stage_count,
+                        },
+                    )
+                break
+
+            if not best_plan:
+                _log_event(
+                    "staged_second_leg_tp_no_valid_min_notional_stage",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "required_profit_to_cover_loss": required_profit_to_cover_loss,
+                        "long_reduce_qty": long_reduce_qty,
+                        "min_order_qty": min_order_qty,
+                        "min_notional": min_notional,
+                    },
+                )
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_no_valid_min_notional_stage",
+                    symbol=snapshot.symbol or self.config.symbol,
+                    long_fill_price=long_entry_price,
+                    short_qty=long_reduce_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
+
+            # Gesamt-required_net und Stage-Count für Exit-Pricing pro Cycle merken
+            cycle_key = str(cycle_index)
+            required_map = state.setdefault("staged_second_leg_tp_required_net_total", {})
+            required_map[cycle_key] = required_profit_to_cover_loss
+            stage_count_map = state.setdefault("staged_second_leg_tp_stage_count", {})
+            stage_count_map[cycle_key] = best_stage_count
+            # Reset Realized/Filled-Maps für diesen Cycle
+            realized_map = state.setdefault("staged_second_leg_tp_realized_net", {})
+            realized_map[cycle_key] = 0.0
+            filled_map = state.setdefault("staged_second_leg_tp_filled_stages", {})
+            filled_map[cycle_key] = []
+
+            sum_expected_net = sum(float(stage.get("expected_net") or 0.0) for stage in best_plan)
+
+            logger.info(
+                "staged_second_leg_tp_final_plan_selected",
+                extra={
+                    "symbol": snapshot.symbol or self.config.symbol,
                     "cycle_index": cycle_index,
-                    "purpose": purpose,
-                    "reason": "long_reduce_sized_from_confirmed_loss",
-                    "confirmed_short_reduce_pnl": confirmed_short_reduce_pnl,
-                    "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
-                    "required_profit_to_cover_loss": required_profit_to_cover_loss,
-                    "expected_long_reduce_profit": expected_long_reduce_profit,
-                    "long_reduce_qty": long_reduce_qty,
-                    "qty_cap_source": qty_cap_source,
-                    "reduction_pct_per_fill": self.config.reduction_pct_per_fill,
-                    "long_entry_price": long_entry_price,
-                    "trigger_price": trigger_price,
-                    "trigger_price_adjusted_for_loss_cover": (
-                        abs(trigger_price - initial_trigger_price) > 1e-12
-                    ),
+                    "stage_count": best_stage_count,
+                    "distance_pct_abs": distance_pct_abs,
+                    "threshold_pct": post_first_leg_recovery_distance_pct,
+                    "required_net_profit": required_profit_to_cover_loss,
+                     "sum_expected_net": sum_expected_net,
+                    "first_leg_fill_price": first_leg_fill_price,
+                    "final_second_leg_trigger_price": trigger_price,
+                    "stages": [
+                        {
+                            "stage_index": int(stage.get("index") or 0),
+                            "qty": float(stage.get("qty") or 0.0),
+                            "trigger_price": float(stage.get("trigger_price") or 0.0),
+                            "expected_net": float(stage.get("expected_net") or 0.0),
+                            "notional": float(stage.get("qty") or 0.0)
+                            * float(stage.get("trigger_price") or 0.0),
+                        }
+                        for stage in best_plan
+                    ],
                 },
             )
+
+            intents: list[StrategyIntent] = []
+            first_leg_cycle_role = self._get_first_leg_cycle_role()
+            second_leg_cycle_role = self._get_second_leg_cycle_role()
+            for new_index, stage in enumerate(best_plan):
+                stage_trigger_price = float(stage.get("trigger_price") or 0.0)
+                stage_qty = float(stage.get("qty") or 0.0)
+                stage_expected_net = float(stage.get("expected_net") or 0.0)
+                if stage_qty <= 0 or stage_trigger_price <= 0:
+                    continue
+                stage_metadata = {
+                    "cycle_index": cycle_index,
+                    "cycle_role": second_leg_cycle_role,
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "is_staged_second_leg_tp": True,
+                    "stage_index": new_index,
+                    "stage_count": best_stage_count,
+                    "stage_expected_net": stage_expected_net,
+                    "stage_required_net_total": required_profit_to_cover_loss,
+                    "stage_trigger_price": stage_trigger_price,
+                    "first_leg_fill_price": first_leg_fill_price,
+                    "final_second_leg_trigger_price": trigger_price,
+                    "distance_pct_abs": distance_pct_abs,
+                    "threshold_pct": post_first_leg_recovery_distance_pct,
+                    "first_leg_cycle_role": first_leg_cycle_role,
+                    "second_leg_cycle_role": second_leg_cycle_role,
+                    "parent_second_leg_purpose": purpose,
+                }
+                intent = StrategyIntent(
+                    side="long",
+                    qty=stage_qty,
+                    purpose=purpose,
+                    order_type="Market",
+                    reduce_only=True,
+                    trigger_price=stage_trigger_price,
+                    trigger_direction=1,
+                    trigger_by="LastPrice",
+                    close_on_trigger=True,
+                    position_idx=1,
+                    metadata=stage_metadata,
+                )
+                intents.append(intent)
+            if not intents:
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_intents_empty",
+                    symbol=snapshot.symbol or self.config.symbol,
+                    long_fill_price=long_entry_price,
+                    short_qty=long_reduce_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
             _log_event(
-                "fixed_cycle_short_followup_intent_built",
+                "staged_second_leg_tp_intents_created",
                 {
                     "symbol": snapshot.symbol or self.config.symbol,
                     "cycle_index": cycle_index,
                     "purpose": purpose,
-                    "qty": long_reduce_qty,
-                    "trigger_price": trigger_price,
-                    "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
-                    "required_profit_to_cover_loss": required_profit_to_cover_loss,
-                    "expected_long_reduce_profit": expected_long_reduce_profit,
-                    "qty_cap_source": qty_cap_source,
-                    "reduction_pct_per_fill": self.config.reduction_pct_per_fill,
-                    "trigger_price_adjusted_for_loss_cover": (
-                        abs(trigger_price - initial_trigger_price) > 1e-12
-                    ),
-                    "reason": "long_reduce_sized_from_confirmed_loss",
+                    "stage_count": len(intents),
+                    "stages": [
+                        {
+                            "stage_index": st.metadata.get("stage_index") if hasattr(st, "metadata") else None,
+                            "qty": getattr(st, "qty", None),
+                            "trigger_price": getattr(st, "trigger_price", None),
+                        }
+                        for st in intents
+                    ],
                 },
             )
-            return [intent]
+            return intents
 
         long_fill = (cycle_state.get("long_fills") or {}).get(str(cycle_index)) or {}
         self._seed_long_fill_closed_pnl_fields(
@@ -8063,14 +8569,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         expected = required_net
 
-        def compute_net(tp: float) -> float:
+        def compute_net(tp: float, qty: float) -> float:
+            second_leg_cycle_role = self._get_second_leg_cycle_role()
+            if second_leg_cycle_role == "short_reduce":
+                return (
+                    (short_entry_price - tp) * qty
+                    - (short_entry_price * qty * fee_rate)
+                    - (tp * qty * fee_rate)
+                )
+            # Long-second-leg (Mirror-Short-Bot): Profit, wenn Preis steigt.
             return (
-                (short_entry_price - tp) * short_qty
-                - (short_entry_price * short_qty * fee_rate)
-                - (tp * short_qty * fee_rate)
+                (tp - short_entry_price) * qty
+                - (short_entry_price * qty * fee_rate)
+                - (tp * qty * fee_rate)
             )
 
-        net = compute_net(tp_price)
+        net = compute_net(tp_price, short_qty)
         max_iterations = 50
         i = 0
         while net < expected and i < max_iterations:
@@ -8078,7 +8592,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if tp_price <= 0:
                 break
             tp_price = math.floor(tp_price / price_tick_size) * price_tick_size
-            net = compute_net(tp_price)
+            net = compute_net(tp_price, short_qty)
             i += 1
 
         raw_trigger_price = max(tp_price, price_tick_size)
@@ -8119,6 +8633,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["last_expected_short_tp_net"] = required_net
         state["last_short_tp_trigger_price"] = trigger_price
         state["last_short_tp_qty"] = short_qty
+
+        # Direction-neutral distance zwischen erstem Bein und finalem Second-Leg-TP
+        first_leg_fill_price = self._get_first_leg_fill_price(runtime_state, cycle_index)
+        if first_leg_fill_price <= 0:
+            first_leg_fill_price = float(cycle_state.get("last_cycle_reference_price") or 0.0)
+        if first_leg_fill_price > 0 and trigger_price > 0:
+            distance_pct_signed = (
+                (trigger_price - first_leg_fill_price) / first_leg_fill_price
+            ) * 100.0
+            distance_pct_abs = abs(distance_pct_signed)
+        else:
+            distance_pct_abs = 0.0
+        threshold_pct = float(self.config.max_post_recovery_long_reduce_distance_pct or 0.0)
+
+        # Stage-Entscheidung auf Basis der bestehenden Recovery-Schwelle
+        stage_count = 1
+        if threshold_pct > 0 and distance_pct_abs > 0:
+            if distance_pct_abs <= 1.5:
+                stage_count = 2
+            elif distance_pct_abs <= threshold_pct:
+                stage_count = 3
+
         if self._maybe_activate_recovery_after_first_leg_fill(
             snapshot,
             runtime_state,
@@ -8141,142 +8677,245 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         current_price = float(snapshot.current_price or 0.0)
         use_market_fallback = current_price > 0 and current_price <= trigger_price
+
+        # Gemeinsame Größen für Single-TP und Staging
         required_price_move = short_entry_price - trigger_price
         required_short_gross = short_qty * required_price_move
-        price = self._normalize_price(
-            max(trigger_price - self.config.price_tick_size, self.config.price_tick_size),
-            runtime_state,
-        )
-        if short_qty <= 0 or trigger_price <= 0:
-            _emit_short_tp_follow_up_skip(
-                "short_tp_invalid_final_trigger_inputs",
-                symbol=active_trade_symbol,
-                long_fill_price=long_fill_price,
-                short_qty=short_qty,
-                trigger_price=trigger_price,
-                final_limit_price=price,
+
+        # Wenn wir keine Stages bauen (stage_count == 1), Single-TP-Logik wie bisher.
+        # Staging wird nur verwendet, wenn wir innerhalb der Recovery-Schwelle liegen.
+        if stage_count == 1 or use_market_fallback:
+            price = self._normalize_price(
+                max(trigger_price - self.config.price_tick_size, self.config.price_tick_size),
+                runtime_state,
+            )
+            if short_qty <= 0 or trigger_price <= 0:
+                _emit_short_tp_follow_up_skip(
+                    "short_tp_invalid_final_trigger_inputs",
+                    symbol=active_trade_symbol,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                    final_limit_price=price,
+                )
+                context.audit.log_event(
+                    "fixed_cycle_downside_skip",
+                    strategy=self.name,
+                    skip_reason="short_tp_invalid",
+                    cycle_number=cycle_index,
+                    purpose=purpose,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
+
+            logger.info(
+                "short_tp_final_inputs",
+                extra={
+                    "order_id": long_fill.get("order_id"),
+                    "cycle_index": cycle_index,
+                    "symbol": active_trade_symbol,
+                    "decision": "trigger_run",
+                    "closed_pnl": confirmed_closed_pnl,
+                    "closed_qty": confirmed_closed_qty,
+                    "long_loss_usdt": long_loss_usdt,
+                    "required_net_profit": required_net,
+                    "trigger_price": trigger_price,
+                    "short_qty": short_qty,
+                    "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
+                    "short_tp_guard_long_avg": long_avg,
+                    "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
+                    "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
+                    "short_tp_guard_applied": short_tp_guard_applied,
+                },
             )
             context.audit.log_event(
-                "fixed_cycle_downside_skip",
+                "fixed_cycle_short_cycle_planned",
                 strategy=self.name,
-                skip_reason="short_tp_invalid",
-                cycle_number=cycle_index,
+                cycle_index=cycle_index,
+                side="short",
                 purpose=purpose,
-                long_fill_price=long_fill_price,
-                short_qty=short_qty,
-                trigger_price=trigger_price,
+                entry_reference_price=float(state.get("entry_reference_price") or 0.0),
+                long_reduce_qty=long_reduce_qty,
+                confirmed_closed_pnl=confirmed_closed_pnl,
+                confirmed_closed_qty=confirmed_closed_qty,
+                confirmed_closed_avg_price=confirmed_closed_avg_price,
+                confirmed_closed_cost=confirmed_closed_cost,
+                confirmed_closed_pnl_updated_time=long_fill.get("closed_pnl_updated_time"),
+                fill_count=long_fill.get("fill_count"),
+                short_entry_price=short_entry_price,
+                short_reduce_reference=short_reduce_reference,
+                fee_rate=fee_rate,
+                target_profit_usdt=target_profit_usdt,
+                long_loss_usdt=long_loss_usdt,
+                required_short_gross=required_short_gross,
+                required_price_move=required_price_move,
+                required_net=required_net,
+                trigger_formula="((short_entry_price * (1 - fee_rate)) - (required_net / short_qty)) / (1 + fee_rate)",
+                trigger_formula_details="tp_price is decremented by price_tick_size until compute_net(tp) >= required_net; compute_net subtracts both entry and exit fees",
+                trigger_price_raw=raw_trigger_price,
+                trigger_price_normalized=trigger_price,
+                price_tick_size=price_tick_size,
+                reduction_multiplier=reduction_multiplier,
+                reduction_pct_used=effective_reduction_pct,
+                qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
+                qty_raw=snapshot.short_qty * self._pct(effective_reduction_pct),
+                qty_normalized=short_qty,
+                short_tp_min_threshold_pct_after_long_reduce=min_threshold_pct,
+                short_tp_guard_long_avg=long_avg,
+                short_tp_guard_original_trigger_price_raw=original_trigger_price_raw,
+                short_tp_guard_safe_short_tp_price=safe_short_tp_price,
+                short_tp_guard_applied=short_tp_guard_applied,
+                order_type="Limit",
+                reduce_only=True,
             )
-            return []
+            pending_after = float(state.get("pending_cycle_loss_usdt") or 0.0)
+            _audit_calc(
+                "short_tp_build_calc",
+                {
+                    "cycle_index": cycle_index,
+                    "symbol": active_trade_symbol,
+                    "long_fill_purpose": long_purpose,
+                    "cycle_entry_long_add_confirmed_pnl": cycle_entry_long_add_confirmed_pnl,
+                    "cycle_entry_long_reduce_closed_pnl": cycle_entry_long_reduce_closed_pnl,
+                    "cycle_entry_long_add_loss_usdt": cycle_entry_long_add_loss_usdt,
+                    "long_fill_confirmed_closed_pnl": long_fill_confirmed_closed_pnl,
+                    "long_fill_closed_pnl": long_fill_closed_pnl,
+                    "long_fill_pnl_this_fill": self._safe_float(long_fill.get("pnl_this_fill"), None),
+                    "provisional_exec_pnl_total": provisional_exec_pnl_total,
+                    "provisional_runtime_pnl_total": provisional_runtime_pnl_total,
+                    "long_loss_usdt": long_loss_usdt,
+                    "confirmed_closed_pnl": confirmed_closed_pnl,
+                    "short_followup_pnl": short_followup_pnl,
+                    "short_followup_pnl_source": short_followup_pnl_source,
+                    "selected_short_followup_pnl_source": short_followup_pnl_source,
+                    "long_fill_top_level_keys": sorted(list(long_fill.keys())),
+                    "long_fill_metadata_keys": sorted(list(long_fill_metadata.keys())),
+                    "metadata_confirmed_closed_pnl": long_fill_metadata.get("confirmed_closed_pnl"),
+                    "metadata_long_reduce_closed_pnl": long_fill_metadata.get("long_reduce_closed_pnl"),
+                    "metadata_closed_pnl": long_fill_metadata.get("closed_pnl"),
+                    "metadata_runtime_calculated_pnl": long_fill_metadata.get("runtime_calculated_pnl"),
+                    "metadata_exec_pnl": long_fill_metadata.get("exec_pnl"),
+                    "target_profit_usdt": target_profit_usdt,
+                    "required_net": required_net,
+                    "short_entry_price": short_entry_price,
+                    "short_qty": short_qty,
+                    "fee_rate": fee_rate,
+                    "trigger_price": trigger_price,
+                    "raw_trigger_price": raw_trigger_price,
+                    "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
+                    "short_tp_guard_long_avg": long_avg,
+                    "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
+                    "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
+                    "short_tp_guard_applied": short_tp_guard_applied,
+                    "break_even_price": float(state.get("latest_break_even_price") or 0.0),
+                    "expected_short_tp_net": required_net,
+                    "pending_cycle_loss_usdt_before": pending_before,
+                    "pending_cycle_loss_usdt_after": pending_after,
+                    "order_purpose": purpose,
+                    "cycle_role": "short_reduce",
+                    "required_price_move": required_price_move,
+                    "required_short_gross": required_short_gross,
+                },
+            )
+        else:
+            # Staged Second-Leg-TP: 2 oder 3 Teil-TPs, direction-neutral um first_leg_fill_price
+            if short_qty <= 0 or trigger_price <= 0 or first_leg_fill_price <= 0:
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_invalid_inputs",
+                    symbol=active_trade_symbol,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                    first_leg_fill_price=first_leg_fill_price,
+                )
+                context.audit.log_event(
+                    "fixed_cycle_downside_skip",
+                    strategy=self.name,
+                    skip_reason="short_tp_invalid",
+                    cycle_number=cycle_index,
+                    purpose=purpose,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
 
-        logger.info(
-            "short_tp_final_inputs",
-            extra={
-                "order_id": long_fill.get("order_id"),
-                "cycle_index": cycle_index,
-                "symbol": active_trade_symbol,
-                "decision": "trigger_run",
-                "closed_pnl": confirmed_closed_pnl,
-                "closed_qty": confirmed_closed_qty,
-                "long_loss_usdt": long_loss_usdt,
-                "required_net_profit": required_net,
-                "trigger_price": trigger_price,
-                "short_qty": short_qty,
-                "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
-                "short_tp_guard_long_avg": long_avg,
-                "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
-                "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
-                "short_tp_guard_applied": short_tp_guard_applied,
-            },
-        )
-        context.audit.log_event(
-            "fixed_cycle_short_cycle_planned",
-            strategy=self.name,
-            cycle_index=cycle_index,
-            side="short",
-            purpose=purpose,
-            entry_reference_price=float(state.get("entry_reference_price") or 0.0),
-            long_reduce_qty=long_reduce_qty,
-            confirmed_closed_pnl=confirmed_closed_pnl,
-            confirmed_closed_qty=confirmed_closed_qty,
-            confirmed_closed_avg_price=confirmed_closed_avg_price,
-            confirmed_closed_cost=confirmed_closed_cost,
-            confirmed_closed_pnl_updated_time=long_fill.get("closed_pnl_updated_time"),
-            fill_count=long_fill.get("fill_count"),
-            short_entry_price=short_entry_price,
-            short_reduce_reference=short_reduce_reference,
-            fee_rate=fee_rate,
-            target_profit_usdt=target_profit_usdt,
-            long_loss_usdt=long_loss_usdt,
-            required_short_gross=required_short_gross,
-            required_price_move=required_price_move,
-            required_net=required_net,
-            trigger_formula="((short_entry_price * (1 - fee_rate)) - (required_net / short_qty)) / (1 + fee_rate)",
-            trigger_formula_details="tp_price is decremented by price_tick_size until compute_net(tp) >= required_net; compute_net subtracts both entry and exit fees",
-            trigger_price_raw=raw_trigger_price,
-            trigger_price_normalized=trigger_price,
-            price_tick_size=price_tick_size,
-            reduction_multiplier=reduction_multiplier,
-            reduction_pct_used=effective_reduction_pct,
-            qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
-            qty_raw=snapshot.short_qty * self._pct(effective_reduction_pct),
-            qty_normalized=short_qty,
-            short_tp_min_threshold_pct_after_long_reduce=min_threshold_pct,
-            short_tp_guard_long_avg=long_avg,
-            short_tp_guard_original_trigger_price_raw=original_trigger_price_raw,
-            short_tp_guard_safe_short_tp_price=safe_short_tp_price,
-            short_tp_guard_applied=short_tp_guard_applied,
-            order_type="Limit",
-            reduce_only=True,
-        )
-        pending_after = float(state.get("pending_cycle_loss_usdt") or 0.0)
-        _audit_calc(
-            "short_tp_build_calc",
-            {
-                "cycle_index": cycle_index,
-                "symbol": active_trade_symbol,
-                "long_fill_purpose": long_purpose,
-                "cycle_entry_long_add_confirmed_pnl": cycle_entry_long_add_confirmed_pnl,
-                "cycle_entry_long_reduce_closed_pnl": cycle_entry_long_reduce_closed_pnl,
-                "cycle_entry_long_add_loss_usdt": cycle_entry_long_add_loss_usdt,
-                "long_fill_confirmed_closed_pnl": long_fill_confirmed_closed_pnl,
-                "long_fill_closed_pnl": long_fill_closed_pnl,
-                "long_fill_pnl_this_fill": self._safe_float(long_fill.get("pnl_this_fill"), None),
-                "provisional_exec_pnl_total": provisional_exec_pnl_total,
-                "provisional_runtime_pnl_total": provisional_runtime_pnl_total,
-                "long_loss_usdt": long_loss_usdt,
-                "confirmed_closed_pnl": confirmed_closed_pnl,
-                "short_followup_pnl": short_followup_pnl,
-                "short_followup_pnl_source": short_followup_pnl_source,
-                "selected_short_followup_pnl_source": short_followup_pnl_source,
-                "long_fill_top_level_keys": sorted(list(long_fill.keys())),
-                "long_fill_metadata_keys": sorted(list(long_fill_metadata.keys())),
-                "metadata_confirmed_closed_pnl": long_fill_metadata.get("confirmed_closed_pnl"),
-                "metadata_long_reduce_closed_pnl": long_fill_metadata.get("long_reduce_closed_pnl"),
-                "metadata_closed_pnl": long_fill_metadata.get("closed_pnl"),
-                "metadata_runtime_calculated_pnl": long_fill_metadata.get("runtime_calculated_pnl"),
-                "metadata_exec_pnl": long_fill_metadata.get("exec_pnl"),
-                "target_profit_usdt": target_profit_usdt,
-                "required_net": required_net,
-                "short_entry_price": short_entry_price,
-                "short_qty": short_qty,
-                "fee_rate": fee_rate,
-                "trigger_price": trigger_price,
-                "raw_trigger_price": raw_trigger_price,
-                "short_tp_min_threshold_pct_after_long_reduce": min_threshold_pct,
-                "short_tp_guard_long_avg": long_avg,
-                "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
-                "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
-                "short_tp_guard_applied": short_tp_guard_applied,
-                "break_even_price": float(state.get("latest_break_even_price") or 0.0),
-                "expected_short_tp_net": required_net,
-                "pending_cycle_loss_usdt_before": pending_before,
-                "pending_cycle_loss_usdt_after": pending_after,
-                "order_purpose": purpose,
-                "cycle_role": "short_reduce",
-                "required_price_move": required_price_move,
-                "required_short_gross": required_short_gross,
-            },
-        )
+            if stage_count == 2:
+                stage_weights = [0.4, 0.6]
+                ratios = [0.5, 1.0]
+            else:
+                stage_weights = [0.2, 0.3, 0.5]
+                ratios = [1.0 / 3.0, 2.0 / 3.0, 1.0]
+
+            # Plan Stages
+            delta = trigger_price - first_leg_fill_price
+            remaining_qty = short_qty
+            remaining_required_net = required_net
+            stages: list[dict[str, Any]] = []
+            for idx, (weight, ratio) in enumerate(zip(stage_weights, ratios)):
+                stage_required_net = weight * required_net
+                # linear Netto-Formel in qty → qty = stage_required_net / per_unit_net
+                stage_trigger_price_raw = first_leg_fill_price + ratio * delta
+                stage_trigger_price = self._normalize_price(stage_trigger_price_raw, runtime_state)
+                per_unit_net = compute_net(stage_trigger_price, 1.0)
+                if per_unit_net <= 0:
+                    # Fallback: keine weitere Stage bauen
+                    break
+                desired_qty = min(remaining_qty, max(stage_required_net / per_unit_net, 0.0))
+                if desired_qty <= 0:
+                    break
+                normalized_qty = self._normalize_qty(desired_qty, runtime_state)
+                if normalized_qty <= 0:
+                    break
+                if idx == stage_count - 1:
+                    # Letzte Stage bekommt Rest
+                    normalized_qty = remaining_qty
+
+                stage_net = compute_net(stage_trigger_price, normalized_qty)
+                remaining_qty = max(remaining_qty - normalized_qty, 0.0)
+                remaining_required_net = max(remaining_required_net - stage_net, 0.0)
+                stages.append(
+                    {
+                        "index": idx,
+                        "trigger_price": stage_trigger_price,
+                        "qty": normalized_qty,
+                        "expected_net": stage_net,
+                    }
+                )
+                if remaining_qty <= 0:
+                    break
+
+            if not stages:
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_no_valid_stages",
+                    symbol=active_trade_symbol,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
+
+            # Gesamt-required_net für Exit-Pricing pro Cycle merken
+            cycle_key = str(cycle_index)
+            required_map = state.setdefault("staged_second_leg_tp_required_net_total", {})
+            required_map[cycle_key] = required_net
+
+            logger.info(
+                "staged_second_leg_tp_plan_created",
+                extra={
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "stage_count": len(stages),
+                    "distance_pct_abs": distance_pct_abs,
+                    "threshold_pct": threshold_pct,
+                    "required_net_profit": required_net,
+                    "first_leg_fill_price": first_leg_fill_price,
+                    "final_second_leg_trigger_price": trigger_price,
+                    "stages": stages,
+                },
+            )
         metadata = {
             "cycle_index": cycle_index,
             "cycle_role": "short_reduce",
@@ -8348,6 +8987,92 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             qty=short_qty,
             trigger_price=trigger_price,
         )
+
+        # Staging: mehrere Second-Leg-TP-Intents mit Stage-Metadaten
+        if stage_count > 1 and not use_market_fallback and "stages" in locals() and stages:
+            intents: list[StrategyIntent] = []
+            first_leg_cycle_role = self._get_first_leg_cycle_role()
+            second_leg_cycle_role = self._get_second_leg_cycle_role()
+            for stage in stages:
+                stage_index = int(stage.get("index") or 0)
+                stage_trigger_price = float(stage.get("trigger_price") or 0.0)
+                stage_qty = float(stage.get("qty") or 0.0)
+                stage_expected_net = float(stage.get("expected_net") or 0.0)
+                if stage_qty <= 0 or stage_trigger_price <= 0:
+                    continue
+                stage_metadata = {
+                    **metadata,
+                    "is_staged_second_leg_tp": True,
+                    "stage_index": stage_index,
+                    "stage_count": len(stages),
+                    "stage_expected_net": stage_expected_net,
+                    "stage_required_net_total": required_net,
+                    "stage_trigger_price": stage_trigger_price,
+                    "first_leg_fill_price": first_leg_fill_price,
+                    "final_second_leg_trigger_price": trigger_price,
+                    "distance_pct_abs": distance_pct_abs,
+                    "threshold_pct": threshold_pct,
+                    "first_leg_cycle_role": first_leg_cycle_role,
+                    "second_leg_cycle_role": second_leg_cycle_role,
+                    "parent_second_leg_purpose": purpose,
+                }
+                if second_leg_cycle_role == "short_reduce":
+                    side = "short"
+                    position_idx = 2
+                elif second_leg_cycle_role == "long_reduce":
+                    side = "long"
+                    position_idx = 1
+                else:
+                    _emit_short_tp_follow_up_skip(
+                        "staged_second_leg_tp_unknown_cycle_role",
+                        symbol=active_trade_symbol,
+                        cycle_index=cycle_index,
+                        cycle_role=second_leg_cycle_role,
+                    )
+                    continue
+                intent = StrategyIntent(
+                    side=side,
+                    qty=stage_qty,
+                    purpose=purpose,
+                    order_type="Market",
+                    reduce_only=True,
+                    trigger_price=stage_trigger_price,
+                    trigger_direction=2,
+                    trigger_by="LastPrice",
+                    close_on_trigger=True,
+                    position_idx=position_idx,
+                    metadata=stage_metadata,
+                )
+                intents.append(intent)
+            if not intents:
+                _emit_short_tp_follow_up_skip(
+                    "staged_second_leg_tp_intents_empty",
+                    symbol=active_trade_symbol,
+                    long_fill_price=long_fill_price,
+                    short_qty=short_qty,
+                    trigger_price=trigger_price,
+                )
+                return []
+            _log_event(
+                "staged_second_leg_tp_intents_created",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "purpose": purpose,
+                    "stage_count": len(intents),
+                    "stages": [
+                        {
+                            "stage_index": m.metadata.get("stage_index") if hasattr(m, "metadata") else None,
+                            "qty": getattr(m, "qty", None),
+                            "trigger_price": getattr(m, "trigger_price", None),
+                        }
+                        for m in intents
+                    ],
+                },
+            )
+            return intents
+
+        # Single-TP-Intent (bestehender Pfad)
         intent = StrategyIntent(
             side="short",
             qty=short_qty,
@@ -8455,6 +9180,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "hard_stop_active": hard_stop_active,
             },
         )
+        if state.get("staged_second_leg_tp_realized_net") and bool(state.get("force_exit_rebuild")):
+            realized_map = state.get("staged_second_leg_tp_realized_net") or {}
+            required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+            cycle_key = str(current_cycle)
+            realized_total = float(realized_map.get(cycle_key) or 0.0)
+            required_total = float(required_map.get(cycle_key) or 0.0)
+            remaining_required_net = max(required_total - realized_total, 0.0) if required_total else 0.0
+            long_avg = float(snapshot.long_avg or 0.0)
+            exit_distance_pct_from_avg = (
+                ((tp_price - long_avg) / long_avg) * 100.0 if long_avg > 0 and tp_price > 0 else 0.0
+            )
+            _log_event(
+                "staged_second_leg_tp_exit_rebuild_pricing",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "current_cycle": current_cycle,
+                    "required_net": required_total,
+                    "realized_total_net": realized_total,
+                    "remaining_required_net": remaining_required_net,
+                    "old_exit_price": float(state.get("latest_tp_price") or 0.0),
+                    "new_exit_price": tp_price,
+                    "exit_distance_pct_from_avg": exit_distance_pct_from_avg,
+                    "long_avg": long_avg,
+                },
+            )
         if snapshot.long_qty <= 0 and snapshot.short_qty <= 0:
             logger.debug(
                 "fixed_cycle_exit_build_skipped_flat_snapshot %s",
@@ -9379,7 +10129,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return
         state = runtime_state.strategy_state
-        if not (state.get("cycle_long_add_filled") and state.get("cycle_short_tp_filled")):
+        staged_required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        cycle_key = str(cycle_index)
+        is_staged_cycle = cycle_key in staged_required_map
+        second_leg_filled_flag = bool(state.get("cycle_short_tp_filled"))
+        if is_staged_cycle:
+            # Für gestagte Second-Leg-TPs darf die Pair-Completion nicht am globalen Flag hängen,
+            # sondern ausschließlich an der pro-Cycle Staging-Logik.
+            complete, diag = self._is_staged_second_leg_cycle_complete(state, cycle_index)
+            if not complete:
+                if diag["stage_count"] <= 0 and diag["required_total_net"] <= 0.0:
+                    _log_event(
+                        "fixed_cycle_staged_second_leg_completion_insufficient_requirements",
+                        diag,
+                    )
+                return
+            second_leg_filled_flag = True
+        if not (state.get("cycle_long_add_filled") and second_leg_filled_flag):
             return
         cycle_state = self._ensure_cycle_state(runtime_state)
         counts_before = {
@@ -9520,6 +10286,86 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return
         state = runtime_state.strategy_state
+        entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+        metadata = dict(getattr(fill_event, "metadata", {}) or {})
+        normalized_second_leg_purpose = self._normalize_cycle_purpose(
+            current_purpose,
+            {"cycle_index": cycle_index, "cycle_role": self._get_second_leg_cycle_role()},
+        )
+        cycle_key = str(cycle_index)
+        staged_required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        is_staged_second_leg = bool(metadata.get("is_staged_second_leg_tp")) or (
+            cycle_key in staged_required_map
+        )
+        if is_staged_second_leg:
+            complete, diag = self._is_staged_second_leg_cycle_complete(state, cycle_index)
+            if not complete:
+                payload = {
+                    **diag,
+                    "purpose": current_purpose,
+                    "reason": "staged_second_leg_not_complete",
+                }
+                _log_event(
+                    "fixed_cycle_force_commit_staged_second_leg_waiting",
+                    payload,
+                )
+                return
+        previous_complete = bool(entry.get("complete"))
+        previous_second_leg_status = self._get_second_leg_status(entry)
+        if previous_second_leg_status != "FILLED":
+            self._set_second_leg_status(entry, "FILLED")
+        if not previous_complete:
+            entry["complete"] = True
+            _log_event(
+                "fixed_cycle_cycle_marked_complete",
+                {
+                    "cycle_index": cycle_index,
+                    "purpose": current_purpose,
+                    "source": "_force_commit_short_reduce_completion_even_if_duplicate",
+                },
+            )
+            _log_event(
+                "fixed_cycle_next_cycle_unlocked",
+                {
+                    "completed_cycle_index": cycle_index,
+                    "next_cycle_index": cycle_index + 1,
+                    "source": "_force_commit_short_reduce_completion_even_if_duplicate",
+                },
+            )
+        processed = set(state.get("processed_cycle_purposes") or [])
+        if normalized_second_leg_purpose not in processed:
+            processed.add(normalized_second_leg_purpose)
+            state["processed_cycle_purposes"] = sorted(processed)
+        if fill_event is not None:
+            second_leg_fill_price = (
+                self._safe_float((fill_event.metadata or {}).get("confirmed_closed_avg_price"), None)
+                or self._safe_float((fill_event.metadata or {}).get("closed_avg_price"), None)
+                or self._safe_float(getattr(fill_event, "exec_price", None), None)
+                or self._safe_float(entry.get("long_reduce_fill_price"), None)
+            )
+            if (
+                self._get_second_leg_cycle_role() == "long_reduce"
+                and second_leg_fill_price is not None
+                and second_leg_fill_price > 0
+            ):
+                previous_long_reduce_fill_price = self._safe_float(
+                    entry.get("long_reduce_fill_price"), 0.0
+                )
+                entry["long_reduce_fill_price"] = float(second_leg_fill_price)
+                entry["long_reduce_fill_confirmed"] = True
+                _log_event(
+                    "fixed_cycle_long_reduce_fill_price_state_set",
+                    {
+                        "symbol": self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "purpose": normalized_second_leg_purpose,
+                        "long_reduce_fill_price": float(second_leg_fill_price),
+                        "source": "force_commit",
+                        "previous_long_reduce_fill_price": previous_long_reduce_fill_price,
+                        "long_reduce_fill_confirmed": True,
+                        "long_reduce_status": entry.get("long_reduce_status"),
+                    },
+                )
         snapshot = runtime_state.last_snapshot
         computed_counts_before = counts_before or {
             "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
@@ -9556,6 +10402,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             computed_counts_before,
             computed_counts_after,
         )
+        # Nach forced completion den Sequencer explizit anhand der jetzt vollständigen
+        # processed_cycle_purposes auf den nächsten Cycle weiterschieben.
+        self._recover_cycle_sequence_state(runtime_state, state)
+        self._persist_cycle_sequence_state(runtime_state)
         self._mark_refill_required_after_cycle_pair(
             runtime_state,
             cycle_index=cycle_index,
@@ -10081,6 +10931,38 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "exchange_order_id": fill_event.exchange_order_id,
                         },
                     )
+                    # Persist a zero-PnL confirmed history row for the refill fill so that
+                    # dashboard detail views can show the refill/rebuy between cycle reduces.
+                    trade_block_id = state.get("trade_block_id") or state.get("last_trade_block_id")
+                    try:
+                        self._write_confirmed_order_pnl_history(
+                            {
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "symbol": snapshot.symbol or self.config.symbol,
+                                "exchange_order_id": fill_event.exchange_order_id,
+                                "client_order_id": fill_event.client_order_id,
+                                "purpose": purpose,
+                                "closed_pnl": 0.0,
+                                "trade_block_id": trade_block_id,
+                                "cycle_index": cycle_index or None,
+                                "pnl_scope": "refill",
+                                "pnl_source": "refill",
+                                "confirmed_via": "refill_fill",
+                            },
+                            runtime_state=runtime_state,
+                        )
+                    except Exception:
+                        _log_warning_event(
+                            "fixed_cycle_refill_confirmed_history_write_failed",
+                            {
+                                "symbol": snapshot.symbol or self.config.symbol,
+                                "purpose": purpose,
+                                "trade_block_id": trade_block_id,
+                                "cycle_index": cycle_index,
+                                "client_order_id": fill_event.client_order_id,
+                                "exchange_order_id": fill_event.exchange_order_id,
+                            },
+                        )
                 self._mark_exit_orders_stale_after_structure_fill(
                     runtime_state,
                     fill_event=fill_event,
@@ -10177,6 +11059,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_role = metadata.get("cycle_role") or (
             "long_reduce" if "LONG" in normalized_purpose else "short_reduce"
         )
+        is_staged_second_leg = bool((metadata or {}).get("is_staged_second_leg_tp"))
         is_long_add_fill = (
             cycle_role == "long_reduce"
             and "LONG_ADD" in (fill_event.purpose or "").upper()
@@ -10216,25 +11099,40 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         },
                     )
             if not short_first_leg_requires_confirmed_pnl or confirmed_first_leg_pnl_ready:
-                sequence_result = advance_cycle_sequence_after_fill(
-                    fill_event.purpose or "", state, self._sequence_config
-                )
-                event_type = sequence_result.get("type")
-                if event_type:
-                    event_name = {
-                        "step_transition": "fixed_cycle_cycle_step_transition",
-                        "pair_completed": "fixed_cycle_cycle_pair_completed",
-                        "unexpected_fill": "fixed_cycle_sequence_unexpected_fill_detected",
-                    }.get(event_type)
-                    if event_name:
-                        _log_event(
-                            event_name,
-                            {
-                                "symbol": symbol or self.config.symbol,
-                                "category": self.config.category,
-                                **sequence_result.get("payload", {}),
-                            },
-                        )
+                # WICHTIG: Für gestagte Second-Leg-Orders darf der Sequencer das Pair erst dann
+                # als "completed" betrachten, wenn der gestagte Second-Leg-TP für GENAU diesen
+                # Cycle aus Sicht der PnL-Logik abgeschlossen ist. Einzelne Stage-Fills dürfen
+                # den active_cycle_index NICHT auf den nächsten Cycle hochschalten.
+                should_advance_sequence = True
+                if is_staged_second_leg and normalized_purpose == second_leg_purpose:
+                    staged_required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+                    cycle_key = str(cycle_index)
+                    total_required = float(staged_required_map.get(cycle_key) or 0.0)
+                    realized_map = state.get("staged_second_leg_tp_realized_net") or {}
+                    total_after = float(realized_map.get(cycle_key) or 0.0)
+                    pnl_completed = total_required > 0.0 and total_after >= total_required - 1e-8
+                    if not pnl_completed:
+                        should_advance_sequence = False
+                if should_advance_sequence:
+                    sequence_result = advance_cycle_sequence_after_fill(
+                        fill_event.purpose or "", state, self._sequence_config
+                    )
+                    event_type = sequence_result.get("type")
+                    if event_type:
+                        event_name = {
+                            "step_transition": "fixed_cycle_cycle_step_transition",
+                            "pair_completed": "fixed_cycle_cycle_pair_completed",
+                            "unexpected_fill": "fixed_cycle_sequence_unexpected_fill_detected",
+                        }.get(event_type)
+                        if event_name:
+                            _log_event(
+                                event_name,
+                                {
+                                    "symbol": symbol or self.config.symbol,
+                                    "category": self.config.category,
+                                    **sequence_result.get("payload", {}),
+                                },
+                            )
         if cycle_index > 0 and field_name:
             entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
             previous_status = str(entry.get(field_name) or "NONE").upper()
@@ -11032,7 +11930,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "fixed_cycle_initial_structure_build_allowed_after_reconcile",
                     payload,
                 )
+                # allow_build wurde vom Aufrufer auf False gesetzt, ist aber nach Reconcile erlaubt.
+                # Für Logs explizit markieren, dass wir es lokal auf True promoten.
+                payload["allow_build_original"] = payload.get("allow_build", False)
                 allow_build = True
+                payload["allow_build"] = True
+                payload["allow_build_promoted_after_reconcile"] = True
             else:
                 _log_event(
                     "fixed_cycle_initial_structure_build_blocked_with_reason",
@@ -11062,14 +11965,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if not previously_confirmed:
             self._reset_exit_state_for_new_structure(runtime_state, "initial_entry_confirmed")
         intents = self._rebuild_structure(snapshot, runtime_state, context, reason=rebuild_reason)
-        state["initial_structure_built"] = True
+
+        # Nur dann als vollständige Initial-Struktur markieren, wenn
+        # - der erwartete First-Leg-Cycle-Intent vorhanden ist und
+        # - beide Exit-Intents (LONG_TP_EXIT, SHORT_SL_EXIT) vorhanden sind.
+        cycle_index = int(state.get("current_effective_cycle") or 0) + 1
         purposes = [intent.purpose for intent in intents]
+        first_leg_purpose = self._get_first_leg_purpose(cycle_index)
+        exit_purposes = {
+            self.LONG_TP_EXIT_PURPOSE,
+            self.SHORT_SL_EXIT_PURPOSE,
+        }
+        purpose_set = set(purposes)
+        has_first_leg = first_leg_purpose in purpose_set
+        has_all_exits = exit_purposes.issubset(purpose_set)
+        initial_complete = has_first_leg and has_all_exits
+        state["initial_structure_built"] = initial_complete
         _log_event(
             "fixed_cycle_initial_structure_build_once_triggered",
             {
                 **{
                     **payload,
-                    "initial_structure_built": True,
+                    "initial_structure_built": initial_complete,
                 },
                 "reason": rebuild_reason,
             },
@@ -14612,8 +15529,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _get_second_leg_status_field(self) -> str:
         return "short_tp_status"
 
+    def _second_leg_fill_price_field(self) -> str:
+        return "short_reduce_fill_price"
+
+    def _second_leg_fill_confirmed_field(self) -> str:
+        return "short_reduce_fill_confirmed"
+
     def _get_second_leg_cycle_role(self) -> str:
-        return "short_tp_pair"
+        # Für die Basisstrategie (Long-Bot) ist das zweite Cycle-Bein
+        # ein Short-Reduce-TP und wird deshalb als "short_reduce" geführt.
+        # Der Short-Bot überschreibt diese Methode mit "long_reduce".
+        return "short_reduce"
 
     def _get_second_leg_purpose(self, cycle_index: int) -> str:
         return purpose_mapping.cycle_short_reduce(cycle_index)
@@ -15154,6 +16080,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
         if normalized_status == "FILLED":
             processed = set(state.get("processed_cycle_purposes") or [])
+            # Für gestagte Second-Leg-TPs darf die Cycle-Purpose erst dann als processed gelten,
+            # wenn der gestagte TP insgesamt abgeschlossen ist (alle Stages gefüllt oder Nettoprofit gedeckt).
+            is_staged_second_leg = bool((metadata or {}).get("is_staged_second_leg_tp"))
+            if is_staged_second_leg:
+                # Stage-Fill: Status-Feld kann auf FILLED gehen, aber Purpose bleibt vorerst unprocessed.
+                # Ob der Cycle wirklich abgeschlossen ist, entscheidet ausschließlich
+                # die pro-Cycle Staging-Logik in _complete_cycle_entry_if_done.
+                self._complete_cycle_entry_if_done(runtime_state, cycle_index, purpose)
+                return
             if normalized_purpose not in processed:
                 processed.add(normalized_purpose)
                 state["processed_cycle_purposes"] = sorted(processed)
@@ -15194,7 +16129,33 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> None:
         if cycle_index <= 0:
             return
+        state = runtime_state.strategy_state
+        # Für gestagte Second-Leg-TPs darf der Cycle erst dann als vollständig gelten,
+        # wenn die gestagte Second-Leg-TP-Logik den Abschluss für GENAU diesen Cycle signalisiert.
+        # Dafür verwenden wir die pro-Cycle Nettoprofit-Maps, nicht das globale Flag cycle_short_tp_filled.
+        staged_required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        cycle_key = str(cycle_index)
+        is_staged_cycle = cycle_key in staged_required_map
+        if is_staged_cycle:
+            complete, diag = self._is_staged_second_leg_cycle_complete(state, cycle_index)
+            if not complete:
+                if diag["stage_count"] <= 0 and diag["required_total_net"] <= 0.0:
+                    _log_event(
+                        "fixed_cycle_staged_second_leg_completion_insufficient_requirements",
+                        diag,
+                    )
+                # Für diesen gestagten Cycle ist der TP aus Sicht der Staging-Logik
+                # noch nicht vollständig.
+                return
         entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+        # Root-Cause-Härtung: Wenn ein gestagter Second-Leg-TP für diesen Cycle laut PnL-Logik
+        # abgeschlossen ist, der direction-neutrale Second-Leg-Status aber noch auf
+        # "NONE"/nicht-FILLED steht, setzen wir ihn hier explizit auf "FILLED", damit der Cycle
+        # konsistent als vollständig gelten kann.
+        if is_staged_cycle:
+            second_leg_status = self._get_second_leg_status(entry)
+            if second_leg_status != "FILLED":
+                self._set_second_leg_status(entry, "FILLED")
         first_leg_field = self._get_first_leg_status_field()
         if (
             entry.get(first_leg_field) != "FILLED"
@@ -16481,7 +17442,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
 
     def _blacklist_file_path(self) -> Path:
-        return Path("live_bots") / "100_50_hedge_bot" / "state" / "blacklisted_symbols.json"
+        """
+        Resolve the blacklist file path in the same way as the runtime:
+        - Absolute path rooted at the project root (two levels above this file)
+        - Grouped by bot_name / strategy_side into long vs short hedge groups.
+        """
+        from pathlib import Path as _Path  # local import to avoid cycles at module import time
+
+        project_root = _Path(__file__).resolve().parents[1]
+        bot_name = getattr(self.config, "bot_name", None)
+        strategy_side = getattr(self.config, "strategy_side", None)
+
+        if (isinstance(bot_name, str) and bot_name.startswith("short_bot_")) or strategy_side == "short":
+            base = project_root / "live_bots" / "short_hedge_bot"
+        else:
+            base = project_root / "live_bots" / "100_50_hedge_bot"
+
+        path = base / "state" / "blacklisted_symbols.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
 
     def _load_blacklisted_symbols(self) -> dict[str, dict[str, Any]]:
         path = self._blacklist_file_path()
@@ -17465,6 +18444,40 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             or "_SHORT_TP" in normalized
         )
 
+    def _is_staged_second_leg_cycle_complete(
+        self,
+        state: dict[str, Any],
+        cycle_index: int,
+    ) -> tuple[bool, dict[str, Any]]:
+        cycle_key = str(cycle_index)
+        required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        realized_map = state.get("staged_second_leg_tp_realized_net") or {}
+        filled_map = state.get("staged_second_leg_tp_filled_stages") or {}
+        stage_count_map = state.get("staged_second_leg_tp_stage_count") or {}
+
+        total_required = float(required_map.get(cycle_key) or 0.0)
+        total_after = float(realized_map.get(cycle_key) or 0.0)
+        filled_stages = list(filled_map.get(cycle_key) or [])
+        stage_count = int(stage_count_map.get(cycle_key) or 0)
+
+        completed_by_pnl = total_required > 0.0 and total_after >= total_required - 1e-8
+        all_stages_done = stage_count > 0 and len(filled_stages) >= stage_count
+
+        complete = completed_by_pnl or all_stages_done
+
+        diagnostics = {
+            "cycle_index": cycle_index,
+            "cycle_key": cycle_key,
+            "stage_count": stage_count,
+            "filled_stages": filled_stages,
+            "realized_total_net": total_after,
+            "required_total_net": total_required,
+            "completed_by_pnl": completed_by_pnl,
+            "all_stages_done": all_stages_done,
+        }
+
+        return complete, diagnostics
+
     def _is_refill_mode_active(self, state: dict[str, Any]) -> bool:
         """Answer whether refill lifecycle protection is currently holding."""
         return bool(
@@ -17562,6 +18575,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         symbol = self._active_trade_symbol(snapshot, runtime_state, fill_event=fill_event) or self.config.symbol
         long_qty = float(snapshot.long_qty or 0.0) if snapshot else 0.0
         short_qty = float(snapshot.short_qty or 0.0) if snapshot else 0.0
+
+        if (fill_event.metadata or {}).get("is_staged_second_leg_tp"):
+            _log_event(
+                "staged_second_leg_tp_exit_rebuild_requested",
+                {
+                    "symbol": symbol,
+                    "fill_purpose": fill_event.purpose,
+                    "cycle_index": (fill_event.metadata or {}).get("cycle_index"),
+                    "stage_index": (fill_event.metadata or {}).get("stage_index"),
+                    "stage_count": (fill_event.metadata or {}).get("stage_count"),
+                },
+            )
 
         if self._is_refill_mode_active(state):
             state["force_exit_rebuild"] = False
@@ -19222,6 +20247,12 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
     def _get_second_leg_status_field(self) -> str:
         return "long_reduce_status"
 
+    def _second_leg_fill_price_field(self) -> str:
+        return "long_reduce_fill_price"
+
+    def _second_leg_fill_confirmed_field(self) -> str:
+        return "long_reduce_fill_confirmed"
+
     def _first_leg_pending_field(self) -> str:
         return "short_reduce_pending"
 
@@ -19246,4 +20277,8 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
         if cycle_index > 0 and field_name == self._get_second_leg_status_field():
             return self._get_second_leg_purpose(cycle_index)
         return super()._normalize_cycle_purpose(purpose, metadata)
+
+    def _is_second_leg_purpose(self, purpose: str) -> bool:
+        normalized = self._normalize_cycle_purpose(purpose)
+        return bool(re.fullmatch(r"CYCLE_\d+_LONG_REDUCE", normalized))
 

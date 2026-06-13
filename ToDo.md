@@ -100,6 +100,10 @@ sudo journalctl -u coin_scanner.service --since "2026-05-17" --no-pager
 sudo systemctl status coin_scanner.service --no-pager
 sudo systemctl status coin_scanner.timer --no-pager
 
+Uberschreiben:
+sudo chown telgenbuescher:telgenbuescher logs/best_coin.json
+chmod 644 logs/best_coin.json
+
 ####################################### Start/Stop Bot ##########################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
@@ -181,71 +185,5 @@ live_bots/100_50_hedge_bot/long_bot_1/scripts/stop_with_cleanup.sh
 ok check jetzt wieder warum die cycle und exit orders nicht gestetzt wurden 
 
 /home/telgenbuescher/projects/spread_recovery_hedge
-
-
-
-
-
-
-Wichtig:
-Bitte nichts Neues erfinden.
-Erst den bestehenden Referenz-Long-Bot unter /home/telgenbuescher/projects/spread_recovery_hedge analysieren.
-Dann die dort vorhandene Lösung exakt gespiegelt für den Short-Bot übernehmen.
-Keine neue Architektur, keine neue State-Machine, keine alternativen Regeln.
-
-
-
-
-Neue Regel: Forward-Looking Recovery Check
-
-Nach jedem wichtigen Fill muss der Bot simulieren:
-
-Was wäre die nächste Cycle-Order?
-
-Zum Beispiel nach einem Cycle-Fill:
-
-aktueller Preis = 0.006927
-nächste geplante Cycle-Order = 0.004451
-
-Distanz:
-(0.006927 - 0.004451) / 0.006927 = ca. 35.7%
-
-Dann darf der Bot nicht sagen:
-
-Okay, ich warte.
-
-Sondern:
-
-Diese nächste Order ist viel zu weit weg.
-Recovery jetzt aktivieren.
-Recovery soll passieren, solange Ratio noch sauber ist
-
-Das ist der entscheidende Teil von dir:
-
-solange unsere Ratio noch 10:5 ist
-
-Also solange z. B.:
-
-Long : Short ≈ 2 : 1
-
-oder im aktuellen Beispiel:
-
-Long 47.83$
-Short 31.88$
-Ratio ca. 1.5 : 1
-
-Dann können wir noch kontrolliert auffüllen.
-
-Wenn wir zu lange warten, wird die Struktur kaputt:
-
-eine Seite zu klein
-andere Seite zu groß
-Avg zu weit weg
-nächste Cycle-Order unrealistisch tief/hoch
-
-Dann wird Recovery teuer und riskant.
-
-
-Wenn LONG_REDUCE > X% über long_avg:
 
 

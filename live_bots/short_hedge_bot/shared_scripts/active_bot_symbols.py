@@ -36,16 +36,41 @@ def _blacklist_file_path(state_dir: Path) -> Path:
     return path
 
 
-def _load_blacklisted_symbols(state_dir: Path) -> dict[str, dict[str, object]]:
+def _load_blacklisted_symbols(
+    state_dir: Path,
+    *,
+    bot_name: str | None = None,
+) -> dict[str, dict[str, object]]:
+    """
+    Load the group-wide blacklist and emit a debug log with the resolved path.
+    """
     path = _blacklist_file_path(state_dir)
+    prefix = f"[{bot_name}]" if bot_name else "[active_bot_symbols]"
     if not path.exists():
+        print(
+            f"{prefix} active_symbol_blacklist_file_loaded path={path} symbol_count=0 symbols=[]",
+            flush=True,
+        )
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8") or "{}")
     except Exception:
+        print(
+            f"{prefix} active_symbol_blacklist_file_loaded path={path} symbol_count=0 symbols=[] (invalid JSON)",
+            flush=True,
+        )
         return {}
     if not isinstance(payload, dict):
+        print(
+            f"{prefix} active_symbol_blacklist_file_loaded path={path} symbol_count=0 symbols=[] (non-dict payload)",
+            flush=True,
+        )
         return {}
+    keys = list(payload.keys())
+    print(
+        f"{prefix} active_symbol_blacklist_file_loaded path={path} symbol_count={len(keys)} symbols={keys}",
+        flush=True,
+    )
     return payload
 
 
@@ -180,7 +205,7 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                 )
                 return 3
 
-            blacklist = _load_blacklisted_symbols(state_path.parent)
+            blacklist = _load_blacklisted_symbols(state_path.parent, bot_name=bot_name)
             candidate_symbols, reason, candidate_count = _read_best_coin_candidates(best_coin_path)
             if not candidate_symbols:
                 if reason:
@@ -203,11 +228,22 @@ def reserve_symbol(args: argparse.Namespace) -> int:
                     status = meta.get("status")
                     sym = meta.get("symbol")
                     if status == "reserved" and sym:
-                        reserved_by_symbol[sym] = other_bot
+                        reserved_by_symbol[str(sym)] = other_bot
                 current_entry = state.get(bot_name)
                 if current_entry and current_entry.get("status") == "reserved":
-                    current_symbol = current_entry.get("symbol")
-                    if current_symbol in candidate_symbols:
+                    current_symbol_raw = current_entry.get("symbol")
+                    current_symbol = _normalize_symbol(str(current_symbol_raw) if current_symbol_raw is not None else None)
+                    if current_symbol and current_symbol in blacklist:
+                        entry = blacklist.get(current_symbol, {}) or {}
+                        detail = entry.get("reason") or f"bybit_{entry.get('ret_code')}_blocked" if entry.get("ret_code") is not None else "blacklisted"
+                        print(
+                            f"[{bot_name}] dynamic_symbol_existing_reservation_blacklisted_released symbol={current_symbol} reason={detail}",
+                            flush=True,
+                        )
+                        # Drop the stale reservation so that a new, non-blacklisted candidate can be chosen below.
+                        state.pop(bot_name, None)
+                        _write_state(state_path, state)
+                    elif current_symbol and current_symbol in candidate_symbols:
                         print(
                             f"[{bot_name}] already reserved {current_symbol}; keeping reservation",
                             flush=True,
@@ -291,6 +327,24 @@ def release_symbol(args: argparse.Namespace) -> int:
 
 def main() -> int:
     args = parse_args()
+    # Log the resolved CLI / file paths once for easier debugging.
+    try:
+        state_dir = args.state_file.parent
+        blacklist_path = _blacklist_file_path(state_dir)
+        print(
+            f"[{args.bot_name}] active_symbol_cli_invocation "
+            f"command={args.command} "
+            f"script_path={Path(__file__).resolve()} "
+            f"state_file={args.state_file} "
+            f"lock_file={args.lock_file} "
+            f"bot_group_dir={args.bot_group_dir} "
+            f"blacklist_file={blacklist_path} "
+            f"cwd={os.getcwd()}",
+            flush=True,
+        )
+    except Exception:
+        # Best-effort logging only; never fail the command because of debug logging.
+        pass
     if args.command == "reserve":
         if not args.best_coin_file:
             print("best_coin_file is required for reserve", file=sys.stderr)

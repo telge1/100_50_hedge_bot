@@ -120,8 +120,8 @@ if [[ -f "${WAIT_PID_FILE}" ]]; then
   echo "[${BOT_NAME}] releasing symbol reservation..."
   set +e
   "${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/active_bot_symbols.py" \
-    --bot-name "${BOT_NAME}" \
     release \
+    --bot-name "${BOT_NAME}" \
     --state-file "${STATE_FILE}" \
     --lock-file "${LOCK_FILE}"
   RELEASE_CODE=$?
@@ -195,8 +195,8 @@ echo "[${BOT_NAME}] stop_with_cleanup_success"
 echo "[${BOT_NAME}] releasing symbol reservation..."
 set +e
 "${PYTHON_CMD}" "${BOT_GROUP_DIR}/shared_scripts/active_bot_symbols.py" \
-  --bot-name "${BOT_NAME}" \
   release \
+  --bot-name "${BOT_NAME}" \
   --state-file "${STATE_FILE}" \
   --lock-file "${LOCK_FILE}"
 RELEASE_CODE=$?
