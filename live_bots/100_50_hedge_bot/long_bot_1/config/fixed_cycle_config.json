@@ -11,6 +11,8 @@
   "best_coin_max_age_minutes": 45,
   "dynamic_symbol_hold_minutes": 0,
   
+  "time_distance_refill_trigger_minutes": 2,
+  
   "base_notional_usdt": 50.0,
   "hedge_ratio_short": 0.5,
   

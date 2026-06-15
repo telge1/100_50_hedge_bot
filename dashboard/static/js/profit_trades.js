@@ -968,7 +968,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!rows.length) {
                     tableWrapper.innerHTML = "<div class='detail-message'>Keine Details gefunden.</div>";
                 } else {
-                    const header = ["Zeit", "Symbol", "Order-ID", "PnL", "Wallet danach", "Purpose"];
+                    const header = [
+                        "Zeit",
+                        "Symbol",
+                        "Order-ID",
+                        "PnL",
+                        "Wallet danach",
+                        "Purpose",
+                        "Stage",
+                        "Qty",
+                    ];
                     const table = document.createElement("table");
                     table.classList.add("detail-table");
                     const thead = document.createElement("thead");
@@ -983,15 +992,36 @@ document.addEventListener("DOMContentLoaded", () => {
                     const tbody = document.createElement("tbody");
                     rows.forEach((row) => {
                         const tr = document.createElement("tr");
+                        const pnlValue = Number(row.pnl_usdt ?? 0);
+                        const pnlClass =
+                            pnlValue > 0 ? "profit-positive" : pnlValue < 0 ? "profit-negative" : "";
+                        const stageLabel = (() => {
+                            if (row.stage_index && row.stage_count) {
+                                return `${row.stage_index}/${row.stage_count}`;
+                            }
+                            const splitIndex = row.split_index;
+                            const splitCount = row.split_count;
+                            if (splitCount && splitIndex != null) {
+                                // split_index ist 0-basiert, Anzeige soll 1/2, 2/2 etc. sein.
+                                return `${splitIndex + 1}/${splitCount}`;
+                            }
+                            return "-";
+                        })();
+                        const qtyLabel =
+                            row.qty != null && row.qty !== ""
+                                ? String(row.qty)
+                                : "-";
                         tr.innerHTML = `
                             <td>${row.time_label || "-"}</td>
                             <td>${row.symbol || "-"}</td>
                             <td>${row.order_id || "-"}</td>
-                            <td class="${row.pnl_usdt > 0 ? "profit-positive" : row.pnl_usdt < 0 ? "profit-negative" : ""}">
-                                ${row.pnl_usdt || 0}
+                            <td class="${pnlClass}">
+                                ${Number.isFinite(pnlValue) ? pnlValue : 0}
                             </td>
                             <td>${row.wallet_after || "-"}</td>
                             <td>${row.purpose || "-"}</td>
+                            <td>${stageLabel}</td>
+                            <td>${qtyLabel}</td>
                         `;
                         tbody.appendChild(tr);
                     });

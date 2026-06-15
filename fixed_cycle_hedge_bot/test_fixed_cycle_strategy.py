@@ -12,6 +12,7 @@ from fixed_cycle_hedge_bot import cleanup
 from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
     FixedCycleHedgeConfig,
     FixedCycleHedgeStrategy,
+    ShortFixedCycleHedgeStrategy,
     FINAL_EXIT_PNL_FETCH_MAX_ATTEMPTS,
 )
 from fixed_cycle_hedge_bot.models import ActiveOrderSnapshot, FillEvent, HedgeSnapshot, ManagedOrder, StrategyIntent
@@ -2249,6 +2250,770 @@ class FixedCycleStrategyTests(unittest.TestCase):
         event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
         self.assertIn("fixed_cycle_short_reduce_pnl_confirmed", event_names)
         self.assertIn("fixed_cycle_refill_triggered", event_names)
+
+    def test_normal_cycle_second_leg_split_helper_allows_non_cycle1(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=100.0,
+            long_qty=1.0,
+            short_qty=0.9,
+            long_avg=100.0,
+            short_avg=100.0,
+            source="test",
+        )
+
+        intents = runtime.strategy._maybe_build_normal_cycle_second_leg_split_intents(
+            cycle_index=3,
+            purpose="CYCLE_3_SHORT_REDUCE",
+            qty=0.9,
+            trigger_price=100.0,
+            snapshot=snapshot,
+            runtime_state=runtime.runtime_state,
+            side="short",
+            position_idx=2,
+            trigger_direction=2,
+            metadata={"cycle_index": 3, "cycle_role": "short_reduce"},
+        )
+
+        self.assertIsNotNone(intents)
+        assert intents is not None
+        self.assertEqual(len(intents), 3)
+        self.assertTrue(all(intent.metadata.get("normal_cycle_second_leg_split") for intent in intents))
+        self.assertEqual({intent.metadata.get("split_cycle_index") for intent in intents}, {3})
+        self.assertEqual(
+            runtime.runtime_state.strategy_state.get("normal_cycle_second_leg_split_stage_count", {}).get("3"),
+            3,
+        )
+
+    def test_normal_cycle_second_leg_split_falls_back_to_single_order_when_min_notional_blocks(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        # Konfiguriere hohe Mindestnotional, so dass selbst 2er-Split nicht möglich ist.
+        runtime.strategy.config.min_notional_usdt = 1000.0
+        snapshot = HedgeSnapshot(
+            symbol="BTCUSDT",
+            current_price=10.0,
+            long_qty=1.0,
+            short_qty=1.0,
+            long_avg=10.0,
+            short_avg=10.0,
+            source="test",
+        )
+        state = runtime.runtime_state.strategy_state
+
+        intents = runtime.strategy._maybe_build_normal_cycle_second_leg_split_intents(
+            cycle_index=1,
+            purpose="CYCLE_1_SHORT_REDUCE",
+            qty=0.9,
+            trigger_price=10.0,
+            snapshot=snapshot,
+            runtime_state=runtime.runtime_state,
+            side="short",
+            position_idx=2,
+            trigger_direction=2,
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
+        )
+
+        # Split-Helper muss in diesem Szenario auf None zurückfallen.
+        self.assertIsNone(intents)
+        # Es darf kein Recovery-Staging-State aufgebaut werden.
+        self.assertFalse(
+            bool(state.get("staged_second_leg_tp_required_net_total")),
+            msg="Recovery-Staging-Maps dürfen im normalen Split-Fallback nicht gefüllt werden",
+        )
+
+    def test_loss_based_second_leg_recovery_uses_two_stages_within_final_price_cap(self) -> None:
+        order_manager = FakeOrderManager()
+        strategy = ShortFixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.0000001,
+                qty_step=1.0,
+                min_order_qty=1.0,
+                min_notional_usdt=5.0,
+                reduction_pct_per_fill=25,
+                target_profit_usdt=0.0,
+                max_post_recovery_long_reduce_distance_pct=5.0,
+            )
+        )
+        runtime = GenericHedgeRuntime(
+            GenericRuntimeConfig(
+                api_key="key",
+                secret_key="secret",
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                min_order_value=1.0,
+                ensure_exchange_ready=False,
+                audit_log_file=None,
+            ),
+            strategy,
+            logger=logging.getLogger("test.fixed_cycle.loss_based_split"),
+            order_manager=order_manager,
+        )
+
+        state = runtime.runtime_state.strategy_state
+        cycle_index = 1
+        state["cycle_state"] = strategy._default_cycle_state()
+        state["cycle_waiting_for_long_reduce"] = True
+        state["long_reduce_pending_cycle"] = cycle_index
+        state["pending_long_cycle_index"] = cycle_index
+        state["active_cycle_index"] = cycle_index
+        state["next_required_purpose"] = f"CYCLE_{cycle_index}_LONG_REDUCE"
+        state["pending_cycle_loss_usdt"] = 0.01
+        state["initial_long_qty"] = 32700.0
+        state["bot_state"] = strategy.STATE_RUNNING
+
+        cycle_state = state["cycle_state"]
+        cycle_state["short_fills"] = {
+            str(cycle_index): {
+                "price": 0.0015315,
+                "qty": 16300.0,
+            }
+        }
+        cycle_state["last_confirmed_short_fill_price"] = 0.0015315
+
+        entry = strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[strategy._get_first_leg_status_field()] = "FILLED"
+        entry["long_add_confirmed_pnl"] = -0.01
+        entry["short_reduce_fill_price"] = 0.0015315
+        entry["short_reduce_status"] = "FILLED"
+
+        snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0015305,
+            long_qty=32700.0,
+            short_qty=49100.0,
+            long_avg=0.0015288,
+            short_avg=0.0015287,
+            source="test",
+        )
+
+        with (
+            patch.object(strategy, "_fixed_long_cycle_qty", return_value=8000.0),
+            patch.object(strategy, "_can_submit_cycle_intent", return_value=(True, "", {})),
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+        ):
+            intents = strategy._build_short_tp_follow_up(
+                snapshot, runtime.runtime_state, runtime.context
+            )
+
+        self.assertEqual(len(intents), 2)
+        self.assertTrue(all(intent.metadata.get("is_staged_second_leg_tp") for intent in intents))
+        self.assertFalse(
+            any(intent.metadata.get("normal_cycle_second_leg_split") for intent in intents)
+        )
+        stage_prices = [float(intent.trigger_price or 0.0) for intent in intents]
+        self.assertEqual(len(stage_prices), len(set(stage_prices)))
+        self.assertLess(stage_prices[0], stage_prices[1])
+        self.assertLessEqual(stage_prices[1], 0.0015319)
+        self.assertEqual([float(intent.qty or 0.0) for intent in intents], [4000.0, 4000.0])
+        expected_first_stage_price = strategy._normalize_price(
+            0.0015315 + 0.5 * (0.0015318 - 0.0015315),
+            runtime.runtime_state,
+        )
+        self.assertAlmostEqual(stage_prices[0], expected_first_stage_price, places=7)
+
+        total_expected_net = sum(
+            float((intent.metadata or {}).get("stage_expected_net") or 0.0) for intent in intents
+        )
+        self.assertGreaterEqual(total_expected_net + 1e-8, 0.01)
+        self.assertEqual(
+            state.get("staged_second_leg_tp_stage_count", {}).get(str(cycle_index)),
+            len(intents),
+        )
+        self.assertFalse(bool(state.get("normal_cycle_second_leg_split_stage_count")))
+
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("loss_based_second_leg_staging_plan_selected", event_names)
+        self.assertNotIn("fixed_cycle_normal_cycle_second_leg_split_created", event_names)
+
+    def test_loss_based_second_leg_recovery_uses_three_stages_within_final_price_cap(self) -> None:
+        order_manager = FakeOrderManager()
+        strategy = ShortFixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.0000001,
+                qty_step=1.0,
+                min_order_qty=1.0,
+                min_notional_usdt=5.0,
+                reduction_pct_per_fill=25,
+                target_profit_usdt=0.0,
+                max_post_recovery_long_reduce_distance_pct=5.0,
+            )
+        )
+        runtime = GenericHedgeRuntime(
+            GenericRuntimeConfig(
+                api_key="key",
+                secret_key="secret",
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                min_order_value=1.0,
+                ensure_exchange_ready=False,
+                audit_log_file=None,
+            ),
+            strategy,
+            logger=logging.getLogger("test.fixed_cycle.loss_based_split_three"),
+            order_manager=order_manager,
+        )
+
+        state = runtime.runtime_state.strategy_state
+        cycle_index = 1
+        state["cycle_state"] = strategy._default_cycle_state()
+        state["cycle_waiting_for_long_reduce"] = True
+        state["long_reduce_pending_cycle"] = cycle_index
+        state["pending_long_cycle_index"] = cycle_index
+        state["active_cycle_index"] = cycle_index
+        state["next_required_purpose"] = f"CYCLE_{cycle_index}_LONG_REDUCE"
+        state["pending_cycle_loss_usdt"] = 0.005
+        state["initial_long_qty"] = 32700.0
+        state["bot_state"] = strategy.STATE_RUNNING
+
+        cycle_state = state["cycle_state"]
+        cycle_state["short_fills"] = {str(cycle_index): {"price": 0.0015308, "qty": 16300.0}}
+        cycle_state["last_confirmed_short_fill_price"] = 0.0015308
+
+        entry = strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[strategy._get_first_leg_status_field()] = "FILLED"
+        entry["long_add_confirmed_pnl"] = -0.005
+        entry["short_reduce_fill_price"] = 0.0015308
+        entry["short_reduce_status"] = "FILLED"
+
+        snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0015305,
+            long_qty=32700.0,
+            short_qty=49100.0,
+            long_avg=0.0015288,
+            short_avg=0.0015287,
+            source="test",
+        )
+
+        with (
+            patch.object(strategy, "_fixed_long_cycle_qty", return_value=12000.0),
+            patch.object(strategy, "_can_submit_cycle_intent", return_value=(True, "", {})),
+        ):
+            intents = strategy._build_short_tp_follow_up(
+                snapshot, runtime.runtime_state, runtime.context
+            )
+
+        self.assertEqual(len(intents), 3)
+        self.assertTrue(all(intent.metadata.get("is_staged_second_leg_tp") for intent in intents))
+        self.assertEqual([float(intent.qty or 0.0) for intent in intents], [4000.0, 4000.0, 4000.0])
+        stage_prices = [float(intent.trigger_price or 0.0) for intent in intents]
+        self.assertEqual(len(stage_prices), len(set(stage_prices)))
+        self.assertLess(stage_prices[0], stage_prices[1])
+        self.assertLess(stage_prices[1], stage_prices[2])
+        self.assertLessEqual(stage_prices[2], 0.0015310)
+        total_expected_net = sum(
+            float((intent.metadata or {}).get("stage_expected_net") or 0.0) for intent in intents
+        )
+        self.assertGreaterEqual(total_expected_net + 1e-8, 0.005)
+        self.assertEqual(
+            state.get("staged_second_leg_tp_stage_count", {}).get(str(cycle_index)),
+            3,
+        )
+
+    def test_loss_based_second_leg_recovery_falls_back_to_one_stage_when_price_cap_blocks_split_profit(self) -> None:
+        order_manager = FakeOrderManager()
+        strategy = ShortFixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.0000001,
+                qty_step=1.0,
+                min_order_qty=1.0,
+                min_notional_usdt=5.0,
+                reduction_pct_per_fill=25,
+                target_profit_usdt=0.015,
+                max_post_recovery_long_reduce_distance_pct=5.0,
+            )
+        )
+        runtime = GenericHedgeRuntime(
+            GenericRuntimeConfig(
+                api_key="key",
+                secret_key="secret",
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                min_order_value=1.0,
+                ensure_exchange_ready=False,
+                audit_log_file=None,
+            ),
+            strategy,
+            logger=logging.getLogger("test.fixed_cycle.loss_based_split_one"),
+            order_manager=order_manager,
+        )
+
+        state = runtime.runtime_state.strategy_state
+        cycle_index = 1
+        state["cycle_state"] = strategy._default_cycle_state()
+        state["cycle_waiting_for_long_reduce"] = True
+        state["long_reduce_pending_cycle"] = cycle_index
+        state["pending_long_cycle_index"] = cycle_index
+        state["active_cycle_index"] = cycle_index
+        state["next_required_purpose"] = f"CYCLE_{cycle_index}_LONG_REDUCE"
+        state["pending_cycle_loss_usdt"] = 0.04667502
+        state["initial_long_qty"] = 32700.0
+        state["bot_state"] = strategy.STATE_RUNNING
+
+        cycle_state = state["cycle_state"]
+        cycle_state["short_fills"] = {str(cycle_index): {"price": 0.00152988, "qty": 16300.0}}
+        cycle_state["last_confirmed_short_fill_price"] = 0.00152988
+
+        entry = strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[strategy._get_first_leg_status_field()] = "FILLED"
+        entry["long_add_confirmed_pnl"] = -0.04667502
+        entry["short_reduce_fill_price"] = 0.00152988
+        entry["short_reduce_status"] = "FILLED"
+
+        snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0015305,
+            long_qty=32700.0,
+            short_qty=49100.0,
+            long_avg=0.0015288,
+            short_avg=0.0015287,
+            source="test",
+        )
+
+        with (
+            patch.object(strategy, "_fixed_long_cycle_qty", return_value=8100.0),
+            patch.object(strategy, "_can_submit_cycle_intent", return_value=(True, "", {})),
+            patch("fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event") as log_event_mock,
+        ):
+            intents = strategy._build_short_tp_follow_up(
+                snapshot, runtime.runtime_state, runtime.context
+            )
+
+        self.assertEqual(len(intents), 1)
+        self.assertTrue(intents[0].metadata.get("is_staged_second_leg_tp"))
+        self.assertFalse(intents[0].metadata.get("normal_cycle_second_leg_split"))
+        self.assertEqual(
+            state.get("staged_second_leg_tp_stage_count", {}).get(str(cycle_index)),
+            1,
+        )
+        event_names = [call.args[0] for call in log_event_mock.call_args_list if call.args]
+        self.assertIn("loss_based_second_leg_staging_plan_rejected_price_cap", event_names)
+
+    def test_normal_cycle_second_leg_split_waits_until_all_stages_filled(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["cycle_state"] = runtime.strategy._default_cycle_state()
+        cycle_index = 2
+        entry = runtime.strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[runtime.strategy._get_first_leg_status_field()] = "FILLED"
+        entry[runtime.strategy._get_second_leg_status_field()] = "INTENT_BUILT"
+        state["normal_cycle_second_leg_split_stage_count"] = {"2": 3}
+        state["normal_cycle_second_leg_split_filled_stages"] = {"2": [0]}
+
+        runtime.strategy._mark_cycle_purpose_status(
+            runtime.runtime_state,
+            purpose="CYCLE_2_SHORT_REDUCE",
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "short_reduce",
+                "normal_cycle_second_leg_split": True,
+                "split_cycle_index": 2,
+                "split_stage_index": 1,
+                "split_stage_count": 3,
+            },
+            status="FILLED",
+        )
+
+        normalized_purpose = runtime.strategy._normalize_cycle_purpose(
+            "CYCLE_2_SHORT_REDUCE",
+            {"cycle_index": 2, "cycle_role": "short_reduce"},
+        )
+        self.assertFalse(entry.get("complete"))
+        self.assertNotIn(normalized_purpose, set(state.get("processed_cycle_purposes") or []))
+
+        state["normal_cycle_second_leg_split_filled_stages"]["2"] = [0, 1, 2]
+        runtime.strategy._mark_cycle_purpose_status(
+            runtime.runtime_state,
+            purpose="CYCLE_2_SHORT_REDUCE",
+            metadata={
+                "cycle_index": 2,
+                "cycle_role": "short_reduce",
+                "normal_cycle_second_leg_split": True,
+                "split_cycle_index": 2,
+                "split_stage_index": 2,
+                "split_stage_count": 3,
+            },
+            status="FILLED",
+        )
+
+        entry = runtime.strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        self.assertTrue(entry.get("complete"))
+        self.assertIn(normalized_purpose, set(state.get("processed_cycle_purposes") or []))
+
+    def test_on_fill_normal_cycle_second_leg_split_rebuilds_each_stage_and_completes_last(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        cycle_index = 2
+        state["cycle_state"] = runtime.strategy._default_cycle_state()
+        state["cycle_completed_count"] = 1
+        state["cycle_pair_count"] = 1
+        state["cycle_long_add_filled"] = True
+        state["cycle_short_tp_filled"] = False
+        state["cycle_waiting_for_short_tp"] = True
+        state["short_tp_pending_cycle"] = cycle_index
+        state["pending_short_cycle_index"] = cycle_index
+        state["bot_state"] = runtime.strategy.STATE_RUNNING
+        state["normal_cycle_second_leg_split_stage_count"] = {str(cycle_index): 3}
+        state["normal_cycle_second_leg_split_filled_stages"] = {str(cycle_index): []}
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {str(cycle_index): -0.1123},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {
+                f"cycle_long_reduce:{cycle_index}:cycle-long-{cycle_index}": {
+                    "pnl": -0.1123,
+                    "source": "confirmed_closed_pnl",
+                    "is_confirmed": True,
+                }
+            },
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": -0.1123,
+        }
+
+        entry = runtime.strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[runtime.strategy._get_first_leg_status_field()] = "FILLED"
+        entry[runtime.strategy._get_second_leg_status_field()] = "INTENT_BUILT"
+
+        snapshots = [
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=1.0,
+                short_qty=0.9,
+                long_avg=99.0,
+                short_avg=101.0,
+                source="websocket",
+            ),
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=1.0,
+                short_qty=0.6,
+                long_avg=99.0,
+                short_avg=101.0,
+                source="websocket",
+            ),
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=1.0,
+                short_qty=0.3,
+                long_avg=99.0,
+                short_avg=101.0,
+                source="websocket",
+            ),
+        ]
+
+        rebuild_observations: list[dict[str, Any]] = []
+
+        def rebuild_side_effect(snapshot, runtime_state, context, reason):
+            cycle_key = str(cycle_index)
+            current_entry = runtime.strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+            rebuild_observations.append(
+                {
+                    "reason": reason,
+                    "short_qty": snapshot.short_qty,
+                    "filled_stages": list(
+                        runtime_state.strategy_state.get(
+                            "normal_cycle_second_leg_split_filled_stages", {}
+                        ).get(cycle_key, [])
+                    ),
+                    "processed_cycle_purposes": list(
+                        runtime_state.strategy_state.get("processed_cycle_purposes") or []
+                    ),
+                    "entry_complete": bool(current_entry.get("complete")),
+                }
+            )
+            return []
+
+        expected_stage_lists = [[0], [0, 1], [0, 1, 2]]
+        expected_short_qtys = [0.9, 0.6, 0.3]
+        normalized_purpose = runtime.strategy._normalize_cycle_purpose(
+            f"CYCLE_{cycle_index}_SHORT_REDUCE",
+            {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
+        )
+
+        with (
+            patch.object(runtime.strategy, "_fast_path_second_order", return_value=[]),
+            patch.object(runtime.strategy, "_rebuild_structure", side_effect=rebuild_side_effect) as rebuild_mock,
+        ):
+            for stage_index, snapshot in enumerate(snapshots):
+                runtime.runtime_state.last_snapshot = snapshot
+                runtime.context.refresh_snapshot = lambda source, snap=snapshot: snap
+                fill_event = FillEvent(
+                    exchange_order_id=f"cycle-split-{stage_index}",
+                    client_order_id=f"cycle-split-{stage_index}",
+                    side="short",
+                    purpose=f"CYCLE_{cycle_index}_SHORT_REDUCE",
+                    exec_qty=0.3,
+                    exec_price=100.0,
+                    order_type="Market",
+                    reduce_only=True,
+                    status="FILLED",
+                    exec_id=f"exec-cycle-split-{stage_index}",
+                    metadata={
+                        "cycle_index": cycle_index,
+                        "cycle_role": "short_reduce",
+                        "normal_cycle_second_leg_split": True,
+                        "split_cycle_index": cycle_index,
+                        "split_stage_index": stage_index,
+                        "split_stage_count": 3,
+                        "runtime_calculated_pnl": 0.1,
+                        "exec_pnl": 0.1,
+                    },
+                )
+
+                intents = runtime.strategy.on_fill(
+                    fill_event, snapshot, runtime.runtime_state, runtime.context
+                )
+
+                self.assertEqual(intents, [])
+                self.assertEqual(rebuild_mock.call_count, stage_index + 1)
+                self.assertEqual(
+                    state["normal_cycle_second_leg_split_filled_stages"][str(cycle_index)],
+                    expected_stage_lists[stage_index],
+                )
+                self.assertEqual(rebuild_observations[stage_index]["reason"], "fill_reconcile")
+                self.assertEqual(
+                    rebuild_observations[stage_index]["filled_stages"],
+                    expected_stage_lists[stage_index],
+                )
+                self.assertEqual(
+                    rebuild_observations[stage_index]["short_qty"],
+                    expected_short_qtys[stage_index],
+                )
+
+                current_entry = runtime.strategy._get_cycle_sequence_entry(
+                    runtime.runtime_state, cycle_index
+                )
+                if stage_index < 2:
+                    self.assertFalse(current_entry.get("complete"))
+                    self.assertNotIn(
+                        normalized_purpose,
+                        set(state.get("processed_cycle_purposes") or []),
+                    )
+                    self.assertEqual(state.get("cycle_completed_count"), 1)
+                else:
+                    self.assertTrue(current_entry.get("complete"))
+                    self.assertIn(
+                        normalized_purpose,
+                        set(state.get("processed_cycle_purposes") or []),
+                    )
+                    self.assertEqual(state.get("cycle_completed_count"), 2)
+
+    def test_on_fill_normal_cycle_second_leg_split_rebuilds_each_stage_and_completes_last_short_bot(self) -> None:
+        order_manager = FakeOrderManager()
+        # Short-Bot / Mirror-Strategie mit Long-Reduce-Second-Leg
+        strategy = ShortFixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                symbol="BTCUSDT",
+                category="linear",
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.1,
+                qty_step=0.001,
+                reduction_pct_per_fill=15,
+                long_fill_distance_pct=0.15,
+            )
+        )
+        runtime = GenericHedgeRuntime(
+            GenericRuntimeConfig(
+                api_key="key",
+                secret_key="secret",
+                symbol="BTCUSDT",
+                category="linear",
+                min_order_value=1.0,
+                ensure_exchange_ready=False,
+                audit_log_file=None,
+            ),
+            strategy,
+            logger=logging.getLogger("test.fixed_cycle.short"),
+            order_manager=order_manager,
+        )
+        symbol_key = strategy.config.symbol.upper()
+        rules = order_manager.get_cached_instrument_rules(symbol_key, strategy.config.category)
+        if rules:
+            runtime.runtime_state.instrument_rules[symbol_key] = rules
+
+        state = runtime.runtime_state.strategy_state
+        cycle_index = 2
+        state["cycle_state"] = strategy._default_cycle_state()
+        state["cycle_completed_count"] = 1
+        state["cycle_pair_count"] = 1
+        state["cycle_long_add_filled"] = True
+        state["cycle_short_tp_filled"] = False
+        state["cycle_waiting_for_long_reduce"] = True
+        state["long_reduce_pending_cycle"] = cycle_index
+        state["pending_long_cycle_index"] = cycle_index
+        state["bot_state"] = strategy.STATE_RUNNING
+        state["normal_cycle_second_leg_split_stage_count"] = {str(cycle_index): 3}
+        state["normal_cycle_second_leg_split_filled_stages"] = {str(cycle_index): []}
+        state["audit_pnl_ledger"] = {
+            "cycle_long_reduce_pnl": {str(cycle_index): -0.1123},
+            "cycle_short_tp_pnl": {},
+            "cycle_pnl_entries": {
+                f"cycle_short_reduce:{cycle_index}:cycle-short-{cycle_index}": {
+                    "pnl": -0.1123,
+                    "source": "confirmed_closed_pnl",
+                    "is_confirmed": True,
+                }
+            },
+            "final_long_exit_pnl": None,
+            "final_short_exit_pnl": None,
+            "total_realized_pnl": -0.1123,
+        }
+
+        entry = strategy._get_cycle_sequence_entry(runtime.runtime_state, cycle_index)
+        entry[strategy._get_first_leg_status_field()] = "FILLED"
+        entry[strategy._get_second_leg_status_field()] = "INTENT_BUILT"
+
+        snapshots = [
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=0.9,
+                short_qty=1.0,
+                long_avg=101.0,
+                short_avg=99.0,
+                source="websocket",
+            ),
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=0.6,
+                short_qty=1.0,
+                long_avg=101.0,
+                short_avg=99.0,
+                source="websocket",
+            ),
+            HedgeSnapshot(
+                symbol="BTCUSDT",
+                current_price=100.0,
+                long_qty=0.3,
+                short_qty=1.0,
+                long_avg=101.0,
+                short_avg=99.0,
+                source="websocket",
+            ),
+        ]
+
+        rebuild_observations: list[dict[str, Any]] = []
+
+        def rebuild_side_effect(snapshot, runtime_state, context, reason):
+            cycle_key = str(cycle_index)
+            current_entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+            rebuild_observations.append(
+                {
+                    "reason": reason,
+                    "long_qty": snapshot.long_qty,
+                    "filled_stages": list(
+                        runtime_state.strategy_state.get(
+                            "normal_cycle_second_leg_split_filled_stages", {}
+                        ).get(cycle_key, [])
+                    ),
+                    "processed_cycle_purposes": list(
+                        runtime_state.strategy_state.get("processed_cycle_purposes") or []
+                    ),
+                    "entry_complete": bool(current_entry.get("complete")),
+                }
+            )
+            return []
+
+        expected_stage_lists = [[0], [0, 1], [0, 1, 2]]
+        expected_long_qtys = [0.9, 0.6, 0.3]
+        normalized_purpose = strategy._normalize_cycle_purpose(
+            f"CYCLE_{cycle_index}_LONG_REDUCE",
+            {"cycle_index": cycle_index, "cycle_role": "long_reduce"},
+        )
+
+        with (
+            patch.object(strategy, "_fast_path_second_order", return_value=[]),
+            patch.object(strategy, "_rebuild_structure", side_effect=rebuild_side_effect) as rebuild_mock,
+        ):
+            for stage_index, snapshot in enumerate(snapshots):
+                runtime.runtime_state.last_snapshot = snapshot
+                runtime.context.refresh_snapshot = lambda source, snap=snapshot: snap
+                fill_event = FillEvent(
+                    exchange_order_id=f"cycle-split-long-{stage_index}",
+                    client_order_id=f"cycle-split-long-{stage_index}",
+                    side="long",
+                    purpose=f"CYCLE_{cycle_index}_LONG_REDUCE",
+                    exec_qty=0.3,
+                    exec_price=100.0,
+                    order_type="Market",
+                    reduce_only=True,
+                    status="FILLED",
+                    exec_id=f"exec-cycle-split-long-{stage_index}",
+                    metadata={
+                        "cycle_index": cycle_index,
+                        "cycle_role": "long_reduce",
+                        "normal_cycle_second_leg_split": True,
+                        "split_cycle_index": cycle_index,
+                        "split_stage_index": stage_index,
+                        "split_stage_count": 3,
+                        "runtime_calculated_pnl": 0.1,
+                        "exec_pnl": 0.1,
+                    },
+                )
+
+                intents = strategy.on_fill(
+                    fill_event, snapshot, runtime.runtime_state, runtime.context
+                )
+
+                self.assertEqual(intents, [])
+                self.assertEqual(rebuild_mock.call_count, stage_index + 1)
+                self.assertEqual(
+                    state["normal_cycle_second_leg_split_filled_stages"][str(cycle_index)],
+                    expected_stage_lists[stage_index],
+                )
+                self.assertEqual(rebuild_observations[stage_index]["reason"], "fill_reconcile")
+                self.assertEqual(
+                    rebuild_observations[stage_index]["filled_stages"],
+                    expected_stage_lists[stage_index],
+                )
+                self.assertEqual(
+                    rebuild_observations[stage_index]["long_qty"],
+                    expected_long_qtys[stage_index],
+                )
+
+                current_entry = strategy._get_cycle_sequence_entry(
+                    runtime.runtime_state, cycle_index
+                )
+                if stage_index < 2:
+                    self.assertFalse(current_entry.get("complete"))
+                    self.assertNotIn(
+                        normalized_purpose,
+                        set(state.get("processed_cycle_purposes") or []),
+                    )
+                    self.assertEqual(state.get("cycle_completed_count"), 1)
+                else:
+                    self.assertTrue(current_entry.get("complete"))
+                    self.assertIn(
+                        normalized_purpose,
+                        set(state.get("processed_cycle_purposes") or []),
+                    )
+                    self.assertEqual(state.get("cycle_completed_count"), 2)
 
     def test_on_tick_builds_refill_intents_when_pending_without_refill_state(self) -> None:
         order_manager = FakeOrderManager()

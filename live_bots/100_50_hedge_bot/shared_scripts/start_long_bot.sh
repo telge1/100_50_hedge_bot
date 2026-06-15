@@ -85,9 +85,10 @@ data = {
     "status": os.environ.get("STATUS_STATUS") or "unknown",
     "updated_at": datetime.now(timezone.utc).isoformat()
 }
-symbol_value = os.environ.get("STATUS_SYMBOL") or ""
-if symbol_value:
-    data["symbol"] = symbol_value
+symbol_value = os.environ.get("STATUS_SYMBOL")
+if symbol_value is None:
+    symbol_value = ""
+data["symbol"] = symbol_value
 reason_value = os.environ.get("STATUS_REASON") or ""
 if reason_value:
     data["reason"] = reason_value
@@ -99,7 +100,9 @@ if start_requested_raw is not None:
     data["start_requested"] = str(start_requested_raw).lower() in ("1","true","yes")
 else:
     data["start_requested"] = False
-if data["status"] == "running":
+runner_started = data["status"] == "running"
+data["runner_started"] = runner_started
+if runner_started:
     pid_value = os.environ.get("STARTED_PID")
     if pid_value and pid_value.isdigit():
         data["pid"] = int(pid_value)
@@ -233,6 +236,52 @@ is_alive_pid_with_bot_name() {
   return 1
 }
 
+cleanup_local_bot_state_if_no_runner() {
+  # Wenn kein laufender Runner für diesen Bot existiert, lokale State-Dateien
+  # defensiv bereinigen (active_bot_symbols-Eintrag + Runtime-/Reserved-Files).
+  local existing_pid=""
+  local runner_alive="false"
+  if [[ -f "${PID_FILE}" ]]; then
+    existing_pid="$(cat "${PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${existing_pid}" ]] && is_alive_pid_with_bot_name "${existing_pid}" "${BOT_NAME}"; then
+      runner_alive="true"
+    fi
+  fi
+  if [[ "${runner_alive}" == "true" ]]; then
+    return
+  fi
+
+  # Stale PID-Datei entfernen, falls vorhanden
+  if [[ -f "${PID_FILE}" ]]; then
+    rm -f "${PID_FILE}"
+  fi
+
+  # Stale active_bot_symbols-Eintrag für diesen Bot entfernen
+  BOT_GROUP_DIR_VALUE="${BOT_GROUP_DIR}" BOT_NAME_VALUE="${BOT_NAME}" python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+group_dir = Path(os.environ["BOT_GROUP_DIR_VALUE"])
+state_path = group_dir / "state" / "active_bot_symbols.json"
+bot_name = os.environ.get("BOT_NAME_VALUE") or ""
+if not bot_name:
+    raise SystemExit(0)
+if not state_path.exists():
+    raise SystemExit(0)
+try:
+    data = json.loads(state_path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    raise SystemExit(0)
+if bot_name in data:
+    data.pop(bot_name, None)
+    state_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+
+  # Stale Runtime-/Reserved-Files entfernen – neue Starts schreiben frische Dateien.
+  rm -f "${RUNTIME_CONFIG_FILE}" "${RESERVED_BEST_COIN_FILE}"
+}
+
 read_reserved_symbol() {
   python3 <<PY
 import json
@@ -259,6 +308,7 @@ write_reserved_runtime_files() {
     exit 1
   fi
 
+  echo "[${BOT_NAME}] runtime_config_prepare_started symbol=${reserved_symbol} source_config=${CONFIG_FILE} runtime_config=${RUNTIME_CONFIG_FILE}" >&2
   RESERVED_SYMBOL_VALUE="${reserved_symbol}" \
   SOURCE_CONFIG_FILE="${CONFIG_FILE}" \
   RUNTIME_CONFIG_FILE_PATH="${RUNTIME_CONFIG_FILE}" \
@@ -297,6 +347,42 @@ reserved_best_coin_file.write_text(
     encoding="utf-8",
 )
 PY
+
+  if [[ ! -f "${RUNTIME_CONFIG_FILE}" ]]; then
+    echo "[${BOT_NAME}] runtime_config_prepare_failed reason=runtime_config_missing path=${RUNTIME_CONFIG_FILE}" >&2
+    exit 1
+  fi
+
+  RESERVED_SYMBOL_VALUE="${reserved_symbol}" \
+  RUNTIME_CONFIG_FILE_PATH="${RUNTIME_CONFIG_FILE}" \
+  python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+runtime_config = Path(os.environ["RUNTIME_CONFIG_FILE_PATH"])
+reserved_symbol = (os.environ.get("RESERVED_SYMBOL_VALUE") or "").upper()
+try:
+    cfg = json.loads(runtime_config.read_text(encoding="utf-8") or "{}")
+except Exception as exc:  # pragma: no cover - defensive
+    print(f"[runtime_config_validate] failed_to_load path={runtime_config} error={exc}", flush=True)
+    raise
+
+symbol_value = str(cfg.get("symbol") or "").upper()
+if symbol_value != reserved_symbol:
+    print(
+        f"[runtime_config_validate] symbol_mismatch path={runtime_config} "
+        f"expected={reserved_symbol} actual={symbol_value}",
+        flush=True,
+    )
+    raise SystemExit(1)
+
+print(
+    f"[runtime_config_validate] runtime_config_validated path={runtime_config} symbol={symbol_value}",
+    flush=True,
+)
+PY
+  echo "[${BOT_NAME}] runtime_config_written path=${RUNTIME_CONFIG_FILE}" >&2
 }
 
 SIDE="long"
@@ -304,6 +390,255 @@ source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE
 
 mkdir -p "${RUN_DIR}"
 rm -f "${CANCEL_START_FILE}" "${WAIT_PID_FILE}"
+
+# Globaler Start-Lock pro Long-Bot, um parallele Starts sicher zu verhindern.
+# Der Lock bleibt für die gesamte Dauer des Skripts gehalten.
+START_LOCK_FILE="${RUN_DIR}/start.lock"
+START_LOCK_FD=0
+if ! exec {START_LOCK_FD}>"${START_LOCK_FILE}"; then
+  echo "[${BOT_NAME}] failed to open start lock file: ${START_LOCK_FILE}" >&2
+  exit 1
+fi
+if ! flock -n "${START_LOCK_FD}"; then
+  # Lock ist belegt – prüfen, ob es sich nur um einen stale Lock ohne echten
+  # Start-/Runner-Prozess handelt. In diesem Fall darf der Lock entfernt werden.
+  self_pid="$$"
+  bash_pid="${BASHPID:-}"
+  ppid="${PPID:-}"
+
+  other_start_pids="$(ps -o pid= -o args= 2>/dev/null \
+    | grep -F "start_long_bot.sh" \
+    | grep -F -- "${BOT_NAME}" \
+    | grep -v "grep" \
+    | awk '{print $1}' \
+    | tr '\n' ' ' \
+    | sed 's/ *$//' || true)"
+  waiter_pids=""  # Long-Bots nutzen keinen separaten Symbol-Waiter-Prozess.
+  runner_pids="$(ps -o pid= -o args= -C python -C python3 2>/dev/null \
+    | grep -F "fixed_cycle_hedge_bot.runner" \
+    | grep -F -- "--bot-name ${BOT_NAME}" \
+    | grep -v "grep" \
+    | awk '{print $1}' \
+    | tr '\n' ' ' \
+    | sed 's/ *$//' || true)"
+
+  cleaned_other=""
+  for pid in ${other_start_pids}; do
+    if [[ "${pid}" != "${self_pid}" && "${pid}" != "${bash_pid}" && "${pid}" != "${ppid}" ]]; then
+      cleaned_other+=" ${pid}"
+    fi
+  done
+  other_start_pids="${cleaned_other# }"
+
+  cleaned_runner=""
+  for pid in ${runner_pids}; do
+    if [[ "${pid}" != "${self_pid}" && "${pid}" != "${bash_pid}" && "${pid}" != "${ppid}" ]]; then
+      cleaned_runner+=" ${pid}"
+    fi
+  done
+  runner_pids="${cleaned_runner# }"
+
+  lock_holders=""
+  if command -v fuser >/dev/null 2>&1; then
+    lock_holders="$(fuser "${START_LOCK_FILE}" 2>/dev/null | tr ' ' '\n' | tr '\n' ' ' | sed 's/ *$//' || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    lock_holders="$(lsof -t -- "${START_LOCK_FILE}" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//' || true)"
+  fi
+  cleaned_holders=""
+  for pid in ${lock_holders}; do
+    if [[ "${pid}" != "${self_pid}" && "${pid}" != "${bash_pid}" && "${pid}" != "${ppid}" ]]; then
+      cleaned_holders+=" ${pid}"
+    fi
+  done
+  lock_holders="${cleaned_holders# }"
+
+  echo "[${BOT_NAME}] start_lock_busy_probe other_start_pids=${other_start_pids:-none} waiter_pids=${waiter_pids:-none} runner_pids=${runner_pids:-none} lock_holders=${lock_holders:-none} self_pid=${self_pid} bashpid=${bash_pid:-none} ppid=${ppid:-none}" >&2
+
+  if [[ -z "${other_start_pids// }" && -z "${waiter_pids// }" && -z "${runner_pids// }" && -z "${lock_holders// }" && ! -f "${PID_FILE}" ]]; then
+    echo "[${BOT_NAME}] stale_start_lock_removed path=${START_LOCK_FILE} reason=no_runner_no_start_process" >&2
+    rm -f "${START_LOCK_FILE}" || true
+    if ! exec {START_LOCK_FD}>"${START_LOCK_FILE}"; then
+      echo "[${BOT_NAME}] failed to reopen start lock file: ${START_LOCK_FILE}" >&2
+      exit 1
+    fi
+    if ! flock -n "${START_LOCK_FD}"; then
+      echo "[${BOT_NAME}] start already in progress; aborting start (lock busy)" >&2
+      exit 0
+    fi
+  else
+    echo "[${BOT_NAME}] start already in progress; aborting start (lock busy)" >&2
+    exit 0
+  fi
+fi
+
+# Direction-neutral Pair-Leader/Follower-Start: gemeinsamer Pair-State pro Profil.
+BOT_INDEX="${BOT_NAME##*_}"
+PAIR_STATE_DIR="${PROJECT_ROOT}/live_bots/state"
+PAIR_STATE_FILE="${PAIR_STATE_DIR}/pair_symbol_bot_${BOT_INDEX}.json"
+PAIR_LOCK_FILE="${PAIR_STATE_DIR}/pair_symbol_bot_${BOT_INDEX}.lock"
+mkdir -p "${PAIR_STATE_DIR}"
+PAIR_LOCK_FD=0
+if ! exec {PAIR_LOCK_FD}>"${PAIR_LOCK_FILE}"; then
+  echo "[${BOT_NAME}] failed to open pair state lock: ${PAIR_LOCK_FILE}" >&2
+  exit 1
+fi
+if ! flock -n "${PAIR_LOCK_FD}"; then
+  echo "[${BOT_NAME}] pair_symbol_start_lock_busy; aborting start" >&2
+  exit 0
+fi
+
+# Wenn kein Runner aktiv ist, lokale State-Dateien (active_bot_symbols, Runtime-/Reserved-Files)
+# defensiv bereinigen, bevor ein neuer Start vorbereitet wird. Wichtig: Cleanup MUSS vor
+# dem Schreiben der neuen Runtime-Config laufen, damit frisch erzeugte Files nicht direkt
+# wieder gelöscht werden.
+cleanup_local_bot_state_if_no_runner
+
+PAIR_SYMBOL=""
+if [[ -f "${PAIR_STATE_FILE}" ]]; then
+  PAIR_SYMBOL="$(python3 <<PY
+import json
+from pathlib import Path
+
+path = Path(${PAIR_STATE_FILE@Q})
+try:
+    data = json.loads(path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    data = {}
+symbol = str(data.get("symbol") or "").strip().upper()
+print(symbol)
+PY
+)"
+fi
+
+# Stale-Pair-State-Check: Wenn ein Pair-Symbol existiert, aber weder Long- noch Short-Bot
+# für dieses Profil laufen, den Pair-State für diesen Start ignorieren.
+if [[ -n "${PAIR_SYMBOL}" ]]; then
+  LONG_BOT_NAME="long_bot_${BOT_INDEX}"
+  SHORT_BOT_NAME="short_bot_${BOT_INDEX}"
+  LONG_PID_FILE="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/${LONG_BOT_NAME}/run/bot.pid"
+  SHORT_PID_FILE="${PROJECT_ROOT}/live_bots/short_hedge_bot/${SHORT_BOT_NAME}/run/bot.pid"
+  long_alive="false"
+  short_alive="false"
+  if [[ -f "${LONG_PID_FILE}" ]]; then
+    long_pid="$(cat "${LONG_PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${long_pid}" && -d "/proc/${long_pid}" ]]; then
+      long_alive="true"
+    fi
+  fi
+  if [[ -f "${SHORT_PID_FILE}" ]]; then
+    short_pid="$(cat "${SHORT_PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${short_pid}" && -d "/proc/${short_pid}" ]]; then
+      short_alive="true"
+    fi
+  fi
+  if [[ "${long_alive}" != "true" && "${short_alive}" != "true" ]]; then
+    echo "[${BOT_NAME}] stale_pair_state_ignored symbol=${PAIR_SYMBOL} reason=no_running_bots" >&2
+    # Pair-State defensiv leeren, damit Folge-Starts keinen alten Handoff mehr nutzen.
+    python3 <<PY
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(${PAIR_STATE_FILE@Q})
+try:
+    data = json.loads(path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    data = {}
+changed = False
+if data.get("symbol"):
+    data["symbol"] = ""
+    changed = True
+if data.get("long_running"):
+    data["long_running"] = False
+    changed = True
+if data.get("short_running"):
+    data["short_running"] = False
+    changed = True
+if not data.get("long_running") and not data.get("short_running") and data.get("leader_bot"):
+    data["leader_bot"] = ""
+    changed = True
+if changed:
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+    PAIR_SYMBOL=""
+  fi
+fi
+
+# Konflikt-Check: Wenn bereits ein Pair-Symbol existiert, aber der Short-Bot
+# (Gegenbot) mit einem anderen Symbol läuft, Start abbrechen.
+CONFLICT_STATUS=0
+if [[ -n "${PAIR_SYMBOL}" ]]; then
+  OTHER_BOT_NAME="short_bot_${BOT_INDEX}"
+  OTHER_RUNTIME_CONFIG="${PROJECT_ROOT}/live_bots/short_hedge_bot/${OTHER_BOT_NAME}/run/fixed_cycle_config.runtime.json"
+  OTHER_PID_FILE="${PROJECT_ROOT}/live_bots/short_hedge_bot/${OTHER_BOT_NAME}/run/bot.pid"
+  export PAIR_SYMBOL OTHER_BOT_NAME OTHER_RUNTIME_CONFIG OTHER_PID_FILE
+  CONFLICT_MSG="$(
+    python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+pair_symbol = os.environ.get("PAIR_SYMBOL") or ""
+other_bot = os.environ.get("OTHER_BOT_NAME") or ""
+runtime_path = Path(os.environ.get("OTHER_RUNTIME_CONFIG") or "")
+pid_path = Path(os.environ.get("OTHER_PID_FILE") or "")
+
+running = False
+other_symbol = ""
+try:
+    pid_text = pid_path.read_text(encoding="utf-8").strip()
+    pid = int(pid_text) if pid_text else None
+except Exception:
+    pid = None
+
+if pid is not None and (Path("/proc") / str(pid)).exists():
+    running = True
+
+if running and runtime_path.exists():
+    try:
+        cfg = json.loads(runtime_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        cfg = {}
+    other_symbol = str(cfg.get("symbol") or "").upper()
+
+if running and other_symbol and other_symbol != pair_symbol:
+    print(
+        f"pair_symbol_conflict_detected pair_symbol={pair_symbol} "
+        f"other_bot={other_bot} other_symbol={other_symbol}"
+    )
+    raise SystemExit(1)
+PY
+  )" || CONFLICT_STATUS=$?
+  if [[ ${CONFLICT_STATUS} -ne 0 ]]; then
+    if [[ -n "${CONFLICT_MSG}" ]]; then
+      echo "[${BOT_NAME}] ${CONFLICT_MSG}" >&2
+    else
+      echo "[${BOT_NAME}] pair_symbol_conflict_detected (details unavailable)" >&2
+    fi
+    exit 1
+  fi
+fi
+
+IS_PAIR_LEADER="false"
+
+if [[ -n "${PAIR_SYMBOL}" ]]; then
+  RESERVED_SYMBOL="${PAIR_SYMBOL}"
+  LONG_SKIP_SYMBOL_RESERVATION=1
+  echo "[${BOT_NAME}] pair_symbol_adopted symbol=${RESERVED_SYMBOL} leader_bot=$(python3 <<PY
+import json
+from pathlib import Path
+
+path = Path(${PAIR_STATE_FILE@Q})
+try:
+    data = json.loads(path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    data = {}
+print(str(data.get("leader_bot") or "unknown"))
+PY
+) source=pair_state"
+  write_reserved_runtime_files "${RESERVED_SYMBOL}"
+fi
 if [[ -f "${PID_FILE}" ]]; then
   EXISTING_PID="$(cat "${PID_FILE}")"
   if is_alive_pid_with_bot_name "${EXISTING_PID}" "${BOT_NAME}"; then
@@ -313,14 +648,15 @@ if [[ -f "${PID_FILE}" ]]; then
   rm -f "${PID_FILE}"
 fi
 
-if [[ -n "${LONG_FIXED_SYMBOL:-}" ]]; then
+if [[ -z "${PAIR_SYMBOL}" && -n "${LONG_FIXED_SYMBOL:-}" ]]; then
   RESERVED_SYMBOL="$(echo "${LONG_FIXED_SYMBOL}" | tr '[:lower:]' '[:upper:]')"
+  echo "[${BOT_NAME}] fixed_symbol_env_detected symbol=${RESERVED_SYMBOL}" >&2
   echo "[${BOT_NAME}] using forced symbol ${RESERVED_SYMBOL}"
   LONG_SKIP_SYMBOL_RESERVATION=1
   write_reserved_runtime_files "${RESERVED_SYMBOL}"
 fi
 
-if [[ -z "${LONG_SKIP_SYMBOL_RESERVATION:-}" ]]; then
+if [[ -z "${PAIR_SYMBOL}" && -z "${LONG_SKIP_SYMBOL_RESERVATION:-}" ]]; then
   mapfile -t WAIT_INFO < <(python3 <<PY
 import json
 from pathlib import Path
@@ -355,6 +691,42 @@ WAIT_SYMBOL="${WAIT_INFO[0]:-}"
 WAIT_REASON="${WAIT_INFO[1]:-waiting_for_symbol}"
 WAIT_RESERVED_BY="${WAIT_INFO[2]:-}"
 
+  # Spezieller Zwischenstatus: keine guten Kandidaten im Scanner (best_coin.json),
+  # kein Pair-/Fixed-Symbol. In diesem Fall keinen Runner starten, sondern einen
+  # stabilen waiting_for_symbol-Status schreiben.
+  BEST_REASON=""
+  BEST_COUNT=0
+  mapfile -t BEST_INFO < <(python3 <<PY
+import json
+from pathlib import Path
+
+best_path = Path(${PROJECT_ROOT@Q}) / "logs" / "best_coin.json"
+reason = ""
+count = 0
+if best_path.exists():
+    try:
+        payload = json.loads(best_path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        payload = {}
+    reason = str(payload.get("reason") or "")
+    try:
+        count = int(payload.get("candidate_count") or 0)
+    except Exception:
+        count = 0
+print(reason)
+print(count)
+PY
+)
+  BEST_REASON="${BEST_INFO[0]:-}"
+  BEST_COUNT="${BEST_INFO[1]:-0}"
+
+  if [[ -z "${WAIT_SYMBOL}" && "${BEST_REASON}" == "no_good_candidates" ]]; then
+    echo "[${BOT_NAME}] waiting_for_symbol reason=no_good_candidates candidate_count=${BEST_COUNT}" >&2
+    write_status_json "waiting_for_symbol" "no_good_candidates" "" "" "true"
+    # Kein Runner-Start, kein bot.pid – Dashboard soll diesen Zwischenstatus anzeigen.
+    exit 0
+  fi
+
 ensure_wait_pid_clean
 
 echo "[${BOT_NAME}] capturing start wallet if missing"
@@ -374,8 +746,41 @@ cleanup_wait_files
 
   RESERVED_SYMBOL="$(read_reserved_symbol)"
   write_reserved_runtime_files "${RESERVED_SYMBOL}"
+  if [[ -z "${PAIR_SYMBOL}" ]]; then
+    IS_PAIR_LEADER="true"
+  fi
 else
   echo "[${BOT_NAME}] forced symbol ${RESERVED_SYMBOL} already written"
+  if [[ -z "${PAIR_SYMBOL}" ]]; then
+    IS_PAIR_LEADER="true"
+  fi
+fi
+
+if [[ "${IS_PAIR_LEADER}" == "true" ]]; then
+  python3 <<PY
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(${PAIR_STATE_FILE@Q})
+try:
+    data = json.loads(path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    data = {}
+symbol = ${RESERVED_SYMBOL@Q}
+index = ${BOT_INDEX@Q}
+data.update({
+    "symbol": symbol,
+    "leader_bot": ${BOT_NAME@Q},
+    "long_bot_name": f"long_bot_{index}",
+    "short_bot_name": f"short_bot_{index}",
+    "updated_at": datetime.now(timezone.utc).isoformat(),
+    "long_running": True,
+})
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+print(f"[PAIR-STATE] updated pair_symbol_bot_{index}.json symbol={symbol} leader={data['leader_bot']}")
+PY
 fi
 
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
@@ -438,6 +843,13 @@ rotate_log() {
 
 rotate_log "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
 rotate_log "${LOG_DIR}/fixed_cycle_calc_audit.log"
+
+# Start-Lock freigeben, bevor längere Hintergrundprozesse (Runner/Watchdogs) gestartet werden,
+# damit diese den FD nicht erben und den Lock nicht dauerhaft halten.
+if [[ -n "${START_LOCK_FD:-}" ]]; then
+  flock -u "${START_LOCK_FD}" || true
+  exec {START_LOCK_FD}>&- || true
+fi
 
 nohup "${PYTHON}" -m fixed_cycle_hedge_bot.runner \
   --strategy fixed_cycle \

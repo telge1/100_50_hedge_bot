@@ -7874,16 +7874,111 @@ def _build_profit_trade_detail_rows(record: dict[str, Any]) -> list[dict[str, An
 
 def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+
+    # Gruppierung nutzen, um Teil-TP-/Split-Serien (mehrere Reihen für denselben Cycle-Reduce-Purpose)
+    # innerhalb eines Trade-Blocks zu erkennen. So können wir Stage-Index/Count robust ableiten.
+    split_group_sizes: dict[tuple[str, int | None, str], int] = {}
     for entry in confirmed_rows:
+        purpose_raw = str(entry.get("purpose") or "")
+        pnl_scope = str(entry.get("pnl_scope") or "").strip().lower()
+        trade_block_id = str(entry.get("trade_block_id") or record.get("trade_block_id") or "")
+        cycle_index = entry.get("cycle_index")
+        # Nur Cycle-PnL-Reihen als Kandidaten behandeln; wenn der Bot bereits Stage-Metadaten liefert,
+        # nutzen wir diese direkt und brauchen keine Heuristik.
+        if not trade_block_id or pnl_scope != "cycle":
+            continue
+        key = (trade_block_id, cycle_index, purpose_raw)
+        split_group_sizes[key] = split_group_sizes.get(key, 0) + 1
+
+    split_stage_counters: dict[tuple[str, int | None, str], int] = {}
+
+    for entry in confirmed_rows:
+        record_type = str(entry.get("record_type") or "").strip().lower()
+        purpose = str(entry.get("purpose") or "")
+        display_purpose = purpose
+        # Mark time-distance triggered refill fills for clarity.
+        if purpose in {"REFILL_LONG", "REFILL_SHORT"} and str(entry.get("refill_trigger_reason") or "").strip() == "time_distance_refill":
+            display_purpose = f"{purpose} (time_distance_refill)"
+        # Synthetic skip event row.
+        is_event_row = record_type == "event" and purpose == "CYCLE_REFILL_SKIPPED_AFTER_TIME_DISTANCE"
+        order_id = "-"
+        pnl_value: Any = "-"
+        parent_purpose: str | None = entry.get("parent_second_leg_purpose") or entry.get("parent_purpose")
+        stage_index: int | None = entry.get("stage_index")
+        stage_count: int | None = entry.get("stage_count")
+        # Split-Indizes zusätzlich durchreichen, damit das Frontend bei Bedarf
+        # einen Stage-Fallback (split_index+1/split_count) anzeigen kann.
+        split_index: int | None = entry.get("split_index")
+        split_count: int | None = entry.get("split_count")
+        source_hint: str | None = None
+        qty_value: Any = entry.get("qty") or entry.get("exec_qty") or None
+        side_value: Any = entry.get("side") or None
+        cycle_role_value: Any = entry.get("cycle_role") or None
+
+        if not is_event_row:
+            order_id = entry.get("exchange_order_id") or entry.get("client_order_id") or ""
+            pnl_value = entry.get("closed_pnl") if entry.get("closed_pnl") is not None else 0.0
+
+            trade_block_id = str(entry.get("trade_block_id") or record.get("trade_block_id") or "")
+            pnl_scope = str(entry.get("pnl_scope") or "").strip().lower()
+            cycle_index = entry.get("cycle_index")
+
+            # Wenn der Bot bereits Stage-Metadaten gesetzt hat, diese bevorzugt nutzen.
+            if trade_block_id and pnl_scope == "cycle":
+                if stage_index is not None or stage_count is not None:
+                    source_hint = (
+                        entry.get("order_source")
+                        or entry.get("split_source")
+                        or entry.get("source")
+                        or "cycle_split"
+                    )
+                else:
+                    # Fallback: Heuristik über gruppierte Zwecke, nur wenn keine expliziten Stage-Felder existieren.
+                    purpose_key = str(entry.get("purpose") or "")
+                    key = (trade_block_id, cycle_index, purpose_key)
+                    group_size = split_group_sizes.get(key, 0)
+                    if purpose_key.startswith("CYCLE_") and group_size > 1:
+                        parent_purpose = parent_purpose or purpose_key
+                        stage_count = group_size
+                        previous = split_stage_counters.get(key, 0)
+                        stage_index = previous + 1
+                        split_stage_counters[key] = stage_index
+                        source_hint = (
+                            entry.get("order_source")
+                            or entry.get("split_source")
+                            or entry.get("source")
+                            or "normal_second_leg_split"
+                        )
+
+        # Anzeige-Source bevorzugt aus order-/split-spezifischen Feldern, dann Heuristik, zuletzt record_source.
+        display_source = (
+            entry.get("order_source")
+            or entry.get("split_source")
+            or source_hint
+            or entry.get("source")
+        )
+        pnl_source = str(entry.get("pnl_source") or "").strip()
+        if pnl_source in {"provisional_runtime_calculated_pnl", "provisional_exec_pnl"} and display_source:
+            display_source = f"{display_source} (provisional)"
         rows.append(
             {
                 "time": entry.get("timestamp"),
                 "time_label": _format_profit_time_label(entry.get("timestamp")),
                 "symbol": entry.get("symbol") or record.get("symbol"),
-                "order_id": entry.get("exchange_order_id") or entry.get("client_order_id") or "",
-                "pnl_usdt": entry.get("closed_pnl") or 0.0,
+                "order_id": order_id,
+                "pnl_usdt": pnl_value,
                 "wallet_after": None,
-                "purpose": entry.get("purpose"),
+                "purpose": display_purpose,
+                "parent_purpose": parent_purpose,
+                "stage_index": stage_index,
+                "stage_count": stage_count,
+                    "split_index": split_index,
+                    "split_count": split_count,
+                "qty": qty_value,
+                "side": side_value,
+                "cycle_role": cycle_role_value,
+                "source": display_source,
+                "record_source": entry.get("source"),
             }
         )
     return rows
@@ -9575,7 +9670,36 @@ async def api_pair_start_symbol(
     entry = data.get(normalized)
     if not entry:
         raise HTTPException(status_code=404, detail="Kein Pair-Start-Symbol verfügbar")
-    return {"success": True, "profile": normalized, "symbol": entry.get("symbol"), "entry": entry}
+
+    symbol_value = _normalize_symbol_value(entry.get("symbol"))
+    # Laufstatus des Long-/Short-Bots für dieses Profil ermitteln, um stales Handoff zu erkennen.
+    long_bot_name, short_bot_name = _resolve_pair_bot_names(normalized) or (None, None)
+    long_running = False
+    short_running = False
+    if symbol_value:
+        try:
+            long_running = is_bot_running(symbol_value, bot_type="long", profile=normalized)
+        except Exception:
+            long_running = False
+        try:
+            short_running = is_bot_running(symbol_value, bot_type="short", profile=normalized)
+        except Exception:
+            short_running = False
+    payload = {
+        "success": True,
+        "profile": normalized,
+        "symbol": symbol_value,
+        "entry": {
+            **entry,
+            "symbol": symbol_value,
+            "profile": normalized,
+            "long_bot_name": long_bot_name,
+            "short_bot_name": short_bot_name,
+            "long_running": long_running,
+            "short_running": short_running,
+        },
+    }
+    return payload
 
 
 @app.post("/api/hedge/start-bot-script")
@@ -9592,7 +9716,9 @@ async def api_start_bot_script(
     project_root = Path(__file__).resolve().parent.parent
     if bot_type not in {"long", "short"}:
         return {"success": False, "error": "bot_type muss 'long' oder 'short' sein"}
-    if not symbol:
+    # Für Short-Bots erlauben wir symbol="" und überlassen die Symbol-Wahl dem Start-Script
+    # (Pair-Leader/Follower-Flow). Für Long bleibt Symbol Pflicht.
+    if not symbol and bot_type != "short":
         return {"success": False, "error": "Symbol fehlt"}
 
     normalized_symbol = _normalize_symbol_value(symbol)
@@ -9653,9 +9779,19 @@ async def api_start_bot_script(
         short_index = profile_key.split("_")[-1] if profile_key.startswith("bot_") else ""
         short_bot_name = f"short_bot_{short_index}" if short_index.isdigit() else None
         if not short_bot_name:
-            short_bot_name = (profile_record.get("short_account") or profile_record.get("bot_name", "").replace("long_bot_", "short_bot_")).strip().lower()
-        else:
-            short_bot_name = short_bot_name.strip().lower()
+            short_bot_name = (
+                profile_record.get("short_account")
+                or profile_record.get("bot_name", "").replace("long_bot_", "short_bot_", 1)
+            )
+        short_bot_name = (short_bot_name or "").strip().lower()
+
+        # Long-Bot-Name für Logging/Pair-State konsistent bestimmen.
+        long_bot_name = profile_record.get("bot_name") or ""
+        if not long_bot_name and profile:
+            long_bot_name = profile_to_long_bot_name(profile) or ""
+        if not long_bot_name and short_index.isdigit():
+            long_bot_name = f"long_bot_{short_index}"
+        long_bot_name = (long_bot_name or "").strip().lower()
         short_group_root = project_root / "live_bots" / "short_hedge_bot"
         short_root = short_group_root / short_bot_name
         config_path = short_root / "config" / "fixed_cycle_config.json"
@@ -9674,6 +9810,54 @@ async def api_start_bot_script(
                 "bot_type": "short",
                 "profile": profile,
             }
+
+        # Neuer Pfad: Short-first ohne explizites Symbol/Handoff.
+        # Wenn symbol leer ist, überlassen wir dem Start-Script (start_short_bot.sh)
+        # die Symbol-Wahl über Pair-State/best_coin – unabhängig von evtl. noch vorhandenen
+        # Pair-Start-Einträgen (stale Handoff).
+        if not symbol:
+            launcher_log = short_root / "logs" / "start_short_bot_launcher.log"
+            launcher_log.parent.mkdir(parents=True, exist_ok=True)
+            env = {**os.environ, "PYTHONPATH": str(project_root)}
+            try:
+                log_handle = open(launcher_log, "a", encoding="utf-8")
+                logger.info(
+                    "short_start_no_symbol_allowed_pair_script_flow",
+                    {
+                        "profile": profile,
+                        "short_bot_name": short_bot_name,
+                        "message": "Starting short bot without symbol; script will select via Pair-State/best_coin.",
+                    },
+                )
+                process = subprocess.Popen(
+                    [str(start_script)],
+                    cwd=str(project_root),
+                    stdout=log_handle,
+                    stderr=log_handle,
+                    start_new_session=True,
+                    env=env,
+                )
+                log_handle.flush()
+                log_handle.close()
+            except Exception as exc:
+                logger.exception("short_start_no_symbol_pair_script_start_failed", exc_info=True)
+                return {
+                    "success": False,
+                    "bot_type": "short",
+                    "profile": profile,
+                    "short_bot_name": short_bot_name,
+                    "message": f"Short script start without symbol failed: {str(exc)}",
+                }
+            return {
+                "success": True,
+                "bot_type": "short",
+                "profile": profile,
+                "short_bot_name": short_bot_name,
+                "pid": process.pid,
+                "launcher_log": str(launcher_log),
+                "message": "Short script start without symbol spawned",
+            }
+
         entry = pair_entry
         if not entry:
             entry = _load_pair_start_symbols().get(profile or "")
@@ -9707,19 +9891,62 @@ async def api_start_bot_script(
         short_active_state_dir.mkdir(parents=True, exist_ok=True)
         active_symbols_path = short_active_state_dir / "active_bot_symbols.json"
         run_timestamp = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+
+        # Pair-State respektieren: Falls bereits ein Pair-Symbol existiert, dieses bevorzugen.
+        index_str = short_bot_name.rsplit("_", 1)[-1]
+        pair_state_dir = project_root / "live_bots" / "state"
+        pair_state_dir.mkdir(parents=True, exist_ok=True)
+        pair_state_path = pair_state_dir / f"pair_symbol_bot_{index_str}.json"
+        effective_symbol = handoff_symbol
+        pair_payload: dict[str, Any] = {}
+        if pair_state_path.exists():
+            try:
+                with open(pair_state_path, "r", encoding="utf-8") as fh:
+                    pair_payload = json.load(fh) or {}
+            except Exception:
+                pair_payload = {}
+            existing_symbol = str(pair_payload.get("symbol") or "").upper()
+            if existing_symbol:
+                if existing_symbol != handoff_symbol:
+                    logger.warning(
+                        "short_pair_handoff_pair_state_conflict",
+                        {
+                            "profile": profile,
+                            "long_bot": long_bot_name,
+                            "short_bot": short_bot_name,
+                            "pair_symbol": existing_symbol,
+                            "handoff_symbol": handoff_symbol,
+                        },
+                    )
+                effective_symbol = existing_symbol
+        # Pair-State aktualisieren bzw. anlegen, falls noch leer.
+        pair_payload.update(
+            {
+                "symbol": effective_symbol,
+                "leader_bot": long_bot_name,
+                "long_bot_name": long_bot_name,
+                "short_bot_name": short_bot_name,
+                "updated_at": run_timestamp,
+            }
+        )
+        tmp_pair_state = pair_state_path.with_suffix(pair_state_path.suffix + ".tmp")
+        with open(tmp_pair_state, "w", encoding="utf-8") as tmp_fh:
+            json.dump(pair_payload, tmp_fh, ensure_ascii=False, indent=2)
+        tmp_pair_state.replace(pair_state_path)
+
         reserved_data = {
-            "symbol": handoff_symbol,
+            "symbol": effective_symbol,
             "timestamp": run_timestamp,
             "source": "pair_handoff_symbol",
             "reason": "pair_handoff_short_start",
             "candidate_count": 1,
-            "candidates": [{"symbol": handoff_symbol}],
+            "candidates": [{"symbol": effective_symbol}],
         }
         with open(reserved_best_coin_path, "w", encoding="utf-8") as fh:
             json.dump(reserved_data, fh, ensure_ascii=False, indent=2)
         with open(config_path, "r", encoding="utf-8") as cfg_fh:
             short_cfg = json.load(cfg_fh)
-        short_cfg["symbol"] = handoff_symbol
+        short_cfg["symbol"] = effective_symbol
         short_cfg["best_coin_file"] = str(reserved_best_coin_path.resolve())
         short_cfg["bot_name"] = short_bot_name
         with open(runtime_config_path, "w", encoding="utf-8") as runtime_fh:

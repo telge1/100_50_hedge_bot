@@ -4010,7 +4010,9 @@
                 : isWaiting
                     ? (longBot.symbol && longBot.reserved_by
                         ? `${longBot.symbol} reserviert von ${longBot.reserved_by}`
-                        : 'wartet auf neuen Coin')
+                        : (longBot.reason === 'no_good_candidates'
+                            ? 'Long Bot wartet auf Symbol. Keine guten Coins verfügbar – bitte später erneut starten, sobald der Scanner einen Kandidaten liefert.'
+                            : 'wartet auf neuen Coin'))
                     : 'Long Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen';
 
             let longStatusClass = longRunning ? 'running' : isWaiting ? 'waiting_for_symbol' : 'stopped';
@@ -4041,10 +4043,20 @@
             let shortRunning = shortBot.running || false;
             const shortPriceAtActive = !!(shortPriceAt && shortPriceAt.target_price);
             const shortStatus = shortBot.status || (shortRunning ? 'running' : 'stopped');
-            let shortStatusClass = shortStatus;
-            let shortIndicatorClass = shortStatus;
-            let shortBotDesc = shortBot.status_text || (shortRunning ? 'Short Bot läuft und wartet auf Positionen' : 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen');
-            const showShortStopButton = !!selectedSymbol && shortRunning;
+            const shortIsWaiting = shortStatus === 'waiting_for_symbol' && !!shortBot.start_requested;
+            let shortStatusClass = shortRunning ? 'running' : (shortIsWaiting ? 'waiting_for_symbol' : shortStatus || 'stopped');
+            let shortIndicatorClass = shortStatusClass;
+            let shortBotDesc;
+            if (shortBot.status_text) {
+                shortBotDesc = shortBot.status_text;
+            } else if (shortRunning) {
+                shortBotDesc = 'Short Bot läuft und wartet auf Positionen';
+            } else if (shortIsWaiting) {
+                shortBotDesc = 'Short Bot wartet auf Symbol. Keine guten Coins verfügbar – bitte später erneut starten, sobald der Scanner einen Kandidaten liefert.';
+            } else {
+                shortBotDesc = 'Short Bot gestoppt - starten Sie den Bot, bevor Sie Positionen setzen';
+            }
+            const showShortStopButton = !!selectedSymbol && (shortRunning || shortIsWaiting);
             console.log("[SHORT CARD STATUS]", {
                 symbol: selectedSymbol,
                 botEntry: selectedSymbol ? bots?.[selectedSymbol] : null,
@@ -4236,15 +4248,18 @@
                     response: data,
                     running: botType === 'long' ? data?.long_bot?.running : data?.short_bot?.running,
                 });
-                
+
                 if (data.success) {
                     const botStatus = botType === 'long' ? data.long_bot : data.short_bot;
-                    return botStatus.running || false;
+                    const running = !!(botStatus && botStatus.running);
+                    const status = (botStatus && botStatus.status) || (running ? 'running' : 'stopped');
+                    const reason = (botStatus && botStatus.reason) || '';
+                    return { running, status, reason };
                 }
-                return false;
+                return { running: false, status: 'unknown', reason: 'api_failed' };
             } catch (error) {
                 console.error('Error checking bot status:', error);
-                return false;
+                return { running: false, status: 'error', reason: error && error.message ? error.message : 'request_failed' };
             }
         }
 
@@ -4310,27 +4325,35 @@
             let shortBotName = shortBotNameFromProfile(resolvedProfile);
             if (botType === 'short' && !resolvedSymbol) {
                 const entry = await fetchPairStartSymbol(selectedProfile);
-                if (!entry || !entry.symbol) {
-                    if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
-                    showToast('error', 'Short Symbol fehlt', 'Kein Hand-off Symbol verfügbar. Bitte starten Sie zuerst den Long Bot.', 6000);
-                    return;
-                }
-                resolvedSymbol = entry.symbol;
-                if (!shortBotName && entry.short_bot) {
-                    shortBotName = entry.short_bot.toString().trim().toLowerCase();
-                }
-                if (!resolvedProfile && entry.profile) {
-                    const normalizedEntryProfile = entry.profile.toString().trim().toLowerCase();
-                    if (isBotProfile(normalizedEntryProfile)) {
-                        resolvedProfile = normalizedEntryProfile;
+                if (entry && entry.symbol && entry.long_running) {
+                    // Nur aktives Long-Handoff nutzen. Stale Einträge werden ignoriert.
+                    resolvedSymbol = entry.symbol;
+                    if (!shortBotName && entry.short_bot) {
+                        shortBotName = entry.short_bot.toString().trim().toLowerCase();
                     }
+                    if (!resolvedProfile && entry.profile) {
+                        const normalizedEntryProfile = entry.profile.toString().trim().toLowerCase();
+                        if (isBotProfile(normalizedEntryProfile)) {
+                            resolvedProfile = normalizedEntryProfile;
+                        }
+                    }
+                    console.log('[SHORT HANDOFF SYMBOL USED]', {
+                        profile: resolvedProfile || selectedProfile,
+                        symbol: resolvedSymbol,
+                        short_bot: shortBotName,
+                        source: 'pair_start_symbol',
+                        long_running: entry.long_running,
+                        short_running: entry.short_running,
+                    });
+                } else {
+                    console.log('[SHORT START] no active long handoff; falling back to script pair-leader flow', {
+                        profile: selectedProfile,
+                        ignored_symbol: entry && entry.symbol,
+                        long_running: entry && entry.long_running,
+                        short_running: entry && entry.short_running,
+                    });
+                    resolvedSymbol = '';
                 }
-                console.log('[SHORT HANDOFF SYMBOL USED]', {
-                    profile: resolvedProfile || selectedProfile,
-                    symbol: resolvedSymbol,
-                    short_bot: shortBotName,
-                    source: 'pair_start_symbol',
-                });
             }
             if (!resolvedProfile && shortBotName) {
                 const derivedProfile = profileFromShortBotName(shortBotName);
@@ -4344,13 +4367,12 @@
                     if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                     return;
                 }
-                if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
-                showToast('error', 'Short Symbol fehlt', 'Short Bot benötigt ein Symbol (z.B. aus Pair-Handoff).', 6000);
-                return;
+                // Für Short ohne Symbol: Start trotzdem erlauben, Script/Paar-Logik entscheidet.
             }
-            symbol = resolvedSymbol;
-            if (botType === 'short') {
-                const shortRunning = await checkBotRunningStatus(symbol, 'short');
+            symbol = resolvedSymbol || '';
+            if (botType === 'short' && symbol) {
+                const shortInfo = await checkBotRunningStatus(symbol, 'short');
+                const shortRunning = !!(shortInfo && shortInfo.running);
                 if (shortRunning) {
                     if (btn) { btn.disabled = false; btn.textContent = '▶️ Start'; }
                     showToast('info', 'Short Bot läuft bereits', `Short Bot für ${symbol} ist schon aktiv.`, 5000);
@@ -4437,32 +4459,60 @@
                     }
                     // Wait a bit for systemd to start the service
                     await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    // Für symbol-losen Short-first-Start gibt es an dieser Stelle noch keinen
+                    // verlässlichen Symbol-Key für checkBotRunningStatus(symbol,...).
+                    // Statt eines falschen "Prüfung X/6"-Loops nur Status refreshen und einen
+                    // neutralen Hinweis anzeigen.
+                    if (!symbol && botType === 'short') {
+                        removeToast(toastId);
+                        showToast('info', 'Start ausgelöst', 'Short Bot Start wurde ausgelöst. Symbol wird jetzt ermittelt.', 6000);
+                        await loadSystemStatus();
+                        setTimeout(() => { try { loadSystemStatus(); } catch (_) {} }, 2000);
+                        setTimeout(() => { try { loadSystemStatus(); } catch (_) {} }, 5000);
+                        return;
+                    }
                     
                     // Check if bot is actually running
                     let attempts = 0;
                     const maxAttempts = 6;
                     const checkInterval = 2000;
-                    let isRunning = false;
-                    
+
                     const checkBotStatus = async () => {
                         attempts++;
-                    isRunning = await checkBotRunningStatus(symbol, botType);
-                    console.log('[SHORT START CHECK]', {
-                        symbol,
-                        attempt: attempts,
-                        running: isRunning,
-                    });
-                        
+                        const info = await checkBotRunningStatus(symbol, botType);
+                        const isRunning = !!(info && info.running);
+                        const status = info && info.status;
+                        const reason = info && info.reason;
+                        console.log('[BOT START CHECK]', {
+                            symbol,
+                            botType,
+                            attempt: attempts,
+                            running: isRunning,
+                            status,
+                            reason,
+                        });
+
                         // Update status displays
                         await loadSystemStatus();
                         if (symbol) {
                             await loadBotStatus(symbol);
                         }
-                        
+
                         if (isRunning) {
                             // Bot is running - show success and remove info toast
                             removeToast(toastId);
                             showToast('success', 'Bot gestartet!', `${botName} Bot für ${symbol} läuft jetzt.`, 5000);
+                            return;
+                        } else if (status === 'waiting_for_symbol' && reason === 'no_good_candidates') {
+                            // Zwischenstatus: Bot wartet auf Symbol (keine guten Kandidaten) – kein harter Startfehler.
+                            removeToast(toastId);
+                            showToast(
+                                'warning',
+                                `${botName} Bot wartet auf Symbol`,
+                                'Keine guten Coins verfügbar. Bitte später erneut starten, sobald der Scanner einen Kandidaten liefert.',
+                                8000
+                            );
                             return;
                         } else if (attempts < maxAttempts) {
                             // Still checking... update info toast
@@ -4822,19 +4872,33 @@
                 const checkBotStatus = async () => {
                     attempts++;
                     const work = [];
-                    const runningPromise = resolvedSymbol ? checkBotRunningStatus(resolvedSymbol, 'long') : Promise.resolve(false);
+                    const runningPromise = resolvedSymbol
+                        ? checkBotRunningStatus(resolvedSymbol, 'long')
+                        : Promise.resolve({ running: false, status: 'stopped', reason: '' });
                     work.push(runningPromise);
                     try { work.push(Promise.resolve(loadSystemStatus()).catch(() => {})); } catch (_) {}
                     if (resolvedSymbol) {
                         try { work.push(Promise.resolve(loadBotStatus(resolvedSymbol)).catch(() => {})); } catch (_) {}
                     }
-                    const [isRunning] = await Promise.all(work);
+                    const [info] = await Promise.all(work);
+                    const isRunning = !!(info && info.running);
+                    const status = info && info.status;
+                    const reason = info && info.reason;
                     if (resolvedSymbol && longSymbolInput && !longSymbolInput.value.trim()) longSymbolInput.value = resolvedSymbol;
 
                     if (isRunning) {
                         removeToast(toastId);
                         if (typeof showError === 'function') showError(null);
                         showToast('success', 'Long Bot läuft', `Long Bot für ${resolvedSymbol} läuft jetzt.`, 5000);
+                        if (btn) { btn.disabled = false; btn.textContent = '🔁 Restart'; }
+                    } else if (status === 'waiting_for_symbol' && reason === 'no_good_candidates') {
+                        removeToast(toastId);
+                        showToast(
+                            'warning',
+                            'Long Bot wartet auf Symbol',
+                            'Keine guten Coins verfügbar. Bitte später erneut starten, sobald der Scanner einen Kandidaten liefert.',
+                            8000
+                        );
                         if (btn) { btn.disabled = false; btn.textContent = '🔁 Restart'; }
                     } else if (attempts < maxAttempts) {
                         showToast('info', 'Long Restart...', `Starte Long Bot... (Prüfung ${attempts}/${maxAttempts})`, 0, toastId);
@@ -4966,13 +5030,18 @@
                 const checkBotStatus = async () => {
                     attempts++;
                     const work = [];
-                    const runningPromise = resolvedSymbol ? checkBotRunningStatus(resolvedSymbol, 'short') : Promise.resolve(false);
+                    const runningPromise = resolvedSymbol
+                        ? checkBotRunningStatus(resolvedSymbol, 'short')
+                        : Promise.resolve({ running: false, status: 'stopped', reason: '' });
                     work.push(runningPromise);
                     try { work.push(Promise.resolve(loadSystemStatus()).catch(() => {})); } catch (_) {}
                     if (resolvedSymbol) {
                         try { work.push(Promise.resolve(loadBotStatus(resolvedSymbol)).catch(() => {})); } catch (_) {}
                     }
-                    const [isRunning] = await Promise.all(work);
+                    const [info] = await Promise.all(work);
+                    const isRunning = !!(info && info.running);
+                    const status = info && info.status;
+                    const reason = info && info.reason;
                     const shortSymbolInput = document.getElementById('startSymbolInputShort');
                     if (resolvedSymbol && shortSymbolInput && !shortSymbolInput.value.trim()) shortSymbolInput.value = resolvedSymbol;
 
@@ -4980,6 +5049,15 @@
                         removeToast(toastId);
                         if (typeof showError === 'function') showError(null);
                         showToast('success', 'Short Bot läuft', `Short Bot für ${resolvedSymbol} läuft jetzt.`, 5000);
+                        if (btnShort) { btnShort.disabled = false; btnShort.textContent = '🔁 Restart'; }
+                    } else if (status === 'waiting_for_symbol' && reason === 'no_good_candidates') {
+                        removeToast(toastId);
+                        showToast(
+                            'warning',
+                            'Short Bot wartet auf Symbol',
+                            'Keine guten Coins verfügbar. Bitte später erneut starten, sobald der Scanner einen Kandidaten liefert.',
+                            8000
+                        );
                         if (btnShort) { btnShort.disabled = false; btnShort.textContent = '🔁 Restart'; }
                     } else if (attempts < maxAttempts) {
                         showToast('info', 'Short Restart...', `Starte Short Bot... (${attempts}/${maxAttempts})`, 0, toastId);
@@ -5221,11 +5299,13 @@
                 const maxAttempts = 6;
                 const checkInterval = 2000;
                 
-                const checkBotStatus = async () => {
+            const checkBotStatus = async () => {
                     attempts++;
-                    const longRunning = await checkBotRunningStatus(explicitSymbol, 'long');
-                    const shortRunning = await checkBotRunningStatus(explicitSymbol, 'short');
-                    
+                    const longInfo = await checkBotRunningStatus(explicitSymbol, 'long');
+                    const shortInfo = await checkBotRunningStatus(explicitSymbol, 'short');
+                    const longRunning = !!(longInfo && longInfo.running);
+                    const shortRunning = !!(shortInfo && shortInfo.running);
+
                     await loadSystemStatus();
                     if (explicitSymbol) await loadBotStatus(explicitSymbol);
                     
@@ -5236,8 +5316,10 @@
                     } else if (attempts < maxAttempts) {
                         setTimeout(checkBotStatus, checkInterval);
                     } else {
-                        const finalLong = await checkBotRunningStatus(explicitSymbol, 'long');
-                        const finalShort = await checkBotRunningStatus(explicitSymbol, 'short');
+                        const finalLongInfo = await checkBotRunningStatus(explicitSymbol, 'long');
+                        const finalShortInfo = await checkBotRunningStatus(explicitSymbol, 'short');
+                        const finalLong = !!(finalLongInfo && finalLongInfo.running);
+                        const finalShort = !!(finalShortInfo && finalShortInfo.running);
                         if (finalLong && finalShort) {
                             showToast('success', 'Beide Bots gestartet!', `Long und Short Bot für ${explicitSymbol} laufen jetzt.`, 5000);
                         } else {

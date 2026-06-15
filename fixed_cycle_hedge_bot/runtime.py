@@ -2831,6 +2831,8 @@ class GenericHedgeRuntime:
         last_reason = "no_candidate"
         candidate_count = 0
         rejected_count = 0
+        intent_metadata = getattr(intent, "metadata", {}) or {}
+        intent_identity: tuple | None = None
         for order in self.runtime_state.active_orders.values():
             if order.status not in {"OPEN", "PARTIAL"}:
                 continue
@@ -2845,6 +2847,33 @@ class GenericHedgeRuntime:
             )
             intent_idx = int(intent.position_idx or (1 if intent.side == "long" else 2))
             candidate_count += 1
+
+            # Split-/Stage-aware Equivalence: nur Orders mit identischer Submit-Identität
+            # (Purpose + Stage/Split-Daten) können als äquivalent betrachtet werden.
+            order_metadata = dict(order.metadata or {})
+            if intent_identity is None:
+                intent_identity = self._cycle_submit_identity(
+                    str(intent.purpose or "").upper(), intent_metadata
+                )
+            order_identity = self._cycle_submit_identity(
+                str(order.purpose or "").upper(), order_metadata
+            )
+            if intent_identity != order_identity:
+                last_candidate_id = order.client_order_id
+                last_reason = "stage_identity_mismatch"
+                rejected_count += 1
+                self.audit.log_event(
+                    "intent_equivalence_reject",
+                    strategy=self.strategy.name,
+                    purpose=intent.purpose,
+                    side=intent.side,
+                    candidate_client_order_id=order.client_order_id,
+                    reason=last_reason,
+                    expected_identity=repr(intent_identity),
+                    actual_identity=repr(order_identity),
+                )
+                continue
+
             if existing_idx != intent_idx:
                 last_candidate_id = order.client_order_id
                 last_reason = "position_idx_mismatch"
@@ -4894,6 +4923,72 @@ class GenericHedgeRuntime:
     def _is_terminal_order_status(status: Any) -> bool:
         return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
 
+    def _cycle_submit_identity(self, purpose_upper: str, metadata: dict[str, Any]) -> tuple:
+        """
+        Build a submit-identity for cycle orders which is stable across intents
+        and open orders, and split-/stage-aware.
+
+        - Normale Cycle-Orders: (PURPOSE, "single")
+        - Gestagte Second-Leg-TPs: (PURPOSE, "staged", cycle_index, stage_index)
+        - Normale Second-Leg-Splits: (PURPOSE, "normal_split", cycle_index, split_stage_index, split_stage_count)
+        - Fallbacks bei unvollständigen Metadaten: (PURPOSE, "staged_fallback") / (PURPOSE, "normal_split_fallback")
+        """
+        base = (purpose_upper,)
+        if not purpose_upper.startswith("CYCLE_"):
+            return base
+
+        staged_flag = bool(metadata.get("is_staged_second_leg_tp"))
+        normal_split_flag = bool(metadata.get("normal_cycle_second_leg_split"))
+
+        if staged_flag:
+            try:
+                cycle_index = int(metadata.get("cycle_index"))
+            except (TypeError, ValueError):
+                cycle_index = None
+            try:
+                stage_index = int(metadata.get("stage_index"))
+            except (TypeError, ValueError):
+                stage_index = None
+            if cycle_index is not None and stage_index is not None:
+                return (purpose_upper, "staged", cycle_index, stage_index)
+            return (purpose_upper, "staged_fallback")
+
+        if normal_split_flag:
+            # Für normale Second-Leg-Splits bevorzugt split_cycle_index, ansonsten cycle_index.
+            split_cycle_val = metadata.get("split_cycle_index")
+            if split_cycle_val is None:
+                split_cycle_val = metadata.get("cycle_index")
+            try:
+                cycle_index = int(split_cycle_val)
+            except (TypeError, ValueError):
+                cycle_index = None
+            try:
+                split_stage_index = int(metadata.get("split_stage_index"))
+            except (TypeError, ValueError):
+                split_stage_index = None
+            try:
+                split_stage_count = int(
+                    metadata.get("split_stage_count") or metadata.get("stage_count")
+                )
+            except (TypeError, ValueError):
+                split_stage_count = None
+            if (
+                cycle_index is not None
+                and split_stage_index is not None
+                and split_stage_count is not None
+            ):
+                return (
+                    purpose_upper,
+                    "normal_split",
+                    cycle_index,
+                    split_stage_index,
+                    split_stage_count,
+                )
+            return (purpose_upper, "normal_split_fallback")
+
+        # Standard-Cycle-Order ohne spezielle Staging-/Split-Metadata.
+        return (purpose_upper, "single")
+
     def _find_duplicate_open_cycle_purpose(
         self, intent: StrategyIntent, snapshot: HedgeSnapshot
     ) -> tuple[ManagedOrder | None, str | None]:
@@ -4901,15 +4996,8 @@ class GenericHedgeRuntime:
         if not purpose_upper.startswith("CYCLE_"):
             return None, None
         intent_metadata = getattr(intent, "metadata", {}) or {}
-        staged_intent = bool(intent_metadata.get("is_staged_second_leg_tp"))
-        try:
-            intent_cycle_index = int(intent_metadata.get("cycle_index"))
-        except (TypeError, ValueError):
-            intent_cycle_index = None
-        try:
-            intent_stage_index = int(intent_metadata.get("stage_index"))
-        except (TypeError, ValueError):
-            intent_stage_index = None
+        intent_identity = self._cycle_submit_identity(purpose_upper, intent_metadata)
+
         def _order_status(order: Any) -> str:
             status = getattr(order, "status", None)
             if status is None and isinstance(order, dict):
@@ -4946,43 +5034,14 @@ class GenericHedgeRuntime:
                     if isinstance(order, dict)
                     else None
                 ) or {}
-                staged_order = bool(order_metadata.get("is_staged_second_leg_tp"))
+                order_identity = self._cycle_submit_identity(order_purpose, order_metadata)
 
-                # Für gestagte Second-Leg-TPs: Duplicate nur, wenn dieselbe Stage (cycle_index + stage_index) bereits offen ist.
-                if staged_intent or staged_order:
-                    # Wenn nur eine Seite gestagt ist oder Indizes fehlen, bleiben wir konservativ
-                    # und behandeln dies als Duplicate nach Purpose, um unkontrollierte Mehrfach-Orders zu vermeiden.
-                    try:
-                        order_cycle_index = int(order_metadata.get("cycle_index"))
-                    except (TypeError, ValueError):
-                        order_cycle_index = None
-                    try:
-                        order_stage_index = int(order_metadata.get("stage_index"))
-                    except (TypeError, ValueError):
-                        order_stage_index = None
-
-                    if (
-                        staged_intent
-                        and staged_order
-                        and intent_cycle_index is not None
-                        and order_cycle_index is not None
-                        and intent_stage_index is not None
-                        and order_stage_index is not None
-                    ):
-                        # Duplicate nur bei exakt gleicher Stage
-                        if (
-                            intent_cycle_index == order_cycle_index
-                            and intent_stage_index == order_stage_index
-                        ):
-                            return order, order_source
-                        # Andere Stage desselben Purposes → kein Duplicate
-                        continue
-
-                    # Fallback: Metadaten unvollständig, Duplicate nach Purpose behandeln
+                # Duplicate nur, wenn Submit-Identität exakt übereinstimmt.
+                # Dadurch sind gestagte und normale Second-Leg-Splits Stage-aware:
+                # - gleiche Purpose & gleiche Stage → Duplicate
+                # - gleiche Purpose & andere Stage → erlaubt
+                if order_identity == intent_identity:
                     return order, order_source
-
-                # Nicht-gestagte Cycle-Orders: wie bisher, ein offener Zweck pro Purpose
-                return order, order_source
         return None, None
 
     def _is_unsettled_strategy_order(self, order: ManagedOrder) -> bool:

@@ -1,5 +1,6 @@
 66% plastic und 33% sand
 
+rosmarin, thymian, petersilie, oregano
 
 python run_psrh.py --config path/to/your/config.yaml
 
@@ -104,6 +105,12 @@ Uberschreiben:
 sudo chown telgenbuescher:telgenbuescher logs/best_coin.json
 chmod 644 logs/best_coin.json
 
+
+Symbol‑Reservation für die Short‑Gruppe zurücksetzen
+rm -f live_bots/short_hedge_bot/state/active_bot_symbols.json
+printf '{}\n' > live_bots/short_hedge_bot/state/active_bot_symbols.json
+
+
 ####################################### Start/Stop Bot ##########################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/scripts/restart_fixed_cycle.sh
@@ -174,16 +181,35 @@ cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 
 ######################################################################################################################
 
-Short:
-SHORT_FIXED_SYMBOL=XRPUSDT bash live_bots/short_hedge_bot/short_bot_1/scripts/start.sh
-bash live_bots/short_hedge_bot/short_bot_1/scripts/stop_with_cleanup.sh
+############################ Time-Distance-Refill nur: ###############################
 
-Long:
-SHORT_FIXED_SYMBOL=XRPUSDT bash live_bots/100_50_hedge_bot/long_bot_1/scripts/start.sh
-live_bots/100_50_hedge_bot/long_bot_1/scripts/stop_with_cleanup.sh 
+CYCLE_2_SHORT_REDUCE filled
++ CYCLE_2_LONG_REDUCE offen
++ Trade älter als X Minuten
++ Preis bei 50% zwischen Avg und CYCLE_2_LONG_REDUCE
 
-ok check jetzt wieder warum die cycle und exit orders nicht gestetzt wurden 
+Danach:
+bestehender Refill-Mode
++ nächsten Cycle-Refill einmal skippen
 
-/home/telgenbuescher/projects/spread_recovery_hedge
+############################################# Neue teil tp order regel ###############
 
+Für jede normale Cycle-Followup-TP:
 
+1. Berechne normale TP-Qty.
+2. Prüfe, ob qty in 3 gültige Orders teilbar ist.
+3. Wenn ja → baue 3 Teil-TPs.
+4. Wenn nein, prüfe, ob qty in 2 gültige Orders teilbar ist.
+5. Wenn ja → baue 2 Teil-TPs.
+6. Wenn nein → baue 1 normale TP-Order.
+
+jede Teilorder >= min_order_qty
+jede Teilorder * trigger_price >= min_notional
+
+###########################################################################################
+
+Refill lief aus Sicht dieses Logs sauber durch.
+Cycle nach Refill läuft korrekt weiter.
+Kein Refill hängt offen.
+Kein doppelter Rebuild/keine doppelte Refill-Order sichtbar.
+Aber: Closed-PnL-Retry für alte Reduce-Orders muss noch gefixt oder begrenzt werden, sonst bleibt der Log dauerhaft voll mit Retry-Versuchen.

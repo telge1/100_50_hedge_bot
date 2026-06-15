@@ -208,3 +208,78 @@ fi
 
 rm -f "${PID_FILE}" "${LEGACY_PID_FILE}"
 write_stopped_status "stop_with_cleanup_success"
+
+# Pair-State nach Stop aktualisieren (Long-Bot).
+BOT_INDEX="${BOT_NAME##*_}"
+PAIR_STATE_DIR="${PROJECT_ROOT}/live_bots/state"
+PAIR_STATE_FILE="${PAIR_STATE_DIR}/pair_symbol_bot_${BOT_INDEX}.json"
+PAIR_LOCK_FILE="${PAIR_STATE_DIR}/pair_symbol_bot_${BOT_INDEX}.lock"
+mkdir -p "${PAIR_STATE_DIR}"
+PAIR_LOCK_FD=0
+if exec {PAIR_LOCK_FD}>"${PAIR_LOCK_FILE}"; then
+  if flock -n "${PAIR_LOCK_FD}"; then
+    python3 <<PY
+import json
+from pathlib import Path
+import os
+
+index = ${BOT_INDEX@Q}
+bot_name = ${BOT_NAME@Q}
+project_root = Path(${PROJECT_ROOT@Q})
+pair_path = Path(${PAIR_STATE_FILE@Q})
+
+if not pair_path.exists():
+    raise SystemExit(0)
+
+try:
+    data = json.loads(pair_path.read_text(encoding="utf-8") or "{}")
+except Exception:
+    data = {}
+
+changed = False
+
+if data.get("long_bot_name") == bot_name and data.get("long_running") is not False:
+    data["long_running"] = False
+    changed = True
+
+def is_running(group: str, name: str) -> bool:
+    if not name:
+        return False
+    if group == "long":
+        run_dir = project_root / "live_bots/100_50_hedge_bot" / name / "run"
+    else:
+        run_dir = project_root / "live_bots/short_hedge_bot" / name / "run"
+    pid_path = run_dir / "bot.pid"
+    try:
+        pid_text = pid_path.read_text(encoding="utf-8").strip()
+        pid = int(pid_text) if pid_text else None
+    except Exception:
+        pid = None
+    if pid is None:
+        return False
+    return (Path("/proc") / str(pid)).exists()
+
+long_bot = data.get("long_bot_name") or f"long_bot_{index}"
+short_bot = data.get("short_bot_name") or f"short_bot_{index}"
+
+long_alive = is_running("long", long_bot)
+short_alive = is_running("short", short_bot)
+
+if not long_alive and not short_alive:
+    # Beide Bots gestoppt -> Pair-Symbol leeren.
+    if data.get("symbol"):
+        data["symbol"] = ""
+        changed = True
+    if data.get("long_running"):
+        data["long_running"] = False
+        changed = True
+    if data.get("short_running"):
+        data["short_running"] = False
+        changed = True
+    print(f"[pair-state] cleared pair_symbol_bot_{index}.json reason=both_bots_stopped")
+
+if changed:
+    pair_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+PY
+  fi
+fi
