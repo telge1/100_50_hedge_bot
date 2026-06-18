@@ -7167,6 +7167,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         second_leg_purpose = self._get_second_leg_purpose(cycle_index) if cycle_index > 0 else None
         purpose = second_leg_purpose
         long_purpose = self._cycle_purpose("long", cycle_index) if cycle_index > 0 else None
+        # Defensive Initialisierung für Staging-/Split-Hilfsvariablen, die in
+        # Fallback-Logs und Metadaten verwendet werden können.
+        stages: list[dict[str, Any]] = []
+        rejected_stage_indices: list[int] = []
+        rejected_stage_notionals: list[float] = []
+        min_notional: float = 0.0
+        intents: list[StrategyIntent] = []
         # Wenn noch kein Pending-Cycle gesetzt ist, die Sequenz aber klar einen Second-Leg
         # für einen bestimmten Cycle verlangt, diesen Cycle als Kandidaten übernehmen.
         if cycle_index <= 0:
@@ -9521,92 +9528,102 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_price=trigger_price,
         )
         if not use_market_fallback:
-            split_intents = self._maybe_build_normal_cycle_second_leg_split_intents(
-                cycle_index=cycle_index,
-                purpose=purpose,
-                qty=short_qty,
-                trigger_price=trigger_price,
-                snapshot=snapshot,
-                runtime_state=runtime_state,
-                side="short",
-                position_idx=2,
-                trigger_direction=2,
-                metadata=metadata,
+            _log_event(
+                "fixed_cycle_normal_second_leg_split_disabled_for_short_reduce",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "purpose": purpose,
+                    "qty": short_qty,
+                    "trigger_price": trigger_price,
+                    "reason": "single_25pct_reduce_required",
+                },
             )
-            if split_intents:
-                return split_intents
 
         # Staging: mehrere Second-Leg-TP-Intents mit Stage-Metadaten
         if stage_count > 1 and not use_market_fallback and "stages" in locals() and stages:
-            # Min-Notional-Grenze für Stages bestimmen (Exchange / Config)
-            _, rules, _ = self._resolve_instrument_rules(runtime_state)
-            min_notional = float(
-                rules["min_notional"]
-                if rules and rules.get("min_notional")
-                else float(self.config.min_notional_usdt or 0.0)
-            )
-
-            intents: list[StrategyIntent] = []
-            rejected_stage_indices: list[int] = []
-            rejected_stage_notionals: list[float] = []
-            first_leg_cycle_role = self._get_first_leg_cycle_role()
             second_leg_cycle_role = self._get_second_leg_cycle_role()
-            for stage in stages:
-                stage_index = int(stage.get("index") or 0)
-                stage_trigger_price = float(stage.get("trigger_price") or 0.0)
-                stage_qty = float(stage.get("qty") or 0.0)
-                stage_expected_net = float(stage.get("expected_net") or 0.0)
-                if stage_qty <= 0 or stage_trigger_price <= 0:
-                    continue
-                stage_notional = stage_qty * stage_trigger_price
-                if min_notional > 0 and stage_notional + 1e-8 < min_notional:
-                    rejected_stage_indices.append(stage_index)
-                    rejected_stage_notionals.append(stage_notional)
-                    continue
-                stage_metadata = {
-                    **metadata,
-                    "is_staged_second_leg_tp": True,
-                    "stage_index": stage_index,
-                    "stage_count": len(stages),
-                    "stage_expected_net": stage_expected_net,
-                    "stage_required_net_total": required_net,
-                    "stage_trigger_price": stage_trigger_price,
-                    "first_leg_fill_price": first_leg_fill_price,
-                    "final_second_leg_trigger_price": trigger_price,
-                    "distance_pct_abs": distance_pct_abs,
-                    "threshold_pct": threshold_pct,
-                    "first_leg_cycle_role": first_leg_cycle_role,
-                    "second_leg_cycle_role": second_leg_cycle_role,
-                    "parent_second_leg_purpose": purpose,
-                }
-                if second_leg_cycle_role == "short_reduce":
-                    side = "short"
-                    position_idx = 2
-                elif second_leg_cycle_role == "long_reduce":
-                    side = "long"
-                    position_idx = 1
-                else:
-                    _emit_short_tp_follow_up_skip(
-                        "staged_second_leg_tp_unknown_cycle_role",
-                        symbol=active_trade_symbol,
-                        cycle_index=cycle_index,
-                        cycle_role=second_leg_cycle_role,
-                    )
-                    continue
-                intent = StrategyIntent(
-                    side=side,
-                    qty=stage_qty,
-                    purpose=purpose,
-                    order_type="Market",
-                    reduce_only=True,
-                    trigger_price=stage_trigger_price,
-                    trigger_direction=2,
-                    trigger_by="LastPrice",
-                    close_on_trigger=True,
-                    position_idx=position_idx,
-                    metadata=stage_metadata,
+            if second_leg_cycle_role == "short_reduce":
+                _log_event(
+                    "fixed_cycle_staged_second_leg_disabled_for_short_reduce",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "purpose": purpose,
+                        "qty": short_qty,
+                        "trigger_price": trigger_price,
+                        "reason": "single_25pct_reduce_required",
+                    },
                 )
-                intents.append(intent)
+            else:
+                # Min-Notional-Grenze für Stages bestimmen (Exchange / Config)
+                _, rules, _ = self._resolve_instrument_rules(runtime_state)
+                min_notional = float(
+                    rules["min_notional"]
+                    if rules and rules.get("min_notional")
+                    else float(self.config.min_notional_usdt or 0.0)
+                )
+
+                intents: list[StrategyIntent] = []
+                rejected_stage_indices = []
+                rejected_stage_notionals = []
+                first_leg_cycle_role = self._get_first_leg_cycle_role()
+                for stage in stages:
+                    stage_index = int(stage.get("index") or 0)
+                    stage_trigger_price = float(stage.get("trigger_price") or 0.0)
+                    stage_qty = float(stage.get("qty") or 0.0)
+                    stage_expected_net = float(stage.get("expected_net") or 0.0)
+                    if stage_qty <= 0 or stage_trigger_price <= 0:
+                        continue
+                    stage_notional = stage_qty * stage_trigger_price
+                    if min_notional > 0 and stage_notional + 1e-8 < min_notional:
+                        rejected_stage_indices.append(stage_index)
+                        rejected_stage_notionals.append(stage_notional)
+                        continue
+                    stage_metadata = {
+                        **metadata,
+                        "is_staged_second_leg_tp": True,
+                        "stage_index": stage_index,
+                        "stage_count": len(stages),
+                        "stage_expected_net": stage_expected_net,
+                        "stage_required_net_total": required_net,
+                        "stage_trigger_price": stage_trigger_price,
+                        "first_leg_fill_price": first_leg_fill_price,
+                        "final_second_leg_trigger_price": trigger_price,
+                        "distance_pct_abs": distance_pct_abs,
+                        "threshold_pct": threshold_pct,
+                        "first_leg_cycle_role": first_leg_cycle_role,
+                        "second_leg_cycle_role": second_leg_cycle_role,
+                        "parent_second_leg_purpose": purpose,
+                    }
+                    if second_leg_cycle_role == "short_reduce":
+                        side = "short"
+                        position_idx = 2
+                    elif second_leg_cycle_role == "long_reduce":
+                        side = "long"
+                        position_idx = 1
+                    else:
+                        _emit_short_tp_follow_up_skip(
+                            "staged_second_leg_tp_unknown_cycle_role",
+                            symbol=active_trade_symbol,
+                            cycle_index=cycle_index,
+                            cycle_role=second_leg_cycle_role,
+                        )
+                        continue
+                    intent = StrategyIntent(
+                        side=side,
+                        qty=stage_qty,
+                        purpose=purpose,
+                        order_type="Market",
+                        reduce_only=True,
+                        trigger_price=stage_trigger_price,
+                        trigger_direction=2,
+                        trigger_by="LastPrice",
+                        close_on_trigger=True,
+                        position_idx=position_idx,
+                        metadata=stage_metadata,
+                    )
+                    intents.append(intent)
 
             if intents:
                 _log_event(
@@ -17220,6 +17237,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "UNTRIGGERED",
             "PARTIALLY_FILLED",
         }:
+            if normalized_prev == "INTENT_BUILT":
+                # Recovery-Guard: Slot reserviert, aber keine aktive Second-Leg-Order vorhanden.
+                # Status auf NONE zurücksetzen, Waiting/Pending beibehalten, damit ein neuer Intent
+                # gebaut werden kann.
+                self._set_second_leg_status(cycle_entry, "NONE")
+                self._persist_cycle_sequence_state(runtime_state)
+                _log_event(
+                    "fixed_cycle_second_leg_intent_built_cleared_due_to_missing_order",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": pending_cycle,
+                        "purpose": second_leg_purpose,
+                        "previous_second_leg_status": previous_status,
+                        "new_second_leg_status": "NONE",
+                        "cycle_waiting_for_second_leg": waiting,
+                        "pending_second_leg_cycle_index": pending_cycle,
+                    },
+                )
+                return
             _log_event(
                 "fixed_cycle_second_leg_active_order_missing_waiting_for_terminal_confirmation",
                 {

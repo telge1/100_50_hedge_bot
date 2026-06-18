@@ -1,12 +1,12 @@
 {
-  "symbol": "APTUSDT",
-  "timestamp": "2026-06-18T08:17:52.841197+00:00",
+  "symbol": "OPUSDT",
+  "timestamp": "2026-06-18T10:34:56.444468+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "APTUSDT"
+      "symbol": "OPUSDT"
     }
   ]
 }
