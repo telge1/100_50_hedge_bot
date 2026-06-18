@@ -14258,8 +14258,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if snapshot.has_open_purpose(purpose):
             return None
 
-        reduction_multiplier = 0.5
-        effective_pct = self.config.reduction_pct_per_fill * reduction_multiplier
+        effective_pct = self.config.reduction_pct_per_fill
         current_short_qty = (
             snapshot.short_qty
             if snapshot.short_qty > 0
@@ -14271,7 +14270,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             float(state.get("initial_short_qty") or 0.0),
             current_short_qty,
             trigger_price,
-            reduction_multiplier=reduction_multiplier,
             runtime_state=runtime_state,
         )
         if short_qty <= 0 or trigger_price <= 0:
@@ -14289,9 +14287,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             current_short_qty=current_short_qty,
             trigger_price_raw=trigger_price,
             trigger_price_normalized=normalized_price,
-            reduction_multiplier=reduction_multiplier,
             reduction_pct_used=effective_pct,
-            qty_formula="current_short_qty * reduction_pct_per_fill * reduction_multiplier",
+            qty_formula="current_short_qty * reduction_pct_per_fill",
             qty_raw=current_short_qty * self._pct(effective_pct),
             qty_normalized=short_qty,
             order_type="Limit",

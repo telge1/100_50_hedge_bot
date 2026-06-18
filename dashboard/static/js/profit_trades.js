@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tradeLookup = new Map();
     const tradeBody = document.getElementById("profit-trades-body");
     const params = new URLSearchParams(window.location.search);
-    const profile = params.get("profile") || window.PROFILE || "bot_1";
+    let profile = params.get("profile") || window.PROFILE || "bot_1";
     const limit = params.get("limit") || "50";
     const refreshButton = document.getElementById("profit-refresh-btn");
     const lastUpdated = document.getElementById("profit-last-updated");
@@ -104,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("[profit_trades] refresh button found", !!refreshButton);
     console.log("[profit_trades] trade body found", !!tradeBody);
     const botSideSelect = document.getElementById("profit-bot-side-select");
+    const profileSelect = document.getElementById("profit-profile-select");
     console.log("[profit_trades] botSideSelect", botSideSelect);
     if (botSideSelect) {
         botSideSelect.value = botSide;
@@ -119,6 +120,24 @@ document.addEventListener("DOMContentLoaded", () => {
             removedTradeKeys.clear();
             loadHiddenTradeKeys();
             console.log("[profit_trades] bot side changed", { botSide, currentBotName });
+            renderTradesTable([]);
+            refreshTrades();
+        });
+    }
+    if (profileSelect) {
+        profileSelect.value = profile;
+        profileSelect.addEventListener("change", () => {
+            const selectedProfile = String(profileSelect.value || "").trim() || "bot_1";
+            if (selectedProfile === profile) {
+                return;
+            }
+            profile = selectedProfile;
+            currentBotName = getExpectedBotNameForSide(botSide);
+            currentTradePage = 0;
+            selectedTradeKeys.clear();
+            removedTradeKeys.clear();
+            loadHiddenTradeKeys();
+            console.log("[profit_trades] profile changed", { profile, botSide, currentBotName });
             renderTradesTable([]);
             refreshTrades();
         });

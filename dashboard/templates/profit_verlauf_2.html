@@ -331,6 +331,14 @@
             <div class="profit-toolbar">
                 <div class="refresh-group">
                     <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                    <label class="refresh-select-label" for="profit-profile-select">Profil</label>
+                    <select class="filter-select" id="profit-profile-select" name="profile">
+                        {% for bot in bot_profiles %}
+                            <option value="{{ bot.profile }}" {% if profile == bot.profile %}selected{% endif %}>
+                                {{ bot.long_account }} / {{ bot.short_account }}
+                            </option>
+                        {% endfor %}
+                    </select>
                     <label class="refresh-select-label" for="profit-bot-side-select">Bot Seite</label>
                     <select class="filter-select" id="profit-bot-side-select" name="bot_side">
                         <option value="long" {% if bot_side == "long" %}selected{% endif %}>Long Bot</option>

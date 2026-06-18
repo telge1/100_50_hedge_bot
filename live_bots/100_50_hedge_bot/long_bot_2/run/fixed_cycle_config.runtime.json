@@ -4,7 +4,7 @@
   "strategy_side": "long",
   "strategy": "fixed_cycle",
   "strategy_class": "FixedCycleHedgeStrategy",
-  "symbol": "INJUSDT",
+  "symbol": "APTUSDT",
   "category": "linear",
   "dynamic_symbol_enabled": false,
   "best_coin_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/live_bots/100_50_hedge_bot/long_bot_2/run/reserved_best_coin.json",
