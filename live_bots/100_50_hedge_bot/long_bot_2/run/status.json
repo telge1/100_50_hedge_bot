@@ -1,11 +1,9 @@
 {
   "bot_name": "long_bot_2",
-  "status": "running",
-  "updated_at": "2026-05-29T19:01:53.255092+00:00",
-  "symbol": "ALGOUSDT",
-  "start_requested": true,
-  "pid": 464032,
-  "long_qty": 0.0,
-  "short_qty": 0.0,
-  "open_order_count": 0
+  "status": "stopped",
+  "start_requested": false,
+  "pid": null,
+  "symbol": "",
+  "reason": "stopped_via_stop_bot",
+  "updated_at": "2026-06-17T16:29:00.333955+00:00"
 }

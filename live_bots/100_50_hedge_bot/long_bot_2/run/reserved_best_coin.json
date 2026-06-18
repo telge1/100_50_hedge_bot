@@ -1,12 +1,12 @@
 {
-  "symbol": "ALGOUSDT",
-  "timestamp": "2026-05-29T19:01:51.644025+00:00",
+  "symbol": "INJUSDT",
+  "timestamp": "2026-06-17T16:28:13.661591+00:00",
   "source": "reserved_symbol",
   "reason": "bot_reservation",
   "candidate_count": 1,
   "candidates": [
     {
-      "symbol": "ALGOUSDT"
+      "symbol": "INJUSDT"
     }
   ]
 }

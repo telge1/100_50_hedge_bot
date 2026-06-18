@@ -17,11 +17,13 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOT_GROUP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${BOT_GROUP_DIR}/../.." && pwd)"
 PID_FILE="${BOT_GROUP_DIR}/run/wallet_refill_watchdog.pid"
 LOG_DIR="${BOT_GROUP_DIR}/logs"
 NOHUP_LOG="${LOG_DIR}/wallet_refill_watchdog.nohup.log"
 WATCHDOG_SCRIPT="${BOT_GROUP_DIR}/watchdog/wallet_refill_watchdog.py"
-TRANSFER_CONFIG="${BOT_GROUP_DIR}/config/config.yaml"
+# Einheitliche Transfer-/Credential-Config für alle Bots über die 100_50_hedge_bot-Gruppe.
+TRANSFER_CONFIG="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/config/config.yaml"
 PYTHON="${PYTHON:-python3}"
 
 mkdir -p "${BOT_GROUP_DIR}/run" "${LOG_DIR}"

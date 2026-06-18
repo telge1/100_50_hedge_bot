@@ -13,7 +13,7 @@
   
   "time_distance_refill_trigger_minutes": 2,
   
-  "base_notional_usdt": 50.0,
+  "base_notional_usdt": 100.0,
   "hedge_ratio_short": 0.5,
   
   "reduction_pct_per_fill": 25,

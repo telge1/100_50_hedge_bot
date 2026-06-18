@@ -2376,6 +2376,13 @@ class GenericHedgeRuntime:
             },
             trace=list(intent.trace),
         )
+        # Mark final exit intents that should use the trading-stop API so downstream
+        # logic can treat them specially (no normal order cancel, different submit path).
+        if is_final_exit_intent and str(intent.purpose or "").upper() in {
+            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+        }:
+            managed_order.metadata["trading_stop_api"] = True
         if is_final_exit_intent and final_exit_signature:
             self._register_pending_final_exit_submission(
                 client_order_id=managed_order.client_order_id,
@@ -2546,6 +2553,11 @@ class GenericHedgeRuntime:
                 if key in response:
                     response_code = response[key]
                     break
+        # Für Trading-Stop-basierte Exit-Orders wird keine echte Bybit-OrderId
+        # im Runtime-State hinterlegt, damit nachfolgende REST-Operationen
+        # (cancel, history lookups, etc.) nicht mit synthetischen IDs arbeiten.
+        if getattr(managed_order, "metadata", None) and managed_order.metadata.get("trading_stop_api"):
+            exchange_order_id = None
         self.audit.log_event(
             "order_submitted",
             strategy=self.strategy.name,
@@ -3199,6 +3211,23 @@ class GenericHedgeRuntime:
         for client_id, order in list(self.runtime_state.active_orders.items()):
             if order.purpose not in purposes_set or self._is_terminal_order_status(order.status):
                 continue
+            # Trading-stop basierte Exit-Orders werden nicht über den normalen
+            # /v5/order/cancel-Pfad gecancelt. Stattdessen werden sie nur aus dem
+            # lokalen Runtime-State entfernt, wenn ein neuer Trading-Stop gesetzt
+            # wird oder ein Reset erfolgt.
+            if getattr(order, "metadata", None) and getattr(order, "metadata", {}).get("trading_stop_api"):
+                self.audit.log_event(
+                    "fixed_cycle_trading_stop_final_exit_skipped_cancel",
+                    strategy=self.strategy.name,
+                    client_order_id=client_id,
+                    purpose=order.purpose,
+                    long_qty=long_qty,
+                    short_qty=short_qty,
+                )
+                self.runtime_state.active_orders.pop(client_id, None)
+                if order.exchange_order_id:
+                    self.runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
+                continue
             # CRITICAL EXIT PROTECTION GUARD
             if order.purpose == self.strategy.SHORT_SL_EXIT_PURPOSE:
                 if long_qty <= 0.0 and short_qty > 0.0:
@@ -3330,6 +3359,179 @@ class GenericHedgeRuntime:
         tp_limit_price = self._safe_float(managed_order.metadata.get("tp_limit_price"), None)
         slippage_tolerance_type = managed_order.metadata.get("slippage_tolerance_type")
         slippage_tolerance = self._safe_float(managed_order.metadata.get("slippage_tolerance"), None)
+        purpose_upper = str(managed_order.purpose or "").upper()
+
+        # Final Basket-Exit-Orders werden über Bybit /v5/position/trading-stop
+        # als positionsgebundene TP/SL gesetzt, nicht mehr als klassische
+        # Conditional Orders über /v5/order/create. Wir behalten dennoch einen
+        # ManagedOrder-Eintrag als logischen Exit-Schutz im Runtime-State.
+        if getattr(managed_order, "metadata", None) and managed_order.metadata.get("trading_stop_api"):
+            # Nur LONG_TP_EXIT und SHORT_SL_EXIT werden hier über Trading-Stop
+            # abgebildet. Andere Exit-Pfade nutzen weiterhin den normalen Order-Pfad.
+            if trigger_price is None or trigger_price <= 0:
+                # Fallback – ohne gültigen Trigger-Preis kein Trading-Stop möglich.
+                self.audit.log_event(
+                    "fixed_cycle_trading_stop_final_exit_failed",
+                    strategy=self.strategy.name,
+                    purpose=managed_order.purpose,
+                    reason="missing_trigger_price",
+                    position_idx=position_idx,
+                )
+                return None
+
+            trigger_by_value = str(trigger_by) if trigger_by else "LastPrice"
+            symbol = self.config.symbol
+            category = self.config.category
+
+            resolved_trigger_price = self._prepare_trading_stop_trigger_price(
+                managed_order=managed_order,
+                snapshot=snapshot,
+                symbol=symbol,
+                category=category,
+                position_idx=position_idx,
+                trigger_price=trigger_price,
+                trigger_by=trigger_by_value,
+            )
+            if resolved_trigger_price is None or resolved_trigger_price <= 0:
+                return None
+            trigger_price = resolved_trigger_price
+
+            self.audit.log_event(
+                "fixed_cycle_trading_stop_final_exit_submit_started",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                symbol=symbol,
+                category=category,
+                position_idx=position_idx,
+                trigger_price=trigger_price,
+                trigger_by=trigger_by_value,
+            )
+
+            if purpose_upper == getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"):
+                response = self.order_manager.set_full_position_trading_stop(
+                    symbol=symbol,
+                    position_idx=position_idx,
+                    category=category,
+                    take_profit=trigger_price,
+                    stop_loss=None,
+                    trigger_by=trigger_by_value,
+                )
+            elif purpose_upper == getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"):
+                response = self.order_manager.set_full_position_trading_stop(
+                    symbol=symbol,
+                    position_idx=position_idx,
+                    category=category,
+                    take_profit=None,
+                    stop_loss=trigger_price,
+                    trigger_by=trigger_by_value,
+                )
+            else:
+                # Unerwarteter Purpose mit trading_stop_api-Flag – zur Sicherheit
+                # zurück in den normalen Pfad fallen lassen.
+                response = None
+
+            ret_code = None
+            ret_msg = None
+            is_success = False
+            raw_error_info = None
+            if isinstance(response, dict):
+                ret_code = response.get("retCode")
+                ret_msg = response.get("retMsg")
+            else:
+                raw_error_info = getattr(self.order_manager, "last_post_error", None)
+                if isinstance(raw_error_info, dict):
+                    ret_code = raw_error_info.get("retCode")
+                    ret_msg = raw_error_info.get("retMsg")
+
+            # Bybit 34040 = "not modified" (idempotent success für bereits
+            # gesetzten Trading-Stop).
+            success_codes = {0, "0", 34040, "34040"}
+            is_success = ret_code in success_codes
+
+            synthetic_order_id = f"trading-stop:{purpose_upper}:{str(symbol or '').upper()}:{position_idx}"
+            wrapped_response: dict[str, Any] = {
+                "retCode": ret_code,
+                "retMsg": ret_msg,
+                "result": {
+                    "orderId": synthetic_order_id,
+                    "orderLinkId": managed_order.client_order_id,
+                    "tradingStop": True,
+                },
+                "raw": response,
+                "raw_error_info": raw_error_info,
+            }
+
+            state = self.runtime_state.strategy_state
+            if is_success:
+                state["final_exit_trading_stop_active"] = True
+                state["final_exit_trading_stop_signature"] = state.get("last_exit_signature")
+                if purpose_upper == getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"):
+                    state["final_exit_trading_stop_long_tp"] = float(trigger_price)
+                if purpose_upper == getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"):
+                    state["final_exit_trading_stop_short_sl"] = float(trigger_price)
+                state["exit_orders_submitted_once"] = True
+                state["exit_rebuild_allowed"] = False
+                state["force_exit_rebuild"] = False
+                if ret_code in (34040, "34040"):
+                    self.audit.log_event(
+                        "fixed_cycle_trading_stop_final_exit_not_modified",
+                        strategy=self.strategy.name,
+                        purpose=managed_order.purpose,
+                        symbol=symbol,
+                        category=category,
+                        position_idx=position_idx,
+                        trigger_price=trigger_price,
+                        trigger_by=trigger_by_value,
+                        ret_code=ret_code,
+                        ret_msg=ret_msg,
+                    )
+                self.audit.log_event(
+                    "fixed_cycle_trading_stop_final_exit_set",
+                    strategy=self.strategy.name,
+                    purpose=managed_order.purpose,
+                    symbol=symbol,
+                    category=category,
+                    position_idx=position_idx,
+                    trigger_price=trigger_price,
+                    trigger_by=trigger_by_value,
+                    synthetic_order_id=synthetic_order_id,
+                    ret_code=ret_code,
+                    ret_msg=ret_msg,
+                )
+                self.audit.log_event(
+                    "fixed_cycle_trading_stop_final_exit_marked_active",
+                    strategy=self.strategy.name,
+                    purpose=managed_order.purpose,
+                    symbol=symbol,
+                    category=category,
+                    position_idx=position_idx,
+                    trigger_price=trigger_price,
+                    trigger_by=trigger_by_value,
+                    ret_code=ret_code,
+                    ret_msg=ret_msg,
+                    final_exit_trading_stop_active=True,
+                    final_exit_trading_stop_signature=state.get("final_exit_trading_stop_signature"),
+                    final_exit_trading_stop_long_tp=state.get("final_exit_trading_stop_long_tp"),
+                    final_exit_trading_stop_short_sl=state.get("final_exit_trading_stop_short_sl"),
+                )
+                return wrapped_response
+
+            # Fehlgeschlagener Trading-Stop: nur Diagnose-Log, kein aktiver Exit-Schutz.
+            self.audit.log_event(
+                "fixed_cycle_trading_stop_final_exit_failed",
+                strategy=self.strategy.name,
+                purpose=managed_order.purpose,
+                symbol=symbol,
+                category=category,
+                position_idx=position_idx,
+                trigger_price=trigger_price,
+                trigger_by=trigger_by_value,
+                ret_code=ret_code,
+                ret_msg=ret_msg,
+            )
+
+            return None
+
         if force_market_fallback and managed_order.reduce_only:
             self._log_order_payload_ready(
                 managed_order,
@@ -3458,6 +3660,145 @@ class GenericHedgeRuntime:
             category=self.config.category,
             order_link_id=managed_order.client_order_id,
         )
+
+    def _normalize_runtime_price(self, price: float) -> float:
+        if price <= 0:
+            return 0.0
+        normalize_fn = getattr(self.strategy, "_normalize_price", None)
+        if callable(normalize_fn):
+            try:
+                normalized = normalize_fn(price, self.runtime_state)
+                return float(normalized or 0.0)
+            except Exception:
+                pass
+        return float(
+            self.order_manager.normalize_price(
+                self.config.symbol,
+                price,
+                self.config.category,
+            )
+        )
+
+    def _resolve_trading_stop_tick_size(self, symbol: str) -> float:
+        rules = self.runtime_state.instrument_rules.get(str(symbol or "").upper()) or {}
+        tick_size = self._safe_float(rules.get("tick_size"), None)
+        if tick_size and tick_size > 0:
+            return tick_size
+        cached_rules = self.order_manager.get_cached_instrument_rules(symbol, self.config.category) or {}
+        tick_size = self._safe_float(cached_rules.get("tick_size"), None)
+        if tick_size and tick_size > 0:
+            return tick_size
+        return max(float(getattr(self.config, "price_tick_size", 0.0) or 0.0), 0.0)
+
+    def _resolve_trading_stop_base_price(
+        self,
+        *,
+        symbol: str,
+        category: str,
+        snapshot: HedgeSnapshot,
+        trigger_by: str,
+    ) -> tuple[float | None, str]:
+        trigger_by_upper = str(trigger_by or "LastPrice").strip().upper()
+        current_price = self._safe_float(getattr(snapshot, "current_price", None), None)
+
+        def _valid(value: float | None) -> bool:
+            return value is not None and value > 0
+
+        if trigger_by_upper == "MARKPRICE":
+            mark_price = self.order_manager.fetch_mark_price(symbol, category)
+            if _valid(mark_price):
+                return float(mark_price), "mark_price"
+            if _valid(current_price):
+                return float(current_price), "snapshot_current_price"
+            last_price = self.order_manager.fetch_last_price(symbol, category)
+            if _valid(last_price):
+                return float(last_price), "last_price_fallback"
+            return None, "missing_mark_price"
+
+        last_price = self.order_manager.fetch_last_price(symbol, category)
+        if _valid(last_price):
+            return float(last_price), "last_price"
+        if _valid(current_price):
+            return float(current_price), "snapshot_current_price"
+        mark_price = self.order_manager.fetch_mark_price(symbol, category)
+        if _valid(mark_price):
+            return float(mark_price), "mark_price_fallback"
+        return None, "missing_last_price"
+
+    def _prepare_trading_stop_trigger_price(
+        self,
+        *,
+        managed_order: ManagedOrder,
+        snapshot: HedgeSnapshot,
+        symbol: str,
+        category: str,
+        position_idx: int,
+        trigger_price: float,
+        trigger_by: str,
+    ) -> float | None:
+        purpose = str(managed_order.purpose or "")
+        purpose_upper = purpose.upper()
+        side = str(managed_order.side or "").lower()
+        original_price = float(trigger_price or 0.0)
+        tick_size = self._resolve_trading_stop_tick_size(symbol)
+        base_price, source_price_field = self._resolve_trading_stop_base_price(
+            symbol=symbol,
+            category=category,
+            snapshot=snapshot,
+            trigger_by=trigger_by,
+        )
+        log_payload = {
+            "strategy": self.strategy.name,
+            "symbol": symbol,
+            "purpose": purpose,
+            "position_idx": position_idx,
+            "side": side,
+            "original_price": original_price,
+            "base_price": base_price,
+            "tick_size": tick_size,
+            "source_price_field": source_price_field,
+        }
+        if original_price <= 0 or tick_size <= 0 or base_price is None or base_price <= 0:
+            self.audit.log_event(
+                "fixed_cycle_trading_stop_price_invalid_skipped",
+                **log_payload,
+                reason="missing_price_basis_or_tick_size",
+            )
+            return None
+
+        requires_price_above_base = purpose_upper in {
+            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
+            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+        }
+        if not requires_price_above_base or original_price > base_price:
+            return original_price
+
+        clamped_price = base_price + (2.0 * tick_size)
+        normalized_price = self._normalize_runtime_price(clamped_price)
+        attempts = 0
+        while normalized_price <= base_price and attempts < 5:
+            clamped_price += tick_size
+            normalized_price = self._normalize_runtime_price(clamped_price)
+            attempts += 1
+
+        if normalized_price <= base_price:
+            self.audit.log_event(
+                "fixed_cycle_trading_stop_price_invalid_skipped",
+                **log_payload,
+                clamped_price=clamped_price,
+                normalized_price=normalized_price,
+                reason="clamp_still_invalid_after_normalization",
+            )
+            return None
+
+        self.audit.log_event(
+            "fixed_cycle_trading_stop_price_clamped",
+            **log_payload,
+            clamped_price=clamped_price,
+            normalized_price=normalized_price,
+            reason="violates_bybit_base_price_rule",
+        )
+        return normalized_price
 
     @staticmethod
     def _exchange_side(side: str, reduce_only: bool) -> str:

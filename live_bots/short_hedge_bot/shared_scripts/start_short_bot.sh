@@ -137,13 +137,13 @@ exchange_flat_check() {
   fi
 
   local payload
+  # Nur stdout (JSON) in payload capturen, stderr im Log lassen.
   if ! payload="$(
     "${PYTHON:-python3}" "${SCRIPT_DIR}/check_exchange_flat.py" \
       --symbol "${symbol}" \
-      --config "${config_file}" \
-      2>&1
+      --config "${config_file}"
   )"; then
-    echo "[${BOT_NAME}] ERROR: exchange flat check failed: ${payload}" >&2
+    echo "[${BOT_NAME}] ERROR: exchange flat check failed" >&2
     return 2
   fi
 
@@ -869,8 +869,12 @@ rotate_log() {
 rotate_log "${LOG_DIR}/fixed_cycle_hedge_runtime.log"
 rotate_log "${LOG_DIR}/fixed_cycle_calc_audit.log"
 
-# Start-Lock freigeben, bevor längere Hintergrundprozesse (Runner/Watchdogs) gestartet werden,
-# damit diese den FD nicht erben und den Lock nicht dauerhaft halten.
+# Pair-Lock und Start-Lock freigeben, bevor längere Hintergrundprozesse (Runner/Watchdogs)
+# gestartet werden, damit diese die FDs nicht erben und die Locks nicht dauerhaft halten.
+if [[ -n "${PAIR_LOCK_FD:-}" ]]; then
+  flock -u "${PAIR_LOCK_FD}" || true
+  exec {PAIR_LOCK_FD}>&- || true
+fi
 if [[ -n "${START_LOCK_FD:-}" ]]; then
   flock -u "${START_LOCK_FD}" || true
   exec {START_LOCK_FD}>&- || true

@@ -4071,7 +4071,7 @@ async def live_charts(
 
 @app.get("/api/live-klines")
 async def api_live_klines(
-    symbol: str = Query(..., description="Bybit Symbol, z.B. FILUSDT"),
+    symbol: str = Query("", description="Bybit Symbol, z.B. FILUSDT"),
     interval: str = Query("5", description="Bybit Kline-Interval, z.B. 1,3,5,15"),
     limit: int = Query(200, ge=1, le=1000),
 ):
@@ -4080,6 +4080,16 @@ async def api_live_klines(
     direkten Request an Bybit (CORS / Browser) machen muss.
     """
     sym = (symbol or "").strip().upper()
+    if not sym:
+        logger.info("[live_klines] missing_symbol_skip_external_request")
+        return JSONResponse(
+            {
+                "success": False,
+                "error": "missing_symbol",
+                "message": "No symbol provided for live klines.",
+            },
+            status_code=400,
+        )
     base_url = "https://api.bybit.com"
 
     async def _fetch(category: str) -> dict:

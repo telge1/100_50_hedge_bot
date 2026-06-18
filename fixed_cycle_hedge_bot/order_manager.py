@@ -644,6 +644,41 @@ class BybitOrderManager:
         payload["triggerBy"] = "MarkPrice"
         return self._post("/v5/position/trading-stop", json.dumps(payload))
 
+    def set_full_position_trading_stop(
+        self,
+        *,
+        symbol: str,
+        position_idx: int,
+        category: str = "linear",
+        take_profit: float | None = None,
+        stop_loss: float | None = None,
+        trigger_by: str = "LastPrice",
+    ) -> Mapping[str, Any] | None:
+        """
+        Configure a full-position TP/SL via Bybit /v5/position/trading-stop.
+
+        This uses the documented V5 field names:
+        - takeProfit / stopLoss
+        - tpTriggerBy / slTriggerBy
+        - tpOrderType / slOrderType
+        - tpslMode = "Full"
+        """
+        payload: dict[str, Any] = {
+            "category": category,
+            "symbol": symbol.upper(),
+            "positionIdx": position_idx,
+            "tpslMode": "Full",
+        }
+        if take_profit is not None and take_profit > 0:
+            payload["takeProfit"] = f"{take_profit}"
+            payload["tpTriggerBy"] = trigger_by
+            payload["tpOrderType"] = "Market"
+        if stop_loss is not None and stop_loss > 0:
+            payload["stopLoss"] = f"{stop_loss}"
+            payload["slTriggerBy"] = trigger_by
+            payload["slOrderType"] = "Market"
+        return self._post("/v5/position/trading-stop", json.dumps(payload))
+
     def fetch_open_orders(
         self,
         symbol: str | None = None,

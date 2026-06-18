@@ -5,8 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LONG_SCRIPT="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/shared_scripts/start_hedge_guard_watchers.sh"
 SHORT_SCRIPT="${PROJECT_ROOT}/live_bots/short_hedge_bot/shared_scripts/start_wallet_refill_watchdog.sh"
+# Einheitliche Credential-/Transfer-Config: immer die 100_50_hedge_bot-Config.
 LONG_TRANSFER_CONFIG="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/config/config.yaml"
-SHORT_TRANSFER_CONFIG="${PROJECT_ROOT}/live_bots/short_hedge_bot/config/config.yaml"
+SHORT_TRANSFER_CONFIG="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/config/config.yaml"
 SHORT_PROFILE="${SHORT_PROFILE:-short_bot_1}"
 
 if [[ ! -x "${LONG_SCRIPT}" ]]; then
