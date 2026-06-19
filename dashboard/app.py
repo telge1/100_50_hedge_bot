@@ -9142,31 +9142,34 @@ def _build_profit_trade_filtered_rows(
         )
 
     def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
-        # Nur geschlossene History-Records gegen laufende Trades wegfiltern.
+        tbid = str(record.get("trade_block_id") or "").strip()
+        # Wenn ein aktiver Prozess mit derselben trade_block_id existiert, soll der
+        # History-Record immer von der Prozess-Zeile überschattet werden – unabhängig
+        # vom ursprünglichen Status (open/closed).
+        if tbid and tbid in running_ids:
+            payload = {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "reason": "trade_block_id_match",
+                "running_ids": sorted(str(rid) for rid in running_ids),
+                "record": {
+                    "bot_name": record.get("bot_name"),
+                    "symbol": record.get("symbol"),
+                    "trade_block_id": record.get("trade_block_id"),
+                    "status": record.get("status"),
+                    "end_time": record.get("end_time"),
+                },
+            }
+            logger.info(
+                "[dashboard] profit_trades_short_active_match %s",
+                json.dumps(payload, default=str),
+            )
+            return True
+
+        # Darüber hinaus nur geschlossene History-Records heuristisch anhand von
+        # (bot_name, symbol, side) wegfiltern.
         if not _is_closed_trade_status(record.get("status")):
             return False
-
-        tbid = record.get("trade_block_id")
-        if tbid and tbid in running_ids:
-            if normalized_side == "short":
-                payload = {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "reason": "trade_block_id_match",
-                    "running_ids": sorted(str(rid) for rid in running_ids),
-                    "record": {
-                        "bot_name": record.get("bot_name"),
-                        "symbol": record.get("symbol"),
-                        "trade_block_id": record.get("trade_block_id"),
-                        "status": record.get("status"),
-                        "end_time": record.get("end_time"),
-                    },
-                }
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match %s",
-                    json.dumps(payload, default=str),
-                )
-            return True
 
         bot_name = str(record.get("bot_name") or "").strip().lower()
         symbol = str(record.get("symbol") or "").strip().upper()
@@ -9271,12 +9274,17 @@ def _build_profit_trade_filtered_rows(
         )
         for record in filtered_base_trades
     ]
-    # For specific bot/profile views (e.g. bot_1 short side) we want to avoid counting
-    # historical "open" records as active trades when they are no longer associated
-    # with the currently running trade_block_id. Mark those as closed so that the
-    # summary only treats truly active process rows as open.
+    # For specific bot/profile views (e.g. bot_1 long/short side) we want to avoid
+    # counting historical "open" records as active trades when they are no longer
+    # associated with the currently running trade_block_id. Mark those as closed so
+    # that the summary only treats truly active process rows as open.
     normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
-    if normalized_profile == "bot_1" and normalized_side == "short" and running_ids:
+    if (
+        normalized_profile
+        and normalized_profile != "main"
+        and normalized_side in {"long", "short"}
+        and running_ids
+    ):
         adjusted_rows: list[dict[str, Any]] = []
         for row in summary_rows:
             tbid = str(row.get("trade_block_id") or "").strip()
