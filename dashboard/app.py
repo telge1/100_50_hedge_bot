@@ -9056,8 +9056,39 @@ def _build_profit_trade_filtered_rows(
         if old_count:
             continue
 
-        confirmed_rows = _get_confirmed_orders_for_tbid(tbid)
+        confirmed_rows_all = _get_confirmed_orders_for_tbid(tbid)
+        if not confirmed_rows_all:
+            continue
+
+        # Für Long-/Short-Ansichten nur Confirmed-Orders verwenden, die zum
+        # aktuellen Bot-Namen passen, um kein Mixing zwischen long_bot_N und
+        # short_bot_N zu verursachen.
+        process_bot = str(row.get("bot_name") or "").strip().lower()
+        filtered_confirmed: list[dict[str, Any]] = []
+        skipped_mismatch = 0
+        for entry in confirmed_rows_all:
+            entry_bot = str(entry.get("bot_name") or "").strip().lower()
+            if entry_bot and process_bot and entry_bot != process_bot:
+                skipped_mismatch += 1
+                continue
+            filtered_confirmed.append(entry)
+
+        confirmed_rows = filtered_confirmed
         if not confirmed_rows:
+            if skipped_mismatch:
+                payload = {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "bot_name": row.get("bot_name"),
+                    "symbol": row.get("symbol"),
+                    "trade_block_id": tbid,
+                    "skipped_mismatch_count": skipped_mismatch,
+                    "reason": "bot_name_mismatch",
+                }
+                logger.info(
+                    "[dashboard] profit_trades_process_row_filled_orders_filtered_by_bot_side %s",
+                    json.dumps(payload, default=str),
+                )
             continue
 
         seen: set[str] = set()
