@@ -8964,6 +8964,124 @@ def _build_profit_trade_filtered_rows(
                 json.dumps(payload, default=str),
             )
 
+    # Backfill gefüllter Orders für Prozess-Zeilen aus bestätigter History
+    confirmed_by_tbid_cache: dict[str, list[dict[str, Any]]] = {}
+
+    def _get_confirmed_orders_for_tbid(trade_block_id: str) -> list[dict[str, Any]]:
+        if not trade_block_id:
+            return []
+        if trade_block_id in confirmed_by_tbid_cache:
+            return confirmed_by_tbid_cache[trade_block_id]
+        # Lazy load aller Confirmed-Orders einmal, gruppiert nach trade_block_id
+        if not confirmed_by_tbid_cache:
+            paths = _collect_confirmed_history_paths(profile, None)
+            rows = _collect_confirmed_order_pnl_rows(paths)
+            grouped: dict[str, list[dict[str, Any]]] = {}
+            for entry in rows:
+                key = str(entry.get("trade_block_id") or "").strip()
+                if not key:
+                    continue
+                grouped.setdefault(key, []).append(entry)
+            confirmed_by_tbid_cache.update(grouped)
+        return confirmed_by_tbid_cache.get(trade_block_id, [])
+
+    for row in filtered_process_rows:
+        # Nur für laufende Prozess-Zeilen ohne bereits gesetzte filled_orders.
+        if not row.get("is_process"):
+            continue
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            continue
+        existing_filled = row.get("filled_orders") or []
+        old_count = len(existing_filled)
+        if old_count:
+            continue
+
+        confirmed_rows = _get_confirmed_orders_for_tbid(tbid)
+        if not confirmed_rows:
+            continue
+
+        seen: set[str] = set()
+        filled: list[dict[str, Any]] = []
+        for entry in confirmed_rows:
+            dedupe_key = str(entry.get("dedupe_key") or "") or f"{entry.get('exchange_order_id') or ''}:{entry.get('purpose') or ''}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+
+            ts = entry.get("timestamp") or entry.get("time") or entry.get("created_at")
+            time_label = _format_profit_time_label(ts)
+
+            closed_pnl = entry.get("closed_pnl")
+            try:
+                pnl_value = float(closed_pnl) if closed_pnl is not None else None
+            except (TypeError, ValueError):
+                pnl_value = None
+
+            qty = entry.get("qty") or entry.get("exec_qty")
+            fill_price = (
+                entry.get("fill_price")
+                or entry.get("avg_fill_price")
+                or entry.get("price")
+            )
+            avg_price = (
+                entry.get("avg_fill_price")
+                or entry.get("avg_price")
+                or fill_price
+            )
+            status = entry.get("status") or "FILLED"
+
+            filled.append(
+                {
+                    "time": ts,
+                    "time_label": time_label,
+                    "symbol": (entry.get("symbol") or row.get("symbol") or "").upper(),
+                    "bot_name": entry.get("bot_name") or row.get("bot_name"),
+                    "trade_block_id": tbid,
+                    "purpose": entry.get("purpose") or entry.get("trade_type"),
+                    "side": entry.get("side"),
+                    "qty": qty,
+                    "exec_qty": entry.get("exec_qty"),
+                    "price": fill_price,
+                    "fill_price": fill_price,
+                    "avg_price": avg_price,
+                    "avg_fill_price": entry.get("avg_fill_price"),
+                    "pnl": pnl_value,
+                    "realized_pnl": pnl_value,
+                    "pnl_scope": entry.get("pnl_scope"),
+                    "cycle_index": entry.get("cycle_index"),
+                    "cycle_role": entry.get("cycle_role"),
+                    "status": status,
+                    "order_id": entry.get("exchange_order_id") or entry.get("client_order_id"),
+                    "exchange_order_id": entry.get("exchange_order_id"),
+                    "client_order_id": entry.get("client_order_id"),
+                    "source": entry.get("source") or entry.get("order_source"),
+                }
+            )
+
+        if not filled:
+            continue
+
+        filled.sort(
+            key=lambda o: _normalize_trade_filter_datetime(o.get("time"))
+            or datetime.min.replace(tzinfo=timezone.utc),
+        )
+        row["filled_orders"] = filled
+        payload = {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "bot_name": row.get("bot_name"),
+            "symbol": row.get("symbol"),
+            "trade_block_id": tbid,
+            "old_count": old_count,
+            "new_count": len(filled),
+            "source": "confirmed_orders_all_by_trade_block_id",
+        }
+        logger.info(
+            "[dashboard] profit_trades_process_row_filled_orders_backfilled %s",
+            json.dumps(payload, default=str),
+        )
+
     def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
         # Nur geschlossene History-Records gegen laufende Trades wegfiltern.
         if not _is_closed_trade_status(record.get("status")):
