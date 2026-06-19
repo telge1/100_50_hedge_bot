@@ -8548,6 +8548,41 @@ def _normalize_active_orders(payload: dict[str, Any], strategy_state: dict[str, 
     return normalized
 
 
+def _filter_active_orders_for_side(
+    active_orders: list[dict[str, Any]] | None,
+    bot_side: str | None,
+) -> list[dict[str, Any]]:
+    """
+    Filter aktive Orders nach der Sicht des Long-/Short-Bots, um z.B. LONG_TP_EXIT
+    nicht in der Short-Ansicht und reine Short-Purposes nicht in der Long-Ansicht
+    anzuzeigen.
+    """
+    normalized_side = _normalize_bot_side(bot_side)
+    if normalized_side not in {"long", "short"}:
+        return list(active_orders or [])
+
+    filtered: list[dict[str, Any]] = []
+    for order in active_orders or []:
+        if not isinstance(order, dict):
+            continue
+        order_side = str(order.get("side") or "").strip().lower()
+        purpose = str(order.get("purpose") or "").upper()
+
+        keep = False
+        if order_side:
+            keep = order_side == normalized_side
+        else:
+            if normalized_side == "short":
+                keep = "SHORT" in purpose
+            else:
+                keep = "LONG" in purpose
+
+        if keep:
+            filtered.append(order)
+
+    return filtered
+
+
 def _safe_int(value: Any) -> int:
     if value is None or value == "":
         return 0
@@ -8674,6 +8709,24 @@ def _collect_process_rows_for_bot(
         )
     start_dt = min(start_times) if start_times else None
     cycle_completed = max(_safe_int(strategy_state.get("cycle_completed_count")), max_cycle)
+    bot_side = "short" if str(bot_name or "").lower().startswith("short_bot_") else "long"
+    active_orders_all = _normalize_active_orders(state, strategy_state)
+    active_orders = _filter_active_orders_for_side(active_orders_all, bot_side)
+    skipped_active = len(active_orders_all or []) - len(active_orders)
+    if skipped_active > 0:
+        payload = {
+            "profile": profile,
+            "bot_side": bot_side,
+            "bot_name": bot_name,
+            "symbol": symbol,
+            "trade_block_id": trade_block_id,
+            "filtered_count": skipped_active,
+            "reason": "filtered_by_bot_side",
+        }
+        logger.info(
+            "[dashboard] profit_trades_active_order_filtered_by_bot_side %s",
+            json.dumps(payload, default=str),
+        )
     return (
         {
             "bot_name": bot_name,
@@ -8689,7 +8742,7 @@ def _collect_process_rows_for_bot(
             "status": "in_progress",
             "is_process": True,
             "filled_orders": filled_orders,
-            "active_orders": _normalize_active_orders(state, strategy_state),
+            "active_orders": active_orders,
             "open_orders": strategy_state.get("open_orders"),
             "orders": strategy_state.get("orders"),
         },
