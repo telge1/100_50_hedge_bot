@@ -7999,7 +7999,22 @@ def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None
     if not normalized or normalized == "main":
         return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
     entries, _warnings = _get_profit_trade_bot_sources(profile, bot_side)
-    paths: list[Path] = [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+    # Wenn keine Bot-Sources konfiguriert sind, nutzen wir als Fallback die
+    # globalen History-Dateien (Legacy-Verhalten).
+    if not entries:
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "closed_path": str(DASHBOARD_CLOSED_PNL_HISTORY_FILE),
+            "confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
+        }
+        logger.info(
+            "[dashboard] profit_trade_history_global_fallback_used %s",
+            json.dumps(payload, default=str),
+        )
+        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+
+    paths: list[Path] = []
     for entry in entries:
         dashboard_path = entry.get("dashboard_closed_pnl_history_file")
         confirmed_path = entry.get("confirmed_order_pnl_history_file")
@@ -8023,6 +8038,18 @@ def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None
                     str(confirmed_path),
                 )
             paths.append(confirmed_path)
+
+    if paths:
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "global_closed_path": str(DASHBOARD_CLOSED_PNL_HISTORY_FILE),
+            "global_confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
+        }
+        logger.info(
+            "[dashboard] profit_trade_history_global_skipped_for_profile_sources %s",
+            json.dumps(payload, default=str),
+        )
     return paths
 
 
@@ -8030,9 +8057,31 @@ def _collect_confirmed_history_paths(profile: str, bot_side: str | None = None) 
     resolved = _normalize_dashboard_profile(profile, fallback_to_main=False)
     paths: list[Path] = []
     if not resolved or resolved == "main":
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
+        }
+        logger.info(
+            "[dashboard] profit_trade_confirmed_global_fallback_used %s",
+            json.dumps(payload, default=str),
+        )
         paths.extend([CONFIRMED_ORDER_PNL_HISTORY_FILE])
         return paths
     sources, _warnings = _get_profit_trade_bot_sources(profile, bot_side)
+    if not sources:
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
+        }
+        logger.info(
+            "[dashboard] profit_trade_confirmed_global_fallback_used %s",
+            json.dumps(payload, default=str),
+        )
+        paths.append(CONFIRMED_ORDER_PNL_HISTORY_FILE)
+        return paths
+
     for source in sources:
         confirmed = source.get("confirmed_order_pnl_history_file")
         if confirmed:
@@ -8045,7 +8094,17 @@ def _collect_confirmed_history_paths(profile: str, bot_side: str | None = None) 
                     str(confirmed),
                 )
             paths.append(confirmed)
-    paths.append(CONFIRMED_ORDER_PNL_HISTORY_FILE)
+
+    if paths:
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "global_confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
+        }
+        logger.info(
+            "[dashboard] profit_trade_confirmed_global_skipped_for_profile_sources %s",
+            json.dumps(payload, default=str),
+        )
     return paths
 
 
