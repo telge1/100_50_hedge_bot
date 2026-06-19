@@ -9423,66 +9423,65 @@ def _build_profit_trade_filtered_rows(
         summary_rows = adjusted_rows
 
     # Enrich geschlossene Summary-Zeilen mit Confirmed-PnL-Daten, falls verfügbar.
-    if confirmed_by_tbid_cache:
-        for row in summary_rows:
-            if not _is_closed_trade_status(row.get("status")):
-                continue
-            tbid = str(row.get("trade_block_id") or "").strip()
-            bot_name = str(row.get("bot_name") or "").strip().lower()
-            if not tbid or not bot_name:
-                continue
-            all_confirmed = confirmed_by_tbid_cache.get(tbid) or []
-            if not all_confirmed:
-                continue
-            confirmed = [
-                entry
-                for entry in all_confirmed
-                if str(entry.get("bot_name") or "").strip().lower() == bot_name
-            ]
-            if not confirmed:
-                continue
+    for row in summary_rows:
+        if not _is_closed_trade_status(row.get("status")):
+            continue
+        tbid = str(row.get("trade_block_id") or "").strip()
+        bot_name = str(row.get("bot_name") or "").strip().lower()
+        if not tbid or not bot_name:
+            continue
+        all_confirmed = _get_confirmed_orders_for_tbid(tbid)
+        if not all_confirmed:
+            continue
+        confirmed = [
+            entry
+            for entry in all_confirmed
+            if str(entry.get("bot_name") or "").strip().lower() == bot_name
+        ]
+        if not confirmed:
+            continue
 
-            pnl_sum = 0.0
-            cycle_indices: set[int] = set()
-            for entry in confirmed:
-                raw_pnl = (
-                    entry.get("closed_pnl")
-                    if entry.get("closed_pnl") is not None
-                    else entry.get("pnl") or entry.get("realized_pnl")
-                )
-                try:
-                    if raw_pnl is not None:
-                        pnl_sum += float(raw_pnl)
-                except (TypeError, ValueError):
-                    pass
-                ci = entry.get("cycle_index")
-                try:
-                    if ci is not None:
-                        cycle_indices.add(int(ci))
-                except (TypeError, ValueError):
-                    continue
-
-            old_pnl = row.get("profit_usdt") or row.get("total_trade_pnl")
-            cycle_count = max(cycle_indices) if cycle_indices else (row.get("cycle_count") or 0)
-            row["total_trade_pnl"] = round(pnl_sum, 8)
-            row["profit_usdt"] = round(pnl_sum, 8)
-            row["cycle_count"] = cycle_count
-
-            payload = {
-                "profile": profile,
-                "bot_side": normalized_side,
-                "bot_name": row.get("bot_name"),
-                "symbol": row.get("symbol"),
-                "trade_block_id": tbid,
-                "confirmed_count": len(confirmed),
-                "profit_usdt": row.get("profit_usdt"),
-                "cycle_count": cycle_count,
-                "old_profit_usdt": old_pnl,
-            }
-            logger.info(
-                "[dashboard] profit_trades_closed_row_enriched_from_confirmed_pnl %s",
-                json.dumps(payload, default=str),
+        pnl_sum = 0.0
+        cycle_indices: set[int] = set()
+        for entry in confirmed:
+            raw_pnl = (
+                entry.get("closed_pnl")
+                if entry.get("closed_pnl") is not None
+                else entry.get("pnl") or entry.get("realized_pnl")
             )
+            try:
+                if raw_pnl is not None:
+                    pnl_sum += float(raw_pnl)
+            except (TypeError, ValueError):
+                pass
+            ci = entry.get("cycle_index")
+            try:
+                if ci is not None:
+                    cycle_indices.add(int(ci))
+            except (TypeError, ValueError):
+                continue
+
+        old_pnl = row.get("profit_usdt") or row.get("total_trade_pnl")
+        cycle_count = max(cycle_indices) if cycle_indices else (row.get("cycle_count") or 0)
+        row["total_trade_pnl"] = round(pnl_sum, 8)
+        row["profit_usdt"] = round(pnl_sum, 8)
+        row["cycle_count"] = cycle_count
+
+        payload = {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "bot_name": row.get("bot_name"),
+            "symbol": row.get("symbol"),
+            "trade_block_id": tbid,
+            "confirmed_count": len(confirmed),
+            "profit_usdt": row.get("profit_usdt"),
+            "cycle_count": cycle_count,
+            "old_profit_usdt": old_pnl,
+        }
+        logger.info(
+            "[dashboard] profit_trades_closed_row_enriched_from_confirmed_pnl %s",
+            json.dumps(payload, default=str),
+        )
     combined_rows = summary_rows + filtered_process_rows
     combined_rows.sort(
         key=lambda trade: _get_trade_filter_datetime(trade)
