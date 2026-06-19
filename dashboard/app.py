@@ -8930,6 +8930,40 @@ def _build_profit_trade_filtered_rows(
         if p_bot and p_symbol and p_side:
             active_process_keys.add((p_bot, p_symbol, p_side))
 
+    # Backfill fehlender start_time-Werte für Prozess-Zeilen aus globaler
+    # Confirmed-History, damit z.B. paired long/short Trades mit gleicher
+    # trade_block_id eine konsistente Startzeit anzeigen.
+    confirmed_start_times_all = _collect_confirmed_trade_start_times(profile, None)
+    if confirmed_start_times_all:
+        for row in filtered_process_rows:
+            existing_start = row.get("start_time")
+            if existing_start:
+                continue
+            tbid = str(row.get("trade_block_id") or "").strip()
+            if not tbid:
+                continue
+            dt = confirmed_start_times_all.get(tbid)
+            if not dt:
+                continue
+            old_start_time = existing_start
+            new_start_time = dt.isoformat()
+            row["start_time"] = new_start_time
+            row["start_label"] = _format_profit_time_label(dt)
+            payload = {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "bot_name": row.get("bot_name"),
+                "symbol": row.get("symbol"),
+                "trade_block_id": tbid,
+                "old_start_time": old_start_time,
+                "new_start_time": new_start_time,
+                "source": "confirmed_start_times_all",
+            }
+            logger.info(
+                "[dashboard] profit_trades_process_row_time_backfilled %s",
+                json.dumps(payload, default=str),
+            )
+
     def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
         # Nur geschlossene History-Records gegen laufende Trades wegfiltern.
         if not _is_closed_trade_status(record.get("status")):
