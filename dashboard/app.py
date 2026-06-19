@@ -8872,9 +8872,81 @@ def _build_profit_trade_filtered_rows(
     running_ids = {
         row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
     }
-    filtered_base_trades = [
-        record for record in base_trades if record.get("trade_block_id") not in running_ids
-    ]
+    # Zusätzlich zu einem reinen trade_block_id-Abgleich auch nach vollständigem
+    # (bot_name, symbol, side) filtern. Gerade auf der Short-Seite kann es
+    # vorkommen, dass Runtime-State und History-Einträge unterschiedliche
+    # trade_block_ids für denselben aktiven Trade führen (z.B. nach Recovery /
+    # Handoff). In diesem Fall würden sonst ein "Closed"-History-Record und ein
+    # "In-Progress"-Process-Record parallel angezeigt. Für laufende Trades wollen
+    # wir jedoch nur die Live-Ansicht aus dem Process-Record zeigen.
+    normalized_side = _normalize_bot_side(bot_side)
+    running_keys: set[tuple[str, str, str]] = set()
+    for row in filtered_process_rows:
+        bot_name = str(row.get("bot_name") or "").strip().lower()
+        symbol = str(row.get("symbol") or "").strip().upper()
+        side = normalized_side
+        if not side:
+            if bot_name.startswith("short_bot_"):
+                side = "short"
+            elif bot_name.startswith("long_bot_"):
+                side = "long"
+        if bot_name and symbol and side:
+            running_keys.add((bot_name, symbol, side))
+
+    shadowed_history: list[dict[str, Any]] = []
+
+    def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
+        # Nur geschlossene History-Records gegen laufende Trades wegfiltern.
+        if not _is_closed_trade_status(record.get("status")):
+            return False
+
+        tbid = record.get("trade_block_id")
+        if tbid and tbid in running_ids:
+            return True
+
+        bot_name = str(record.get("bot_name") or "").strip().lower()
+        symbol = str(record.get("symbol") or "").strip().upper()
+        side = normalized_side
+        if not side:
+            if bot_name.startswith("short_bot_"):
+                side = "short"
+            elif bot_name.startswith("long_bot_"):
+                side = "long"
+
+        if not (bot_name and symbol and side):
+            return False
+
+        return (bot_name, symbol, side) in running_keys
+
+    filtered_base_trades: list[dict[str, Any]] = []
+    for record in base_trades:
+        if _is_shadowed_by_running(record):
+            shadowed_history.append(record)
+            continue
+        filtered_base_trades.append(record)
+
+    if shadowed_history:
+        logger.info(
+            "[dashboard] profit_trades_shadowed_history_records",
+            {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "running_ids": sorted(str(rid) for rid in running_ids),
+                "running_keys": sorted(
+                    f"{bot}|{symbol}|{side}" for (bot, symbol, side) in running_keys
+                ),
+                "shadowed": [
+                    {
+                        "bot_name": row.get("bot_name"),
+                        "symbol": row.get("symbol"),
+                        "trade_block_id": row.get("trade_block_id"),
+                        "status": row.get("status"),
+                        "end_time": row.get("end_time"),
+                    }
+                    for row in shadowed_history
+                ],
+            },
+        )
     confirmed_start_times = _collect_confirmed_trade_start_times(profile, bot_side)
     summary_rows = [
         _build_profit_trade_summary(
@@ -8888,7 +8960,6 @@ def _build_profit_trade_filtered_rows(
     # with the currently running trade_block_id. Mark those as closed so that the
     # summary only treats truly active process rows as open.
     normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
-    normalized_side = _normalize_bot_side(bot_side)
     if normalized_profile == "bot_1" and normalized_side == "short" and running_ids:
         adjusted_rows: list[dict[str, Any]] = []
         for row in summary_rows:
