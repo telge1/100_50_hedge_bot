@@ -8653,24 +8653,25 @@ def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) 
         if row:
             rows.append(row)
     if rows:
+        payload = {
+            "profile": profile,
+            "bot_side": _normalize_bot_side(bot_side),
+            "records": [
+                {
+                    "bot_name": row.get("bot_name"),
+                    "symbol": row.get("symbol"),
+                    "trade_block_id": row.get("trade_block_id"),
+                    "status": row.get("status"),
+                    "is_process": bool(row.get("is_process")),
+                    "start_time": row.get("start_time"),
+                    "end_time": row.get("end_time"),
+                }
+                for row in rows
+            ],
+        }
         logger.info(
-            "[dashboard] profit_trades_active_process_records",
-            {
-                "profile": profile,
-                "bot_side": _normalize_bot_side(bot_side),
-                "records": [
-                    {
-                        "bot_name": row.get("bot_name"),
-                        "symbol": row.get("symbol"),
-                        "trade_block_id": row.get("trade_block_id"),
-                        "status": row.get("status"),
-                        "is_process": bool(row.get("is_process")),
-                        "start_time": row.get("start_time"),
-                        "end_time": row.get("end_time"),
-                    }
-                    for row in rows
-                ],
-            },
+            "[dashboard] profit_trades_active_process_records %s",
+            json.dumps(payload, default=str),
         )
     return rows, warnings
 
@@ -8915,6 +8916,20 @@ def _build_profit_trade_filtered_rows(
 
     shadowed_history: list[dict[str, Any]] = []
 
+    # Aktive Prozess-Schlüssel für Stale/Open-Handling:
+    active_process_keys: set[tuple[str, str, str]] = set()
+    for row in filtered_process_rows:
+        p_bot = str(row.get("bot_name") or "").strip().lower()
+        p_symbol = str(row.get("symbol") or "").strip().upper()
+        p_side = normalized_side
+        if not p_side:
+            if p_bot.startswith("short_bot_"):
+                p_side = "short"
+            elif p_bot.startswith("long_bot_"):
+                p_side = "long"
+        if p_bot and p_symbol and p_side:
+            active_process_keys.add((p_bot, p_symbol, p_side))
+
     def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
         # Nur geschlossene History-Records gegen laufende Trades wegfiltern.
         if not _is_closed_trade_status(record.get("status")):
@@ -8923,21 +8938,22 @@ def _build_profit_trade_filtered_rows(
         tbid = record.get("trade_block_id")
         if tbid and tbid in running_ids:
             if normalized_side == "short":
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match",
-                    {
-                        "profile": profile,
-                        "bot_side": normalized_side,
-                        "reason": "trade_block_id_match",
-                        "running_ids": sorted(str(rid) for rid in running_ids),
-                        "record": {
-                            "bot_name": record.get("bot_name"),
-                            "symbol": record.get("symbol"),
-                            "trade_block_id": record.get("trade_block_id"),
-                            "status": record.get("status"),
-                            "end_time": record.get("end_time"),
-                        },
+                payload = {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "reason": "trade_block_id_match",
+                    "running_ids": sorted(str(rid) for rid in running_ids),
+                    "record": {
+                        "bot_name": record.get("bot_name"),
+                        "symbol": record.get("symbol"),
+                        "trade_block_id": record.get("trade_block_id"),
+                        "status": record.get("status"),
+                        "end_time": record.get("end_time"),
                     },
+                }
+                logger.info(
+                    "[dashboard] profit_trades_short_active_match %s",
+                    json.dumps(payload, default=str),
                 )
             return True
 
@@ -8955,23 +8971,24 @@ def _build_profit_trade_filtered_rows(
 
         if (bot_name, symbol, side) in running_keys:
             if normalized_side == "short":
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match",
-                    {
-                        "profile": profile,
-                        "bot_side": normalized_side,
-                        "reason": "exact_key_match",
-                        "running_keys": sorted(
-                            f"{b}|{s}|{sd}" for (b, s, sd) in running_keys
-                        ),
-                        "record": {
-                            "bot_name": record.get("bot_name"),
-                            "symbol": record.get("symbol"),
-                            "trade_block_id": record.get("trade_block_id"),
-                            "status": record.get("status"),
-                            "end_time": record.get("end_time"),
-                        },
+                payload = {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "reason": "exact_key_match",
+                    "running_keys": sorted(
+                        f"{b}|{s}|{sd}" for (b, s, sd) in running_keys
+                    ),
+                    "record": {
+                        "bot_name": record.get("bot_name"),
+                        "symbol": record.get("symbol"),
+                        "trade_block_id": record.get("trade_block_id"),
+                        "status": record.get("status"),
+                        "end_time": record.get("end_time"),
                     },
+                }
+                logger.info(
+                    "[dashboard] profit_trades_short_active_match %s",
+                    json.dumps(payload, default=str),
                 )
             return True
 
@@ -8984,21 +9001,22 @@ def _build_profit_trade_filtered_rows(
                 (bot_name and bot_name == r_bot) or (symbol and symbol == r_symbol)
             )
             if loose_match:
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match",
-                    {
-                        "profile": profile,
-                        "bot_side": normalized_side,
-                        "reason": "loose_symbol_or_bot_match",
-                        "running_key": f"{r_bot}|{r_symbol}|{r_side}",
-                        "record": {
-                            "bot_name": record.get("bot_name"),
-                            "symbol": record.get("symbol"),
-                            "trade_block_id": record.get("trade_block_id"),
-                            "status": record.get("status"),
-                            "end_time": record.get("end_time"),
-                        },
+                payload = {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "reason": "loose_symbol_or_bot_match",
+                    "running_key": f"{r_bot}|{r_symbol}|{r_side}",
+                    "record": {
+                        "bot_name": record.get("bot_name"),
+                        "symbol": record.get("symbol"),
+                        "trade_block_id": record.get("trade_block_id"),
+                        "status": record.get("status"),
+                        "end_time": record.get("end_time"),
                     },
+                }
+                logger.info(
+                    "[dashboard] profit_trades_short_active_match %s",
+                    json.dumps(payload, default=str),
                 )
                 return True
 
@@ -9012,26 +9030,27 @@ def _build_profit_trade_filtered_rows(
         filtered_base_trades.append(record)
 
     if shadowed_history:
+        payload = {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "running_ids": sorted(str(rid) for rid in running_ids),
+            "running_keys": sorted(
+                f"{bot}|{symbol}|{side}" for (bot, symbol, side) in running_keys
+            ),
+            "shadowed": [
+                {
+                    "bot_name": row.get("bot_name"),
+                    "symbol": row.get("symbol"),
+                    "trade_block_id": row.get("trade_block_id"),
+                    "status": row.get("status"),
+                    "end_time": row.get("end_time"),
+                }
+                for row in shadowed_history
+            ],
+        }
         logger.info(
-            "[dashboard] profit_trades_shadowed_history_records",
-            {
-                "profile": profile,
-                "bot_side": normalized_side,
-                "running_ids": sorted(str(rid) for rid in running_ids),
-                "running_keys": sorted(
-                    f"{bot}|{symbol}|{side}" for (bot, symbol, side) in running_keys
-                ),
-                "shadowed": [
-                    {
-                        "bot_name": row.get("bot_name"),
-                        "symbol": row.get("symbol"),
-                        "trade_block_id": row.get("trade_block_id"),
-                        "status": row.get("status"),
-                        "end_time": row.get("end_time"),
-                    }
-                    for row in shadowed_history
-                ],
-            },
+            "[dashboard] profit_trades_shadowed_history_records %s",
+            json.dumps(payload, default=str),
         )
     confirmed_start_times = _collect_confirmed_trade_start_times(profile, bot_side)
     summary_rows = [
@@ -9053,6 +9072,26 @@ def _build_profit_trade_filtered_rows(
             original_status = row.get("status")
             status_str = str(original_status or "").strip().lower()
             if status_str == "open" and (not tbid or tbid not in running_ids):
+                row_bot = str(row.get("bot_name") or "").strip().lower()
+                row_symbol = str(row.get("symbol") or "").strip().upper()
+                row_key = (row_bot, row_symbol, normalized_side)
+                if row_key in active_process_keys:
+                    skip_payload = {
+                        "profile": profile,
+                        "bot_side": normalized_side,
+                        "bot_name": row.get("bot_name"),
+                        "symbol": row.get("symbol"),
+                        "trade_block_id": tbid,
+                        "original_status": original_status,
+                        "reason": "matched_active_process_key",
+                    }
+                    logger.info(
+                        "[dashboard] profit_trades_stale_open_skip_active_process %s",
+                        json.dumps(skip_payload, default=str),
+                    )
+                    # Diesen historischen "open" Record komplett überspringen, damit
+                    # nur der aktive Prozess-Record angezeigt wird.
+                    continue
                 updated = dict(row)
                 updated["status"] = "closed"
                 updated["stale_open_auto_closed"] = True
@@ -9060,19 +9099,20 @@ def _build_profit_trade_filtered_rows(
                 if not updated.get("end_time"):
                     # Fallback: reuse start_time as end_time if no explicit end timestamp exists.
                     updated["end_time"] = updated.get("end_time") or updated.get("start_time")
+                payload = {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "bot_name": row.get("bot_name"),
+                    "trade_block_id": tbid,
+                    "symbol": row.get("symbol"),
+                    "original_status": original_status,
+                    "new_status": updated.get("status"),
+                    "reason": "stale_open_not_in_current_state",
+                    "running_ids": sorted(str(rid) for rid in running_ids),
+                }
                 logger.info(
-                    "[dashboard] profit_trades_stale_open_auto_closed",
-                    {
-                        "profile": profile,
-                        "bot_side": normalized_side,
-                        "bot_name": row.get("bot_name"),
-                        "trade_block_id": tbid,
-                        "symbol": row.get("symbol"),
-                        "original_status": original_status,
-                        "new_status": updated.get("status"),
-                        "reason": "stale_open_not_in_current_state",
-                        "running_ids": sorted(str(rid) for rid in running_ids),
-                    },
+                    "[dashboard] profit_trades_stale_open_auto_closed %s",
+                    json.dumps(payload, default=str),
                 )
                 adjusted_rows.append(updated)
             else:
