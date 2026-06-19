@@ -533,35 +533,7 @@ if [[ -n "${PAIR_SYMBOL}" ]]; then
   fi
   if [[ "${long_alive}" != "true" && "${short_alive}" != "true" ]]; then
     echo "[${BOT_NAME}] stale_pair_state_ignored symbol=${PAIR_SYMBOL} reason=no_running_bots" >&2
-    # Pair-State defensiv leeren, damit Folge-Starts keinen alten Handoff mehr nutzen.
-    python3 <<PY
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-
-path = Path(${PAIR_STATE_FILE@Q})
-try:
-    data = json.loads(path.read_text(encoding="utf-8") or "{}")
-except Exception:
-    data = {}
-changed = False
-if data.get("symbol"):
-    data["symbol"] = ""
-    changed = True
-if data.get("long_running"):
-    data["long_running"] = False
-    changed = True
-if data.get("short_running"):
-    data["short_running"] = False
-    changed = True
-if not data.get("long_running") and not data.get("short_running") and data.get("leader_bot"):
-    data["leader_bot"] = ""
-    changed = True
-if changed:
-    data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-PY
-    PAIR_SYMBOL=""
+    # Pair-State NICHT mehr leeren; Symbol bleibt als Fallback für nächste Starts erhalten.
   fi
 fi
 
@@ -781,6 +753,14 @@ path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 print(f"[PAIR-STATE] updated pair_symbol_bot_{index}.json symbol={symbol} leader={data['leader_bot']}")
 PY
+fi
+
+# Pair-Lock freigeben, sobald der gemeinsame Coin feststeht bzw. adoptiert wurde.
+# Der Short-Bot muss den Pair-State danach sofort lesen koennen und darf nicht
+# bis zum Ende des Long-Startskripts blockiert werden.
+if [[ -n "${PAIR_LOCK_FD:-}" ]]; then
+  flock -u "${PAIR_LOCK_FD}" || true
+  exec {PAIR_LOCK_FD}>&- || true
 fi
 
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"

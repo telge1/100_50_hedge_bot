@@ -134,7 +134,7 @@ if [[ -f "${WAIT_PID_FILE}" ]]; then
   exit 0
 fi
 
-SIDE="long"
+SIDE="short"
 source "${BOT_GROUP_DIR}/shared_scripts/load_bybit_env.sh" "${BOT_NAME}" "${SIDE}"
 
 set +e
@@ -266,17 +266,13 @@ long_alive = is_running("long", long_bot)
 short_alive = is_running("short", short_bot)
 
 if not long_alive and not short_alive:
-    # Beide Bots gestoppt -> Pair-Symbol leeren.
-    if data.get("symbol"):
-        data["symbol"] = ""
-        changed = True
+    # Beide Bots gestoppt -> nur running-Flags zurücksetzen, Symbol zur Wiederaufnahme behalten.
     if data.get("long_running"):
         data["long_running"] = False
         changed = True
     if data.get("short_running"):
         data["short_running"] = False
         changed = True
-    print(f"[pair-state] cleared pair_symbol_bot_{index}.json reason=both_bots_stopped")
 
 if changed:
     pair_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

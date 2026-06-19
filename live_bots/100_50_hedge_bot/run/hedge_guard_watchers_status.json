@@ -1,15 +1,15 @@
 {
   "status": "running",
-  "updated_at": "2026-06-15T09:00:29Z",
+  "updated_at": "2026-06-19T06:35:41Z",
   "watchers": {
     "safety_order_watchdog": {
       "status": "running",
-      "pid": 464084,
+      "pid": 1410879,
       "log_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/live_bots/100_50_hedge_bot/logs/safety_order_watchdog.nohup.log"
     },
     "wallet_refill_watchdog": {
       "status": "running",
-      "pid": 464093,
+      "pid": 1410888,
       "log_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/live_bots/100_50_hedge_bot/logs/wallet_refill_watchdog.nohup.log"
     }
   }

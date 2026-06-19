@@ -213,3 +213,11 @@ Cycle nach Refill läuft korrekt weiter.
 Kein Refill hängt offen.
 Kein doppelter Rebuild/keine doppelte Refill-Order sichtbar.
 Aber: Closed-PnL-Retry für alte Reduce-Orders muss noch gefixt oder begrenzt werden, sonst bleibt der Log dauerhaft voll mit Retry-Versuchen.
+
+
+
+
+
+
+
+Guten Morgen ich hatte jetzt nochmal beide bots bis zum refill schnell getestet und beide funktionieren jetzt dann werde ich jetzt gleich beide starten

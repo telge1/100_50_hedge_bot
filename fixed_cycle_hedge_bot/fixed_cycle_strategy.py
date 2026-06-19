@@ -365,6 +365,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             allow_unknown_final_pnl=allow_unknown_final_pnl,
         )
 
+    # Final-Exit-Purpose-Resolver (direction-aware, von Short-Strategie überschreibbar)
+    def _get_final_long_exit_purpose(self) -> str:
+        return self.LONG_TP_EXIT_PURPOSE
+
+    def _get_final_short_exit_purpose(self) -> str:
+        return self.SHORT_SL_EXIT_PURPOSE
+
+    def _get_final_exit_purposes(self) -> set[str]:
+        return {
+            self._get_final_long_exit_purpose(),
+            self._get_final_short_exit_purpose(),
+        }
+
     def __init__(self, config: FixedCycleHedgeConfig | None = None) -> None:
         self.config = config or FixedCycleHedgeConfig()
         logger = logging.getLogger(__name__)
@@ -5660,7 +5673,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         next_required = str(state.get("next_required_purpose") or "").strip()
         if next_required:
             purposes.append(next_required)
-        for purpose in (self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE):
+        for purpose in (
+            self._get_final_long_exit_purpose(),
+            self._get_final_short_exit_purpose(),
+        ):
             if purpose not in purposes:
                 purposes.append(purpose)
         return purposes
@@ -10199,6 +10215,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             same_exit_price = max(long_tp_price, short_sl_price)
             long_tp_price = same_exit_price
             short_sl_price = same_exit_price
+        long_exit_purpose = self._get_final_long_exit_purpose()
+        short_exit_purpose = self._get_final_short_exit_purpose()
         _log_event(
             "fixed_cycle_final_exit_tick_offset_config_applied",
             {
@@ -10214,8 +10232,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     if tick_size > 0
                     else None
                 ),
-                "long_purpose": self.LONG_TP_EXIT_PURPOSE,
-                "short_purpose": self.SHORT_SL_EXIT_PURPOSE,
+                "long_purpose": long_exit_purpose,
+                "short_purpose": short_exit_purpose,
             },
         )
         def _resolve_exit_trigger(trigger_price: float, purpose: str) -> tuple[bool, int | None]:
@@ -10231,7 +10249,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "reference_price": float(tp_price or 0.0),
                     "avg_price": float(
                         snapshot.long_avg
-                        if purpose == self.LONG_TP_EXIT_PURPOSE
+                        if purpose == self._get_final_long_exit_purpose()
                         else snapshot.short_avg or 0.0
                     ),
                     "trigger_price": float(trigger_price or 0.0),
@@ -10252,12 +10270,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "symbol": snapshot.symbol or self.config.symbol,
                         "purpose": purpose,
                         "current_price": float(current_price or 0.0),
-                        "reference_price": float(tp_price or 0.0),
-                        "avg_price": float(
-                            snapshot.long_avg
-                            if purpose == self.LONG_TP_EXIT_PURPOSE
-                            else snapshot.short_avg or 0.0
-                        ),
+                    "reference_price": float(tp_price or 0.0),
+                    "avg_price": float(
+                        snapshot.long_avg
+                        if purpose == self._get_final_long_exit_purpose()
+                        else snapshot.short_avg or 0.0
+                    ),
                         "trigger_price": float(trigger_price or 0.0),
                         "order_type": "Market",
                         "trigger_direction": trigger_direction,
@@ -10267,10 +10285,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return valid, trigger_direction
 
         long_tp_valid, long_tp_trigger_direction = _resolve_exit_trigger(
-            long_tp_price, self.LONG_TP_EXIT_PURPOSE
+            long_tp_price, long_exit_purpose
         )
         short_sl_valid, short_sl_trigger_direction = _resolve_exit_trigger(
-            short_sl_price, self.SHORT_SL_EXIT_PURPOSE
+            short_sl_price, short_exit_purpose
         )
         signature = {
             "basket_tp_price": tp_price,
@@ -10285,9 +10303,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
         }
         active_final_exit_purposes, _ = self._collect_active_final_exit_purposes(snapshot, runtime_state)
+        expected_final_exit_purposes = self._get_final_exit_purposes()
         has_both_final_exits = all(
             purpose in active_final_exit_purposes
-            for purpose in {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+            for purpose in expected_final_exit_purposes
         )
         if (
             bool(state.get("initial_structure_built"))
@@ -10407,7 +10426,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 StrategyIntent(
                     side="long",
                     qty=snapshot.long_qty,
-                    purpose=self.LONG_TP_EXIT_PURPOSE,
+                    purpose=long_exit_purpose,
                     order_type="Market",
                     reduce_only=True,
                     trigger_price=long_tp_price,
@@ -10415,13 +10434,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     trigger_by="LastPrice",
                     close_on_trigger=True,
                     position_idx=1,
-                    metadata=build_metadata(self.LONG_TP_EXIT_PURPOSE, "long_tp"),
+                    metadata=build_metadata(long_exit_purpose, "long_exit"),
                 )
             )
             _audit_calc(
                 "exit_order_plan_calc",
                 {
-                    "purpose": self.LONG_TP_EXIT_PURPOSE,
+                    "purpose": long_exit_purpose,
                     "side": "long",
                     "qty": snapshot.long_qty,
                     "trigger_price": long_tp_price,
@@ -10445,7 +10464,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 StrategyIntent(
                     side="short",
                     qty=snapshot.short_qty,
-                    purpose=self.SHORT_SL_EXIT_PURPOSE,
+                    purpose=short_exit_purpose,
                     order_type="Market",
                     reduce_only=True,
                     trigger_price=short_sl_price,
@@ -10453,13 +10472,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     trigger_by="LastPrice",
                     close_on_trigger=True,
                     position_idx=2,
-                    metadata=build_metadata(self.SHORT_SL_EXIT_PURPOSE, "short_sl"),
+                    metadata=build_metadata(short_exit_purpose, "short_exit"),
                 )
             )
             _audit_calc(
                 "exit_order_plan_calc",
                 {
-                    "purpose": self.SHORT_SL_EXIT_PURPOSE,
+                    "purpose": short_exit_purpose,
                     "side": "short",
                     "qty": snapshot.short_qty,
                     "trigger_price": short_sl_price,
@@ -12834,16 +12853,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 and not payload["active_initial_entry_orders"]
                 and not state.get("initial_structure_built")
             ):
-                _log_event(
-                    "fixed_cycle_initial_structure_build_allowed_after_reconcile",
-                    payload,
-                )
                 # allow_build wurde vom Aufrufer auf False gesetzt, ist aber nach Reconcile erlaubt.
                 # Für Logs explizit markieren, dass wir es lokal auf True promoten.
                 payload["allow_build_original"] = payload.get("allow_build", False)
                 allow_build = True
                 payload["allow_build"] = True
                 payload["allow_build_promoted_after_reconcile"] = True
+                _log_event(
+                    "fixed_cycle_initial_structure_build_allowed_after_reconcile",
+                    payload,
+                )
             else:
                 _log_event(
                     "fixed_cycle_initial_structure_build_blocked_with_reason",
@@ -12876,14 +12895,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         # Nur dann als vollständige Initial-Struktur markieren, wenn
         # - der erwartete First-Leg-Cycle-Intent vorhanden ist und
-        # - beide Exit-Intents (LONG_TP_EXIT, SHORT_SL_EXIT) vorhanden sind.
+        # - beide direction-aware Final-Exit-Intents vorhanden sind.
         cycle_index = int(state.get("current_effective_cycle") or 0) + 1
         purposes = [intent.purpose for intent in intents]
         first_leg_purpose = self._get_first_leg_purpose(cycle_index)
-        exit_purposes = {
-            self.LONG_TP_EXIT_PURPOSE,
-            self.SHORT_SL_EXIT_PURPOSE,
-        }
+        exit_purposes = self._get_final_exit_purposes()
         purpose_set = set(purposes)
         has_first_leg = first_leg_purpose in purpose_set
         has_all_exits = exit_purposes.issubset(purpose_set)
@@ -17958,11 +17974,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return None
 
-        # Erwartete Exit-Orders bei offener Position: LONG_TP_EXIT + SHORT_SL_EXIT
+        # Erwartete Exit-Orders bei offener Position: direction-aware Final-Exits
         expected_purposes: set[str] = set()
         if long_qty > 0.0 or short_qty > 0.0:
-            expected_purposes.add(self.LONG_TP_EXIT_PURPOSE)
-            expected_purposes.add(self.SHORT_SL_EXIT_PURPOSE)
+            expected_purposes.update(self._get_final_exit_purposes())
 
         next_required_purpose = str(state.get("next_required_purpose") or "").upper()
         active_cycle_index = int(state.get("active_cycle_index") or 0)
@@ -20901,6 +20916,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return self.SHORT_SL_EXIT_RECOVERY_PURPOSE
             if "LONG_TP_EXIT_RECOVERY" in upper:
                 return self.LONG_TP_EXIT_RECOVERY_PURPOSE
+            if "LONG_SL_EXIT" in upper:
+                return self.LONG_SL_EXIT_PURPOSE
+            if "SHORT_TP_EXIT" in upper:
+                return self.SHORT_TP_EXIT_PURPOSE
             if "SHORT_SL_EXIT" in upper:
                 return self.SHORT_SL_EXIT_PURPOSE
             if "LONG_TP_EXIT" in upper:
@@ -21013,16 +21032,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         has_cycle_order = bool(
             expected_cycle_purpose and expected_cycle_purpose in rest_open_purposes
         )
-        has_long_tp_exit = self.LONG_TP_EXIT_PURPOSE in rest_open_purposes
-        has_short_sl_exit = self.SHORT_SL_EXIT_PURPOSE in rest_open_purposes
+        long_exit_purpose = self._get_final_long_exit_purpose()
+        short_exit_purpose = self._get_final_short_exit_purpose()
+        has_long_exit = long_exit_purpose in rest_open_purposes
+        has_short_exit = short_exit_purpose in rest_open_purposes
 
         missing_purposes: list[str] = []
         if not has_cycle_order:
             missing_purposes.append(expected_cycle_purpose or "CURRENT_CYCLE_ORDER")
-        if not has_long_tp_exit:
-            missing_purposes.append(self.LONG_TP_EXIT_PURPOSE)
-        if not has_short_sl_exit:
-            missing_purposes.append(self.SHORT_SL_EXIT_PURPOSE)
+        if not has_long_exit:
+            missing_purposes.append(long_exit_purpose)
+        if not has_short_exit:
+            missing_purposes.append(short_exit_purpose)
         if fetch_error:
             missing_purposes.append("REST_FETCH_FAILED")
 
@@ -21036,8 +21057,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "rest_open_purposes": rest_open_purposes,
             "expected_cycle_purpose": expected_cycle_purpose,
             "has_cycle_order": has_cycle_order,
-            "has_long_tp_exit": has_long_tp_exit,
-            "has_short_sl_exit": has_short_sl_exit,
+            "has_long_tp_exit": has_long_exit,
+            "has_short_sl_exit": has_short_exit,
             "missing_purposes": missing_purposes,
         }
         if fetch_error:
@@ -21087,8 +21108,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
     def _emergency_exit_purposes(self) -> set[str]:
         return {
-            self.LONG_TP_EXIT_PURPOSE,
-            self.SHORT_SL_EXIT_PURPOSE,
+            *self._get_final_exit_purposes(),
             self.LONG_TP_EXIT_RECOVERY_PURPOSE,
             self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
             self.SHORT_HARD_STOP_PURPOSE,
@@ -21570,9 +21590,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return True, reason, {**details, **{"expected_next_action": "order_allowed", "allowed_purposes": allowed_purposes}}
 
     def _expected_exit_cancel_purposes(self) -> set[str]:
+        base_finals = self._get_final_exit_purposes()
         return {
-            self.LONG_TP_EXIT_PURPOSE,
-            self.SHORT_SL_EXIT_PURPOSE,
+            *base_finals,
             self.LONG_TP_EXIT_RECOVERY_PURPOSE,
             self.SHORT_SL_EXIT_RECOVERY_PURPOSE,
             "FINAL_LONG_EXIT",
@@ -22069,7 +22089,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         has_exit_prices = latest_tp_price > 0 or latest_break_even_price > 0
         fallback_marker = bool(state.get("final_exit_context_missing_but_flat_confirmed"))
         if (
-            purpose in {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+            purpose in self._get_final_exit_purposes()
             and status == "DEACTIVATED"
             and long_qty <= 0
             and short_qty <= 0
@@ -22152,7 +22172,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
 
         if (
-            purpose in {self.LONG_TP_EXIT_PURPOSE, self.SHORT_SL_EXIT_PURPOSE}
+            purpose in self._get_final_exit_purposes()
             and status == "DEACTIVATED"
             and not expected_suppressed
         ):
@@ -22178,12 +22198,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 active_final_exit_purposes = sorted(
                     set(snapshot_purposes or []) | set(runtime_purposes or [])
                 )
-                missing_long_exit = (
-                    long_qty > 0 and self.LONG_TP_EXIT_PURPOSE not in active_final_exit_purposes
-                )
-                missing_short_exit = (
-                    short_qty > 0 and self.SHORT_SL_EXIT_PURPOSE not in active_final_exit_purposes
-                )
+                long_exit_purpose = self._get_final_long_exit_purpose()
+                short_exit_purpose = self._get_final_short_exit_purpose()
+                missing_long_exit = long_exit_purpose not in active_final_exit_purposes
+                missing_short_exit = short_exit_purpose not in active_final_exit_purposes
                 if missing_long_exit or missing_short_exit:
                     exit_locked_before = bool(state.get("exit_locked"))
                     exit_rebuild_allowed_before = bool(state.get("exit_rebuild_allowed", True))
@@ -22584,4 +22602,12 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
     def _is_second_leg_purpose(self, purpose: str) -> bool:
         normalized = self._normalize_cycle_purpose(purpose)
         return bool(re.fullmatch(r"CYCLE_\d+_LONG_REDUCE", normalized))
+
+    def _get_final_long_exit_purpose(self) -> str:
+        # Für den Short-Bot ist der Long-Bein-Exit gespiegelt ein Stop-Loss.
+        return self.LONG_SL_EXIT_PURPOSE
+
+    def _get_final_short_exit_purpose(self) -> str:
+        # Für den Short-Bot ist der Short-Bein-Exit gespiegelt ein Take-Profit.
+        return self.SHORT_TP_EXIT_PURPOSE
 

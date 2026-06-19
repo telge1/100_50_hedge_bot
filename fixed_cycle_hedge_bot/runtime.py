@@ -1383,6 +1383,8 @@ class GenericHedgeRuntime:
         return {
             getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
             getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
+            getattr(self.strategy, "LONG_SL_EXIT_PURPOSE", "LONG_SL_EXIT"),
+            getattr(self.strategy, "SHORT_TP_EXIT_PURPOSE", "SHORT_TP_EXIT"),
             getattr(self.strategy, "LONG_TP_EXIT_RECOVERY_PURPOSE", "LONG_TP_EXIT_RECOVERY"),
             getattr(self.strategy, "SHORT_SL_EXIT_RECOVERY_PURPOSE", "SHORT_SL_EXIT_RECOVERY"),
             "FINAL_LONG_EXIT",
@@ -2378,10 +2380,18 @@ class GenericHedgeRuntime:
         )
         # Mark final exit intents that should use the trading-stop API so downstream
         # logic can treat them specially (no normal order cancel, different submit path).
-        if is_final_exit_intent and str(intent.purpose or "").upper() in {
-            getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"),
-            getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"),
-        }:
+        purpose_upper = str(intent.purpose or "").upper()
+        if hasattr(self.strategy, "_get_final_exit_purposes"):
+            final_exit_trading_stop_purposes = {
+                str(p).upper()
+                for p in (self.strategy._get_final_exit_purposes() or set())
+            }
+        else:
+            final_exit_trading_stop_purposes = {
+                str(getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT")).upper(),
+                str(getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT")).upper(),
+            }
+        if is_final_exit_intent and purpose_upper in final_exit_trading_stop_purposes:
             managed_order.metadata["trading_stop_api"] = True
         if is_final_exit_intent and final_exit_signature:
             self._register_pending_final_exit_submission(
@@ -2823,7 +2833,12 @@ class GenericHedgeRuntime:
         target_trigger = intent.trigger_price or 0.0
         first_leg_requirements = self._cycle_first_leg_reduce_requirements(intent.purpose)
         is_first_leg_reduce = first_leg_requirements is not None
-        is_exit_order = intent.purpose in {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
+        is_exit_order = intent.purpose in {
+            "LONG_TP_EXIT",
+            "SHORT_SL_EXIT",
+            "LONG_SL_EXIT",
+            "SHORT_TP_EXIT",
+        }
         is_final_exit_intent = self._is_final_exit_purpose(intent.purpose)
         final_exit_intent_signature = (
             self._build_final_exit_submit_signature(
@@ -3407,7 +3422,13 @@ class GenericHedgeRuntime:
                 trigger_by=trigger_by_value,
             )
 
-            if purpose_upper == getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT"):
+            long_tp = getattr(self.strategy, "LONG_TP_EXIT_PURPOSE", "LONG_TP_EXIT")
+            short_sl = getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT")
+            long_sl = getattr(self.strategy, "LONG_SL_EXIT_PURPOSE", "LONG_SL_EXIT")
+            short_tp = getattr(self.strategy, "SHORT_TP_EXIT_PURPOSE", "SHORT_TP_EXIT")
+
+            if purpose_upper in {long_tp, short_tp}:
+                # Take-Profit-Feld für Long- oder Short-Position setzen.
                 response = self.order_manager.set_full_position_trading_stop(
                     symbol=symbol,
                     position_idx=position_idx,
@@ -3416,7 +3437,8 @@ class GenericHedgeRuntime:
                     stop_loss=None,
                     trigger_by=trigger_by_value,
                 )
-            elif purpose_upper == getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"):
+            elif purpose_upper in {long_sl, short_sl}:
+                # Stop-Loss-Feld für Long- oder Short-Position setzen.
                 response = self.order_manager.set_full_position_trading_stop(
                     symbol=symbol,
                     position_idx=position_idx,
@@ -4506,6 +4528,13 @@ class GenericHedgeRuntime:
             str(order.get("orderLinkId")): order for order in open_orders if order.get("orderLinkId")
         }
         for client_id, managed_order in list(self.runtime_state.active_orders.items()):
+            metadata = getattr(managed_order, "metadata", None) or {}
+            if metadata.get("trading_stop_api"):
+                # Trading-Stop-Exit-Orders (LONG_TP_EXIT/SHORT_SL_EXIT) werden positionsgebunden
+                # über /v5/position/trading-stop gesetzt und besitzen keine klassische
+                # exchange_order_id. Sie dürfen daher nicht über open_orders/order_history
+                # reconciled werden.
+                continue
             if self._is_terminal_order_status(managed_order.status):
                 self._normalize_terminal_order_quantities(managed_order)
                 self.audit.log_event(
