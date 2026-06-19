@@ -256,6 +256,41 @@ def _log_warning_event(event: str, payload: dict[str, Any]) -> None:
     logger.warning("%s %s", event, payload)
 
 
+def _resolve_confirmed_pnl_history_target(
+    *,
+    route_side: str,
+    default_bot: str,
+    base_path: Path,
+) -> tuple[str, Path]:
+    """
+    Bestimme das Ziel-Bot-Label (long_bot_N/short_bot_N) und die History-Datei
+    für Confirmed-PnL-Einträge auf Basis von side/purpose und default_bot.
+    """
+    normalized_side = str(route_side or "").strip().lower()
+    target_bot_name = default_bot
+    target_path = base_path
+    try:
+        match = re.search(r"_(\d+)$", str(default_bot or "").strip().lower())
+        index = match.group(1) if match else None
+        if index and normalized_side in {"long", "short"}:
+            # Beispiel:
+            # .../live_bots/100_50_hedge_bot/long_bot_2/logs/confirmed_order_pnl_history.jsonl
+            # -> group_root = .../live_bots/100_50_hedge_bot
+            group_root = base_path.parent.parent.parent
+            if normalized_side == "short":
+                target_bot_name = f"short_bot_{index}"
+            else:
+                target_bot_name = f"long_bot_{index}"
+            target_logs_dir = group_root / target_bot_name / "logs"
+            target_logs_dir.mkdir(parents=True, exist_ok=True)
+            target_path = target_logs_dir / "confirmed_order_pnl_history.jsonl"
+    except Exception:
+        # Fallback: im Zweifel bleibt der ursprüngliche Pfad/Bot bestehen.
+        target_bot_name = default_bot
+        target_path = base_path
+    return target_bot_name, target_path
+
+
 def _safe_audit_value(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
@@ -15710,14 +15745,40 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return
         record["dedupe_key"] = f"{exchange_order_id}:{purpose}"
         dedupe_key = record["dedupe_key"]
+        # Route Confirmed-PnL-Eintrag zum passenden Bot (long_bot_N / short_bot_N)
+        # anhand von side/purpose, damit jede Seite ihre eigene History-Datei erhält.
+        route_side = str(record.get("side") or "").strip().lower()
+        purpose_upper = str(purpose or "").upper()
+        if not route_side:
+            if "SHORT" in purpose_upper:
+                route_side = "short"
+            elif "LONG" in purpose_upper:
+                route_side = "long"
+        target_bot_name, target_path = _resolve_confirmed_pnl_history_target(
+            route_side=route_side,
+            default_bot=default_bot_name,
+            base_path=confirmed_order_pnl_history_path,
+        )
+        record["bot_name"] = target_bot_name
+        _log_event(
+            "confirmed_pnl_history_route",
+            {
+                "purpose": record.get("purpose"),
+                "side": record.get("side"),
+                "source_bot": default_bot_name,
+                "target_bot": target_bot_name,
+                "target_path": str(target_path),
+                "trade_block_id": record.get("trade_block_id"),
+                "exchange_order_id": record.get("exchange_order_id"),
+            },
+        )
         state = runtime_state.strategy_state if runtime_state is not None else None
         written_keys = set(str(value) for value in ((state or {}).get("processed_confirmed_order_keys") or []))
         is_provisional_source = pnl_source in {
             "provisional_runtime_calculated_pnl",
             "provisional_exec_pnl",
         }
-        record["bot_name"] = default_bot_name
-        path = confirmed_order_pnl_history_path
+        path = target_path
         try:
             # Für Upserts benötigen wir nicht nur die Existenz des Schlüssels,
             # sondern auch die bisherige pnl_source, um provisional vs. confirmed
