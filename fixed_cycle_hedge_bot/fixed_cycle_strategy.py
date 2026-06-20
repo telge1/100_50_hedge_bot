@@ -5620,6 +5620,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "fixed_cycle_post_refill_structure_rebuild_completed",
                         log_payload,
                     )
+                    # Nur Recovery-Lifecycle beobachten: bei rein normalen Refills
+                    # bleibt recovery_lifecycle_state in der Regel unset/None.
+                    if state.get("recovery_lifecycle_state") is not None:
+                        self._set_recovery_lifecycle_state(
+                            state,
+                            "COMPLETED",
+                            event="post_refill_structure_rebuild_completed",
+                        )
                 else:
                     _log_event(
                         "fixed_cycle_post_refill_structure_rebuild_waiting",
@@ -13237,6 +13245,41 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         qty = notional_usdt / price
         return self._normalize_qty(qty, runtime_state)
 
+    def _set_recovery_lifecycle_state(
+        self,
+        state: dict[str, Any],
+        new_state: str,
+        *,
+        event: str,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Beobachtender Lifecycle-State für den Recovery-/Refill-Ablauf.
+
+        - Verändert keine bestehende Guard- oder Flag-Logik.
+        - Dient nur zur Diagnose und besseren Nachvollziehbarkeit.
+        """
+        old_state = state.get("recovery_lifecycle_state")
+        state["recovery_lifecycle_state"] = new_state
+        cycle_state = state.get("cycle_state") or {}
+        payload: dict[str, Any] = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "trade_block_id": state.get("trade_block_id"),
+            "cycle_index": (
+                state.get("recovery_reference_cycle_index")
+                or cycle_state.get("recovery_reference_cycle_index")
+                or state.get("active_cycle_index")
+                or 0
+            ),
+            "event": event,
+            "old_state": old_state,
+            "new_state": new_state,
+        }
+        if extra:
+            payload.update(extra)
+        _log_event("fixed_cycle_recovery_lifecycle_transition", payload)
+
     def _apply_recovery_refill_state(
         self,
         runtime_state: RuntimeState,
@@ -13729,6 +13772,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state = runtime_state.strategy_state
         cycle_state = self._ensure_cycle_state(runtime_state)
         baseline = self._ensure_recovery_wallet_baseline(snapshot, runtime_state, context)
+        self._set_recovery_lifecycle_state(
+            state,
+            "WAITING_WALLET_TRANSFER",
+            event="recovery_wallet_transfer_check_started",
+            extra={"cycle_index": cycle_index},
+        )
         if not baseline:
             state["recovery_wallet_transfer_pending"] = True
             _log_event(
@@ -13739,6 +13788,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "cycle_index": cycle_index,
                     "trade_block_id": state.get("trade_block_id"),
                 },
+            )
+            self._set_recovery_lifecycle_state(
+                state,
+                "FAILED",
+                event="recovery_wallet_transfer_baseline_missing",
+                extra={"cycle_index": cycle_index},
             )
             return False
         if self._recovery_wallet_transfer_already_completed(baseline, cycle_index):
@@ -13751,6 +13806,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "cycle_index": cycle_index,
                     "trade_block_id": state.get("trade_block_id"),
                 },
+            )
+            self._set_recovery_lifecycle_state(
+                state,
+                "WALLET_TRANSFER_COMPLETED",
+                event="recovery_wallet_transfer_already_completed",
+                extra={"cycle_index": cycle_index},
             )
             return True
         transfer_required_payload = {
@@ -13778,6 +13839,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 transfer_required_payload,
             )
             state["recovery_wallet_transfer_pending"] = True
+            self._set_recovery_lifecycle_state(
+                state,
+                "FAILED",
+                event="recovery_wallet_transfer_invalid_amount",
+                extra={"cycle_index": cycle_index},
+            )
             return False
         success, transfer_id = self._execute_recovery_wallet_transfer(
             baseline, cycle_index, runtime_state, context, transfer_amount_usdt
@@ -13788,6 +13855,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 transfer_required_payload,
             )
             state["recovery_wallet_transfer_pending"] = True
+            self._set_recovery_lifecycle_state(
+                state,
+                "FAILED",
+                event="recovery_wallet_transfer_failed",
+                extra={"cycle_index": cycle_index},
+            )
             return False
         state["recovery_wallet_transfer_pending"] = False
         state["recovery_wallet_transfer_completed"] = True
@@ -13833,6 +13906,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         self._write_cycle_state(cycle_state)
+        self._set_recovery_lifecycle_state(
+            state,
+            "WALLET_TRANSFER_COMPLETED",
+            event="recovery_wallet_transfer_completed",
+            extra={"cycle_index": cycle_index},
+        )
         return True
     def _build_recovery_debug_payload(
         self,
@@ -14058,6 +14137,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "short_ratio": short_ratio,
             },
         )
+        self._set_recovery_lifecycle_state(
+            state,
+            "REFILL_INTENTS_CREATED",
+            event="recovery_refill_intents_created",
+            extra={"cycle_index": recovery_cycle_index},
+        )
         return intents
 
     def _handle_recovery_refill_fill(
@@ -14124,6 +14209,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
             return
+        # Vor dem Update merken, ob bereits eine Seite als gefüllt markiert war,
+        # um den Übergang REFILL_PARTIALLY_FILLED beobachten zu können.
+        long_filled_before = bool(state.get("recovery_refill_long_filled"))
+        short_filled_before = bool(state.get("recovery_refill_short_filled"))
         fill_price = float(fill_event.exec_price or 0.0)
         state[pending_key] = False
         state[filled_key] = True
@@ -14143,6 +14232,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         }
         _log_event("fixed_cycle_recovery_refill_fill_detected", payload)
         self._write_cycle_state(cycle_state)
+        # Lifecycle-Transition: erster Teil-Fill der Recovery-Refills.
+        long_filled_after = bool(state.get("recovery_refill_long_filled"))
+        short_filled_after = bool(state.get("recovery_refill_short_filled"))
+        if (
+            (long_filled_after or short_filled_after)
+            and not (long_filled_after and short_filled_after)
+            and not (long_filled_before or short_filled_before)
+        ):
+            self._set_recovery_lifecycle_state(
+                state,
+                "REFILL_PARTIALLY_FILLED",
+                event="recovery_refill_partial_fill",
+            )
         if state.get("recovery_refill_long_filled") and state.get("recovery_refill_short_filled"):
             completed_cycle_index = int(
                 state.get("recovery_reference_cycle_index")
@@ -14153,6 +14255,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 state["recovery_completed_cycle_index"] = completed_cycle_index
                 cycle_state["recovery_completed_cycle_index"] = completed_cycle_index
             _log_event("fixed_cycle_recovery_refill_complete", payload)
+            self._set_recovery_lifecycle_state(
+                state,
+                "REFILL_FILLED",
+                event="recovery_refill_filled",
+            )
             state["post_refill_structure_rebuild_required"] = True
             _log_event("fixed_cycle_recovery_exit_rebuild_requested", payload)
             # Time-Distance-Recovery hat den normalen Refill-Mode via _enter_refill_mode aktiviert.
@@ -14166,6 +14273,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 symbol=self.config.symbol,
             )
             self._clear_recovery_state(runtime_state)
+            self._set_recovery_lifecycle_state(
+                state,
+                "REBUILDING_STRUCTURE",
+                event="recovery_refill_mode_exited",
+            )
             _log_event("fixed_cycle_recovery_required_cleared", payload)
             _log_event("fixed_cycle_recovery_normal_cycle_resumed", payload)
 
@@ -16761,6 +16873,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "current_price": current_price_f,
                 "time_distance_refill_trigger_minutes": cfg_minutes,
             },
+        )
+        self._set_recovery_lifecycle_state(
+            state,
+            "TRIGGERED",
+            event="time_distance_refill_triggered",
         )
         self._enter_refill_mode(
             state,
