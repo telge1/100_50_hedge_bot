@@ -273,15 +273,31 @@ def _resolve_confirmed_pnl_history_target(
         match = re.search(r"_(\d+)$", str(default_bot or "").strip().lower())
         index = match.group(1) if match else None
         if index and normalized_side in {"long", "short"}:
-            # Beispiel:
-            # .../live_bots/100_50_hedge_bot/long_bot_2/logs/confirmed_order_pnl_history.jsonl
-            # -> group_root = .../live_bots/100_50_hedge_bot
-            group_root = base_path.parent.parent.parent
+            # Basis-Verzeichnis des aktuell laufenden Bots, z.B.
+            # .../live_bots/100_50_hedge_bot/long_bot_1/logs/confirmed_order_pnl_history.jsonl
+            group_root_candidate = base_path.parent.parent.parent
+            live_bots_root = group_root_candidate.parent
+
+            # Langfristiges Mapping:
+            # - long_bot_N  -> live_bots/100_50_hedge_bot/long_bot_N
+            # - short_bot_N -> live_bots/short_hedge_bot/short_bot_N
+            if group_root_candidate.name == "100_50_hedge_bot":
+                long_group_root = group_root_candidate
+                short_group_root = live_bots_root / "short_hedge_bot"
+            elif group_root_candidate.name == "short_hedge_bot":
+                short_group_root = group_root_candidate
+                long_group_root = live_bots_root / "100_50_hedge_bot"
+            else:
+                # Unerwarteter Pfad – zur Sicherheit keine Umlenkung.
+                return default_bot, base_path
+
             if normalized_side == "short":
                 target_bot_name = f"short_bot_{index}"
+                target_logs_dir = short_group_root / target_bot_name / "logs"
             else:
                 target_bot_name = f"long_bot_{index}"
-            target_logs_dir = group_root / target_bot_name / "logs"
+                target_logs_dir = long_group_root / target_bot_name / "logs"
+
             target_logs_dir.mkdir(parents=True, exist_ok=True)
             target_path = target_logs_dir / "confirmed_order_pnl_history.jsonl"
     except Exception:
@@ -6458,6 +6474,94 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
         intents.extend(short_intents)
         sequence_state = get_cycle_sequence_state(state, self._sequence_config)
+
+        # Wenn die Sequenz bereits klar auf dem Second-Leg steht und keine aktive
+        # Second-Leg-Order mehr existiert, darf der Bot nach einem Refill nicht
+        # mit leeren Intents stehen bleiben. In diesem Fall wird explizit der
+        # Second-Leg-Purpose aus dem Sequenz-State neu aufgebaut, anstatt einen
+        # weiteren First-Leg (LONG_ADD) zu versuchen.
+        second_leg_rebuild_done = False
+        if (
+            not short_intents
+            and bool(state.get("post_refill_structure_rebuild_required"))
+        ):
+            cycle_step = sequence_state.get("cycle_step")
+            next_required = str(sequence_state.get("next_required_purpose") or "").upper()
+            if cycle_step == STEP_WAITING_FOR_PAIR_SECOND_LEG and next_required:
+                seq_cycle_index, seq_field = self._extract_cycle_sequence_target(next_required, {})
+                if (
+                    seq_cycle_index > 0
+                    and seq_field == self._get_second_leg_status_field()
+                ):
+                    normalized_next = self._normalize_cycle_purpose(
+                        next_required,
+                        {
+                            "cycle_index": seq_cycle_index,
+                            "cycle_role": self._get_second_leg_cycle_role(),
+                        },
+                    )
+                    if self._is_second_leg_purpose(normalized_next):
+                        active_purposes = [
+                            str(getattr(order, "purpose", "") or "").upper()
+                            for order in runtime_state.active_orders.values()
+                            if getattr(order, "purpose", None)
+                        ]
+                        if next_required not in active_purposes:
+                            # Triggerpreis ausschließlich aus Sequenz-/State-Daten rekonstruieren.
+                            cycle_entry = self._get_cycle_sequence_entry(
+                                runtime_state, seq_cycle_index
+                            )
+                            trigger_price = float(
+                                cycle_entry.get("short_tp_trigger_price")
+                                or state.get("last_short_tp_trigger_price")
+                                or 0.0
+                            )
+                            if trigger_price <= 0:
+                                _log_event(
+                                    "fixed_cycle_second_leg_rebuild_missing_state_trigger_price",
+                                    {
+                                        "symbol": snapshot.symbol or self.config.symbol,
+                                        "cycle_index": seq_cycle_index,
+                                        "cycle_step": cycle_step,
+                                        "next_required_purpose": next_required,
+                                        "active_order_purposes": active_purposes,
+                                        "cycle_entry": dict(cycle_entry),
+                                        "state_last_short_tp_trigger_price": float(
+                                            state.get("last_short_tp_trigger_price") or 0.0
+                                        ),
+                                    },
+                                )
+                            else:
+                                second_intent = self._build_short_tp_pair_intent(
+                                    snapshot=snapshot,
+                                    state=state,
+                                    runtime_state=runtime_state,
+                                    trigger_price=trigger_price,
+                                    long_cycle_number=seq_cycle_index,
+                                    context=context,
+                                )
+                                if second_intent is not None:
+                                    intents.append(second_intent)
+                                    second_leg_rebuild_done = True
+                                    _log_event(
+                                        "fixed_cycle_second_leg_rebuild_from_sequence_state",
+                                        {
+                                            "symbol": snapshot.symbol or self.config.symbol,
+                                            "cycle_index": seq_cycle_index,
+                                            "cycle_step": cycle_step,
+                                            "next_required_purpose": next_required,
+                                            "normalized_next_required_purpose": normalized_next,
+                                            "trigger_price": trigger_price,
+                                            "active_order_purposes": active_purposes,
+                                            "processed_cycle_purposes": list(
+                                                state.get("processed_cycle_purposes") or []
+                                            ),
+                                        },
+                                    )
+
+        if second_leg_rebuild_done:
+            return intents
+
         if long_cycle_number <= self.config.max_cycles:
             purpose = self._get_first_leg_purpose(long_cycle_number)
             if not is_attempted_purpose_matching_sequence(purpose, sequence_state):
@@ -14440,6 +14544,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self,
         snapshot: HedgeSnapshot,
         state: dict,
+        runtime_state: RuntimeState,
         trigger_price: float,
         long_cycle_number: int,
         context: StrategyContext,

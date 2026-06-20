@@ -91,7 +91,11 @@ def _iter_long_bot_histories(group_root: Path) -> Iterable[Tuple[int, Path]]:
 
 def backfill_for_pair(group_root: Path, index: int, source_path: Path, apply: bool) -> BackfillStats:
     short_bot_name = f"short_bot_{index}"
-    target_logs_dir = group_root / short_bot_name / "logs"
+    # Neue Policy: Short-Histories immer unterhalb von live_bots/short_hedge_bot/short_bot_N
+    # ablegen, auch wenn group_root z.B. .../live_bots/100_50_hedge_bot ist.
+    live_bots_root = group_root.parent
+    short_root = live_bots_root / "short_hedge_bot"
+    target_logs_dir = short_root / short_bot_name / "logs"
     target_path = target_logs_dir / "confirmed_order_pnl_history.jsonl"
     stats = BackfillStats(source_path=source_path, target_path=target_path)
 

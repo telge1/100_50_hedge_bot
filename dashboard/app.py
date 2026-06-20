@@ -7403,6 +7403,21 @@ def _profit_trade_account_name_from_bot_name(bot_name: str) -> str:
     return f"Long_bot_{index}"
 
 
+def _paired_trade_bot_names(bot_name: str | None) -> set[str]:
+    normalized = str(bot_name or "").strip().lower()
+    if not normalized:
+        return set()
+    match = re.search(r"_(\d+)$", normalized)
+    if not match:
+        return {normalized}
+    index = match.group(1)
+    if normalized.startswith("short_bot_"):
+        return {normalized, f"long_bot_{index}"}
+    if normalized.startswith("long_bot_"):
+        return {normalized, f"short_bot_{index}"}
+    return {normalized}
+
+
 def _profit_trade_source_from_entry(entry: dict[str, Any], *, side: str) -> dict[str, Any]:
     bot_name = str(entry.get("bot_name") or "").strip().lower()
     if side == "short":
@@ -7924,6 +7939,7 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
         qty_value: Any = entry.get("qty") or entry.get("exec_qty") or None
         side_value: Any = entry.get("side") or None
         cycle_role_value: Any = entry.get("cycle_role") or None
+        bot_name_value: Any = (entry.get("bot_name") or record.get("bot_name") or "").strip() or None
 
         if not is_event_row:
             order_id = entry.get("exchange_order_id") or entry.get("client_order_id") or ""
@@ -7987,6 +8003,8 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
                 "qty": qty_value,
                 "side": side_value,
                 "cycle_role": cycle_role_value,
+                "bot_name": bot_name_value,
+                "source_bot": bot_name_value,
                 "source": display_source,
                 "record_source": entry.get("source"),
             }
@@ -8163,7 +8181,16 @@ def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> l
             continue
         seen.add(key)
         deduped.append(row)
-    deduped.sort(key=lambda entry: _parse_profit_time(entry.get("timestamp")) or datetime.min)
+    # Chronologische Sortierung; bei nahezu identischen Zeitstempeln zusätzliche
+    # Stabilisierung über Cycle- und Purpose-Metadaten.
+    def _confirmed_row_sort_key(entry: dict[str, Any]) -> tuple:
+        ts = _parse_profit_time(entry.get("timestamp")) or datetime.min
+        cycle_index = _safe_int(entry.get("cycle_index"))
+        purpose = str(entry.get("purpose") or "")
+        order_id = str(entry.get("exchange_order_id") or entry.get("client_order_id") or "")
+        return (ts, cycle_index, purpose, order_id)
+
+    deduped.sort(key=_confirmed_row_sort_key)
     return deduped
 
 
@@ -8175,13 +8202,30 @@ def _load_confirmed_order_pnl_rows_for_trade(
     bot_side: str | None = None,
 ) -> list[dict[str, Any]]:
     paths = _collect_confirmed_history_paths(profile, bot_side)
+    if bot_name:
+        for paired_bot_name in sorted(_paired_trade_bot_names(bot_name)):
+            candidate_paths: list[Path] = []
+            if paired_bot_name.startswith("short_bot_"):
+                candidate_paths.append(
+                    SHORT_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
+                )
+            elif paired_bot_name.startswith("long_bot_"):
+                candidate_paths.append(
+                    LIVE_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
+                )
+            for candidate_path in candidate_paths:
+                if candidate_path.exists() and candidate_path not in paths:
+                    paths.append(candidate_path)
     rows = _collect_confirmed_order_pnl_rows(paths)
     candidate = _filter_confirmed_rows(rows, trade_block_id)
     if symbol:
         candidate = [row for row in candidate if str(row.get("symbol") or "").upper() == symbol.upper()] or candidate
     if bot_name:
+        allowed_bot_names = _paired_trade_bot_names(bot_name)
         candidate = [
-            row for row in candidate if str(row.get("bot_name") or "").lower() == bot_name.lower()
+            row
+            for row in candidate
+            if str(row.get("bot_name") or "").strip().lower() in allowed_bot_names
         ] or candidate
     return candidate
 
@@ -8286,7 +8330,17 @@ def _merge_trade_history_breakdown(record: dict[str, Any], history_entry: dict[s
 
 def _normalize_trade_record(event: dict[str, Any]) -> dict[str, Any]:
     breakdown = event.get("breakdown") or {}
-    total_trade_pnl = float(event.get("total_trade_pnl") or event.get("total_trade_profit_usdt") or 0.0)
+    raw_total_trade_pnl = (
+        event.get("total_trade_pnl")
+        if event.get("total_trade_pnl") is not None
+        else event.get("total_trade_profit_usdt")
+    )
+    if raw_total_trade_pnl is None and event.get("closed_pnl") is not None:
+        # Fallback fuer reine confirmed_order_pnl_history-Eintraege:
+        # Wenn kein persistierter Trade-Block vorliegt, nutzen wir den
+        # bestaetigten Closed-PnL wenigstens als Trade-PnL fuer die Anzeige.
+        raw_total_trade_pnl = event.get("closed_pnl")
+    total_trade_pnl = float(raw_total_trade_pnl or 0.0)
     cycle_net = float(breakdown.get("cycle_net_pnl") or event.get("cycle_net_pnl") or 0.0)
     final_exit_net = float(breakdown.get("final_exit_net_pnl") or event.get("final_exit_net_pnl") or 0.0)
     final_long = float(breakdown.get("final_long_exit_pnl") or event.get("final_long_exit_pnl") or 0.0)
@@ -8306,6 +8360,8 @@ def _normalize_trade_record(event: dict[str, Any]) -> dict[str, Any]:
     }:
         closed_flags = True
     if event.get("total_trade_pnl") is not None and event.get("trade_block_id"):
+        closed_flags = True
+    if event.get("closed_pnl") is not None and event.get("trade_block_id"):
         closed_flags = True
     status = "closed" if closed_flags else "open"
     return {
@@ -8334,8 +8390,28 @@ def _normalize_trade_record(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def _event_priority(event: dict[str, Any]) -> tuple[int, int, datetime]:
-    pnl_complete = 1 if bool(event.get("pnl_complete")) else 0
-    is_persisted = 1 if event.get("__event") == "fixed_cycle_last_trade_pnl_persisted" else 0
+    raw_event_name = str(event.get("__event") or event.get("event") or "").strip()
+    has_closed_payload = False
+    if event.get("trade_block_id"):
+        if event.get("pnl_complete") or event.get("last_trade_pnl_complete"):
+            has_closed_payload = True
+        elif event.get("finalized_at"):
+            has_closed_payload = True
+        elif event.get("total_trade_pnl") is not None or event.get("total_trade_profit_usdt") is not None:
+            has_closed_payload = True
+        elif event.get("closed_pnl") is not None:
+            has_closed_payload = True
+        elif raw_event_name in {
+            "fixed_cycle_trade_pnl_finalized",
+            "fixed_cycle_last_trade_pnl_persisted",
+            "dashboard_closed_pnl_history",
+        }:
+            has_closed_payload = True
+    pnl_complete = 1 if has_closed_payload else 0
+    is_persisted = 1 if raw_event_name in {
+        "fixed_cycle_last_trade_pnl_persisted",
+        "dashboard_closed_pnl_history",
+    } else 0
     ts_val = event.get("finalized_at") or event.get("timestamp")
     parsed = _normalize_dashboard_datetime(ts_val)
     if not parsed:
@@ -8446,7 +8522,18 @@ def _bot_paths_with_fallback(entry: dict[str, Any]) -> dict[str, Path]:
     bot_name = entry.get("bot_name")
     if not bot_name:
         return {}
-    base = get_bot_paths(bot_name) or {}
+    normalized_bot_name = str(bot_name).strip().lower()
+    # Die Dashboard-Bot-Registry kennt nur long_bot_N-Verzeichnisse und mappt
+    # "short_bot_N" / "Short_bot_N" auf das zugehoerige long_bot_N. Fuer die
+    # Profit-Verlauf-Ansicht waere das fatal, weil dadurch der aktive
+    # Short-Prozess den State/Log-Pfad des Long-Bots lesen wuerde.
+    #
+    # Deshalb fuer Short-Bots bewusst KEIN get_bot_paths()-Lookup verwenden,
+    # sondern immer den expliziten bot_dir aus der Short-Source beibehalten.
+    if normalized_bot_name.startswith("short_bot_"):
+        base = {}
+    else:
+        base = get_bot_paths(bot_name) or {}
     bot_dir = Path(entry.get("bot_dir") or LIVE_BOT_LOGS_ROOT / bot_name)
     result: dict[str, Path] = {}
 
@@ -8708,6 +8795,13 @@ def _collect_process_rows_for_bot(
             }
         )
     start_dt = min(start_times) if start_times else None
+    if start_dt is None:
+        start_dt = (
+            _normalize_dashboard_datetime(strategy_state.get("trade_started_at"))
+            or _normalize_dashboard_datetime(state.get("trade_started_at"))
+            or _normalize_dashboard_datetime(strategy_state.get("created_at"))
+            or _normalize_dashboard_datetime(state.get("created_at"))
+        )
     cycle_completed = max(_safe_int(strategy_state.get("cycle_completed_count")), max_cycle)
     bot_side = "short" if str(bot_name or "").lower().startswith("short_bot_") else "long"
     active_orders_all = _normalize_active_orders(state, strategy_state)
@@ -8898,15 +8992,16 @@ async def api_profit_trade_details(
     user: dict = Depends(require_auth),
 ):
     bot_side = _normalize_bot_side(bot_side)
-    trades, warnings, _pagination = _load_trade_blocks_for_profile(
+    trades, _summary, _pagination, warnings, _metadata = _build_profit_trade_page(
         profile,
         limit=500,
-        paginate=False,
+        start_time=None,
+        end_time=None,
+        page=0,
+        page_size=500,
         bot_side=bot_side,
     )
-    trades = _filter_trades_by_side(trades, bot_side)
-    normalized = list(trades)
-    match = next((record for record in normalized if record.get("trade_block_id") == trade_block_id), None)
+    match = next((record for record in trades if record.get("trade_block_id") == trade_block_id), None)
     if not match:
         raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
     bot_name = match.get("bot_name") or ""
@@ -9250,74 +9345,17 @@ def _build_profit_trade_filtered_rows(
             )
             return True
 
-        # Darüber hinaus nur geschlossene History-Records heuristisch anhand von
-        # (bot_name, symbol, side) wegfiltern.
+        # Darüber hinaus KEINE geschlossenen History-Records mehr nur anhand von
+        # (bot_name, symbol, side) wegfiltern. Sobald derselbe Bot dasselbe
+        # Symbol erneut handelt, muss die Historie der vorherigen Trade-Blocks
+        # sichtbar bleiben. Sonst verschwinden alte geschlossene Trades, nur
+        # weil aktuell wieder ein Trade auf demselben Symbol laeuft.
+        #
+        # Shadowing ist deshalb nur noch ueber identische trade_block_id
+        # erlaubt (siehe oben). Das ist praezise genug, um doppelte
+        # In-Progress/History-Darstellungen desselben Trades zu vermeiden.
         if not _is_closed_trade_status(record.get("status")):
             return False
-
-        bot_name = str(record.get("bot_name") or "").strip().lower()
-        symbol = str(record.get("symbol") or "").strip().upper()
-        side = normalized_side
-        if not side:
-            if bot_name.startswith("short_bot_"):
-                side = "short"
-            elif bot_name.startswith("long_bot_"):
-                side = "long"
-
-        if not (bot_name and symbol and side):
-            return False
-
-        if (bot_name, symbol, side) in running_keys:
-            if normalized_side == "short":
-                payload = {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "reason": "exact_key_match",
-                    "running_keys": sorted(
-                        f"{b}|{s}|{sd}" for (b, s, sd) in running_keys
-                    ),
-                    "record": {
-                        "bot_name": record.get("bot_name"),
-                        "symbol": record.get("symbol"),
-                        "trade_block_id": record.get("trade_block_id"),
-                        "status": record.get("status"),
-                        "end_time": record.get("end_time"),
-                    },
-                }
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match %s",
-                    json.dumps(payload, default=str),
-                )
-            return True
-
-        # Fallback-Heuristik nur für Short-Seite: Wenn genau ein aktiver Short-Trade
-        # existiert, History-Eintrag aber z.B. keinen bot_name oder eine leicht
-        # abweichende Normalisierung hat, dann über Symbol/Side matchen.
-        if normalized_side == "short" and len(running_keys) == 1:
-            (r_bot, r_symbol, r_side) = next(iter(running_keys))
-            loose_match = r_side == side and (
-                (bot_name and bot_name == r_bot) or (symbol and symbol == r_symbol)
-            )
-            if loose_match:
-                payload = {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "reason": "loose_symbol_or_bot_match",
-                    "running_key": f"{r_bot}|{r_symbol}|{r_side}",
-                    "record": {
-                        "bot_name": record.get("bot_name"),
-                        "symbol": record.get("symbol"),
-                        "trade_block_id": record.get("trade_block_id"),
-                        "status": record.get("status"),
-                        "end_time": record.get("end_time"),
-                    },
-                }
-                logger.info(
-                    "[dashboard] profit_trades_short_active_match %s",
-                    json.dumps(payload, default=str),
-                )
-                return True
-
         return False
 
     filtered_base_trades: list[dict[str, Any]] = []
@@ -9433,10 +9471,11 @@ def _build_profit_trade_filtered_rows(
         all_confirmed = _get_confirmed_orders_for_tbid(tbid)
         if not all_confirmed:
             continue
+        allowed_bot_names = _paired_trade_bot_names(bot_name)
         confirmed = [
             entry
             for entry in all_confirmed
-            if str(entry.get("bot_name") or "").strip().lower() == bot_name
+            if str(entry.get("bot_name") or "").strip().lower() in allowed_bot_names
         ]
         if not confirmed:
             continue
@@ -9597,7 +9636,11 @@ def _build_profit_trade_page(
         page=page,
         page_size=effective_page_size,
     )
-    summary = _summarize_trade_blocks(paged_rows)
+    # Summary-Karten sollen den gesamten gefilterten Datenbestand widerspiegeln
+    # und nicht nur die aktuell sichtbare Seite. Sonst kann ein In-Progress-Trade
+    # bei Pagination / fehlender Startzeit aus der ersten Seite fallen und die
+    # Karten zeigen faelschlich "Open Trades: 0".
+    summary = _summarize_trade_blocks(filtered_rows)
     summary.update(_build_profit_trade_wallet_summary(profile=profile, bot_side=bot_side))
     metadata = {
         "total_before_side_filter": len(combined_rows),
@@ -9745,7 +9788,11 @@ def _persist_profit_trade_closed_rows(profile: str, closed_rows: list[dict[str, 
         bot_lower = str(bot).lower()
         symbol_upper = str(symbol).upper()
         key = f"{bot_lower}|{symbol_upper}|{tbid}"
-        per_bot_path = project_root / "live_bots" / "100_50_hedge_bot" / bot_lower / "logs" / "dashboard_closed_pnl_history.jsonl"
+        if bot_lower.startswith("short_bot_"):
+            per_bot_root = project_root / "live_bots" / "short_hedge_bot"
+        else:
+            per_bot_root = project_root / "live_bots" / "100_50_hedge_bot"
+        per_bot_path = per_bot_root / bot_lower / "logs" / "dashboard_closed_pnl_history.jsonl"
         targets = [per_bot_path, global_path]
         written = False
         for target in targets:
