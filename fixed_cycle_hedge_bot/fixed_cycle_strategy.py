@@ -14155,6 +14155,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             _log_event("fixed_cycle_recovery_refill_complete", payload)
             state["post_refill_structure_rebuild_required"] = True
             _log_event("fixed_cycle_recovery_exit_rebuild_requested", payload)
+            # Time-Distance-Recovery hat den normalen Refill-Mode via _enter_refill_mode aktiviert.
+            # Sobald beide Recovery-Refill-Orders gefüllt sind, verlassen wir den Refill-Mode
+            # explizit über den bestehenden Lifecycle-Helfer, damit refill_*- und Exit-Blocker
+            # (refill_pending/refill_required/exit_locked/cycle_block_status=REFILL_REQUIRED etc.)
+            # sauber zurückgesetzt werden.
+            self._exit_refill_mode_after_complete_refill(
+                state,
+                reason="recovery_refill_completed",
+                symbol=self.config.symbol,
+            )
             self._clear_recovery_state(runtime_state)
             _log_event("fixed_cycle_recovery_required_cleared", payload)
             _log_event("fixed_cycle_recovery_normal_cycle_resumed", payload)
@@ -16363,6 +16373,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         previous_key = str(state.get("time_distance_refill_triggered_key") or "")
 
         # Diagnose-Log, welcher Cycle für den Time-Distance-Refill verwendet wird.
+        def _is_same_second_leg_purpose(a: Any, b: Any) -> bool:
+            """
+            Lokaler Helper nur für den Recovery-Time-Distance-Pfad:
+            - behandelt CYCLE_N_LONG_REDUCE als Alias zu CYCLE_N_LONG_ADD auf der Short-Seite,
+              damit offene Second-Leg-Orders korrekt erkannt werden.
+            """
+            a_text = str(a or "")
+            b_text = str(b or "")
+            if a_text == b_text:
+                return True
+            if is_short_side:
+                a_up = a_text.upper()
+                b_up = b_text.upper()
+                ma = re.fullmatch(r"CYCLE_(\d+)_LONG_REDUCE", a_up)
+                mb = re.fullmatch(r"CYCLE_(\d+)_LONG_ADD", b_up)
+                if ma and mb and ma.group(1) == mb.group(1):
+                    return True
+                # Symmetrisch auch LONG_ADD vs. LONG_REDUCE behandeln, falls second_leg_purpose gespiegelt ist.
+                ma2 = re.fullmatch(r"CYCLE_(\d+)_LONG_ADD", a_up)
+                mb2 = re.fullmatch(r"CYCLE_(\d+)_LONG_REDUCE", b_up)
+                if ma2 and mb2 and ma2.group(1) == mb2.group(1):
+                    return True
+            return False
+
         _log_event(
             "fixed_cycle_time_distance_refill_cycle_resolved",
             {
@@ -16381,8 +16415,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "open_second_leg_purposes": [
                     p
                     for p in _active_order_purposes()
-                    if self._normalize_cycle_purpose(p)
-                    == self._normalize_cycle_purpose(second_leg_purpose)
+                    if _is_same_second_leg_purpose(p, second_leg_purpose)
                 ],
                 "processed_cycle_purposes": list(processed_cycle_purposes),
             },
@@ -16424,10 +16457,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 parent_second_leg = meta.get("parent_second_leg_purpose")
                 replace_open = meta.get("replace_open_purpose")
                 purpose_text = str(purpose or "")
+                # Nutze den lokalen Helper, um CYCLE_N_LONG_REDUCE vs. CYCLE_N_LONG_ADD
+                # im Recovery-Second-Leg-Matching zu harmonisieren.
                 return bool(
-                    purpose_text == second_leg_purpose
-                    or parent_second_leg == second_leg_purpose
-                    or replace_open == second_leg_purpose
+                    _is_same_second_leg_purpose(purpose_text, second_leg_purpose)
+                    or _is_same_second_leg_purpose(parent_second_leg, second_leg_purpose)
+                    or _is_same_second_leg_purpose(replace_open, second_leg_purpose)
                 )
 
             def _extract_price(order: Any, meta: dict[str, Any]) -> float | None:
