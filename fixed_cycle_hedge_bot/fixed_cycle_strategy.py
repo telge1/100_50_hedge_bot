@@ -4240,6 +4240,153 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return True
         return not self._is_terminal_order_status(getattr(order, "status", None))
 
+    def _clear_final_exit_trading_stop_state(self, state: dict[str, Any]) -> None:
+        state.pop("final_exit_trading_stop_active", None)
+        state.pop("final_exit_trading_stop_signature", None)
+        state.pop("final_exit_trading_stop_long_tp", None)
+        state.pop("final_exit_trading_stop_short_sl", None)
+        state.pop("final_exit_trading_stop_context", None)
+        state.pop("final_exit_context_missing_but_flat_confirmed", None)
+        state.pop("final_exit_fallback_reason", None)
+        state.pop("final_exit_fallback_applied_at", None)
+
+    def _record_final_exit_trading_stop_submission(
+        self,
+        runtime_state: RuntimeState,
+        snapshot: HedgeSnapshot | None,
+        *,
+        purpose: str,
+        side: str,
+        client_order_id: str | None,
+        exchange_order_id: str | None,
+        trigger_price: float | None,
+        position_idx: int | None,
+    ) -> None:
+        state = runtime_state.strategy_state
+        symbol = str((snapshot.symbol if snapshot else None) or self.config.symbol or "")
+        trade_block_id = state.get("trade_block_id")
+        now_ms = _current_time_ms()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        existing_context = state.get("final_exit_trading_stop_context") or {}
+        if (
+            existing_context.get("trade_block_id") != trade_block_id
+            or str(existing_context.get("symbol") or "").upper() != symbol.upper()
+        ):
+            existing_context = {}
+
+        context = {
+            **existing_context,
+            "symbol": symbol,
+            "trade_block_id": trade_block_id,
+            "set_time_ms": int(existing_context.get("set_time_ms") or now_ms),
+            "set_time": existing_context.get("set_time") or now_iso,
+            "flat_detected_time_ms": existing_context.get("flat_detected_time_ms"),
+            "flat_detected_at": existing_context.get("flat_detected_at"),
+            "final_long_exit_purpose": self._get_final_long_exit_purpose(),
+            "final_short_exit_purpose": self._get_final_short_exit_purpose(),
+            "long_position_idx": 1,
+            "short_position_idx": 2,
+            "long_expected_side": "Sell",
+            "short_expected_side": "Buy",
+            "long_qty_before": float(
+                existing_context.get("long_qty_before")
+                if existing_context.get("long_qty_before") is not None
+                else (snapshot.long_qty if snapshot else 0.0)
+            ),
+            "short_qty_before": float(
+                existing_context.get("short_qty_before")
+                if existing_context.get("short_qty_before") is not None
+                else (snapshot.short_qty if snapshot else 0.0)
+            ),
+        }
+        side_key = "long" if str(side or "").lower() == "long" else "short"
+        expected_purpose = (
+            self._get_final_long_exit_purpose()
+            if side_key == "long"
+            else self._get_final_short_exit_purpose()
+        )
+        expected_side = "Sell" if side_key == "long" else "Buy"
+        if side_key == "long" and snapshot is not None:
+            context["long_qty_before"] = float(snapshot.long_qty or 0.0)
+        if side_key == "short" and snapshot is not None:
+            context["short_qty_before"] = float(snapshot.short_qty or 0.0)
+        context[f"{side_key}_submission"] = {
+            "purpose": expected_purpose,
+            "client_order_id": str(client_order_id or ""),
+            "exchange_order_id": str(exchange_order_id or ""),
+            "trigger_price": float(trigger_price or 0.0),
+            "position_idx": int(position_idx or (1 if side_key == "long" else 2)),
+            "set_time_ms": now_ms,
+            "set_time": now_iso,
+        }
+        state["final_exit_trading_stop_context"] = context
+        order_context = {
+            "symbol": symbol,
+            "side": side_key,
+            "purpose": expected_purpose,
+            "exchange_order_id": str(exchange_order_id or ""),
+            "client_order_id": str(client_order_id or ""),
+            "exec_id": "",
+            "exec_price": float(trigger_price or 0.0),
+            "exec_qty": float(
+                context.get("long_qty_before" if side_key == "long" else "short_qty_before") or 0.0
+            ),
+            "trigger_price": float(trigger_price or 0.0),
+            "basket_tp_price": 0.0,
+            "basket_break_even_price": 0.0,
+            "occurred_at": now_iso,
+            "source": "trading_stop_submission",
+            "position_idx": int(position_idx or (1 if side_key == "long" else 2)),
+            "expected_side": expected_side,
+            "trade_block_id": trade_block_id,
+            "set_time_ms": int(context.get("set_time_ms") or now_ms),
+        }
+        if side_key == "long":
+            state["final_long_exit_order_context"] = order_context
+        else:
+            state["final_short_exit_order_context"] = order_context
+        _log_event(
+            "fixed_cycle_trading_stop_final_exit_context_recorded",
+            {
+                "symbol": symbol,
+                "trade_block_id": trade_block_id,
+                "side": side_key,
+                "purpose": expected_purpose,
+                "position_idx": order_context["position_idx"],
+                "qty_before": order_context["exec_qty"],
+                "set_time_ms": order_context["set_time_ms"],
+            },
+        )
+
+    def _mark_trading_stop_flat_detected(
+        self,
+        state: dict[str, Any],
+        *,
+        symbol: str,
+        reason: str,
+        long_qty: float,
+        short_qty: float,
+    ) -> dict[str, Any]:
+        context = dict(state.get("final_exit_trading_stop_context") or {})
+        if not context:
+            return context
+        if not context.get("flat_detected_time_ms"):
+            context["flat_detected_time_ms"] = _current_time_ms()
+            context["flat_detected_at"] = datetime.now(timezone.utc).isoformat()
+            state["final_exit_trading_stop_context"] = context
+            _log_event(
+                "fixed_cycle_trading_stop_final_exit_flat_state_recorded",
+                {
+                    "symbol": symbol,
+                    "reason": reason,
+                    "trade_block_id": context.get("trade_block_id"),
+                    "long_qty": float(long_qty or 0.0),
+                    "short_qty": float(short_qty or 0.0),
+                    "flat_detected_time_ms": context.get("flat_detected_time_ms"),
+                },
+            )
+        return context
+
     def _finalize_trading_stop_basket_exit(
         self,
         snapshot: HedgeSnapshot,
@@ -4255,7 +4402,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         Positionen flat sind.
 
         Ziel:
-        - Trading-Stop-Marker zurücksetzen
+        - Trading-Stop-Flat-Zeitpunkt festhalten
         - logische Trading-Stop-Exit-Orders aus dem Runtime-State entfernen
         - verbliebene Cycle-/Reduce-Orders bei flat Position bereinigen
         - einen Block-Close-Analyzer-Event emittieren
@@ -4267,9 +4414,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return False
         if snapshot.long_qty > 0 or snapshot.short_qty > 0:
             return False
-
         unsettled_runtime_orders = unsettled_runtime_orders or []
         unsettled_snapshot_orders = unsettled_snapshot_orders or []
+        trading_stop_context = self._mark_trading_stop_flat_detected(
+            state,
+            symbol=self.config.symbol,
+            reason=reason,
+            long_qty=float(snapshot.long_qty or 0.0),
+            short_qty=float(snapshot.short_qty or 0.0),
+        )
+        if trading_stop_context.get("flat_detected_time_ms") and not unsettled_runtime_orders and not unsettled_snapshot_orders:
+            if state.get("final_exit_context_missing_but_flat_confirmed"):
+                return False
 
         active_runtime_summaries = list(unsettled_runtime_orders)
         active_snapshot_summaries = list(unsettled_snapshot_orders)
@@ -4335,11 +4491,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
 
-        # 3) Trading-Stop-spezifische Marker zurücksetzen.
-        state.pop("final_exit_trading_stop_active", None)
-        state.pop("final_exit_trading_stop_signature", None)
-        state.pop("final_exit_trading_stop_long_tp", None)
-        state.pop("final_exit_trading_stop_short_sl", None)
+        # 3) Trading-Stop-Marker bewusst NICHT sofort zurücksetzen.
+        # Die finale Closed-PnL muss ggf. erst im Flat-Reconcile per REST geholt werden.
 
         # 4) Analyzer-Block schließen, auch ohne klassischen Exit-Order-Kontext.
         if not state.get("block_closed_marker_emitted"):
@@ -4371,6 +4524,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "symbol": self.config.symbol,
                 "reason": reason,
+                "trade_block_id": (trading_stop_context or {}).get("trade_block_id"),
                 "long_qty": float(snapshot.long_qty or 0.0),
                 "short_qty": float(snapshot.short_qty or 0.0),
                 "removed_trading_stop_orders": removed_trading_stop_orders,
@@ -12807,15 +12961,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             _emit_analyzer_event(logger, "analyzer_block_closed", payload)
             state["block_closed_marker_emitted"] = True
             state["fresh_restart_required"] = True
-            # Trading-Stop-basierte Exit-Marker nach vollständigem Flat-Exit zurücksetzen.
-            state.pop("final_exit_trading_stop_active", None)
-            state.pop("final_exit_trading_stop_signature", None)
-            state.pop("final_exit_trading_stop_long_tp", None)
-            state.pop("final_exit_trading_stop_short_sl", None)
+            trading_stop_context = self._mark_trading_stop_flat_detected(
+                state,
+                symbol=self.config.symbol,
+                reason="on_fill_block_closed",
+                long_qty=float(snapshot.long_qty or 0.0),
+                short_qty=float(snapshot.short_qty or 0.0),
+            )
             _log_event(
-                "fixed_cycle_trading_stop_final_exit_reset_flat",
+                "fixed_cycle_trading_stop_final_exit_flat_pending_audit",
                 {
                     "symbol": self.config.symbol,
+                    "trade_block_id": trading_stop_context.get("trade_block_id"),
                     "long_qty": snapshot.long_qty,
                     "short_qty": snapshot.short_qty,
                 },
@@ -12831,10 +12988,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             and float(snapshot_for_reset.short_qty or 0.0) == 0.0
             and state.get("final_exit_trading_stop_active")
         ):
-            state.pop("final_exit_trading_stop_active", None)
-            state.pop("final_exit_trading_stop_signature", None)
-            state.pop("final_exit_trading_stop_long_tp", None)
-            state.pop("final_exit_trading_stop_short_sl", None)
+            trading_stop_context = self._mark_trading_stop_flat_detected(
+                state,
+                symbol=self.config.symbol,
+                reason="on_fill_flat_zero",
+                long_qty=float(snapshot_for_reset.long_qty or 0.0),
+                short_qty=float(snapshot_for_reset.short_qty or 0.0),
+            )
             # Alle Trading-Stop-basierten Exit-Orders aus dem Runtime-State entfernen.
             to_remove: list[str] = []
             for client_id, order in runtime_state.active_orders.items():
@@ -12845,9 +13005,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 if order and getattr(order, "exchange_order_id", None):
                     runtime_state.exchange_to_client_id.pop(order.exchange_order_id, None)
             _log_event(
-                "fixed_cycle_trading_stop_final_exit_reset_flat",
+                "fixed_cycle_trading_stop_final_exit_flat_pending_audit",
                 {
                     "symbol": self.config.symbol,
+                    "trade_block_id": trading_stop_context.get("trade_block_id"),
                     "long_qty": float(snapshot_for_reset.long_qty or 0.0),
                     "short_qty": float(snapshot_for_reset.short_qty or 0.0),
                 },
@@ -18949,6 +19110,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         fetcher = getattr(context.order_manager, "fetch_closed_pnl", None) if context and context.order_manager else None
         if not callable(fetcher):
             return bool(state.get("final_long_exit_audited") and state.get("final_short_exit_audited"))
+        trading_stop_context = dict(state.get("final_exit_trading_stop_context") or {})
+        trading_stop_flat_reconcile_active = bool(
+            state.get("final_exit_trading_stop_active")
+            and long_qty <= 0
+            and short_qty <= 0
+            and trading_stop_context
+        )
+        if trading_stop_flat_reconcile_active:
+            trading_stop_context = self._mark_trading_stop_flat_detected(
+                state,
+                symbol=str((snapshot.symbol if snapshot else None) or self.config.symbol or ""),
+                reason=reason,
+                long_qty=long_qty,
+                short_qty=short_qty,
+            )
 
         ledger = state.setdefault(
             "audit_pnl_ledger",
@@ -18981,40 +19157,101 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 parsed = parsed.replace(tzinfo=timezone.utc)
             return int(parsed.timestamp() * 1000)
 
+        def _is_required_side(side_key: str) -> bool:
+            qty_before = self._safe_float(trading_stop_context.get(f"{side_key}_qty_before"), None)
+            if qty_before is None:
+                return True
+            return float(qty_before) > 1e-12
+
         def _fetch_for_side(
             *,
+            side_key: str,
             state_key: str,
             ledger_key: str,
             audited_key: str,
             expected_side: str,
+            purpose: str,
         ) -> None:
             if state.get(audited_key):
                 return
+            if trading_stop_flat_reconcile_active and not _is_required_side(side_key):
+                if ledger.get(ledger_key) is None:
+                    ledger[ledger_key] = 0.0
+                state[audited_key] = True
+                _log_event(
+                    "fixed_cycle_final_exit_pnl_fetch_skipped_no_expected_qty",
+                    {
+                        "reason": reason,
+                        "state_key": state_key,
+                        "side": side_key,
+                        "trade_block_id": trading_stop_context.get("trade_block_id"),
+                    },
+                )
+                return
+
             order_context = state.get(state_key) or {}
+            expected_symbol = str(
+                order_context.get("symbol")
+                or trading_stop_context.get("symbol")
+                or (snapshot.symbol if snapshot else self.config.symbol)
+                or ""
+            )
+            expected_order_id = str(order_context.get("exchange_order_id") or "").strip()
+            expected_client_order_id = str(order_context.get("client_order_id") or "").strip()
+            expected_qty = float(
+                self._safe_float(
+                    order_context.get("exec_qty"),
+                    self._safe_float(trading_stop_context.get(f"{side_key}_qty_before"), 0.0),
+                )
+                or 0.0
+            )
+            expected_fill_price = float(
+                self._safe_float(
+                    order_context.get("exec_price"),
+                    self._safe_float(order_context.get("trigger_price"), 0.0),
+                )
+                or 0.0
+            )
+            occurred_at_ms = _parse_occurred_at_ms(order_context.get("occurred_at"))
+            set_time_ms = (
+                self._safe_int(order_context.get("set_time_ms"), None)
+                or self._safe_int(trading_stop_context.get("set_time_ms"), None)
+                or occurred_at_ms
+            )
+            flat_detected_time_ms = (
+                self._safe_int(order_context.get("flat_detected_time_ms"), None)
+                or self._safe_int(trading_stop_context.get("flat_detected_time_ms"), None)
+                or _current_time_ms()
+            )
+            if trading_stop_flat_reconcile_active and set_time_ms is not None:
+                start_time_ms = max(int(set_time_ms) - 120_000, 0)
+                end_time_ms = int(flat_detected_time_ms) + 120_000
+            else:
+                start_time_ms = max(occurred_at_ms - 300_000, 0) if occurred_at_ms is not None else None
+                end_time_ms = occurred_at_ms + 900_000 if occurred_at_ms is not None else None
+
             _log_event(
                 "fixed_cycle_final_exit_pnl_fetch_started",
                 {
                     "reason": reason,
                     "state_key": state_key,
-                    "symbol": order_context.get("symbol") or (snapshot.symbol if snapshot else self.config.symbol),
-                    "exchange_order_id": order_context.get("exchange_order_id"),
-                    "client_order_id": order_context.get("client_order_id"),
+                    "side": side_key,
+                    "symbol": expected_symbol or (snapshot.symbol if snapshot else self.config.symbol),
+                    "exchange_order_id": expected_order_id or None,
+                    "client_order_id": expected_client_order_id or None,
+                    "trade_block_id": trading_stop_context.get("trade_block_id") or order_context.get("trade_block_id"),
+                    "trading_stop_flat_reconcile": trading_stop_flat_reconcile_active,
+                    "start_time_ms": start_time_ms,
+                    "end_time_ms": end_time_ms,
                 },
             )
-            if not order_context:
+            if not order_context and not trading_stop_flat_reconcile_active:
                 _log_event(
                     "fixed_cycle_final_exit_pnl_fetch_missing",
                     {"reason": reason, "state_key": state_key, "missing": "order_context"},
                 )
                 return
-            expected_symbol = str(order_context.get("symbol") or (snapshot.symbol if snapshot else self.config.symbol) or "")
-            expected_order_id = str(order_context.get("exchange_order_id") or "").strip()
-            expected_client_order_id = str(order_context.get("client_order_id") or "").strip()
-            expected_qty = float(self._safe_float(order_context.get("exec_qty"), 0.0) or 0.0)
-            expected_fill_price = float(self._safe_float(order_context.get("exec_price"), 0.0) or 0.0)
-            occurred_at_ms = _parse_occurred_at_ms(order_context.get("occurred_at"))
-            start_time_ms = max(occurred_at_ms - 300_000, 0) if occurred_at_ms is not None else None
-            end_time_ms = occurred_at_ms + 900_000 if occurred_at_ms is not None else None
+
             rows = fetcher(
                 expected_symbol or self.config.symbol,
                 self.config.category,
@@ -19025,10 +19262,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             matched = None
             matched_sig = None
             match_source = None
+            expected_order_id_is_synthetic = expected_order_id.startswith("trading-stop:")
             for row in rows:
                 row_order_id = str(row.get("orderId") or "").strip()
                 row_link_id = str(row.get("orderLinkId") or "").strip()
-                if expected_order_id and row_order_id == expected_order_id:
+                if expected_order_id and not expected_order_id_is_synthetic and row_order_id == expected_order_id:
                     matched = row
                     matched_sig = self._make_closed_pnl_signature(row)
                     match_source = "orderId"
@@ -19062,6 +19300,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 if matched_sig:
                     processed_signatures.add(matched_sig)
                     state["final_exit_closed_pnl_signatures"] = list(processed_signatures)
+                resolved_exchange_order_id = (
+                    matched.get("orderId")
+                    or (None if expected_order_id_is_synthetic else expected_order_id)
+                    or f"bybit-closed-pnl:{matched_sig or side_key}:{expected_symbol}"
+                )
+                resolved_trade_block_id = (
+                    trading_stop_context.get("trade_block_id")
+                    or order_context.get("trade_block_id")
+                    or runtime_state.strategy_state.get("trade_block_id")
+                )
                 _log_event(
                     "fixed_cycle_final_exit_pnl_fetch_matched",
                     {
@@ -19074,23 +19322,32 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "matched_order_id": matched.get("orderId"),
                         "matched_order_link_id": matched.get("orderLinkId"),
                         "closed_pnl": float(closed_pnl),
+                        "resolved_trade_block_id": resolved_trade_block_id,
                     },
                 )
                 self._write_confirmed_order_pnl_history(
                     {
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "symbol": expected_symbol or self.config.symbol,
-                        "exchange_order_id": expected_order_id or matched.get("orderId"),
+                        "exchange_order_id": resolved_exchange_order_id,
                         "client_order_id": expected_client_order_id or matched.get("orderLinkId"),
-                        "purpose": (
-                            "LONG_TP_EXIT"
-                            if state_key == "final_long_exit_order_context"
-                            else "SHORT_SL_EXIT"
-                        ),
+                        "purpose": purpose,
                         "closed_pnl": float(closed_pnl),
-                        "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                        "trade_block_id": resolved_trade_block_id,
                         "cycle_index": None,
                         "pnl_scope": "final_exit",
+                        "pnl_source": (
+                            "bybit_closed_pnl_flat_reconcile"
+                            if trading_stop_flat_reconcile_active
+                            else "bybit_closed_pnl"
+                        ),
+                        "confirmed_via": (
+                            "final_exit_flat_reconcile"
+                            if trading_stop_flat_reconcile_active
+                            else "final_exit_closed_pnl_fetch"
+                        ),
+                        "side": side_key,
+                        "cycle_role": None,
                     },
                     runtime_state=runtime_state,
                 )
@@ -19103,23 +19360,60 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "exchange_order_id": expected_order_id,
                     "client_order_id": expected_client_order_id,
                     "rows_count": len(rows),
+                    "side": side_key,
+                    "trade_block_id": trading_stop_context.get("trade_block_id") or order_context.get("trade_block_id"),
+                    "trading_stop_flat_reconcile": trading_stop_flat_reconcile_active,
+                    "start_time_ms": start_time_ms,
+                    "end_time_ms": end_time_ms,
                 },
             )
 
         _fetch_for_side(
+            side_key="long",
             state_key="final_long_exit_order_context",
             ledger_key="final_long_exit_pnl",
             audited_key="final_long_exit_audited",
             expected_side="Sell",
+            purpose=self._get_final_long_exit_purpose(),
         )
         _fetch_for_side(
+            side_key="short",
             state_key="final_short_exit_order_context",
             ledger_key="final_short_exit_pnl",
             audited_key="final_short_exit_audited",
             expected_side="Buy",
+            purpose=self._get_final_short_exit_purpose(),
         )
+        long_required = _is_required_side("long")
+        short_required = _is_required_side("short")
         final_long_exit_audited = bool(state.get("final_long_exit_audited"))
         final_short_exit_audited = bool(state.get("final_short_exit_audited"))
+        if state.get("final_exit_trading_stop_active"):
+            if ((not long_required or final_long_exit_audited) and (not short_required or final_short_exit_audited)):
+                self._clear_final_exit_trading_stop_state(state)
+                _log_event(
+                    "fixed_cycle_trading_stop_final_exit_audit_completed",
+                    {
+                        "reason": reason,
+                        "trade_block_id": trading_stop_context.get("trade_block_id"),
+                        "long_required": long_required,
+                        "short_required": short_required,
+                        "final_long_exit_audited": final_long_exit_audited,
+                        "final_short_exit_audited": final_short_exit_audited,
+                    },
+                )
+            else:
+                _log_event(
+                    "fixed_cycle_trading_stop_final_exit_audit_pending",
+                    {
+                        "reason": reason,
+                        "trade_block_id": trading_stop_context.get("trade_block_id"),
+                        "long_required": long_required,
+                        "short_required": short_required,
+                        "final_long_exit_audited": final_long_exit_audited,
+                        "final_short_exit_audited": final_short_exit_audited,
+                    },
+                )
         snapshot_for_reset = snapshot or runtime_state.last_snapshot
         if not (final_long_exit_audited and final_short_exit_audited):
             if (
@@ -19129,6 +19423,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 and not snapshot_for_reset.active_orders
                 and not runtime_state.active_orders
                 and not state.get("verified_flat_runtime_reset_done")
+                and not state.get("final_exit_trading_stop_active")
             ):
                 if self._perform_verified_flat_runtime_reset(
                     snapshot=snapshot_for_reset,
@@ -19920,6 +20215,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "final_short_exit_audited",
             "final_long_exit_order_context",
             "final_short_exit_order_context",
+            "final_exit_trading_stop_context",
             "final_exit_closed_pnl_signatures",
             "audit_processed_exit_fill_ids",
             "audit_completed_cycle_indices",
@@ -19930,6 +20226,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "flat_final_pnl_ready_logged",
             "final_pnl_context_missing_logged",
             "restart_delayed_pending_final_pnl_logged",
+            "final_exit_context_missing_but_flat_confirmed",
+            "final_exit_fallback_reason",
+            "final_exit_fallback_applied_at",
         ]
 
         for key in keys_to_reset_or_pop:

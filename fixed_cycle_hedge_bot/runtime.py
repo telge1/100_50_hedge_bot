@@ -3491,6 +3491,28 @@ class GenericHedgeRuntime:
                     state["final_exit_trading_stop_long_tp"] = float(trigger_price)
                 if purpose_upper == getattr(self.strategy, "SHORT_SL_EXIT_PURPOSE", "SHORT_SL_EXIT"):
                     state["final_exit_trading_stop_short_sl"] = float(trigger_price)
+                if hasattr(self.strategy, "_record_final_exit_trading_stop_submission"):
+                    try:
+                        self.strategy._record_final_exit_trading_stop_submission(
+                            self.runtime_state,
+                            snapshot,
+                            purpose=managed_order.purpose,
+                            side=managed_order.side,
+                            client_order_id=managed_order.client_order_id,
+                            exchange_order_id=synthetic_order_id,
+                            trigger_price=trigger_price,
+                            position_idx=position_idx,
+                        )
+                    except Exception:
+                        self.logger.exception(
+                            "fixed_cycle_trading_stop_context_store_failed %s",
+                            {
+                                "purpose": managed_order.purpose,
+                                "side": managed_order.side,
+                                "symbol": symbol,
+                                "position_idx": position_idx,
+                            },
+                        )
                 state["exit_orders_submitted_once"] = True
                 state["exit_rebuild_allowed"] = False
                 state["force_exit_rebuild"] = False

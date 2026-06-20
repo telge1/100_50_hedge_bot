@@ -193,6 +193,45 @@ class FixedCycleStrategyTests(unittest.TestCase):
             runtime.runtime_state.instrument_rules[symbol_key] = rules
         return runtime
 
+    def build_short_runtime(
+        self,
+        order_manager: FakeOrderManager,
+        config: FixedCycleHedgeConfig | None = None,
+    ) -> GenericHedgeRuntime:
+        strategy = ShortFixedCycleHedgeStrategy(
+            config
+            or FixedCycleHedgeConfig(
+                symbol="PUMPFUNUSDT",
+                category="linear",
+                rest_poll_after_fill_ms=0,
+                order_refresh_cooldown_ms=0,
+                max_cycles=3,
+                price_tick_size=0.0000001,
+                qty_step=1.0,
+                reduction_pct_per_fill=15,
+                long_fill_distance_pct=0.15,
+            )
+        )
+        runtime = GenericHedgeRuntime(
+            GenericRuntimeConfig(
+                api_key="key",
+                secret_key="secret",
+                symbol=strategy.config.symbol,
+                category=strategy.config.category,
+                min_order_value=1.0,
+                ensure_exchange_ready=False,
+                audit_log_file=None,
+            ),
+            strategy,
+            logger=logging.getLogger("test.fixed_cycle.short"),
+            order_manager=order_manager,
+        )
+        symbol_key = strategy.config.symbol.upper()
+        rules = order_manager.get_cached_instrument_rules(symbol_key, strategy.config.category)
+        if rules:
+            runtime.runtime_state.instrument_rules[symbol_key] = rules
+        return runtime
+
     def _seed_confirmed_cycle_state(
         self,
         runtime: GenericHedgeRuntime,
@@ -6252,6 +6291,203 @@ class FixedCycleStrategyTests(unittest.TestCase):
         self.assertIn("fixed_cycle_last_trade_pnl_persisted", event_names_final)
         self.assertIn("fixed_cycle_trade_pnl_finalized", event_names_final)
         self.assertTrue(state.get("last_trade_pnl_complete", False))
+
+    def test_trading_stop_flat_reconcile_writes_short_bot_final_exit_records(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_short_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["trade_block_id"] = "old-trade-block"
+        pre_flat_snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0013650,
+            long_qty=18200.0,
+            short_qty=72300.0,
+            long_avg=0.0013650,
+            short_avg=0.0013650,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = pre_flat_snapshot
+        runtime.strategy._record_final_exit_trading_stop_submission(
+            runtime.runtime_state,
+            pre_flat_snapshot,
+            purpose=runtime.strategy._get_final_long_exit_purpose(),
+            side="long",
+            client_order_id="long-ts-link",
+            exchange_order_id="trading-stop:LONG:PUMPFUNUSDT:1",
+            trigger_price=0.0013650,
+            position_idx=1,
+        )
+        runtime.strategy._record_final_exit_trading_stop_submission(
+            runtime.runtime_state,
+            pre_flat_snapshot,
+            purpose=runtime.strategy._get_final_short_exit_purpose(),
+            side="short",
+            client_order_id="short-ts-link",
+            exchange_order_id="trading-stop:SHORT:PUMPFUNUSDT:2",
+            trigger_price=0.0013650,
+            position_idx=2,
+        )
+        state["final_exit_trading_stop_active"] = True
+        old_context = dict(state["final_exit_trading_stop_context"])
+        state["trade_block_id"] = "new-trade-block"
+        flat_snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0013650,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = flat_snapshot
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "real-long-final",
+                "orderLinkId": "other-long-link",
+                "symbol": "PUMPFUNUSDT",
+                "closedPnl": "-0.33",
+                "side": "Sell",
+                "closedSize": "18200",
+                "avgExitPrice": "0.0013650",
+                "updatedTime": str(int(old_context["set_time_ms"]) + 5_000),
+            },
+            {
+                "orderId": "real-short-final",
+                "orderLinkId": "other-short-link",
+                "symbol": "PUMPFUNUSDT",
+                "closedPnl": "0.44",
+                "side": "Buy",
+                "closedSize": "72300",
+                "avgExitPrice": "0.0013650",
+                "updatedTime": str(int(old_context["set_time_ms"]) + 7_000),
+            },
+        ]
+
+        with patch.object(runtime.strategy, "_write_confirmed_order_pnl_history") as write_mock:
+            confirmed = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state,
+                runtime.context,
+                "test_trading_stop_flat_reconcile",
+            )
+            confirmed_again = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state,
+                runtime.context,
+                "test_trading_stop_flat_reconcile_repeat",
+            )
+
+        self.assertTrue(confirmed)
+        self.assertTrue(confirmed_again)
+        self.assertEqual(write_mock.call_count, 2)
+        payloads = [call.args[0] for call in write_mock.call_args_list]
+        self.assertEqual(
+            {payload["purpose"] for payload in payloads},
+            {
+                runtime.strategy._get_final_long_exit_purpose(),
+                runtime.strategy._get_final_short_exit_purpose(),
+            },
+        )
+        self.assertEqual({payload["side"] for payload in payloads}, {"long", "short"})
+        self.assertTrue(all(payload["pnl_scope"] == "final_exit" for payload in payloads))
+        self.assertTrue(all(payload["cycle_role"] is None for payload in payloads))
+        self.assertTrue(all(payload["trade_block_id"] == "old-trade-block" for payload in payloads))
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_long_exit_pnl"], -0.33)
+        self.assertAlmostEqual(state["audit_pnl_ledger"]["final_short_exit_pnl"], 0.44)
+        self.assertFalse(state.get("final_exit_trading_stop_active", False))
+        self.assertIsNone(state.get("final_exit_trading_stop_context"))
+        self.assertEqual(len(state.get("final_exit_closed_pnl_signatures", [])), 2)
+
+    def test_trading_stop_flat_reconcile_retries_until_all_required_sides_audited(self) -> None:
+        order_manager = FakeOrderManager()
+        runtime = self.build_short_runtime(order_manager)
+        state = runtime.runtime_state.strategy_state
+        state["trade_block_id"] = "retry-trade-block"
+        pre_flat_snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0013650,
+            long_qty=18200.0,
+            short_qty=72300.0,
+            long_avg=0.0013650,
+            short_avg=0.0013650,
+            source="tick",
+        )
+        runtime.runtime_state.last_snapshot = pre_flat_snapshot
+        runtime.strategy._record_final_exit_trading_stop_submission(
+            runtime.runtime_state,
+            pre_flat_snapshot,
+            purpose=runtime.strategy._get_final_long_exit_purpose(),
+            side="long",
+            client_order_id="retry-long-link",
+            exchange_order_id="trading-stop:LONG:PUMPFUNUSDT:1",
+            trigger_price=0.0013650,
+            position_idx=1,
+        )
+        runtime.strategy._record_final_exit_trading_stop_submission(
+            runtime.runtime_state,
+            pre_flat_snapshot,
+            purpose=runtime.strategy._get_final_short_exit_purpose(),
+            side="short",
+            client_order_id="retry-short-link",
+            exchange_order_id="trading-stop:SHORT:PUMPFUNUSDT:2",
+            trigger_price=0.0013650,
+            position_idx=2,
+        )
+        state["final_exit_trading_stop_active"] = True
+        old_context = dict(state["final_exit_trading_stop_context"])
+        runtime.runtime_state.last_snapshot = HedgeSnapshot(
+            symbol="PUMPFUNUSDT",
+            current_price=0.0013650,
+            long_qty=0.0,
+            short_qty=0.0,
+            long_avg=0.0,
+            short_avg=0.0,
+            source="tick",
+        )
+        order_manager.closed_pnl_rows = [
+            {
+                "orderId": "retry-short-final",
+                "symbol": "PUMPFUNUSDT",
+                "closedPnl": "0.44",
+                "side": "Buy",
+                "closedSize": "72300",
+                "avgExitPrice": "0.0013650",
+                "updatedTime": str(int(old_context["set_time_ms"]) + 7_000),
+            },
+        ]
+
+        with patch.object(runtime.strategy, "_write_confirmed_order_pnl_history") as write_mock:
+            confirmed_before = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state,
+                runtime.context,
+                "test_trading_stop_pending_before",
+            )
+            self.assertFalse(confirmed_before)
+            self.assertEqual(write_mock.call_count, 1)
+            self.assertTrue(state.get("final_exit_trading_stop_active"))
+            self.assertFalse(state.get("final_long_exit_audited", False))
+            self.assertTrue(state.get("final_short_exit_audited", False))
+
+            order_manager.closed_pnl_rows.append(
+                {
+                    "orderId": "retry-long-final",
+                    "symbol": "PUMPFUNUSDT",
+                    "closedPnl": "-0.33",
+                    "side": "Sell",
+                    "closedSize": "18200",
+                    "avgExitPrice": "0.0013650",
+                    "updatedTime": str(int(old_context["set_time_ms"]) + 8_000),
+                }
+            )
+            confirmed_after = runtime.strategy._ensure_final_exit_pnl_from_exchange(
+                runtime.runtime_state,
+                runtime.context,
+                "test_trading_stop_pending_after",
+            )
+
+        self.assertTrue(confirmed_after)
+        self.assertEqual(write_mock.call_count, 2)
+        self.assertFalse(state.get("final_exit_trading_stop_active", False))
+        self.assertTrue(state.get("final_long_exit_audited", False))
+        self.assertTrue(state.get("final_short_exit_audited", False))
 
     def test_fresh_entry_blocked_pending_final_exit_settlement(self) -> None:
         order_manager = FakeOrderManager()
