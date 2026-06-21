@@ -7,6 +7,9 @@
   "dynamic_symbol_hold_minutes": 0,
   
   "time_distance_refill_trigger_minutes": 2,
+  "recovery_mode_trigger_override_enabled": true,
+  "recovery_mode_trigger_override_pct": 0.2,
+  "recovery_mode_trigger_override_ticks": null,
   
   "base_notional_usdt": 50.0,
   "hedge_ratio_short": 2.0,
