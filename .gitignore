@@ -108,3 +108,9 @@ live_bots/**/run/start.lock
 .env*
 env/.env*
 *.env
+
+# Local live bot credentials/configs
+live_bots/**/config/config_telge.yaml
+live_bots/**/config/config.local.yaml
+live_bots/**/config/*secret*.yaml
+live_bots/**/config/*credentials*.yaml
