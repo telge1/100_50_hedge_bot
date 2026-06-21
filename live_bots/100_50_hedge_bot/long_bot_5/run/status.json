@@ -1,9 +1,0 @@
-{
-  "bot_name": "long_bot_5",
-  "status": "stopped",
-  "start_requested": false,
-  "pid": null,
-  "symbol": "",
-  "reason": "stale_status_cleanup_no_runner",
-  "updated_at": "2026-05-20T12:57:46.269217+00:00"
-}

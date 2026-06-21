@@ -96,3 +96,10 @@ live_bots/**/state/active_bot_symbols.json
 
 # Local backup diffs
 short_bot_mirror_changes_*.diff
+
+# Bot runtime run files
+live_bots/**/run/*.json
+live_bots/**/run/*.pid
+live_bots/**/run/*.lock
+live_bots/**/run/start.lock
+!live_bots/**/run/.gitkeep
