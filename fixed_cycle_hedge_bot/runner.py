@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from strategy.config_legacy import StrategyConfig
+from .strategy_config_legacy import StrategyConfig
 
 from .registry import STRATEGY_REGISTRY, build_registered_runtime, list_strategy_names
 from .runtime import configure_runtime_logging

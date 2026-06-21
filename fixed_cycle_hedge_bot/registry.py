@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from strategy.config import StrategyConfig
+from .strategy_config import StrategyConfig
 
 from .basket_exit_strategy import BasketExitConfig, BasketExitHedgeStrategy
 from .dynamic_breakeven_strategy import DynamicBreakevenConfig, DynamicBreakevenHedgeStrategy
