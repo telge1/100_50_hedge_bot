@@ -17,7 +17,7 @@ from typing import Any
 from uuid import uuid4
 
 from core.websocket_client import BybitWebSocketClient
-from utils.math_utils import calculate_pnl
+from .math_utils import calculate_pnl
 
 from .audit_logger import AuditLogger
 from .base import HedgeStrategy, StrategyContext
