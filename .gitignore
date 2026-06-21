@@ -103,3 +103,8 @@ live_bots/**/run/*.pid
 live_bots/**/run/*.lock
 live_bots/**/run/start.lock
 !live_bots/**/run/.gitkeep
+
+# Local environment / secrets
+.env*
+env/.env*
+*.env
