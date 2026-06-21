@@ -7656,6 +7656,44 @@ def _build_trade_details(breakdown: dict[str, Any] | None, pnl_source: str | Non
     return details
 
 
+def _compute_trade_end_profit_from_existing_details(
+    record: dict[str, Any],
+) -> tuple[float | None, int, list[str]]:
+    """
+    Berechnet einen konsistenten Endprofit aus bestehenden Detailzeilen.
+
+    Nutzt ausschließlich bereits vorhandene Details (Breakdown/Confirmed-Details),
+    ohne neue Quellen zu laden.
+    """
+    details = record.get("details") or []
+    if not details:
+        return None, 0, []
+
+    pnl_values: list[float] = []
+    purposes: set[str] = set()
+    for detail in details:
+        raw = (
+            detail.get("pnl")
+            if detail.get("pnl") is not None
+            else detail.get("pnl_usdt")
+            if detail.get("pnl_usdt") is not None
+            else detail.get("realized_pnl")
+        )
+        value = _safe_wallet_float(raw)
+        if value is None:
+            continue
+        pnl_values.append(value)
+        purpose_text = str(detail.get("purpose") or "").strip()
+        if purpose_text:
+            purposes.add(purpose_text)
+
+    if not pnl_values:
+        return None, 0, sorted(purposes)
+
+    end_profit = float(sum(pnl_values))
+    return end_profit, len(pnl_values), sorted(purposes)
+
+
 SERVER_TZ = timezone(timedelta(hours=2))
 DASHBOARD_TZ = timezone(timedelta(hours=3))
 
@@ -9015,6 +9053,9 @@ async def api_profit_trade_details(
     )
     if confirmed_rows:
         rows = _build_confirmed_detail_rows(match, confirmed_rows)
+        # confirmed_rows wurden nur für die Detailansicht geladen; Details im Record
+        # können weiterhin aus Breakdown stammen und von der bestehenden Logik
+        # genutzt werden.
     else:
         if not match.get("details"):
             history_entry = _find_closed_pnl_history_entry(
@@ -9026,12 +9067,38 @@ async def api_profit_trade_details(
             )
             match = _merge_trade_history_breakdown(match, history_entry)
         rows = _build_profit_trade_detail_rows(match)
+
+    # Endprofit aus bestehenden Details neu berechnen, damit Listen- und Detail-API
+    # dieselbe Summenlogik verwenden.
+    recomputed_end_profit: float | None = None
+    end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(match)
+    if end_profit is not None:
+        recomputed_end_profit = end_profit
+        old_end_profit = _safe_wallet_float(match.get("total_trade_pnl"))
+        match["end_profit"] = end_profit
+        payload = {
+            "profile": profile,
+            "bot_name": bot_name,
+            "bot_side": bot_side,
+            "symbol": symbol,
+            "trade_block_id": trade_block_id,
+            "selected_source": "sum_existing_details",
+            "old_end_profit": old_end_profit,
+            "recomputed_end_profit": end_profit,
+            "detail_pnl_count": pnl_count,
+            "detail_purposes": purposes,
+        }
+        logger.info(
+            "[dashboard] summary_end_profit_recomputed_from_existing_details %s",
+            json.dumps(payload, default=str),
+        )
+
     return {
         "profile": profile,
         "trade_block_id": trade_block_id,
         "bot_name": match.get("bot_name"),
         "symbol": match.get("symbol"),
-        "profit_usdt": match.get("total_trade_pnl"),
+        "profit_usdt": recomputed_end_profit if recomputed_end_profit is not None else match.get("total_trade_pnl"),
         "wallet_after": match.get("wallet_after_trade"),
         "rows": rows,
         "warnings": warnings,
@@ -9040,8 +9107,8 @@ async def api_profit_trade_details(
 
 def _get_trade_profit_value(trade: dict[str, Any]) -> float | None:
     for key in (
-        "total_trade_pnl",
         "end_profit",
+        "total_trade_pnl",
         "endprofit",
         "profit",
         "pnl",
@@ -9087,6 +9154,46 @@ def _build_profit_trade_filtered_rows(
         paginate=False,
         bot_side=bot_side,
     )
+    # Für History-Trades Endprofit aus bestehenden Details neu berechnen, falls vorhanden.
+    normalized_side = _normalize_bot_side(bot_side)
+    recomputed_count = 0
+    for base in base_trades:
+        end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(base)
+        if end_profit is None:
+            continue
+        old_end_profit = _safe_wallet_float(base.get("total_trade_pnl"))
+        base["end_profit"] = end_profit
+        recomputed_count += 1
+        payload = {
+            "profile": profile,
+            "bot_name": base.get("bot_name"),
+            "bot_side": normalized_side,
+            "symbol": base.get("symbol"),
+            "trade_block_id": base.get("trade_block_id"),
+            "selected_source": "sum_existing_details",
+            "old_end_profit": old_end_profit,
+            "recomputed_end_profit": end_profit,
+            "detail_pnl_count": pnl_count,
+            "detail_purposes": purposes,
+        }
+        logger.info(
+            "[dashboard] summary_end_profit_recomputed_from_existing_details %s",
+            json.dumps(payload, default=str),
+        )
+
+    if not recomputed_count:
+        logger.info(
+            "[dashboard] summary_end_profit_source_selected %s",
+            json.dumps(
+                {
+                    "profile": profile,
+                    "bot_side": normalized_side,
+                    "selected_source": "total_trade_pnl_fallback",
+                },
+                default=str,
+            ),
+        )
+
     process_rows, process_warnings = _collect_active_bot_process_rows(profile, bot_side)
     warnings.extend(process_warnings)
     active_start_dt = _normalize_trade_filter_datetime(start_time)
@@ -9191,6 +9298,30 @@ def _build_profit_trade_filtered_rows(
                 grouped.setdefault(key, []).append(entry)
             confirmed_by_tbid_cache.update(grouped)
         return confirmed_by_tbid_cache.get(trade_block_id, [])
+
+    def _final_exit_confirmed_for_tbid(trade_block_id: str) -> tuple[bool, bool, bool]:
+        """
+        Prüft, ob für eine trade_block_id beide finalen Exit-Seiten (LONG_TP_EXIT und SHORT_SL_EXIT)
+        mit pnl_scope="final_exit" in der Confirmed-History vorhanden sind.
+
+        Rückgabe: (final_exit_confirmed, has_long_final_exit, has_short_final_exit)
+        """
+        if not trade_block_id:
+            return False, False, False
+        entries = _get_confirmed_orders_for_tbid(trade_block_id)
+        if not entries:
+            return False, False, False
+        has_long = any(
+            str(e.get("purpose") or "").upper() == "LONG_TP_EXIT"
+            and str(e.get("pnl_scope") or "").strip().lower() == "final_exit"
+            for e in entries
+        )
+        has_short = any(
+            str(e.get("purpose") or "").upper() == "SHORT_SL_EXIT"
+            and str(e.get("pnl_scope") or "").strip().lower() == "final_exit"
+            for e in entries
+        )
+        return has_long and has_short, has_long, has_short
 
     for row in filtered_process_rows:
         # Nur für laufende Prozess-Zeilen ohne bereits gesetzte filled_orders.
@@ -9396,6 +9527,78 @@ def _build_profit_trade_filtered_rows(
         )
         for record in filtered_base_trades
     ]
+
+    # Final-Exit-Status pro trade_block_id global erfassen (unabhängig von bot_side und Row-Typ).
+    final_exit_confirmed_ids: set[str] = set()
+    final_exit_meta: dict[str, dict[str, Any]] = {}
+    candidate_tbids: set[str] = set()
+    for row in summary_rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if tbid:
+            candidate_tbids.add(tbid)
+    for row in filtered_process_rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if tbid:
+            candidate_tbids.add(tbid)
+
+    for tbid in sorted(candidate_tbids):
+        confirmed, has_long, has_short = _final_exit_confirmed_for_tbid(tbid)
+        meta = {
+            "final_exit_confirmed": confirmed,
+            "has_long_final_exit": has_long,
+            "has_short_final_exit": has_short,
+        }
+        final_exit_meta[tbid] = meta
+        if not confirmed:
+            continue
+        final_exit_confirmed_ids.add(tbid)
+        payload = {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "trade_block_id": tbid,
+            "final_exit_confirmed": confirmed,
+            "has_long_final_exit": has_long,
+            "has_short_final_exit": has_short,
+        }
+        logger.info(
+            "[dashboard] dashboard_final_exit_confirmed_detected %s",
+            json.dumps(payload, default=str),
+        )
+
+    # Trades mit bestätigter Final-Exit-PnL (LONG_TP_EXIT und SHORT_SL_EXIT mit pnl_scope=final_exit)
+    # explizit als "closed" markieren und als nicht-Process ohne aktive Orders behandeln.
+    for row in summary_rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            continue
+        meta = final_exit_meta.get(tbid) or {}
+        if not meta.get("final_exit_confirmed"):
+            continue
+        original_status = row.get("status")
+        row["status"] = "closed"
+        row["is_process"] = False
+        if row.get("active_orders"):
+            row["active_orders"] = []
+        if not row.get("end_time"):
+            row["end_time"] = row.get("start_time")
+        log_payload = {
+            "profile": profile,
+            "bot_side": normalized_side,
+            "trade_block_id": tbid,
+            "final_exit_confirmed": bool(meta.get("final_exit_confirmed")),
+            "has_long_final_exit": bool(meta.get("has_long_final_exit")),
+            "has_short_final_exit": bool(meta.get("has_short_final_exit")),
+            "summary_rows_count": len(summary_rows),
+            "original_status": original_status,
+            "selected_record_status": row.get("status"),
+            "selected_record_is_process": bool(row.get("is_process")),
+            "active_order_count": len(row.get("active_orders") or []),
+            "source": "summary",
+        }
+        logger.info(
+            "[dashboard] dashboard_profit_row_status_forced_closed %s",
+            json.dumps(log_payload, default=str),
+        )
     # For specific bot/profile views (e.g. bot_1 long/short side) we want to avoid
     # counting historical "open" records as active trades when they are no longer
     # associated with the currently running trade_block_id. Mark those as closed so
@@ -9405,14 +9608,13 @@ def _build_profit_trade_filtered_rows(
         normalized_profile
         and normalized_profile != "main"
         and normalized_side in {"long", "short"}
-        and running_ids
     ):
         adjusted_rows: list[dict[str, Any]] = []
         for row in summary_rows:
             tbid = str(row.get("trade_block_id") or "").strip()
             original_status = row.get("status")
             status_str = str(original_status or "").strip().lower()
-            if status_str == "open" and (not tbid or tbid not in running_ids):
+            if status_str == "open" and running_ids and (not tbid or tbid not in running_ids):
                 row_bot = str(row.get("bot_name") or "").strip().lower()
                 row_symbol = str(row.get("symbol") or "").strip().upper()
                 row_key = (row_bot, row_symbol, normalized_side)
@@ -9459,6 +9661,82 @@ def _build_profit_trade_filtered_rows(
             else:
                 adjusted_rows.append(row)
         summary_rows = adjusted_rows
+
+    # Prozess-Zeilen für Trades mit bestätigtem Final-Exit bevorzugt ausblenden,
+    # damit diese nicht mehr als "In Progress" erscheinen oder alte aktive Orders
+    # anzeigen. Falls keine Summary-Zeile existiert, Process-Zeilen in geschlossene
+    # History-Zeilen ummappen.
+    if final_exit_confirmed_ids:
+        summary_tbid_set: set[str] = {
+            str(row.get("trade_block_id") or "").strip()
+            for row in summary_rows
+            if row.get("trade_block_id")
+        }
+        process_rows_before = len(filtered_process_rows)
+        new_process_rows: list[dict[str, Any]] = []
+        removed_process_rows: list[dict[str, Any]] = []
+        for row in filtered_process_rows:
+            tbid = str(row.get("trade_block_id") or "").strip()
+            if not tbid or tbid not in final_exit_confirmed_ids:
+                new_process_rows.append(row)
+                continue
+            meta = final_exit_meta.get(tbid) or {}
+            if tbid in summary_tbid_set:
+                removed_process_rows.append(
+                    {
+                        "bot_name": row.get("bot_name"),
+                        "symbol": row.get("symbol"),
+                        "trade_block_id": tbid,
+                        "status": row.get("status"),
+                        "is_process": bool(row.get("is_process")),
+                        "active_order_count": len(row.get("active_orders") or []),
+                        "final_exit_confirmed": bool(meta.get("final_exit_confirmed")),
+                        "has_long_final_exit": bool(meta.get("has_long_final_exit")),
+                        "has_short_final_exit": bool(meta.get("has_short_final_exit")),
+                    }
+                )
+                continue
+            # Keine Summary-Zeile vorhanden – Process-Row in geschlossene Zeile umwandeln.
+            converted = dict(row)
+            converted["status"] = "closed"
+            converted["is_process"] = False
+            if converted.get("active_orders"):
+                converted["active_orders"] = []
+            new_process_rows.append(converted)
+            log_payload = {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "trade_block_id": tbid,
+                "final_exit_confirmed": bool(meta.get("final_exit_confirmed")),
+                "has_long_final_exit": bool(meta.get("has_long_final_exit")),
+                "has_short_final_exit": bool(meta.get("has_short_final_exit")),
+                "summary_rows_count": len(summary_rows),
+                "original_status": row.get("status"),
+                "selected_record_status": converted.get("status"),
+                "selected_record_is_process": bool(converted.get("is_process")),
+                "active_order_count": len(converted.get("active_orders") or []),
+                "source": "process_to_history",
+            }
+            logger.info(
+                "[dashboard] dashboard_profit_row_status_forced_closed %s",
+                json.dumps(log_payload, default=str),
+            )
+
+        filtered_process_rows = new_process_rows
+        process_rows_after = len(filtered_process_rows)
+        if removed_process_rows:
+            payload = {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "summary_rows_count": len(summary_rows),
+                "process_rows_count_before": process_rows_before,
+                "process_rows_count_after": process_rows_after,
+                "removed_process_rows": removed_process_rows,
+            }
+            logger.info(
+                "[dashboard] dashboard_process_row_suppressed_by_final_exit %s",
+                json.dumps(payload, default=str),
+            )
 
     # Enrich geschlossene Summary-Zeilen mit Confirmed-PnL-Daten, falls verfügbar.
     for row in summary_rows:
