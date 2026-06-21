@@ -1,18 +1,18 @@
 master:
-  api_key: "PUT_MASTER_API_KEY_HERE"
-  secret_key: "PUT_MASTER_SECRET_KEY_HERE"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 sub:
-  api_key: "PUT_SUB_API_KEY_HERE"
-  secret_key: "PUT_SUB_SECRET_KEY_HERE"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 bot_2:
-  api_key: "PUT_LONG_BOT_2_API_KEY_HERE"
-  secret_key: "PUT_LONG_BOT_2_SECRET_KEY_HERE"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 bot_2_sub:
-  api_key: "PUT_SHORT_BOT_2_API_KEY_HERE"
-  secret_key: "PUT_SHORT_BOT_2_SECRET_KEY_HERE"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 profiles:
   long_bot_1:

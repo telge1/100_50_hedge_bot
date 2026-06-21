@@ -9,60 +9,60 @@
 # - BYBIT_MASTER_API_KEY / BYBIT_MASTER_SECRET_KEY
 # - BYBIT_SUB_API_KEY / BYBIT_SUB_SECRET_KEY
 master:
-  api_key: "84zEIfTRRg4GkquFqk"
-  secret_key: "xavUjBmWxcsu8iAbMutJcV46e9t4ftOMu7YV"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   uid: "33700306"
 
 sub:
-  api_key: "jWh1Z71ffe9fHcaAAI"
-  secret_key: "to56SURCMYdetC7hmhpXIPblLcyPqlL8ytaw"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 
 Long_bot_1:
-  api_key: "KlZVj1NBbsOctXXAUt" 
-  secret_key: "rqco22zmpMdQXUM1IdxyjLRUWqrJFLwfjvHF"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   sub_uid: "549637342"
 
 Short_bot_1: 
-  api_key: "TQ6OIWLMnl2t1P0qCv"
-  secret_key: "3rvCZLoKEy99A7kPPWc1ecHFQ7tgjNsgO7Td"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 
 Long_bot_2:
-  api_key: "TWEZ7UcMJsDmSDo9E3"
-  secret_key: "5eiNyNy5dVRFIgSDpSgGvp3c0KzxFNN96eol"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   sub_uid: "549637537"
 
 Short_bot_2:
-  api_key: "RGWU2ywiQsBmxAys1V"
-  secret_key: "ldte2uUSv6BlvmNZkoSSCp1qv3Oh1Y2OvkYq"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 Long_bot_3:
-  api_key: "747dg0wUwXIC2l4Ra2"
-  secret_key: "G7iAxUG28mxNTgJyWlWSmM7zF8AXwucRf1Rn"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   sub_uid: "562735923"
 
 Short_bot_3:
-  api_key: ""
-  secret_key: ""
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 Long_bot_4:
-  api_key: "jiS1ZOOekWVW9omxqS"
-  secret_key: "D8kqVye56C4gYL2VtDdPua4JEdrHLdRcbl1g"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   sub_uid: "562913248"
 
 Short_bot_4:
-  api_key: ""
-  secret_key: ""
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 Long_bot_5:
-  api_key: "kkyeSat9W4WbLVH5vd"
-  secret_key: "M9qdxw7qNpqH0Za6tpWRb9wYJ3uuAufGCeKM"
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
   sub_uid: "562914397"
 
 Short_bot_5:
-  api_key: ""
-  secret_key: ""
+  api_key: "YOUR_BYBIT_API_KEY"
+  secret_key: "YOUR_BYBIT_SECRET_KEY"
 
 
 
@@ -93,7 +93,7 @@ long_tp_profit_percent: 1.0
 
 # Für Dashboard Restart/Stop von Long- und Short-Bot per systemctl (wird für beide verwendet)
 system:
-  sudo_password: "telgenbuescher"
+  sudo_password: "YOUR_SUDO_PASSWORD_OPTIONAL"
 
 
 
