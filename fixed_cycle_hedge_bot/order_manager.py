@@ -15,7 +15,7 @@ import requests
 
 from fixed_cycle_hedge_bot.exchange_errors import ExchangeUnavailableError, is_retryable_exchange_error
 
-logger = logging.getLogger("modular_hedge_runtime.order_manager")
+logger = logging.getLogger("fixed_cycle_hedge_bot.order_manager")
 logger.setLevel(logging.INFO)
 
 
