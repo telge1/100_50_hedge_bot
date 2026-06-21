@@ -7,11 +7,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-logs/
-*.log
-*.jsonl
 *.csv
 *.sqlite
 *.db
 dist/
 build/
+
+_archive_removed_from_main_bot/
+_cleanup_safety_20260621_105139/
+legacy_backup/
