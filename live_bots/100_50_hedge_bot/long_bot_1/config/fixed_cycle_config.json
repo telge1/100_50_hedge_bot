@@ -13,8 +13,8 @@
   
   "time_distance_refill_trigger_minutes": 2,
   "recovery_mode_trigger_override_enabled": true,
-  "recovery_mode_trigger_override_pct": 0.2,
-  "recovery_mode_trigger_override_ticks": null,
+  "recovery_mode_trigger_override_pct": null,
+  "recovery_mode_trigger_override_ticks": 5,
   
   
   "base_notional_usdt": 100.0,

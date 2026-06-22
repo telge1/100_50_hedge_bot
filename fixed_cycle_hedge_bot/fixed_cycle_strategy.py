@@ -19002,6 +19002,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         next_required_before = state.get("next_required_purpose")
         cycle_step_before = state.get("cycle_step")
         short_tp_purpose = str(self._get_second_leg_purpose(recovery_cycle_index))
+        long_add_rebuild_allowed_before = bool(state.get("long_add_rebuild_allowed", True))
 
         # Waiting-/Pending-Flags zurücksetzen
         self._set_second_leg_waiting_state(
@@ -19024,6 +19025,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if key in cycle_entry or value is not None:
                 cycle_entry[key] = value
 
+        # Nach dem Bereinigen des Second-Leg-States darf der Cycle-Builder
+        # erneut Second-Leg-/Followup-Orders auf Basis der neuen
+        # Recovery-Reload-Struktur aufbauen. Ein eventuell zuvor gesetztes
+        # long_add_rebuild_allowed=False (z.B. nach dem ursprünglichen
+        # LONG_ADD) würde diesen Rebuild sonst vollständig blockieren.
+        state["long_add_rebuild_allowed"] = True
+
         self._persist_cycle_sequence_state(runtime_state)
         cycle_waiting_after = self._get_second_leg_waiting(state, cycle_state)
         short_tp_pending_after = self._get_second_leg_pending_cycle(state, cycle_state)
@@ -19034,6 +19042,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         next_required_after = state.get("next_required_purpose")
         cycle_step_after = state.get("cycle_step")
+        long_add_rebuild_allowed_after = bool(state.get("long_add_rebuild_allowed", True))
 
         _log_event(
             "fixed_cycle_recovery_pre_reload_stale_cycle_state_cleared",
@@ -19054,6 +19063,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "next_required_purpose_after": next_required_after,
                 "cycle_step_before": cycle_step_before,
                 "cycle_step_after": cycle_step_after,
+                "long_add_rebuild_allowed_before": long_add_rebuild_allowed_before,
+                "long_add_rebuild_allowed_after": long_add_rebuild_allowed_after,
                 "reason": reason,
             },
         )
