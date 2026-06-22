@@ -17937,28 +17937,54 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         # Raw flags from cycle_state, may be missing/False due to earlier bugs.
         short_reduce_done_flag = bool(entry.get("short_reduce_fill_confirmed")) if isinstance(entry, dict) else False
         long_reduce_done_flag = bool(entry.get("long_reduce_fill_confirmed")) if isinstance(entry, dict) else False
+        short_reduce_status_norm = self._normalize_cycle_order_status(
+            (entry or {}).get("short_reduce_status") if isinstance(entry, dict) else None
+        )
+        long_reduce_status_norm = self._normalize_cycle_order_status(
+            (entry or {}).get("long_reduce_status") if isinstance(entry, dict) else None
+        )
 
-        # Expected first-/second-leg purposes for cycle 2.
-        if is_short_side:
-            first_leg_purpose = self._cycle_purpose("short", 2)
-            second_leg_purpose = self._cycle_purpose("long", 2)
-        else:
-            first_leg_purpose = self._cycle_purpose("long", 2)
-            second_leg_purpose = self._cycle_purpose("short", 2)
+        # Expected first-/second-leg purposes für Cycle 2 ausschließlich über die
+        # direction-neutralen Helper bestimmen, damit Long- und Short-Bot exakt
+        # gespiegelt sind (z.B. CYCLE_2_LONG_REDUCE statt CYCLE_2_LONG_ADD auf
+        # der Short-Seite).
+        first_leg_purpose = self._get_first_leg_purpose(2)
+        second_leg_purpose = self._get_second_leg_purpose(2)
 
         # Inference: first leg is considered filled if either the cycle_state flag
-        # is set or we see the purpose in processed_cycle_purposes or as
-        # last_completed_purpose.
+        # is set, the status is bereits finalisiert (FILLED/PROCESSED), or we see
+        # die Purpose in processed_cycle_purposes / last_completed_purpose.
         inferred_first_leg_filled = False
         if is_short_side:
+            short_status_finalized = self._cycle_status_finalized(short_reduce_status_norm)
             inferred_first_leg_filled = bool(
                 short_reduce_done_flag
+                or short_status_finalized
                 or first_leg_purpose in processed_cycle_purposes
                 or last_completed_purpose == first_leg_purpose
             )
+            # Diagnose-Log: Short-First-Leg wurde nur über Status/Fallback als
+            # gefüllt erkannt, obwohl das ursprüngliche Fill-Flag noch False war.
+            if not short_reduce_done_flag and short_status_finalized and inferred_first_leg_filled:
+                _log_event(
+                    "short_recovery_first_leg_state_reconciled",
+                    {
+                        "symbol": symbol,
+                        "trade_block_id": trade_block_id,
+                        "cycle_index": 2,
+                        "strategy_side": strategy_side,
+                        "short_reduce_status": short_reduce_status_norm,
+                        "short_reduce_fill_confirmed": short_reduce_done_flag,
+                        "first_leg_purpose": first_leg_purpose,
+                        "processed_cycle_purposes": list(processed_cycle_purposes),
+                        "last_completed_purpose": last_completed_purpose,
+                    },
+                )
         else:
+            long_status_finalized = self._cycle_status_finalized(long_reduce_status_norm)
             inferred_first_leg_filled = bool(
                 long_reduce_done_flag
+                or long_status_finalized
                 or first_leg_purpose in processed_cycle_purposes
                 or last_completed_purpose == first_leg_purpose
             )
@@ -18160,6 +18186,27 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         target_price = _find_target_order_price()
         inferred_second_leg_open = target_price is not None
 
+        # Diagnose-Log für die Zuordnung von First-/Second-Leg im
+        # Recovery-Reload-Gate, um Long- und Short-Bot-Verhalten direkt
+        # vergleichen zu können.
+        _log_event(
+            "recovery_reload_gate_leg_mapping",
+            {
+                "symbol": symbol,
+                "trade_block_id": trade_block_id,
+                "cycle_index": resolved_cycle_index,
+                "strategy_side": strategy_side,
+                "first_leg_purpose": first_leg_purpose,
+                "second_leg_purpose": second_leg_purpose,
+                "first_leg_status_field": self._get_first_leg_status_field(),
+                "second_leg_status_field": self._get_second_leg_status_field(),
+                "first_leg_cycle_role": self._get_first_leg_cycle_role(),
+                "second_leg_cycle_role": self._get_second_leg_cycle_role(),
+                "inferred_first_leg_filled": inferred_first_leg_filled,
+                "inferred_second_leg_open": inferred_second_leg_open,
+            },
+        )
+
         cycle_state_entry = entry if isinstance(entry, dict) else {}
         # Log a detailed inconsistency snapshot if the raw cycle_state does not
         # agree with the inferred reality.
@@ -18186,6 +18233,24 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         # If we cannot reconstruct a valid first/second-leg combination, abort.
         if not inferred_first_leg_filled:
+            # Spezieller Diagnose-Log für den Short-Bot: First-Leg-Order ist noch
+            # nicht final gefüllt (SUBMITTED / PARTIALLY_FILLED).
+            if is_short_side:
+                _log_event(
+                    "short_recovery_first_leg_blocked_partial_fill",
+                    {
+                        "symbol": symbol,
+                        "trade_block_id": trade_block_id,
+                        "cycle_index": 2,
+                        "age_minutes": age_minutes,
+                        "min_age_minutes": float(cfg_minutes),
+                        "first_leg_purpose": first_leg_purpose,
+                        "short_reduce_status": short_reduce_status_norm,
+                        "short_reduce_fill_confirmed": short_reduce_done_flag,
+                        "processed_cycle_purposes": list(processed_cycle_purposes),
+                        "last_completed_purpose": last_completed_purpose,
+                    },
+                )
             _log_candidate_skipped(
                 "first_leg_not_filled",
                 {
@@ -18515,6 +18580,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             event="time_distance_refill_triggered",
             extra={"cycle_index": active_cycle_index},
         )
+
+        # Zusätzlicher Diagnose-Log speziell für den Short-Bot:
+        # First-Leg wurde nun als Basis für den Recovery-Reload bestätigt.
+        if is_short_side:
+            _log_event(
+                "short_recovery_first_leg_confirmed_for_reload",
+                {
+                    "symbol": symbol,
+                    "trade_block_id": trade_block_id,
+                    "cycle_index": active_cycle_index,
+                    "recovery_reload_id": reload_id,
+                    "short_reduce_status": short_reduce_status_norm,
+                    "short_reduce_fill_confirmed": short_reduce_done_flag,
+                    "first_leg_purpose": first_leg_purpose,
+                },
+            )
 
         _log_event(
             "fixed_cycle_recovery_reload_required",
