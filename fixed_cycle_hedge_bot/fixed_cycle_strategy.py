@@ -15432,6 +15432,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             recovery_cycle_index,
             reason="pre_recovery_reload_cancel",
         )
+        # Nach dem Bereinigen des Second-Leg-States muss explizit signalisiert werden,
+        # dass nun ein neuer Second-Leg-Order (z.B. CYCLE_N_SHORT_REDUCE) für den
+        # Recovery-Referenz-Cycle erwartet wird. Ohne diesen Schritt würde die
+        # nachgelagerte Rebuild-Logik zwar den Sequenz-State (next_required_purpose)
+        # sehen, aber keine klaren Waiting-/Pending-Flags für den Second-Leg
+        # vorfinden und deshalb keine neuen Second-Leg-Intents aufbauen.
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        self._set_second_leg_waiting_state(
+            state,
+            cycle_state,
+            waiting=True,
+            cycle_index=recovery_cycle_index,
+        )
+        state["pending_short_cycle_index"] = recovery_cycle_index
+        cycle_state["pending_short_cycle_index"] = recovery_cycle_index
+        _log_event(
+            "fixed_cycle_recovery_post_clear_second_leg_expected_set",
+            {
+                "symbol": self.config.symbol,
+                "bot_name": self.config.bot_name,
+                "trade_block_id": state.get("trade_block_id"),
+                "recovery_reload_id": state.get("recovery_reload_id"),
+                "recovery_cycle_index": recovery_cycle_index,
+                "cycle_waiting_for_short_tp": self._get_second_leg_waiting(state, cycle_state),
+                "short_tp_pending_cycle": self._get_second_leg_pending_cycle(state, cycle_state),
+                "pending_short_cycle_index": int(
+                    state.get("pending_short_cycle_index")
+                    or cycle_state.get("pending_short_cycle_index")
+                    or 0
+                ),
+            },
+        )
         self._apply_recovery_refill_state(
             runtime_state,
             base_notional,
