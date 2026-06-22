@@ -14413,6 +14413,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
                 continue
+            metadata = getattr(order, "metadata", None) or {}
             exchange_order_id = str(getattr(order, "exchange_order_id", "") or "").strip()
             payload_base = {
                 "symbol": symbol,
@@ -14426,6 +14427,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "exchange_order_id": exchange_order_id,
                 "active_order_purposes_before": active_order_purposes_before,
             }
+            # Trading-Stop-basierte Exit-Orders (LONG_TP_EXIT/SHORT_SL_EXIT) werden als
+            # positionsgebundene TP/SL über /v5/position/trading-stop verwaltet und
+            # besitzen bewusst keine klassische exchange_order_id im Runtime-State.
+            # Sie werden im Anschluss an den Recovery-Reload über den Exit-Rebuild
+            # neu gesetzt und dürfen den Pre-Reload-Cancel nicht blockieren.
+            if metadata.get("trading_stop_api"):
+                _log_event(
+                    "fixed_cycle_recovery_pre_reload_trading_stop_exit_skipped",
+                    {
+                        **payload_base,
+                        "reason": "trading_stop_exit_managed_via_position_trading_stop",
+                    },
+                )
+                continue
             _log_event(
                 "fixed_cycle_recovery_pre_reload_cancel_order_requested",
                 payload_base,
