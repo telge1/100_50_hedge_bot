@@ -5863,6 +5863,27 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         state = runtime_state.strategy_state
         if state.get("post_refill_structure_rebuild_required"):
+            is_recovery_reload = bool(state.get("recovery_reload_completed")) or bool(
+                state.get("recovery_lifecycle_state")
+            )
+            recovery_cycle_index = int(
+                state.get("recovery_reload_cycle_index")
+                or self._ensure_cycle_state(runtime_state).get("recovery_reference_cycle_index")
+                or 0
+            )
+            if is_recovery_reload:
+                _log_event(
+                    "fixed_cycle_recovery_post_reload_rebuild_started",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "bot_name": self.config.bot_name,
+                        "trade_block_id": state.get("trade_block_id"),
+                        "recovery_reload_id": state.get("recovery_reload_id"),
+                        "recovery_cycle_index": recovery_cycle_index or None,
+                        "next_required_purpose_before": state.get("next_required_purpose"),
+                        "cycle_step_before": state.get("cycle_step"),
+                    },
+                )
             expected_purposes = self._expected_post_refill_structure_purposes(runtime_state)
             if expected_purposes:
                 final_purposes = [p for p in [intent.purpose for intent in intents] if p]
@@ -5908,12 +5929,54 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "COMPLETED",
                             event="post_refill_structure_rebuild_completed",
                         )
+                    if is_recovery_reload:
+                        last_snapshot = getattr(runtime_state, "last_snapshot", None) or snapshot
+                        _log_event(
+                            "fixed_cycle_recovery_post_reload_rebuild_completed",
+                            {
+                                **log_payload,
+                                "bot_name": self.config.bot_name,
+                                "trade_block_id": state.get("trade_block_id"),
+                                "recovery_reload_id": state.get("recovery_reload_id"),
+                                "recovery_cycle_index": recovery_cycle_index or None,
+                                "actual_long_qty": float(
+                                    getattr(last_snapshot, "long_qty", 0.0) or 0.0
+                                ),
+                                "actual_short_qty": float(
+                                    getattr(last_snapshot, "short_qty", 0.0) or 0.0
+                                ),
+                                "actual_long_avg": float(
+                                    getattr(last_snapshot, "long_avg", 0.0) or 0.0
+                                ),
+                                "actual_short_avg": float(
+                                    getattr(last_snapshot, "short_avg", 0.0) or 0.0
+                                ),
+                                "next_required_purpose_after": state.get(
+                                    "next_required_purpose"
+                                ),
+                                "cycle_step_after": state.get("cycle_step"),
+                            },
+                        )
                 else:
                     _log_event(
                         "fixed_cycle_post_refill_structure_rebuild_waiting",
                         log_payload,
                     )
         if exit_intents:
+            if state.get("post_refill_structure_rebuild_required") and bool(
+                state.get("recovery_reload_completed")
+            ):
+                _log_event(
+                    "fixed_cycle_recovery_post_reload_exit_rebuild_started",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "bot_name": self.config.bot_name,
+                        "trade_block_id": state.get("trade_block_id"),
+                        "recovery_reload_id": state.get("recovery_reload_id"),
+                        "recovery_cycle_index": state.get("recovery_reload_cycle_index"),
+                        "exit_intents": [intent.purpose for intent in exit_intents],
+                    },
+                )
             self._set_final_exit_missing_block(
                 runtime_state, self.FINAL_EXIT_MISSING_REBUILD_BLOCK_SEC
             )
@@ -14260,6 +14323,199 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return None
         return entry
 
+    def _cancel_pre_recovery_reload_orders(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        recovery_cycle_index: int,
+    ) -> bool:
+        """
+        Cancel all stale pre-recovery exit and cycle orders before submitting
+        Recovery-Reload-Orders.
+        """
+        state = runtime_state.strategy_state
+        symbol = snapshot.symbol or self.config.symbol
+        trade_block_id = state.get("trade_block_id")
+        recovery_reload_id = state.get("recovery_reload_id")
+        _, profile_dir = self._resolve_recovery_wallet_state_paths()
+        profile = profile_dir.name if profile_dir else None
+        # aktive Zwecke vor Cancel
+        active_runtime_purposes_before = sorted(
+            {
+                str(getattr(order, "purpose", "") or "")
+                for order in runtime_state.active_orders.values()
+                if not self._is_terminal_order_status(getattr(order, "status", None))
+            }
+        )
+        active_snapshot_purposes_before = sorted(
+            {
+                str(getattr(order, "purpose", "") or "")
+                for order in getattr(snapshot, "active_orders", []) or []
+                if not self._is_terminal_order_status(getattr(order, "status", None))
+            }
+        )
+        active_order_purposes_before = sorted(
+            set(active_runtime_purposes_before) | set(active_snapshot_purposes_before)
+        )
+        _log_event(
+            "fixed_cycle_recovery_pre_reload_cancel_started",
+            {
+                "symbol": symbol,
+                "bot_name": self.config.bot_name,
+                "profile": profile,
+                "trade_block_id": trade_block_id,
+                "recovery_reload_id": recovery_reload_id,
+                "recovery_cycle_index": recovery_cycle_index,
+                "active_order_purposes_before": active_order_purposes_before,
+            },
+        )
+
+        exit_purposes = {str(p) for p in self._exit_purposes()}
+        cycle_purposes = {str(p) for p in self._all_cycle_purposes()}
+        recovery_purposes = {
+            str(self.RECOVERY_RELOAD_LONG_ENTRY),
+            str(self.RECOVERY_RELOAD_SHORT_ENTRY),
+            str(self.RECOVERY_REFILL_LONG),
+            str(self.RECOVERY_REFILL_SHORT),
+        }
+        order_manager = getattr(context, "order_manager", None)
+        canceled_client_ids: list[str] = []
+        canceled_exchange_ids: list[str] = []
+        canceled_purposes: list[str] = []
+
+        for client_id, order in list(runtime_state.active_orders.items()):
+            purpose_raw = getattr(order, "purpose", None)
+            if not purpose_raw:
+                continue
+            purpose = str(purpose_raw)
+            purpose_upper = purpose.upper()
+            if purpose_upper in recovery_purposes:
+                # Recovery-Reload-Orders selbst nie canceln.
+                continue
+            if purpose_upper not in exit_purposes and purpose_upper not in cycle_purposes:
+                continue
+            status = str(getattr(order, "status", "") or "").upper()
+            if self._is_terminal_order_status(status):
+                _log_event(
+                    "fixed_cycle_recovery_pre_reload_cancel_order_missing_or_terminal",
+                    {
+                        "symbol": symbol,
+                        "bot_name": self.config.bot_name,
+                        "profile": profile,
+                        "trade_block_id": trade_block_id,
+                        "recovery_reload_id": recovery_reload_id,
+                        "recovery_cycle_index": recovery_cycle_index,
+                        "purpose": purpose,
+                        "client_order_id": client_id,
+                        "exchange_order_id": getattr(order, "exchange_order_id", None),
+                        "reason": "terminal_status",
+                    },
+                )
+                continue
+            exchange_order_id = str(getattr(order, "exchange_order_id", "") or "").strip()
+            payload_base = {
+                "symbol": symbol,
+                "bot_name": self.config.bot_name,
+                "profile": profile,
+                "trade_block_id": trade_block_id,
+                "recovery_reload_id": recovery_reload_id,
+                "recovery_cycle_index": recovery_cycle_index,
+                "purpose": purpose,
+                "client_order_id": client_id,
+                "exchange_order_id": exchange_order_id,
+                "active_order_purposes_before": active_order_purposes_before,
+            }
+            _log_event(
+                "fixed_cycle_recovery_pre_reload_cancel_order_requested",
+                payload_base,
+            )
+            if not exchange_order_id or not order_manager:
+                _log_event(
+                    "fixed_cycle_recovery_pre_reload_cancel_order_missing_or_terminal",
+                    {**payload_base, "reason": "missing_exchange_order_id_or_manager"},
+                )
+                _log_event(
+                    "fixed_cycle_recovery_reload_blocked_waiting_for_pre_reload_cancel",
+                    payload_base,
+                )
+                return False
+            try:
+                canceled = order_manager.cancel_order(
+                    exchange_order_id,
+                    symbol=symbol,
+                    category=self.config.category,
+                )
+            except Exception as exc:
+                _log_event(
+                    "fixed_cycle_recovery_pre_reload_cancel_order_missing_or_terminal",
+                    {**payload_base, "reason": str(exc)},
+                )
+                _log_event(
+                    "fixed_cycle_recovery_reload_blocked_waiting_for_pre_reload_cancel",
+                    payload_base,
+                )
+                return False
+            if not canceled:
+                _log_event(
+                    "fixed_cycle_recovery_pre_reload_cancel_order_missing_or_terminal",
+                    {**payload_base, "reason": "cancel_failed"},
+                )
+                _log_event(
+                    "fixed_cycle_recovery_reload_blocked_waiting_for_pre_reload_cancel",
+                    payload_base,
+                )
+                return False
+            canceled_client_ids.append(str(client_id))
+            if exchange_order_id:
+                canceled_exchange_ids.append(exchange_order_id)
+            canceled_purposes.append(purpose)
+            runtime_state.active_orders.pop(client_id, None)
+            if exchange_order_id:
+                runtime_state.exchange_to_client_id.pop(exchange_order_id, None)
+            _log_event(
+                "fixed_cycle_recovery_pre_reload_cancel_order_confirmed",
+                {
+                    **payload_base,
+                    "reason": "cancel_confirmed",
+                },
+            )
+
+        active_runtime_purposes_after = sorted(
+            {
+                str(getattr(order, "purpose", "") or "")
+                for order in runtime_state.active_orders.values()
+                if not self._is_terminal_order_status(getattr(order, "status", None))
+            }
+        )
+        active_snapshot_purposes_after = sorted(
+            {
+                str(getattr(order, "purpose", "") or "")
+                for order in getattr(snapshot, "active_orders", []) or []
+                if not self._is_terminal_order_status(getattr(order, "status", None))
+            }
+        )
+        active_order_purposes_after = sorted(
+            set(active_runtime_purposes_after) | set(active_snapshot_purposes_after)
+        )
+        _log_event(
+            "fixed_cycle_recovery_pre_reload_cancel_completed",
+            {
+                "symbol": symbol,
+                "bot_name": self.config.bot_name,
+                "profile": profile,
+                "trade_block_id": trade_block_id,
+                "recovery_reload_id": recovery_reload_id,
+                "recovery_cycle_index": recovery_cycle_index,
+                "active_order_purposes_before": active_order_purposes_before,
+                "active_order_purposes_after": active_order_purposes_after,
+                "canceled_order_purposes": sorted(canceled_purposes),
+                "canceled_order_ids": canceled_client_ids,
+                "canceled_exchange_order_ids": canceled_exchange_ids,
+            },
+        )
+        return True
+
     def _current_recovery_reference_cycle_index(
         self, runtime_state: RuntimeState
     ) -> int:
@@ -15146,6 +15402,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             snapshot, runtime_state, context, recovery_cycle_index
         ):
             return []
+        # Vor dem eigentlichen Recovery-Reload-Entry alle alten Exit- und
+        # Cycle-Orders canceln, damit die neue Struktur nicht mit der alten
+        # Pre-Recovery-Struktur kollidiert.
+        if not self._cancel_pre_recovery_reload_orders(
+            snapshot, runtime_state, context, recovery_cycle_index
+        ):
+            return []
+        # Nach erfolgreichem Cancel den Second-Leg-/Short-TP-State des
+        # Recovery-Referenz-Cycles bereinigen, damit keine alte
+        # CYCLE_N_SHORT_REDUCE-Struktur den Reload blockiert.
+        self._clear_recovery_pre_reload_stale_cycle_state(
+            runtime_state,
+            recovery_cycle_index,
+            reason="pre_recovery_reload_cancel",
+        )
         self._apply_recovery_refill_state(
             runtime_state,
             base_notional,
@@ -18685,6 +18956,92 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _set_second_leg_status(self, entry: dict[str, Any], status: str) -> None:
         field_name = self._get_second_leg_status_field()
         entry[field_name] = str(status or "").upper()
+
+    def _clear_recovery_pre_reload_stale_cycle_state(
+        self,
+        runtime_state: RuntimeState,
+        recovery_cycle_index: int,
+        *,
+        reason: str = "pre_recovery_reload_cancel",
+    ) -> None:
+        """
+        Bereinigt Second-Leg-/Short-TP-State für den Recovery-Referenz-Cycle,
+        damit alte Pre-Recovery-Second-Leg-Orders den Reload nicht blockieren.
+        """
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        cycle_entry = self._get_cycle_sequence_entry(runtime_state, recovery_cycle_index)
+        if not isinstance(cycle_entry, dict):
+            return
+        symbol = self.config.symbol
+        trade_block_id = state.get("trade_block_id")
+        recovery_reload_id = state.get("recovery_reload_id")
+        # Vorher-Zustand erfassen
+        cycle_waiting_before = self._get_second_leg_waiting(state, cycle_state)
+        short_tp_pending_before = self._get_second_leg_pending_cycle(state, cycle_state)
+        pending_short_before = int(
+            state.get("pending_short_cycle_index")
+            or cycle_state.get("pending_short_cycle_index")
+            or 0
+        )
+        next_required_before = state.get("next_required_purpose")
+        cycle_step_before = state.get("cycle_step")
+        short_tp_purpose = str(self._get_second_leg_purpose(recovery_cycle_index))
+
+        # Waiting-/Pending-Flags zurücksetzen
+        self._set_second_leg_waiting_state(
+            state,
+            cycle_state,
+            waiting=False,
+            cycle_index=0,
+        )
+        state["pending_short_cycle_index"] = 0
+        cycle_state["pending_short_cycle_index"] = 0
+
+        # Second-Leg-Status und zugehörige Felder neutralisieren
+        self._set_second_leg_status(cycle_entry, "NONE")
+        for key, value in (
+            ("short_tp_purpose", None),
+            ("short_tp_qty", 0.0),
+            ("short_tp_trigger_price", 0.0),
+            ("short_tp_reserved_at", 0),
+        ):
+            if key in cycle_entry or value is not None:
+                cycle_entry[key] = value
+
+        self._persist_cycle_sequence_state(runtime_state)
+        cycle_waiting_after = self._get_second_leg_waiting(state, cycle_state)
+        short_tp_pending_after = self._get_second_leg_pending_cycle(state, cycle_state)
+        pending_short_after = int(
+            state.get("pending_short_cycle_index")
+            or cycle_state.get("pending_short_cycle_index")
+            or 0
+        )
+        next_required_after = state.get("next_required_purpose")
+        cycle_step_after = state.get("cycle_step")
+
+        _log_event(
+            "fixed_cycle_recovery_pre_reload_stale_cycle_state_cleared",
+            {
+                "symbol": symbol,
+                "bot_name": self.config.bot_name,
+                "trade_block_id": trade_block_id,
+                "recovery_reload_id": recovery_reload_id,
+                "recovery_cycle_index": recovery_cycle_index,
+                "stale_cycle_purpose": short_tp_purpose,
+                "cycle_waiting_for_short_tp_before": cycle_waiting_before,
+                "cycle_waiting_for_short_tp_after": cycle_waiting_after,
+                "short_tp_pending_cycle_before": short_tp_pending_before,
+                "short_tp_pending_cycle_after": short_tp_pending_after,
+                "pending_short_cycle_index_before": pending_short_before,
+                "pending_short_cycle_index_after": pending_short_after,
+                "next_required_purpose_before": next_required_before,
+                "next_required_purpose_after": next_required_after,
+                "cycle_step_before": cycle_step_before,
+                "cycle_step_after": cycle_step_after,
+                "reason": reason,
+            },
+        )
 
     def _maybe_clear_second_leg_waiting_without_orders(
         self,
