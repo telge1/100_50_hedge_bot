@@ -1,12 +1,50 @@
-1. Öffne Long.
-2. Wenn Preis fällt, wird bei der Hedge-Schwelle Short eröffnet.
-3. Long-Rebuys werden unterhalb der Short-Position gesetzt.
-4. Rebuy-Abstand wird aus dem Spread berechnet (z. B. Spread / 3).
-5. Rebuy-Size wächst strategisch abhängig vom Spread und als Prozentsatz der aktuellen Long-Size.
-6. Nach jedem Long-Rebuy oder sobald Short ausgelöst wurde, wird Short sofort auf 50% der Long-Size nachgezogen.
-7. Ziel ist: Spread heilen, Hedge stabil halten, dann bei Rebound erst Break-Even und danach Profit.
+Initial Entry
+   Long + Short werden eröffnet. Beispiel 100$ Long 50$ Short
 
 
+1. Preis fällt gegen den Long-Bot
+
+2. Cycle 1 wird ausgelöst
+
+3. Long-Seite wird reduziert
+   → Long wird mit Verlust teilweise geschlossen
+
+4. Dieser realisierte Long-Verlust wird gespeichert/berechnet
+
+5. Danach wird eine Short-TP-Order gesetzt
+   → Ziel: Short-Gewinn soll genau diesen Long-Verlust + Zielprofit decken
+
+6. Wenn Short-TP gefüllt wird:
+   → Verlust ist ausgeglichen
+   → Cycle ist sauber abgeschlossen
+
+7. Danach läuft der nächste Cycle ähnlich weiter
+
+8. Nach Cycle 2 kommt der Refill:
+   Die reduzierte Long-Seite wird im tieferen Preisbereich wieder aufgefüllt, sodass der Long-Average sinkt.
+   Gleichzeitig wird auch die Short-Seite passend aufgefüllt, damit Long und Short wieder möglichst denselben Average-Price-Bereich haben und kein Spread zwischen den beiden Hedge-Seiten entsteht.
+   Danach arbeitet der Bot mit einer neu ausgerichteten Hedge-Struktur weiter.
+
+Also vereinfacht:
+
+Fallender Preis im Long-Bot:
+
+Long Reduce mit Verlust
+→ Short TP gleicht Verlust aus
+→ Cycle abgeschlossen
+→ nächster Cycle
+→ nach Cycle 2 Refill
+
+Der wichtige Punkt ist:
+
+Ihr kauft nicht blind Long nach,
+sondern reduziert zuerst Long-Verlust kontrolliert
+und benutzt die profitable Short-Seite,
+um diesen Verlust zurückzuholen.
+
+
+
+####################################################################################################
 
 🧠 Strategie (einfach erklärt)
 Start

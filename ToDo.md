@@ -218,6 +218,3 @@ Aber: Closed-PnL-Retry für alte Reduce-Orders muss noch gefixt oder begrenzt we
 
 
 
-
-
-Guten Morgen ich hatte jetzt nochmal beide bots bis zum refill schnell getestet und beide funktionieren jetzt dann werde ich jetzt gleich beide starten

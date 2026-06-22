@@ -5621,6 +5621,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             debug_payload = self._build_recovery_debug_payload(
                 runtime_state, snapshot, cycle_state
             )
+            if debug_payload.get("missing_recovery_order_reason") == "pending_flag_true_but_no_active_order":
+                self._clear_stale_recovery_reload_pending_flags(runtime_state, cycle_state, debug_payload)
             if recovery_actions:
                 _log_event(
                     "fixed_cycle_recovery_refill_intents_built",
@@ -13876,6 +13878,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return None
         return state_dir / "wallet_guard.json"
 
+    def _load_watchdog_wallet_guard(self) -> tuple[Path | None, dict[str, Any] | None]:
+        guard_path = self._watchdog_wallet_guard_path()
+        if not guard_path or not guard_path.exists():
+            return None, None
+        try:
+            payload = json.loads(guard_path.read_text(encoding="utf-8") or "{}")
+        except Exception:
+            return guard_path, None
+        if not isinstance(payload, dict):
+            return guard_path, None
+        return guard_path, payload
+
+    def _save_watchdog_wallet_guard(self, path: Path, data: dict[str, Any]) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            # Guard-Speicherfehler sollen den Bot nicht hart stoppen; Logging erfolgt im Aufrufer.
+            return
+
     def _load_watchdog_start_wallet_usdt(self) -> float | None:
         guard_path = self._watchdog_wallet_guard_path()
         if not guard_path or not guard_path.exists():
@@ -14078,6 +14100,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "source": source,
             "total_transferred_recovery_usdt": 0.0,
             "allocated_wallet_balance_usdt": initial_wallet_balance,
+            "pending_recovery_transfer_usdt": 0.0,
             "recovery_transfers": [],
             "wallet_metric": metric,
         }
@@ -14349,6 +14372,241 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state.pop("recovery_reload_transfer_error", None)
         return True, transfer_id
 
+    def _reserve_recovery_wallet_and_watcher_baselines(
+        self,
+        baseline: dict[str, Any],
+        transfer_amount_usdt: float,
+        cycle_index: int,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        """
+        Reserve the recovery wallet baseline and the profit/refill watcher
+        baseline before executing a real wallet transfer.
+        """
+        state = runtime_state.strategy_state
+        trade_block_id = state.get("trade_block_id")
+        baseline_path = self._recovery_wallet_baseline_path()
+        guard_path, guard = self._load_watchdog_wallet_guard()
+        symbol = self.config.symbol
+        bot_name = self.config.bot_name
+        _, profile_dir = self._resolve_recovery_wallet_state_paths()
+        profile = profile_dir.name if profile_dir else None
+
+        initial_wallet_balance = float(baseline.get("initial_wallet_balance_usdt") or 0.0)
+        total_transferred_before = float(baseline.get("total_transferred_recovery_usdt") or 0.0)
+        pending_before = float(baseline.get("pending_recovery_transfer_usdt") or 0.0)
+        allocated_before = float(baseline.get("allocated_wallet_balance_usdt") or 0.0)
+        if allocated_before <= 0:
+            allocated_before = initial_wallet_balance + total_transferred_before + pending_before
+
+        watcher_start_before = float((guard or {}).get("start_wallet_usdt") or 0.0)
+        watcher_baseline_before = float((guard or {}).get("baseline_wallet_usdt") or watcher_start_before)
+
+        payload_base: dict[str, Any] = {
+            "symbol": symbol,
+            "bot_name": bot_name,
+            "profile": profile,
+            "trade_block_id": trade_block_id,
+            "cycle_index": cycle_index,
+            "transfer_amount_usdt": float(transfer_amount_usdt),
+            "initial_wallet_balance_usdt": initial_wallet_balance,
+            "total_transferred_recovery_usdt_before": total_transferred_before,
+            "pending_recovery_transfer_usdt_before": pending_before,
+            "allocated_wallet_balance_usdt_before": allocated_before,
+            "watcher_baseline_before": watcher_baseline_before,
+            "watcher_start_wallet_before": watcher_start_before,
+        }
+        _log_event("fixed_cycle_recovery_wallet_baseline_reservation_started", payload_base)
+
+        if not baseline_path or not guard_path or guard is None:
+            _log_event(
+                "fixed_cycle_recovery_wallet_baseline_reservation_rolled_back",
+                {
+                    **payload_base,
+                    "rollback_applied": False,
+                    "reason": "baseline_or_guard_missing",
+                },
+            )
+            return False
+
+        # Idempotenz: bestehende Reservation für dieselbe (cycle_index, amount) respektieren.
+        existing_pending = float(baseline.get("pending_recovery_transfer_usdt") or 0.0)
+        existing_cycle = int(baseline.get("pending_recovery_transfer_cycle_index") or 0)
+        if existing_pending == float(transfer_amount_usdt) and existing_cycle == int(cycle_index):
+            _log_event(
+                "fixed_cycle_recovery_wallet_baseline_reserved_before_transfer",
+                {
+                    **payload_base,
+                    "allocated_wallet_balance_usdt_after": baseline.get("allocated_wallet_balance_usdt"),
+                    "pending_recovery_transfer_usdt": existing_pending,
+                    "rollback_applied": False,
+                    "reason": "existing_reservation_reused",
+                },
+            )
+            return True
+
+        # Kopien für potentiellen Rollback sichern.
+        original_baseline = json.loads(json.dumps(baseline, ensure_ascii=False))
+        original_guard = json.loads(json.dumps(guard, ensure_ascii=False))
+
+        baseline["pending_recovery_transfer_usdt"] = float(transfer_amount_usdt)
+        baseline["pending_recovery_transfer_cycle_index"] = int(cycle_index)
+        allocated_after = initial_wallet_balance + total_transferred_before + float(transfer_amount_usdt)
+        baseline["allocated_wallet_balance_usdt"] = allocated_after
+
+        guard["pending_recovery_transfer_usdt"] = float(transfer_amount_usdt)
+        guard["pending_recovery_transfer_cycle_index"] = int(cycle_index)
+        guard["start_wallet_usdt"] = watcher_start_before + float(transfer_amount_usdt)
+        guard["baseline_wallet_usdt"] = watcher_baseline_before + float(transfer_amount_usdt)
+        guard["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        watcher_baseline_after = float(guard.get("baseline_wallet_usdt") or 0.0)
+
+        try:
+            self._save_recovery_wallet_baseline(baseline_path, baseline)
+            _log_event(
+                "fixed_cycle_recovery_wallet_baseline_reserved_before_transfer",
+                {
+                    **payload_base,
+                    "allocated_wallet_balance_usdt_after": allocated_after,
+                    "pending_recovery_transfer_usdt": float(transfer_amount_usdt),
+                    "rollback_applied": False,
+                    "reason": "reservation_persisted",
+                },
+            )
+            self._save_watchdog_wallet_guard(guard_path, guard)
+            _log_event(
+                "fixed_cycle_profit_watcher_baseline_reserved_before_transfer",
+                {
+                    **payload_base,
+                    "watcher_baseline_after": watcher_baseline_after,
+                    "watcher_start_wallet_after": guard.get("start_wallet_usdt"),
+                },
+            )
+        except Exception as exc:
+            # Best-effort-Rollback beider Dateien.
+            self._save_recovery_wallet_baseline(baseline_path, original_baseline)
+            self._save_watchdog_wallet_guard(guard_path, original_guard)
+            _log_event(
+                "fixed_cycle_recovery_wallet_baseline_reservation_rolled_back",
+                {
+                    **payload_base,
+                    "rollback_applied": True,
+                    "reason": f"reservation_persist_failed:{exc}",
+                },
+            )
+            _log_event(
+                "fixed_cycle_profit_watcher_baseline_reservation_rolled_back",
+                {
+                    **payload_base,
+                    "rollback_applied": True,
+                    "reason": f"reservation_persist_failed:{exc}",
+                },
+            )
+            return False
+
+        return True
+
+    def _rollback_recovery_wallet_and_watcher_baseline_reservation(
+        self,
+        baseline: dict[str, Any],
+        cycle_index: int,
+        runtime_state: RuntimeState,
+        *,
+        reason: str,
+    ) -> None:
+        state = runtime_state.strategy_state
+        trade_block_id = state.get("trade_block_id")
+        baseline_path = self._recovery_wallet_baseline_path()
+        guard_path, guard = self._load_watchdog_wallet_guard()
+        symbol = self.config.symbol
+        bot_name = self.config.bot_name
+        _, profile_dir = self._resolve_recovery_wallet_state_paths()
+        profile = profile_dir.name if profile_dir else None
+
+        initial_wallet_balance = float(baseline.get("initial_wallet_balance_usdt") or 0.0)
+        total_transferred_before = float(baseline.get("total_transferred_recovery_usdt") or 0.0)
+        pending_before = float(baseline.get("pending_recovery_transfer_usdt") or 0.0)
+        allocated_before = float(baseline.get("allocated_wallet_balance_usdt") or 0.0)
+        if allocated_before <= 0:
+            allocated_before = initial_wallet_balance + total_transferred_before + pending_before
+
+        watcher_start_before = float((guard or {}).get("start_wallet_usdt") or 0.0)
+        watcher_baseline_before = float((guard or {}).get("baseline_wallet_usdt") or watcher_start_before)
+
+        payload_base: dict[str, Any] = {
+            "symbol": symbol,
+            "bot_name": bot_name,
+            "profile": profile,
+            "trade_block_id": trade_block_id,
+            "cycle_index": cycle_index,
+            "initial_wallet_balance_usdt": initial_wallet_balance,
+            "total_transferred_recovery_usdt_before": total_transferred_before,
+            "pending_recovery_transfer_usdt_before": pending_before,
+            "allocated_wallet_balance_usdt_before": allocated_before,
+            "watcher_baseline_before": watcher_baseline_before,
+            "watcher_start_wallet_before": watcher_start_before,
+            "reason": reason,
+        }
+
+        # Baseline-Rollback.
+        if baseline_path:
+            baseline["pending_recovery_transfer_usdt"] = 0.0
+            baseline["pending_recovery_transfer_cycle_index"] = None
+            baseline["allocated_wallet_balance_usdt"] = initial_wallet_balance + total_transferred_before
+            try:
+                self._save_recovery_wallet_baseline(baseline_path, baseline)
+                _log_event(
+                    "fixed_cycle_recovery_wallet_baseline_reservation_rolled_back",
+                    {
+                        **payload_base,
+                        "rollback_applied": True,
+                        "allocated_wallet_balance_usdt_after": baseline.get(
+                            "allocated_wallet_balance_usdt"
+                        ),
+                    },
+                )
+            except Exception:
+                _log_event(
+                    "fixed_cycle_recovery_wallet_baseline_reservation_rolled_back",
+                    {
+                        **payload_base,
+                        "rollback_applied": False,
+                        "reason": f"{reason}:baseline_rollback_failed",
+                    },
+                )
+
+        # Watcher-Rollback.
+        if guard_path and guard is not None:
+            pending_amount = float(guard.get("pending_recovery_transfer_usdt") or 0.0)
+            guard["pending_recovery_transfer_usdt"] = 0.0
+            guard["pending_recovery_transfer_cycle_index"] = None
+            # Start-/Baseline-Wallet nur zurücksetzen, falls eine Reservation vorgenommen wurde.
+            if pending_amount > 0:
+                guard["start_wallet_usdt"] = max(0.0, watcher_start_before - pending_amount)
+                guard["baseline_wallet_usdt"] = max(0.0, watcher_baseline_before - pending_amount)
+            guard["updated_at"] = datetime.now(timezone.utc).isoformat()
+            try:
+                self._save_watchdog_wallet_guard(guard_path, guard)
+                _log_event(
+                    "fixed_cycle_profit_watcher_baseline_reservation_rolled_back",
+                    {
+                        **payload_base,
+                        "rollback_applied": True,
+                        "watcher_baseline_after": guard.get("baseline_wallet_usdt"),
+                        "watcher_start_wallet_after": guard.get("start_wallet_usdt"),
+                    },
+                )
+            except Exception:
+                _log_event(
+                    "fixed_cycle_profit_watcher_baseline_reservation_rolled_back",
+                    {
+                        **payload_base,
+                        "rollback_applied": False,
+                        "reason": f"{reason}:watcher_rollback_failed",
+                    },
+                )
+
     def _ensure_recovery_wallet_transfer(
         self,
         snapshot: HedgeSnapshot,
@@ -14442,7 +14700,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "fixed_cycle_recovery_wallet_transfer_required",
             transfer_required_payload,
         )
-        transfer_amount_usdt = float(baseline.get("initial_wallet_balance_usdt") or 0.0)
+        initial_wallet_balance = float(baseline.get("initial_wallet_balance_usdt") or 0.0)
+        total_transferred_before = float(baseline.get("total_transferred_recovery_usdt") or 0.0)
+        pending_before = float(baseline.get("pending_recovery_transfer_usdt") or 0.0)
+        allocated_before = float(baseline.get("allocated_wallet_balance_usdt") or 0.0)
+        if allocated_before <= 0:
+            allocated_before = initial_wallet_balance + total_transferred_before + pending_before
+        transfer_amount_usdt = allocated_before
+        _log_event(
+            "fixed_cycle_recovery_next_transfer_amount_resolved",
+            {
+                **transfer_required_payload,
+                "total_transferred_recovery_usdt_before": total_transferred_before,
+                "pending_recovery_transfer_usdt": pending_before,
+                "allocated_wallet_balance_usdt_before": allocated_before,
+                "resolved_transfer_amount_usdt": transfer_amount_usdt,
+            },
+        )
         if transfer_amount_usdt <= 0:
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
@@ -14467,10 +14741,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 extra={"cycle_index": cycle_index},
             )
             return False
+        if not self._reserve_recovery_wallet_and_watcher_baselines(
+            baseline, transfer_amount_usdt, cycle_index, runtime_state
+        ):
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {
+                    **transfer_required_payload,
+                    "reason": "baseline_reservation_failed",
+                    "resolved_transfer_amount_usdt": transfer_amount_usdt,
+                },
+            )
+            state["recovery_wallet_transfer_pending"] = True
+            state["recovery_reload_transfer_required"] = True
+            state["recovery_reload_transfer_submitted"] = False
+            state["recovery_reload_transfer_confirmed"] = False
+            state["recovery_reload_transfer_error"] = "baseline_reservation_failed"
+            self._set_recovery_lifecycle_state(
+                state,
+                "FAILED",
+                event="recovery_wallet_transfer_reservation_failed",
+                extra={"cycle_index": cycle_index},
+            )
+            return False
         success, transfer_id = self._execute_recovery_wallet_transfer(
             baseline, cycle_index, runtime_state, context, transfer_amount_usdt
         )
         if not success:
+            self._rollback_recovery_wallet_and_watcher_baseline_reservation(
+                baseline,
+                cycle_index,
+                runtime_state,
+                reason="executor_failed",
+            )
             _log_event(
                 "fixed_cycle_recovery_refill_blocked_waiting_for_wallet_transfer",
                 transfer_required_payload,
@@ -14498,12 +14801,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_state["recovery_wallet_transfer_amount_usdt"] = transfer_amount_usdt
         cycle_state["recovery_wallet_transfer_id"] = transfer_id
         cycle_state["recovery_wallet_transfer_status"] = "completed"
-        baseline["total_transferred_recovery_usdt"] = float(
-            baseline.get("total_transferred_recovery_usdt") or 0.0
-        ) + transfer_amount_usdt
+        total_transferred_after = float(baseline.get("total_transferred_recovery_usdt") or 0.0) + transfer_amount_usdt
+        baseline["total_transferred_recovery_usdt"] = total_transferred_after
+        baseline["pending_recovery_transfer_usdt"] = 0.0
+        baseline["pending_recovery_transfer_cycle_index"] = None
         baseline["allocated_wallet_balance_usdt"] = float(
             baseline.get("initial_wallet_balance_usdt") or 0.0
-        ) + baseline["total_transferred_recovery_usdt"]
+        ) + total_transferred_after
         transfer_record = {
             "cycle_index": cycle_index,
             "amount_usdt": transfer_amount_usdt,
@@ -14525,8 +14829,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 **transfer_required_payload,
                 "transfer_id": transfer_id,
-                "total_transferred_recovery_usdt": baseline.get(
-                    "total_transferred_recovery_usdt"
+                "total_transferred_recovery_usdt_before": total_transferred_before,
+                "total_transferred_recovery_usdt_after": total_transferred_after,
+                "allocated_wallet_balance_usdt_after": baseline.get(
+                    "allocated_wallet_balance_usdt"
+                ),
+            },
+        )
+        _log_event(
+            "fixed_cycle_recovery_wallet_transfer_confirmed",
+            {
+                **transfer_required_payload,
+                "transfer_id": transfer_id,
+                "total_transferred_recovery_usdt_before": total_transferred_before,
+                "total_transferred_recovery_usdt_after": total_transferred_after,
+                "allocated_wallet_balance_usdt_before": allocated_before,
+                "allocated_wallet_balance_usdt_after": baseline.get(
+                    "allocated_wallet_balance_usdt"
                 ),
             },
         )
@@ -14656,6 +14975,49 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "snapshot_recovery_active_orders": snapshot_recovery_active_orders,
             "missing_recovery_order_reason": missing_reason,
         }
+
+    def _clear_stale_recovery_reload_pending_flags(
+        self,
+        runtime_state: RuntimeState,
+        cycle_state: dict[str, Any],
+        debug_payload: dict[str, Any],
+    ) -> None:
+        """
+        Wenn Pending-Flags gesetzt sind, aber keine aktiven Recovery-Orders existieren,
+        wurden die Orders vermutlich vom Exchange rejected. In diesem Fall die
+        Pending-Flags zurücksetzen, damit der Bot nicht dauerhaft blockiert bleibt.
+        """
+        state = runtime_state.strategy_state
+        symbol = self.config.symbol
+        trade_block_id = state.get("trade_block_id")
+        recovery_reload_long_pending = bool(debug_payload.get("recovery_reload_long_pending"))
+        recovery_reload_short_pending = bool(debug_payload.get("recovery_reload_short_pending"))
+        if not (recovery_reload_long_pending or recovery_reload_short_pending):
+            return
+        # Flags auf State- und Cycle-Ebene zurücksetzen (inkl. Legacy-Aliase).
+        self._set_recovery_reload_state_value(
+            state,
+            cycle_state,
+            "recovery_reload_long_pending",
+            False,
+        )
+        self._set_recovery_reload_state_value(
+            state,
+            cycle_state,
+            "recovery_reload_short_pending",
+            False,
+        )
+        payload = {
+            "symbol": symbol,
+            "bot_name": self.config.bot_name,
+            "trade_block_id": trade_block_id,
+            "recovery_reload_long_pending_before": recovery_reload_long_pending,
+            "recovery_reload_short_pending_before": recovery_reload_short_pending,
+            "runtime_recovery_active_orders": debug_payload.get("runtime_recovery_active_orders"),
+            "snapshot_recovery_active_orders": debug_payload.get("snapshot_recovery_active_orders"),
+            "missing_recovery_order_reason": debug_payload.get("missing_recovery_order_reason"),
+        }
+        _log_event("fixed_cycle_recovery_reload_order_rejected_pending_flags_cleared", payload)
 
     def _safe_order_field(self, order: Any, field: str) -> Any:
         if isinstance(order, dict):

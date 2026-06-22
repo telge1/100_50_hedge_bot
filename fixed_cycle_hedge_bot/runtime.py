@@ -2138,7 +2138,14 @@ class GenericHedgeRuntime:
                 else None
             )
             self._cancel_open_orders_by_purpose_internal(replace_purposes, replace_context)
-        client_id = f"{self.strategy.name}-{intent.purpose.lower()}-{uuid4().hex[:10]}"
+        purpose_upper = str(intent.purpose or "").upper()
+        if purpose_upper == getattr(self.strategy, "RECOVERY_RELOAD_LONG_ENTRY", "RECOVERY_RELOAD_LONG_ENTRY"):
+            prefix = "fc-rrl"
+        elif purpose_upper == getattr(self.strategy, "RECOVERY_RELOAD_SHORT_ENTRY", "RECOVERY_RELOAD_SHORT_ENTRY"):
+            prefix = "fc-rrs"
+        else:
+            prefix = f"{self.strategy.name}-{str(intent.purpose or '').lower()}"
+        client_id = f"{prefix}-{uuid4().hex[:8]}"
         current_price = snapshot.current_price
         strategy_state = self.runtime_state.strategy_state
         fallback_context = self._build_long_add_market_fallback_context(
