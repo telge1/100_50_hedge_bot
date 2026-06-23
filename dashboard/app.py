@@ -7694,6 +7694,12 @@ def _compute_trade_end_profit_from_existing_details(
     return end_profit, len(pnl_values), sorted(purposes)
 
 
+def _compute_trade_end_profit_from_detail_rows(
+    rows: list[dict[str, Any]] | None,
+) -> tuple[float | None, int, list[str]]:
+    return _compute_trade_end_profit_from_existing_details({"details": list(rows or [])})
+
+
 SERVER_TZ = timezone(timedelta(hours=2))
 DASHBOARD_TZ = timezone(timedelta(hours=3))
 
@@ -9071,7 +9077,12 @@ async def api_profit_trade_details(
     # Endprofit aus bestehenden Details neu berechnen, damit Listen- und Detail-API
     # dieselbe Summenlogik verwenden.
     recomputed_end_profit: float | None = None
-    end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(match)
+    selected_source = "sum_existing_details"
+    if confirmed_rows:
+        selected_source = "sum_confirmed_rows"
+        end_profit, pnl_count, purposes = _compute_trade_end_profit_from_detail_rows(rows)
+    else:
+        end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(match)
     if end_profit is not None:
         recomputed_end_profit = end_profit
         old_end_profit = _safe_wallet_float(match.get("total_trade_pnl"))
@@ -9082,7 +9093,7 @@ async def api_profit_trade_details(
             "bot_side": bot_side,
             "symbol": symbol,
             "trade_block_id": trade_block_id,
-            "selected_source": "sum_existing_details",
+            "selected_source": selected_source,
             "old_end_profit": old_end_profit,
             "recomputed_end_profit": end_profit,
             "detail_pnl_count": pnl_count,
@@ -9157,8 +9168,36 @@ def _build_profit_trade_filtered_rows(
     # Für History-Trades Endprofit aus bestehenden Details neu berechnen, falls vorhanden.
     normalized_side = _normalize_bot_side(bot_side)
     recomputed_count = 0
+    confirmed_paths = _collect_confirmed_history_paths(profile, normalized_side)
+    confirmed_rows_all = _collect_confirmed_order_pnl_rows(confirmed_paths)
     for base in base_trades:
-        end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(base)
+        selected_source = "sum_existing_details"
+        confirmed_rows: list[dict[str, Any]] = []
+        trade_block_id = str(base.get("trade_block_id") or "").strip()
+        bot_name = str(base.get("bot_name") or "").strip().lower()
+        symbol = str(base.get("symbol") or "").strip().upper()
+        if trade_block_id:
+            confirmed_rows = _filter_confirmed_rows(confirmed_rows_all, trade_block_id)
+            if symbol:
+                confirmed_rows = [
+                    row
+                    for row in confirmed_rows
+                    if str(row.get("symbol") or "").strip().upper() == symbol
+                ] or confirmed_rows
+            if bot_name:
+                allowed_bot_names = _paired_trade_bot_names(bot_name)
+                confirmed_rows = [
+                    row
+                    for row in confirmed_rows
+                    if str(row.get("bot_name") or "").strip().lower() in allowed_bot_names
+                ] or confirmed_rows
+        if confirmed_rows:
+            selected_source = "sum_confirmed_rows"
+            end_profit, pnl_count, purposes = _compute_trade_end_profit_from_detail_rows(
+                _build_confirmed_detail_rows(base, confirmed_rows)
+            )
+        else:
+            end_profit, pnl_count, purposes = _compute_trade_end_profit_from_existing_details(base)
         if end_profit is None:
             continue
         old_end_profit = _safe_wallet_float(base.get("total_trade_pnl"))
@@ -9170,7 +9209,7 @@ def _build_profit_trade_filtered_rows(
             "bot_side": normalized_side,
             "symbol": base.get("symbol"),
             "trade_block_id": base.get("trade_block_id"),
-            "selected_source": "sum_existing_details",
+            "selected_source": selected_source,
             "old_end_profit": old_end_profit,
             "recomputed_end_profit": end_profit,
             "detail_pnl_count": pnl_count,

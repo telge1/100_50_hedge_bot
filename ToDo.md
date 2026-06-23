@@ -175,6 +175,15 @@ python3 live_bots/100_50_hedge_bot/watchdog/wallet_refill_watchdog.py \
 
 cat live_bots/100_50_hedge_bot/state/active_bot_symbols.json | jq .
 
+alte reserve coins loschen 
+rm -f live_bots/100_50_hedge_bot/long_bot_1/run/reserved_best_coin.json
+rm -f live_bots/short_hedge_bot/short_bot_1/run/reserved_best_coin.json
+
+rm -f live_bots/100_50_hedge_bot/long_bot_1/run/fixed_cycle_config.runtime.json
+rm -f live_bots/short_hedge_bot/short_bot_1/run/fixed_cycle_config.runtime.json
+
+rm -f live_bots/state/pair_symbol_bot_1.json
+
 ######################################################################################################################
 
 /home/telgenbuescher/projects/spread_recovery_hedge/modular_hedge_runtime/strategy.md
