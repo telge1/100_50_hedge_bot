@@ -11,10 +11,10 @@
   "best_coin_max_age_minutes": 45,
   "dynamic_symbol_hold_minutes": 0,
   
-  "time_distance_refill_trigger_minutes": 2,
+  "time_distance_refill_trigger_minutes": 60,
   "recovery_mode_trigger_override_enabled": true,
-  "recovery_mode_trigger_override_pct": null,
-  "recovery_mode_trigger_override_ticks": 5,
+  "recovery_mode_trigger_override_pct": 50.0,
+  "recovery_mode_trigger_override_ticks": null,
   
   
   "base_notional_usdt": 100.0,

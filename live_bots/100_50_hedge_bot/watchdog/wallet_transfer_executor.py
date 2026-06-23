@@ -68,6 +68,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-transfer-usdt", type=float, default=0.0)
     parser.add_argument("--min-transfer-usdt", type=float, default=1.0)
     parser.add_argument("--config-file", type=Path, default=DEFAULT_CONFIG_PATH)
+    parser.add_argument("--transfer-id", type=str, default="")
     return parser.parse_args()
 
 
@@ -177,6 +178,17 @@ def format_decimal(amount: Decimal) -> str:
     return text or "0"
 
 
+def mask_member_id(member_id: str | None) -> str | None:
+    raw = str(member_id or "").strip()
+    if not raw:
+        return None
+    if len(raw) <= 4:
+        return "***"
+    if len(raw) <= 8:
+        return f"***{raw[-4:]}"
+    return f"{raw[:4]}***{raw[-4:]}"
+
+
 def build_payload(
     bot_name: str,
     direction: str,
@@ -196,8 +208,8 @@ def build_payload(
         "coin": coin.upper(),
         "requested_amount": float(requested_amount),
         "final_amount": float(final_amount),
-        "from_member_id": from_member_id,
-        "to_member_id": to_member_id,
+        "from_member_id": mask_member_id(from_member_id),
+        "to_member_id": mask_member_id(to_member_id),
         "from_account_type": from_account_type,
         "to_account_type": to_account_type,
     }
@@ -425,7 +437,7 @@ def main() -> None:
         )
         return
 
-    transfer_id = str(uuid.uuid4())
+    transfer_id = str(args.transfer_id or "").strip() or str(uuid.uuid4())
     write_json_event(
         "wallet_transfer_requested",
         build_payload(
@@ -460,7 +472,8 @@ def main() -> None:
         )
         print(
             f"DRY RUN transfer {direction} {final_amount} {args.coin} "
-            f"from {from_member_id}:{from_account} to {to_member_id}:{to_account} (id={transfer_id})"
+            f"from {mask_member_id(from_member_id)}:{from_account} "
+            f"to {mask_member_id(to_member_id)}:{to_account} (id={transfer_id})"
         )
         return
     write_json_event(
