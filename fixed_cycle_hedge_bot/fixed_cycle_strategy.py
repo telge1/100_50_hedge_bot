@@ -13976,38 +13976,234 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return value if value > 0 else None
 
     def _wallet_transfer_executor_paths(self) -> tuple[Path | None, Path | None]:
-        _, profile_dir = self._resolve_recovery_wallet_state_paths()
-        if not profile_dir:
+        source_group_dir, _ = self._wallet_transfer_source_group_dir()
+        if not source_group_dir:
             return None, None
-        executor = profile_dir / "watchdog" / "wallet_transfer_executor.py"
-        json_log = profile_dir / "logs" / "wallet_transfer_executor.jsonl"
+        executor = source_group_dir / "watchdog" / "wallet_transfer_executor.py"
+        json_log = source_group_dir / "logs" / "wallet_transfer_executor.jsonl"
         return (executor if executor.exists() else None, json_log)
 
-    def _resolve_wallet_transfer_config_path(self, profile_dir: Path) -> Path | None:
+    def _wallet_transfer_profile_name(self) -> str | None:
+        bot_name = str(self.config.bot_name or "").strip().lower()
+        match = re.match(r"^(?:long|short)_bot_(\d+)$", bot_name)
+        if not match:
+            return None
+        return f"bot_{match.group(1)}"
+
+    def _wallet_transfer_is_short_target(self) -> bool:
+        bot_name = str(self.config.bot_name or "").strip().lower()
+        strategy_side = str(getattr(self.config, "strategy_side", "") or "").strip().lower()
+        return bot_name.startswith("short_bot_") or strategy_side == "short"
+
+    def _wallet_transfer_source_group_dir(self) -> tuple[Path | None, str]:
+        _, current_group_dir = self._resolve_recovery_wallet_state_paths()
+        if self._wallet_transfer_is_short_target():
+            long_group_dir = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot"
+            if long_group_dir.exists():
+                return long_group_dir, "paired_long_bot_group"
+            return None, "paired_long_bot_group_missing"
+        if current_group_dir:
+            return current_group_dir, "current_bot_group"
+        return None, "current_bot_group_missing"
+
+    def _resolve_wallet_transfer_config_path(
+        self, group_dir: Path
+    ) -> tuple[Path | None, str | None]:
         """
         Resolve the wallet transfer config path in the same way as the wallet_refill_watchdog.
 
         Priority:
         - wallet_transfer.transfer_config_file
         - transfer_config_file
-        - fallback to config/config.yaml under the profile directory
+        - fallback to config/config.yaml under the group directory
         """
-        base_config = profile_dir / "config" / "config.yaml"
+        base_config = group_dir / "config" / "config.yaml"
         if not base_config.exists():
-            return None
+            return None, None
         try:
             raw = yaml.safe_load(base_config.read_text(encoding="utf-8")) or {}
         except Exception:
             # If parsing fails, fall back to the base config path (no secrets logged)
-            return base_config
+            return base_config, "group_config_fallback_on_parse_error"
         transfer_section = raw.get("wallet_transfer") or {}
         override_path = transfer_section.get("transfer_config_file") or raw.get("transfer_config_file")
         if not override_path:
-            return base_config
+            return base_config, "group_config"
         override_path = Path(str(override_path))
         if not override_path.is_absolute():
             override_path = base_config.parent / override_path
-        return override_path
+        if transfer_section.get("transfer_config_file"):
+            return override_path, "wallet_transfer.transfer_config_file"
+        return override_path, "transfer_config_file"
+
+    def _wallet_transfer_get_section_case_insensitive(
+        self, config: dict[str, Any], key: str
+    ) -> tuple[str | None, dict[str, Any]]:
+        if key in config:
+            section = config[key]
+            if isinstance(section, dict):
+                return str(key), section
+            return None, {}
+        key_lower = key.lower()
+        for existing_key, value in config.items():
+            if str(existing_key).lower() == key_lower and isinstance(value, dict):
+                return str(existing_key), value
+        return None, {}
+
+    def _wallet_transfer_get_value_case_insensitive(
+        self, section: dict[str, Any], key: str
+    ) -> Any | None:
+        if key in section:
+            return section[key]
+        key_lower = key.lower()
+        for existing_key, value in section.items():
+            if str(existing_key).lower() == key_lower:
+                return value
+        return None
+
+    def _wallet_transfer_get_first_field(
+        self, section: dict[str, Any], candidates: tuple[str, ...]
+    ) -> tuple[str, str | None]:
+        for candidate in candidates:
+            value = self._wallet_transfer_get_value_case_insensitive(section, candidate)
+            if value is not None and str(value).strip():
+                return str(value).strip(), candidate
+        return "", None
+
+    def _wallet_transfer_find_main_account_section(
+        self, config: dict[str, Any]
+    ) -> tuple[str | None, dict[str, Any] | None]:
+        main_candidates = (
+            "Main_bot",
+            "main_bot",
+            "master",
+            "Master",
+            "main",
+            "main_account",
+        )
+        uid_candidates = ("uid", "main_uid", "account_uid", "member_id")
+        for candidate in main_candidates:
+            section_key, section = self._wallet_transfer_get_section_case_insensitive(config, candidate)
+            if not section:
+                continue
+            api_key = str(
+                self._wallet_transfer_get_value_case_insensitive(section, "api_key") or ""
+            ).strip()
+            secret_key = str(
+                self._wallet_transfer_get_value_case_insensitive(section, "secret_key") or ""
+            ).strip()
+            uid_value, _ = self._wallet_transfer_get_first_field(section, uid_candidates)
+            if api_key and secret_key and uid_value:
+                return section_key or candidate, section
+        profiles_key, profiles_section = self._wallet_transfer_get_section_case_insensitive(
+            config, "profiles"
+        )
+        if profiles_section:
+            section_key, section = self._wallet_transfer_get_section_case_insensitive(
+                profiles_section, "main"
+            )
+            if section:
+                api_key = str(
+                    self._wallet_transfer_get_value_case_insensitive(section, "api_key") or ""
+                ).strip()
+                secret_key = str(
+                    self._wallet_transfer_get_value_case_insensitive(section, "secret_key") or ""
+                ).strip()
+                uid_value, _ = self._wallet_transfer_get_first_field(section, uid_candidates)
+                if api_key and secret_key and uid_value:
+                    label = f"{profiles_key or 'profiles'}.{section_key or 'main'}"
+                    return label, section
+        return None, None
+
+    def _inspect_wallet_transfer_config(
+        self,
+        config_path: Path,
+        *,
+        target_bot_name: str,
+        target_profile: str | None,
+        source_config_origin: str,
+    ) -> dict[str, Any]:
+        payload_base = {
+            "source_config_origin": source_config_origin,
+            "target_bot_name": target_bot_name,
+            "target_profile": target_profile,
+        }
+        if not config_path.exists():
+            return {**payload_base, "ok": False, "reason": "config_missing"}
+        try:
+            raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:
+            return {
+                **payload_base,
+                "ok": False,
+                "reason": "config_parse_failed",
+                "error": str(exc),
+            }
+        if not isinstance(raw, dict):
+            return {**payload_base, "ok": False, "reason": "config_not_object"}
+
+        source_account_label, main_section = self._wallet_transfer_find_main_account_section(raw)
+        if not main_section:
+            return {
+                **payload_base,
+                "ok": False,
+                "reason": "missing_main_account_section",
+            }
+
+        target_account_label = target_bot_name
+        profiles_key, profiles_section = self._wallet_transfer_get_section_case_insensitive(
+            raw, "profiles"
+        )
+        if profiles_section and target_profile:
+            _, profile_section = self._wallet_transfer_get_section_case_insensitive(
+                profiles_section, target_profile
+            )
+            if profile_section:
+                account_key = "short_account" if self._wallet_transfer_is_short_target() else "long_account"
+                resolved_account = self._wallet_transfer_get_value_case_insensitive(
+                    profile_section, account_key
+                )
+                if resolved_account is not None and str(resolved_account).strip():
+                    target_account_label = str(resolved_account).strip()
+
+        target_section_label, target_section = self._wallet_transfer_get_section_case_insensitive(
+            raw, target_account_label
+        )
+        if not target_section and target_account_label.lower() != target_bot_name.lower():
+            target_section_label, target_section = self._wallet_transfer_get_section_case_insensitive(
+                raw, target_bot_name
+            )
+            if target_section:
+                target_account_label = target_bot_name
+        if not target_section:
+            return {
+                **payload_base,
+                "ok": False,
+                "reason": "missing_target_account_section",
+                "source_account_label": source_account_label,
+                "target_account_label": target_account_label,
+                "profiles_section": profiles_key,
+            }
+
+        target_uid, target_uid_field = self._wallet_transfer_get_first_field(
+            target_section, ("sub_uid", "uid", "account_uid", "member_id")
+        )
+        if not target_uid:
+            return {
+                **payload_base,
+                "ok": False,
+                "reason": "missing_target_sub_uid",
+                "source_account_label": source_account_label,
+                "target_account_label": target_section_label or target_account_label,
+            }
+
+        return {
+            **payload_base,
+            "ok": True,
+            "source_account_label": source_account_label,
+            "target_account_label": target_section_label or target_account_label,
+            "target_uid_field": target_uid_field,
+        }
 
     def _format_transfer_amount_for_executor(self, amount: float) -> str:
         quantized = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
@@ -14551,16 +14747,38 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         transfer_amount_usdt: float,
     ) -> tuple[bool, str | None]:
         executor_path, log_path = self._wallet_transfer_executor_paths()
-        _, profile_dir = self._resolve_recovery_wallet_state_paths()
-        config_path: Path | None = self._resolve_wallet_transfer_config_path(profile_dir) if profile_dir else None
+        source_group_dir, group_origin = self._wallet_transfer_source_group_dir()
+        config_path, config_origin = (
+            self._resolve_wallet_transfer_config_path(source_group_dir)
+            if source_group_dir
+            else (None, None)
+        )
         state = runtime_state.strategy_state
+        target_profile = self._wallet_transfer_profile_name()
+        source_config_origin = group_origin
+        if config_origin:
+            source_config_origin = f"{group_origin}:{config_origin}"
         payload_base = {
             "symbol": self.config.symbol,
             "bot_name": self.config.bot_name,
             "cycle_index": cycle_index,
             "transfer_amount_usdt": transfer_amount_usdt,
+            "group_origin": group_origin,
+            "source_config_origin": source_config_origin,
+            "executor_path_exists": bool(executor_path and executor_path.exists()),
+            "config_path_exists": bool(config_path and config_path.exists()),
+            "target_bot_name": self.config.bot_name,
+            "target_profile": target_profile,
         }
         if not executor_path or not config_path or not config_path.exists():
+            _log_event(
+                "recovery_wallet_transfer_blocked_missing_config",
+                {
+                    **payload_base,
+                    "reason": "executor_or_config_missing",
+                    "target_account_label": self.config.bot_name,
+                },
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {**payload_base, "reason": "executor_or_config_missing"},
@@ -14569,8 +14787,63 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_required"] = True
             state["recovery_reload_transfer_submitted"] = False
             state["recovery_reload_transfer_confirmed"] = False
-            state["recovery_reload_transfer_error"] = "executor_or_config_missing"
+            state["recovery_reload_transfer_error"] = "waiting_for_wallet_config"
             return False, None
+        inspection = self._inspect_wallet_transfer_config(
+            config_path,
+            target_bot_name=str(self.config.bot_name or ""),
+            target_profile=target_profile,
+            source_config_origin=source_config_origin,
+        )
+        if not inspection.get("ok"):
+            _log_event(
+                "recovery_wallet_transfer_blocked_missing_config",
+                {
+                    **payload_base,
+                    "reason": inspection.get("reason"),
+                    "source_account_label": inspection.get("source_account_label"),
+                    "target_account_label": inspection.get("target_account_label") or self.config.bot_name,
+                },
+            )
+            _log_event(
+                "fixed_cycle_recovery_wallet_transfer_failed",
+                {
+                    **payload_base,
+                    "reason": inspection.get("reason"),
+                    "source_account_label": inspection.get("source_account_label"),
+                    "target_account_label": inspection.get("target_account_label"),
+                },
+            )
+            state["recovery_reload_transfer_required"] = True
+            state["recovery_reload_transfer_submitted"] = False
+            state["recovery_reload_transfer_confirmed"] = False
+            state["recovery_reload_transfer_error"] = "waiting_for_wallet_config"
+            return False, None
+        _log_event(
+            "recovery_wallet_transfer_config_resolved",
+            {
+                **payload_base,
+                "source_account_label": inspection.get("source_account_label"),
+                "target_account_label": inspection.get("target_account_label"),
+            },
+        )
+        _log_event(
+            "recovery_wallet_transfer_target_resolved",
+            {
+                **payload_base,
+                "source_account_label": inspection.get("source_account_label"),
+                "target_account_label": inspection.get("target_account_label"),
+            },
+        )
+        if group_origin == "paired_long_bot_group":
+            _log_event(
+                "recovery_wallet_transfer_using_master_funding_source",
+                {
+                    **payload_base,
+                    "source_account_label": inspection.get("source_account_label"),
+                    "target_account_label": inspection.get("target_account_label"),
+                },
+            )
         cmd = [
             sys.executable,
             str(executor_path),
@@ -14612,6 +14885,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             or "Transfer failed" in stderr
         )
         if failure:
+            stderr_lower = stderr.lower()
+            stdout_lower = stdout.lower()
+            insufficient_balance = (
+                "131212" in stderr
+                or "131212" in stdout
+                or "insufficient balance" in stderr_lower
+                or "insufficient balance" in stdout_lower
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {
@@ -14624,7 +14905,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_required"] = True
             state["recovery_reload_transfer_submitted"] = False
             state["recovery_reload_transfer_confirmed"] = False
-            state["recovery_reload_transfer_error"] = "subprocess_failure"
+            state["recovery_reload_transfer_error"] = (
+                "waiting_for_funds" if insufficient_balance else "subprocess_failure"
+            )
             return False, None
         transfer_event = self._find_latest_wallet_transfer_success_event(
             log_path, start_time, self.config.bot_name
@@ -14639,6 +14922,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_exchange_transfer_id"] = transfer_id
             state["recovery_reload_transfer_source_account"] = "FUND"
             state["recovery_reload_transfer_target_account"] = "UNIFIED"
+            state["recovery_reload_transfer_source_config_origin"] = source_config_origin
+            state["recovery_reload_transfer_source_account_label"] = inspection.get(
+                "source_account_label"
+            )
+            state["recovery_reload_transfer_target_profile"] = target_profile
+            state["recovery_reload_transfer_target_account_label"] = inspection.get(
+                "target_account_label"
+            )
+            state["recovery_reload_transfer_config_path"] = str(config_path)
             state["recovery_reload_transfer_script_path"] = str(executor_path)
             state.pop("recovery_reload_transfer_error", None)
         return True, transfer_id
@@ -15053,11 +15345,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_required"] = True
             state["recovery_reload_transfer_submitted"] = False
             state["recovery_reload_transfer_confirmed"] = False
-            state["recovery_reload_transfer_error"] = "executor_failed"
+            failure_reason = str(state.get("recovery_reload_transfer_error") or "").strip()
+            if failure_reason not in {"waiting_for_wallet_config", "waiting_for_funds"}:
+                failure_reason = "executor_failed"
+            state["recovery_reload_transfer_error"] = failure_reason
+            lifecycle_state = "FAILED"
+            lifecycle_event = "recovery_wallet_transfer_failed"
+            if failure_reason == "waiting_for_wallet_config":
+                lifecycle_state = "WAITING_FOR_WALLET_CONFIG"
+                lifecycle_event = "recovery_wallet_transfer_blocked_missing_config"
+            elif failure_reason == "waiting_for_funds":
+                lifecycle_state = "WAITING_FOR_FUNDS"
+                lifecycle_event = "recovery_wallet_transfer_insufficient_funds"
             self._set_recovery_lifecycle_state(
                 state,
-                "FAILED",
-                event="recovery_wallet_transfer_failed",
+                lifecycle_state,
+                event=lifecycle_event,
                 extra={"cycle_index": cycle_index},
             )
             return False
