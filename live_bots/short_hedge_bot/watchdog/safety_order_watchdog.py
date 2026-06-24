@@ -221,6 +221,91 @@ def write_debug_event(logger: logging.Logger, event_name: str, payload: dict[str
         logger.warning("Failed to write debug event %s: %s", event_name, exc)
 
 
+def _cleanup_flat_runtime_state(
+    bot_name: str,
+    logger: logging.Logger,
+    runtime_state_payload: Mapping[str, Any],
+) -> None:
+    state_path_str = runtime_state_payload.get("path")
+    if not state_path_str:
+        return
+    state_path = Path(state_path_str)
+    if not state_path.exists():
+        return
+    try:
+        raw = state_path.read_text(encoding="utf-8")
+        payload = json.loads(raw) or {}
+    except Exception as exc:
+        logger.info(
+            "watchdog_flat_runtime_state_cleanup_read_failed bot=%s path=%s error=%s",
+            bot_name,
+            state_path,
+            exc,
+        )
+        return
+    if not isinstance(payload, dict):
+        return
+
+    strategy_state = payload.get("strategy_state") or {}
+    if not isinstance(strategy_state, Mapping):
+        strategy_state = {}
+    strategy_state = dict(strategy_state)
+
+    # Beide active_orders-Felder leeren.
+    payload["active_orders"] = []
+    strategy_state["active_orders"] = []
+
+    # Qty-/Entry-/Flat-Marker neutralisieren.
+    for key in (
+        "initial_entry_submitted",
+        "initial_structure_built",
+        "trade_active",
+        "emergency_flat_required",
+        "emergency_flat_in_progress",
+    ):
+        strategy_state[key] = False
+
+    for key in (
+        "initial_long_qty",
+        "initial_short_qty",
+        "long_qty",
+        "short_qty",
+    ):
+        strategy_state[key] = 0.0
+
+    # Cycle-State-Marker neutralisieren.
+    cycle_state = strategy_state.get("cycle_state") or {}
+    if not isinstance(cycle_state, Mapping):
+        cycle_state = {}
+    cycle_state = dict(cycle_state)
+    for key in (
+        "trade_active",
+        "refill_required",
+        "refill_in_progress",
+        "short_reduce_pending",
+        "long_add_pending",
+        "cycle_waiting_for_short_tp",
+    ):
+        cycle_state[key] = False
+    strategy_state["cycle_state"] = cycle_state
+
+    payload["strategy_state"] = strategy_state
+
+    try:
+        state_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(
+            "watchdog_flat_runtime_state_cleanup_applied bot=%s path=%s",
+            bot_name,
+            state_path,
+        )
+    except Exception as exc:
+        logger.info(
+            "watchdog_flat_runtime_state_cleanup_write_failed bot=%s path=%s error=%s",
+            bot_name,
+            state_path,
+            exc,
+        )
+
 def _load_bot_status(bot_name: str, logger: logging.Logger) -> dict[str, Any]:
     status_path = BOT_ROOT / bot_name.lower() / "run" / "status.json"
     if not status_path.exists():
@@ -625,6 +710,7 @@ def handle_profile(
                 top_level_symbol,
                 cycle_state_symbol,
             )
+            _cleanup_flat_runtime_state(bot_name, logger, runtime_state_payload)
         return
     write_debug_event(
         logger,
@@ -689,6 +775,7 @@ def handle_profile(
                 top_level_symbol,
                 cycle_state_symbol,
             )
+            _cleanup_flat_runtime_state(bot_name, logger, runtime_state_payload)
         return
 
     has_position = long_qty > 0 or short_qty > 0
