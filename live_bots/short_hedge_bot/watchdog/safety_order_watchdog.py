@@ -564,6 +564,16 @@ def handle_profile(
         },
     )
     if not detected_symbol:
+        runtime_state_payload = load_bot_runtime_state(bot_name, logger)
+        strategy_state = runtime_state_payload.get("strategy_state") or {}
+        active_orders = runtime_state_payload.get("active_orders") or []
+        status_payload = _load_bot_status(bot_name, logger)
+        state_active = _strategy_state_looks_active(strategy_state, active_orders)
+        status_inactive = _status_clearly_inactive(status_payload)
+        top_level_symbol = strategy_state.get("symbol")
+        cycle_state = strategy_state.get("cycle_state") or {}
+        cycle_state_symbol = cycle_state.get("symbol") if isinstance(cycle_state, Mapping) else None
+        bot_state = str(strategy_state.get("bot_state") or "").upper()
         write_debug_event(
             logger,
             "positions_fetched",
@@ -585,6 +595,36 @@ def handle_profile(
                 "symbol": symbol,
             },
         )
+        logger.info(
+            "watchdog_profile_skipped_no_position bot=%s symbol=%s long_qty=%s short_qty=%s state_active=%s status_inactive=%s state_path=%s",
+            bot_name,
+            symbol,
+            long_qty,
+            short_qty,
+            state_active,
+            status_inactive,
+            runtime_state_payload.get("path"),
+        )
+        if cycle_state_symbol:
+            logger.info(
+                "watchdog_cycle_state_symbol_available_but_no_exchange_position bot=%s config_symbol=%s cycle_state_symbol=%s long_qty=%s short_qty=%s",
+                bot_name,
+                config_symbol,
+                cycle_state_symbol,
+                long_qty,
+                short_qty,
+            )
+        if status_inactive and state_active:
+            logger.warning(
+                "watchdog_stale_active_state_without_exchange_position bot=%s state_path=%s bot_state=%s initial_entry_submitted=%s initial_structure_built=%s top_level_symbol=%s cycle_state_symbol=%s",
+                bot_name,
+                runtime_state_payload.get("path"),
+                bot_state,
+                bool(strategy_state.get("initial_entry_submitted")),
+                bool(strategy_state.get("initial_structure_built")),
+                top_level_symbol,
+                cycle_state_symbol,
+            )
         return
     write_debug_event(
         logger,
@@ -600,6 +640,16 @@ def handle_profile(
     )
     has_position = long_qty > 0 or short_qty > 0
     if not has_position:
+        runtime_state_payload = load_bot_runtime_state(bot_name, logger)
+        strategy_state = runtime_state_payload.get("strategy_state") or {}
+        active_orders = runtime_state_payload.get("active_orders") or []
+        status_payload = _load_bot_status(bot_name, logger)
+        state_active = _strategy_state_looks_active(strategy_state, active_orders)
+        status_inactive = _status_clearly_inactive(status_payload)
+        top_level_symbol = strategy_state.get("symbol")
+        cycle_state = strategy_state.get("cycle_state") or {}
+        cycle_state_symbol = cycle_state.get("symbol") if isinstance(cycle_state, Mapping) else None
+        bot_state = str(strategy_state.get("bot_state") or "").upper()
         write_debug_event(
             logger,
             "profile_skipped_no_position",
@@ -609,6 +659,36 @@ def handle_profile(
                 "symbol": symbol,
             },
         )
+        logger.info(
+            "watchdog_profile_skipped_no_position bot=%s symbol=%s long_qty=%s short_qty=%s state_active=%s status_inactive=%s state_path=%s",
+            bot_name,
+            symbol,
+            long_qty,
+            short_qty,
+            state_active,
+            status_inactive,
+            runtime_state_payload.get("path"),
+        )
+        if cycle_state_symbol:
+            logger.info(
+                "watchdog_cycle_state_symbol_available_but_no_exchange_position bot=%s config_symbol=%s cycle_state_symbol=%s long_qty=%s short_qty=%s",
+                bot_name,
+                config_symbol,
+                cycle_state_symbol,
+                long_qty,
+                short_qty,
+            )
+        if status_inactive and state_active:
+            logger.warning(
+                "watchdog_stale_active_state_without_exchange_position bot=%s state_path=%s bot_state=%s initial_entry_submitted=%s initial_structure_built=%s top_level_symbol=%s cycle_state_symbol=%s",
+                bot_name,
+                runtime_state_payload.get("path"),
+                bot_state,
+                bool(strategy_state.get("initial_entry_submitted")),
+                bool(strategy_state.get("initial_structure_built")),
+                top_level_symbol,
+                cycle_state_symbol,
+            )
         return
 
     has_position = long_qty > 0 or short_qty > 0
