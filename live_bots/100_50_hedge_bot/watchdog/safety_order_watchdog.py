@@ -47,40 +47,165 @@ def setup_logger() -> logging.Logger:
 
 def _validate_runner_process(bot_name: str, logger: logging.Logger) -> bool:
     bot_name = bot_name.lower()
-    pid_file = BOT_ROOT / bot_name / "run" / "bot.pid"
-    reason = None
-    if not pid_file.exists():
-        reason = "no_pid_file"
-    else:
+    bot_dir = BOT_ROOT / bot_name
+    run_dir = bot_dir / "run"
+    primary_pid_file = run_dir / "bot.pid"
+    legacy_pid_file = bot_dir / "pids" / "fixed_cycle_bot.pid"
+
+    def _read_pid_file(path: Path) -> int | None:
+        if not path.exists():
+            return None
         try:
-            pid = int(pid_file.read_text().strip())
+            text = path.read_text(encoding="utf-8").strip()
         except Exception:
-            reason = "invalid_pid"
+            return None
+        try:
+            pid_value = int(text)
+        except (TypeError, ValueError):
+            return None
+        if pid_value <= 0:
+            return None
+        return pid_value
+
+    def _pid_looks_like_runner(pid_value: int) -> bool:
+        proc_cmd = Path(f"/proc/{pid_value}/cmdline")
+        if not proc_cmd.exists():
+            return False
+        try:
+            cmdline = proc_cmd.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+        except Exception:
+            return False
+        tokens = [
+            "fixed_cycle_hedge_bot.runner",
+            f"--bot-name {bot_name}",
+            str(PROJECT_ROOT),
+        ]
+        return all(token in cmdline for token in tokens)
+
+    def _scan_runner_pids() -> list[int]:
+        try:
+            process = subprocess.run(
+                ["ps", "-o", "pid=", "-o", "args=", "-C", "python", "-C", "python3"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception as exc:
+            logger.info(
+                "watchdog_runner_scan_failed bot=%s error=%s",
+                bot_name,
+                exc,
+            )
+            return []
+        pids: list[int] = []
+        for line in process.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) != 2:
+                continue
+            pid_str, args = parts
+            if (
+                "fixed_cycle_hedge_bot.runner" in args
+                and f"--bot-name {bot_name}" in args
+                and str(PROJECT_ROOT) in args
+            ):
+                try:
+                    pids.append(int(pid_str))
+                except (TypeError, ValueError):
+                    continue
+        return pids
+
+    runner_pid: int | None = None
+    runner_source: str | None = None
+
+    candidate = _read_pid_file(primary_pid_file)
+    if candidate is not None and _pid_looks_like_runner(candidate):
+        runner_pid = candidate
+        runner_source = "run_pid_file"
+    else:
+        legacy_candidate = _read_pid_file(legacy_pid_file)
+        if legacy_candidate is not None and _pid_looks_like_runner(legacy_candidate):
+            runner_pid = legacy_candidate
+            runner_source = "legacy_pid_file"
         else:
-            if pid <= 0:
-                reason = "invalid_pid"
-            else:
-                proc_cmd = Path(f"/proc/{pid}/cmdline")
-                if not proc_cmd.exists():
-                    reason = "pid_not_running"
-                else:
-                    try:
-                        cmdline = proc_cmd.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
-                    except Exception:
-                        reason = "cmdline_unreadable"
-                    else:
-                        tokens = [
-                            "fixed_cycle_hedge_bot.runner",
-                            f"--bot-name {bot_name}",
-                            str(PROJECT_ROOT),
-                        ]
-                        for token in tokens:
-                            if token not in cmdline:
-                                reason = f"missing_{token.replace(' ', '_')}"
-                                break
-    if reason:
-        logger.info("watchdog_skip_inactive_bot bot=%s reason=%s", bot_name, reason)
+            scanned = _scan_runner_pids()
+            if scanned:
+                runner_pid = scanned[0]
+                runner_source = "process_scan"
+
+    if runner_pid is not None and (
+        not primary_pid_file.exists() or _read_pid_file(primary_pid_file) != runner_pid
+    ):
+        try:
+            run_dir.mkdir(parents=True, exist_ok=True)
+            primary_pid_file.write_text(str(runner_pid), encoding="utf-8")
+            logger.info(
+                "watchdog_runner_pid_recovered bot=%s source=%s pid=%s",
+                bot_name,
+                runner_source,
+                runner_pid,
+            )
+        except Exception as exc:
+            logger.info(
+                "watchdog_runner_pid_recover_failed bot=%s source=%s pid=%s error=%s",
+                bot_name,
+                runner_source,
+                runner_pid,
+                exc,
+            )
+
+    runtime_state = load_bot_runtime_state(bot_name, logger)
+    strategy_state = runtime_state.get("strategy_state") or {}
+    active_orders = runtime_state.get("active_orders") or []
+    status_payload = _load_bot_status(bot_name, logger)
+    state_active = _strategy_state_looks_active(strategy_state, active_orders)
+    status_inactive = _status_clearly_inactive(status_payload)
+
+    if runner_pid is not None:
+        logger.info(
+            "watchdog_profile_checked bot=%s runner_status=active pid=%s source=%s state_active=%s status_inactive=%s",
+            bot_name,
+            runner_pid,
+            runner_source,
+            state_active,
+            status_inactive,
+        )
+        return True
+
+    if state_active:
+        logger.warning(
+            "watchdog_runner_missing_but_state_active bot=%s state_path=%s",
+            bot_name,
+            runtime_state.get("path"),
+        )
+        logger.info(
+            "watchdog_profile_checked bot=%s runner_status=missing state_active=%s status_inactive=%s",
+            bot_name,
+            state_active,
+            status_inactive,
+        )
+        return True
+
+    if not state_active and status_inactive:
+        logger.info(
+            "watchdog_runner_validation_failed_but_state_inactive bot=%s status=%s",
+            bot_name,
+            (status_payload.get("status") if isinstance(status_payload, dict) else None),
+        )
+        logger.info(
+            "watchdog_profile_skipped_inactive bot=%s reason=status_inactive",
+            bot_name,
+        )
         return False
+
+    logger.info(
+        "watchdog_profile_checked bot=%s runner_status=missing state_active=%s status_inactive=%s",
+        bot_name,
+        state_active,
+        status_inactive,
+    )
     return True
 
 
@@ -94,6 +219,75 @@ def write_debug_event(logger: logging.Logger, event_name: str, payload: dict[str
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception as exc:
         logger.warning("Failed to write debug event %s: %s", event_name, exc)
+
+
+def _load_bot_status(bot_name: str, logger: logging.Logger) -> dict[str, Any]:
+    status_path = BOT_ROOT / bot_name.lower() / "run" / "status.json"
+    if not status_path.exists():
+        return {}
+    try:
+        raw = status_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        logger.info("watchdog_status_read_failed bot=%s path=%s error=%s", bot_name, status_path, exc)
+        return {}
+    try:
+        data = json.loads(raw) or {}
+    except Exception as exc:
+        logger.info("watchdog_status_parse_failed bot=%s path=%s error=%s", bot_name, status_path, exc)
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def _status_clearly_inactive(status_payload: dict[str, Any] | None) -> bool:
+    if not isinstance(status_payload, dict):
+        return False
+    status_value = str(status_payload.get("status") or "").strip().lower()
+    return status_value in {"stopped", "idle", "inactive"}
+
+
+def _strategy_state_looks_active(
+    strategy_state: Mapping[str, Any] | None,
+    active_orders: list[Mapping[str, Any]] | None,
+) -> bool:
+    state = dict(strategy_state or {})
+    orders = list(active_orders or [])
+
+    if state.get("initial_entry_submitted") or state.get("initial_structure_built"):
+        return True
+    if state.get("trade_active"):
+        return True
+    if state.get("active_orders"):
+        return True
+    if orders:
+        return True
+
+    for key in ("initial_long_qty", "initial_short_qty", "long_qty", "short_qty"):
+        try:
+            value = float(state.get(key) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return True
+
+    bot_state = str(state.get("bot_state") or "").strip().upper()
+    if bot_state and bot_state not in {"IDLE", "STOPPED", "CLOSED"}:
+        return True
+
+    cycle_state = state.get("cycle_state") or {}
+    if isinstance(cycle_state, Mapping):
+        if (
+            cycle_state.get("trade_active")
+            or cycle_state.get("refill_in_progress")
+            or cycle_state.get("refill_required")
+        ):
+            return True
+
+    if state.get("emergency_flat_required") or state.get("emergency_flat_in_progress"):
+        return True
+
+    return False
 
 
 def required_groups_for_position(long_qty: float, short_qty: float) -> list[str]:
