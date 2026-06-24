@@ -615,25 +615,6 @@ def extract_order_signature(order: Mapping[str, Any]) -> str:
     return " ".join(pieces)
 
 
-
-def _is_long_exit_signature(signature: str) -> bool:
-    return (
-        "LONG_TP_EXIT" in signature
-        or "LONG_TP_EXIT_RECOVERY" in signature
-        or "LONG_SL_EXIT" in signature
-        or "LONG_SL_EXIT_RECOVERY" in signature
-    )
-
-
-def _is_short_exit_signature(signature: str) -> bool:
-    return (
-        "SHORT_TP_EXIT" in signature
-        or "SHORT_TP_EXIT_RECOVERY" in signature
-        or "SHORT_SL_EXIT" in signature
-        or "SHORT_SL_EXIT_RECOVERY" in signature
-    )
-
-
 def classify_order_groups(
     exchange_orders: list[Mapping[str, Any]],
     persisted_orders: list[Mapping[str, Any]] | None = None,
@@ -643,9 +624,9 @@ def classify_order_groups(
     for order in exchange_orders:
         signature = extract_order_signature(order)
         summary.append(summarize_order(order))
-        if _is_long_exit_signature(signature):
+        if "LONG_TP_EXIT" in signature or "LONG_TP_EXIT_RECOVERY" in signature:
             groups["long_exit"] = True
-        if _is_short_exit_signature(signature):
+        if "SHORT_SL_EXIT" in signature or "SHORT_SL_EXIT_RECOVERY" in signature:
             groups["short_exit"] = True
         if "CYCLE_" in signature:
             groups["cycle"] = True
@@ -655,9 +636,9 @@ def classify_order_groups(
         signature = extract_order_signature(order)
         summary.append(summarize_order(order))
         # Exit orders may be synthetic/trading-stop based and can still be represented only in runtime state.
-        if _is_long_exit_signature(signature):
+        if "LONG_TP_EXIT" in signature or "LONG_TP_EXIT_RECOVERY" in signature:
             groups["long_exit"] = True
-        if _is_short_exit_signature(signature):
+        if "SHORT_SL_EXIT" in signature or "SHORT_SL_EXIT_RECOVERY" in signature:
             groups["short_exit"] = True
         # Refill orders are still allowed from persisted runtime state to bridge short exchange propagation gaps.
         if "REFILL_LONG" in signature or "REFILL_SHORT" in signature:
