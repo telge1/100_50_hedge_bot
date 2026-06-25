@@ -7520,7 +7520,7 @@ def _get_profit_trade_bot_sources(profile: str, bot_side: str | None = None) -> 
         sources: list[dict[str, Any]] = []
         if source:
             sources.append(source)
-        logger.info(
+        logger.debug(
             "[dashboard] profit_trade_sources profile=%s bot_side=%s sources=%s",
             profile,
             _normalize_bot_side(bot_side),
@@ -7592,7 +7592,7 @@ def _get_profit_trade_bot_sources(profile: str, bot_side: str | None = None) -> 
         seen_bot_names.add(bot_name)
         deduped.append(source)
 
-    logger.info(
+    logger.debug(
         "[dashboard] profit_trade_sources profile=%s bot_side=%s sources=%s",
         profile,
         raw_side,
@@ -7904,6 +7904,205 @@ def _detail_order_id(detail: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_cycle_index_from_purpose(purpose: str | None) -> int:
+    match = re.search(r"CYCLE_(\d+)", str(purpose or "").upper())
+    if not match:
+        return 0
+    try:
+        return int(match.group(1))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _trade_block_detail_purpose_rank(purpose: str | None) -> int:
+    base = str(purpose or "").strip().upper()
+    if " (" in base:
+        base = base.split(" (", 1)[0]
+    if "INITIAL" in base and "ENTRY" in base:
+        return 10
+    if base.startswith("RECOVERY_RELOAD") or base.startswith("RECOVERY_REFILL"):
+        return 20
+    cycle_index = _extract_cycle_index_from_purpose(base)
+    if cycle_index > 0:
+        if "ADD" in base:
+            return 100 + cycle_index * 10
+        if "REDUCE" in base:
+            return 100 + cycle_index * 10 + 5
+        if "TP" in base:
+            return 100 + cycle_index * 10 + 7
+        return 100 + cycle_index * 10 + 3
+    if base.startswith("REFILL") or "REFILL" in base:
+        return 400 + cycle_index
+    if any(
+        token in base
+        for token in (
+            "LONG_TP_EXIT",
+            "LONG_SL_EXIT",
+            "SHORT_TP_EXIT",
+            "SHORT_SL_EXIT",
+            "SHORT_HARD_STOP",
+            "FINAL_EXIT",
+            "EMERGENCY_FLAT",
+        )
+    ):
+        return 9000
+    if "_EXIT" in base and ("TP" in base or "SL" in base):
+        return 9000
+    return 500
+
+
+def _detail_row_timestamp(row: dict[str, Any]) -> datetime | None:
+    for key in ("time", "timestamp", "filled_at", "created_at", "updated_at", "exec_time"):
+        dt = _normalize_trade_filter_datetime(row.get(key))
+        if dt:
+            return dt
+    return None
+
+
+def _trade_block_detail_row_sort_key(row: dict[str, Any]) -> tuple:
+    dt = _detail_row_timestamp(row)
+    missing_ts = 1 if dt is None else 0
+    ts_value = dt.timestamp() if dt is not None else 0.0
+    cycle_index = _safe_int(row.get("cycle_index"))
+    if cycle_index <= 0:
+        cycle_index = _extract_cycle_index_from_purpose(str(row.get("purpose") or ""))
+    purpose_rank = _trade_block_detail_purpose_rank(str(row.get("purpose") or ""))
+    stage_index = _safe_int(row.get("stage_index") or row.get("split_index"))
+    stable_id = str(
+        row.get("exchange_order_id") or row.get("order_id") or row.get("client_order_id") or ""
+    )
+    if missing_ts:
+        return (1, purpose_rank, cycle_index, stage_index, stable_id)
+    return (0, ts_value, cycle_index, purpose_rank, stage_index, stable_id)
+
+
+def _sort_trade_block_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    return sorted(rows, key=_trade_block_detail_row_sort_key)
+
+
+def _trade_block_detail_row_dedupe_key(row: dict[str, Any]) -> str:
+    purpose = str(row.get("purpose") or "").strip().upper().split(" (", 1)[0]
+    exchange_id = str(row.get("exchange_order_id") or row.get("order_id") or "").strip()
+    client_id = str(row.get("client_order_id") or "").strip()
+    if exchange_id and exchange_id != "-":
+        return f"{exchange_id}:{purpose}"
+    if client_id:
+        return f"client:{client_id}:{purpose}"
+    ts = str(row.get("time") or row.get("timestamp") or "")
+    raw_pnl = row.get("pnl_usdt")
+    if raw_pnl in (None, "-"):
+        raw_pnl = row.get("pnl")
+    if raw_pnl in (None, "-"):
+        raw_pnl = row.get("closed_pnl")
+    return f"fallback:{ts}:{purpose}:{raw_pnl}"
+
+
+def _detail_row_is_confirmed_source(row: dict[str, Any]) -> bool:
+    if str(row.get("detail_source") or "").strip().lower() == "confirmed":
+        return True
+    return str(row.get("record_source") or "").strip() == "bot_confirmed_pnl"
+
+
+def _detail_row_has_numeric_pnl(row: dict[str, Any]) -> bool:
+    raw_pnl = row.get("pnl_usdt")
+    if raw_pnl in (None, "-"):
+        raw_pnl = row.get("pnl")
+    if raw_pnl in (None, "-"):
+        raw_pnl = row.get("closed_pnl")
+    return _safe_wallet_float(raw_pnl) is not None
+
+
+def _prefer_trade_block_detail_row(candidate: dict[str, Any], incumbent: dict[str, Any]) -> bool:
+    candidate_confirmed = _detail_row_is_confirmed_source(candidate)
+    incumbent_confirmed = _detail_row_is_confirmed_source(incumbent)
+    if candidate_confirmed and not incumbent_confirmed:
+        return True
+    if incumbent_confirmed and not candidate_confirmed:
+        return False
+    candidate_has_pnl = _detail_row_has_numeric_pnl(candidate)
+    incumbent_has_pnl = _detail_row_has_numeric_pnl(incumbent)
+    if candidate_has_pnl and not incumbent_has_pnl:
+        return True
+    return False
+
+
+def _dedupe_trade_block_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = _trade_block_detail_row_dedupe_key(row)
+        existing = merged.get(key)
+        if existing is None or _prefer_trade_block_detail_row(row, existing):
+            merged[key] = row
+    return list(merged.values())
+
+
+def _filled_order_to_detail_row(order: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+    pnl_value = order.get("pnl")
+    if pnl_value is None:
+        pnl_value = order.get("realized_pnl")
+    return {
+        "time": order.get("time"),
+        "time_label": order.get("time_label") or _format_profit_time_label(order.get("time")),
+        "symbol": order.get("symbol") or record.get("symbol"),
+        "order_id": order.get("order_id") or order.get("exchange_order_id") or order.get("client_order_id") or "",
+        "exchange_order_id": order.get("exchange_order_id"),
+        "client_order_id": order.get("client_order_id"),
+        "pnl_usdt": pnl_value if pnl_value is not None else "-",
+        "wallet_after": None,
+        "purpose": order.get("purpose"),
+        "cycle_index": order.get("cycle_index"),
+        "pnl_scope": order.get("pnl_scope"),
+        "stage_index": order.get("stage_index"),
+        "split_index": order.get("split_index"),
+        "qty": order.get("qty") or order.get("exec_qty"),
+        "side": order.get("side"),
+        "cycle_role": order.get("cycle_role"),
+        "bot_name": order.get("bot_name") or record.get("bot_name"),
+        "source": order.get("source"),
+        "detail_source": "filled_order",
+    }
+
+
+def _legacy_detail_to_detail_row(
+    detail: dict[str, Any],
+    record: dict[str, Any],
+    fallback_time: datetime | None,
+) -> dict[str, Any]:
+    time_val = detail.get("time") or detail.get("timestamp") or detail.get("created_at") or fallback_time
+    formatted_time = time_val.isoformat() if isinstance(time_val, datetime) else time_val
+    return {
+        "time": formatted_time,
+        "time_label": _format_profit_time_label(time_val),
+        "symbol": record.get("symbol"),
+        "order_id": _detail_order_id(detail),
+        "pnl_usdt": detail.get("pnl") or detail.get("pnl_usdt") or detail.get("realized_pnl") or 0.0,
+        "wallet_after": detail.get("wallet_after") or detail.get("wallet_after_trade") or record.get("wallet_after_trade"),
+        "purpose": detail.get("purpose"),
+        "cycle_index": detail.get("cycle_index"),
+        "detail_source": "legacy_detail",
+    }
+
+
+def _build_trade_block_detail_rows(
+    record: dict[str, Any],
+    confirmed_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if confirmed_rows:
+        rows.extend(_build_confirmed_detail_rows(record, confirmed_rows))
+    for order in record.get("filled_orders") or []:
+        if isinstance(order, dict):
+            rows.append(_filled_order_to_detail_row(order, record))
+    fallback_time = _get_trade_start_time(record) or _get_trade_end_time(record)
+    for detail in record.get("details") or []:
+        if isinstance(detail, dict):
+            rows.append(_legacy_detail_to_detail_row(detail, record, fallback_time))
+    rows = _dedupe_trade_block_detail_rows(rows)
+    return _sort_trade_block_detail_rows(rows)
+
+
 def _build_profit_trade_summary(
     record: dict[str, Any], confirmed_start: datetime | None = None
 ) -> dict[str, Any]:
@@ -7924,6 +8123,11 @@ def _build_profit_trade_summary(
         else record.get("end_profit")
         if record.get("end_profit") is not None
         else record.get("total_trade_pnl"),
+        "confirmed_pnl_row_count": record.get("confirmed_pnl_row_count"),
+        "final_exit_confirmed": record.get("final_exit_confirmed"),
+        "no_final_exit_confirmed": record.get("no_final_exit_confirmed"),
+        "profit_is_final": record.get("profit_is_final"),
+        "close_reason": record.get("close_reason"),
         "wallet_after": record.get("wallet_after_trade"),
         "cycle_count": record.get("cycle_count"),
         "status": record.get("status"),
@@ -8052,14 +8256,19 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
                 "time_label": _format_profit_time_label(entry.get("timestamp")),
                 "symbol": entry.get("symbol") or record.get("symbol"),
                 "order_id": order_id,
+                "exchange_order_id": entry.get("exchange_order_id"),
+                "client_order_id": entry.get("client_order_id"),
                 "pnl_usdt": pnl_value,
+                "closed_pnl": entry.get("closed_pnl"),
                 "wallet_after": None,
                 "purpose": display_purpose,
                 "parent_purpose": parent_purpose,
                 "stage_index": stage_index,
                 "stage_count": stage_count,
-                    "split_index": split_index,
-                    "split_count": split_count,
+                "split_index": split_index,
+                "split_count": split_count,
+                "cycle_index": entry.get("cycle_index"),
+                "pnl_scope": entry.get("pnl_scope"),
                 "qty": qty_value,
                 "side": side_value,
                 "cycle_role": cycle_role_value,
@@ -8068,6 +8277,7 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
                 "bot_side": bot_side_value,
                 "source": display_source,
                 "record_source": entry.get("source"),
+                "detail_source": "confirmed",
             }
         )
     return rows
@@ -8229,52 +8439,87 @@ def _collect_confirmed_order_pnl_rows(paths: list[Path]) -> list[dict[str, Any]]
     return _collect_confirmed_order_pnl_rows_from_paths(paths)
 
 
-def _collect_confirmed_trade_start_times(profile: str, bot_side: str | None = None) -> dict[str, datetime]:
-    paths = _collect_confirmed_history_paths(profile, bot_side)
-    rows = _collect_confirmed_order_pnl_rows(paths)
-    if bot_side:
-        rows = _filter_trades_by_side(rows, bot_side)
-    start_times: dict[str, datetime] = {}
-    for row in rows:
-        tbid = str(row.get("trade_block_id") or "").strip()
-        if not tbid:
-            continue
-        ts = _normalize_dashboard_datetime(row.get("timestamp"))
-        if not ts:
-            continue
-        existing = start_times.get(tbid)
-        if not existing or ts < existing:
-            start_times[tbid] = ts
-    return start_times
+def _collect_confirmed_trade_start_times(
+    profile: str,
+    bot_side: str | None = None,
+    *,
+    confirmed_index: dict[str, Any] | None = None,
+) -> dict[str, datetime]:
+    if confirmed_index is not None:
+        return dict(confirmed_index.get("start_times") or {})
+    return dict(_build_confirmed_pnl_index(profile, bot_side).get("start_times") or {})
 
 
 def _confirmed_row_dedupe_key(row: dict[str, Any]) -> str:
     return _shared_confirmed_row_dedupe_key(row)
 
 
-def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> list[dict[str, Any]]:
-    filtered = [row for row in rows if str(row.get("trade_block_id") or "").strip() == trade_block_id]
-    if not filtered:
+def _confirmed_row_sort_key(entry: dict[str, Any]) -> tuple:
+    ts = _parse_profit_time(entry.get("timestamp")) or datetime.min
+    cycle_index = _safe_int(entry.get("cycle_index"))
+    purpose = str(entry.get("purpose") or "")
+    order_id = str(entry.get("exchange_order_id") or entry.get("client_order_id") or "")
+    return (ts, cycle_index, purpose, order_id)
+
+
+def _dedupe_confirmed_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
         return []
     seen: set[str] = set()
-    deduped = []
-    for row in filtered:
+    deduped: list[dict[str, Any]] = []
+    for row in rows:
         key = _confirmed_row_dedupe_key(row)
         if key in seen:
             continue
         seen.add(key)
         deduped.append(row)
-    # Chronologische Sortierung; bei nahezu identischen Zeitstempeln zusätzliche
-    # Stabilisierung über Cycle- und Purpose-Metadaten.
-    def _confirmed_row_sort_key(entry: dict[str, Any]) -> tuple:
-        ts = _parse_profit_time(entry.get("timestamp")) or datetime.min
-        cycle_index = _safe_int(entry.get("cycle_index"))
-        purpose = str(entry.get("purpose") or "")
-        order_id = str(entry.get("exchange_order_id") or entry.get("client_order_id") or "")
-        return (ts, cycle_index, purpose, order_id)
-
     deduped.sort(key=_confirmed_row_sort_key)
     return deduped
+
+
+def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> list[dict[str, Any]]:
+    filtered = [row for row in rows if str(row.get("trade_block_id") or "").strip() == trade_block_id]
+    return _dedupe_confirmed_rows(filtered)
+
+
+def _build_confirmed_pnl_index(
+    profile: str,
+    bot_side: str | None = None,
+) -> dict[str, Any]:
+    paths = _collect_confirmed_pnl_paths_for_view(profile, bot_side)
+    all_rows = _collect_confirmed_order_pnl_rows_from_paths(paths)
+    by_trade_block_id: dict[str, list[dict[str, Any]]] = {}
+    start_times: dict[str, datetime] = {}
+    end_times: dict[str, datetime] = {}
+    for row in all_rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            continue
+        by_trade_block_id.setdefault(tbid, []).append(row)
+        ts = _normalize_dashboard_datetime(row.get("timestamp"))
+        if ts:
+            existing_start = start_times.get(tbid)
+            if not existing_start or ts < existing_start:
+                start_times[tbid] = ts
+            existing_end = end_times.get(tbid)
+            if not existing_end or ts > existing_end:
+                end_times[tbid] = ts
+    for tbid, items in by_trade_block_id.items():
+        by_trade_block_id[tbid] = _dedupe_confirmed_rows(items)
+    logger.info(
+        "[dashboard] profit_trade_confirmed_index_built profile=%s bot_side=%s paths=%s trade_blocks=%s rows=%s",
+        profile,
+        _normalize_bot_side(bot_side),
+        [str(path) for path in paths],
+        len(by_trade_block_id),
+        len(all_rows),
+    )
+    return {
+        "by_trade_block_id": by_trade_block_id,
+        "start_times": start_times,
+        "end_times": end_times,
+        "paths": paths,
+    }
 
 
 def _load_confirmed_order_pnl_rows_for_trade(
@@ -8639,13 +8884,55 @@ def _get_confirmed_pnl_rows_for_trade_block(
     trade_block_id: str,
     bot_side: str | None = None,
     bot_name: str | None = None,
+    *,
+    confirmed_index: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if not trade_block_id:
         return []
-    _ = bot_name
+    _ = bot_name, profile, bot_side
+    if confirmed_index is not None:
+        return list((confirmed_index.get("by_trade_block_id") or {}).get(trade_block_id, []))
     paths = _collect_confirmed_pnl_paths_for_view(profile, bot_side)
     rows = _collect_confirmed_order_pnl_rows_from_paths(paths)
     return _filter_confirmed_rows(rows, trade_block_id)
+
+
+def _enrich_profit_trade_row_from_confirmed_index(
+    row: dict[str, Any],
+    confirmed_index: dict[str, Any],
+    *,
+    allow_stale_open_close: bool = False,
+) -> bool:
+    trade_block_id = str(row.get("trade_block_id") or "").strip()
+    if not trade_block_id:
+        return False
+    confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(
+        "",
+        trade_block_id,
+        confirmed_index=confirmed_index,
+    )
+    if confirmed_rows:
+        _apply_confirmed_end_profit_to_record(row, confirmed_rows)
+        cycle_indices: set[int] = set()
+        for entry in confirmed_rows:
+            try:
+                if entry.get("cycle_index") is not None:
+                    cycle_indices.add(int(entry.get("cycle_index")))
+            except (TypeError, ValueError):
+                continue
+        if cycle_indices:
+            row["cycle_count"] = max(cycle_indices)
+        return True
+    row["total_trade_pnl"] = 0.0
+    row["end_profit"] = 0.0
+    row["profit_usdt"] = 0.0
+    row["confirmed_pnl_row_count"] = 0
+    if allow_stale_open_close and not _is_closed_trade_status(row.get("status")):
+        row["details"] = []
+        row["stale_open_no_confirmed_pnl"] = True
+        if not row.get("end_time"):
+            row["end_time"] = row.get("start_time")
+    return False
 
 
 def _sum_confirmed_closed_pnl_rows(
@@ -8693,20 +8980,124 @@ def _apply_confirmed_end_profit_to_record(
     return end_profit, pnl_count, purposes
 
 
+def _normalize_confirmed_purpose(purpose: object) -> str:
+    return str(purpose or "").strip().upper().split(" (", 1)[0]
+
+
+def _is_final_exit_confirmed_row(entry: dict[str, Any]) -> bool:
+    purpose = _normalize_confirmed_purpose(entry.get("purpose"))
+    pnl_scope = str(entry.get("pnl_scope") or "").strip().lower()
+    if pnl_scope == "final_exit":
+        return True
+    if purpose in {
+        "LONG_TP_EXIT",
+        "LONG_SL_EXIT",
+        "LONG_TP_EXIT_RECOVERY",
+        "SHORT_TP_EXIT",
+        "SHORT_SL_EXIT",
+        "SHORT_SL_EXIT_RECOVERY",
+        "SHORT_HARD_STOP_EXIT",
+        "EMERGENCY_FLAT_LONG",
+        "EMERGENCY_FLAT_SHORT",
+        "FINAL_EXIT_LONG",
+        "FINAL_EXIT_SHORT",
+        "FULL_EXIT",
+        "BASKET_EXIT",
+    }:
+        return True
+    if any(token in purpose for token in ("FINAL_EXIT", "FULL_EXIT", "BASKET_EXIT")):
+        return True
+    if any(token in purpose for token in ("FORCE_CLOSE", "MANUAL_CLOSE")):
+        return True
+    if any(token in purpose for token in ("LONG_TP_EXIT", "LONG_SL_EXIT", "SHORT_TP_EXIT", "SHORT_SL_EXIT")):
+        if not purpose.startswith("CYCLE_"):
+            return True
+    return False
+
+
+def _analyze_confirmed_final_exit(confirmed_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    has_long = False
+    has_short = False
+    has_any = False
+    final_exit_purposes: list[str] = []
+    for entry in confirmed_rows:
+        if not _is_final_exit_confirmed_row(entry):
+            continue
+        purpose = str(entry.get("purpose") or "").strip()
+        if purpose:
+            final_exit_purposes.append(purpose)
+        has_any = True
+        purpose_upper = _normalize_confirmed_purpose(purpose)
+        if any(token in purpose_upper for token in ("FULL_EXIT", "BASKET_EXIT", "FINAL_EXIT")):
+            has_long = True
+            has_short = True
+        elif "LONG" in purpose_upper:
+            has_long = True
+        elif "SHORT" in purpose_upper:
+            has_short = True
+    return {
+        "final_exit_confirmed": has_any,
+        "has_long_final_exit": has_long,
+        "has_short_final_exit": has_short,
+        "final_exit_purposes": final_exit_purposes,
+    }
+
+
+def _apply_trade_block_close_status(
+    row: dict[str, Any],
+    confirmed_rows: list[dict[str, Any]],
+    final_exit_meta: dict[str, Any],
+    *,
+    is_active_process: bool,
+    confirmed_index: dict[str, Any] | None = None,
+) -> None:
+    tbid = str(row.get("trade_block_id") or "").strip()
+    if is_active_process:
+        row["is_process"] = True
+        if not str(row.get("status") or "").strip():
+            row["status"] = "in_progress"
+        row["no_final_exit_confirmed"] = not bool(final_exit_meta.get("final_exit_confirmed"))
+        row["final_exit_confirmed"] = bool(final_exit_meta.get("final_exit_confirmed"))
+        row["profit_is_final"] = False
+        return
+
+    row["is_process"] = False
+    if row.get("active_orders"):
+        row["active_orders"] = []
+
+    if final_exit_meta.get("final_exit_confirmed"):
+        row["status"] = "closed"
+        row["final_exit_confirmed"] = True
+        row["no_final_exit_confirmed"] = False
+        row["profit_is_final"] = True
+        if not row.get("end_time") and confirmed_index and tbid:
+            end_dt = (confirmed_index.get("end_times") or {}).get(tbid)
+            if end_dt:
+                row["end_time"] = end_dt.isoformat()
+        return
+
+    status_lower = str(row.get("status") or "").strip().lower()
+    if status_lower in {"in_progress", "open", "running", "active", "progress"}:
+        return
+
+    row["status"] = "closed_without_final_exit"
+    row["final_exit_confirmed"] = False
+    row["no_final_exit_confirmed"] = True
+    row["profit_is_final"] = False
+    row.setdefault("close_reason", "missing_final_exit_confirmed")
+    if confirmed_rows and confirmed_index and tbid and not row.get("end_time"):
+        end_dt = (confirmed_index.get("end_times") or {}).get(tbid)
+        if end_dt:
+            row["end_time"] = end_dt.isoformat()
+
+
 def _final_exit_purposes_detected(entries: list[dict[str, Any]]) -> tuple[bool, bool, bool]:
-    long_exit_purposes = {"LONG_TP_EXIT", "LONG_SL_EXIT"}
-    short_exit_purposes = {"SHORT_TP_EXIT", "SHORT_SL_EXIT"}
-    has_long = any(
-        str(entry.get("purpose") or "").upper() in long_exit_purposes
-        and str(entry.get("pnl_scope") or "").strip().lower() == "final_exit"
-        for entry in entries
+    meta = _analyze_confirmed_final_exit(entries)
+    return (
+        bool(meta.get("final_exit_confirmed")),
+        bool(meta.get("has_long_final_exit")),
+        bool(meta.get("has_short_final_exit")),
     )
-    has_short = any(
-        str(entry.get("purpose") or "").upper() in short_exit_purposes
-        and str(entry.get("pnl_scope") or "").strip().lower() == "final_exit"
-        for entry in entries
-    )
-    return has_long and has_short, has_long, has_short
 
 
 def _normalize_active_orders(payload: dict[str, Any], strategy_state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -8907,7 +9298,11 @@ def _has_active_trade_state(
 
 
 def _collect_process_rows_for_bot(
-    profile: str, bot_name: str, paths: dict[str, Path]
+    profile: str,
+    bot_name: str,
+    paths: dict[str, Path],
+    *,
+    confirmed_index: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     state = _load_json_file(paths.get("state_file"))
     if not state:
@@ -8941,6 +9336,7 @@ def _collect_process_rows_for_bot(
         profile,
         trade_block_id,
         bot_side=process_bot_side,
+        confirmed_index=confirmed_index,
     )
     filled_orders: list[dict[str, Any]] = []
     start_times: list[datetime] = []
@@ -9026,7 +9422,12 @@ def _collect_process_rows_for_bot(
     )
 
 
-def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+def _collect_active_bot_process_rows(
+    profile: str,
+    bot_side: str | None = None,
+    *,
+    confirmed_index: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     entries, entry_warnings = _get_profit_trade_bot_sources(profile, bot_side)
     warnings: list[str] = entry_warnings.copy()
     rows: list[dict[str, Any]] = []
@@ -9035,7 +9436,12 @@ def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) 
         if not bot_name:
             continue
         paths = _bot_paths_with_fallback(entry)
-        row, warning = _collect_process_rows_for_bot(profile, bot_name, paths)
+        row, warning = _collect_process_rows_for_bot(
+            profile,
+            bot_name,
+            paths,
+            confirmed_index=confirmed_index,
+        )
         if warning:
             warnings.append(warning)
         if row:
@@ -9147,7 +9553,7 @@ async def api_profit_trades_chart(
 ):
     normalized_group_by = "month" if str(group_by or "").strip().lower() == "month" else "day"
     normalized_side = _normalize_bot_side(bot_side)
-    trades, warnings = _build_profit_trade_filtered_rows(
+    trades, warnings, _confirmed_index = _build_profit_trade_filtered_rows(
         profile,
         limit=500,
         start_time=start_time,
@@ -9174,7 +9580,7 @@ async def api_profit_trade_details(
     user: dict = Depends(require_auth),
 ):
     bot_side = _normalize_bot_side(bot_side)
-    trades, _summary, _pagination, warnings, _metadata = _build_profit_trade_page(
+    trades, _summary, _pagination, warnings, metadata = _build_profit_trade_page(
         profile,
         limit=500,
         start_time=None,
@@ -9188,18 +9594,25 @@ async def api_profit_trade_details(
         raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
     bot_name = match.get("bot_name") or ""
     symbol = match.get("symbol") or ""
+    confirmed_index = metadata.get("confirmed_index") or _build_confirmed_pnl_index(profile, bot_side)
     confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(
-        profile, trade_block_id, bot_side=bot_side
+        profile,
+        trade_block_id,
+        bot_side=bot_side,
+        confirmed_index=confirmed_index,
     )
     if confirmed_rows:
-        rows = _build_confirmed_detail_rows(match, confirmed_rows)
+        rows = _build_trade_block_detail_rows(match, confirmed_rows)
     else:
-        rows = []
+        rows = _build_trade_block_detail_rows(match, [])
 
     recomputed_end_profit: float | None = None
     selected_source = "sum_confirmed_rows"
     if confirmed_rows:
-        end_profit, pnl_count, purposes = _compute_trade_end_profit_from_detail_rows(rows)
+        end_profit, pnl_count, _purposes, _purpose_counts, _pnl_scope_counts = _sum_confirmed_closed_pnl_rows(
+            confirmed_rows
+        )
+        purposes = sorted(_purposes)
     else:
         end_profit, pnl_count, purposes = 0.0, 0, []
         selected_source = "confirmed_rows_empty"
@@ -9221,7 +9634,7 @@ async def api_profit_trade_details(
         "detail_purposes": purposes,
         "confirmed_row_count": len(confirmed_rows),
     }
-    logger.info(
+    logger.debug(
         "[dashboard] summary_end_profit_recomputed_from_confirmed_rows %s",
         json.dumps(payload, default=str),
     )
@@ -9231,6 +9644,11 @@ async def api_profit_trade_details(
         "trade_block_id": trade_block_id,
         "bot_name": match.get("bot_name"),
         "symbol": match.get("symbol"),
+        "status": match.get("status"),
+        "final_exit_confirmed": match.get("final_exit_confirmed"),
+        "no_final_exit_confirmed": match.get("no_final_exit_confirmed"),
+        "profit_is_final": match.get("profit_is_final"),
+        "close_reason": match.get("close_reason"),
         "profit_usdt": recomputed_end_profit,
         "wallet_after": match.get("wallet_after_trade"),
         "rows": rows,
@@ -9257,6 +9675,13 @@ def _is_closed_trade_status(status: Any) -> bool:
     return str(status or "").strip().lower() == "closed"
 
 
+def _is_incomplete_closed_trade_status(status: Any) -> bool:
+    return str(status or "").strip().lower() in {
+        "closed_without_final_exit",
+        "manual_or_incomplete_close",
+    }
+
+
 def _get_trade_chart_datetime(trade: dict[str, Any]) -> datetime | None:
     if _is_closed_trade_status(trade.get("status")):
         dt = _normalize_trade_filter_datetime(trade.get("end_time"))
@@ -9269,6 +9694,210 @@ def _get_trade_chart_datetime(trade: dict[str, Any]) -> datetime | None:
     return None
 
 
+def _profit_trade_row_is_active_for_sort(row: dict[str, Any]) -> bool:
+    if _is_closed_trade_status(row.get("status")):
+        return False
+    if _is_incomplete_closed_trade_status(row.get("status")):
+        return False
+    if bool(row.get("is_process")):
+        return True
+    status = str(row.get("status") or "").strip().lower()
+    return status in {"in_progress", "open", "running", "active", "progress"}
+
+
+def _profit_trade_row_start_sort_datetime(
+    row: dict[str, Any],
+    confirmed_index: dict[str, Any] | None = None,
+) -> datetime:
+    tbid = str(row.get("trade_block_id") or "").strip()
+    start_dt = _get_trade_start_time(row)
+    if not start_dt and confirmed_index and tbid:
+        start_dt = (confirmed_index.get("start_times") or {}).get(tbid)
+    if not start_dt:
+        for key in ("trade_started_at", "timestamp", "created_at", "__ts"):
+            start_dt = _normalize_trade_filter_datetime(row.get(key))
+            if start_dt:
+                break
+    return start_dt.astimezone(timezone.utc) if start_dt else datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _profit_trade_row_end_sort_datetime(
+    row: dict[str, Any],
+    confirmed_index: dict[str, Any] | None = None,
+) -> datetime:
+    tbid = str(row.get("trade_block_id") or "").strip()
+    end_dt = _get_trade_end_time(row)
+    if not end_dt and confirmed_index and tbid:
+        end_dt = (confirmed_index.get("end_times") or {}).get(tbid)
+    if not end_dt:
+        end_dt = _profit_trade_row_start_sort_datetime(row, confirmed_index)
+        if end_dt == datetime.min.replace(tzinfo=timezone.utc):
+            end_dt = None
+    return end_dt.astimezone(timezone.utc) if end_dt else datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _profit_trade_stable_sort_key(
+    row: dict[str, Any],
+    confirmed_index: dict[str, Any] | None = None,
+) -> tuple[int, float, float, str]:
+    active_tier = 0 if _profit_trade_row_is_active_for_sort(row) else 1
+    start_dt = _profit_trade_row_start_sort_datetime(row, confirmed_index)
+    end_dt = _profit_trade_row_end_sort_datetime(row, confirmed_index)
+    return (
+        active_tier,
+        -start_dt.timestamp(),
+        -end_dt.timestamp(),
+        str(row.get("trade_block_id") or ""),
+    )
+
+
+def _profit_trade_row_closed_sort_datetime(row: dict[str, Any]) -> datetime:
+    end_dt = _get_trade_end_time(row)
+    if end_dt:
+        return end_dt.astimezone(timezone.utc)
+    start_dt = _get_trade_start_time(row)
+    if start_dt:
+        return start_dt.astimezone(timezone.utc)
+    for key in ("timestamp", "created_at", "__ts"):
+        dt = _normalize_trade_filter_datetime(row.get(key))
+        if dt:
+            return dt
+    return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _profit_trade_default_sort_key(
+    row: dict[str, Any],
+    confirmed_index: dict[str, Any] | None = None,
+) -> tuple[int, float, float, str]:
+    return _profit_trade_stable_sort_key(row, confirmed_index)
+
+
+def _sort_profit_trade_rows_default(
+    rows: list[dict[str, Any]],
+    confirmed_index: dict[str, Any] | None = None,
+) -> None:
+    rows.sort(key=lambda row: _profit_trade_stable_sort_key(row, confirmed_index))
+
+
+def _profit_trade_row_confirmed_count(row: dict[str, Any]) -> int:
+    return max(0, _safe_int(row.get("confirmed_pnl_row_count")))
+
+
+def _profit_trade_row_detail_count(row: dict[str, Any]) -> int:
+    return (
+        len(row.get("filled_orders") or [])
+        + len(row.get("details") or [])
+        + len(row.get("active_orders") or [])
+    )
+
+
+def _profit_trade_row_is_active_process(row: dict[str, Any]) -> bool:
+    if not row.get("is_process"):
+        return False
+    status = str(row.get("status") or "").strip().lower()
+    return status in {"in_progress", "open", "running", "active"} or not _is_closed_trade_status(status)
+
+
+def _profit_trade_row_is_closed_summary(row: dict[str, Any]) -> bool:
+    if _is_closed_trade_status(row.get("status")):
+        return True
+    if bool(row.get("final_exit_confirmed")):
+        return True
+    return False
+
+
+def _profit_trade_row_rank(row: dict[str, Any]) -> tuple[int, int, int, float, int]:
+    if _profit_trade_row_is_closed_summary(row):
+        tier = 3
+    elif _profit_trade_row_is_active_process(row):
+        tier = 2
+    else:
+        tier = 1
+    confirmed_count = _profit_trade_row_confirmed_count(row)
+    has_profit = 1 if _get_trade_profit_value(row) is not None else 0
+    profit_value = _get_trade_profit_value(row) or 0.0
+    detail_count = _profit_trade_row_detail_count(row)
+    return (tier, confirmed_count, has_profit, profit_value, detail_count)
+
+
+def _merge_profit_trade_duplicate_fields(selected: dict[str, Any], other: dict[str, Any]) -> None:
+    if _profit_trade_row_confirmed_count(selected) <= 0 and _profit_trade_row_confirmed_count(other) > 0:
+        selected["confirmed_pnl_row_count"] = other.get("confirmed_pnl_row_count")
+
+    for key in ("end_profit", "profit_usdt", "total_trade_pnl"):
+        if selected.get(key) is None and other.get(key) is not None:
+            selected[key] = other[key]
+
+    if not selected.get("filled_orders") and other.get("filled_orders"):
+        selected["filled_orders"] = other["filled_orders"]
+    if not selected.get("details") and other.get("details"):
+        selected["details"] = other["details"]
+
+    if _profit_trade_row_is_active_process(selected):
+        if bool(other.get("is_process")) and other.get("active_orders"):
+            if not selected.get("active_orders"):
+                selected["active_orders"] = other["active_orders"]
+
+
+def _dedupe_profit_trade_rows_by_trade_block_id(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    passthrough: list[dict[str, Any]] = []
+    for row in rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            passthrough.append(row)
+            continue
+        grouped.setdefault(tbid, []).append(row)
+
+    duplicate_tbids = sorted(tbid for tbid, items in grouped.items() if len(items) > 1)
+    if not duplicate_tbids:
+        return rows
+
+    before_count = len(rows)
+    deduped: list[dict[str, Any]] = []
+    selected_summaries: list[dict[str, Any]] = []
+    for tbid, items in grouped.items():
+        if len(items) == 1:
+            deduped.append(items[0])
+            continue
+        winner = max(items, key=_profit_trade_row_rank)
+        merged = dict(winner)
+        for other in items:
+            if other is winner:
+                continue
+            _merge_profit_trade_duplicate_fields(merged, other)
+        deduped.append(merged)
+        selected_summaries.append(
+            {
+                "trade_block_id": tbid,
+                "candidate_count": len(items),
+                "selected_bot_name": merged.get("bot_name"),
+                "selected_status": merged.get("status"),
+                "selected_is_process": bool(merged.get("is_process")),
+                "confirmed_pnl_row_count": merged.get("confirmed_pnl_row_count"),
+                "profit_usdt": merged.get("profit_usdt"),
+            }
+        )
+
+    result = passthrough + deduped
+    logger.info(
+        "[dashboard] profit_trades_trade_block_deduped %s",
+        json.dumps(
+            {
+                "before_count": before_count,
+                "after_count": len(result),
+                "duplicate_trade_block_ids": duplicate_tbids,
+                "selected": selected_summaries,
+            },
+            default=str,
+        ),
+    )
+    return result
+
+
 def _build_profit_trade_filtered_rows(
     profile: str,
     *,
@@ -9276,7 +9905,8 @@ def _build_profit_trade_filtered_rows(
     start_time: str | None = None,
     end_time: str | None = None,
     bot_side: str | None = None,
-) -> tuple[list[dict[str, Any]], list[str]]:
+    confirmed_index: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
         profile,
         limit,
@@ -9287,69 +9917,33 @@ def _build_profit_trade_filtered_rows(
         paginate=False,
         bot_side=bot_side,
     )
-    # Endprofit ausschließlich aus confirmed_order_pnl_history pro trade_block_id.
     normalized_side = _normalize_bot_side(bot_side)
-    recomputed_count = 0
+    if confirmed_index is None:
+        confirmed_index = _build_confirmed_pnl_index(profile, normalized_side)
+    enriched_from_confirmed = 0
     for base in base_trades:
         trade_block_id = str(base.get("trade_block_id") or "").strip()
-        bot_name = str(base.get("bot_name") or "").strip().lower()
         if not trade_block_id:
             continue
-        confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(
-            profile, trade_block_id, bot_side=normalized_side
-        )
-        old_end_profit = _safe_wallet_float(base.get("total_trade_pnl"))
-        if confirmed_rows:
-            end_profit, pnl_count, purposes = _apply_confirmed_end_profit_to_record(base, confirmed_rows)
-            selected_source = "sum_confirmed_rows"
-        else:
-            end_profit = 0.0
-            pnl_count = 0
-            purposes = []
-            selected_source = "confirmed_rows_empty"
-            base["total_trade_pnl"] = 0.0
-            base["end_profit"] = 0.0
-            base["profit_usdt"] = 0.0
-            base["confirmed_pnl_row_count"] = 0
-            base["details"] = []
-            if not _is_closed_trade_status(base.get("status")):
-                base["status"] = "closed"
-                base["stale_open_no_confirmed_pnl"] = True
-                if not base.get("end_time"):
-                    base["end_time"] = base.get("start_time")
-        recomputed_count += 1
-        payload = {
-            "profile": profile,
-            "bot_name": base.get("bot_name"),
-            "bot_side": normalized_side,
-            "symbol": base.get("symbol"),
-            "trade_block_id": trade_block_id,
-            "selected_source": selected_source,
-            "old_end_profit": old_end_profit,
-            "recomputed_end_profit": end_profit,
-            "detail_pnl_count": pnl_count,
-            "detail_purposes": purposes,
-            "confirmed_row_count": len(confirmed_rows),
-        }
-        logger.info(
-            "[dashboard] summary_end_profit_recomputed_from_confirmed_rows %s",
-            json.dumps(payload, default=str),
-        )
+        if _enrich_profit_trade_row_from_confirmed_index(
+            base,
+            confirmed_index,
+            allow_stale_open_close=True,
+        ):
+            enriched_from_confirmed += 1
+    logger.debug(
+        "[dashboard] profit_trades_confirmed_enrichment_summary profile=%s bot_side=%s enriched=%s total=%s",
+        profile,
+        normalized_side,
+        enriched_from_confirmed,
+        len(base_trades),
+    )
 
-    if not recomputed_count:
-        logger.info(
-            "[dashboard] summary_end_profit_source_selected %s",
-            json.dumps(
-                {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "selected_source": "total_trade_pnl_fallback",
-                },
-                default=str,
-            ),
-        )
-
-    process_rows, process_warnings = _collect_active_bot_process_rows(profile, bot_side)
+    process_rows, process_warnings = _collect_active_bot_process_rows(
+        profile,
+        bot_side,
+        confirmed_index=confirmed_index,
+    )
     warnings.extend(process_warnings)
     active_start_dt = _normalize_trade_filter_datetime(start_time)
     active_end_dt = _normalize_trade_filter_datetime(end_time)
@@ -9402,7 +9996,11 @@ def _build_profit_trade_filtered_rows(
     # Backfill fehlender start_time-Werte für Prozess-Zeilen aus globaler
     # Confirmed-History, damit z.B. paired long/short Trades mit gleicher
     # trade_block_id eine konsistente Startzeit anzeigen.
-    confirmed_start_times_all = _collect_confirmed_trade_start_times(profile, normalized_side)
+    confirmed_start_times_all = _collect_confirmed_trade_start_times(
+        profile,
+        normalized_side,
+        confirmed_index=confirmed_index,
+    )
     if confirmed_start_times_all:
         for row in filtered_process_rows:
             existing_start = row.get("start_time")
@@ -9434,16 +10032,15 @@ def _build_profit_trade_filtered_rows(
             )
 
     # Backfill gefüllter Orders für Prozess-Zeilen aus bestätigter History
-    confirmed_by_tbid_cache: dict[str, list[dict[str, Any]]] = {}
-
     def _get_confirmed_orders_for_tbid(trade_block_id: str) -> list[dict[str, Any]]:
         if not trade_block_id:
             return []
-        if trade_block_id in confirmed_by_tbid_cache:
-            return confirmed_by_tbid_cache[trade_block_id]
-        rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id, bot_side=normalized_side)
-        confirmed_by_tbid_cache[trade_block_id] = rows
-        return rows
+        return _get_confirmed_pnl_rows_for_trade_block(
+            profile,
+            trade_block_id,
+            bot_side=normalized_side,
+            confirmed_index=confirmed_index,
+        )
 
     def _final_exit_confirmed_for_tbid(trade_block_id: str) -> tuple[bool, bool, bool]:
         if not trade_block_id:
@@ -9531,11 +10128,7 @@ def _build_profit_trade_filtered_rows(
         if not filled:
             continue
 
-        filled.sort(
-            key=lambda o: _normalize_trade_filter_datetime(o.get("time"))
-            or datetime.min.replace(tzinfo=timezone.utc),
-        )
-        row["filled_orders"] = filled
+        row["filled_orders"] = _sort_trade_block_detail_rows(filled)
         payload = {
             "profile": profile,
             "bot_side": normalized_side,
@@ -9619,7 +10212,11 @@ def _build_profit_trade_filtered_rows(
             "[dashboard] profit_trades_shadowed_history_records %s",
             json.dumps(payload, default=str),
         )
-    confirmed_start_times = _collect_confirmed_trade_start_times(profile, bot_side)
+    confirmed_start_times = _collect_confirmed_trade_start_times(
+        profile,
+        bot_side,
+        confirmed_index=confirmed_index,
+    )
     summary_rows = [
         _build_profit_trade_summary(
             record,
@@ -9642,64 +10239,27 @@ def _build_profit_trade_filtered_rows(
             candidate_tbids.add(tbid)
 
     for tbid in sorted(candidate_tbids):
-        confirmed, has_long, has_short = _final_exit_confirmed_for_tbid(tbid)
-        meta = {
-            "final_exit_confirmed": confirmed,
-            "has_long_final_exit": has_long,
-            "has_short_final_exit": has_short,
-        }
+        confirmed_rows_for_tbid = _get_confirmed_orders_for_tbid(tbid)
+        meta = _analyze_confirmed_final_exit(confirmed_rows_for_tbid)
         final_exit_meta[tbid] = meta
-        if not confirmed:
+        if not meta.get("final_exit_confirmed"):
             continue
         final_exit_confirmed_ids.add(tbid)
         payload = {
             "profile": profile,
             "bot_side": normalized_side,
             "trade_block_id": tbid,
-            "final_exit_confirmed": confirmed,
-            "has_long_final_exit": has_long,
-            "has_short_final_exit": has_short,
+            "final_exit_confirmed": bool(meta.get("final_exit_confirmed")),
+            "has_long_final_exit": bool(meta.get("has_long_final_exit")),
+            "has_short_final_exit": bool(meta.get("has_short_final_exit")),
+            "final_exit_purposes": meta.get("final_exit_purposes"),
         }
-        logger.info(
+        logger.debug(
             "[dashboard] dashboard_final_exit_confirmed_detected %s",
             json.dumps(payload, default=str),
         )
 
-    # Trades mit bestätigter Final-Exit-PnL (LONG_TP_EXIT und SHORT_SL_EXIT mit pnl_scope=final_exit)
-    # explizit als "closed" markieren und als nicht-Process ohne aktive Orders behandeln.
-    for row in summary_rows:
-        tbid = str(row.get("trade_block_id") or "").strip()
-        if not tbid:
-            continue
-        meta = final_exit_meta.get(tbid) or {}
-        if not meta.get("final_exit_confirmed"):
-            continue
-        original_status = row.get("status")
-        row["status"] = "closed"
-        row["is_process"] = False
-        if row.get("active_orders"):
-            row["active_orders"] = []
-        if not row.get("end_time"):
-            row["end_time"] = row.get("start_time")
-        log_payload = {
-            "profile": profile,
-            "bot_side": normalized_side,
-            "trade_block_id": tbid,
-            "final_exit_confirmed": bool(meta.get("final_exit_confirmed")),
-            "has_long_final_exit": bool(meta.get("has_long_final_exit")),
-            "has_short_final_exit": bool(meta.get("has_short_final_exit")),
-            "summary_rows_count": len(summary_rows),
-            "original_status": original_status,
-            "selected_record_status": row.get("status"),
-            "selected_record_is_process": bool(row.get("is_process")),
-            "active_order_count": len(row.get("active_orders") or []),
-            "source": "summary",
-        }
-        logger.info(
-            "[dashboard] dashboard_profit_row_status_forced_closed %s",
-            json.dumps(log_payload, default=str),
-        )
-    # For specific bot/profile views (e.g. bot_1 long/short side) we want to avoid
+    # Stale-open History bereinigen, aber finalen Status erst zentral setzen.
     # counting historical "open" records as active trades when they are no longer
     # associated with the currently running trade_block_id. Mark those as closed so
     # that the summary only treats truly active process rows as open.
@@ -9736,7 +10296,6 @@ def _build_profit_trade_filtered_rows(
                     # nur der aktive Prozess-Record angezeigt wird.
                     continue
                 updated = dict(row)
-                updated["status"] = "closed"
                 updated["stale_open_auto_closed"] = True
                 updated["close_reason"] = "stale_open_not_in_current_state"
                 if not updated.get("end_time"):
@@ -9796,9 +10355,8 @@ def _build_profit_trade_filtered_rows(
                     }
                 )
                 continue
-            # Keine Summary-Zeile vorhanden – Process-Row in geschlossene Zeile umwandeln.
+            # Keine Summary-Zeile vorhanden – Process-Row später zentral status-setzen.
             converted = dict(row)
-            converted["status"] = "closed"
             converted["is_process"] = False
             if converted.get("active_orders"):
                 converted["active_orders"] = []
@@ -9838,74 +10396,29 @@ def _build_profit_trade_filtered_rows(
                 json.dumps(payload, default=str),
             )
 
-    # Geschlossene Summary-Zeilen mit Endprofit aus confirmed_order_pnl_history anreichern.
-    for row in summary_rows:
-        tbid = str(row.get("trade_block_id") or "").strip()
-        bot_name = str(row.get("bot_name") or "").strip().lower()
-        if not tbid or not bot_name:
-            continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_side=normalized_side)
-        if not confirmed:
-            continue
-
-        end_profit, _pnl_count, _purposes, _purpose_counts, _pnl_scope_counts = _sum_confirmed_closed_pnl_rows(
-            confirmed
-        )
-        cycle_indices: set[int] = set()
-        for entry in confirmed:
-            ci = entry.get("cycle_index")
-            try:
-                if ci is not None:
-                    cycle_indices.add(int(ci))
-            except (TypeError, ValueError):
-                continue
-
-        old_pnl = row.get("profit_usdt") or row.get("total_trade_pnl")
-        cycle_count = max(cycle_indices) if cycle_indices else (row.get("cycle_count") or 0)
-        row["total_trade_pnl"] = end_profit
-        row["profit_usdt"] = end_profit
-        row["end_profit"] = end_profit
-        row["cycle_count"] = cycle_count
-        row["confirmed_pnl_row_count"] = len(confirmed)
-
-        payload = {
-            "profile": profile,
-            "bot_side": normalized_side,
-            "bot_name": row.get("bot_name"),
-            "symbol": row.get("symbol"),
-            "trade_block_id": tbid,
-            "confirmed_count": len(confirmed),
-            "profit_usdt": row.get("profit_usdt"),
-            "cycle_count": cycle_count,
-            "old_profit_usdt": old_pnl,
-        }
-        logger.info(
-            "[dashboard] profit_trades_closed_row_enriched_from_confirmed_pnl %s",
-            json.dumps(payload, default=str),
-        )
-
     for row in filtered_process_rows:
         tbid = str(row.get("trade_block_id") or "").strip()
-        bot_name = str(row.get("bot_name") or "").strip().lower()
-        if not tbid or not bot_name:
-            continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_side=normalized_side)
-        if not confirmed:
-            continue
-        end_profit, _pnl_count, _purposes, _purpose_counts, _pnl_scope_counts = _sum_confirmed_closed_pnl_rows(
-            confirmed
-        )
-        row["total_trade_pnl"] = end_profit
-        row["profit_usdt"] = end_profit
-        row["end_profit"] = end_profit
-        row["confirmed_pnl_row_count"] = len(confirmed)
+        if tbid:
+            _enrich_profit_trade_row_from_confirmed_index(row, confirmed_index)
     combined_rows = summary_rows + filtered_process_rows
-    combined_rows.sort(
-        key=lambda trade: _get_trade_filter_datetime(trade)
-        or datetime.min.replace(tzinfo=timezone.utc),
-        reverse=True,
-    )
-    return combined_rows, warnings
+    combined_rows = _dedupe_profit_trade_rows_by_trade_block_id(combined_rows)
+    for row in combined_rows:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        confirmed_rows_for_status = (
+            _get_confirmed_pnl_rows_for_trade_block("", tbid, confirmed_index=confirmed_index)
+            if tbid
+            else []
+        )
+        meta = final_exit_meta.get(tbid) or _analyze_confirmed_final_exit(confirmed_rows_for_status)
+        _apply_trade_block_close_status(
+            row,
+            confirmed_rows_for_status,
+            meta,
+            is_active_process=bool(tbid and tbid in running_ids),
+            confirmed_index=confirmed_index,
+        )
+    _sort_profit_trade_rows_default(combined_rows, confirmed_index)
+    return combined_rows, warnings, confirmed_index
 
 
 def _aggregate_profit_chart_rows(
@@ -9993,6 +10506,7 @@ def _build_profit_trade_page(
     page: int = 0,
     page_size: int | None = None,
     bot_side: str = "long",
+    confirmed_index: dict[str, Any] | None = None,
 ) -> tuple[
     list[dict[str, Any]],
     dict[str, Any],
@@ -10000,12 +10514,13 @@ def _build_profit_trade_page(
     list[str],
     dict[str, int],
 ]:
-    combined_rows, warnings = _build_profit_trade_filtered_rows(
+    combined_rows, warnings, confirmed_index = _build_profit_trade_filtered_rows(
         profile,
         limit=limit,
         start_time=start_time,
         end_time=end_time,
         bot_side=bot_side,
+        confirmed_index=confirmed_index,
     )
     filtered_rows = _filter_trades_by_side(combined_rows, bot_side)
     effective_page_size = page_size or limit
@@ -10023,6 +10538,7 @@ def _build_profit_trade_page(
     metadata = {
         "total_before_side_filter": len(combined_rows),
         "total_after_side_filter": len(filtered_rows),
+        "confirmed_index": confirmed_index,
     }
     return paged_rows, summary, pagination, warnings, metadata
 
