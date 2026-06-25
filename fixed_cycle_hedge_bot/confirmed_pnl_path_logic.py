@@ -54,7 +54,6 @@ def path_bot_side(path_bot_name: str | None) -> str | None:
 
 
 def purpose_allowed_for_path_bot(path_bot_name: str | None, purpose: str | None) -> bool:
-    """Classify whether purpose side matches path bot side (write-side guard only)."""
     implied_side = purpose_implies_bot_side(purpose)
     if implied_side is None:
         return True
@@ -95,14 +94,6 @@ def validate_confirmed_pnl_row_for_path(
     row: Mapping[str, Any],
     path: str | Path,
 ) -> tuple[bool, str | None, dict[str, Any]]:
-    """
-    Decide whether a confirmed PnL row belongs to the bot file at ``path``.
-
-    Membership is determined only by ``bot_name`` vs path-derived bot name.
-    Purpose is retained in the payload for classification/logging but must not
-    reject rows when ``row_bot_name == path_bot_name`` (hedge bots manage both
-    long and short legs in one profile file).
-    """
     path_bot_name = path_bot_name_from_logs_path(path)
     row_bot_name = str(row.get("bot_name") or "").strip().lower()
     purpose = str(row.get("purpose") or row.get("trade_type") or "").strip()
@@ -119,61 +110,9 @@ def validate_confirmed_pnl_row_for_path(
     }
     if path_bot_name and not row_bot_name_matches_path(path_bot_name, row):
         return False, "confirmed_pnl_history_path_bot_mismatch_skipped", skip_payload
+    if path_bot_name and purpose and not purpose_allowed_for_path_bot(path_bot_name, purpose):
+        return False, "confirmed_pnl_history_path_purpose_mismatch_skipped", skip_payload
     return True, None, skip_payload
-
-
-def confirmed_row_sort_key(entry: Mapping[str, Any]) -> tuple[Any, ...]:
-    cycle_index = 0
-    try:
-        if entry.get("cycle_index") is not None:
-            cycle_index = int(entry.get("cycle_index"))
-    except (TypeError, ValueError):
-        cycle_index = 0
-    return (
-        str(entry.get("timestamp") or "").strip(),
-        cycle_index,
-        str(entry.get("purpose") or "").strip(),
-        str(entry.get("exchange_order_id") or entry.get("client_order_id") or "").strip(),
-    )
-
-
-def finalize_confirmed_rows(rows: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    if not rows:
-        return []
-    seen: set[str] = set()
-    deduped: list[dict[str, Any]] = []
-    for row in rows:
-        key = confirmed_row_dedupe_key(row)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(dict(row))
-    deduped.sort(key=confirmed_row_sort_key)
-    return deduped
-
-
-def filter_confirmed_rows_for_trade_block(
-    rows: Iterable[Mapping[str, Any]],
-    trade_block_id: str,
-) -> list[dict[str, Any]]:
-    filtered = [
-        dict(row)
-        for row in rows
-        if str(row.get("trade_block_id") or "").strip() == trade_block_id
-    ]
-    return finalize_confirmed_rows(filtered)
-
-
-def build_confirmed_pnl_index_from_rows(
-    all_rows: Iterable[Mapping[str, Any]],
-) -> dict[str, list[dict[str, Any]]]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for row in all_rows:
-        tbid = str(row.get("trade_block_id") or "").strip()
-        if not tbid:
-            continue
-        grouped.setdefault(tbid, []).append(dict(row))
-    return {tbid: finalize_confirmed_rows(rows) for tbid, rows in grouped.items()}
 
 
 def load_valid_confirmed_pnl_rows_from_paths(
