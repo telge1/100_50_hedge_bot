@@ -1,10 +1,40 @@
-from .audit_logger import AuditLogger
-from .basket_exit_strategy import BasketExitConfig, BasketExitHedgeStrategy
-from .base import HedgeStrategy, StrategyContext
-from .dynamic_breakeven_strategy import DynamicBreakevenConfig, DynamicBreakevenHedgeStrategy
-from .fixed_cycle_strategy import FixedCycleHedgeConfig, FixedCycleHedgeStrategy
-from .models import CalculationTrace, FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent
-from .order_manager import BybitOrderManager, OrderPayload
-from .position_manager import PositionManager
-from .registry import STRATEGY_REGISTRY, StrategyRegistration, build_registered_runtime, list_strategy_names
-from .runtime import GenericHedgeRuntime, GenericRuntimeConfig, configure_runtime_logging
+"""Fixed-cycle hedge bot package.
+
+Keep package imports lightweight.
+
+Dashboard modules import helper files from this package, for example
+fixed_cycle_hedge_bot.confirmed_pnl_path_logic. Importing those helpers must
+not load runtime/websocket dependencies as a package side effect.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+__all__ = [
+    "STRATEGY_REGISTRY",
+    "StrategyRegistration",
+    "build_registered_runtime",
+    "list_strategy_names",
+]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy-load registry exports only when callers explicitly request them."""
+    if name in __all__:
+        from .registry import (
+            STRATEGY_REGISTRY,
+            StrategyRegistration,
+            build_registered_runtime,
+            list_strategy_names,
+        )
+
+        exports = {
+            "STRATEGY_REGISTRY": STRATEGY_REGISTRY,
+            "StrategyRegistration": StrategyRegistration,
+            "build_registered_runtime": build_registered_runtime,
+            "list_strategy_names": list_strategy_names,
+        }
+        return exports[name]
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
