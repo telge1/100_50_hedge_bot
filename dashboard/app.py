@@ -17,6 +17,7 @@ import requests
 import asyncio
 import httpx
 import uuid
+import importlib.util
 import json
 import math
 import signal
@@ -40,10 +41,20 @@ if vendor_root.exists():
     sys.path.insert(0, str(vendor_root))
 os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 
-from fixed_cycle_hedge_bot.confirmed_pnl_path_logic import (
-    confirmed_row_dedupe_key as _shared_confirmed_row_dedupe_key,
-    validate_confirmed_pnl_row_for_path,
+_confirmed_pnl_path_logic_path = project_root / "fixed_cycle_hedge_bot" / "confirmed_pnl_path_logic.py"
+_confirmed_pnl_path_logic_spec = importlib.util.spec_from_file_location(
+    "_dashboard_confirmed_pnl_path_logic",
+    _confirmed_pnl_path_logic_path,
 )
+if _confirmed_pnl_path_logic_spec is None or _confirmed_pnl_path_logic_spec.loader is None:
+    raise ImportError(f"unable to load confirmed pnl path logic from {_confirmed_pnl_path_logic_path}")
+_confirmed_pnl_path_logic = importlib.util.module_from_spec(_confirmed_pnl_path_logic_spec)
+_confirmed_pnl_path_logic_spec.loader.exec_module(_confirmed_pnl_path_logic)
+_shared_confirmed_row_dedupe_key = _confirmed_pnl_path_logic.confirmed_row_dedupe_key
+validate_confirmed_pnl_row_for_path = _confirmed_pnl_path_logic.validate_confirmed_pnl_row_for_path
+_finalize_confirmed_rows = _confirmed_pnl_path_logic.finalize_confirmed_rows
+_build_confirmed_pnl_index_from_rows = _confirmed_pnl_path_logic.build_confirmed_pnl_index_from_rows
+_filter_confirmed_rows_for_trade_block = _confirmed_pnl_path_logic.filter_confirmed_rows_for_trade_block
 
 CONFIRMED_ORDER_PNL_HISTORY_FILE = project_root / "logs" / "confirmed_order_pnl_history.jsonl"
 DASHBOARD_CLOSED_PNL_HISTORY_FILE = project_root / "logs" / "dashboard_closed_pnl_history.jsonl"
@@ -8073,30 +8084,26 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
     return rows
 
 
-def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None) -> list[Path]:
+def _collect_closed_history_paths_for_profile(profile: str, bot_side: str | None = None) -> list[Path]:
     normalized = _normalize_dashboard_profile(profile, fallback_to_main=False)
     if not normalized or normalized == "main":
-        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE]
     entries, _warnings = _get_profit_trade_bot_sources(profile, bot_side)
-    # Wenn keine Bot-Sources konfiguriert sind, nutzen wir als Fallback die
-    # globalen History-Dateien (Legacy-Verhalten).
     if not entries:
         payload = {
             "profile": profile,
             "bot_side": _normalize_bot_side(bot_side),
             "closed_path": str(DASHBOARD_CLOSED_PNL_HISTORY_FILE),
-            "confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
         }
         logger.info(
             "[dashboard] profit_trade_history_global_fallback_used %s",
             json.dumps(payload, default=str),
         )
-        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE, CONFIRMED_ORDER_PNL_HISTORY_FILE]
+        return [DASHBOARD_CLOSED_PNL_HISTORY_FILE]
 
     paths: list[Path] = []
     for entry in entries:
         dashboard_path = entry.get("dashboard_closed_pnl_history_file")
-        confirmed_path = entry.get("confirmed_order_pnl_history_file")
         if dashboard_path:
             dashboard_path = Path(dashboard_path)
             if not dashboard_path.exists():
@@ -8107,28 +8114,23 @@ def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None
                     str(dashboard_path),
                 )
             paths.append(dashboard_path)
-        if confirmed_path:
-            confirmed_path = Path(confirmed_path)
-            if not confirmed_path.exists():
-                logger.info(
-                    "[dashboard] profit_trade_history_missing bot_name=%s side=%s path=%s",
-                    entry.get("bot_name"),
-                    entry.get("side"),
-                    str(confirmed_path),
-                )
-            paths.append(confirmed_path)
 
     if paths:
         payload = {
             "profile": profile,
             "bot_side": _normalize_bot_side(bot_side),
             "global_closed_path": str(DASHBOARD_CLOSED_PNL_HISTORY_FILE),
-            "global_confirmed_path": str(CONFIRMED_ORDER_PNL_HISTORY_FILE),
         }
         logger.info(
             "[dashboard] profit_trade_history_global_skipped_for_profile_sources %s",
             json.dumps(payload, default=str),
         )
+    return paths
+
+
+def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None) -> list[Path]:
+    paths = _collect_closed_history_paths_for_profile(profile, bot_side)
+    paths.extend(_collect_confirmed_history_paths(profile, bot_side))
     return paths
 
 
@@ -8207,7 +8209,7 @@ def _collect_confirmed_order_pnl_rows_from_paths(paths: list[Path]) -> list[dict
                         continue
                     ok, skip_event, skip_payload = validate_confirmed_pnl_row_for_path(payload, path)
                     if not ok:
-                        logger.warning(
+                        logger.debug(
                             "[dashboard] %s %s",
                             skip_event,
                             json.dumps(skip_payload, default=str),
@@ -8229,9 +8231,16 @@ def _collect_confirmed_order_pnl_rows(paths: list[Path]) -> list[dict[str, Any]]
     return _collect_confirmed_order_pnl_rows_from_paths(paths)
 
 
-def _collect_confirmed_trade_start_times(profile: str, bot_side: str | None = None) -> dict[str, datetime]:
-    paths = _collect_confirmed_history_paths(profile, bot_side)
-    rows = _collect_confirmed_order_pnl_rows(paths)
+def _collect_confirmed_trade_start_times(
+    profile: str,
+    bot_side: str | None = None,
+    confirmed_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, datetime]:
+    if confirmed_rows is None:
+        paths = _collect_confirmed_history_paths(profile, bot_side)
+        rows = _collect_confirmed_order_pnl_rows(paths)
+    else:
+        rows = confirmed_rows
     if bot_side:
         rows = _filter_trades_by_side(rows, bot_side)
     start_times: dict[str, datetime] = {}
@@ -8253,28 +8262,26 @@ def _confirmed_row_dedupe_key(row: dict[str, Any]) -> str:
 
 
 def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> list[dict[str, Any]]:
-    filtered = [row for row in rows if str(row.get("trade_block_id") or "").strip() == trade_block_id]
-    if not filtered:
-        return []
-    seen: set[str] = set()
-    deduped = []
-    for row in filtered:
-        key = _confirmed_row_dedupe_key(row)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(row)
-    # Chronologische Sortierung; bei nahezu identischen Zeitstempeln zusätzliche
-    # Stabilisierung über Cycle- und Purpose-Metadaten.
-    def _confirmed_row_sort_key(entry: dict[str, Any]) -> tuple:
-        ts = _parse_profit_time(entry.get("timestamp")) or datetime.min
-        cycle_index = _safe_int(entry.get("cycle_index"))
-        purpose = str(entry.get("purpose") or "")
-        order_id = str(entry.get("exchange_order_id") or entry.get("client_order_id") or "")
-        return (ts, cycle_index, purpose, order_id)
+    return _filter_confirmed_rows_for_trade_block(rows, trade_block_id)
 
-    deduped.sort(key=_confirmed_row_sort_key)
-    return deduped
+
+def _build_confirmed_pnl_index(
+    profile: str,
+    bot_side: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Load confirmed PnL history once and group rows by trade_block_id."""
+    paths = _collect_confirmed_pnl_paths_for_view(profile, bot_side)
+    all_rows = _collect_confirmed_order_pnl_rows_from_paths(paths)
+    return _build_confirmed_pnl_index_from_rows(all_rows)
+
+
+def _flatten_confirmed_pnl_index(
+    confirmed_index: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    flattened: list[dict[str, Any]] = []
+    for tbid in sorted(confirmed_index):
+        flattened.extend(confirmed_index[tbid])
+    return flattened
 
 
 def _load_confirmed_order_pnl_rows_for_trade(
@@ -8314,14 +8321,14 @@ def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
     return entries
 
 
-def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = None) -> list[dict[str, Any]]:
-    entries = _load_history_entries_from_paths(_collect_history_paths_for_profile(profile, bot_side))
+def _history_trade_events_from_entries(
+    entries: list[dict[str, Any]],
+    profile: str,
+    bot_side: str | None = None,
+) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
 
     expected_bot_name: str | None = None
-    # For concrete long/short views resolve the specific bot_name we expect and
-    # later filter global history files strictly by this bot_name to avoid
-    # mixing trades from multiple bots on the same side.
     if bot_side:
         source, _ = _resolve_profit_trade_source(profile, bot_side)
         if source:
@@ -8334,7 +8341,10 @@ def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = 
         record = dict(entry)
         ts_val = record.get("finalized_at") or record.get("timestamp") or record.get("__ts") or record.get("created_at")
         record["__ts"] = _normalize_dashboard_datetime(ts_val) or datetime.now(timezone.utc)
-        record["__event"] = record.get("__event") or record.get("event") or "dashboard_closed_pnl_history"
+        if record.get("closed_pnl") is not None and not record.get("__event") and not record.get("event"):
+            record["__event"] = "confirmed_order_pnl_history"
+        else:
+            record["__event"] = record.get("__event") or record.get("event") or "dashboard_closed_pnl_history"
 
         if expected_bot_name:
             trade_bot_name = _extract_trade_bot_name(record)
@@ -8345,6 +8355,27 @@ def _load_history_trade_events_for_profile(profile: str, bot_side: str | None = 
     if bot_side:
         return _filter_trades_by_side(events, bot_side)
     return events
+
+
+def _load_history_trade_events_for_profile(
+    profile: str,
+    bot_side: str | None = None,
+    confirmed_rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    closed_entries = _load_history_entries_from_paths(
+        _collect_closed_history_paths_for_profile(profile, bot_side)
+    )
+    if confirmed_rows is None:
+        confirmed_entries = _collect_confirmed_order_pnl_rows_from_paths(
+            _collect_confirmed_history_paths(profile, bot_side)
+        )
+    else:
+        confirmed_entries = confirmed_rows
+    return _history_trade_events_from_entries(
+        closed_entries + confirmed_entries,
+        profile,
+        bot_side,
+    )
 
 
 def _find_closed_pnl_history_entry(
@@ -8489,6 +8520,7 @@ def _load_trade_blocks_for_profile(
     page_size: int | None = None,
     paginate: bool = True,
     bot_side: str | None = None,
+    confirmed_rows: list[dict[str, Any]] | None = None,
 ) -> Tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     entries, entry_warnings = _get_profit_trade_bot_sources(profile, bot_side)
     if not entries:
@@ -8519,7 +8551,9 @@ def _load_trade_blocks_for_profile(
             [str(p) for p in log_paths],
             len(parsed),
         )
-    history_events = _load_history_trade_events_for_profile(profile, bot_side)
+    history_events = _load_history_trade_events_for_profile(
+        profile, bot_side, confirmed_rows=confirmed_rows
+    )
     if history_events:
         warnings.append(f"loaded {len(history_events)} history events for profile {profile}")
     events.extend(history_events)
@@ -8639,10 +8673,13 @@ def _get_confirmed_pnl_rows_for_trade_block(
     trade_block_id: str,
     bot_side: str | None = None,
     bot_name: str | None = None,
+    confirmed_index: dict[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     if not trade_block_id:
         return []
     _ = bot_name
+    if confirmed_index is not None:
+        return list(confirmed_index.get(trade_block_id, []))
     paths = _collect_confirmed_pnl_paths_for_view(profile, bot_side)
     rows = _collect_confirmed_order_pnl_rows_from_paths(paths)
     return _filter_confirmed_rows(rows, trade_block_id)
@@ -8907,7 +8944,10 @@ def _has_active_trade_state(
 
 
 def _collect_process_rows_for_bot(
-    profile: str, bot_name: str, paths: dict[str, Path]
+    profile: str,
+    bot_name: str,
+    paths: dict[str, Path],
+    confirmed_index: dict[str, list[dict[str, Any]]] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     state = _load_json_file(paths.get("state_file"))
     if not state:
@@ -8941,6 +8981,7 @@ def _collect_process_rows_for_bot(
         profile,
         trade_block_id,
         bot_side=process_bot_side,
+        confirmed_index=confirmed_index,
     )
     filled_orders: list[dict[str, Any]] = []
     start_times: list[datetime] = []
@@ -9026,7 +9067,11 @@ def _collect_process_rows_for_bot(
     )
 
 
-def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) -> tuple[list[dict[str, Any]], list[str]]:
+def _collect_active_bot_process_rows(
+    profile: str,
+    bot_side: str | None = None,
+    confirmed_index: dict[str, list[dict[str, Any]]] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     entries, entry_warnings = _get_profit_trade_bot_sources(profile, bot_side)
     warnings: list[str] = entry_warnings.copy()
     rows: list[dict[str, Any]] = []
@@ -9035,7 +9080,9 @@ def _collect_active_bot_process_rows(profile: str, bot_side: str | None = None) 
         if not bot_name:
             continue
         paths = _bot_paths_with_fallback(entry)
-        row, warning = _collect_process_rows_for_bot(profile, bot_name, paths)
+        row, warning = _collect_process_rows_for_bot(
+            profile, bot_name, paths, confirmed_index=confirmed_index
+        )
         if warning:
             warnings.append(warning)
         if row:
@@ -9277,6 +9324,9 @@ def _build_profit_trade_filtered_rows(
     end_time: str | None = None,
     bot_side: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
+    normalized_side = _normalize_bot_side(bot_side)
+    confirmed_index = _build_confirmed_pnl_index(profile, normalized_side)
+    confirmed_rows_flat = _flatten_confirmed_pnl_index(confirmed_index)
     base_trades, warnings, _base_pagination = _load_trade_blocks_for_profile(
         profile,
         limit,
@@ -9286,9 +9336,9 @@ def _build_profit_trade_filtered_rows(
         page_size=limit,
         paginate=False,
         bot_side=bot_side,
+        confirmed_rows=confirmed_rows_flat,
     )
     # Endprofit ausschließlich aus confirmed_order_pnl_history pro trade_block_id.
-    normalized_side = _normalize_bot_side(bot_side)
     recomputed_count = 0
     for base in base_trades:
         trade_block_id = str(base.get("trade_block_id") or "").strip()
@@ -9296,7 +9346,10 @@ def _build_profit_trade_filtered_rows(
         if not trade_block_id:
             continue
         confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(
-            profile, trade_block_id, bot_side=normalized_side
+            profile,
+            trade_block_id,
+            bot_side=normalized_side,
+            confirmed_index=confirmed_index,
         )
         old_end_profit = _safe_wallet_float(base.get("total_trade_pnl"))
         if confirmed_rows:
@@ -9349,7 +9402,9 @@ def _build_profit_trade_filtered_rows(
             ),
         )
 
-    process_rows, process_warnings = _collect_active_bot_process_rows(profile, bot_side)
+    process_rows, process_warnings = _collect_active_bot_process_rows(
+        profile, bot_side, confirmed_index=confirmed_index
+    )
     warnings.extend(process_warnings)
     active_start_dt = _normalize_trade_filter_datetime(start_time)
     active_end_dt = _normalize_trade_filter_datetime(end_time)
@@ -9402,7 +9457,9 @@ def _build_profit_trade_filtered_rows(
     # Backfill fehlender start_time-Werte für Prozess-Zeilen aus globaler
     # Confirmed-History, damit z.B. paired long/short Trades mit gleicher
     # trade_block_id eine konsistente Startzeit anzeigen.
-    confirmed_start_times_all = _collect_confirmed_trade_start_times(profile, normalized_side)
+    confirmed_start_times_all = _collect_confirmed_trade_start_times(
+        profile, normalized_side, confirmed_rows=confirmed_rows_flat
+    )
     if confirmed_start_times_all:
         for row in filtered_process_rows:
             existing_start = row.get("start_time")
@@ -9433,17 +9490,10 @@ def _build_profit_trade_filtered_rows(
                 json.dumps(payload, default=str),
             )
 
-    # Backfill gefüllter Orders für Prozess-Zeilen aus bestätigter History
-    confirmed_by_tbid_cache: dict[str, list[dict[str, Any]]] = {}
-
     def _get_confirmed_orders_for_tbid(trade_block_id: str) -> list[dict[str, Any]]:
         if not trade_block_id:
             return []
-        if trade_block_id in confirmed_by_tbid_cache:
-            return confirmed_by_tbid_cache[trade_block_id]
-        rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id, bot_side=normalized_side)
-        confirmed_by_tbid_cache[trade_block_id] = rows
-        return rows
+        return list(confirmed_index.get(trade_block_id, []))
 
     def _final_exit_confirmed_for_tbid(trade_block_id: str) -> tuple[bool, bool, bool]:
         if not trade_block_id:
@@ -9619,7 +9669,9 @@ def _build_profit_trade_filtered_rows(
             "[dashboard] profit_trades_shadowed_history_records %s",
             json.dumps(payload, default=str),
         )
-    confirmed_start_times = _collect_confirmed_trade_start_times(profile, bot_side)
+    confirmed_start_times = _collect_confirmed_trade_start_times(
+        profile, bot_side, confirmed_rows=confirmed_rows_flat
+    )
     summary_rows = [
         _build_profit_trade_summary(
             record,
@@ -9844,7 +9896,7 @@ def _build_profit_trade_filtered_rows(
         bot_name = str(row.get("bot_name") or "").strip().lower()
         if not tbid or not bot_name:
             continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_side=normalized_side)
+        confirmed = confirmed_index.get(tbid, [])
         if not confirmed:
             continue
 
@@ -9889,7 +9941,7 @@ def _build_profit_trade_filtered_rows(
         bot_name = str(row.get("bot_name") or "").strip().lower()
         if not tbid or not bot_name:
             continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_side=normalized_side)
+        confirmed = confirmed_index.get(tbid, [])
         if not confirmed:
             continue
         end_profit, _pnl_count, _purposes, _purpose_counts, _pnl_scope_counts = _sum_confirmed_closed_pnl_rows(
