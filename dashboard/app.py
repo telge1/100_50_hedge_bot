@@ -7988,6 +7988,13 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
         side_value: Any = entry.get("side") or None
         cycle_role_value: Any = entry.get("cycle_role") or None
         bot_name_value: Any = (entry.get("bot_name") or record.get("bot_name") or "").strip() or None
+        bot_side_value: str | None = None
+        if bot_name_value:
+            normalized_bot = str(bot_name_value).strip().lower()
+            if normalized_bot.startswith("short_bot_"):
+                bot_side_value = "short"
+            elif normalized_bot.startswith("long_bot_"):
+                bot_side_value = "long"
 
         if not is_event_row:
             order_id = entry.get("exchange_order_id") or entry.get("client_order_id") or ""
@@ -8053,6 +8060,7 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
                 "cycle_role": cycle_role_value,
                 "bot_name": bot_name_value,
                 "source_bot": bot_name_value,
+                "bot_side": bot_side_value,
                 "source": display_source,
                 "record_source": entry.get("source"),
             }
@@ -8217,14 +8225,31 @@ def _collect_confirmed_trade_start_times(profile: str, bot_side: str | None = No
     return start_times
 
 
+def _confirmed_row_dedupe_key(row: dict[str, Any]) -> str:
+    explicit_dedupe_key = str(row.get("dedupe_key") or "").strip()
+    return "|".join(
+        [
+            str(row.get("bot_name") or "").strip().lower(),
+            str(row.get("trade_block_id") or "").strip(),
+            str(row.get("pnl_scope") or "").strip().lower(),
+            str(row.get("purpose") or "").strip().upper(),
+            str(row.get("cycle_index") or ""),
+            str(row.get("exchange_order_id") or row.get("client_order_id") or "").strip(),
+            str(row.get("timestamp") or "").strip(),
+            str(row.get("closed_pnl") if row.get("closed_pnl") is not None else ""),
+            explicit_dedupe_key,
+        ]
+    )
+
+
 def _filter_confirmed_rows(rows: list[dict[str, Any]], trade_block_id: str) -> list[dict[str, Any]]:
-    filtered = [row for row in rows if row.get("trade_block_id") == trade_block_id]
+    filtered = [row for row in rows if str(row.get("trade_block_id") or "").strip() == trade_block_id]
     if not filtered:
         return []
     seen: set[str] = set()
     deduped = []
     for row in filtered:
-        key = f"{row.get('exchange_order_id') or ''}-{row.get('purpose') or ''}"
+        key = _confirmed_row_dedupe_key(row)
         if key in seen:
             continue
         seen.add(key)
@@ -8249,33 +8274,10 @@ def _load_confirmed_order_pnl_rows_for_trade(
     symbol: str | None = None,
     bot_side: str | None = None,
 ) -> list[dict[str, Any]]:
-    paths = _collect_confirmed_history_paths(profile, bot_side)
-    if bot_name:
-        for paired_bot_name in sorted(_paired_trade_bot_names(bot_name)):
-            candidate_paths: list[Path] = []
-            if paired_bot_name.startswith("short_bot_"):
-                candidate_paths.append(
-                    SHORT_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
-                )
-            elif paired_bot_name.startswith("long_bot_"):
-                candidate_paths.append(
-                    LIVE_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
-                )
-            for candidate_path in candidate_paths:
-                if candidate_path.exists() and candidate_path not in paths:
-                    paths.append(candidate_path)
-    rows = _collect_confirmed_order_pnl_rows(paths)
-    candidate = _filter_confirmed_rows(rows, trade_block_id)
-    if symbol:
-        candidate = [row for row in candidate if str(row.get("symbol") or "").upper() == symbol.upper()] or candidate
-    if bot_name:
-        allowed_bot_names = _paired_trade_bot_names(bot_name)
-        candidate = [
-            row
-            for row in candidate
-            if str(row.get("bot_name") or "").strip().lower() in allowed_bot_names
-        ] or candidate
-    return candidate
+    # Endprofit/Details: immer alle confirmed Rows der trade_block_id (long+short paired).
+    # bot_name/bot_side/symbol duerfen die Row-Auswahl nicht einschraenken.
+    _ = bot_name, symbol, bot_side
+    return _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id)
 
 
 def _load_history_entries_from_paths(paths: list[Path]) -> list[dict[str, Any]]:
@@ -8619,10 +8621,7 @@ def _is_bot_running(status: dict[str, Any] | None) -> bool:
     return str(status.get("status") or "").strip().lower() == "running"
 
 
-def _collect_confirmed_pnl_paths_for_trade_block(
-    profile: str,
-    bot_name: str | None = None,
-) -> list[Path]:
+def _collect_confirmed_pnl_paths_for_trade_block(profile: str) -> list[Path]:
     paths: list[Path] = []
     seen: set[str] = set()
     for side in ("long", "short"):
@@ -8632,14 +8631,15 @@ def _collect_confirmed_pnl_paths_for_trade_block(
                 continue
             seen.add(key)
             paths.append(candidate)
-    if bot_name:
-        for paired_bot_name in sorted(_paired_trade_bot_names(bot_name)):
+    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
+    profile_match = re.search(r"_(\d+)$", str(normalized_profile or "").strip().lower())
+    if profile_match:
+        index = profile_match.group(1)
+        for paired_bot_name in (f"long_bot_{index}", f"short_bot_{index}"):
             if paired_bot_name.startswith("short_bot_"):
                 candidate = SHORT_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
-            elif paired_bot_name.startswith("long_bot_"):
-                candidate = LIVE_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
             else:
-                continue
+                candidate = LIVE_BOT_LOGS_ROOT / paired_bot_name / "logs" / "confirmed_order_pnl_history.jsonl"
             key = str(candidate)
             if candidate.exists() and key not in seen:
                 seen.add(key)
@@ -8654,7 +8654,8 @@ def _get_confirmed_pnl_rows_for_trade_block(
 ) -> list[dict[str, Any]]:
     if not trade_block_id:
         return []
-    paths = _collect_confirmed_pnl_paths_for_trade_block(profile, bot_name)
+    _ = bot_name
+    paths = _collect_confirmed_pnl_paths_for_trade_block(profile)
     rows = _collect_confirmed_order_pnl_rows(paths)
     return _filter_confirmed_rows(rows, trade_block_id)
 
@@ -8947,23 +8948,14 @@ def _collect_process_rows_for_bot(
         or (strategy_state.get("cycle_state") or {}).get("symbol")
         or ""
     )
-    rows = _load_confirmed_order_pnl_rows_for_trade(
-        profile,
-        trade_block_id,
-        bot_name,
-        symbol,
-        bot_side="short" if str(bot_name or "").lower().startswith("short_bot_") else "long",
-    )
+    rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id)
     filled_orders: list[dict[str, Any]] = []
     start_times: list[datetime] = []
     total_pnl = 0.0
     max_cycle = 0
     seen_dedupe: set[str] = set()
     for row in rows:
-        dedupe_key = row.get("dedupe_key")
-        if not dedupe_key:
-            dedupe_key = f"{row.get('exchange_order_id') or ''}:{row.get('purpose') or ''}"
-        key = str(dedupe_key)
+        key = _confirmed_row_dedupe_key(row)
         if key in seen_dedupe:
             continue
         seen_dedupe.add(key)
@@ -9203,7 +9195,7 @@ async def api_profit_trade_details(
         raise HTTPException(status_code=404, detail=f"trade {trade_block_id} not found for profile {profile}")
     bot_name = match.get("bot_name") or ""
     symbol = match.get("symbol") or ""
-    confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id, bot_name)
+    confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id)
     if confirmed_rows:
         rows = _build_confirmed_detail_rows(match, confirmed_rows)
     else:
@@ -9308,7 +9300,7 @@ def _build_profit_trade_filtered_rows(
         bot_name = str(base.get("bot_name") or "").strip().lower()
         if not trade_block_id:
             continue
-        confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id, bot_name)
+        confirmed_rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id)
         old_end_profit = _safe_wallet_float(base.get("total_trade_pnl"))
         if confirmed_rows:
             end_profit, pnl_count, purposes = _apply_confirmed_end_profit_to_record(base, confirmed_rows)
@@ -9452,18 +9444,9 @@ def _build_profit_trade_filtered_rows(
             return []
         if trade_block_id in confirmed_by_tbid_cache:
             return confirmed_by_tbid_cache[trade_block_id]
-        # Lazy load aller Confirmed-Orders einmal, gruppiert nach trade_block_id
-        if not confirmed_by_tbid_cache:
-            paths = _collect_confirmed_pnl_paths_for_trade_block(profile)
-            rows = _collect_confirmed_order_pnl_rows(paths)
-            grouped: dict[str, list[dict[str, Any]]] = {}
-            for entry in rows:
-                key = str(entry.get("trade_block_id") or "").strip()
-                if not key:
-                    continue
-                grouped.setdefault(key, []).append(entry)
-            confirmed_by_tbid_cache.update(grouped)
-        return confirmed_by_tbid_cache.get(trade_block_id, [])
+        rows = _get_confirmed_pnl_rows_for_trade_block(profile, trade_block_id)
+        confirmed_by_tbid_cache[trade_block_id] = rows
+        return rows
 
     def _final_exit_confirmed_for_tbid(trade_block_id: str) -> tuple[bool, bool, bool]:
         if not trade_block_id:
@@ -9489,41 +9472,11 @@ def _build_profit_trade_filtered_rows(
         if not confirmed_rows_all:
             continue
 
-        # Für Long-/Short-Ansichten nur Confirmed-Orders verwenden, die zum
-        # aktuellen Bot-Namen passen, um kein Mixing zwischen long_bot_N und
-        # short_bot_N zu verursachen.
-        process_bot = str(row.get("bot_name") or "").strip().lower()
-        filtered_confirmed: list[dict[str, Any]] = []
-        skipped_mismatch = 0
-        for entry in confirmed_rows_all:
-            entry_bot = str(entry.get("bot_name") or "").strip().lower()
-            if entry_bot and process_bot and entry_bot != process_bot:
-                skipped_mismatch += 1
-                continue
-            filtered_confirmed.append(entry)
-
-        confirmed_rows = filtered_confirmed
-        if not confirmed_rows:
-            if skipped_mismatch:
-                payload = {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "bot_name": row.get("bot_name"),
-                    "symbol": row.get("symbol"),
-                    "trade_block_id": tbid,
-                    "skipped_mismatch_count": skipped_mismatch,
-                    "reason": "bot_name_mismatch",
-                }
-                logger.info(
-                    "[dashboard] profit_trades_process_row_filled_orders_filtered_by_bot_side %s",
-                    json.dumps(payload, default=str),
-                )
-            continue
-
+        confirmed_rows = confirmed_rows_all
         seen: set[str] = set()
         filled: list[dict[str, Any]] = []
         for entry in confirmed_rows:
-            dedupe_key = str(entry.get("dedupe_key") or "") or f"{entry.get('exchange_order_id') or ''}:{entry.get('purpose') or ''}"
+            dedupe_key = _confirmed_row_dedupe_key(entry)
             if dedupe_key in seen:
                 continue
             seen.add(dedupe_key)
@@ -9894,7 +9847,7 @@ def _build_profit_trade_filtered_rows(
         bot_name = str(row.get("bot_name") or "").strip().lower()
         if not tbid or not bot_name:
             continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_name)
+        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid)
         if not confirmed:
             continue
 
@@ -9939,7 +9892,7 @@ def _build_profit_trade_filtered_rows(
         bot_name = str(row.get("bot_name") or "").strip().lower()
         if not tbid or not bot_name:
             continue
-        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid, bot_name)
+        confirmed = _get_confirmed_pnl_rows_for_trade_block(profile, tbid)
         if not confirmed:
             continue
         end_profit, _pnl_count, _purposes, _purpose_counts, _pnl_scope_counts = _sum_confirmed_closed_pnl_rows(
