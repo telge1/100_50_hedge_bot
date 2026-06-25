@@ -38,6 +38,10 @@ from .cycle_sequence import (
     is_attempted_purpose_matching_sequence,
 )
 from . import direction_config, purpose_mapping
+from .confirmed_pnl_path_logic import (
+    purpose_implies_bot_side,
+    should_skip_foreign_confirmed_pnl_write,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
@@ -18125,10 +18129,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         record["dedupe_key"] = f"{exchange_order_id}:{purpose}"
         dedupe_key = record["dedupe_key"]
         # Route Confirmed-PnL-Eintrag zum passenden Bot (long_bot_N / short_bot_N)
-        # anhand von side/purpose, damit jede Seite ihre eigene History-Datei erhält.
-        route_side = str(record.get("side") or "").strip().lower()
-        purpose_upper = str(purpose or "").upper()
+        # anhand von purpose (primär) und side, damit jede Seite ihre eigene History-Datei erhält.
+        route_side = purpose_implies_bot_side(purpose)
+        if route_side is None:
+            raw_side = str(record.get("side") or "").strip().lower()
+            if raw_side in {"long", "short"}:
+                route_side = raw_side
         if not route_side:
+            purpose_upper = str(purpose or "").upper()
             if "SHORT" in purpose_upper:
                 route_side = "short"
             elif "LONG" in purpose_upper:
@@ -18138,6 +18146,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             default_bot=default_bot_name,
             base_path=confirmed_order_pnl_history_path,
         )
+        skip_write, skip_reason, skip_context = should_skip_foreign_confirmed_pnl_write(
+            payload=payload,
+            default_bot_name=default_bot_name,
+            target_bot_name=target_bot_name,
+            target_path=target_path,
+            purpose=purpose,
+        )
+        if skip_write:
+            _log_warning_event(
+                "confirmed_pnl_history_foreign_bot_row_skipped",
+                {
+                    **skip_context,
+                    "reason": skip_reason,
+                },
+            )
+            return
         record["bot_name"] = target_bot_name
         _log_event(
             "confirmed_pnl_history_route",
