@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
 BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot" / "config" / "config.yaml"
+DEFAULT_CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 LOG_PATH = BOT_ROOT / "logs" / "wallet_transfer_executor.log"
 JSON_LOG_PATH = BOT_ROOT / "logs" / "wallet_transfer_executor.jsonl"
 DEFAULT_COIN = "USDT"

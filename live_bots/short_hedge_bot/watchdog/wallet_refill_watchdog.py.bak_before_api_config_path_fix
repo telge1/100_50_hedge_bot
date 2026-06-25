@@ -21,7 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
 BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
-CONFIG_PATH = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot" / "config" / "config.yaml"
+CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 EXECUTOR_PATH = BOT_ROOT / "watchdog" / "wallet_transfer_executor.py"
 LOG_PATH = BOT_ROOT / "logs" / "wallet_refill_watchdog.log"
 JSON_LOG_PATH = BOT_ROOT / "logs" / "wallet_refill_watchdog.jsonl"
@@ -575,81 +575,21 @@ def initialize_wallet_baselines_on_start(
 
 
 def resolve_bot_metadata(bot_name: str, logger: logging.Logger) -> tuple[str, str] | None:
-    """Resolve active bot symbol/category from runtime sources first.
-
-    Wichtig für short_hedge_bot:
-    - Runtime/Reserved/State enthalten den echten aktuell reservierten Coin.
-    - config/fixed_cycle_config.json kann stale sein, z.B. ENAUSDT.
-    """
-    bot_name = bot_name.lower()
-    bot_root = BOT_ROOT / bot_name
-
-    candidates: list[tuple[str, str, str]] = []
-
-    def _read_json(path: Path) -> dict:
-        try:
-            if not path.exists():
-                return {}
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            return payload if isinstance(payload, dict) else {}
-        except Exception as exc:
-            logger.warning("Failed to read metadata json for %s path=%s error=%s", bot_name, path, exc)
-            return {}
-
-    def _add_candidate(source: str, symbol: object, category: object = None) -> None:
-        if symbol is None:
-            return
-        symbol_s = str(symbol).strip().upper()
-        if not symbol_s:
-            return
-        category_s = str(category or "linear").strip() or "linear"
-        candidates.append((source, symbol_s, category_s))
-
-    # 1) Runtime config: highest priority, normally contains current reserved/active symbol.
-    runtime_payload = _read_json(bot_root / "run" / "fixed_cycle_config.runtime.json")
-    _add_candidate("runtime_config", runtime_payload.get("symbol"), runtime_payload.get("category"))
-
-    # 2) Reserved coin file: active scanner/bot reservation.
-    reserved_payload = _read_json(bot_root / "run" / "reserved_best_coin.json")
-    _add_candidate("reserved_best_coin", reserved_payload.get("symbol"), reserved_payload.get("category"))
-
-    # 3) Current state: fallback when runtime file is missing.
-    state_payload = _read_json(bot_root / "state" / "fixed_cycle_state.json")
-    _add_candidate("state", state_payload.get("symbol"), state_payload.get("category"))
-
-    strategy_state = state_payload.get("strategy_state") or {}
-    if isinstance(strategy_state, dict):
-        _add_candidate(
-            "strategy_state",
-            strategy_state.get("symbol"),
-            strategy_state.get("category") or state_payload.get("category"),
-        )
-
-        cycle_state = strategy_state.get("cycle_state") or {}
-        if isinstance(cycle_state, dict):
-            _add_candidate(
-                "cycle_state",
-                cycle_state.get("symbol"),
-                cycle_state.get("category") or strategy_state.get("category") or state_payload.get("category"),
-            )
-
-    # 4) Static config only as final fallback. This can be stale.
-    config_payload = _read_json(bot_root / "config" / "fixed_cycle_config.json")
-    _add_candidate("config", config_payload.get("symbol"), config_payload.get("category"))
-
-    if not candidates:
-        logger.warning("No symbol resolved for %s", bot_name)
+    config_path = BOT_ROOT / bot_name / "config" / "fixed_cycle_config.json"
+    if not config_path.exists():
+        logger.warning("Config missing for %s", bot_name)
         return None
-
-    selected_source, selected_symbol, selected_category = candidates[0]
-    logger.info(
-        "wallet_refill_resolved_symbol_candidates bot=%s selected_symbol=%s selected_source=%s candidates=%s",
-        bot_name,
-        selected_symbol,
-        selected_source,
-        [(source, symbol) for source, symbol, _category in candidates],
-    )
-    return selected_symbol, selected_category
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Failed to read config for %s: %s", bot_name, exc)
+        return None
+    symbol = payload.get("symbol")
+    category = payload.get("category") or "linear"
+    if not symbol:
+        logger.warning("No symbol in config for %s", bot_name)
+        return None
+    return symbol.upper(), category
 
 
 def is_bot_runner_active(bot_name: str) -> bool:

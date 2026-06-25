@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
 BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
-CONFIG_PATH = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot" / "config" / "config.yaml"
+CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog.log"
 DEBUG_LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog_debug.jsonl"
 SIGNIFICANT_DEBUG_EVENTS = {
@@ -420,97 +420,25 @@ def load_profile_accounts(logger: logging.Logger) -> Mapping[str, dict[str, Any]
     return accounts
 
 
-def _read_json_file(path: Path, logger: logging.Logger) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        logger.warning("Failed to read json file %s: %s", path, exc, exc_info=False)
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _normalized_symbol_from_payload(payload: Mapping[str, Any]) -> str | None:
-    symbol = payload.get("symbol")
-    if symbol is None:
-        return None
-    normalized = str(symbol).strip().upper()
-    return normalized or None
-
-
 def resolve_bot_metadata(bot_name: str, logger: logging.Logger) -> tuple[str, str] | None:
     bot_name = bot_name.lower()
-    bot_root = BOT_ROOT / bot_name
-
-    config_path = bot_root / "config" / "fixed_cycle_config.json"
-    runtime_config_path = bot_root / "run" / "fixed_cycle_config.runtime.json"
-    reserved_coin_path = bot_root / "run" / "reserved_best_coin.json"
-    state_path = bot_root / "state" / "fixed_cycle_state.json"
-
-    config_payload = _read_json_file(config_path, logger)
-    runtime_payload = _read_json_file(runtime_config_path, logger)
-    reserved_payload = _read_json_file(reserved_coin_path, logger)
-    state_payload = _read_json_file(state_path, logger)
-
-    category = (
-        runtime_payload.get("category")
-        or config_payload.get("category")
-        or "linear"
-    )
-
-    symbol_candidates: list[tuple[str, str]] = []
-
-    runtime_symbol = _normalized_symbol_from_payload(runtime_payload)
-    if runtime_symbol:
-        symbol_candidates.append(("runtime_config", runtime_symbol))
-
-    reserved_symbol = _normalized_symbol_from_payload(reserved_payload)
-    if reserved_symbol:
-        symbol_candidates.append(("reserved_best_coin", reserved_symbol))
-
-    state_symbol = _normalized_symbol_from_payload(state_payload)
-    if state_symbol:
-        symbol_candidates.append(("state_symbol", state_symbol))
-
-    strategy_state = state_payload.get("strategy_state") or {}
-    if isinstance(strategy_state, Mapping):
-        strategy_symbol = _normalized_symbol_from_payload(strategy_state)
-        if strategy_symbol:
-            symbol_candidates.append(("strategy_state.symbol", strategy_symbol))
-        cycle_state = strategy_state.get("cycle_state") or {}
-        if isinstance(cycle_state, Mapping):
-            cycle_symbol = _normalized_symbol_from_payload(cycle_state)
-            if cycle_symbol:
-                symbol_candidates.append(("cycle_state.symbol", cycle_symbol))
-
-    config_symbol = _normalized_symbol_from_payload(config_payload)
-    if config_symbol:
-        symbol_candidates.append(("config", config_symbol))
-
-    seen: set[str] = set()
-    deduped: list[tuple[str, str]] = []
-    for source, symbol in symbol_candidates:
-        if symbol in seen:
-            continue
-        seen.add(symbol)
-        deduped.append((source, symbol))
-
-    if not deduped:
+    config_path = BOT_ROOT / bot_name / "config" / "fixed_cycle_config.json"
+    if not config_path.exists():
+        logger.warning("Config missing for bot %s; skipping", bot_name)
+        return None
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning(
+            "Failed to read config for %s: %s", bot_name, exc, exc_info=False
+        )
+        return None
+    symbol = payload.get("symbol")
+    category = payload.get("category")
+    if not symbol:
         logger.warning("No symbol found for bot %s; skipping", bot_name)
         return None
-
-    selected_source, selected_symbol = deduped[0]
-    if len(deduped) > 1:
-        logger.info(
-            "watchdog_resolved_symbol_candidates bot=%s selected_symbol=%s selected_source=%s candidates=%s",
-            bot_name,
-            selected_symbol,
-            selected_source,
-            deduped,
-        )
-
-    return (selected_symbol, category or "linear")
+    return (symbol.upper(), category or "linear")
 
 
 def load_bot_runtime_state(bot_name: str, logger: logging.Logger) -> dict[str, Any]:
@@ -848,26 +776,13 @@ def handle_profile(
         status_payload,
         persisted_active_orders,
     )
-
-    # Root-state symbol can be outside strategy_state depending on how the runtime state was written.
-    # Prefer it before config_symbol so a stale reserved/config symbol does not hide the active trade.
-    root_state_symbol = _normalize_symbol_candidate(runtime_state_payload.get("symbol"))
-    if root_state_symbol:
-        symbol_candidates = [("runtime_state.symbol", root_state_symbol)] + [
-            item for item in symbol_candidates if item[1] != root_state_symbol
-        ]
-
     order_manager = BybitOrderManager(api_key, secret_key)
     detected_symbol, long_qty, short_qty = detect_active_symbol_and_qty(
         order_manager, config_symbol, category
     )
-    has_detected_position = long_qty > 0 or short_qty > 0
-    symbol_resolution_source = "exchange_detected" if has_detected_position else None
+    symbol_resolution_source = "exchange_detected" if detected_symbol else None
     probed_symbol_results: list[dict[str, Any]] = []
-
-    # Only accept detect_active_symbol_and_qty when it found an actual position.
-    # If it merely echoed config_symbol with 0/0 qty, continue probing state-derived candidates.
-    if not has_detected_position:
+    if not detected_symbol:
         (
             resolved_symbol,
             resolved_long_qty,

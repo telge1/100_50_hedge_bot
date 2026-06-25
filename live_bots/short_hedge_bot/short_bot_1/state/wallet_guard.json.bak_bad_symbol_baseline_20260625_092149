@@ -1,0 +1,22 @@
+{
+  "bot_name": "short_bot_1",
+  "symbol": "ENAUSDT",
+  "start_wallet_usdt": 3.344e-05,
+  "current_wallet_usdt": 9.98362495,
+  "wallet_metric_used": "total_margin_balance",
+  "refill_threshold_pct": 50,
+  "refill_threshold_wallet_usdt": 1.672e-05,
+  "refill_required": false,
+  "refill_amount_usdt": 0.0,
+  "cashout_profit_trigger_pct": 50,
+  "cashout_trigger_wallet_usdt": 5.0159999999999994e-05,
+  "cashout_profit_share_pct": 50,
+  "profit_usdt": 0.0,
+  "cashout_required": false,
+  "cashout_amount_usdt": 0.0,
+  "last_refill_at": null,
+  "last_cashout_at": null,
+  "refill_count": 0,
+  "cashout_count": 0,
+  "updated_at": "2026-06-25T07:18:53.873376+00:00"
+}

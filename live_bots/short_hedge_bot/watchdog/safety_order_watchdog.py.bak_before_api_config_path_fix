@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fixed_cycle_hedge_bot.order_manager import BybitOrderManager
 
 BOT_ROOT = PROJECT_ROOT / "live_bots" / "short_hedge_bot"
-CONFIG_PATH = PROJECT_ROOT / "live_bots" / "100_50_hedge_bot" / "config" / "config.yaml"
+CONFIG_PATH = BOT_ROOT / "config" / "config.yaml"
 LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog.log"
 DEBUG_LOG_PATH = BOT_ROOT / "logs" / "safety_order_watchdog_debug.jsonl"
 SIGNIFICANT_DEBUG_EVENTS = {

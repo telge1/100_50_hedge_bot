@@ -1,0 +1,19 @@
+{
+  "bot_name": "short_bot_1",
+  "symbol": "JTOUSDT",
+  "start_wallet_usdt": 26.96113096,
+  "current_wallet_usdt": 26.96145496,
+  "baseline_wallet_usdt": 26.96113096,
+  "wallet_metric_used": "total_margin_balance",
+  "refill_required": false,
+  "refill_amount_usdt": 0.0,
+  "cashout_required": false,
+  "cashout_amount_usdt": 0.0,
+  "updated_at": "2026-06-25T07:29:45.388183+00:00",
+  "refill_threshold_pct": 50,
+  "refill_threshold_wallet_usdt": 13.48056548,
+  "cashout_profit_trigger_pct": 50,
+  "cashout_trigger_wallet_usdt": 40.44169644,
+  "cashout_profit_share_pct": 50,
+  "profit_usdt": 0.0003240000000026555
+}
