@@ -118,3 +118,7 @@ live_bots/**/config/*credentials*.yaml
 _archive_removed_from_main_bot/
 _cleanup_safety_20260621_105139/
 legacy_backup/
+
+# Runtime bot state
+live_bots/state/
+live_bots/100_50_hedge_bot/*/state/
