@@ -12343,39 +12343,29 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "exchange_order_id": fill_event.exchange_order_id,
                         },
                     )
-                    # Persist a zero-PnL confirmed history row for the refill fill so that
-                    # dashboard detail views can show the refill/rebuy between cycle reduces.
-                    trade_block_id = self._resolve_active_trade_block_id(state)
-                    try:
-                        self._write_confirmed_order_pnl_history(
-                            {
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "exchange_order_id": fill_event.exchange_order_id,
-                                "client_order_id": fill_event.client_order_id,
-                                "purpose": purpose,
-                                "closed_pnl": 0.0,
-                                "trade_block_id": trade_block_id,
-                                "cycle_index": cycle_index or None,
-                                "pnl_scope": "refill",
-                                "pnl_source": "refill",
-                                "confirmed_via": "refill_fill",
-                                "refill_trigger_reason": state.get("refill_trigger_reason"),
-                            },
-                            runtime_state=runtime_state,
-                        )
-                    except Exception:
-                        _log_warning_event(
-                            "fixed_cycle_refill_confirmed_history_write_failed",
-                            {
-                                "symbol": snapshot.symbol or self.config.symbol,
-                                "purpose": purpose,
-                                "trade_block_id": trade_block_id,
-                                "cycle_index": cycle_index,
-                                "client_order_id": fill_event.client_order_id,
-                                "exchange_order_id": fill_event.exchange_order_id,
-                            },
-                        )
+                refill_trigger_reason = state.get("refill_trigger_reason")
+                refill_order_source = (
+                    "time_distance_refill"
+                    if str(refill_trigger_reason or "").strip() == "time_distance_refill"
+                    else "cycle_refill"
+                )
+                self._write_refill_documentation_confirmed_row(
+                    fill_event,
+                    snapshot,
+                    runtime_state,
+                    state,
+                    pnl_scope="refill",
+                    pnl_source="refill_fill",
+                    confirmed_via="refill_fill",
+                    cycle_index=cycle_index or None,
+                    order_source=refill_order_source,
+                    refill_batch_id=(
+                        registry_entry.get("refill_batch_id")
+                        if registry_entry
+                        else state.get("refill_batch_id")
+                    ),
+                    refill_trigger_reason=refill_trigger_reason,
+                )
                 self._mark_exit_orders_stale_after_structure_fill(
                     runtime_state,
                     fill_event=fill_event,
@@ -16401,6 +16391,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             ),
         }
         _log_event("fixed_cycle_recovery_refill_fill_detected", payload)
+        recovery_cycle_index = int(
+            state.get("recovery_reference_cycle_index")
+            or cycle_state.get("recovery_reference_cycle_index")
+            or 0
+        ) or None
+        self._write_refill_documentation_confirmed_row(
+            fill_event,
+            snapshot,
+            runtime_state,
+            state,
+            pnl_scope="recovery_reload",
+            pnl_source="recovery_reload_fill",
+            confirmed_via="recovery_reload_fill",
+            cycle_index=recovery_cycle_index,
+            order_source="recovery_capital_reload",
+            recovery_reload_id=state.get("recovery_reload_id"),
+            refill_batch_id=state.get("refill_batch_id"),
+            stage_index=state.get("recovery_stage_index") or cycle_state.get("recovery_stage_index"),
+            stage_count=state.get("recovery_stage_count") or cycle_state.get("recovery_stage_count"),
+        )
         reload_fill_payload = {
             **payload,
             "recovery_reload_id": state.get("recovery_reload_id"),
@@ -18060,6 +18070,113 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         return True
 
+    def _write_refill_documentation_confirmed_row(
+        self,
+        fill_event: FillEvent,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        state: dict[str, Any],
+        *,
+        pnl_scope: str,
+        pnl_source: str,
+        confirmed_via: str,
+        cycle_index: int | None = None,
+        order_source: str | None = None,
+        recovery_reload_id: str | None = None,
+        refill_batch_id: str | None = None,
+        refill_trigger_reason: str | None = None,
+        stage_index: int | None = None,
+        stage_count: int | None = None,
+    ) -> None:
+        if fill_event.status != "FILLED":
+            return
+        exchange_order_id = str(fill_event.exchange_order_id or "").strip()
+        purpose = str(fill_event.purpose or "").strip()
+        if not exchange_order_id or not purpose:
+            return
+        if self._cycle_order_confirmed(runtime_state, exchange_order_id, purpose):
+            return
+
+        exec_qty = float(fill_event.exec_qty or 0.0)
+        fill_price = float(fill_event.exec_price or 0.0)
+        side = str(fill_event.side or "").strip().lower()
+        if side not in {"long", "short"}:
+            if purpose == "REFILL_LONG" or self._is_recovery_reload_long_purpose(purpose):
+                side = "long"
+            elif purpose == "REFILL_SHORT" or self._is_recovery_reload_short_purpose(purpose):
+                side = "short"
+            else:
+                side = ""
+
+        metadata = dict(fill_event.metadata or {})
+        resolved_cycle_index = cycle_index
+        if resolved_cycle_index is None or resolved_cycle_index <= 0:
+            try:
+                resolved_cycle_index = int(metadata.get("cycle_index") or 0) or None
+            except (TypeError, ValueError):
+                resolved_cycle_index = None
+        if resolved_cycle_index is None or resolved_cycle_index <= 0:
+            try:
+                active_cycle = int(state.get("active_cycle_index") or 0)
+                resolved_cycle_index = active_cycle or None
+            except (TypeError, ValueError):
+                resolved_cycle_index = None
+
+        occurred_at = fill_event.occurred_at
+        timestamp = (
+            occurred_at.isoformat()
+            if occurred_at is not None
+            else datetime.now(timezone.utc).isoformat()
+        )
+
+        payload: dict[str, Any] = {
+            "timestamp": timestamp,
+            "symbol": snapshot.symbol or self.config.symbol,
+            "exchange_order_id": exchange_order_id,
+            "client_order_id": fill_event.client_order_id,
+            "purpose": purpose,
+            "closed_pnl": 0.0,
+            "trade_block_id": self._resolve_active_trade_block_id(state),
+            "cycle_index": resolved_cycle_index,
+            "pnl_scope": pnl_scope,
+            "pnl_source": pnl_source,
+            "confirmed_via": confirmed_via,
+            "qty": exec_qty,
+            "exec_qty": exec_qty,
+            "side": side or None,
+        }
+        if fill_price > 0:
+            payload["fill_price"] = fill_price
+            payload["avg_fill_price"] = fill_price
+        if order_source:
+            payload["order_source"] = order_source
+        if refill_batch_id:
+            payload["refill_batch_id"] = refill_batch_id
+        if refill_trigger_reason is not None:
+            payload["refill_trigger_reason"] = refill_trigger_reason
+        if recovery_reload_id:
+            payload["recovery_reload_id"] = recovery_reload_id
+        if stage_index is not None:
+            payload["stage_index"] = stage_index
+        if stage_count is not None:
+            payload["stage_count"] = stage_count
+
+        try:
+            self._write_confirmed_order_pnl_history(payload, runtime_state=runtime_state)
+        except Exception:
+            _log_warning_event(
+                "fixed_cycle_refill_confirmed_history_write_failed",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "purpose": purpose,
+                    "trade_block_id": payload.get("trade_block_id"),
+                    "cycle_index": resolved_cycle_index,
+                    "client_order_id": fill_event.client_order_id,
+                    "exchange_order_id": exchange_order_id,
+                    "pnl_scope": pnl_scope,
+                },
+            )
+
     def _write_confirmed_order_pnl_history(
         self,
         payload: dict[str, Any],
@@ -18098,9 +18215,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "side",
             "fill_price",
             "avg_fill_price",
+            "refill_batch_id",
+            "refill_trigger_reason",
+            "recovery_reload_id",
         ):
             if key in payload:
                 record[key] = payload.get(key)
+        pnl_scope_normalized = str(record.get("pnl_scope") or "").strip().lower()
+        if pnl_scope_normalized in {"refill", "recovery_reload"}:
+            record["closed_pnl"] = 0.0
         exchange_order_id = str(record.get("exchange_order_id") or "").strip()
         purpose = str(record.get("purpose") or "").strip()
         closed_pnl = record.get("closed_pnl")

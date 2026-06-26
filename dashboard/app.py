@@ -7920,19 +7920,6 @@ def _trade_block_detail_purpose_rank(purpose: str | None) -> int:
         base = base.split(" (", 1)[0]
     if "INITIAL" in base and "ENTRY" in base:
         return 10
-    if base.startswith("RECOVERY_RELOAD") or base.startswith("RECOVERY_REFILL"):
-        return 20
-    cycle_index = _extract_cycle_index_from_purpose(base)
-    if cycle_index > 0:
-        if "ADD" in base:
-            return 100 + cycle_index * 10
-        if "REDUCE" in base:
-            return 100 + cycle_index * 10 + 5
-        if "TP" in base:
-            return 100 + cycle_index * 10 + 7
-        return 100 + cycle_index * 10 + 3
-    if base.startswith("REFILL") or "REFILL" in base:
-        return 400 + cycle_index
     if any(
         token in base
         for token in (
@@ -7948,6 +7935,21 @@ def _trade_block_detail_purpose_rank(purpose: str | None) -> int:
         return 9000
     if "_EXIT" in base and ("TP" in base or "SL" in base):
         return 9000
+    cycle_index = _extract_cycle_index_from_purpose(base)
+    if cycle_index <= 0:
+        cycle_index = 1
+    if "ADD" in base:
+        return 100 + cycle_index * 10
+    if "REDUCE" in base:
+        return 100 + cycle_index * 10 + 5
+    if "TP" in base and base.startswith("CYCLE_"):
+        return 100 + cycle_index * 10 + 7
+    if base.startswith("RECOVERY_RELOAD") or base.startswith("RECOVERY_REFILL"):
+        return 100 + cycle_index * 10 + 10
+    if base.startswith("REFILL") or (base.startswith("CYCLE") and "REFILL" in base):
+        return 100 + cycle_index * 10 + 8
+    if cycle_index > 0 and base.startswith("CYCLE_"):
+        return 100 + cycle_index * 10 + 3
     return 500
 
 
@@ -8067,6 +8069,63 @@ def _detail_row_debug_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "dedupe_key": _trade_block_detail_row_dedupe_key(row),
         "detail_source": row.get("detail_source"),
     }
+
+
+def _is_refill_confirmed_row(row: dict[str, Any]) -> bool:
+    purpose = str(row.get("purpose") or "").strip().upper().split(" (", 1)[0]
+    pnl_scope = str(row.get("pnl_scope") or "").strip().lower()
+    if pnl_scope in {"refill", "recovery_reload"}:
+        return True
+    if purpose in {"REFILL_LONG", "REFILL_SHORT"}:
+        return True
+    if purpose.startswith("RECOVERY_RELOAD") or purpose.startswith("RECOVERY_REFILL"):
+        return True
+    return False
+
+
+def _refill_row_debug_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "purpose": row.get("purpose"),
+        "pnl_scope": row.get("pnl_scope"),
+        "closed_pnl": row.get("closed_pnl"),
+        "qty": row.get("qty") or row.get("exec_qty"),
+        "fill_price": row.get("fill_price") or row.get("avg_fill_price"),
+        "exchange_order_id": row.get("exchange_order_id"),
+        "timestamp": row.get("timestamp"),
+        "source": row.get("source"),
+        "order_source": row.get("order_source"),
+        "stage_index": row.get("stage_index"),
+        "stage_count": row.get("stage_count"),
+        "refill_batch_id": row.get("refill_batch_id"),
+        "recovery_reload_id": row.get("recovery_reload_id"),
+    }
+
+
+def _log_profit_trade_refill_rows_debug(
+    confirmed_rows: list[dict[str, Any]],
+    *,
+    bot_side: str,
+    profile: str,
+    bot_name: str | None,
+    symbol: str | None,
+    trade_block_id: str,
+) -> None:
+    refill_rows = [row for row in confirmed_rows if _is_refill_confirmed_row(row)]
+    if not refill_rows:
+        return
+    payload = {
+        "profile": profile,
+        "bot_side": bot_side,
+        "bot_name": bot_name,
+        "trade_block_id": trade_block_id,
+        "symbol": symbol,
+        "refill_row_count": len(refill_rows),
+        "rows": [_refill_row_debug_snapshot(row) for row in refill_rows],
+    }
+    logger.info(
+        "[dashboard] profit_trade_refill_rows_debug %s",
+        json.dumps(payload, default=str),
+    )
 
 
 def _log_profit_trade_confirmed_rows_for_details_debug(
@@ -8371,6 +8430,7 @@ def _build_confirmed_detail_rows(record: dict[str, Any], confirmed_rows: list[di
                 "cycle_index": entry.get("cycle_index"),
                 "pnl_scope": entry.get("pnl_scope"),
                 "qty": qty_value,
+                "fill_price": entry.get("fill_price") or entry.get("avg_fill_price") or entry.get("exec_price"),
                 "side": side_value,
                 "cycle_role": cycle_role_value,
                 "bot_name": bot_name_value,
@@ -9761,6 +9821,14 @@ async def api_profit_trade_details(
         confirmed_index=confirmed_index,
     )
     _log_profit_trade_confirmed_rows_for_details_debug(
+        confirmed_rows,
+        bot_side=bot_side,
+        profile=profile,
+        bot_name=bot_name,
+        symbol=symbol,
+        trade_block_id=trade_block_id,
+    )
+    _log_profit_trade_refill_rows_debug(
         confirmed_rows,
         bot_side=bot_side,
         profile=profile,

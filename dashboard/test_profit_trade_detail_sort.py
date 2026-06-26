@@ -350,5 +350,186 @@ class ShortPrimaryHedgeConfirmedRowsTests(unittest.TestCase):
         self.assertIn("CYCLE_1_LONG_REDUCE", purposes)
 
 
+class RefillDetailRowsTests(unittest.TestCase):
+    def test_normal_refill_appears_in_details(self) -> None:
+        confirmed_rows = [
+            {
+                "trade_block_id": TBID,
+                "timestamp": "2026-06-02T12:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_REDUCE",
+                "closed_pnl": 0.5,
+                "exchange_order_id": "c1",
+                "cycle_index": 1,
+                "pnl_scope": "cycle",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": TBID,
+                "timestamp": "2026-06-02T12:05:00+00:00",
+                "purpose": "REFILL_LONG",
+                "closed_pnl": 0.0,
+                "exchange_order_id": "refill-1",
+                "cycle_index": 1,
+                "pnl_scope": "refill",
+                "qty": 2.5,
+                "fill_price": 5.01,
+                "source": "bot_confirmed_pnl",
+            },
+        ]
+        record = {"trade_block_id": TBID, "symbol": "NEARUSDT", "bot_name": "short_bot_1"}
+        rows = _build_trade_block_detail_rows(record, confirmed_rows)
+        purposes = {row["purpose"] for row in rows}
+        self.assertIn("REFILL_LONG", purposes)
+        refill_row = next(row for row in rows if row["purpose"] == "REFILL_LONG")
+        self.assertEqual(refill_row["qty"], 2.5)
+        self.assertEqual(refill_row["fill_price"], 5.01)
+
+    def test_recovery_reload_appears_in_details(self) -> None:
+        confirmed_rows = [
+            {
+                "trade_block_id": TBID,
+                "timestamp": "2026-06-02T12:00:00+00:00",
+                "purpose": "RECOVERY_RELOAD_LONG_ENTRY",
+                "closed_pnl": 0.0,
+                "exchange_order_id": "recovery-1",
+                "pnl_scope": "recovery_reload",
+                "source": "bot_confirmed_pnl",
+            }
+        ]
+        record = {"trade_block_id": TBID, "symbol": "NEARUSDT", "bot_name": "long_bot_1"}
+        rows = _build_trade_block_detail_rows(record, confirmed_rows)
+        self.assertEqual(rows[0]["purpose"], "RECOVERY_RELOAD_LONG_ENTRY")
+
+    def test_refill_zero_pnl_does_not_change_summary_endprofit(self) -> None:
+        confirmed_rows = [
+            {"trade_block_id": TBID, "closed_pnl": 0.5, "purpose": "CYCLE_1_LONG_REDUCE"},
+            {"trade_block_id": TBID, "closed_pnl": 0.0, "purpose": "REFILL_LONG", "pnl_scope": "refill"},
+            {"trade_block_id": TBID, "closed_pnl": 0.2, "purpose": "LONG_TP_EXIT"},
+        ]
+        record: dict = {"trade_block_id": TBID}
+        end_profit, _count, _purposes, _pc, _sc = _sum_confirmed_closed_pnl_rows(confirmed_rows)
+        _apply_confirmed_end_profit_to_record(record, confirmed_rows)
+        self.assertAlmostEqual(end_profit, 0.7)
+        self.assertAlmostEqual(record["profit_usdt"], 0.7)
+
+    def test_refill_not_removed_by_dedupe(self) -> None:
+        confirmed_rows = [
+            {
+                "trade_block_id": TBID,
+                "timestamp": "2026-06-02T12:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_REDUCE",
+                "closed_pnl": 0.5,
+                "exchange_order_id": "c1",
+                "pnl_scope": "cycle",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": TBID,
+                "timestamp": "2026-06-02T12:05:00+00:00",
+                "purpose": "REFILL_LONG",
+                "closed_pnl": 0.0,
+                "exchange_order_id": "refill-1",
+                "pnl_scope": "refill",
+                "source": "bot_confirmed_pnl",
+            },
+        ]
+        built = _build_confirmed_detail_rows({"trade_block_id": TBID}, confirmed_rows)
+        deduped = _dedupe_trade_block_detail_rows(built)
+        purposes = {row["purpose"] for row in deduped}
+        self.assertIn("REFILL_LONG", purposes)
+        self.assertEqual(len(deduped), 2)
+
+    def test_same_timestamp_sort_reduce_refill_recovery_final(self) -> None:
+        same_time = "2026-06-02T12:00:00+00:00"
+        rows = [
+            _row(
+                purpose="SHORT_SL_EXIT",
+                time=same_time,
+                cycle_index=1,
+                exchange_order_id="final",
+            ),
+            _row(
+                purpose="RECOVERY_RELOAD_LONG_ENTRY",
+                time=same_time,
+                cycle_index=1,
+                exchange_order_id="recovery",
+            ),
+            _row(
+                purpose="REFILL_LONG",
+                time=same_time,
+                cycle_index=1,
+                exchange_order_id="refill",
+            ),
+            _row(
+                purpose="CYCLE_1_LONG_REDUCE",
+                time=same_time,
+                cycle_index=1,
+                exchange_order_id="reduce",
+            ),
+        ]
+        sorted_rows = _sort_trade_block_detail_rows(rows)
+        self.assertEqual(
+            [row["exchange_order_id"] for row in sorted_rows],
+            ["reduce", "refill", "recovery", "final"],
+        )
+
+    def test_paired_read_loads_refill_for_same_tbid_only(self) -> None:
+        tbid = TBID
+        foreign_tbid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        short_path = Path("/tmp/short_bot_1/logs/confirmed_order_pnl_history.jsonl")
+        long_path = Path("/tmp/long_bot_1/logs/confirmed_order_pnl_history.jsonl")
+        all_rows = [
+            {
+                "trade_block_id": tbid,
+                "bot_name": "short_bot_1",
+                "purpose": "REFILL_LONG",
+                "closed_pnl": 0.0,
+                "pnl_scope": "refill",
+                "exchange_order_id": "refill-short",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": foreign_tbid,
+                "bot_name": "long_bot_1",
+                "purpose": "REFILL_SHORT",
+                "closed_pnl": 0.0,
+                "pnl_scope": "refill",
+                "exchange_order_id": "foreign-refill",
+                "source": "bot_confirmed_pnl",
+            },
+        ]
+
+        def _collect_side_effect(paths: list[Path]) -> list[dict]:
+            collected: list[dict] = []
+            for path in paths:
+                path_str = str(path)
+                if "short_bot_1" in path_str:
+                    collected.extend(row for row in all_rows if row["bot_name"] == "short_bot_1")
+                if "long_bot_1" in path_str:
+                    collected.extend(row for row in all_rows if row["bot_name"] == "long_bot_1")
+            return collected
+
+        paired_source = {
+            "confirmed_order_pnl_history_file": long_path,
+            "bot_name": "long_bot_1",
+        }
+        paths: list[Path] = [short_path]
+        with mock.patch("app._resolve_profit_trade_source", return_value=(paired_source, [])):
+            _append_paired_hedge_confirmed_paths("bot_1", "short", paths)
+
+        with mock.patch(
+            "app._collect_confirmed_order_pnl_rows_from_paths",
+            side_effect=_collect_side_effect,
+        ):
+            with mock.patch(
+                "app._collect_confirmed_history_paths",
+                return_value=[short_path, long_path],
+            ):
+                index = _build_confirmed_pnl_index("bot_1", "short")
+        rows = _get_confirmed_pnl_rows_for_trade_block("", tbid, confirmed_index=index)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["purpose"], "REFILL_LONG")
+
+
 if __name__ == "__main__":
     unittest.main()
