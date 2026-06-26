@@ -135,6 +135,12 @@ sudo systemctl restart dashboard
 
 sudo systemctl status dashboard
 
+short api ausgabe
+https://dash.immotel.de/profit-verlauf_2?bot_side=short&profile=bot_1&page=0&page_size=500
+
+long api ausgabe
+https://dash.immotel.de/api/dashboard/profit-trades?profile=bot_1&bot_side=long&page=0&page_size=500
+
 ####################################### Add Bot ###################################################################
 
  live_bots/100_50_hedge_bot/shared_scripts/create_bot_env.sh long_bot_5 --with-wrappers
