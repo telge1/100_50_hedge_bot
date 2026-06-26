@@ -43,6 +43,7 @@ from .confirmed_pnl_path_logic import (
     should_skip_foreign_confirmed_pnl_write,
 )
 from .trade_block_id_resolver import resolve_active_trade_block_id
+from . import log_throttle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
@@ -260,7 +261,38 @@ def _emit_analyzer_event(logger: logging.Logger, event: str, payload: dict[str, 
     logger.info(json.dumps(data))
 
 
-def _log_event(event: str, payload: dict[str, Any]) -> None:
+def _log_event(
+    event: str,
+    payload: dict[str, Any],
+    *,
+    runtime_state: RuntimeState | None = None,
+) -> None:
+    if event == "fixed_cycle_refill_gate_state_after_reconcile":
+        before = payload.get("before") or {}
+        after = payload.get("after") or {}
+        if before == after:
+            logger.debug("%s %s", event, payload)
+            return
+        logger.info("%s %s", event, payload)
+        return
+
+    if log_throttle.is_debug_only_event(event):
+        logger.debug("%s %s", event, payload)
+        return
+
+    if log_throttle.is_throttled_info_event(event):
+        strategy_state = runtime_state.strategy_state if runtime_state is not None else None
+        throttle_state = log_throttle.resolve_throttle_state(payload, strategy_state)
+        decision = log_throttle.should_log_throttled_event(event, payload, throttle_state)
+        if not decision.should_log:
+            return
+        log_payload = dict(payload)
+        if decision.suppressed_count > 0:
+            log_payload["suppressed_count"] = decision.suppressed_count
+            log_payload["throttle_interval_sec"] = decision.throttle_interval_sec
+        logger.info("%s %s", event, log_payload)
+        return
+
     logger.info("%s %s", event, payload)
 
 
@@ -5775,6 +5807,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "current_price": snapshot.current_price,
                         **pending_second_pair_short_reduce,
                     },
+                    runtime_state=runtime_state,
                 )
             else:
                 exit_intents = self._build_exit_intents(
@@ -6745,6 +6778,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                                     ],
                                     "reason": "waiting_for_second_leg_fill_or_confirmation",
                                 },
+                                runtime_state=runtime_state,
                             )
                             return intents
                     else:
@@ -19441,6 +19475,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "first_leg_purpose": first_leg_purpose,
                     "second_leg_purpose": second_leg_purpose,
                 },
+                runtime_state=runtime_state,
             )
             return False
 
@@ -20292,6 +20327,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "processed_cycle_purposes": list(state.get("processed_cycle_purposes") or []),
         }
         if first_done and not second_done:
+            before_recovery = (
+                str(state.get("cycle_step") or ""),
+                str(state.get("next_required_purpose") or "").upper(),
+                str(state.get("last_completed_purpose") or "").upper(),
+                int(state.get("active_cycle_index") or active_cycle_index),
+            )
             if state.get("cycle_step") != STEP_WAITING_FOR_PAIR_SECOND_LEG:
                 state["cycle_step"] = STEP_WAITING_FOR_PAIR_SECOND_LEG
             state["next_required_purpose"] = derive_next_required_purpose(
@@ -20299,17 +20340,24 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             state["last_completed_purpose"] = first_purpose
             state["sequence_recovery_blocked"] = False
-            _log_event(
-                "fixed_cycle_sequence_state_recovered_to_second_leg",
-                {
-                    **log_payload_base,
-                    "cycle_step": state["cycle_step"],
-                    "next_required_purpose": state["next_required_purpose"],
-                    "last_completed_purpose": state["last_completed_purpose"],
-                    "sequence_recovery_blocked": False,
-                },
+            after_recovery = (
+                str(state.get("cycle_step") or ""),
+                str(state.get("next_required_purpose") or "").upper(),
+                str(state.get("last_completed_purpose") or "").upper(),
+                int(state.get("active_cycle_index") or active_cycle_index),
             )
-            updated = True
+            if before_recovery != after_recovery:
+                _log_event(
+                    "fixed_cycle_sequence_state_recovered_to_second_leg",
+                    {
+                        **log_payload_base,
+                        "cycle_step": state["cycle_step"],
+                        "next_required_purpose": state["next_required_purpose"],
+                        "last_completed_purpose": state["last_completed_purpose"],
+                        "sequence_recovery_blocked": False,
+                    },
+                )
+                updated = True
         elif first_done and second_done:
             next_index = active_cycle_index + 1
             state["active_cycle_index"] = next_index

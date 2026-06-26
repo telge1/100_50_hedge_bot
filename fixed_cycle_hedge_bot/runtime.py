@@ -83,6 +83,7 @@ class GenericHedgeRuntime:
             self.logger,
             config.audit_log_file,
             extra_fields={"bot_name": config.bot_name},
+            runtime_state=self.runtime_state,
         )
         self.context = StrategyContext(
             audit=self.audit,
