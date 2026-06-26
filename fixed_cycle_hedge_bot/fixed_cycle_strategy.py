@@ -9783,10 +9783,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             distance_pct_abs = 0.0
         threshold_pct = float(self.config.max_post_recovery_long_reduce_distance_pct or 0.0)
 
-        # Stage-Entscheidung auf Basis der bestehenden Recovery-Schwelle
-        # Für reine Recovery-Szenarien (required_net > 0) behalten wir das alte Staging,
-        # für "normale" Zyklen ohne Nettoloss bleibt stage_count bei 1 und wir nutzen nur
-        # den neuen, min_notional-basierten Split-Helper.
+        # Stage-Entscheidung auf Basis der bestehenden Recovery-Schwelle.
+        # Profit-Staging (2/3 gewichtete Teil-TPs) gilt nur bei required_net > 0.
+        # Normale Zyklen ohne Nettoloss (stage_count == 1) versuchen zuerst den
+        # min_notional-basierten Equal-Split-Helper; bei Misserfolg Single-Fallback.
         stage_count = 1
         if required_net > 0 and threshold_pct > 0 and distance_pct_abs > 0:
             if distance_pct_abs <= 1.5:
@@ -10127,6 +10127,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_price=trigger_price,
         )
         if not use_market_fallback:
+            split_intents = self._maybe_build_normal_cycle_second_leg_split_intents(
+                cycle_index=cycle_index,
+                purpose=purpose,
+                qty=short_qty,
+                trigger_price=trigger_price,
+                snapshot=snapshot,
+                runtime_state=runtime_state,
+                side="short",
+                position_idx=2,
+                trigger_direction=2,
+                metadata=metadata,
+            )
+            if split_intents:
+                return split_intents
+            _, rules, _ = self._resolve_instrument_rules(runtime_state)
+            min_order_qty = float(
+                rules["min_order_qty"]
+                if rules and rules.get("min_order_qty")
+                else float(self.config.min_order_qty or 0.0)
+            )
+            min_notional_value = float(
+                rules["min_notional"]
+                if rules and rules.get("min_notional")
+                else float(self.config.min_notional_usdt or 0.0)
+            )
             _log_event(
                 "fixed_cycle_normal_second_leg_split_disabled_for_short_reduce",
                 {
@@ -10135,7 +10160,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "purpose": purpose,
                     "qty": short_qty,
                     "trigger_price": trigger_price,
-                    "reason": "single_25pct_reduce_required",
+                    "min_order_qty": min_order_qty,
+                    "min_notional_value": min_notional_value,
+                    "side": "short",
+                    "reason": "split_disabled_min_order_or_notional",
                 },
             )
 
