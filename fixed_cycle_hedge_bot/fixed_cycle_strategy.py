@@ -14243,6 +14243,173 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             text = text.rstrip("0").rstrip(".")
         return text or "0"
 
+    @staticmethod
+    def _recovery_wallet_transfer_audit_event_name(suffix: str) -> str:
+        if suffix == "baseline_updated_after_transfer":
+            return "fixed_cycle_recovery_wallet_baseline_updated_after_transfer"
+        return f"fixed_cycle_recovery_wallet_transfer_{suffix}"
+
+    @staticmethod
+    def _truncate_recovery_wallet_transfer_log_text(text: str, *, limit: int = 500) -> str:
+        raw = str(text or "")
+        if len(raw) <= limit:
+            return raw
+        return raw[: limit - 3] + "..."
+
+    def _extract_executor_transfer_audit_fields(
+        self, executor_event: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        if not isinstance(executor_event, dict):
+            return {}
+        fields: dict[str, Any] = {}
+        for key, target in (
+            ("status", "bybit_status"),
+            ("requested_amount", "requested_amount_usdt"),
+            ("final_amount", "rounded_amount_usdt"),
+            ("from_account_type", "from_account_type"),
+            ("to_account_type", "to_account_type"),
+            ("transfer_id", "bybit_transfer_id"),
+        ):
+            value = executor_event.get(key)
+            if value is not None:
+                fields[target] = value
+        return fields
+
+    def _build_recovery_wallet_transfer_envelope(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        baseline: dict[str, Any] | None = None,
+        cycle_index: int | None = None,
+        transfer_context: dict[str, Any] | None = None,
+        transfer_amount_usdt: float | None = None,
+        transfer_required: bool | None = None,
+        transfer_id: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        state = runtime_state.strategy_state
+        baseline_payload = baseline if isinstance(baseline, dict) else {}
+        transfer_context = transfer_context if isinstance(transfer_context, dict) else {}
+        if transfer_amount_usdt is None:
+            payload_base = transfer_context.get("payload_base") or {}
+            if isinstance(payload_base, dict):
+                transfer_amount_usdt = float(payload_base.get("transfer_amount_usdt") or 0.0)
+            else:
+                transfer_amount_usdt = 0.0
+        requested_amount = float(transfer_amount_usdt or 0.0)
+        rounded_amount = float(self._format_transfer_amount_for_executor(requested_amount) or 0.0)
+        recovery_cycle_index = cycle_index
+        if recovery_cycle_index is None:
+            recovery_cycle_index = int(
+                state.get("recovery_reference_cycle_index")
+                or state.get("active_cycle_index")
+                or 0
+            )
+        envelope: dict[str, Any] = {
+            "symbol": self.config.symbol,
+            "bot_name": self.config.bot_name,
+            "strategy_side": getattr(self.config, "strategy_side", None) or self.config.side,
+            "trade_block_id": state.get("trade_block_id"),
+            "recovery_reload_id": state.get("recovery_reload_id"),
+            "recovery_cycle_index": recovery_cycle_index,
+            "trigger_reason": state.get("recovery_activation_reason"),
+            "recovery_activation_reason": state.get("recovery_activation_reason"),
+            "coin": "USDT",
+            "asset": "USDT",
+            "from_account_type": "FUND",
+            "to_account_type": "UNIFIED",
+            "source_account_label": transfer_context.get("source_account_label"),
+            "target_account_label": transfer_context.get("target_account_label"),
+            "initial_wallet_balance_usdt": baseline_payload.get("initial_wallet_balance_usdt"),
+            "allocated_wallet_balance_usdt": baseline_payload.get("allocated_wallet_balance_usdt"),
+            "total_transferred_recovery_usdt": baseline_payload.get(
+                "total_transferred_recovery_usdt"
+            ),
+            "pending_recovery_transfer_usdt": baseline_payload.get("pending_recovery_transfer_usdt"),
+        }
+        if transfer_required is not None:
+            envelope["transfer_required"] = transfer_required
+        if requested_amount > 0:
+            envelope["transfer_amount_usdt"] = requested_amount
+            envelope["requested_amount_usdt"] = requested_amount
+            envelope["rounded_amount_usdt"] = rounded_amount
+        if transfer_id:
+            envelope["transfer_id"] = transfer_id
+            envelope["bybit_transfer_id"] = transfer_id
+        if extra:
+            for key, value in extra.items():
+                if key not in envelope:
+                    envelope[key] = value
+        return envelope
+
+    def _log_recovery_wallet_transfer_audit(
+        self,
+        context: StrategyContext | None,
+        suffix: str,
+        runtime_state: RuntimeState,
+        *,
+        baseline: dict[str, Any] | None = None,
+        cycle_index: int | None = None,
+        transfer_context: dict[str, Any] | None = None,
+        transfer_amount_usdt: float | None = None,
+        transfer_required: bool | None = None,
+        transfer_id: str | None = None,
+        also_audit: bool = True,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = self._build_recovery_wallet_transfer_envelope(
+            runtime_state,
+            baseline=baseline,
+            cycle_index=cycle_index,
+            transfer_context=transfer_context,
+            transfer_amount_usdt=transfer_amount_usdt,
+            transfer_required=transfer_required,
+            transfer_id=transfer_id,
+            extra=extra,
+        )
+        event = self._recovery_wallet_transfer_audit_event_name(suffix)
+        _log_event(event, payload)
+        if also_audit and context is not None and getattr(context, "audit", None) is not None:
+            context.audit.log_event(event, **payload)
+        return payload
+
+    def _enrich_recovery_wallet_transfer_record(
+        self,
+        record: dict[str, Any],
+        runtime_state: RuntimeState,
+        transfer_context: dict[str, Any],
+        transfer_amount_usdt: float,
+        executor_event: dict[str, Any] | None,
+        executor_log_path: Path | None,
+    ) -> dict[str, Any]:
+        state = runtime_state.strategy_state
+        requested_amount = float(transfer_amount_usdt or 0.0)
+        rounded_amount = float(self._format_transfer_amount_for_executor(requested_amount) or 0.0)
+        executor_fields = self._extract_executor_transfer_audit_fields(executor_event)
+        enriched = dict(record)
+        enriched.update(
+            {
+                "requested_amount_usdt": executor_fields.get(
+                    "requested_amount_usdt", requested_amount
+                ),
+                "rounded_amount_usdt": executor_fields.get(
+                    "rounded_amount_usdt", rounded_amount
+                ),
+                "from_account_type": executor_fields.get("from_account_type") or "FUND",
+                "to_account_type": executor_fields.get("to_account_type") or "UNIFIED",
+                "source_account_label": transfer_context.get("source_account_label"),
+                "target_account_label": transfer_context.get("target_account_label"),
+                "recovery_reload_id": state.get("recovery_reload_id"),
+                "recovery_activation_reason": state.get("recovery_activation_reason"),
+                "executor_log_path": str(executor_log_path) if executor_log_path else None,
+            }
+        )
+        if executor_fields.get("bybit_status") is not None:
+            enriched["bybit_status"] = executor_fields.get("bybit_status")
+        if executor_fields.get("bybit_transfer_id") is not None:
+            enriched["bybit_transfer_id"] = executor_fields.get("bybit_transfer_id")
+        return enriched
+
     def _is_flat_snapshot_for_baseline(
         self, snapshot: HedgeSnapshot, runtime_state: RuntimeState
     ) -> bool:
@@ -14978,7 +15145,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         runtime_state: RuntimeState,
         transfer_context: dict[str, Any],
         transfer_id: str,
-    ) -> tuple[bool, str | None, str]:
+        *,
+        context: StrategyContext | None = None,
+        baseline: dict[str, Any] | None = None,
+        cycle_index: int | None = None,
+    ) -> tuple[bool, str | None, str, dict[str, Any] | None]:
         state = runtime_state.strategy_state
         payload_base = dict(transfer_context.get("payload_base") or {})
         payload_base["transfer_id"] = transfer_id
@@ -14987,6 +15158,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         config_path = transfer_context.get("config_path")
         source_account_label = transfer_context.get("source_account_label")
         target_account_label = transfer_context.get("target_account_label")
+        transfer_amount_usdt = float(payload_base.get("transfer_amount_usdt") or 0.0)
         if not transfer_context.get("ok"):
             _log_event(
                 "recovery_wallet_transfer_blocked_missing_config",
@@ -14997,6 +15169,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "target_account_label": target_account_label or self.config.bot_name,
                 },
             )
+            self._log_recovery_wallet_transfer_audit(
+                context,
+                "failed",
+                runtime_state,
+                baseline=baseline,
+                cycle_index=cycle_index,
+                transfer_context=transfer_context,
+                transfer_amount_usdt=transfer_amount_usdt,
+                transfer_required=True,
+                transfer_id=transfer_id,
+                extra={
+                    "reason": transfer_context.get("reason") or "missing_config",
+                    "failure_phase": "config_resolution",
+                },
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {**payload_base, "reason": transfer_context.get("reason")},
@@ -15005,7 +15192,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_submitted"] = False
             state["recovery_reload_transfer_confirmed"] = False
             state["recovery_reload_transfer_error"] = "waiting_for_wallet_config"
-            return False, transfer_id, "waiting_for_wallet_config"
+            return False, transfer_id, "waiting_for_wallet_config", None
         _log_event(
             "recovery_wallet_transfer_config_resolved",
             {
@@ -15041,14 +15228,24 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "--direction",
             "refill",
             "--amount",
-            self._format_transfer_amount_for_executor(
-                float(payload_base.get("transfer_amount_usdt") or 0.0)
-            ),
+            self._format_transfer_amount_for_executor(transfer_amount_usdt),
             "--coin",
             "USDT",
             "--transfer-id",
             transfer_id,
         ]
+        self._log_recovery_wallet_transfer_audit(
+            context,
+            "started",
+            runtime_state,
+            baseline=baseline,
+            cycle_index=cycle_index,
+            transfer_context=transfer_context,
+            transfer_amount_usdt=transfer_amount_usdt,
+            transfer_required=True,
+            transfer_id=transfer_id,
+            extra={"cmd": cmd, "executor_log_path": str(log_path) if log_path else None},
+        )
         _log_event("fixed_cycle_recovery_wallet_transfer_started", {**payload_base, "cmd": cmd})
         start_time = datetime.now(timezone.utc)
         try:
@@ -15059,6 +15256,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 cwd=PROJECT_ROOT,
             )
         except Exception as exc:
+            self._log_recovery_wallet_transfer_audit(
+                context,
+                "failed",
+                runtime_state,
+                baseline=baseline,
+                cycle_index=cycle_index,
+                transfer_context=transfer_context,
+                transfer_amount_usdt=transfer_amount_usdt,
+                transfer_required=True,
+                transfer_id=transfer_id,
+                extra={
+                    "reason": str(exc),
+                    "failure_phase": "subprocess",
+                    "error": str(exc),
+                },
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {**payload_base, "error": str(exc), "phase": "subprocess"},
@@ -15071,7 +15284,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "recovery_wallet_transfer_unknown_result_requires_manual_check",
                 {**payload_base, "reason": "subprocess_exception"},
             )
-            return False, transfer_id, "check_required"
+            return False, transfer_id, "check_required", None
         stderr = result.stderr or ""
         stdout = result.stdout or ""
         failure = (
@@ -15096,6 +15309,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 or "insufficient balance" in stderr_lower
                 or "insufficient balance" in stdout_lower
             )
+            failure_reason = "waiting_for_funds" if insufficient_balance else "check_required"
+            self._log_recovery_wallet_transfer_audit(
+                context,
+                "failed",
+                runtime_state,
+                baseline=baseline,
+                cycle_index=cycle_index,
+                transfer_context=transfer_context,
+                transfer_amount_usdt=transfer_amount_usdt,
+                transfer_required=True,
+                transfer_id=transfer_id,
+                extra={
+                    "reason": failure_reason,
+                    "failure_phase": "executor",
+                    "returncode": result.returncode,
+                    "stderr": self._truncate_recovery_wallet_transfer_log_text(stderr),
+                    "stdout": self._truncate_recovery_wallet_transfer_log_text(stdout),
+                },
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {
@@ -15110,7 +15342,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_confirmed"] = False
             if insufficient_balance:
                 state["recovery_reload_transfer_error"] = "waiting_for_funds"
-                return False, transfer_id, "waiting_for_funds"
+                return False, transfer_id, "waiting_for_funds", None
             state["recovery_reload_transfer_error"] = "check_required"
             _log_event(
                 "recovery_wallet_transfer_unknown_result_requires_manual_check",
@@ -15121,20 +15353,34 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "stdout": stdout,
                 },
             )
-            return False, transfer_id, "check_required"
+            return False, transfer_id, "check_required", None
         transfer_id = (
             str(transfer_event.get("transfer_id") or "").strip()
             if transfer_event
             else transfer_id
+        )
+        executor_audit = self._extract_executor_transfer_audit_fields(transfer_event)
+        self._log_recovery_wallet_transfer_audit(
+            context,
+            "success",
+            runtime_state,
+            baseline=baseline,
+            cycle_index=cycle_index,
+            transfer_context=transfer_context,
+            transfer_amount_usdt=transfer_amount_usdt,
+            transfer_required=False,
+            transfer_id=transfer_id,
+            extra={
+                **executor_audit,
+                "executor_log_path": str(log_path) if log_path else None,
+            },
         )
         # Erfolgreicher Transfer: Recovery-Reload-Transfer-State setzen (falls aktiv).
         if state.get("recovery_reload_id"):
             state["recovery_reload_transfer_required"] = False
             state["recovery_reload_transfer_submitted"] = True
             state["recovery_reload_transfer_confirmed"] = True
-            state["recovery_reload_transfer_amount_usdt"] = float(
-                payload_base.get("transfer_amount_usdt") or 0.0
-            )
+            state["recovery_reload_transfer_amount_usdt"] = transfer_amount_usdt
             state["recovery_reload_transfer_exchange_transfer_id"] = transfer_id
             state["recovery_reload_transfer_source_account"] = "FUND"
             state["recovery_reload_transfer_target_account"] = "UNIFIED"
@@ -15149,7 +15395,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             state["recovery_reload_transfer_config_path"] = str(config_path)
             state["recovery_reload_transfer_script_path"] = str(executor_path)
             state.pop("recovery_reload_transfer_error", None)
-        return True, transfer_id, "completed"
+        return True, transfer_id, "completed", transfer_event
 
     def _reserve_recovery_wallet_and_watcher_baselines(
         self,
@@ -15426,6 +15672,15 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return False
         if self._recovery_wallet_transfer_already_completed(baseline, cycle_index):
             state["recovery_wallet_transfer_pending"] = False
+            self._log_recovery_wallet_transfer_audit(
+                context,
+                "skipped",
+                runtime_state,
+                baseline=baseline,
+                cycle_index=cycle_index,
+                transfer_required=False,
+                extra={"skip_reason": "already_completed"},
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_already_completed",
                 {
@@ -15486,6 +15741,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if allocated_before <= 0:
             allocated_before = initial_wallet_balance + total_transferred_before + pending_before
         transfer_amount_usdt = allocated_before
+        self._log_recovery_wallet_transfer_audit(
+            context,
+            "planned",
+            runtime_state,
+            baseline=baseline,
+            cycle_index=cycle_index,
+            transfer_amount_usdt=transfer_amount_usdt,
+            transfer_required=True,
+            extra={
+                "total_transferred_recovery_usdt_before": total_transferred_before,
+                "pending_recovery_transfer_usdt_before": pending_before,
+                "allocated_wallet_balance_usdt_before": allocated_before,
+            },
+        )
         _log_event(
             "fixed_cycle_recovery_next_transfer_amount_resolved",
             {
@@ -15497,6 +15766,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         if transfer_amount_usdt <= 0:
+            self._log_recovery_wallet_transfer_audit(
+                context,
+                "failed",
+                runtime_state,
+                baseline=baseline,
+                cycle_index=cycle_index,
+                transfer_amount_usdt=transfer_amount_usdt,
+                transfer_required=True,
+                extra={
+                    "reason": "invalid_transfer_amount",
+                    "failure_phase": "amount_resolution",
+                },
+            )
             _log_event(
                 "fixed_cycle_recovery_wallet_transfer_failed",
                 {
@@ -15548,6 +15830,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if self._recovery_wallet_transfer_already_completed(baseline, cycle_index):
                 self._sync_recovery_wallet_transfer_tracking_state(state, baseline)
                 state["recovery_wallet_transfer_pending"] = False
+                self._log_recovery_wallet_transfer_audit(
+                    context,
+                    "skipped",
+                    runtime_state,
+                    baseline=baseline,
+                    cycle_index=cycle_index,
+                    transfer_context=transfer_context,
+                    transfer_required=False,
+                    transfer_id=str(
+                        baseline.get("recovery_reload_transfer_id")
+                        or baseline.get("recovery_reload_transfer_exchange_transfer_id")
+                        or ""
+                    ).strip()
+                    or None,
+                    extra={"skip_reason": "already_completed"},
+                )
                 _log_event(
                     "recovery_wallet_transfer_existing_completed_reused",
                     {
@@ -15601,6 +15899,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     if existing_status == "COMPLETED" or self._recovery_wallet_transfer_already_completed(
                         baseline, cycle_index
                     ):
+                        self._log_recovery_wallet_transfer_audit(
+                            context,
+                            "skipped",
+                            runtime_state,
+                            baseline=baseline,
+                            cycle_index=cycle_index,
+                            transfer_context=transfer_context,
+                            transfer_required=False,
+                            transfer_id=existing_transfer_id or None,
+                            extra={
+                                "skip_reason": "existing_completed_reused",
+                                "existing_status": existing_status,
+                            },
+                        )
                         _log_event(
                             "recovery_wallet_transfer_existing_completed_reused",
                             {
@@ -15620,6 +15932,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             extra={"cycle_index": cycle_index},
                         )
                         return True
+                    self._log_recovery_wallet_transfer_audit(
+                        context,
+                        "skipped",
+                        runtime_state,
+                        baseline=baseline,
+                        cycle_index=cycle_index,
+                        transfer_context=transfer_context,
+                        transfer_required=False,
+                        transfer_id=existing_transfer_id or None,
+                        extra={
+                            "skip_reason": "duplicate_suppressed",
+                            "existing_status": existing_status,
+                        },
+                    )
                     _log_event(
                         "recovery_wallet_transfer_duplicate_suppressed",
                         {
@@ -15640,6 +15966,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     and existing_status in {"IN_PROGRESS", "SUBMITTED", "CHECK_REQUIRED", "UNKNOWN"}
                 ):
                     self._sync_recovery_wallet_transfer_tracking_state(state, baseline)
+                    self._log_recovery_wallet_transfer_audit(
+                        context,
+                        "skipped",
+                        runtime_state,
+                        baseline=baseline,
+                        cycle_index=cycle_index,
+                        transfer_context=transfer_context,
+                        transfer_required=False,
+                        transfer_id=existing_transfer_id or None,
+                        extra={
+                            "skip_reason": "duplicate_suppressed",
+                            "existing_status": existing_status,
+                            "existing_transfer_signature": existing_signature,
+                        },
+                    )
                     _log_event(
                         "recovery_wallet_transfer_duplicate_suppressed",
                         {
@@ -15659,6 +16000,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 if not self._reserve_recovery_wallet_and_watcher_baselines(
                     baseline, transfer_amount_usdt, cycle_index, runtime_state
                 ):
+                    self._log_recovery_wallet_transfer_audit(
+                        context,
+                        "failed",
+                        runtime_state,
+                        baseline=baseline,
+                        cycle_index=cycle_index,
+                        transfer_context=transfer_context,
+                        transfer_amount_usdt=transfer_amount_usdt,
+                        transfer_required=True,
+                        extra={
+                            "reason": "baseline_reservation_failed",
+                            "failure_phase": "baseline_reservation",
+                        },
+                    )
                     _log_event(
                         "fixed_cycle_recovery_wallet_transfer_failed",
                         {
@@ -15722,10 +16077,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "target_account_label": transfer_context.get("target_account_label"),
                     },
                 )
-        success, transfer_id, result_code = self._execute_recovery_wallet_transfer(
+        success, transfer_id, result_code, executor_event = self._execute_recovery_wallet_transfer(
             runtime_state,
             transfer_context,
             transfer_id,
+            context=context,
+            baseline=baseline,
+            cycle_index=cycle_index,
         )
         if not success:
             status_map = {
@@ -15861,6 +16219,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "status": "completed",
                 "timestamp": completed_at,
             }
+            transfer_record = self._enrich_recovery_wallet_transfer_record(
+                transfer_record,
+                runtime_state,
+                transfer_context,
+                transfer_amount_usdt,
+                executor_event,
+                transfer_context.get("log_path"),
+            )
             baseline_transfers = baseline.get("recovery_transfers")
             if isinstance(baseline_transfers, list):
                 if not any(
@@ -15873,6 +16239,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 baseline["recovery_transfers"] = [transfer_record]
             if baseline_path:
                 self._save_recovery_wallet_baseline(baseline_path, baseline)
+        self._log_recovery_wallet_transfer_audit(
+            context,
+            "baseline_updated_after_transfer",
+            runtime_state,
+            baseline=baseline,
+            cycle_index=cycle_index,
+            transfer_context=transfer_context,
+            transfer_amount_usdt=transfer_amount_usdt,
+            transfer_required=False,
+            transfer_id=transfer_id,
+            extra={
+                "total_transferred_recovery_usdt_before": total_transferred_before,
+                "total_transferred_recovery_usdt_after": total_transferred_after,
+                "allocated_wallet_balance_usdt_before": allocated_before,
+                "allocated_wallet_balance_usdt_after": baseline.get(
+                    "allocated_wallet_balance_usdt"
+                ),
+                "recovery_transfers_count": len(baseline.get("recovery_transfers") or []),
+            },
+        )
         _log_event(
             "fixed_cycle_recovery_wallet_transfer_completed",
             {
