@@ -493,8 +493,24 @@ fi
 # wieder gelöscht werden.
 cleanup_local_bot_state_if_no_runner
 
+LONG_BOT_NAME="long_bot_${BOT_INDEX}"
+SHORT_BOT_NAME="short_bot_${BOT_INDEX}"
+LONG_PID_FILE="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/${LONG_BOT_NAME}/run/bot.pid"
+SHORT_PID_FILE="${PROJECT_ROOT}/live_bots/short_hedge_bot/${SHORT_BOT_NAME}/run/bot.pid"
+PAIR_SYMBOL_RESOLVER="${BOT_GROUP_DIR}/shared_scripts/pair_symbol_resolve.py"
 PAIR_SYMBOL=""
-if [[ -f "${PAIR_STATE_FILE}" ]]; then
+if [[ -f "${PAIR_SYMBOL_RESOLVER}" && -f "${PAIR_STATE_FILE}" ]]; then
+  RESOLVE_ERR="$(mktemp)"
+  PAIR_SYMBOL="$(
+    python3 "${PAIR_SYMBOL_RESOLVER}" "${PAIR_STATE_FILE}" "${LONG_PID_FILE}" "${SHORT_PID_FILE}" 2>"${RESOLVE_ERR}"
+  )"
+  if [[ -s "${RESOLVE_ERR}" ]]; then
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && echo "[${BOT_NAME}] ${line}" >&2
+    done < "${RESOLVE_ERR}"
+  fi
+  rm -f "${RESOLVE_ERR}"
+elif [[ -f "${PAIR_STATE_FILE}" ]]; then
   PAIR_SYMBOL="$(python3 <<PY
 import json
 from pathlib import Path
@@ -508,33 +524,6 @@ symbol = str(data.get("symbol") or "").strip().upper()
 print(symbol)
 PY
 )"
-fi
-
-# Stale-Pair-State-Check: Wenn ein Pair-Symbol existiert, aber weder Long- noch Short-Bot
-# für dieses Profil laufen, den Pair-State für diesen Start ignorieren.
-if [[ -n "${PAIR_SYMBOL}" ]]; then
-  LONG_BOT_NAME="long_bot_${BOT_INDEX}"
-  SHORT_BOT_NAME="short_bot_${BOT_INDEX}"
-  LONG_PID_FILE="${PROJECT_ROOT}/live_bots/100_50_hedge_bot/${LONG_BOT_NAME}/run/bot.pid"
-  SHORT_PID_FILE="${PROJECT_ROOT}/live_bots/short_hedge_bot/${SHORT_BOT_NAME}/run/bot.pid"
-  long_alive="false"
-  short_alive="false"
-  if [[ -f "${LONG_PID_FILE}" ]]; then
-    long_pid="$(cat "${LONG_PID_FILE}" 2>/dev/null || true)"
-    if [[ -n "${long_pid}" && -d "/proc/${long_pid}" ]]; then
-      long_alive="true"
-    fi
-  fi
-  if [[ -f "${SHORT_PID_FILE}" ]]; then
-    short_pid="$(cat "${SHORT_PID_FILE}" 2>/dev/null || true)"
-    if [[ -n "${short_pid}" && -d "/proc/${short_pid}" ]]; then
-      short_alive="true"
-    fi
-  fi
-  if [[ "${long_alive}" != "true" && "${short_alive}" != "true" ]]; then
-    echo "[${BOT_NAME}] stale_pair_state_ignored symbol=${PAIR_SYMBOL} reason=no_running_bots" >&2
-    # Pair-State NICHT mehr leeren; Symbol bleibt als Fallback für nächste Starts erhalten.
-  fi
 fi
 
 # Konflikt-Check: Wenn bereits ein Pair-Symbol existiert, aber der Short-Bot
