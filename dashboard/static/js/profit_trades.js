@@ -255,6 +255,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function isOpenTrade(trade) {
         const status = (trade?.status || "").toLowerCase();
+        if (status === "closed_without_final_exit" || status === "closed") {
+            return false;
+        }
         return (
             trade?.is_process ||
             status === "in_progress" ||
@@ -265,6 +268,20 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
+    function getTradeStatusLabel(trade) {
+        const statusValue = String(trade?.status || "").toLowerCase();
+        if (statusValue === "closed_without_final_exit") {
+            return trade?.warning_label || "Ohne Final Exit";
+        }
+        if (statusValue === "closed") {
+            return "Closed";
+        }
+        if (isOpenTrade(trade) || statusValue === "in_progress") {
+            return "In Progress";
+        }
+        return "Open";
+    }
+
     function getStatusSortRank(trade) {
         if (isOpenTrade(trade)) {
             return 0;
@@ -272,7 +289,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (String(trade?.status || "").toLowerCase() === "closed") {
             return 1;
         }
-        return 2;
+        if (String(trade?.status || "").toLowerCase() === "closed_without_final_exit") {
+            return 2;
+        }
+        return 3;
     }
 
     function getTradeDateValue(trade, key) {
@@ -485,9 +505,10 @@ document.addEventListener("DOMContentLoaded", () => {
             row.dataset.profile = profile;
             row.dataset.tradeRowKey = rowKey;
                 const statusValue = String(trade.status || "").toLowerCase();
-            const isProcess = isOpenTrade(trade) || statusValue === "in_progress";
-            const isClosed = statusValue === "closed";
-            const statusLabel = isClosed ? "Closed" : isProcess ? "In Progress" : "Open";
+            const isNonFinalClosed = statusValue === "closed_without_final_exit";
+            const isProcess =
+                !isNonFinalClosed && (isOpenTrade(trade) || statusValue === "in_progress");
+            const statusLabel = getTradeStatusLabel(trade);
             const endLabel = isProcess ? "-" : trade.end_label || "-";
             const walletAfter = isProcess ? "-" : trade.wallet_after != null ? trade.wallet_after : "-";
                 const startLabel = trade.start_label || "-";

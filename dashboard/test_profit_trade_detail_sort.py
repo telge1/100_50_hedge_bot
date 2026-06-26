@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 DASHBOARD_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = DASHBOARD_ROOT.parent
@@ -12,8 +13,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import (  # noqa: E402
     _apply_confirmed_end_profit_to_record,
+    _append_paired_hedge_confirmed_paths,
+    _build_confirmed_pnl_index,
+    _build_confirmed_detail_rows,
     _build_trade_block_detail_rows,
     _dedupe_trade_block_detail_rows,
+    _get_confirmed_pnl_rows_for_trade_block,
     _sort_trade_block_detail_rows,
     _sum_confirmed_closed_pnl_rows,
     _trade_block_detail_row_sort_key,
@@ -191,6 +196,158 @@ class BuildTradeBlockDetailRowsTests(unittest.TestCase):
         self.assertEqual(record["confirmed_pnl_row_count"], 3)
         detail_rows = _build_trade_block_detail_rows(record, confirmed_rows)
         self.assertEqual(len(detail_rows), 3)
+
+
+class ShortPrimaryHedgeConfirmedRowsTests(unittest.TestCase):
+    def _jto_confirmed_rows(self) -> list[dict]:
+        tbid = "jto-tbid-0000-0000-0000-000000000001"
+        return [
+            {
+                "trade_block_id": tbid,
+                "bot_name": "short_bot_1",
+                "symbol": "JTOUSDT",
+                "timestamp": "2026-06-26T10:16:00+00:00",
+                "purpose": "CYCLE_1_SHORT_REDUCE",
+                "cycle_index": 1,
+                "closed_pnl": -0.1,
+                "pnl_scope": "cycle",
+                "exchange_order_id": "short-c1",
+                "dedupe_key": "short-c1:CYCLE_1_SHORT_REDUCE",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": tbid,
+                "bot_name": "long_bot_1",
+                "symbol": "JTOUSDT",
+                "timestamp": "2026-06-26T10:17:00+00:00",
+                "purpose": "CYCLE_1_LONG_REDUCE",
+                "cycle_index": 1,
+                "closed_pnl": 0.05,
+                "pnl_scope": "cycle",
+                "exchange_order_id": "long-c1",
+                "dedupe_key": "long-c1:CYCLE_1_LONG_REDUCE",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": tbid,
+                "bot_name": "short_bot_1",
+                "symbol": "JTOUSDT",
+                "timestamp": "2026-06-26T10:18:00+00:00",
+                "purpose": "CYCLE_2_SHORT_REDUCE",
+                "cycle_index": 2,
+                "closed_pnl": -0.2,
+                "pnl_scope": "cycle",
+                "exchange_order_id": "short-c2",
+                "dedupe_key": "short-c2:CYCLE_2_SHORT_REDUCE",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": tbid,
+                "bot_name": "long_bot_1",
+                "symbol": "JTOUSDT",
+                "timestamp": "2026-06-26T10:21:00+00:00",
+                "purpose": "LONG_SL_EXIT",
+                "closed_pnl": -0.3,
+                "pnl_scope": "final_exit",
+                "exchange_order_id": "long-sl",
+                "dedupe_key": "long-sl:LONG_SL_EXIT",
+                "source": "bot_confirmed_pnl",
+            },
+            {
+                "trade_block_id": tbid,
+                "bot_name": "short_bot_1",
+                "symbol": "JTOUSDT",
+                "timestamp": "2026-06-26T10:22:00+00:00",
+                "purpose": "SHORT_TP_EXIT",
+                "closed_pnl": 0.4,
+                "pnl_scope": "final_exit",
+                "exchange_order_id": "short-tp",
+                "dedupe_key": "short-tp:SHORT_TP_EXIT",
+                "source": "bot_confirmed_pnl",
+            },
+        ]
+
+    def test_short_primary_details_include_both_cycle_legs_and_final_exits(self) -> None:
+        tbid = "jto-tbid-0000-0000-0000-000000000001"
+        confirmed_rows = self._jto_confirmed_rows()
+        record = {
+            "trade_block_id": tbid,
+            "symbol": "JTOUSDT",
+            "bot_name": "short_bot_1",
+            "status": "closed",
+        }
+        detail_rows = _build_trade_block_detail_rows(record, confirmed_rows)
+        purposes = {row["purpose"] for row in detail_rows}
+        self.assertEqual(len(detail_rows), 5)
+        self.assertIn("CYCLE_1_SHORT_REDUCE", purposes)
+        self.assertIn("CYCLE_1_LONG_REDUCE", purposes)
+        self.assertIn("CYCLE_2_SHORT_REDUCE", purposes)
+        self.assertIn("LONG_SL_EXIT", purposes)
+        self.assertIn("SHORT_TP_EXIT", purposes)
+
+    def test_dedupe_does_not_remove_cycle_long_reduce(self) -> None:
+        confirmed_rows = self._jto_confirmed_rows()
+        built = _build_confirmed_detail_rows(
+            {"trade_block_id": confirmed_rows[0]["trade_block_id"], "bot_name": "short_bot_1"},
+            confirmed_rows,
+        )
+        deduped = _dedupe_trade_block_detail_rows(built)
+        purposes = {row["purpose"] for row in deduped}
+        self.assertIn("CYCLE_1_LONG_REDUCE", purposes)
+        self.assertEqual(len(deduped), 5)
+
+    def test_summary_endprofit_equals_sum_of_all_five_confirmed_rows(self) -> None:
+        confirmed_rows = self._jto_confirmed_rows()
+        record: dict = {
+            "trade_block_id": confirmed_rows[0]["trade_block_id"],
+            "status": "closed",
+        }
+        end_profit, pnl_count, _purposes, _pc, _sc = _sum_confirmed_closed_pnl_rows(confirmed_rows)
+        _apply_confirmed_end_profit_to_record(record, confirmed_rows)
+        detail_rows = _build_trade_block_detail_rows(record, confirmed_rows)
+        self.assertEqual(pnl_count, 5)
+        self.assertEqual(len(detail_rows), 5)
+        self.assertAlmostEqual(end_profit, -0.15)
+        self.assertAlmostEqual(record["profit_usdt"], end_profit)
+
+    def test_confirmed_index_merges_paired_hedge_paths_for_short_view(self) -> None:
+        tbid = "jto-tbid-0000-0000-0000-000000000001"
+        short_path = Path("/tmp/short_bot_1/logs/confirmed_order_pnl_history.jsonl")
+        long_path = Path("/tmp/long_bot_1/logs/confirmed_order_pnl_history.jsonl")
+        all_rows = self._jto_confirmed_rows()
+
+        def _collect_side_effect(paths: list[Path]) -> list[dict]:
+            collected: list[dict] = []
+            for path in paths:
+                path_str = str(path)
+                if "short_bot_1" in path_str:
+                    collected.extend(row for row in all_rows if row["bot_name"] == "short_bot_1")
+                if "long_bot_1" in path_str:
+                    collected.extend(row for row in all_rows if row["bot_name"] == "long_bot_1")
+            return collected
+
+        paired_source = {
+            "confirmed_order_pnl_history_file": long_path,
+            "bot_name": "long_bot_1",
+        }
+        paths: list[Path] = [short_path]
+        with mock.patch("app._resolve_profit_trade_source", return_value=(paired_source, [])):
+            _append_paired_hedge_confirmed_paths("bot_1", "short", paths)
+        self.assertEqual(paths, [short_path, long_path])
+
+        with mock.patch(
+            "app._collect_confirmed_order_pnl_rows_from_paths",
+            side_effect=_collect_side_effect,
+        ):
+            with mock.patch(
+                "app._collect_confirmed_history_paths",
+                return_value=[short_path, long_path],
+            ):
+                index = _build_confirmed_pnl_index("bot_1", "short")
+        rows = _get_confirmed_pnl_rows_for_trade_block("", tbid, confirmed_index=index)
+        purposes = {row["purpose"] for row in rows}
+        self.assertEqual(len(rows), 5)
+        self.assertIn("CYCLE_1_LONG_REDUCE", purposes)
 
 
 if __name__ == "__main__":

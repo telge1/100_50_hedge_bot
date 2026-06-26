@@ -88,10 +88,39 @@ class ProfitTradeDefaultSortTests(unittest.TestCase):
         self.assertEqual(rows[0]["trade_block_id"], TBID_A)
         self.assertEqual(rows[1]["trade_block_id"], TBID_B)
 
-    def test_closed_rows_sort_by_end_time_desc(self) -> None:
+    def test_closed_rows_sort_by_start_time_desc(self) -> None:
         rows = [
-            {"trade_block_id": TBID_A, "status": "closed", "end_time": "2026-06-01T12:00:00+00:00"},
-            {"trade_block_id": TBID_B, "status": "closed", "end_time": "2026-06-03T12:00:00+00:00"},
+            {
+                "trade_block_id": TBID_A,
+                "status": "closed",
+                "start_time": "2026-06-01T12:00:00+00:00",
+                "end_time": "2026-06-03T12:00:00+00:00",
+            },
+            {
+                "trade_block_id": TBID_B,
+                "status": "closed",
+                "start_time": "2026-06-03T12:00:00+00:00",
+                "end_time": "2026-06-01T12:00:00+00:00",
+            },
+        ]
+        _sort_profit_trade_rows_default(rows)
+        self.assertEqual(rows[0]["trade_block_id"], TBID_B)
+        self.assertEqual(rows[1]["trade_block_id"], TBID_A)
+
+    def test_closed_rows_use_end_time_only_as_tiebreaker(self) -> None:
+        rows = [
+            {
+                "trade_block_id": TBID_A,
+                "status": "closed",
+                "start_time": "2026-06-03T12:00:00+00:00",
+                "end_time": "2026-06-03T14:00:00+00:00",
+            },
+            {
+                "trade_block_id": TBID_B,
+                "status": "closed",
+                "start_time": "2026-06-03T12:00:00+00:00",
+                "end_time": "2026-06-03T16:00:00+00:00",
+            },
         ]
         _sort_profit_trade_rows_default(rows)
         self.assertEqual(rows[0]["trade_block_id"], TBID_B)

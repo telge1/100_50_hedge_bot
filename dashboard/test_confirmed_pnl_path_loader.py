@@ -250,7 +250,7 @@ class ConfirmedPnlWriterSkipTests(unittest.TestCase):
         self.assertEqual(reason, "source_path_foreign_bot")
         self.assertEqual(context.get("source_path"), payload["source_path"])
 
-    def test_purpose_path_mismatch_blocks_write_to_long_file(self) -> None:
+    def test_owner_long_bot_accepts_counter_leg_short_reduce_write(self) -> None:
         payload = {
             "bot_name": "long_bot_1",
             "purpose": "CYCLE_1_SHORT_REDUCE",
@@ -263,8 +263,24 @@ class ConfirmedPnlWriterSkipTests(unittest.TestCase):
             target_path=LONG_PATH,
             purpose="CYCLE_1_SHORT_REDUCE",
         )
-        self.assertTrue(skip)
-        self.assertEqual(reason, "purpose_path_mismatch")
+        self.assertFalse(skip)
+        self.assertIsNone(reason)
+
+    def test_owner_short_bot_accepts_counter_leg_long_reduce_write(self) -> None:
+        payload = {
+            "bot_name": "short_bot_1",
+            "purpose": "CYCLE_1_LONG_REDUCE",
+            "exchange_order_id": "7813a42a-f12d-4db1-92f2-b17ffa50b103",
+        }
+        skip, reason, _context = should_skip_foreign_confirmed_pnl_write(
+            payload=payload,
+            default_bot_name="short_bot_1",
+            target_bot_name="short_bot_1",
+            target_path=SHORT_PATH,
+            purpose="CYCLE_1_LONG_REDUCE",
+        )
+        self.assertFalse(skip)
+        self.assertIsNone(reason)
 
 
 if __name__ == "__main__":

@@ -8038,6 +8038,88 @@ def _dedupe_trade_block_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str
     return list(merged.values())
 
 
+def _confirmed_row_debug_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "timestamp": row.get("timestamp"),
+        "purpose": row.get("purpose"),
+        "pnl_scope": row.get("pnl_scope"),
+        "closed_pnl": row.get("closed_pnl"),
+        "exchange_order_id": row.get("exchange_order_id"),
+        "order_id": row.get("order_id"),
+        "client_order_id": row.get("client_order_id"),
+        "order_link_id": row.get("order_link_id"),
+        "dedupe_key": row.get("dedupe_key"),
+        "side": row.get("side"),
+        "qty": row.get("qty") or row.get("exec_qty"),
+        "price": row.get("fill_price") or row.get("avg_fill_price") or row.get("price"),
+        "bot_name": row.get("bot_name"),
+    }
+
+
+def _detail_row_debug_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "timestamp": row.get("time") or row.get("timestamp"),
+        "purpose": row.get("purpose"),
+        "pnl_scope": row.get("pnl_scope"),
+        "closed_pnl": row.get("closed_pnl"),
+        "pnl_usdt": row.get("pnl_usdt"),
+        "exchange_order_id": row.get("exchange_order_id") or row.get("order_id"),
+        "dedupe_key": _trade_block_detail_row_dedupe_key(row),
+        "detail_source": row.get("detail_source"),
+    }
+
+
+def _log_profit_trade_confirmed_rows_for_details_debug(
+    confirmed_rows: list[dict[str, Any]],
+    *,
+    bot_side: str,
+    profile: str,
+    bot_name: str | None,
+    symbol: str | None,
+    trade_block_id: str,
+) -> None:
+    payload = {
+        "bot_side": bot_side,
+        "profile": profile,
+        "bot_name": bot_name,
+        "symbol": symbol,
+        "trade_block_id": trade_block_id,
+        "confirmed_row_count": len(confirmed_rows),
+        "rows": [_confirmed_row_debug_snapshot(row) for row in confirmed_rows],
+    }
+    logger.info(
+        "[dashboard] profit_trade_confirmed_rows_for_details_debug %s",
+        json.dumps(payload, default=str),
+    )
+
+
+def _log_profit_trade_detail_rows_after_dedupe_debug(
+    before_rows: list[dict[str, Any]],
+    after_rows: list[dict[str, Any]],
+    *,
+    debug_context: dict[str, Any],
+    phase: str,
+) -> None:
+    event = (
+        "profit_trade_detail_rows_after_dedupe_debug"
+        if phase == "after_dedupe"
+        else "profit_trade_detail_rows_before_dedupe_debug"
+    )
+    active_rows = after_rows if phase == "after_dedupe" else before_rows
+    payload = {
+        **debug_context,
+        "phase": phase,
+        "row_count": len(active_rows),
+        "purposes": [str(row.get("purpose") or "") for row in active_rows],
+        "rows": [_detail_row_debug_snapshot(row) for row in active_rows],
+    }
+    if phase == "after_dedupe":
+        before_purposes = {str(row.get("purpose") or "") for row in before_rows}
+        after_purposes = {str(row.get("purpose") or "") for row in after_rows}
+        payload["removed_purposes"] = sorted(before_purposes - after_purposes)
+    logger.info("[dashboard] %s %s", event, json.dumps(payload, default=str))
+
+
 def _filled_order_to_detail_row(order: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
     pnl_value = order.get("pnl")
     if pnl_value is None:
@@ -8088,6 +8170,8 @@ def _legacy_detail_to_detail_row(
 def _build_trade_block_detail_rows(
     record: dict[str, Any],
     confirmed_rows: list[dict[str, Any]],
+    *,
+    debug_context: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if confirmed_rows:
@@ -8099,7 +8183,22 @@ def _build_trade_block_detail_rows(
     for detail in record.get("details") or []:
         if isinstance(detail, dict):
             rows.append(_legacy_detail_to_detail_row(detail, record, fallback_time))
+    if debug_context:
+        _log_profit_trade_detail_rows_after_dedupe_debug(
+            rows,
+            rows,
+            debug_context=debug_context,
+            phase="before_dedupe",
+        )
+    pre_dedupe_rows = list(rows)
     rows = _dedupe_trade_block_detail_rows(rows)
+    if debug_context:
+        _log_profit_trade_detail_rows_after_dedupe_debug(
+            pre_dedupe_rows,
+            rows,
+            debug_context=debug_context,
+            phase="after_dedupe",
+        )
     return _sort_trade_block_detail_rows(rows)
 
 
@@ -8128,6 +8227,8 @@ def _build_profit_trade_summary(
         "no_final_exit_confirmed": record.get("no_final_exit_confirmed"),
         "profit_is_final": record.get("profit_is_final"),
         "close_reason": record.get("close_reason"),
+        "warning_label": record.get("warning_label"),
+        "display_warning": record.get("display_warning"),
         "wallet_after": record.get("wallet_after_trade"),
         "cycle_count": record.get("cycle_count"),
         "status": record.get("status"),
@@ -8342,6 +8443,45 @@ def _collect_history_paths_for_profile(profile: str, bot_side: str | None = None
     return paths
 
 
+def _append_paired_hedge_confirmed_paths(
+    profile: str,
+    bot_side: str | None,
+    paths: list[Path],
+) -> None:
+    """
+    Hedge trades share one trade_block_id across both bots. Counter-leg cycle
+    rows may still live in the paired bot file from legacy purpose-side routing;
+    include that file when building the confirmed index (read-only fallback).
+    """
+    normalized_side = _normalize_bot_side(bot_side)
+    if normalized_side not in {"long", "short"}:
+        return
+    paired_side = "long" if normalized_side == "short" else "short"
+    paired_source, _warnings = _resolve_profit_trade_source(profile, paired_side)
+    if not paired_source:
+        return
+    paired_path = paired_source.get("confirmed_order_pnl_history_file")
+    if not paired_path:
+        return
+    paired = Path(paired_path)
+    existing = {str(path) for path in paths}
+    if str(paired) in existing:
+        return
+    paths.append(paired)
+    logger.info(
+        "[dashboard] profit_trade_confirmed_paired_hedge_path_added %s",
+        json.dumps(
+            {
+                "profile": profile,
+                "bot_side": normalized_side,
+                "paired_side": paired_side,
+                "paired_path": str(paired),
+            },
+            default=str,
+        ),
+    )
+
+
 def _collect_confirmed_history_paths(profile: str, bot_side: str | None = None) -> list[Path]:
     resolved = _normalize_dashboard_profile(profile, fallback_to_main=False)
     paths: list[Path] = []
@@ -8383,6 +8523,8 @@ def _collect_confirmed_history_paths(profile: str, bot_side: str | None = None) 
                     str(confirmed),
                 )
             paths.append(confirmed)
+
+    _append_paired_hedge_confirmed_paths(profile, bot_side, paths)
 
     if paths:
         payload = {
@@ -9043,6 +9185,9 @@ def _analyze_confirmed_final_exit(confirmed_rows: list[dict[str, Any]]) -> dict[
     }
 
 
+NON_FINAL_EXIT_CLOSE_WARNING_LABEL = "Ohne bestätigten Final Exit geschlossen"
+
+
 def _apply_trade_block_close_status(
     row: dict[str, Any],
     confirmed_rows: list[dict[str, Any]],
@@ -9059,6 +9204,8 @@ def _apply_trade_block_close_status(
         row["no_final_exit_confirmed"] = not bool(final_exit_meta.get("final_exit_confirmed"))
         row["final_exit_confirmed"] = bool(final_exit_meta.get("final_exit_confirmed"))
         row["profit_is_final"] = False
+        row.pop("display_warning", None)
+        row.pop("warning_label", None)
         return
 
     row["is_process"] = False
@@ -9070,6 +9217,9 @@ def _apply_trade_block_close_status(
         row["final_exit_confirmed"] = True
         row["no_final_exit_confirmed"] = False
         row["profit_is_final"] = True
+        row["close_reason"] = "final_exit_confirmed"
+        row.pop("display_warning", None)
+        row.pop("warning_label", None)
         if not row.get("end_time") and confirmed_index and tbid:
             end_dt = (confirmed_index.get("end_times") or {}).get(tbid)
             if end_dt:
@@ -9084,7 +9234,9 @@ def _apply_trade_block_close_status(
     row["final_exit_confirmed"] = False
     row["no_final_exit_confirmed"] = True
     row["profit_is_final"] = False
-    row.setdefault("close_reason", "missing_final_exit_confirmed")
+    row["close_reason"] = "no_final_exit_confirmed"
+    row["warning_label"] = NON_FINAL_EXIT_CLOSE_WARNING_LABEL
+    row["display_warning"] = True
     if confirmed_rows and confirmed_index and tbid and not row.get("end_time"):
         end_dt = (confirmed_index.get("end_times") or {}).get(tbid)
         if end_dt:
@@ -9507,6 +9659,13 @@ async def api_profit_trades(
             "page_size": actual_page_size,
         },
     )
+    _log_profit_trade_final_api_order_debug(
+        trades,
+        profile=profile,
+        bot_side=bot_side,
+        page=page,
+        confirmed_index=metadata.get("confirmed_index"),
+    )
     return {
         "success": True,
         "profile": profile,
@@ -9601,10 +9760,29 @@ async def api_profit_trade_details(
         bot_side=bot_side,
         confirmed_index=confirmed_index,
     )
+    _log_profit_trade_confirmed_rows_for_details_debug(
+        confirmed_rows,
+        bot_side=bot_side,
+        profile=profile,
+        bot_name=bot_name,
+        symbol=symbol,
+        trade_block_id=trade_block_id,
+    )
+    detail_debug_context = {
+        "bot_side": bot_side,
+        "profile": profile,
+        "bot_name": bot_name,
+        "symbol": symbol,
+        "trade_block_id": trade_block_id,
+    }
     if confirmed_rows:
-        rows = _build_trade_block_detail_rows(match, confirmed_rows)
+        rows = _build_trade_block_detail_rows(
+            match,
+            confirmed_rows,
+            debug_context=detail_debug_context,
+        )
     else:
-        rows = _build_trade_block_detail_rows(match, [])
+        rows = _build_trade_block_detail_rows(match, [], debug_context=detail_debug_context)
 
     recomputed_end_profit: float | None = None
     selected_source = "sum_confirmed_rows"
@@ -9649,6 +9827,8 @@ async def api_profit_trade_details(
         "no_final_exit_confirmed": match.get("no_final_exit_confirmed"),
         "profit_is_final": match.get("profit_is_final"),
         "close_reason": match.get("close_reason"),
+        "warning_label": match.get("warning_label"),
+        "display_warning": match.get("display_warning"),
         "profit_usdt": recomputed_end_profit,
         "wallet_after": match.get("wallet_after_trade"),
         "rows": rows,
@@ -9682,6 +9862,38 @@ def _is_incomplete_closed_trade_status(status: Any) -> bool:
     }
 
 
+def _is_open_trade_for_summary(trade: dict[str, Any]) -> bool:
+    status = str(trade.get("status") or "").strip().lower()
+    if _is_closed_trade_status(status):
+        return False
+    if _is_incomplete_closed_trade_status(status):
+        return False
+    if bool(trade.get("is_process")):
+        return True
+    return status in {"in_progress", "open", "running", "active", "progress"}
+
+
+def _is_historical_closed_trade_for_summary(trade: dict[str, Any]) -> bool:
+    status = str(trade.get("status") or "").strip().lower()
+    return _is_closed_trade_status(status) or _is_incomplete_closed_trade_status(status)
+
+
+def _is_final_closed_trade_for_summary(trade: dict[str, Any]) -> bool:
+    if not _is_closed_trade_status(trade.get("status")):
+        return False
+    if bool(trade.get("final_exit_confirmed")):
+        return True
+    return bool(trade.get("profit_is_final"))
+
+
+def _is_non_final_closed_trade_for_summary(trade: dict[str, Any]) -> bool:
+    if _is_incomplete_closed_trade_status(trade.get("status")):
+        return True
+    if bool(trade.get("no_final_exit_confirmed")) and not _is_open_trade_for_summary(trade):
+        return True
+    return False
+
+
 def _get_trade_chart_datetime(trade: dict[str, Any]) -> datetime | None:
     if _is_closed_trade_status(trade.get("status")):
         dt = _normalize_trade_filter_datetime(trade.get("end_time"))
@@ -9695,14 +9907,7 @@ def _get_trade_chart_datetime(trade: dict[str, Any]) -> datetime | None:
 
 
 def _profit_trade_row_is_active_for_sort(row: dict[str, Any]) -> bool:
-    if _is_closed_trade_status(row.get("status")):
-        return False
-    if _is_incomplete_closed_trade_status(row.get("status")):
-        return False
-    if bool(row.get("is_process")):
-        return True
-    status = str(row.get("status") or "").strip().lower()
-    return status in {"in_progress", "open", "running", "active", "progress"}
+    return _is_open_trade_for_summary(row)
 
 
 def _profit_trade_row_start_sort_datetime(
@@ -9956,42 +10161,6 @@ def _build_profit_trade_filtered_rows(
     running_ids = {
         row.get("trade_block_id") for row in filtered_process_rows if row.get("trade_block_id")
     }
-    # Zusätzlich zu einem reinen trade_block_id-Abgleich auch nach vollständigem
-    # (bot_name, symbol, side) filtern. Gerade auf der Short-Seite kann es
-    # vorkommen, dass Runtime-State und History-Einträge unterschiedliche
-    # trade_block_ids für denselben aktiven Trade führen (z.B. nach Recovery /
-    # Handoff). In diesem Fall würden sonst ein "Closed"-History-Record und ein
-    # "In-Progress"-Process-Record parallel angezeigt. Für laufende Trades wollen
-    # wir jedoch nur die Live-Ansicht aus dem Process-Record zeigen.
-    normalized_side = _normalize_bot_side(bot_side)
-    running_keys: set[tuple[str, str, str]] = set()
-    for row in filtered_process_rows:
-        bot_name = str(row.get("bot_name") or "").strip().lower()
-        symbol = str(row.get("symbol") or "").strip().upper()
-        side = normalized_side
-        if not side:
-            if bot_name.startswith("short_bot_"):
-                side = "short"
-            elif bot_name.startswith("long_bot_"):
-                side = "long"
-        if bot_name and symbol and side:
-            running_keys.add((bot_name, symbol, side))
-
-    shadowed_history: list[dict[str, Any]] = []
-
-    # Aktive Prozess-Schlüssel für Stale/Open-Handling:
-    active_process_keys: set[tuple[str, str, str]] = set()
-    for row in filtered_process_rows:
-        p_bot = str(row.get("bot_name") or "").strip().lower()
-        p_symbol = str(row.get("symbol") or "").strip().upper()
-        p_side = normalized_side
-        if not p_side:
-            if p_bot.startswith("short_bot_"):
-                p_side = "short"
-            elif p_bot.startswith("long_bot_"):
-                p_side = "long"
-        if p_bot and p_symbol and p_side:
-            active_process_keys.add((p_bot, p_symbol, p_side))
 
     # Backfill fehlender start_time-Werte für Prozess-Zeilen aus globaler
     # Confirmed-History, damit z.B. paired long/short Trades mit gleicher
@@ -10041,14 +10210,6 @@ def _build_profit_trade_filtered_rows(
             bot_side=normalized_side,
             confirmed_index=confirmed_index,
         )
-
-    def _final_exit_confirmed_for_tbid(trade_block_id: str) -> tuple[bool, bool, bool]:
-        if not trade_block_id:
-            return False, False, False
-        entries = _get_confirmed_orders_for_tbid(trade_block_id)
-        if not entries:
-            return False, False, False
-        return _final_exit_purposes_detected(entries)
 
     for row in filtered_process_rows:
         # Nur für laufende Prozess-Zeilen ohne bereits gesetzte filled_orders.
@@ -10144,74 +10305,11 @@ def _build_profit_trade_filtered_rows(
             json.dumps(payload, default=str),
         )
 
-    def _is_shadowed_by_running(record: dict[str, Any]) -> bool:
-        tbid = str(record.get("trade_block_id") or "").strip()
-        # Wenn ein aktiver Prozess mit derselben trade_block_id existiert, soll der
-        # History-Record immer von der Prozess-Zeile überschattet werden – unabhängig
-        # vom ursprünglichen Status (open/closed).
-        if tbid and tbid in running_ids:
-            payload = {
-                "profile": profile,
-                "bot_side": normalized_side,
-                "reason": "trade_block_id_match",
-                "running_ids": sorted(str(rid) for rid in running_ids),
-                "record": {
-                    "bot_name": record.get("bot_name"),
-                    "symbol": record.get("symbol"),
-                    "trade_block_id": record.get("trade_block_id"),
-                    "status": record.get("status"),
-                    "end_time": record.get("end_time"),
-                },
-            }
-            logger.info(
-                "[dashboard] profit_trades_short_active_match %s",
-                json.dumps(payload, default=str),
-            )
-            return True
-
-        # Darüber hinaus KEINE geschlossenen History-Records mehr nur anhand von
-        # (bot_name, symbol, side) wegfiltern. Sobald derselbe Bot dasselbe
-        # Symbol erneut handelt, muss die Historie der vorherigen Trade-Blocks
-        # sichtbar bleiben. Sonst verschwinden alte geschlossene Trades, nur
-        # weil aktuell wieder ein Trade auf demselben Symbol laeuft.
-        #
-        # Shadowing ist deshalb nur noch ueber identische trade_block_id
-        # erlaubt (siehe oben). Das ist praezise genug, um doppelte
-        # In-Progress/History-Darstellungen desselben Trades zu vermeiden.
-        if not _is_closed_trade_status(record.get("status")):
-            return False
-        return False
-
-    filtered_base_trades: list[dict[str, Any]] = []
-    for record in base_trades:
-        if _is_shadowed_by_running(record):
-            shadowed_history.append(record)
-            continue
-        filtered_base_trades.append(record)
-
-    if shadowed_history:
-        payload = {
-            "profile": profile,
-            "bot_side": normalized_side,
-            "running_ids": sorted(str(rid) for rid in running_ids),
-            "running_keys": sorted(
-                f"{bot}|{symbol}|{side}" for (bot, symbol, side) in running_keys
-            ),
-            "shadowed": [
-                {
-                    "bot_name": row.get("bot_name"),
-                    "symbol": row.get("symbol"),
-                    "trade_block_id": row.get("trade_block_id"),
-                    "status": row.get("status"),
-                    "end_time": row.get("end_time"),
-                }
-                for row in shadowed_history
-            ],
-        }
-        logger.info(
-            "[dashboard] profit_trades_shadowed_history_records %s",
-            json.dumps(payload, default=str),
-        )
+    filtered_base_trades = [
+        record
+        for record in base_trades
+        if record.get("trade_block_id") not in running_ids
+    ]
     confirmed_start_times = _collect_confirmed_trade_start_times(
         profile,
         bot_side,
@@ -10258,68 +10356,6 @@ def _build_profit_trade_filtered_rows(
             "[dashboard] dashboard_final_exit_confirmed_detected %s",
             json.dumps(payload, default=str),
         )
-
-    # Stale-open History bereinigen, aber finalen Status erst zentral setzen.
-    # counting historical "open" records as active trades when they are no longer
-    # associated with the currently running trade_block_id. Mark those as closed so
-    # that the summary only treats truly active process rows as open.
-    normalized_profile = _normalize_dashboard_profile(profile, fallback_to_main=False)
-    if (
-        normalized_profile
-        and normalized_profile != "main"
-        and normalized_side in {"long", "short"}
-    ):
-        adjusted_rows: list[dict[str, Any]] = []
-        for row in summary_rows:
-            tbid = str(row.get("trade_block_id") or "").strip()
-            original_status = row.get("status")
-            status_str = str(original_status or "").strip().lower()
-            if status_str == "open" and running_ids and (not tbid or tbid not in running_ids):
-                row_bot = str(row.get("bot_name") or "").strip().lower()
-                row_symbol = str(row.get("symbol") or "").strip().upper()
-                row_key = (row_bot, row_symbol, normalized_side)
-                if row_key in active_process_keys:
-                    skip_payload = {
-                        "profile": profile,
-                        "bot_side": normalized_side,
-                        "bot_name": row.get("bot_name"),
-                        "symbol": row.get("symbol"),
-                        "trade_block_id": tbid,
-                        "original_status": original_status,
-                        "reason": "matched_active_process_key",
-                    }
-                    logger.info(
-                        "[dashboard] profit_trades_stale_open_skip_active_process %s",
-                        json.dumps(skip_payload, default=str),
-                    )
-                    # Diesen historischen "open" Record komplett überspringen, damit
-                    # nur der aktive Prozess-Record angezeigt wird.
-                    continue
-                updated = dict(row)
-                updated["stale_open_auto_closed"] = True
-                updated["close_reason"] = "stale_open_not_in_current_state"
-                if not updated.get("end_time"):
-                    # Fallback: reuse start_time as end_time if no explicit end timestamp exists.
-                    updated["end_time"] = updated.get("end_time") or updated.get("start_time")
-                payload = {
-                    "profile": profile,
-                    "bot_side": normalized_side,
-                    "bot_name": row.get("bot_name"),
-                    "trade_block_id": tbid,
-                    "symbol": row.get("symbol"),
-                    "original_status": original_status,
-                    "new_status": updated.get("status"),
-                    "reason": "stale_open_not_in_current_state",
-                    "running_ids": sorted(str(rid) for rid in running_ids),
-                }
-                logger.info(
-                    "[dashboard] profit_trades_stale_open_auto_closed %s",
-                    json.dumps(payload, default=str),
-                )
-                adjusted_rows.append(updated)
-            else:
-                adjusted_rows.append(row)
-        summary_rows = adjusted_rows
 
     # Prozess-Zeilen für Trades mit bestätigtem Final-Exit bevorzugt ausblenden,
     # damit diese nicht mehr als "In Progress" erscheinen oder alte aktive Orders
@@ -10414,7 +10450,7 @@ def _build_profit_trade_filtered_rows(
             row,
             confirmed_rows_for_status,
             meta,
-            is_active_process=bool(tbid and tbid in running_ids),
+            is_active_process=bool(tbid and tbid in running_ids and row.get("is_process")),
             confirmed_index=confirmed_index,
         )
     _sort_profit_trade_rows_default(combined_rows, confirmed_index)
@@ -10467,34 +10503,162 @@ def _aggregate_profit_chart_rows(
 
 def _summarize_trade_blocks(trades: Iterable[dict[str, Any]]) -> dict[str, Any]:
     trades = list(trades)
-    closed_records = [trade for trade in trades if _is_closed_trade_status(trade.get("status"))]
-    closed_trades = len(closed_records)
+    historical_closed = [
+        trade for trade in trades if _is_historical_closed_trade_for_summary(trade)
+    ]
+    final_closed_records = [
+        trade for trade in trades if _is_final_closed_trade_for_summary(trade)
+    ]
+    non_final_closed_records = [
+        trade for trade in trades if _is_non_final_closed_trade_for_summary(trade)
+    ]
+    closed_trades = len(historical_closed)
+    final_closed_trades = len(final_closed_records)
+    non_final_closed_trades = len(non_final_closed_records)
     total_profit = 0.0
     for trade in trades:
         pnl = _get_trade_profit_value(trade)
         if pnl is not None:
             total_profit += pnl
-    winning = sum(1 for trade in closed_records if (_get_trade_profit_value(trade) or 0.0) > 0)
-    losing = sum(1 for trade in closed_records if (_get_trade_profit_value(trade) or 0.0) <= 0)
-    winrate = (winning / closed_trades * 100.0) if closed_trades else 0.0
+    final_winning = sum(
+        1 for trade in final_closed_records if (_get_trade_profit_value(trade) or 0.0) > 0
+    )
+    final_losing = sum(
+        1 for trade in final_closed_records if (_get_trade_profit_value(trade) or 0.0) <= 0
+    )
+    final_winrate = (final_winning / final_closed_trades * 100.0) if final_closed_trades else 0.0
     best_bot = None
     best_profit = None
-    for trade in closed_records:
+    for trade in final_closed_records:
         pnl = _get_trade_profit_value(trade) or 0.0
         bot = trade.get("bot_name")
         if best_profit is None or pnl > best_profit:
             best_profit = pnl
             best_bot = bot
-    open_trades = sum(1 for trade in trades if not _is_closed_trade_status(trade.get("status")))
+    open_trades = sum(1 for trade in trades if _is_open_trade_for_summary(trade))
     return {
         "total_profit": round(total_profit, 8),
         "closed_trades": closed_trades,
-        "winning_trades": winning,
-        "losing_trades": losing,
-        "winrate": round(winrate, 2),
+        "final_closed_trades": final_closed_trades,
+        "non_final_closed_trades": non_final_closed_trades,
+        "winning_trades": final_winning,
+        "losing_trades": final_losing,
+        "winrate": round(final_winrate, 2),
+        "final_winning_trades": final_winning,
+        "final_losing_trades": final_losing,
+        "final_winrate": round(final_winrate, 2),
         "best_bot": best_bot,
         "open_trades": open_trades,
     }
+
+
+def _verify_profit_trade_list_invariants(
+    trades: list[dict[str, Any]],
+    summary: dict[str, Any] | None = None,
+    *,
+    max_check: int = 20,
+    confirmed_index: dict[str, Any] | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    if not trades:
+        return errors
+
+    checked = trades[:max_check]
+    seen_tbids: set[str] = set()
+    for row in checked:
+        tbid = str(row.get("trade_block_id") or "").strip()
+        if not tbid:
+            continue
+        if tbid in seen_tbids:
+            errors.append(f"duplicate trade_block_id in list: {tbid}")
+        seen_tbids.add(tbid)
+
+    active_indices = [
+        idx for idx, row in enumerate(checked) if _is_open_trade_for_summary(row)
+    ]
+    inactive_indices = [
+        idx for idx, row in enumerate(checked) if not _is_open_trade_for_summary(row)
+    ]
+    if active_indices and inactive_indices and max(active_indices) > min(inactive_indices):
+        errors.append("active/process trades must appear before historical closed trades")
+
+    inactive_rows = [checked[idx] for idx in inactive_indices]
+    for left, right in zip(inactive_rows, inactive_rows[1:]):
+        left_start = _profit_trade_row_start_sort_datetime(left, confirmed_index).timestamp()
+        right_start = _profit_trade_row_start_sort_datetime(right, confirmed_index).timestamp()
+        if left_start < right_start:
+            errors.append(
+                "inactive trades not sorted by start_time desc: "
+                f"{left.get('trade_block_id')} before {right.get('trade_block_id')}"
+            )
+
+    for row in checked:
+        if not _is_non_final_closed_trade_for_summary(row):
+            continue
+        if _is_open_trade_for_summary(row):
+            errors.append(
+                f"non-final closed trade must not be open/in_progress: {row.get('trade_block_id')}"
+            )
+        if str(row.get("status") or "").strip().lower() != "closed_without_final_exit":
+            errors.append(
+                f"non-final closed trade must have status=closed_without_final_exit: {row.get('trade_block_id')}"
+            )
+
+    if summary is None:
+        return errors
+
+    expected_open = sum(1 for trade in trades if _is_open_trade_for_summary(trade))
+    if summary.get("open_trades") != expected_open:
+        errors.append(
+            f"open_trades mismatch: summary={summary.get('open_trades')} expected={expected_open}"
+        )
+
+    expected_non_final = sum(1 for trade in trades if _is_non_final_closed_trade_for_summary(trade))
+    if summary.get("non_final_closed_trades") != expected_non_final:
+        errors.append(
+            "non_final_closed_trades mismatch: "
+            f"summary={summary.get('non_final_closed_trades')} expected={expected_non_final}"
+        )
+
+    expected_closed = sum(1 for trade in trades if _is_historical_closed_trade_for_summary(trade))
+    if summary.get("closed_trades") != expected_closed:
+        errors.append(
+            f"closed_trades mismatch: summary={summary.get('closed_trades')} expected={expected_closed}"
+        )
+
+    return errors
+
+
+def _log_profit_trade_final_api_order_debug(
+    trades: list[dict[str, Any]],
+    *,
+    profile: str,
+    bot_side: str,
+    page: int,
+    confirmed_index: dict[str, Any] | None = None,
+    max_rows: int = 20,
+) -> None:
+    if page != 0:
+        return
+    for idx, row in enumerate(trades[:max_rows]):
+        sort_key = _profit_trade_stable_sort_key(row, confirmed_index)
+        payload = {
+            "index": idx,
+            "bot_side": bot_side,
+            "profile": profile,
+            "trade_block_id": row.get("trade_block_id"),
+            "symbol": row.get("symbol"),
+            "status": row.get("status"),
+            "is_process": bool(row.get("is_process")),
+            "active_tier": sort_key[0],
+            "start_time": row.get("start_time"),
+            "end_time": row.get("end_time"),
+            "sort_key": list(sort_key),
+        }
+        logger.info(
+            "[dashboard] profit_trade_final_api_order_debug %s",
+            json.dumps(payload, default=str),
+        )
 
 
 def _build_profit_trade_page(
