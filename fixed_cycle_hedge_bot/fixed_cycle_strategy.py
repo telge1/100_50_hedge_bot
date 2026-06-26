@@ -751,6 +751,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["cycle_states"] = {}
         state["processed_cycle_purposes"] = []
         state.pop("completed_cycle_purposes", None)
+        self._clear_second_leg_followup_residuals(runtime_state, clear_cycle_states=False)
         if not preserve_audit_history:
             for key in list(state.keys()):
                 if key.startswith("last_trade_"):
@@ -7816,6 +7817,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         def _emit_short_tp_follow_up_skip(reason: str, **extra: Any) -> None:
             runtime_active_orders = list(runtime_state.active_orders.values())
+            extra.pop("pending_cycle_loss_usdt", None)
             context.audit.log_event(
                 "fixed_cycle_short_tp_follow_up_skip",
                 strategy=self.name,
@@ -7846,6 +7848,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 ],
                 **extra,
             )
+
+        cycle_step = str(state.get("cycle_step") or "")
+        next_required_guard = str(state.get("next_required_purpose") or "").upper()
+        active_idx = int(state.get("active_cycle_index") or cycle_index or 1)
+        if active_idx <= 0:
+            active_idx = max(cycle_index, 1)
+        expected_first_leg = self._normalize_cycle_purpose(
+            self._get_first_leg_purpose(active_idx),
+            {"cycle_index": active_idx, "cycle_role": self._get_first_leg_cycle_role()},
+        )
+        if cycle_step == STEP_WAITING_FOR_PAIR_FIRST_LEG or (
+            next_required_guard and next_required_guard == expected_first_leg
+        ):
+            _emit_short_tp_follow_up_skip(
+                "sequence_waiting_for_first_leg",
+                cycle_step=cycle_step,
+                next_required_purpose=next_required_guard,
+                expected_first_leg_purpose=expected_first_leg,
+            )
+            return []
 
         fallback_state = self._get_short_tp_fallback_state(runtime_state)
         if fallback_state.active:
@@ -8170,7 +8192,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 _emit_short_tp_follow_up_skip(
                     "long_reduce_blocked_until_confirmed_pnl",
                     confirmed_short_reduce_pnl=confirmed_short_reduce_pnl,
-                    pending_cycle_loss_usdt=pending_cycle_loss_usdt,
                 )
                 return []
 
@@ -8205,7 +8226,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 _emit_short_tp_follow_up_skip(
                     "long_reduce_invalid_initial_inputs",
                     confirmed_short_reduce_pnl=confirmed_short_reduce_pnl,
-                    pending_cycle_loss_usdt=pending_cycle_loss_usdt,
                     long_reduce_qty=long_reduce_qty,
                     long_entry_price=long_entry_price,
                     fee_rate=fee_rate,
@@ -19638,22 +19658,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["cycle_state"] = cycle_state
         state.setdefault("current_long_cycle_index", int(cycle_state.get("long_cycle_index") or 0))
         state.setdefault("current_short_cycle_index", int(cycle_state.get("short_cycle_index") or 0))
-        state["cycle_waiting_for_short_tp"] = bool(state.get("cycle_waiting_for_short_tp")) or bool(
-            cycle_state.get("cycle_waiting_for_short_tp")
-        )
+        waiting_field = self._second_leg_waiting_flag_field()
+        pending_field = self._second_leg_pending_cycle_field()
+        if waiting_field in state:
+            state[waiting_field] = bool(state.get(waiting_field))
+        else:
+            state[waiting_field] = bool(cycle_state.get(waiting_field))
+        if pending_field in state:
+            state[pending_field] = int(state.get(pending_field) or 0)
+        else:
+            state[pending_field] = int(cycle_state.get(pending_field) or 0)
         state["pending_long_cycle_index"] = max(
             int(state.get("pending_long_cycle_index") or 0),
             int(cycle_state.get("pending_long_cycle_index") or 0),
         )
-        state["short_tp_pending_cycle"] = max(
-            int(state.get("short_tp_pending_cycle") or 0),
-            int(cycle_state.get("short_tp_pending_cycle") or 0),
-        )
         state.setdefault("long_add_pending", bool(cycle_state.get("long_add_pending")))
-        state["cycle_states"] = dict(state.get("cycle_states") or cycle_state.get("cycle_states") or {})
-        state["processed_cycle_purposes"] = list(
-            state.get("processed_cycle_purposes") or cycle_state.get("processed_cycle_purposes") or []
-        )
+        if "cycle_states" in state:
+            state["cycle_states"] = dict(state.get("cycle_states") or {})
+        else:
+            state["cycle_states"] = dict(cycle_state.get("cycle_states") or {})
+        if "processed_cycle_purposes" in state:
+            state["processed_cycle_purposes"] = list(state.get("processed_cycle_purposes") or [])
+        else:
+            state["processed_cycle_purposes"] = list(
+                cycle_state.get("processed_cycle_purposes") or []
+            )
         state.setdefault("exit_rebuild_allowed", True)
         state.setdefault("long_add_rebuild_allowed", True)
         return cycle_state
@@ -19784,8 +19813,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["current_effective_cycle"] = 0
         state["current_long_cycle_index"] = 0
         state["current_short_cycle_index"] = 0
-        state["cycle_waiting_for_short_tp"] = False
-        state["short_tp_pending_cycle"] = 0
         state["pending_cycle_loss_usdt"] = 0.0
         state["processed_cycle_purposes"] = []
         state["completed_cycle_purposes"] = []
@@ -19798,18 +19825,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["current_short_cycle_index"] = 0
         state["active_cycle_index"] = 1
         state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
-        state["next_required_purpose"] = self._cycle_purpose("long", 1)
         state["last_completed_purpose"] = None
-        state["cycle_waiting_for_short_tp"] = False
-        state["short_tp_pending_cycle"] = 0
-        state["long_add_pending"] = False
-        state["short_tp_pending"] = False
-        state["pending_cycle_loss_usdt"] = 0.0
-        state["pending_long_cycle_index"] = 0
-        state["pending_short_cycle_index"] = 0
-        state["refill_pending"] = False
         state["refill_required"] = False
-        state["refill_in_progress"] = False
+        self._clear_second_leg_followup_residuals(runtime_state, clear_cycle_states=False)
         state["refill_exit_orders_cancel_required"] = False
         state["exit_locked"] = False
         state["exit_rebuild_allowed"] = True
@@ -20015,6 +20033,50 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
     def _clear_second_leg_waiting_state(self, state: dict[str, Any]) -> None:
         self._set_second_leg_waiting_state(state, waiting=False, cycle_index=0)
+
+    def _clear_second_leg_followup_residuals(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        clear_cycle_states: bool = False,
+    ) -> None:
+        """Remove stale second-leg waiting/pending flags before a fresh structure."""
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        self._set_second_leg_waiting_state(state, cycle_state, waiting=False, cycle_index=0)
+        state["cycle_waiting_for_short_tp"] = False
+        state["short_tp_pending_cycle"] = 0
+        state["cycle_waiting_for_long_reduce"] = False
+        state["long_reduce_pending_cycle"] = 0
+        state["pending_short_cycle_index"] = 0
+        state["pending_long_cycle_index"] = 0
+        state["refill_pending"] = False
+        state["refill_in_progress"] = False
+        state["post_refill_structure_rebuild_required"] = False
+        state["cycle_long_add_filled"] = False
+        state["cycle_short_tp_filled"] = False
+        state["long_add_pending"] = False
+        state["short_tp_pending"] = False
+        if isinstance(cycle_state, dict):
+            cycle_state["cycle_waiting_for_short_tp"] = False
+            cycle_state["short_tp_pending_cycle"] = 0
+            cycle_state["cycle_waiting_for_long_reduce"] = False
+            cycle_state["long_reduce_pending_cycle"] = 0
+            cycle_state["pending_short_cycle_index"] = 0
+            cycle_state["pending_long_cycle_index"] = 0
+            cycle_state["refill_pending"] = False
+            cycle_state["refill_in_progress"] = False
+            cycle_state["processed_cycle_purposes"] = list(
+                state.get("processed_cycle_purposes") or []
+            )
+            if clear_cycle_states:
+                cycle_state["cycle_states"] = {}
+            elif "cycle_states" in state:
+                cycle_state["cycle_states"] = dict(state.get("cycle_states") or {})
+        if clear_cycle_states:
+            state["cycle_states"] = {}
+            if isinstance(cycle_state, dict):
+                cycle_state["cycle_states"] = {}
 
     def _get_second_leg_waiting(
         self, state: dict[str, Any], cycle_state: dict[str, Any] | None = None
@@ -22677,6 +22739,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["exit_recovery_marker"] = False
         state["force_exit_rebuild"] = True
         init_payload = initialize_cycle_sequence_state(state, self._sequence_config)
+        clear_cycle_states = reason == "initial_entry_confirmed"
+        if clear_cycle_states:
+            state["processed_cycle_purposes"] = []
+            state.pop("completed_cycle_purposes", None)
+            state["cycle_completed_count"] = 0
+            state["cycle_pair_count"] = 0
+            state["current_effective_cycle"] = 0
+            state["current_long_cycle_index"] = 0
+            state["current_short_cycle_index"] = 0
+            state["last_refill_completed_cycle_index"] = None
+        self._clear_second_leg_followup_residuals(
+            runtime_state,
+            clear_cycle_states=clear_cycle_states,
+        )
         _log_event(
             "fixed_cycle_sequence_state_initialized",
             {
