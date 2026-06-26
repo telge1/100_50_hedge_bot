@@ -42,6 +42,7 @@ from .confirmed_pnl_path_logic import (
     purpose_implies_bot_side,
     should_skip_foreign_confirmed_pnl_write,
 )
+from .trade_block_id_resolver import resolve_active_trade_block_id
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.json")
@@ -3891,6 +3892,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if abs(total) <= 1e-12 and snapshot:
             total = float(snapshot.realized_pnl_total or 0.0)
         return total
+
+    @staticmethod
+    def _resolve_active_trade_block_id(strategy_state: dict[str, Any] | None) -> str | None:
+        return resolve_active_trade_block_id(strategy_state)
 
     @staticmethod
     def _final_pnl_ready_for_restart(runtime_state: RuntimeState) -> bool:
@@ -12340,7 +12345,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     )
                     # Persist a zero-PnL confirmed history row for the refill fill so that
                     # dashboard detail views can show the refill/rebuy between cycle reduces.
-                    trade_block_id = state.get("trade_block_id") or state.get("last_trade_block_id")
+                    trade_block_id = self._resolve_active_trade_block_id(state)
                     try:
                         self._write_confirmed_order_pnl_history(
                             {
@@ -17933,7 +17938,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     else self._cycle_purpose("long", cycle_index)
                 ),
                 "closed_pnl": long_fill.get("confirmed_closed_pnl"),
-                "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                "trade_block_id": self._resolve_active_trade_block_id(runtime_state.strategy_state),
                 "cycle_index": cycle_index,
                 "pnl_scope": "cycle",
                 # Optional: bereits gemergte Stage-/Split-/Role-Felder aus long_fill übernehmen, falls vorhanden.
@@ -18011,7 +18016,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "client_order_id": fill_event.client_order_id,
                 "purpose": purpose,
                 "closed_pnl": float(provisional_pnl),
-                "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                "trade_block_id": self._resolve_active_trade_block_id(runtime_state.strategy_state),
                 "cycle_index": cycle_index,
                 "pnl_scope": "cycle",
                 "pnl_source": pnl_source,
@@ -18126,26 +18131,49 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
             return
+        strategy_state = runtime_state.strategy_state if runtime_state is not None else {}
+        payload_trade_block_id = str(record.get("trade_block_id") or "").strip()
+        trade_block_id = payload_trade_block_id or self._resolve_active_trade_block_id(strategy_state)
+        if not trade_block_id:
+            _log_warning_event(
+                "confirmed_order_pnl_missing_trade_block_id",
+                {
+                    "exchange_order_id": exchange_order_id,
+                    "purpose": purpose,
+                    "client_order_id": record.get("client_order_id"),
+                    "pnl_scope": record.get("pnl_scope"),
+                    "trade_block_id": record.get("trade_block_id"),
+                    "last_trade_block_id": strategy_state.get("last_trade_block_id"),
+                },
+            )
+            return
+        record["trade_block_id"] = trade_block_id
         record["dedupe_key"] = f"{exchange_order_id}:{purpose}"
         dedupe_key = record["dedupe_key"]
-        # Route Confirmed-PnL-Eintrag zum passenden Bot (long_bot_N / short_bot_N)
-        # anhand von purpose (primär) und side, damit jede Seite ihre eigene History-Datei erhält.
-        route_side = purpose_implies_bot_side(purpose)
-        if route_side is None:
-            raw_side = str(record.get("side") or "").strip().lower()
-            if raw_side in {"long", "short"}:
-                route_side = raw_side
-        if not route_side:
-            purpose_upper = str(purpose or "").upper()
-            if "SHORT" in purpose_upper:
-                route_side = "short"
-            elif "LONG" in purpose_upper:
-                route_side = "long"
-        target_bot_name, target_path = _resolve_confirmed_pnl_history_target(
-            route_side=route_side,
-            default_bot=default_bot_name,
-            base_path=confirmed_order_pnl_history_path,
-        )
+        owner_bot_name = str(default_bot_name or "").strip().lower()
+        if owner_bot_name.startswith(("long_bot_", "short_bot_")):
+            target_bot_name = owner_bot_name
+            target_path = confirmed_order_pnl_history_path
+            route_reason = "owner_bot"
+            route_side = "short" if owner_bot_name.startswith("short_bot_") else "long"
+        else:
+            route_reason = "fallback_purpose_side"
+            route_side = purpose_implies_bot_side(purpose)
+            if route_side is None:
+                raw_side = str(record.get("side") or "").strip().lower()
+                if raw_side in {"long", "short"}:
+                    route_side = raw_side
+            if not route_side:
+                purpose_upper = str(purpose or "").upper()
+                if "SHORT" in purpose_upper:
+                    route_side = "short"
+                elif "LONG" in purpose_upper:
+                    route_side = "long"
+            target_bot_name, target_path = _resolve_confirmed_pnl_history_target(
+                route_side=route_side or "long",
+                default_bot=default_bot_name,
+                base_path=confirmed_order_pnl_history_path,
+            )
         skip_write, skip_reason, skip_context = should_skip_foreign_confirmed_pnl_write(
             payload=payload,
             default_bot_name=default_bot_name,
@@ -18168,11 +18196,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             {
                 "purpose": record.get("purpose"),
                 "side": record.get("side"),
-                "source_bot": default_bot_name,
+                "source_bot_name": default_bot_name,
+                "self_bot_name": default_bot_name,
                 "target_bot": target_bot_name,
                 "target_path": str(target_path),
                 "trade_block_id": record.get("trade_block_id"),
                 "exchange_order_id": record.get("exchange_order_id"),
+                "route_reason": route_reason,
+                "route_side": route_side,
             },
         )
         state = runtime_state.strategy_state if runtime_state is not None else None
@@ -21676,11 +21707,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     or (None if expected_order_id_is_synthetic else expected_order_id)
                     or f"bybit-closed-pnl:{matched_sig or side_key}:{expected_symbol}"
                 )
-                resolved_trade_block_id = (
-                    trading_stop_context.get("trade_block_id")
-                    or order_context.get("trade_block_id")
-                    or runtime_state.strategy_state.get("trade_block_id")
-                )
+                resolved_trade_block_id = self._resolve_active_trade_block_id(runtime_state.strategy_state)
                 _log_event(
                     "fixed_cycle_final_exit_pnl_fetch_matched",
                     {
@@ -21965,8 +21992,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         total_trade_pnl = cycle_net_pnl + final_exit_net_pnl
         realized_long_pnl = float(runtime_state.realized_long_pnl_total or 0.0)
         realized_short_pnl = float(runtime_state.realized_short_pnl_total or 0.0)
-        trade_block_id = state.get("trade_block_id") or str(uuid4())
-        state["trade_block_id"] = trade_block_id
+        trade_block_id = self._resolve_active_trade_block_id(state)
+        if not trade_block_id:
+            _log_warning_event(
+                "fixed_cycle_finalize_missing_trade_block_id",
+                {
+                    "reason": reason,
+                    "trade_block_id": state.get("trade_block_id"),
+                    "last_trade_block_id": state.get("last_trade_block_id"),
+                },
+            )
+            return False
         source = "bybit_closed_pnl"
         finalized_at = datetime.now(timezone.utc).isoformat()
         breakdown = {
@@ -23082,7 +23118,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "client_order_id": fill_event.client_order_id,
                 "purpose": fill_event.purpose,
                 "closed_pnl": closed_pnl,
-                "trade_block_id": runtime_state.strategy_state.get("trade_block_id"),
+                "trade_block_id": self._resolve_active_trade_block_id(runtime_state.strategy_state),
                 "cycle_index": cycle_index,
                 "pnl_scope": "cycle",
                 # Split-/Stage-/Role-Metadata auch für History-Match-Weg durchreichen.

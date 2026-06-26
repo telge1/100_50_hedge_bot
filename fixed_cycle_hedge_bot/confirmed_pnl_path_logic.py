@@ -15,6 +15,7 @@ def path_bot_name_from_logs_path(path: str | Path) -> str | None:
 
 
 def purpose_implies_bot_side(purpose: str | None) -> str | None:
+    """Classify which leg a purpose name refers to (display/write metadata only)."""
     purpose_upper = str(purpose or "").strip().upper()
     if not purpose_upper:
         return None
@@ -54,6 +55,12 @@ def path_bot_side(path_bot_name: str | None) -> str | None:
 
 
 def purpose_allowed_for_path_bot(path_bot_name: str | None, purpose: str | None) -> bool:
+    """
+    Write-side purpose/path side guard only.
+
+    Must not be used for dashboard read membership. Hedge bots may persist
+    counter-leg purposes in their own bot-specific confirmed file.
+    """
     implied_side = purpose_implies_bot_side(purpose)
     if implied_side is None:
         return True
@@ -94,6 +101,14 @@ def validate_confirmed_pnl_row_for_path(
     row: Mapping[str, Any],
     path: str | Path,
 ) -> tuple[bool, str | None, dict[str, Any]]:
+    """
+    Read-side bot ownership validation for confirmed PnL rows.
+
+    A row belongs to a bot-specific confirmed file when row["bot_name"]
+    matches the path-derived bot name (long_bot_N / short_bot_N). Purpose
+    must not decide long vs short dashboard membership; counter-leg purposes
+    remain with the owning bot file.
+    """
     path_bot_name = path_bot_name_from_logs_path(path)
     row_bot_name = str(row.get("bot_name") or "").strip().lower()
     purpose = str(row.get("purpose") or row.get("trade_type") or "").strip()
@@ -110,8 +125,6 @@ def validate_confirmed_pnl_row_for_path(
     }
     if path_bot_name and not row_bot_name_matches_path(path_bot_name, row):
         return False, "confirmed_pnl_history_path_bot_mismatch_skipped", skip_payload
-    if path_bot_name and purpose and not purpose_allowed_for_path_bot(path_bot_name, purpose):
-        return False, "confirmed_pnl_history_path_purpose_mismatch_skipped", skip_payload
     return True, None, skip_payload
 
 
@@ -156,10 +169,9 @@ def should_skip_foreign_confirmed_pnl_write(
     """
     Decide whether a confirmed PnL row must not be written to target_path.
 
-    Runtime-stamped payload bot_name (current/default bot) must not block
-    purpose-based routing. Only explicit foreign import context (source_path
-    and/or payload owner conflicting with target while source_path is set)
-    should hard-skip.
+    Counter-leg purposes (e.g. CYCLE_1_LONG_REDUCE on short_bot_1) belong in the
+    owning bot file. Do not block writes based on purpose-implied side.
+    Only explicit foreign import context should hard-skip.
     """
     path_bot_name = path_bot_name_from_logs_path(target_path) or target_bot_name
     normalized_target = str(path_bot_name or target_bot_name or "").strip().lower()
@@ -175,9 +187,6 @@ def should_skip_foreign_confirmed_pnl_write(
         "source_path": source_path or None,
         "path_bot_name": normalized_target or None,
     }
-
-    if normalized_target and not purpose_allowed_for_path_bot(normalized_target, purpose):
-        return True, "purpose_path_mismatch", context
 
     if not source_path:
         return False, None, context

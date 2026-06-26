@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from .base import StrategyContext
 from .models import HedgeSnapshot, RuntimeState
+from .trade_block_id_resolver import preserve_last_trade_block_id_before_clear
 
 TERMINAL_ORDER_STATUSES = {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
 
@@ -344,6 +345,8 @@ def perform_verified_flat_runtime_reset(
     for key in RUNTIME_BLOCKING_FIELDS_TO_EMPTY_LIST:
         state[key] = []
 
+    preserve_last_trade_block_id_before_clear(state)
+
     state.update(
         {
             "bot_state": state_init_value,
@@ -374,7 +377,6 @@ def perform_verified_flat_runtime_reset(
             "last_trade_pnl_breakdown": None,
             "last_trade_pnl_finalized_at": None,
             "last_trade_symbol": None,
-            "last_trade_block_id": None,
             "trade_block_id": None,
             "post_exit_cleanup_required": False,
             "post_exit_cleanup_in_progress": False,
