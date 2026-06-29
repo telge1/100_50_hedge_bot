@@ -14,6 +14,7 @@ from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOr
 from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
+REFILL_MARKET_FILL_PURPOSES = frozenset({"REFILL_LONG", "REFILL_SHORT"})
 
 
 @dataclass(frozen=True)
@@ -25,10 +26,21 @@ class OrderTouchResult:
     fill_price: float | None = None
 
 
-def is_immediate_market_fill(intent: StrategyIntent) -> bool:
-    """Only initial hedge entries are filled immediately at candle close."""
+def is_immediate_refill_market_fill(intent: StrategyIntent) -> bool:
+    """Cycle refill market orders (no price/trigger) fill immediately at candle close."""
     purpose = str(intent.purpose or "").strip().upper()
-    return purpose in INITIAL_ENTRY_PURPOSES
+    if purpose not in REFILL_MARKET_FILL_PURPOSES:
+        return False
+    order_type = str(intent.order_type or "Market").strip().upper()
+    return order_type == "MARKET" and intent.price is None and intent.trigger_price is None
+
+
+def is_immediate_market_fill(intent: StrategyIntent) -> bool:
+    """Initial hedge entries and cycle refill market orders fill at candle close."""
+    purpose = str(intent.purpose or "").strip().upper()
+    if purpose in INITIAL_ENTRY_PURPOSES:
+        return True
+    return is_immediate_refill_market_fill(intent)
 
 
 def order_trigger_side(order: VirtualOrder) -> str:
@@ -317,7 +329,8 @@ def fill_entry_intents_at_candle_close(
 ) -> list[tuple[str, FillEvent]]:
     filled: list[tuple[str, FillEvent]] = []
     for intent in intents:
-        if not is_immediate_market_fill(intent):
+        purpose = str(intent.purpose or "").strip().upper()
+        if purpose not in INITIAL_ENTRY_PURPOSES:
             submit_intent_to_book(book, runtime_state, intent)
             continue
         order = submit_intent_to_book(book, runtime_state, intent, replace=False)

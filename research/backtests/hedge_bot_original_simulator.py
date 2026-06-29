@@ -24,10 +24,16 @@ from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState,
 
 from .backtest_report import build_order_log_entry
 from .backtest_config_loader import BacktestConfigLoadResult, extract_highlight_bot_config
+from .cycle_fill_reference_repair import install_cycle_fill_reference_repair
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
 from .purpose_utils import preserve_bot_purpose
-from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills
+from .simulated_execution import (
+    fill_entry_intents_at_candle_close,
+    fill_order_at_candle_close,
+    is_immediate_refill_market_fill,
+    process_candle_fills,
+)
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 Signal = Literal["long", "short"]
@@ -200,6 +206,7 @@ class HedgeBotOriginalSimulator:
             self.config_overlay_missing_keys = []
         self.loaded_bot_config = extract_highlight_bot_config(self.config)
         self.strategy = build_strategy(signal, self.config)
+        install_cycle_fill_reference_repair(self.strategy)
         self.runtime_state = build_runtime_state(
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),
@@ -411,6 +418,76 @@ class HedgeBotOriginalSimulator:
         return cancelled
 
 
+    def _mark_refill_registry_submitted(self, intent: StrategyIntent, order: VirtualOrder) -> None:
+        purpose = preserve_bot_purpose(intent.purpose)
+        if purpose not in {"REFILL_LONG", "REFILL_SHORT"}:
+            return
+        update_registry = getattr(self.strategy, "_update_refill_registry_status", None)
+        if not callable(update_registry):
+            return
+        update_registry(
+            self.runtime_state.strategy_state,
+            purpose,
+            "SUBMITTED",
+            client_order_id=order.order_id,
+            exchange_order_id=order.exchange_order_id,
+        )
+
+    def _dispatch_fill_to_strategy(
+        self,
+        fill_event: FillEvent,
+        *,
+        event_source: str,
+        source_fill_purpose: str | None = None,
+    ) -> list[StrategyIntent]:
+        self._refresh_snapshot_from_book(
+            source="after_immediate_market_fill",
+            price=self.candle.close,
+        )
+        follow_up = self.strategy.on_fill(
+            fill_event,
+            self.snapshot,
+            self.runtime_state,
+            self.context,
+        ) or []
+        if follow_up:
+            self.submit_intents_to_book(
+                follow_up,
+                event_source=event_source,
+                source_fill_purpose=source_fill_purpose or fill_event.purpose,
+            )
+        self._cancel_active_orders_when_flat(source="after_immediate_market_fill")
+        return list(follow_up)
+
+    def _fill_immediate_refill_market_intent(
+        self,
+        intent: StrategyIntent,
+        order: VirtualOrder,
+        *,
+        event_source: str,
+        source_fill_purpose: str | None = None,
+    ) -> FillEvent:
+        self._mark_refill_registry_submitted(intent, order)
+        fill_event = fill_order_at_candle_close(
+            book=self.book,
+            runtime_state=self.runtime_state,
+            order_id=order.order_id,
+            candle=self.candle,
+        )
+        filled_order = self.book.get_order(fill_event.client_order_id)
+        if filled_order is not None:
+            self._record_order_event(
+                filled_order,
+                event_type="filled",
+                status="FILLED",
+            )
+        self._dispatch_fill_to_strategy(
+            fill_event,
+            event_source=event_source,
+            source_fill_purpose=source_fill_purpose or preserve_bot_purpose(intent.purpose),
+        )
+        return fill_event
+
     def _resolve_intent_log_index(self, intent: StrategyIntent) -> int | None:
         purpose = preserve_bot_purpose(intent.purpose)
         for idx in range(len(self.intent_log) - 1, -1, -1):
@@ -446,6 +523,7 @@ class HedgeBotOriginalSimulator:
             else [self._resolve_intent_log_index(intent) for intent in intents]
         )
         resting: list[VirtualOrder] = []
+        submitted_pairs: list[tuple[StrategyIntent, VirtualOrder]] = []
         for intent, intent_log_index in zip(intents, intent_indices):
             if log_orders:
                 order = self._submit_intent_with_logging(
@@ -459,10 +537,20 @@ class HedgeBotOriginalSimulator:
                     order.created_candle_index = self.candle_index
             if order is None:
                 continue
-            resting.append(order)
+            submitted_pairs.append((intent, order))
         self.book.sync_runtime_state(self.runtime_state)
-        self.orders_submitted += len(resting)
+        self.orders_submitted += len(submitted_pairs)
         self._refresh_snapshot_from_book(source="after_submit_intents")
+        for intent, order in submitted_pairs:
+            if is_immediate_refill_market_fill(intent):
+                self._fill_immediate_refill_market_intent(
+                    intent,
+                    order,
+                    event_source=event_source,
+                    source_fill_purpose=source_fill_purpose,
+                )
+                continue
+            resting.append(order)
         return resting
 
     def process_candle(
