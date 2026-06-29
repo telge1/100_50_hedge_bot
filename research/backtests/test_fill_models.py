@@ -72,7 +72,7 @@ def _submit_exit_pair(book: SimulatedOrderBook) -> tuple:
     return long_tp, short_sl
 
 
-def test_conservative_max_one_fill_from_multiple_touchable() -> None:
+def test_conservative_pairs_final_exit_orders_same_candle() -> None:
     book = SimulatedOrderBook(symbol="BTCUSDT")
     runtime_state = RuntimeState(strategy_state={})
     _submit_exit_pair(book)
@@ -88,9 +88,11 @@ def test_conservative_max_one_fill_from_multiple_touchable() -> None:
         max_fills_per_candle=1,
     )
 
-    assert len(fills) == 1
-    assert stats["same_candle_fill_count"] == 1
-    assert len(book.active_orders()) == 1
+    assert len(fills) == 2
+    assert stats["same_candle_fill_count"] == 2
+    assert stats["paired_exit_fills_count"] == 2
+    assert len(book.active_orders()) == 0
+    assert {fill.purpose for fill in fills} == {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
 
 
 def test_conservative_multi_allows_two_fills_same_candle() -> None:
@@ -151,7 +153,7 @@ def test_new_orders_not_eligible_in_same_candle_snapshot() -> None:
         fill_model="conservative",
         max_fills_per_candle=1,
     )
-    assert len(fills) == 1
+    assert len(fills) == 2
 
     new_order, _ = book.submit_intent(
         StrategyIntent(
@@ -337,6 +339,7 @@ def test_simulator_process_candle_uses_fill_model() -> None:
             fill_model="conservative",
             max_fills_per_candle=1,
         )
-        assert result.same_candle_fill_count <= 1
+        assert result.same_candle_fill_count == 2
+        assert result.paired_exit_fills_count == 2
     finally:
         sim.close()

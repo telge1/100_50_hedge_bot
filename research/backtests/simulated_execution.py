@@ -422,6 +422,25 @@ def select_orders_for_fill_model(
         stats["paired_exit_fills_count"] = paired_count
         return selected, stats
 
+    # Even in conservative mode, basket final exits must be paired when both
+    # sides touch in the same OHLC candle. Otherwise one side can close while
+    # the paired final-exit order remains open, leaving an impossible hedge
+    # state such as long_qty=0 with only SHORT_SL_EXIT active.
+    if model in {"conservative", "conservative_multi"}:
+        # Conservative normally allows only one fill per candle. Basket final
+        # exits are the exception: if both final exit legs touch in the same
+        # OHLC candle, both must fill together to avoid an impossible one-sided
+        # hedge state.
+        paired_exit_limit = max(2, int(max_fills_per_candle))
+        selected, paired_count = _select_paired_exit_orders(
+            touchable,
+            candle,
+            max_fills_per_candle=paired_exit_limit,
+        )
+        if paired_count >= 2:
+            stats["paired_exit_fills_count"] = paired_count
+            return selected, stats
+
     ranked = rank_conservative_fill_orders(eligible_orders, candle)
     return ranked[:max_fills_per_candle], stats
 
