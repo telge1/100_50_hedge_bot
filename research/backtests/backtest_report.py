@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
+import csv
+import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
 from .simulated_order_book import SimulatedOrderBook, VirtualOrder
+
+SUMMARY_CSV_FIELDS = (
+    "symbol",
+    "direction",
+    "start_time",
+    "end_time",
+    "candles_processed",
+    "entry_price",
+    "final_status",
+    "exit_reason",
+    "realized_pnl",
+    "realized_pnl_pct",
+    "max_drawdown_pct",
+    "fills_count",
+    "orders_submitted",
+    "active_orders_count",
+    "cycles_seen",
+)
 
 
 def build_fill_log_entry(
@@ -80,3 +101,59 @@ class BacktestResult:
         if self.end_time is not None:
             payload["end_time"] = self.end_time.isoformat()
         return payload
+
+
+def result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
+    payload = result.to_dict()
+    row: dict[str, Any] = {}
+    for key in SUMMARY_CSV_FIELDS:
+        value = payload.get(key)
+        if value is None:
+            row[key] = ""
+        else:
+            row[key] = value
+    return row
+
+
+def write_summary_csv(path: str | Path, results: Iterable[BacktestResult]) -> Path:
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    rows = [result_to_summary_row(result) for result in results]
+    with path_obj.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(SUMMARY_CSV_FIELDS))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path_obj
+
+
+def write_results_json(
+    path: str | Path,
+    *,
+    symbol: str,
+    limit: int | None,
+    max_candles: int | None,
+    results: dict[str, BacktestResult],
+    meta: dict[str, Any] | None = None,
+) -> Path:
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {
+        "symbol": symbol.upper(),
+        "limit": limit,
+        "max_candles": max_candles,
+        "runs": {direction: result.to_dict() for direction, result in results.items()},
+    }
+    if meta:
+        payload["meta"] = meta
+    with path_obj.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+    return path_obj
+
+
+def default_output_paths(output_dir: str | Path, symbol: str) -> tuple[Path, Path]:
+    base = Path(output_dir)
+    symbol_upper = symbol.upper()
+    json_path = base / f"{symbol_upper}_original_hedge_5m_results.json"
+    csv_path = base / f"{symbol_upper}_original_hedge_5m_summary.csv"
+    return json_path, csv_path
