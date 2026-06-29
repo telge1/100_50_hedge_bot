@@ -295,3 +295,67 @@ def test_short_reduce_loss_cover_uses_full_qty_when_normal_split_disabled() -> N
     assert row["order_qty"] == 19.177
     assert row["fill_qty"] == 19.177
     assert row["coverage_ratio"] > 1.0
+
+def test_cycle_loss_can_be_covered_by_final_exit_basket() -> None:
+    """Regression: a cycle loss can be covered by recalculated final exits.
+
+    In the short-side flow, CYCLE_1_SHORT_REDUCE can realize a loss.
+    The bot may then recalculate LONG_SL_EXIT and SHORT_TP_EXIT so the
+    remaining hedge basket closes flat with profit. That is a successful cover,
+    even without a direct CYCLE_1_LONG_ADD fill.
+    """
+    from research.backtests.backtest_report import BacktestResult
+    from research.backtests.pnl_coverage_audit import build_pnl_coverage_audit
+
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="short",
+        start_index=0,
+        fill_log=[
+            {
+                "timestamp": "2026-06-24T01:30:00+00:00",
+                "purpose": "CYCLE_1_SHORT_REDUCE",
+                "cycle_index": 1,
+                "cycle_role": "short_reduce",
+                "side": "short",
+                "qty": 38.355,
+                "fill_price": 0.6551,
+                "closed_pnl": -0.12657149999999884,
+                "long_avg_after": 0.6518,
+                "short_avg_after": 0.6518,
+            },
+            {
+                "timestamp": "2026-06-24T02:20:00+00:00",
+                "purpose": "LONG_SL_EXIT",
+                "cycle_index": 0,
+                "side": "long",
+                "qty": 76.71,
+                "fill_price": 0.645,
+                "closed_pnl": -0.5216280000000021,
+            },
+            {
+                "timestamp": "2026-06-24T02:25:00+00:00",
+                "purpose": "SHORT_TP_EXIT",
+                "cycle_index": 0,
+                "side": "short",
+                "qty": 115.066,
+                "fill_price": 0.645,
+                "closed_pnl": 0.7824488000000033,
+            },
+        ],
+        intent_log=[],
+        order_log=[],
+        final_active_order_purposes=[],
+    )
+
+    rows = build_pnl_coverage_audit(result)
+    assert len(rows) == 1
+    row = rows[0]
+
+    assert row["loss_purpose"] == "CYCLE_1_SHORT_REDUCE"
+    assert row["cover_purpose"] == "LONG_SL_EXIT|SHORT_TP_EXIT"
+    assert row["status"] == "overcovered_by_final_exit"
+    assert row["missing_pnl"] == 0.0
+    assert row["cover_pnl"] == 0.2608208000000012
+    assert row["net_pnl"] == 0.13424930000000235
+    assert row["coverage_ratio"] > 2.0

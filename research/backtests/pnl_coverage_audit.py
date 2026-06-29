@@ -271,6 +271,53 @@ def _select_cover_fills(
     return selected
 
 
+def _fill_sort_key(fill: dict[str, Any]) -> tuple[str, str]:
+    return (
+        str(fill.get("timestamp") or ""),
+        str(fill.get("order_id") or ""),
+    )
+
+
+def _select_final_exit_fills_after_loss(
+    fills: list[dict[str, Any]],
+    *,
+    loss_fill: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return final exit fills after a cycle loss fill.
+
+    Some strategy paths do not cover a cycle loss with another cycle purpose.
+    Instead the bot recalculates final exit orders so the remaining hedge basket
+    closes flat with profit. In that case LONG_*_EXIT / SHORT_*_EXIT are the
+    economic cover for the cycle loss.
+    """
+    loss_ts = str(loss_fill.get("timestamp") or "")
+    selected: list[dict[str, Any]] = []
+    for fill in fills:
+        purpose = preserve_bot_purpose(fill.get("purpose"))
+        if purpose not in EXIT_PURPOSES:
+            continue
+        if fill is loss_fill:
+            continue
+        fill_ts = str(fill.get("timestamp") or "")
+        if loss_ts and fill_ts and fill_ts < loss_ts:
+            continue
+        selected.append(fill)
+    return sorted(selected, key=_fill_sort_key)
+
+
+def _final_exit_coverage_status(
+    *,
+    loss_pnl: float,
+    exit_cover_pnl: float,
+) -> str:
+    abs_loss = abs(loss_pnl)
+    if exit_cover_pnl >= abs_loss + COVER_TOLERANCE:
+        return "overcovered_by_final_exit"
+    if exit_cover_pnl >= abs_loss - COVER_TOLERANCE:
+        return "covered_by_final_exit"
+    return "undercovered_by_final_exit"
+
+
 def build_pnl_coverage_audit(result: BacktestResult) -> list[dict[str, Any]]:
     """Audit cycle loss fills against cover fills within the same cycle_index."""
     fills = list(result.fill_log or [])
@@ -301,9 +348,23 @@ def build_pnl_coverage_audit(result: BacktestResult) -> list[dict[str, Any]]:
             cover_purpose=cover_purpose,
             loss_cycle_role=str(loss_fill.get("cycle_role") or "").lower(),
         )
+        loss_pnl = _fill_pnl(loss_fill)
+        final_exit_cover_used = False
+        if not cover_candidates:
+            final_exit_candidates = _select_final_exit_fills_after_loss(
+                fills,
+                loss_fill=loss_fill,
+            )
+            final_exit_net_pnl = sum(_fill_pnl(fill) for fill in final_exit_candidates)
+            if final_exit_candidates and final_exit_net_pnl > COVER_TOLERANCE:
+                cover_candidates = final_exit_candidates
+                cover_purpose = "|".join(
+                    preserve_bot_purpose(fill.get("purpose")) for fill in cover_candidates
+                )
+                final_exit_cover_used = True
+
         cover_pnl = sum(_fill_pnl(fill) for fill in cover_candidates)
         primary_cover = cover_candidates[0] if cover_candidates else None
-        loss_pnl = _fill_pnl(loss_fill)
         net_pnl = loss_pnl + cover_pnl
         abs_loss = abs(loss_pnl)
         coverage_ratio = (cover_pnl / abs_loss) if abs_loss > COVER_TOLERANCE else None
@@ -344,10 +405,17 @@ def build_pnl_coverage_audit(result: BacktestResult) -> list[dict[str, Any]]:
                 "net_pnl": net_pnl,
                 "coverage_ratio": coverage_ratio,
                 "missing_pnl": missing_pnl,
-                "status": _coverage_status(
-                    loss_pnl=loss_pnl,
-                    cover_pnl=cover_pnl,
-                    pending_exit_purposes=pending_exits,
+                "status": (
+                    _final_exit_coverage_status(
+                        loss_pnl=loss_pnl,
+                        exit_cover_pnl=cover_pnl,
+                    )
+                    if final_exit_cover_used
+                    else _coverage_status(
+                        loss_pnl=loss_pnl,
+                        cover_pnl=cover_pnl,
+                        pending_exit_purposes=pending_exits,
+                    )
                 ),
                 "pending_final_active_order_purposes": pending_exit_joined,
                 "expected_cover_qty": expected_qty,
