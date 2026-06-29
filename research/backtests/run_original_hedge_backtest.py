@@ -29,6 +29,7 @@ from .unfinished_deep_dive import (
     print_unfinished_deep_dive_summary,
     run_unfinished_deep_dive_after_multi_start,
 )
+from .pnl_coverage_audit import export_pnl_coverage_audits, print_pnl_coverage_audit_summary
 from .trade_block_export import (
     export_trade_blocks_for_results,
     iter_payload_results,
@@ -402,6 +403,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="With --multi-start, export only these start indices (comma-separated)",
     )
+    parser.add_argument(
+        "--pnl-coverage-audit",
+        action="store_true",
+        help="Export cycle PnL coverage audit CSV/JSON",
+    )
     return parser
 
 
@@ -558,6 +564,19 @@ def main(argv: list[str] | None = None) -> int:
                 args.output_dir,
             )
 
+    pnl_audit_written: list[dict[str, str]] = []
+    pnl_audit_rows: list[list[dict[str, Any]]] = []
+    if args.pnl_coverage_audit:
+        audit_results = iter_payload_results(payload)
+        audit_start_indices = None
+        if payload.get("multi_start") and args.trade_block_start_indices:
+            audit_start_indices = parse_trade_block_start_indices(args.trade_block_start_indices)
+        pnl_audit_written, pnl_audit_rows = export_pnl_coverage_audits(
+            audit_results,
+            args.output_dir,
+            start_indices=audit_start_indices,
+        )
+
     if payload.get("multi_start"):
         print_multi_start_summary(payload)
         if payload.get("deep_dive"):
@@ -567,6 +586,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if trade_block_written:
         print_trade_block_export_summary(trade_block_written)
+
+    if pnl_audit_written:
+        print_pnl_coverage_audit_summary(pnl_audit_written, pnl_audit_rows)
 
     if args.debug and not payload.get("multi_start"):
         for _, result in payload["results"].items():

@@ -29,6 +29,57 @@ INTENT_METADATA_EXCERPT_KEYS = (
     "replace_existing",
     "action",
     "intent_type",
+    # Recovery / second-leg pricing diagnostics
+    "source_long_reduce_confirmed_pnl",
+    "source_long_reduce_confirmed_qty",
+    "source_long_reduce_confirmed_avg_price",
+    "source_long_reduce_confirmed_cost",
+    "source_long_reduce_confirmed_pnl_updated_time",
+    "long_fill_price",
+    "long_reduce_qty",
+    "short_entry_price",
+    "short_reduce_reference",
+    "required_price_move",
+    "required_net",
+    "long_loss_usdt",
+    "target_profit_usdt",
+    "fee_rate",
+    "short_followup_pnl",
+    "short_followup_pnl_source",
+    "short_tp_guard_applied",
+    "short_tp_guard_original_trigger_price_raw",
+    "short_tp_guard_safe_short_tp_price",
+    "fallback_to_single_second_leg",
+    "split_fallback_reason",
+
+    # Staged second-leg diagnostics
+    "stage_index",
+    "stage_count",
+    "stage_required_net",
+    "stage_expected_net",
+    "expected_net",
+    "sum_expected_net",
+    "remaining_required_net",
+    "first_leg_fill_price",
+    "final_second_leg_trigger_price",
+    "distance_pct_abs",
+    "threshold_pct",
+    "trigger_price",
+    "raw_trigger_price",
+    "original_stage_count",
+    "rejected_stage_count",
+    "rejected_stage_notional_values",
+    "market_fallback",
+    "fallback_reason",
+    "original_trigger_price",
+    "current_price",
+
+    # Trigger / guard diagnostics
+    "original_trigger_price_raw",
+    "use_market_fallback",
+
+    # Split disable diagnostics
+    "normal_cycle_second_leg_split_disabled",
 )
 
 TRIGGER_ORDER_TYPES = frozenset({"STOP", "STOP_MARKET", "TAKE_PROFIT", "TAKE_PROFIT_MARKET"})

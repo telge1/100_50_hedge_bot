@@ -9633,7 +9633,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             short_followup_pnl_source = "cycle_entry_long_add_loss_usdt"
         else:
             short_followup_pnl = 0.0
-        short_followup_pnl_source = "missing_assumed_zero"
+        if short_followup_pnl_source is None:
+            short_followup_pnl_source = "missing_assumed_zero"
         if second_leg_is_long:
             current_price = float(snapshot.current_price or 0.0)
             reference_price_candidates = [
@@ -10404,6 +10405,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "short_reduce_reference": short_reduce_reference,
             "fee_rate": fee_rate,
             "required_price_move": required_price_move,
+            "required_net": required_net,
+            "long_loss_usdt": long_loss_usdt,
+            "target_profit_usdt": target_profit_usdt,
+            "short_followup_pnl": short_followup_pnl,
+            "short_followup_pnl_source": short_followup_pnl_source,
+            "raw_trigger_price": raw_trigger_price,
+            "trigger_price": trigger_price,
+            "original_trigger_price_raw": original_trigger_price_raw,
+            "short_tp_guard_applied": short_tp_guard_applied,
+            "short_tp_guard_safe_short_tp_price": safe_short_tp_price,
+            "short_tp_guard_original_trigger_price_raw": original_trigger_price_raw,
+            "first_leg_fill_price": first_leg_fill_price,
+            "distance_pct_abs": distance_pct_abs,
+            "threshold_pct": threshold_pct,
+            "stage_count": stage_count,
+            "use_market_fallback": use_market_fallback,
         }
         if use_market_fallback:
             metadata.update(
@@ -10455,20 +10472,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             trigger_price=trigger_price,
         )
         if not use_market_fallback:
-            split_intents = self._maybe_build_normal_cycle_second_leg_split_intents(
-                cycle_index=cycle_index,
-                purpose=purpose,
-                qty=short_qty,
-                trigger_price=trigger_price,
-                snapshot=snapshot,
-                runtime_state=runtime_state,
-                side="short",
-                position_idx=2,
-                trigger_direction=2,
-                metadata=metadata,
-            )
-            if split_intents:
-                return split_intents
+            second_leg_cycle_role_for_split = self._get_second_leg_cycle_role()
+            if second_leg_cycle_role_for_split == "short_reduce":
+                metadata["stage_count"] = 1
+                metadata["normal_cycle_second_leg_split_disabled"] = True
+                metadata["split_fallback_reason"] = "single_short_reduce_order_required_to_cover_loss"
+                _log_event(
+                    "fixed_cycle_normal_second_leg_split_disabled_for_short_reduce",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "purpose": purpose,
+                        "qty": short_qty,
+                        "trigger_price": trigger_price,
+                        "required_net": required_net,
+                        "long_loss_usdt": long_loss_usdt,
+                        "reason": "single_short_reduce_order_required_to_cover_loss",
+                    },
+                )
+            else:
+                split_intents = self._maybe_build_normal_cycle_second_leg_split_intents(
+                    cycle_index=cycle_index,
+                    purpose=purpose,
+                    qty=short_qty,
+                    trigger_price=trigger_price,
+                    snapshot=snapshot,
+                    runtime_state=runtime_state,
+                    side="short",
+                    position_idx=2,
+                    trigger_direction=2,
+                    metadata=metadata,
+                )
+                if split_intents:
+                    return split_intents
             _, rules, _ = self._resolve_instrument_rules(runtime_state)
             min_order_qty = float(
                 rules["min_order_qty"]
@@ -10676,7 +10712,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             # Fallback: einzelne Second-Leg-Order mit Gesamtmenge
             fallback_metadata = {
                 **metadata,
-                "split_fallback_reason": "stage_below_min_notional",
+                "split_fallback_reason": metadata.get(
+                    "split_fallback_reason",
+                    "stage_below_min_notional",
+                ),
                 "rejected_stage_count": len(rejected_stage_indices),
                 "rejected_stage_notional_values": rejected_stage_notionals,
                 "original_stage_count": len(stages),

@@ -14,6 +14,7 @@ from fixed_cycle_hedge_bot.models import FillEvent
 from .intent_diagnostics import last_intent_summary, summarize_exit_diagnostics
 from .backtest_config_loader import HIGHLIGHT_BOT_CONFIG_KEYS
 from .config_diagnostics import config_diagnostics_summary_fields
+from .intent_diagnostics import _metadata_excerpt
 from .purpose_utils import purpose_log_fields
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -102,6 +103,9 @@ def build_fill_log_entry(
         "active_orders_after_count": len(book.active_orders()),
         **purpose_fields,
     }
+    metadata_excerpt = _metadata_excerpt(metadata)
+    if metadata_excerpt:
+        entry["metadata_excerpt"] = metadata_excerpt
     for key in ("trigger_touched", "trigger_touch_rule", "trigger_warning"):
         if key in metadata:
             entry[key] = metadata.get(key)
@@ -140,6 +144,9 @@ def build_order_log_entry(
         "status": status or order.status,
         **purpose_fields,
     }
+    metadata_excerpt = _metadata_excerpt(dict(order.metadata or {}))
+    if metadata_excerpt:
+        entry["metadata_excerpt"] = metadata_excerpt
     if replaced_old_order_id:
         entry["replaced_old_order_id"] = replaced_old_order_id
     if new_order_id:
