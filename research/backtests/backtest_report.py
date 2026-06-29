@@ -1,4 +1,4 @@
-"""Backtest result structures and logging helpers (Phase 4)."""
+"""Backtest result structures and logging helpers (Phase 4/6)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
-from .simulated_order_book import SimulatedOrderBook, VirtualOrder
+from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -22,6 +22,7 @@ SUMMARY_CSV_FIELDS = (
     "entry_price",
     "final_status",
     "exit_reason",
+    "open_reason_detail",
     "realized_pnl",
     "realized_pnl_pct",
     "max_drawdown_pct",
@@ -29,6 +30,9 @@ SUMMARY_CSV_FIELDS = (
     "orders_submitted",
     "active_orders_count",
     "cycles_seen",
+    "final_long_qty",
+    "final_short_qty",
+    "final_active_order_purposes",
 )
 
 
@@ -37,40 +41,72 @@ def build_fill_log_entry(
     book: SimulatedOrderBook,
     *,
     timestamp: datetime | None = None,
+    candle_index: int | None = None,
+    candle: SyntheticCandle | None = None,
+    order_check_price: float | None = None,
 ) -> dict[str, Any]:
     ts = timestamp or fill.occurred_at
     metadata = dict(fill.metadata or {})
-    return {
+    closed_pnl = float(metadata.get("closed_pnl") or metadata.get("confirmed_closed_pnl") or 0.0)
+    runtime_pnl = metadata.get("runtime_calculated_pnl")
+    confirmed_pnl = metadata.get("confirmed_closed_pnl")
+    entry: dict[str, Any] = {
+        "candle_index": candle_index,
         "timestamp": ts.isoformat() if ts is not None else None,
         "symbol": metadata.get("symbol") or book.symbol,
         "side": fill.side,
         "qty": float(fill.exec_qty),
+        "order_check_price": order_check_price,
         "fill_price": float(fill.exec_price),
         "purpose": fill.purpose,
         "order_id": fill.client_order_id,
-        "closed_pnl": float(metadata.get("closed_pnl") or metadata.get("confirmed_closed_pnl") or 0.0),
-        "position_long_qty": float(book.long_qty),
-        "position_short_qty": float(book.short_qty),
+        "closed_pnl": closed_pnl,
+        "runtime_calculated_pnl": float(runtime_pnl) if runtime_pnl is not None else closed_pnl,
+        "confirmed_closed_pnl": float(confirmed_pnl) if confirmed_pnl is not None else closed_pnl,
+        "long_qty_after": float(book.long_qty),
+        "short_qty_after": float(book.short_qty),
+        "long_avg_after": float(book.long_avg),
+        "short_avg_after": float(book.short_avg),
+        "active_orders_after_count": len(book.active_orders()),
     }
+    if candle is not None:
+        entry["candle_open"] = float(candle.open if candle.open is not None else candle.close)
+        entry["candle_high"] = float(candle.high if candle.high is not None else candle.close)
+        entry["candle_low"] = float(candle.low if candle.low is not None else candle.close)
+        entry["candle_close"] = float(candle.close)
+    return entry
 
 
 def build_order_log_entry(
     order: VirtualOrder,
     *,
     timestamp: datetime | None = None,
+    candle_index: int | None = None,
+    event_type: str = "submitted",
     status: str | None = None,
+    replaced_old_order_id: str | None = None,
+    new_order_id: str | None = None,
 ) -> dict[str, Any]:
     ts = timestamp or order.created_at
-    return {
+    entry: dict[str, Any] = {
         "timestamp": ts.isoformat() if ts is not None else None,
+        "candle_index": candle_index,
+        "event_type": event_type,
+        "order_id": order.order_id,
         "purpose": order.purpose,
         "side": order.side,
         "qty": float(order.qty),
         "price": order.price,
         "trigger_price": order.trigger_price,
+        "trigger_direction": order.trigger_direction,
+        "reduce_only": bool(order.reduce_only),
         "status": status or order.status,
-        "order_id": order.order_id,
     }
+    if replaced_old_order_id:
+        entry["replaced_old_order_id"] = replaced_old_order_id
+    if new_order_id:
+        entry["new_order_id"] = new_order_id
+    return entry
 
 
 @dataclass
@@ -93,6 +129,18 @@ class BacktestResult:
     fill_log: list[dict[str, Any]] = field(default_factory=list)
     order_log: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
+    final_long_qty: float | None = None
+    final_short_qty: float | None = None
+    final_long_avg_price: float | None = None
+    final_short_avg_price: float | None = None
+    final_active_orders: list[dict[str, Any]] = field(default_factory=list)
+    final_active_order_purposes: list[str] = field(default_factory=list)
+    final_strategy_state_excerpt: dict[str, Any] = field(default_factory=dict)
+    last_fill: dict[str, Any] | None = None
+    last_order: dict[str, Any] | None = None
+    first_fill_time: str | None = None
+    last_fill_time: str | None = None
+    open_reason_detail: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -108,6 +156,10 @@ def result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
     row: dict[str, Any] = {}
     for key in SUMMARY_CSV_FIELDS:
         value = payload.get(key)
+        if key == "final_active_order_purposes":
+            purposes = value or []
+            row[key] = "|".join(str(purpose) for purpose in purposes if purpose)
+            continue
         if value is None:
             row[key] = ""
         else:

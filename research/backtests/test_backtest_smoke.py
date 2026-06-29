@@ -182,8 +182,8 @@ def test_cancel_by_purpose_removes_only_matching_order() -> None:
         price=99.0,
         reduce_only=True,
     )
-    order_a = book.submit_intent(intent_a, replace=False)
-    order_b = book.submit_intent(intent_b, replace=False)
+    order_a, _ = book.submit_intent(intent_a, replace=False)
+    order_b, _ = book.submit_intent(intent_b, replace=False)
     book.sync_runtime_state(runtime_state)
 
     canceled = book.cancel_by_purpose("LONG_TP_EXIT")
@@ -217,8 +217,8 @@ def test_submit_same_purpose_replaces_existing_order() -> None:
         reduce_only=True,
     )
 
-    old_order = book.submit_intent(first, replace=True)
-    new_order = book.submit_intent(second, replace=True)
+    old_order, _ = book.submit_intent(first, replace=True)
+    new_order, _ = book.submit_intent(second, replace=True)
     book.sync_runtime_state(runtime_state)
 
     active = book.active_orders_by_purpose("LONG_TP_EXIT")
@@ -240,7 +240,7 @@ def _candle(symbol: str, *, open_: float, high: float, low: float, close: float)
 def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
     book = SimulatedOrderBook(symbol="BTCUSDT")
     runtime_state = RuntimeState(strategy_state={})
-    order = book.submit_intent(
+    order, _ = book.submit_intent(
         StrategyIntent(
             side="short",
             qty=0.5,
@@ -271,7 +271,7 @@ def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
 def test_phase3_sell_order_fills_when_candle_high_reaches_trigger() -> None:
     book = SimulatedOrderBook(symbol="BTCUSDT")
     runtime_state = RuntimeState(strategy_state={})
-    order = book.submit_intent(
+    order, _ = book.submit_intent(
         StrategyIntent(
             side="long",
             qty=1.0,
@@ -299,7 +299,7 @@ def test_phase3_orders_stay_active_when_candle_does_not_reach_trigger() -> None:
     book = SimulatedOrderBook(symbol="BTCUSDT")
     runtime_state = RuntimeState(strategy_state={})
 
-    buy_order = book.submit_intent(
+    buy_order, _ = book.submit_intent(
         StrategyIntent(
             side="short",
             qty=0.5,
@@ -310,7 +310,7 @@ def test_phase3_orders_stay_active_when_candle_does_not_reach_trigger() -> None:
         ),
         replace=False,
     )
-    sell_order = book.submit_intent(
+    sell_order, _ = book.submit_intent(
         StrategyIntent(
             side="long",
             qty=1.0,
@@ -338,7 +338,7 @@ def test_phase3_reduce_fill_updates_position_and_pnl() -> None:
     runtime_state = RuntimeState(strategy_state={})
     book.long_qty = 1.0
     book.long_avg = 100.0
-    order = book.submit_intent(
+    order, _ = book.submit_intent(
         StrategyIntent(
             side="long",
             qty=1.0,
@@ -422,7 +422,7 @@ def test_phase35_reduce_fill_metadata_matches_pnl_function() -> None:
     runtime_state = RuntimeState(strategy_state={})
     book.short_qty = 1.0
     book.short_avg = 100.0
-    order = book.submit_intent(
+    order, _ = book.submit_intent(
         StrategyIntent(
             side="short",
             qty=1.0,

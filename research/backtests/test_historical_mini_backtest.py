@@ -78,7 +78,7 @@ def test_max_fills_per_candle_limits_intra_candle_chain() -> None:
     book.long_qty = 2.0
     book.long_avg = 100.0
 
-    low_tp = book.submit_intent(
+    low_tp, _ = book.submit_intent(
         StrategyIntent(
             side="long",
             qty=1.0,
@@ -89,7 +89,7 @@ def test_max_fills_per_candle_limits_intra_candle_chain() -> None:
         ),
         replace=False,
     )
-    high_tp = book.submit_intent(
+    high_tp, _ = book.submit_intent(
         StrategyIntent(
             side="long",
             qty=1.0,

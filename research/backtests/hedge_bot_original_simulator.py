@@ -23,7 +23,7 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
 from .backtest_report import build_order_log_entry
-from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills, submit_resting_intents
+from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 Signal = Literal["long", "short"]
@@ -179,17 +179,83 @@ class HedgeBotOriginalSimulator:
         )
         self.orders_submitted = 0
         self.order_log: list[dict[str, Any]] = []
+        self.candle_index = 0
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
 
     def _wire_order_book_callbacks(self) -> None:
         def _cancel_open_orders_by_purpose(purposes: list[str]) -> None:
             for purpose in purposes:
-                self.book.cancel_by_purpose(purpose)
+                canceled_ids = self.book.cancel_by_purpose(purpose)
+                for order_id in canceled_ids:
+                    order = self.book.get_order(order_id)
+                    if order is None:
+                        continue
+                    self.order_log.append(
+                        build_order_log_entry(
+                            order,
+                            timestamp=self.candle.timestamp,
+                            candle_index=self.candle_index,
+                            event_type="cancelled",
+                            status="CANCELED",
+                        )
+                    )
             self.book.sync_runtime_state(self.runtime_state)
             self._refresh_snapshot_from_book(source="after_cancel_by_purpose")
 
         self.context.cancel_open_orders_by_purpose = _cancel_open_orders_by_purpose
+
+    def _record_order_event(
+        self,
+        order: VirtualOrder,
+        *,
+        event_type: str,
+        status: str | None = None,
+        replaced_old_order_id: str | None = None,
+    ) -> None:
+        self.order_log.append(
+            build_order_log_entry(
+                order,
+                timestamp=self.candle.timestamp,
+                candle_index=self.candle_index,
+                event_type=event_type,
+                status=status,
+                replaced_old_order_id=replaced_old_order_id,
+                new_order_id=order.order_id if event_type == "replaced" else None,
+            )
+        )
+
+    def _submit_intent_with_logging(
+        self,
+        intent: StrategyIntent,
+        *,
+        replace: bool,
+    ) -> VirtualOrder | None:
+        if str(intent.purpose or "").strip().upper() in {
+            "INITIAL_LONG_ENTRY",
+            "INITIAL_SHORT_ENTRY",
+        }:
+            return None
+        order, replaced_ids = self.book.submit_intent(intent, replace=replace)
+        for old_id in replaced_ids:
+            old_order = self.book.get_order(old_id)
+            if old_order is not None:
+                self._record_order_event(
+                    old_order,
+                    event_type="cancelled",
+                    status="CANCELED",
+                )
+                self._record_order_event(
+                    order,
+                    event_type="replaced",
+                    status=order.status,
+                    replaced_old_order_id=old_id,
+                )
+            else:
+                self._record_order_event(order, event_type="submitted")
+        if not replaced_ids:
+            self._record_order_event(order, event_type="submitted")
+        return order
 
     def _configure_isolated_paths(self) -> None:
         if self._temp_dir is None:
@@ -228,18 +294,17 @@ class HedgeBotOriginalSimulator:
         replace: bool = True,
         log_orders: bool = True,
     ) -> list[VirtualOrder]:
-        resting = submit_resting_intents(
-            self.book,
-            self.runtime_state,
-            intents,
-            replace=replace,
-        )
+        resting: list[VirtualOrder] = []
+        for intent in intents:
+            if log_orders:
+                order = self._submit_intent_with_logging(intent, replace=replace)
+            else:
+                order, _ = self.book.submit_intent(intent, replace=replace)
+            if order is None:
+                continue
+            resting.append(order)
+        self.book.sync_runtime_state(self.runtime_state)
         self.orders_submitted += len(resting)
-        if log_orders:
-            for order in resting:
-                self.order_log.append(
-                    build_order_log_entry(order, timestamp=self.candle.timestamp)
-                )
         self._refresh_snapshot_from_book(source="after_submit_intents")
         return resting
 
@@ -264,6 +329,13 @@ class HedgeBotOriginalSimulator:
 
         for fill_event in candle_fills:
             self._refresh_snapshot_from_book(source="after_candle_fill", price=candle.close)
+            filled_order = self.book.get_order(fill_event.client_order_id)
+            if filled_order is not None:
+                self._record_order_event(
+                    filled_order,
+                    event_type="filled",
+                    status="FILLED",
+                )
             intents = self.strategy.on_fill(
                 fill_event,
                 self.snapshot,

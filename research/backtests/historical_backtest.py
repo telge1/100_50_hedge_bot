@@ -1,13 +1,13 @@
-"""Historical mini-backtest runner over 5m candle series (Phase 4)."""
+"""Historical mini-backtest runner over 5m candle series (Phase 4/6)."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
 from .backtest_report import BacktestResult, build_fill_log_entry, build_order_log_entry
+from .debug_report import finalize_backtest_debug
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
 from .simulated_order_book import SyntheticCandle
 
@@ -53,11 +53,20 @@ def _append_fill_logs(
     sim: HedgeBotOriginalSimulator,
     fills: list[FillEvent],
     *,
-    timestamp: datetime | None,
+    candle: SyntheticCandle | None,
+    candle_index: int | None,
 ) -> float:
     pnl_delta = 0.0
     for fill in fills:
-        entry = build_fill_log_entry(fill, sim.book, timestamp=timestamp)
+        metadata = dict(fill.metadata or {})
+        entry = build_fill_log_entry(
+            fill,
+            sim.book,
+            timestamp=fill.occurred_at,
+            candle_index=candle_index,
+            candle=candle,
+            order_check_price=metadata.get("order_check_price"),
+        )
         result.fill_log.append(entry)
         pnl_delta += float(entry["closed_pnl"])
     result.fills_count = len(result.fill_log)
@@ -74,18 +83,7 @@ def run_historical_backtest(
     conservative_fill_order: bool = True,
     initial_notional_usdt: float = 100.0,
 ) -> BacktestResult:
-    """Run a conservative mini-backtest over a 5m candle series.
-
-    Flow:
-    1. Initialize original hedge strategy (long → FixedCycle, short → ShortFixedCycle).
-    2. Entry fills at the first candle close.
-    3. Process subsequent candles one-by-one with ``process_candle``.
-    4. At most ``max_fills_per_candle`` resting fills per candle (default 1).
-    5. Resting orders placed after a fill are only checked from the next candle.
-
-    Stops when the trade is flat with no active orders, ``max_candles`` is reached,
-    or an exception occurs.
-    """
+    """Run a conservative mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
     symbol_upper = symbol.upper()
     candle_list = normalize_candles(symbol_upper, candles)
@@ -96,6 +94,7 @@ def run_historical_backtest(
             final_status="error",
             exit_reason="no_candles",
             error="candle series is empty",
+            open_reason_detail="no_candles",
         )
 
     first_candle = candle_list[0]
@@ -104,6 +103,7 @@ def run_historical_backtest(
         symbol=symbol_upper,
         candle_close=float(first_candle.close),
     )
+    sim.candle_index = 0
     result = BacktestResult(
         symbol=symbol_upper,
         direction=signal,
@@ -118,16 +118,13 @@ def run_historical_backtest(
     try:
         entry_result = sim.run_entry_smoke()
         result.orders_submitted = sim.orders_submitted
-        for order in entry_result.resting_orders:
-            result.order_log.append(
-                build_order_log_entry(order, timestamp=first_candle.timestamp)
-            )
 
         entry_pnl = _append_fill_logs(
             result,
             sim,
             entry_result.entry_fills,
-            timestamp=first_candle.timestamp,
+            candle=first_candle,
+            candle_index=0,
         )
         cumulative_pnl += entry_pnl
         peak_pnl, max_drawdown = _update_drawdown(
@@ -140,8 +137,9 @@ def run_historical_backtest(
         if max_candles is not None:
             loop_candles = loop_candles[: max(0, int(max_candles))]
 
-        for candle in loop_candles:
+        for loop_index, candle in enumerate(loop_candles, start=1):
             sim.candle = candle
+            sim.candle_index = loop_index
             candle_result = sim.process_candle(
                 candle,
                 max_fills_per_candle=max_fills_per_candle,
@@ -154,7 +152,8 @@ def run_historical_backtest(
                 result,
                 sim,
                 candle_result.candle_fills,
-                timestamp=candle.timestamp,
+                candle=candle,
+                candle_index=loop_index,
             )
             cumulative_pnl += pnl_delta
             peak_pnl, max_drawdown = _update_drawdown(
@@ -180,12 +179,17 @@ def run_historical_backtest(
         if initial_notional_usdt > 0:
             result.realized_pnl_pct = (cumulative_pnl / float(initial_notional_usdt)) * 100.0
             result.max_drawdown_pct = (max_drawdown / float(initial_notional_usdt)) * 100.0
-        result.active_orders_count = len(sim.book.active_orders())
         result.cycles_seen = _cycles_seen(dict(sim.runtime_state.strategy_state))
+        finalize_backtest_debug(result, sim)
     except Exception as exc:
         result.final_status = "error"
         result.exit_reason = "exception"
         result.error = str(exc)
+        result.open_reason_detail = f"error:{exc}"
+        try:
+            finalize_backtest_debug(result, sim)
+        except Exception:
+            pass
     finally:
         sim.close()
 

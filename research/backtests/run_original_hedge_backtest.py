@@ -14,6 +14,7 @@ from .backtest_report import (
     write_summary_csv,
 )
 from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
+from .debug_report import print_debug_report
 from .historical_backtest import run_historical_backtest
 
 
@@ -154,6 +155,21 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip CSV output",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print extended debug summary per direction",
+    )
+    parser.add_argument(
+        "--print-fill-log",
+        action="store_true",
+        help="With --debug, print full fill_log",
+    )
+    parser.add_argument(
+        "--print-order-log",
+        action="store_true",
+        help="With --debug, print full order_log",
+    )
     return parser
 
 
@@ -199,6 +215,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"json={payload['output_files']['json']}")
     if payload["output_files"]["csv"]:
         print(f"csv={payload['output_files']['csv']}")
+
+    if args.debug:
+        for direction in payload["directions"]:
+            print_debug_report(
+                payload["results"][direction],
+                print_fill_log=args.print_fill_log,
+                print_order_log=args.print_order_log,
+            )
     return 0
 
 

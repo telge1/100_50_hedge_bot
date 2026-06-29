@@ -60,7 +60,7 @@ def submit_intent_to_book(
     *,
     replace: bool = True,
 ) -> VirtualOrder:
-    order = book.submit_intent(intent, replace=replace)
+    order, _ = book.submit_intent(intent, replace=replace)
     book.sync_runtime_state(runtime_state)
     return order
 
@@ -132,10 +132,22 @@ def fill_order_at_price(
     fill_price: float,
     occurred_at: datetime | None = None,
 ) -> FillEvent:
+    order_before = book.get_order(order_id)
+    order_check_price: float | None = None
+    if order_before is not None:
+        try:
+            order_check_price, _ = resolve_order_check_and_fill_prices(order_before)
+        except ValueError:
+            order_check_price = float(fill_price)
+    else:
+        order_check_price = float(fill_price)
     order, _ = book.apply_fill(order_id=order_id, fill_price=fill_price)
     _mark_order_terminal(runtime_state, order)
     book.sync_runtime_state(runtime_state)
-    return virtual_order_to_fill_event(order, fill_price=fill_price, occurred_at=occurred_at)
+    fill_event = virtual_order_to_fill_event(order, fill_price=fill_price, occurred_at=occurred_at)
+    if order_check_price is not None:
+        fill_event.metadata["order_check_price"] = float(order_check_price)
+    return fill_event
 
 
 def fill_order_at_candle_close(

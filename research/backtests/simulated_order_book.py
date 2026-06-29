@@ -115,10 +115,11 @@ class SimulatedOrderBook:
         slug = str(purpose or "order").lower().replace("_", "-")
         return f"sim-fixed_cycle-{slug}-{self._order_seq}"
 
-    def submit_intent(self, intent: StrategyIntent, *, replace: bool = True) -> VirtualOrder:
+    def submit_intent(self, intent: StrategyIntent, *, replace: bool = True) -> tuple[VirtualOrder, list[str]]:
         purpose = str(intent.purpose or "").strip()
+        replaced_ids: list[str] = []
         if replace and purpose:
-            self.cancel_by_purpose(purpose)
+            replaced_ids = self.cancel_by_purpose(purpose)
         order_id = self.next_client_order_id(purpose or "order")
         exchange_order_id = f"sim-ex-{uuid4().hex[:12]}"
         initial_status = "NEW"
@@ -140,7 +141,7 @@ class SimulatedOrderBook:
             created_index=self._order_seq,
         )
         self._orders[order_id] = order
-        return order
+        return order, replaced_ids
 
     def get_order(self, order_id: str) -> VirtualOrder | None:
         return self._orders.get(order_id)
