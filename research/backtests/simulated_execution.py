@@ -11,7 +11,7 @@ from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 from .fill_models import is_exit_purpose, normalize_fill_model
 from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
-from .simulated_pnl import attach_closed_pnl_metadata
+from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
 
@@ -232,17 +232,57 @@ def fill_order_at_price(
 ) -> FillEvent:
     order_before = book.get_order(order_id)
     order_check_price: float | None = None
+    simulated_closed_pnl: float | None = None
+    simulated_pnl_details: dict[str, float | None] | None = None
+
     if order_before is not None:
         try:
             order_check_price, _ = resolve_order_check_and_fill_prices(order_before)
         except ValueError:
             order_check_price = float(fill_price)
+
+        side = str(order_before.side or "").lower()
+        reduce_only = bool(order_before.reduce_only)
+        requested_qty = float(order_before.filled_qty or order_before.qty or 0.0)
+
+        if side == "long":
+            avg_entry_price = float(book.long_avg or 0.0)
+            close_qty = min(requested_qty, float(book.long_qty or 0.0)) if reduce_only else requested_qty
+        elif side == "short":
+            avg_entry_price = float(book.short_avg or 0.0)
+            close_qty = min(requested_qty, float(book.short_qty or 0.0)) if reduce_only else requested_qty
+        else:
+            avg_entry_price = 0.0
+            close_qty = requested_qty
+
+        fee_rate_raw = (order_before.metadata or {}).get("fee_rate")
+        if fee_rate_raw is None:
+            fee_rate_raw = (order_before.metadata or {}).get("runtime_fee_rate")
+        fee_rate = float(fee_rate_raw) if fee_rate_raw is not None else None
+
+        simulated_closed_pnl, simulated_pnl_details = closed_pnl_for_virtual_order_fill(
+            side=side,
+            reduce_only=reduce_only,
+            avg_entry_price=avg_entry_price,
+            fill_price=float(fill_price),
+            qty=float(close_qty),
+            fee_rate=fee_rate,
+        )
     else:
         order_check_price = float(fill_price)
+
     order, _ = book.apply_fill(order_id=order_id, fill_price=fill_price)
     _mark_order_terminal(runtime_state, order)
     book.sync_runtime_state(runtime_state)
     fill_event = virtual_order_to_fill_event(order, fill_price=fill_price, occurred_at=occurred_at)
+
+    if simulated_closed_pnl is not None:
+        attach_closed_pnl_metadata(
+            fill_event.metadata,
+            simulated_closed_pnl,
+            pnl_details=simulated_pnl_details,
+        )
+
     if order_check_price is not None:
         fill_event.metadata["order_check_price"] = float(order_check_price)
     if touch_metadata:

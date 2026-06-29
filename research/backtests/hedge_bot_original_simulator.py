@@ -382,6 +382,35 @@ class HedgeBotOriginalSimulator:
         self.runtime_state.last_snapshot = self.snapshot
         return self.snapshot
 
+    def _cancel_active_orders_when_flat(self, *, source: str) -> list[str]:
+        """Cancel all remaining simulated active orders after both legs are flat.
+
+        This keeps the historical simulator aligned with live behavior: once the
+        trade is flat, stale resting cycle/exit orders must not fill later with
+        zero PnL.
+        """
+        if float(self.book.long_qty or 0.0) > 1e-12:
+            return []
+        if float(self.book.short_qty or 0.0) > 1e-12:
+            return []
+
+        cancelled: list[str] = []
+        for order in list(self.book.active_orders()):
+            if not self.book.cancel_by_order_id(order.order_id):
+                continue
+            cancelled.append(order.order_id)
+            self._record_order_event(
+                order,
+                event_type="cancelled",
+                status="CANCELED",
+            )
+
+        if cancelled:
+            self.book.sync_runtime_state(self.runtime_state)
+            self._refresh_snapshot_from_book(source=source)
+        return cancelled
+
+
     def _resolve_intent_log_index(self, intent: StrategyIntent) -> int | None:
         purpose = preserve_bot_purpose(intent.purpose)
         for idx in range(len(self.intent_log) - 1, -1, -1):
@@ -484,6 +513,7 @@ class HedgeBotOriginalSimulator:
                 event_source="after_fill",
                 source_fill_purpose=fill_event.purpose,
             )
+            self._cancel_active_orders_when_flat(source="after_fill_flat_cleanup")
 
         self._refresh_snapshot_from_book(source="before_on_tick", price=candle.close)
         tick_intents = self.strategy.on_tick(
@@ -567,6 +597,7 @@ class HedgeBotOriginalSimulator:
             event_source="after_fill",
             log_intents=False,
         )
+        self._cancel_active_orders_when_flat(source="after_entry_fill_flat_cleanup")
 
         state = dict(self.runtime_state.strategy_state)
         return SimulationResult(

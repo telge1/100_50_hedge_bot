@@ -259,6 +259,7 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     rows = sort_trade_block_rows(rows)
+    rows = drop_stale_submitted_orders_after_flat(rows)
     return apply_cumulative_pnl(rows)
 
 
@@ -282,6 +283,85 @@ def sort_trade_block_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ),
     )
     return main_sorted + final_sorted
+
+
+
+def _row_float_or_zero(value: object) -> float:
+    try:
+        if value in (None, ""):
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _trade_block_export_key(row: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(row.get("symbol") or ""),
+        str(row.get("direction") or ""),
+        str(row.get("trade_block_id") or ""),
+    )
+
+
+def _is_flat_fill_export_row(row: dict[str, Any]) -> bool:
+    if row.get("row_type") != "fill":
+        return False
+    return (
+        _row_float_or_zero(row.get("long_qty_after")) == 0.0
+        and _row_float_or_zero(row.get("short_qty_after")) == 0.0
+    )
+
+
+def _is_stale_submitted_order_after_flat(row: dict[str, Any]) -> bool:
+    if row.get("row_type") != "order":
+        return False
+
+    event_type = str(row.get("event_type") or "")
+    status = str(row.get("status") or "")
+    purpose = str(row.get("purpose") or "")
+
+    if event_type != "submitted":
+        return False
+    if status not in {"", "NEW"}:
+        return False
+
+    return (
+        purpose.startswith("CYCLE_")
+        or purpose
+        in {
+            "LONG_TP_EXIT",
+            "SHORT_TP_EXIT",
+            "LONG_SL_EXIT",
+            "SHORT_SL_EXIT",
+        }
+    )
+
+
+def drop_stale_submitted_orders_after_flat(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Remove stale submitted/NEW order-log rows after a trade block is already flat.
+
+    These rows can be old order-log entries whose timestamp is generated during
+    export/report creation. They make the CSV look as if cycle/exit orders stayed
+    active after the final flat fill, even when active_orders_after_count is zero.
+    """
+    flat_seen: set[tuple[str, str, str]] = set()
+    filtered: list[dict[str, Any]] = []
+
+    for row in rows:
+        key = _trade_block_export_key(row)
+
+        if key in flat_seen and _is_stale_submitted_order_after_flat(row):
+            continue
+
+        filtered.append(row)
+
+        if _is_flat_fill_export_row(row):
+            flat_seen.add(key)
+
+    return filtered
 
 
 def apply_cumulative_pnl(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

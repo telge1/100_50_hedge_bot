@@ -13390,13 +13390,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             if persisted_loss_source is not None and float(persisted_loss_source) < 0:
                 cycle_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+                long_add_loss_usdt = abs(float(persisted_loss_source))
                 if cycle_entry.get("long_add_confirmed_pnl") is None:
                     cycle_entry["long_add_confirmed_pnl"] = persisted_loss_source
                 if cycle_entry.get("long_reduce_closed_pnl") is None:
                     cycle_entry["long_reduce_closed_pnl"] = persisted_loss_source
-                cycle_entry["long_add_loss_usdt"] = abs(float(persisted_loss_source))
+                cycle_entry["long_add_loss_usdt"] = long_add_loss_usdt
                 if not cycle_entry.get("short_followup_pnl_source"):
                     cycle_entry["short_followup_pnl_source"] = "confirmed_closed_pnl"
+                state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+                state["pending_short_cycle_index"] = cycle_index
+                state["cycle_long_add_filled"] = True
+                state["cycle_short_tp_filled"] = False
+                cycle_state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+                cycle_state["pending_short_cycle_index"] = cycle_index
                 self._persist_cycle_sequence_state(runtime_state)
 
             _log_event(
