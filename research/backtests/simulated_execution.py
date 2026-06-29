@@ -177,17 +177,80 @@ def fill_entry_intents_at_candle_close(
     return filled
 
 
+def rank_conservative_fill_orders(
+    orders: list[VirtualOrder],
+    candle: SyntheticCandle,
+) -> list[VirtualOrder]:
+    """Rank touchable orders for a conservative 5m OHLC fill (Phase 4).
+
+    With only 5m bars we do not know intracandle path. When multiple resting
+    orders would fill on the same candle, we assume an adverse move first:
+
+    - Buy triggers (``low <= check_price``) before sell triggers.
+    - Among buy triggers: highest check price first (worst buy / pay more).
+    - Among sell triggers: lowest check price first (worst sell / receive less).
+
+    Tie-break: ``created_index``, then ``order_id``.
+    """
+    touchable = [order for order in orders if should_fill_order_on_candle(order, candle)]
+
+    def _sort_key(order: VirtualOrder) -> tuple[int, float, int, str]:
+        direction = order_trigger_side(order)
+        check_price, _ = resolve_order_check_and_fill_prices(order)
+        if direction == "buy":
+            return (0, -float(check_price), int(order.created_index), order.order_id)
+        return (1, float(check_price), int(order.created_index), order.order_id)
+
+    return sorted(touchable, key=_sort_key)
+
+
+def select_orders_to_fill_on_candle(
+    orders: list[VirtualOrder],
+    candle: SyntheticCandle,
+    *,
+    max_fills_per_candle: int | None = None,
+    conservative_fill_order: bool = True,
+) -> list[VirtualOrder]:
+    """Return the subset of active orders that may fill on this candle."""
+    if max_fills_per_candle is None:
+        return [order for order in orders if should_fill_order_on_candle(order, candle)]
+
+    if max_fills_per_candle <= 0:
+        return []
+
+    if conservative_fill_order:
+        ranked = rank_conservative_fill_orders(orders, candle)
+    else:
+        ranked = [
+            order
+            for order in sorted(orders, key=lambda item: (item.created_index, item.order_id))
+            if should_fill_order_on_candle(order, candle)
+        ]
+    return ranked[: int(max_fills_per_candle)]
+
+
 def process_candle_fills(
     *,
     book: SimulatedOrderBook,
     runtime_state: RuntimeState,
     candle: SyntheticCandle,
+    max_fills_per_candle: int | None = None,
+    conservative_fill_order: bool = True,
 ) -> list[FillEvent]:
-    """Check active resting orders against candle high/low and emit FillEvents."""
+    """Check active resting orders against candle high/low and emit FillEvents.
+
+    Phase 4 default for historical backtests: ``max_fills_per_candle=1`` so
+    new orders from ``on_fill`` are not eligible until the next candle.
+    Pass ``max_fills_per_candle=None`` for legacy unlimited fills (smoke tests).
+    """
+    candidates = select_orders_to_fill_on_candle(
+        list(book.active_orders()),
+        candle,
+        max_fills_per_candle=max_fills_per_candle,
+        conservative_fill_order=conservative_fill_order,
+    )
     fill_events: list[FillEvent] = []
-    for order in list(book.active_orders()):
-        if not should_fill_order_on_candle(order, candle):
-            continue
+    for order in candidates:
         _, fill_price = resolve_order_check_and_fill_prices(order)
         fill_events.append(
             fill_order_at_price(

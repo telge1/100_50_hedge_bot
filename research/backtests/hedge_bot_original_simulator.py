@@ -22,6 +22,7 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 )
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
+from .backtest_report import build_order_log_entry
 from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills, submit_resting_intents
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -176,6 +177,8 @@ class HedgeBotOriginalSimulator:
             symbol=self.symbol,
             runtime_state=self.runtime_state,
         )
+        self.orders_submitted = 0
+        self.order_log: list[dict[str, Any]] = []
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
 
@@ -223,6 +226,7 @@ class HedgeBotOriginalSimulator:
         intents: list[StrategyIntent],
         *,
         replace: bool = True,
+        log_orders: bool = True,
     ) -> list[VirtualOrder]:
         resting = submit_resting_intents(
             self.book,
@@ -230,10 +234,22 @@ class HedgeBotOriginalSimulator:
             intents,
             replace=replace,
         )
+        self.orders_submitted += len(resting)
+        if log_orders:
+            for order in resting:
+                self.order_log.append(
+                    build_order_log_entry(order, timestamp=self.candle.timestamp)
+                )
         self._refresh_snapshot_from_book(source="after_submit_intents")
         return resting
 
-    def process_candle(self, candle: SyntheticCandle) -> ProcessCandleResult:
+    def process_candle(
+        self,
+        candle: SyntheticCandle,
+        *,
+        max_fills_per_candle: int | None = None,
+        conservative_fill_order: bool = True,
+    ) -> ProcessCandleResult:
         self.candle = candle
         self._refresh_snapshot_from_book(source="before_process_candle", price=candle.close)
 
@@ -241,6 +257,8 @@ class HedgeBotOriginalSimulator:
             book=self.book,
             runtime_state=self.runtime_state,
             candle=candle,
+            max_fills_per_candle=max_fills_per_candle,
+            conservative_fill_order=conservative_fill_order,
         )
         on_fill_intents: list[StrategyIntent] = []
 
