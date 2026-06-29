@@ -29,6 +29,12 @@ from .unfinished_deep_dive import (
     print_unfinished_deep_dive_summary,
     run_unfinished_deep_dive_after_multi_start,
 )
+from .trade_block_export import (
+    export_trade_blocks_for_results,
+    iter_payload_results,
+    parse_trade_block_start_indices,
+    print_trade_block_export_summary,
+)
 
 
 def resolve_directions(direction: str) -> list[str]:
@@ -386,6 +392,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional comma-separated start indices to deep-dive, e.g. 800,1300,1600",
     )
+    parser.add_argument(
+        "--trade-block-export",
+        action="store_true",
+        help="Export fills/orders/intents grouped by trade_block_id",
+    )
+    parser.add_argument(
+        "--trade-block-start-indices",
+        default=None,
+        help="With --multi-start, export only these start indices (comma-separated)",
+    )
     return parser
 
 
@@ -520,12 +536,37 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    trade_block_written: list[dict[str, str]] = []
+    if args.trade_block_export:
+        if payload.get("multi_start"):
+            start_indices = parse_trade_block_start_indices(args.trade_block_start_indices)
+            if not start_indices:
+                print(
+                    "error: --trade-block-start-indices is required with "
+                    "--multi-start --trade-block-export",
+                    file=sys.stderr,
+                )
+                return 1
+            trade_block_written = export_trade_blocks_for_results(
+                iter_payload_results(payload),
+                args.output_dir,
+                start_indices=start_indices,
+            )
+        else:
+            trade_block_written = export_trade_blocks_for_results(
+                iter_payload_results(payload),
+                args.output_dir,
+            )
+
     if payload.get("multi_start"):
         print_multi_start_summary(payload)
         if payload.get("deep_dive"):
             print_unfinished_deep_dive_summary(payload["deep_dive"])
     else:
         _print_run_summary(payload)
+
+    if trade_block_written:
+        print_trade_block_export_summary(trade_block_written)
 
     if args.debug and not payload.get("multi_start"):
         for _, result in payload["results"].items():
