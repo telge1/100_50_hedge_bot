@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 
+from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 from .simulated_pnl import attach_closed_pnl_metadata
 
@@ -86,17 +87,12 @@ def virtual_order_to_fill_event(
     fill_price: float,
     occurred_at: datetime | None = None,
 ) -> FillEvent:
-    metadata = dict(order.metadata or {})
+    metadata = enrich_purpose_metadata(order.purpose, dict(order.metadata or {}))
     metadata.setdefault("source", "simulated_execution")
     metadata.setdefault("fill_price", fill_price)
     metadata.setdefault("symbol", order.symbol)
     metadata.setdefault("order_id", order.order_id)
     metadata.setdefault("exchange_order_id", order.exchange_order_id)
-    metadata.setdefault("purpose", order.purpose)
-    if metadata.get("cycle_index") is None and order.metadata.get("cycle_index") is not None:
-        metadata["cycle_index"] = order.metadata.get("cycle_index")
-    if metadata.get("cycle_role") is None and order.metadata.get("cycle_role") is not None:
-        metadata["cycle_role"] = order.metadata.get("cycle_role")
 
     pnl = float(metadata.get("confirmed_closed_pnl") or metadata.get("closed_pnl") or 0.0)
     attach_closed_pnl_metadata(metadata, pnl)
@@ -105,7 +101,7 @@ def virtual_order_to_fill_event(
         exchange_order_id=order.exchange_order_id,
         client_order_id=order.order_id,
         side=order.side,
-        purpose=order.purpose,
+        purpose=preserve_bot_purpose(order.purpose),
         exec_qty=float(order.filled_qty or order.qty),
         exec_price=float(fill_price),
         order_type=order.order_type,

@@ -11,6 +11,7 @@ from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
+from .purpose_utils import purpose_log_fields
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 SUMMARY_CSV_FIELDS = (
@@ -47,6 +48,7 @@ def build_fill_log_entry(
 ) -> dict[str, Any]:
     ts = timestamp or fill.occurred_at
     metadata = dict(fill.metadata or {})
+    purpose_fields = purpose_log_fields(fill.purpose or metadata.get("purpose"), metadata)
     closed_pnl = float(metadata.get("closed_pnl") or metadata.get("confirmed_closed_pnl") or 0.0)
     runtime_pnl = metadata.get("runtime_calculated_pnl")
     confirmed_pnl = metadata.get("confirmed_closed_pnl")
@@ -58,7 +60,6 @@ def build_fill_log_entry(
         "qty": float(fill.exec_qty),
         "order_check_price": order_check_price,
         "fill_price": float(fill.exec_price),
-        "purpose": fill.purpose,
         "order_id": fill.client_order_id,
         "closed_pnl": closed_pnl,
         "runtime_calculated_pnl": float(runtime_pnl) if runtime_pnl is not None else closed_pnl,
@@ -68,6 +69,7 @@ def build_fill_log_entry(
         "long_avg_after": float(book.long_avg),
         "short_avg_after": float(book.short_avg),
         "active_orders_after_count": len(book.active_orders()),
+        **purpose_fields,
     }
     if candle is not None:
         entry["candle_open"] = float(candle.open if candle.open is not None else candle.close)
@@ -88,12 +90,12 @@ def build_order_log_entry(
     new_order_id: str | None = None,
 ) -> dict[str, Any]:
     ts = timestamp or order.created_at
+    purpose_fields = purpose_log_fields(order.purpose, order.metadata)
     entry: dict[str, Any] = {
         "timestamp": ts.isoformat() if ts is not None else None,
         "candle_index": candle_index,
         "event_type": event_type,
         "order_id": order.order_id,
-        "purpose": order.purpose,
         "side": order.side,
         "qty": float(order.qty),
         "price": order.price,
@@ -101,6 +103,7 @@ def build_order_log_entry(
         "trigger_direction": order.trigger_direction,
         "reduce_only": bool(order.reduce_only),
         "status": status or order.status,
+        **purpose_fields,
     }
     if replaced_old_order_id:
         entry["replaced_old_order_id"] = replaced_old_order_id

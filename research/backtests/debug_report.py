@@ -6,6 +6,7 @@ from typing import Any
 
 from .backtest_report import BacktestResult
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator
+from .purpose_utils import purpose_log_fields, preserve_bot_purpose
 from .simulated_order_book import VirtualOrder
 
 STRATEGY_STATE_EXCERPT_KEYS = (
@@ -45,14 +46,10 @@ def extract_strategy_state_excerpt(strategy_state: dict[str, Any]) -> dict[str, 
 
 def active_order_to_dict(order: VirtualOrder) -> dict[str, Any]:
     metadata = dict(order.metadata or {})
-    excerpt: dict[str, Any] = {}
-    for key in ("cycle_index", "cycle_role", "order_id"):
-        if metadata.get(key) is not None:
-            excerpt[key] = metadata.get(key)
+    purpose_fields = purpose_log_fields(order.purpose, metadata)
     return {
         "order_id": order.order_id,
         "symbol": order.symbol,
-        "purpose": order.purpose,
         "side": order.side,
         "qty": float(order.qty),
         "price": order.price,
@@ -61,7 +58,7 @@ def active_order_to_dict(order: VirtualOrder) -> dict[str, Any]:
         "order_type": order.order_type,
         "reduce_only": bool(order.reduce_only),
         "status": order.status,
-        "metadata": excerpt,
+        **purpose_fields,
     }
 
 
@@ -123,7 +120,9 @@ def finalize_backtest_debug(result: BacktestResult, sim: HedgeBotOriginalSimulat
 
     active_orders = [active_order_to_dict(order) for order in sim.book.active_orders()]
     result.final_active_orders = active_orders
-    result.final_active_order_purposes = [str(order.get("purpose") or "") for order in active_orders]
+    result.final_active_order_purposes = [
+        preserve_bot_purpose(order.get("purpose")) for order in active_orders
+    ]
     result.active_orders_count = len(active_orders)
 
     strategy_state = dict(sim.runtime_state.strategy_state)

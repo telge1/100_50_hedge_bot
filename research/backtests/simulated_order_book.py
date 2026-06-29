@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fixed_cycle_hedge_bot.models import ManagedOrder, RuntimeState, StrategyIntent
 
+from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
 
 ACTIVE_ORDER_STATUSES = frozenset(
@@ -116,7 +117,7 @@ class SimulatedOrderBook:
         return f"sim-fixed_cycle-{slug}-{self._order_seq}"
 
     def submit_intent(self, intent: StrategyIntent, *, replace: bool = True) -> tuple[VirtualOrder, list[str]]:
-        purpose = str(intent.purpose or "").strip()
+        purpose = preserve_bot_purpose(intent.purpose)
         replaced_ids: list[str] = []
         if replace and purpose:
             replaced_ids = self.cancel_by_purpose(purpose)
@@ -124,6 +125,7 @@ class SimulatedOrderBook:
         exchange_order_id = f"sim-ex-{uuid4().hex[:12]}"
         initial_status = "NEW"
         order_type = str(intent.order_type or "Market")
+        metadata = enrich_purpose_metadata(purpose, dict(intent.metadata or {}))
         order = VirtualOrder(
             order_id=order_id,
             exchange_order_id=exchange_order_id,
@@ -137,7 +139,7 @@ class SimulatedOrderBook:
             reduce_only=bool(intent.reduce_only),
             purpose=purpose,
             status=initial_status,
-            metadata=dict(intent.metadata or {}),
+            metadata=metadata,
             created_index=self._order_seq,
         )
         self._orders[order_id] = order
