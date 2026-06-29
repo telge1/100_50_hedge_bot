@@ -68,7 +68,7 @@ def build_fill_log_entry(
         "symbol": metadata.get("symbol") or book.symbol,
         "side": fill.side,
         "qty": float(fill.exec_qty),
-        "order_check_price": order_check_price,
+        "order_check_price": order_check_price or metadata.get("order_check_price"),
         "fill_price": float(fill.exec_price),
         "order_id": fill.client_order_id,
         "closed_pnl": closed_pnl,
@@ -81,6 +81,9 @@ def build_fill_log_entry(
         "active_orders_after_count": len(book.active_orders()),
         **purpose_fields,
     }
+    for key in ("trigger_touched", "trigger_touch_rule", "trigger_warning"):
+        if key in metadata:
+            entry[key] = metadata.get(key)
     if candle is not None:
         entry["candle_open"] = float(candle.open if candle.open is not None else candle.close)
         entry["candle_high"] = float(candle.high if candle.high is not None else candle.close)

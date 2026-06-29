@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -13,6 +14,15 @@ from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOr
 from .simulated_pnl import attach_closed_pnl_metadata
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
+
+
+@dataclass(frozen=True)
+class OrderTouchResult:
+    touched: bool
+    trigger_touch_rule: str | None = None
+    trigger_warning: str | None = None
+    order_check_price: float | None = None
+    fill_price: float | None = None
 
 
 def is_immediate_market_fill(intent: StrategyIntent) -> bool:
@@ -31,6 +41,85 @@ def order_trigger_side(order: VirtualOrder) -> str:
     raise ValueError(f"unsupported order side for trigger check: {order.side}")
 
 
+def normalize_trigger_direction(value: object) -> str | None:
+    """Map strategy trigger_direction to ``rise`` or ``fall`` semantics."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "rise", "above", "gte"}:
+            return "rise"
+        if normalized in {"2", "-1", "fall", "below", "lte"}:
+            return "fall"
+        return "unknown"
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return "unknown"
+    if numeric == 1:
+        return "rise"
+    if numeric in (2, -1):
+        return "fall"
+    return "unknown"
+
+
+def evaluate_order_touch(order: VirtualOrder, candle: SyntheticCandle) -> OrderTouchResult:
+    """Determine whether a resting order is touchable on a 5m OHLC candle."""
+    low = float(candle.low if candle.low is not None else candle.close)
+    high = float(candle.high if candle.high is not None else candle.close)
+
+    if order.trigger_price is not None:
+        trigger = float(order.trigger_price)
+        fill_price = float(order.price) if order.price is not None else trigger
+        direction = normalize_trigger_direction(order.trigger_direction)
+        if direction == "rise":
+            touched = high >= trigger
+            return OrderTouchResult(
+                touched=touched,
+                trigger_touch_rule="high>=trigger",
+                order_check_price=trigger,
+                fill_price=fill_price,
+            )
+        if direction == "fall":
+            touched = low <= trigger
+            return OrderTouchResult(
+                touched=touched,
+                trigger_touch_rule="low<=trigger",
+                order_check_price=trigger,
+                fill_price=fill_price,
+            )
+        return OrderTouchResult(
+            touched=False,
+            trigger_warning="missing_trigger_direction",
+            order_check_price=trigger,
+            fill_price=fill_price,
+        )
+
+    if order.price is not None:
+        price = float(order.price)
+        side = order_trigger_side(order)
+        if side == "buy":
+            return OrderTouchResult(
+                touched=low <= price,
+                trigger_touch_rule="limit_buy_low<=price",
+                order_check_price=price,
+                fill_price=price,
+            )
+        return OrderTouchResult(
+            touched=high >= price,
+            trigger_touch_rule="limit_sell_high>=price",
+            order_check_price=price,
+            fill_price=price,
+        )
+
+    return OrderTouchResult(
+        touched=False,
+        trigger_warning="no_price_or_trigger",
+        order_check_price=None,
+        fill_price=None,
+    )
+
+
 def resolve_order_check_and_fill_prices(order: VirtualOrder) -> tuple[float, float]:
     trigger = order.trigger_price
     price = order.price
@@ -46,13 +135,24 @@ def resolve_order_check_and_fill_prices(order: VirtualOrder) -> tuple[float, flo
 
 
 def should_fill_order_on_candle(order: VirtualOrder, candle: SyntheticCandle) -> bool:
+    return evaluate_order_touch(order, candle).touched
+
+
+def conservative_fill_rank_key(order: VirtualOrder) -> tuple[int, float, int, str]:
+    """Rank touchable orders for adverse 5m OHLC fill ordering."""
     check_price, _ = resolve_order_check_and_fill_prices(order)
-    direction = order_trigger_side(order)
-    low = float(candle.low if candle.low is not None else candle.close)
-    high = float(candle.high if candle.high is not None else candle.close)
-    if direction == "buy":
-        return low <= check_price
-    return high >= check_price
+    if order.trigger_price is not None:
+        direction = normalize_trigger_direction(order.trigger_direction)
+        if direction == "fall":
+            return (0, -float(check_price), int(order.created_index), order.order_id)
+        if direction == "rise":
+            return (1, float(check_price), int(order.created_index), order.order_id)
+        return (2, float(check_price), int(order.created_index), order.order_id)
+
+    side = order_trigger_side(order)
+    if side == "buy":
+        return (0, -float(check_price), int(order.created_index), order.order_id)
+    return (1, float(check_price), int(order.created_index), order.order_id)
 
 
 def submit_intent_to_book(
@@ -128,6 +228,7 @@ def fill_order_at_price(
     order_id: str,
     fill_price: float,
     occurred_at: datetime | None = None,
+    touch_metadata: dict[str, object] | None = None,
 ) -> FillEvent:
     order_before = book.get_order(order_id)
     order_check_price: float | None = None
@@ -144,6 +245,10 @@ def fill_order_at_price(
     fill_event = virtual_order_to_fill_event(order, fill_price=fill_price, occurred_at=occurred_at)
     if order_check_price is not None:
         fill_event.metadata["order_check_price"] = float(order_check_price)
+    if touch_metadata:
+        for key, value in touch_metadata.items():
+            if value is not None:
+                fill_event.metadata[key] = value
     return fill_event
 
 
@@ -202,15 +307,7 @@ def rank_conservative_fill_orders(
     Tie-break: ``created_index``, then ``order_id``.
     """
     touchable = [order for order in orders if should_fill_order_on_candle(order, candle)]
-
-    def _sort_key(order: VirtualOrder) -> tuple[int, float, int, str]:
-        direction = order_trigger_side(order)
-        check_price, _ = resolve_order_check_and_fill_prices(order)
-        if direction == "buy":
-            return (0, -float(check_price), int(order.created_index), order.order_id)
-        return (1, float(check_price), int(order.created_index), order.order_id)
-
-    return sorted(touchable, key=_sort_key)
+    return sorted(touchable, key=conservative_fill_rank_key)
 
 
 def _select_paired_exit_orders(
@@ -347,7 +444,8 @@ def process_candle_fills(
 
     fill_events: list[FillEvent] = []
     for order in candidates:
-        _, fill_price = resolve_order_check_and_fill_prices(order)
+        touch = evaluate_order_touch(order, candle)
+        fill_price = float(touch.fill_price if touch.fill_price is not None else order.trigger_price or order.price or candle.close)
         fill_events.append(
             fill_order_at_price(
                 book=book,
@@ -355,6 +453,12 @@ def process_candle_fills(
                 order_id=order.order_id,
                 fill_price=fill_price,
                 occurred_at=candle.timestamp,
+                touch_metadata={
+                    "trigger_touched": touch.touched,
+                    "trigger_touch_rule": touch.trigger_touch_rule,
+                    "trigger_warning": touch.trigger_warning,
+                    "order_check_price": touch.order_check_price,
+                },
             )
         )
 

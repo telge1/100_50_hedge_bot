@@ -96,6 +96,7 @@ def test_exit_diagnostics_not_touchable_sell_trigger() -> None:
         order_type="Market",
         reduce_only=True,
         trigger_price=100.0,
+        trigger_direction=1,
     )
     order, _ = book.submit_intent(intent, replace=False)
     candles_after = [_candle(index=1, high=90.0, low=88.0)]
@@ -114,6 +115,7 @@ def test_exit_diagnostics_touchable_sell_trigger() -> None:
         order_type="Market",
         reduce_only=True,
         trigger_price=100.0,
+        trigger_direction=1,
     )
     order, _ = book.submit_intent(intent, replace=False)
     candles_after = [_candle(index=1, high=101.0, low=99.0)]

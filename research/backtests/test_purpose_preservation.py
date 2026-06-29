@@ -72,6 +72,7 @@ def test_fill_purpose_preservation_on_reduce() -> None:
             purpose="CYCLE_1_SHORT_REDUCE",
             order_type="Market",
             trigger_price=0.95,
+            trigger_direction=2,
             reduce_only=True,
             metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
         ),
@@ -81,6 +82,7 @@ def test_fill_purpose_preservation_on_reduce() -> None:
     candle = SyntheticCandle(symbol="APTUSDT", open=1.0, high=1.0, low=0.94, close=0.98)
     fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
     assert len(fills) == 1
+    assert fills[0].metadata.get("trigger_touch_rule") == "low<=trigger"
 
     fill = fills[0]
     assert fill.purpose == "CYCLE_1_SHORT_REDUCE"

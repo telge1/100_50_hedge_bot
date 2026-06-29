@@ -237,7 +237,7 @@ def _candle(symbol: str, *, open_: float, high: float, low: float, close: float)
     return SyntheticCandle(symbol=symbol, open=open_, high=high, low=low, close=close)
 
 
-def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
+def test_phase3_rise_trigger_fills_when_candle_high_reaches_trigger() -> None:
     book = SimulatedOrderBook(symbol="BTCUSDT")
     runtime_state = RuntimeState(strategy_state={})
     order, _ = book.submit_intent(
@@ -247,6 +247,7 @@ def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
             purpose="SHORT_SL_EXIT",
             order_type="Market",
             trigger_price=99.0,
+            trigger_direction=1,
             reduce_only=True,
         ),
         replace=False,
@@ -257,15 +258,37 @@ def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
     book.short_avg = 100.0
     book.sync_runtime_state(runtime_state)
 
-    candle = _candle("BTCUSDT", open_=100.0, high=101.0, low=98.0, close=100.0)
+    candle = _candle("BTCUSDT", open_=100.0, high=101.0, low=50.0, close=100.0)
     assert should_fill_order_on_candle(order, candle)
 
     fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
     assert len(fills) == 1
     assert fills[0].status == "FILLED"
     assert fills[0].purpose == "SHORT_SL_EXIT"
+    assert fills[0].metadata.get("trigger_touch_rule") == "high>=trigger"
     assert book.active_orders() == []
     assert order.order_id not in runtime_state.active_orders
+
+
+def test_phase3_rise_trigger_does_not_fill_when_only_low_reaches_trigger() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+    order, _ = book.submit_intent(
+        StrategyIntent(
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            order_type="Market",
+            trigger_price=99.0,
+            trigger_direction=1,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    candle = _candle("BTCUSDT", open_=100.0, high=90.0, low=50.0, close=100.0)
+    assert not should_fill_order_on_candle(order, candle)
+    fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    assert fills == []
 
 
 def test_phase3_sell_order_fills_when_candle_high_reaches_trigger() -> None:
@@ -278,6 +301,7 @@ def test_phase3_sell_order_fills_when_candle_high_reaches_trigger() -> None:
             purpose="LONG_TP_EXIT",
             order_type="Market",
             trigger_price=101.0,
+            trigger_direction=1,
             reduce_only=True,
         ),
         replace=False,
@@ -345,6 +369,7 @@ def test_phase3_reduce_fill_updates_position_and_pnl() -> None:
             purpose="LONG_TP_EXIT",
             order_type="Market",
             trigger_price=101.0,
+            trigger_direction=1,
             reduce_only=True,
         ),
         replace=False,

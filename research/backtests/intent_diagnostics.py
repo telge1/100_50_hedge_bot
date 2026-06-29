@@ -8,7 +8,7 @@ from typing import Any, Iterable
 from fixed_cycle_hedge_bot.models import RuntimeState, StrategyIntent
 
 from .purpose_utils import preserve_bot_purpose, purpose_log_fields
-from .simulated_execution import order_trigger_side, should_fill_order_on_candle
+from .simulated_execution import evaluate_order_touch, normalize_trigger_direction, order_trigger_side
 from .simulated_order_book import SyntheticCandle, VirtualOrder
 
 INTENT_METADATA_EXCERPT_KEYS = (
@@ -175,12 +175,17 @@ def diagnose_exit_level(
         low = float(candle.low if candle.low is not None else candle.close)
         max_high = high if max_high is None else max(max_high, high)
         min_low = low if min_low is None else min(min_low, low)
-        if should_fill_order_on_candle(order, candle):
+        touch = evaluate_order_touch(order, candle)
+        if touch.touched:
             was_touchable = True
             if first_touch_time is None and candle.timestamp is not None:
                 first_touch_time = candle.timestamp.isoformat()
 
-    trigger_side = order_trigger_side(order)
+    trigger_mode = normalize_trigger_direction(order.trigger_direction)
+    if order.trigger_price is not None:
+        trigger_check_side = f"trigger_{trigger_mode or 'unknown'}"
+    else:
+        trigger_check_side = order_trigger_side(order)
     distance_to_max_high_pct: float | None = None
     distance_to_min_low_pct: float | None = None
     if check_price is not None and check_price > 0:
@@ -203,7 +208,7 @@ def diagnose_exit_level(
         "final_order_price": _safe_float(order.price),
         "final_order_trigger_price": trigger_price,
         "trigger_direction": order.trigger_direction,
-        "trigger_check_side": trigger_side,
+        "trigger_check_side": trigger_check_side,
         "created_candle_index": created_candle_index,
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "candles_waited": candles_waited,
