@@ -55,10 +55,16 @@ MULTI_START_AGGREGATE_CSV_FIELDS = (
     "config_source",
     "runs",
     "closed_count",
+    "successful_closed_count",
     "open_count",
+    "max_candles_count",
     "error_count",
+    "unfinished_count",
     "closed_rate_pct",
+    "successful_closed_rate_pct",
     "open_rate_pct",
+    "max_candles_rate_pct",
+    "unfinished_rate_pct",
     "total_pnl",
     "avg_pnl",
     "median_pnl",
@@ -68,7 +74,33 @@ MULTI_START_AGGREGATE_CSV_FIELDS = (
     "avg_candles_processed",
     "avg_duration_candles",
     "most_common_open_reason",
+    "most_common_max_candles_reason",
+    "most_common_unfinished_reason",
     "most_common_final_active_order_purposes",
+    "most_common_unfinished_active_order_purposes",
+)
+
+MULTI_START_UNFINISHED_CSV_FIELDS = (
+    "symbol",
+    "direction",
+    "fill_model",
+    "config_source",
+    "start_index",
+    "start_time",
+    "end_time",
+    "final_status",
+    "exit_reason",
+    "open_reason_detail",
+    "realized_pnl",
+    "fills_count",
+    "cycles_seen",
+    "candles_processed",
+    "final_active_order_purposes",
+    "final_long_qty",
+    "final_short_qty",
+    "initial_exit_trigger",
+    "price_tick_size",
+    "tp_profit_target_pct",
 )
 
 COMPACT_RESULT_LOG_KEYS = (
@@ -165,6 +197,32 @@ def _most_common(counter: Counter[str]) -> str:
     return counter.most_common(1)[0][0]
 
 
+def _run_reason(run: BacktestResult) -> str:
+    return str(run.open_reason_detail or run.exit_reason or run.final_status or "").strip()
+
+
+def _is_unfinished(run: BacktestResult) -> bool:
+    return run.final_status != "closed"
+
+
+def multi_start_result_to_unfinished_row(result: BacktestResult) -> dict[str, Any]:
+    row: dict[str, Any] = {}
+    for key in MULTI_START_UNFINISHED_CSV_FIELDS:
+        if key == "final_active_order_purposes":
+            row[key] = _purposes_joined(result.final_active_order_purposes)
+            continue
+        if key in {"start_time", "end_time"}:
+            row[key] = _format_timestamp(getattr(result, key, None))
+            continue
+        value = getattr(result, key, None)
+        row[key] = "" if value is None else value
+    return row
+
+
+def filter_unfinished_results(results: Iterable[BacktestResult]) -> list[BacktestResult]:
+    return [result for result in results if _is_unfinished(result)]
+
+
 def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dict[str, Any]]:
     """Aggregate per-run results grouped by symbol, direction, fill_model, config_source."""
     grouped: dict[tuple[str, str, str, str], list[BacktestResult]] = {}
@@ -184,7 +242,9 @@ def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dic
         run_count = len(runs)
         closed = [run for run in runs if run.final_status == "closed"]
         open_runs = [run for run in runs if run.final_status == "open"]
+        max_candles_runs = [run for run in runs if run.final_status == "max_candles"]
         errors = [run for run in runs if run.final_status == "error"]
+        unfinished = [run for run in runs if _is_unfinished(run)]
 
         pnls = [float(run.realized_pnl) for run in runs]
         fills = [int(run.fills_count) for run in runs]
@@ -193,9 +253,25 @@ def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dic
 
         open_reason_counter: Counter[str] = Counter()
         for run in open_runs:
-            reason = str(run.open_reason_detail or run.exit_reason or "").strip()
+            reason = _run_reason(run)
             if reason:
                 open_reason_counter[reason] += 1
+
+        max_candles_reason_counter: Counter[str] = Counter()
+        for run in max_candles_runs:
+            reason = _run_reason(run)
+            if reason:
+                max_candles_reason_counter[reason] += 1
+
+        unfinished_reason_counter: Counter[str] = Counter()
+        unfinished_purposes_counter: Counter[str] = Counter()
+        for run in unfinished:
+            reason = _run_reason(run)
+            if reason:
+                unfinished_reason_counter[reason] += 1
+            joined = _purposes_joined(run.final_active_order_purposes)
+            if joined:
+                unfinished_purposes_counter[joined] += 1
 
         purposes_counter: Counter[str] = Counter()
         for run in runs:
@@ -205,7 +281,10 @@ def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dic
 
         closed_count = len(closed)
         open_count = len(open_runs)
+        max_candles_count = len(max_candles_runs)
         error_count = len(errors)
+        unfinished_count = len(unfinished)
+        closed_rate_pct = (closed_count / run_count * 100.0) if run_count else 0.0
         aggregates.append(
             {
                 "symbol": symbol,
@@ -214,10 +293,16 @@ def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dic
                 "config_source": config_source,
                 "runs": run_count,
                 "closed_count": closed_count,
+                "successful_closed_count": closed_count,
                 "open_count": open_count,
+                "max_candles_count": max_candles_count,
                 "error_count": error_count,
-                "closed_rate_pct": (closed_count / run_count * 100.0) if run_count else 0.0,
+                "unfinished_count": unfinished_count,
+                "closed_rate_pct": closed_rate_pct,
+                "successful_closed_rate_pct": closed_rate_pct,
                 "open_rate_pct": (open_count / run_count * 100.0) if run_count else 0.0,
+                "max_candles_rate_pct": (max_candles_count / run_count * 100.0) if run_count else 0.0,
+                "unfinished_rate_pct": (unfinished_count / run_count * 100.0) if run_count else 0.0,
                 "total_pnl": sum(pnls),
                 "avg_pnl": statistics.mean(pnls) if pnls else 0.0,
                 "median_pnl": statistics.median(pnls) if pnls else 0.0,
@@ -227,19 +312,28 @@ def aggregate_multi_start_results(results: Iterable[BacktestResult]) -> list[dic
                 "avg_candles_processed": statistics.mean(candles) if candles else 0.0,
                 "avg_duration_candles": statistics.mean(closed_candles) if closed_candles else 0.0,
                 "most_common_open_reason": _most_common(open_reason_counter),
+                "most_common_max_candles_reason": _most_common(max_candles_reason_counter),
+                "most_common_unfinished_reason": _most_common(unfinished_reason_counter),
                 "most_common_final_active_order_purposes": _most_common(purposes_counter),
+                "most_common_unfinished_active_order_purposes": _most_common(
+                    unfinished_purposes_counter
+                ),
             }
         )
     return aggregates
 
 
-def multi_start_output_paths(output_dir: str | Path, symbol: str) -> tuple[Path, Path, Path]:
+def multi_start_output_paths(
+    output_dir: str | Path,
+    symbol: str,
+) -> tuple[Path, Path, Path, Path]:
     base = Path(output_dir)
     symbol_upper = symbol.upper()
     summary_path = base / f"{symbol_upper}_original_hedge_5m_multi_start_summary.csv"
     json_path = base / f"{symbol_upper}_original_hedge_5m_multi_start_results.json"
     aggregate_path = base / f"{symbol_upper}_original_hedge_5m_multi_start_aggregate.csv"
-    return summary_path, json_path, aggregate_path
+    unfinished_path = base / f"{symbol_upper}_original_hedge_5m_multi_start_unfinished.csv"
+    return summary_path, json_path, aggregate_path, unfinished_path
 
 
 def write_multi_start_summary_csv(path: str | Path, results: Iterable[BacktestResult]) -> Path:
@@ -248,6 +342,18 @@ def write_multi_start_summary_csv(path: str | Path, results: Iterable[BacktestRe
     rows = [multi_start_result_to_summary_row(result) for result in results]
     with path_obj.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(MULTI_START_SUMMARY_CSV_FIELDS))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path_obj
+
+
+def write_multi_start_unfinished_csv(path: str | Path, results: Iterable[BacktestResult]) -> Path:
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    unfinished = filter_unfinished_results(results)
+    rows = [multi_start_result_to_unfinished_row(result) for result in unfinished]
+    with path_obj.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(MULTI_START_UNFINISHED_CSV_FIELDS))
         writer.writeheader()
         writer.writerows(rows)
     return path_obj
@@ -397,8 +503,16 @@ def run_multi_start_backtests(
             )
 
     aggregates = aggregate_multi_start_results(all_results)
-    summary_path, json_path, aggregate_path = multi_start_output_paths(output_dir, symbol_upper)
-    written: dict[str, str | None] = {"summary_csv": None, "json": None, "aggregate_csv": None}
+    summary_path, json_path, aggregate_path, unfinished_path = multi_start_output_paths(
+        output_dir,
+        symbol_upper,
+    )
+    written: dict[str, str | None] = {
+        "summary_csv": None,
+        "json": None,
+        "aggregate_csv": None,
+        "unfinished_csv": None,
+    }
 
     metadata = {
         "symbol": symbol_upper,
@@ -419,7 +533,10 @@ def run_multi_start_backtests(
     if write_csv:
         written["summary_csv"] = str(write_multi_start_summary_csv(summary_path, all_results))
         written["aggregate_csv"] = str(write_multi_start_aggregate_csv(aggregate_path, aggregates))
+        written["unfinished_csv"] = str(write_multi_start_unfinished_csv(unfinished_path, all_results))
     if write_json:
+        written["json"] = str(json_path)
+        metadata["output_files"] = dict(written)
         written["json"] = str(
             write_multi_start_results_json(
                 json_path,
@@ -429,6 +546,7 @@ def run_multi_start_backtests(
                 include_logs=include_logs,
             )
         )
+        metadata["output_files"] = dict(written)
 
     return {
         "symbol": symbol_upper,
@@ -461,18 +579,27 @@ def print_multi_start_summary(payload: dict[str, Any]) -> None:
             runs = [r for r in payload["results"] if r.direction == direction]
             closed = sum(1 for r in runs if r.final_status == "closed")
             open_count = sum(1 for r in runs if r.final_status == "open")
+            max_candles = sum(1 for r in runs if r.final_status == "max_candles")
+            error_count = sum(1 for r in runs if r.final_status == "error")
+            unfinished = open_count + max_candles + error_count
+            closed_rate = (closed / len(runs) * 100.0) if runs else 0.0
             pnls = [float(r.realized_pnl) for r in runs]
             total_pnl = sum(pnls)
             avg_pnl = statistics.mean(pnls) if pnls else 0.0
             print(
-                f"  {direction}: runs={len(runs)} closed={closed} open={open_count} "
-                f"total_pnl={total_pnl:.4f} avg_pnl={avg_pnl:.4f}"
+                f"  {direction}: runs={len(runs)} closed={closed} max_candles={max_candles} "
+                f"open={open_count} error={error_count} unfinished={unfinished} "
+                f"closed_rate={closed_rate:.1f}% total_pnl={total_pnl:.4f} avg_pnl={avg_pnl:.4f}"
             )
             continue
         for row in direction_rows:
             print(
                 f"  {direction} ({row['fill_model']}): runs={row['runs']} "
-                f"closed={row['closed_count']} open={row['open_count']} "
+                f"closed={row['closed_count']} max_candles={row['max_candles_count']} "
+                f"open={row['open_count']} error={row['error_count']} "
+                f"unfinished={row['unfinished_count']} "
+                f"closed_rate={row['closed_rate_pct']:.1f}% "
+                f"unfinished_rate={row['unfinished_rate_pct']:.1f}% "
                 f"total_pnl={row['total_pnl']:.4f} avg_pnl={row['avg_pnl']:.4f}"
             )
     output_files = payload.get("output_files") or {}
@@ -480,5 +607,7 @@ def print_multi_start_summary(payload: dict[str, Any]) -> None:
         print(f"summary_csv={output_files['summary_csv']}")
     if output_files.get("aggregate_csv"):
         print(f"aggregate_csv={output_files['aggregate_csv']}")
+    if output_files.get("unfinished_csv"):
+        print(f"unfinished_csv={output_files['unfinished_csv']}")
     if output_files.get("json"):
         print(f"json={output_files['json']}")
