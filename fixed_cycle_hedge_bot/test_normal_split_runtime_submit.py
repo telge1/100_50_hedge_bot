@@ -420,5 +420,37 @@ class StrategySplitGateTests(unittest.TestCase):
         self.assertTrue(all("replace_open_purpose" not in intent.metadata for intent in intents))
 
 
+def test_recover_split_metadata_from_client_id_restores_normal_split_fields():
+    from types import SimpleNamespace
+
+    from fixed_cycle_hedge_bot.runtime import GenericHedgeRuntime
+
+    runtime = object.__new__(GenericHedgeRuntime)
+    runtime.runtime_state = SimpleNamespace(
+        strategy_state={
+            "normal_cycle_second_leg_split_stage_count": {
+                "3": 3,
+            }
+        }
+    )
+
+    metadata = runtime._recover_split_metadata_from_client_id(
+        "fixed_cycle-cycle_3_short_reduce-split2-abc123",
+        "CYCLE_3_SHORT_REDUCE",
+        existing_metadata={},
+    )
+
+    assert metadata["normal_cycle_second_leg_split"] is True
+    assert metadata["split_stage_index"] == 2
+    assert metadata["stage_index"] == 3
+    assert metadata["split_index"] == 3
+    assert metadata["cycle_index"] == 3
+    assert metadata["split_cycle_index"] == 3
+    assert metadata["split_stage_count"] == 3
+    assert metadata["stage_count"] == 3
+    assert metadata["split_count"] == 3
+    assert metadata["split_metadata_recovered_from_client_id"] is True
+    assert "split_metadata_missing_stage_count" not in metadata
+
 if __name__ == "__main__":
     unittest.main()

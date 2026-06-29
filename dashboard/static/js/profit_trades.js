@@ -1036,15 +1036,24 @@ document.addEventListener("DOMContentLoaded", () => {
                         const pnlClass =
                             pnlValue > 0 ? "profit-positive" : pnlValue < 0 ? "profit-negative" : "";
                         const stageLabel = (() => {
-                            if (row.stage_index && row.stage_count) {
-                                return `${row.stage_index}/${row.stage_count}`;
+                            const explicitLabel = row.split_fill_label || row.stage_label;
+                            if (explicitLabel) {
+                                return explicitLabel;
                             }
+
                             const splitIndex = row.split_index;
                             const splitCount = row.split_count;
                             if (splitCount && splitIndex != null) {
-                                // split_index ist 0-basiert, Anzeige soll 1/2, 2/2 etc. sein.
-                                return `${splitIndex + 1}/${splitCount}`;
+                                // confirmed_order_pnl_history.split_index ist bereits 1-basiert.
+                                return `${splitIndex}/${splitCount}`;
                             }
+
+                            const stageIndex = row.stage_index;
+                            const stageCount = row.stage_count;
+                            if (stageCount && stageIndex != null) {
+                                return `${stageIndex}/${stageCount}`;
+                            }
+
                             return "-";
                         })();
                         const qtyLabel =
@@ -1219,6 +1228,18 @@ document.addEventListener("DOMContentLoaded", () => {
                             : pnlValue < 0
                                 ? "profit-negative"
                                 : "";
+                const splitLabel = (() => {
+                    if (order.split_fill_label || order.stage_label) {
+                        return order.split_fill_label || order.stage_label;
+                    }
+                    if (order.split_count && order.split_index != null) {
+                        return `${order.split_index}/${order.split_count}`;
+                    }
+                    if (order.stage_count && order.stage_index != null) {
+                        return `${order.stage_index}/${order.stage_count}`;
+                    }
+                    return "-";
+                })();
                 const qty = order.qty ?? order.exec_qty ?? "-";
                 const price =
                     order.price ??
@@ -1235,6 +1256,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 tr.innerHTML = `
                     <td>${timeValue}</td>
                     <td>${order.purpose || "-"}</td>
+                    <td>${splitLabel}</td>
                     <td>${order.side || "-"}</td>
                     <td>${qty}</td>
                     <td>${price}</td>
@@ -1316,6 +1338,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderOrdersTable(activeOrders, [
                     "Zeit",
                     "Purpose",
+                    "Teilorder",
                     "Side",
                     "Qty",
                     "Price/Trigger",
@@ -1334,6 +1357,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderOrdersTable(filledOrders, [
                     "Zeit",
                     "Purpose",
+                    "Teilorder",
                     "Side",
                     "Qty",
                     "Price/Trigger",

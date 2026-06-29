@@ -5281,6 +5281,11 @@ class GenericHedgeRuntime:
         filled_qty = float(exchange_order.get("cumExecQty") or (existing.filled_qty if existing else 0.0))
         remaining_qty = max(qty - filled_qty, 0.0)
         metadata = dict(existing.metadata) if existing else {}
+        metadata = self._recover_split_metadata_from_client_id(
+            client_id,
+            purpose,
+            existing_metadata=metadata,
+        )
         metadata.setdefault("recovered_from_exchange", True)
         metadata["recovery_source"] = "startup"
         metadata.setdefault("position_idx", exchange_order.get("positionIdx"))
@@ -5564,6 +5569,70 @@ class GenericHedgeRuntime:
         if reduce_only:
             return "short" if side == "buy" else "long"
         return "long" if side in {"buy", "long"} else "short"
+
+    @staticmethod
+    def _recover_split_stage_index_from_client_id(client_id: str) -> int | None:
+        match = re.search(r"-split(\d+)(?:-|$)", str(client_id or "").lower())
+        if not match:
+            return None
+        try:
+            return int(match.group(1))
+        except (TypeError, ValueError):
+            return None
+
+    def _recover_split_metadata_from_client_id(
+        self,
+        client_id: str,
+        purpose: str,
+        existing_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        metadata = dict(existing_metadata or {})
+        split_stage_index = self._recover_split_stage_index_from_client_id(client_id)
+        if split_stage_index is None:
+            return metadata
+
+        purpose_upper = str(purpose or "").upper()
+        cycle_match = re.search(r"CYCLE_(\d+)", purpose_upper)
+        cycle_index = None
+        if cycle_match:
+            try:
+                cycle_index = int(cycle_match.group(1))
+            except (TypeError, ValueError):
+                cycle_index = None
+
+        split_stage_count = metadata.get("split_stage_count") or metadata.get("stage_count")
+        if split_stage_count is None and cycle_index is not None:
+            state = getattr(self.runtime_state, "strategy_state", {}) or {}
+            stage_count_map = state.get("normal_cycle_second_leg_split_stage_count") or {}
+            cycle_key = str(cycle_index)
+            split_stage_count = (
+                stage_count_map.get(cycle_key)
+                or stage_count_map.get(cycle_index)
+                or metadata.get("split_count")
+            )
+
+        metadata.setdefault("normal_cycle_second_leg_split", True)
+        metadata.setdefault("split_stage_index", split_stage_index)
+        metadata.setdefault("stage_index", split_stage_index + 1)
+        metadata.setdefault("split_index", split_stage_index + 1)
+
+        if cycle_index is not None:
+            metadata.setdefault("cycle_index", cycle_index)
+            metadata.setdefault("split_cycle_index", cycle_index)
+
+        if split_stage_count is not None:
+            try:
+                split_stage_count = int(split_stage_count)
+                metadata.setdefault("split_stage_count", split_stage_count)
+                metadata.setdefault("stage_count", split_stage_count)
+                metadata.setdefault("split_count", split_stage_count)
+            except (TypeError, ValueError):
+                metadata.setdefault("split_metadata_missing_stage_count", True)
+        else:
+            metadata.setdefault("split_metadata_missing_stage_count", True)
+
+        metadata.setdefault("split_metadata_recovered_from_client_id", True)
+        return metadata
 
     def _recover_purpose_from_client_id(self, client_id: str) -> str:
         prefix = f"{self.strategy.name}-"
