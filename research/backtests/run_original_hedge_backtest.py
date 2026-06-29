@@ -24,6 +24,11 @@ from .debug_report import print_debug_report
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .multi_start_backtest import print_multi_start_summary, run_multi_start_backtests
+from .unfinished_deep_dive import (
+    parse_deep_dive_start_indices,
+    print_unfinished_deep_dive_summary,
+    run_unfinished_deep_dive_after_multi_start,
+)
 
 
 def resolve_directions(direction: str) -> list[str]:
@@ -365,6 +370,22 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="With --multi-start JSON output, include full fill/order/intent logs",
     )
+    parser.add_argument(
+        "--deep-dive-unfinished",
+        action="store_true",
+        help="With --multi-start, re-run unfinished windows with an extended horizon",
+    )
+    parser.add_argument(
+        "--extended-window-candles",
+        type=int,
+        default=3000,
+        help="Extended candle window for --deep-dive-unfinished (default: 3000)",
+    )
+    parser.add_argument(
+        "--deep-dive-start-indices",
+        default=None,
+        help="Optional comma-separated start indices to deep-dive, e.g. 800,1300,1600",
+    )
     return parser
 
 
@@ -414,6 +435,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.multi_start:
             if args.compare_fill_models:
                 raise ValueError("--multi-start cannot be combined with --compare-fill-models")
+            if args.deep_dive_unfinished and args.extended_window_candles <= args.window_candles:
+                raise ValueError(
+                    "--extended-window-candles must be greater than --window-candles for deep dive"
+                )
             candle_rows = _load_candles(
                 symbol=args.symbol,
                 limit=args.limit,
@@ -438,6 +463,27 @@ def main(argv: list[str] | None = None) -> int:
                 write_csv=write_csv,
                 include_logs=args.include_logs or args.debug,
             )
+            if args.deep_dive_unfinished:
+                deep_dive_payload = run_unfinished_deep_dive_after_multi_start(
+                    multi_start_payload=payload,
+                    candles=candle_rows,
+                    config_source=args.config_source,
+                    fill_model=args.fill_model,
+                    max_fills_per_candle=args.max_fills_per_candle,
+                    original_window_candles=args.window_candles,
+                    extended_window_candles=args.extended_window_candles,
+                    deep_dive_start_indices=parse_deep_dive_start_indices(
+                        args.deep_dive_start_indices
+                    ),
+                    long_config_path=args.long_config_path,
+                    short_config_path=args.short_config_path,
+                    file_config_path=args.config_path,
+                    output_dir=args.output_dir,
+                    write_json=write_json,
+                    write_csv=write_csv,
+                    include_logs=args.include_logs or args.debug,
+                )
+                payload["deep_dive"] = deep_dive_payload
         elif args.compare_fill_models:
             payload = run_fill_model_comparison(
                 symbol=args.symbol,
@@ -476,6 +522,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if payload.get("multi_start"):
         print_multi_start_summary(payload)
+        if payload.get("deep_dive"):
+            print_unfinished_deep_dive_summary(payload["deep_dive"])
     else:
         _print_run_summary(payload)
 
