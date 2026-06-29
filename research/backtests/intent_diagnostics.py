@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import RuntimeState, StrategyIntent
 
+from .config_diagnostics import enrich_exit_intent_metadata
 from .purpose_utils import preserve_bot_purpose, purpose_log_fields
 from .simulated_execution import evaluate_order_touch, normalize_trigger_direction, order_trigger_side
 from .simulated_order_book import SyntheticCandle, VirtualOrder
@@ -63,10 +64,24 @@ def build_intent_log_entry(
     candle_index: int | None,
     event_source: str,
     source_fill_purpose: str | None = None,
+    entry_price: float | None = None,
+    config: object | None = None,
+    config_source: str | None = None,
+    strategy_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a diagnostic record for one StrategyIntent."""
     metadata = dict(intent.metadata or {})
     purpose_fields = purpose_log_fields(intent.purpose, metadata)
+    metadata_excerpt = _metadata_excerpt(metadata)
+    exit_fields = enrich_exit_intent_metadata(
+        intent,
+        entry_price=entry_price,
+        config_source=config_source or "unknown",
+        config=config,
+        strategy_state=strategy_state,
+    )
+    if exit_fields:
+        metadata_excerpt.update(exit_fields)
     entry: dict[str, Any] = {
         "timestamp": timestamp.isoformat() if timestamp is not None else None,
         "candle_index": candle_index,
@@ -81,7 +96,7 @@ def build_intent_log_entry(
         "order_type": intent.order_type,
         "reduce_only": bool(intent.reduce_only),
         "raw_intent_class": type(intent).__name__,
-        "metadata_excerpt": _metadata_excerpt(metadata),
+        "metadata_excerpt": metadata_excerpt,
     }
     if source_fill_purpose:
         entry["source_fill_purpose"] = preserve_bot_purpose(source_fill_purpose)

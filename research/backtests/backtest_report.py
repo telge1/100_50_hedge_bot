@@ -12,6 +12,7 @@ from typing import Any, Iterable
 from fixed_cycle_hedge_bot.models import FillEvent
 
 from .intent_diagnostics import last_intent_summary, summarize_exit_diagnostics
+from .config_diagnostics import config_diagnostics_summary_fields
 from .purpose_utils import purpose_log_fields
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -44,6 +45,12 @@ SUMMARY_CSV_FIELDS = (
     "last_intent_trigger_price",
     "last_intent_price",
     "last_intent_source_fill_purpose",
+    "config_source",
+    "initial_exit_trigger",
+    "initial_exit_trigger_distance_abs",
+    "initial_exit_trigger_distance_pct",
+    "nearest_config_candidate",
+    "nearest_config_candidate_source",
 )
 
 
@@ -166,6 +173,15 @@ class BacktestResult:
     paired_exit_fills_count: int = 0
     intent_log: list[dict[str, Any]] = field(default_factory=list)
     final_active_order_diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    config_diagnostics: dict[str, Any] = field(default_factory=dict)
+    live_config_comparison: dict[str, Any] = field(default_factory=dict)
+    exit_level_diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    config_source: str = ""
+    initial_exit_trigger: float | None = None
+    initial_exit_trigger_distance_abs: float | None = None
+    initial_exit_trigger_distance_pct: float | None = None
+    nearest_config_candidate: float | None = None
+    nearest_config_candidate_source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -183,6 +199,8 @@ def result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
     payload["final_active_order_diagnostics_summary"] = summarize_exit_diagnostics(
         result.final_active_order_diagnostics or []
     )
+    if result.config_diagnostics:
+        payload.update(config_diagnostics_summary_fields(result.config_diagnostics))
     row: dict[str, Any] = {}
     for key in SUMMARY_CSV_FIELDS:
         value = payload.get(key)

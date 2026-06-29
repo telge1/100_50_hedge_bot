@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from .backtest_report import BacktestResult
+from .config_diagnostics import (
+    build_backtest_config_diagnostics,
+    build_exit_level_diagnostics_from_intents,
+    compare_backtest_config_to_live_configs,
+    config_diagnostics_summary_fields,
+    extract_initial_exit_trigger,
+)
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator
 from .intent_diagnostics import compute_final_active_order_diagnostics
 from .purpose_utils import purpose_log_fields, preserve_bot_purpose
@@ -189,6 +196,26 @@ def finalize_backtest_debug(
 
     result.open_reason_detail = explain_open_reason(result)
 
+    exit_trigger = extract_initial_exit_trigger(result.intent_log)
+    result.config_diagnostics = build_backtest_config_diagnostics(
+        sim.strategy,
+        sim.config,
+        symbol=result.symbol,
+        entry_price=result.entry_price,
+        config_source=getattr(sim, "config_source", "unknown"),
+        strategy_state=dict(sim.runtime_state.strategy_state),
+        exit_trigger_price=exit_trigger,
+        long_qty=float(sim.book.long_qty),
+        short_qty=float(sim.book.short_qty),
+        long_avg=float(sim.book.long_avg),
+        short_avg=float(sim.book.short_avg),
+    )
+    result.live_config_comparison = compare_backtest_config_to_live_configs(sim.config)
+    result.exit_level_diagnostics = build_exit_level_diagnostics_from_intents(result.intent_log)
+    summary = config_diagnostics_summary_fields(result.config_diagnostics)
+    for key, value in summary.items():
+        setattr(result, key, value)
+
 
 def format_fill_line(fill: dict[str, Any]) -> str:
     return (
@@ -205,6 +232,59 @@ def format_order_line(order: dict[str, Any]) -> str:
     )
 
 
+def format_config_diagnostics_line(key: str, value: object) -> str:
+    return f"{key}={value}"
+
+
+def print_config_diagnostics_report(result: BacktestResult) -> None:
+    print("config_diagnostics:")
+    diagnostics = result.config_diagnostics or {}
+    for key in (
+        "strategy_class",
+        "config_source",
+        "entry_price",
+        "exit_trigger_price",
+        "trigger_minus_entry",
+        "trigger_distance_pct",
+        "nearest_config_candidate",
+        "nearest_config_candidate_source",
+        "nearest_config_candidate_name",
+    ):
+        if key in diagnostics:
+            print(f"  {format_config_diagnostics_line(key, diagnostics.get(key))}")
+
+    nearest = diagnostics.get("nearest_candidate_to_exit_trigger")
+    if nearest:
+        print(f"  nearest_match={nearest}")
+
+    relevant = diagnostics.get("relevant_config") or {}
+    if relevant:
+        print("  relevant_config:")
+        for cfg_key, cfg_value in sorted(relevant.items()):
+            print(f"    {cfg_key}={cfg_value}")
+
+    comparison = getattr(result, "live_config_comparison", None) or {}
+    if comparison.get("differences"):
+        print("  live_config_differences:")
+        for direction, diff in comparison["differences"].items():
+            print(f"    {direction}:")
+            for cfg_key, values in sorted(diff.items()):
+                print(f"      {cfg_key}: backtest={values.get('backtest')} live={values.get('live')}")
+    for note in comparison.get("notes") or []:
+        print(f"  note: {note}")
+
+    exit_levels = getattr(result, "exit_level_diagnostics", None) or []
+    if exit_levels:
+        print("  exit_level_diagnostics:")
+        for item in exit_levels:
+            print(
+                f"    {item.get('purpose')} trigger={item.get('trigger_price')} "
+                f"entry={item.get('entry_price_at_intent')} abs={item.get('trigger_minus_entry')} "
+                f"pct={item.get('trigger_distance_pct')} candidate={item.get('nearest_config_candidate')} "
+                f"source={item.get('config_candidate_source')}"
+            )
+
+
 def print_debug_report(
     result: BacktestResult,
     *,
@@ -212,6 +292,8 @@ def print_debug_report(
     print_order_log: bool = False,
     print_intent_log: bool = False,
     print_exit_diagnostics: bool = False,
+    print_config_diagnostics: bool = False,
+    config_summary: bool = True,
     tail: int = 5,
     intent_tail: int = 10,
 ) -> None:
@@ -230,6 +312,18 @@ def print_debug_report(
     )
     if result.final_strategy_state_excerpt:
         print(f"strategy_excerpt={result.final_strategy_state_excerpt}")
+
+    if config_summary and getattr(result, "config_source", None):
+        print(
+            f"config_source={result.config_source} "
+            f"initial_exit_trigger={getattr(result, 'initial_exit_trigger', None)} "
+            f"trigger_dist_abs={getattr(result, 'initial_exit_trigger_distance_abs', None)} "
+            f"trigger_dist_pct={getattr(result, 'initial_exit_trigger_distance_pct', None)} "
+            f"nearest_candidate={getattr(result, 'nearest_config_candidate', None)}"
+        )
+
+    if print_config_diagnostics:
+        print_config_diagnostics_report(result)
 
     if result.final_active_orders:
         print("active_orders:")

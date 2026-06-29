@@ -279,6 +279,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="With --debug, print full final exit diagnostics",
     )
+    parser.add_argument(
+        "--print-config-diagnostics",
+        action="store_true",
+        help="With --debug, print full config and exit-level diagnostics",
+    )
     return parser
 
 
@@ -361,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
                 print_order_log=args.print_order_log,
                 print_intent_log=args.print_intent_log,
                 print_exit_diagnostics=args.print_exit_diagnostics,
+                print_config_diagnostics=args.print_config_diagnostics,
             )
     return 0
 

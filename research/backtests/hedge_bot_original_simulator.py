@@ -169,6 +169,7 @@ class HedgeBotOriginalSimulator:
         self._temp_dir = temp_dir
         self._owned_temp_dir: tempfile.TemporaryDirectory[str] | None = None
         self.config = config or build_test_config(signal=signal, symbol=self.symbol)
+        self.config_source = "research.backtests.build_test_config"
         self.strategy = build_strategy(signal, self.config)
         self.runtime_state = build_runtime_state(symbol=self.symbol)
         self.book = SimulatedOrderBook(symbol=self.symbol)
@@ -185,6 +186,7 @@ class HedgeBotOriginalSimulator:
         self.orders_submitted = 0
         self.order_log: list[dict[str, Any]] = []
         self.intent_log: list[dict[str, Any]] = []
+        self.entry_price: float | None = float(candle_close)
         self.candle_index = 0
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
@@ -246,6 +248,10 @@ class HedgeBotOriginalSimulator:
             candle_index=self.candle_index,
             event_source=event_source,
             source_fill_purpose=source_fill_purpose,
+            entry_price=self.entry_price,
+            config=self.config,
+            config_source=self.config_source,
+            strategy_state=dict(self.runtime_state.strategy_state),
         )
         self.intent_log.append(entry)
         return len(self.intent_log) - 1
