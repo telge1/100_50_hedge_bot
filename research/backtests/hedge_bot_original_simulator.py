@@ -1,4 +1,4 @@
-"""Minimal Phase-1/2 harness: run original hedge strategies without Bybit."""
+"""Minimal Phase-1/2/3 harness: run original hedge strategies without Bybit."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 )
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
-from .simulated_execution import fill_entry_intents_at_candle_close, submit_resting_intents
+from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills, submit_resting_intents
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 Signal = Literal["long", "short"]
@@ -41,6 +41,16 @@ class SimulationResult:
     resting_orders: list[VirtualOrder] = field(default_factory=list)
     final_snapshot: HedgeSnapshot | None = None
     runtime_state: RuntimeState | None = None
+    strategy_state: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ProcessCandleResult:
+    candle: SyntheticCandle
+    candle_fills: list[FillEvent] = field(default_factory=list)
+    on_fill_intents: list[StrategyIntent] = field(default_factory=list)
+    tick_intents: list[StrategyIntent] = field(default_factory=list)
+    snapshot: HedgeSnapshot | None = None
     strategy_state: dict[str, Any] = field(default_factory=dict)
 
 
@@ -136,7 +146,7 @@ def build_context(
 
 
 class HedgeBotOriginalSimulator:
-    """Run a single flat-start entry smoke path against the real strategy classes."""
+    """Run original hedge strategies against synthetic candles without Bybit."""
 
     def __init__(
         self,
@@ -195,11 +205,12 @@ class HedgeBotOriginalSimulator:
             self._owned_temp_dir.cleanup()
             self._owned_temp_dir = None
 
-    def _refresh_snapshot_from_book(self, *, source: str) -> HedgeSnapshot:
+    def _refresh_snapshot_from_book(self, *, source: str, price: float | None = None) -> HedgeSnapshot:
         self.book.sync_runtime_state(self.runtime_state)
+        current_price = float(price if price is not None else self.candle.close)
         self.snapshot = snapshot_from_mapping(
             symbol=self.symbol,
-            current_price=self.candle.close,
+            current_price=current_price,
             positions=self.book.positions_mapping(),
             runtime_state=self.runtime_state,
             source=source,
@@ -221,6 +232,46 @@ class HedgeBotOriginalSimulator:
         )
         self._refresh_snapshot_from_book(source="after_submit_intents")
         return resting
+
+    def process_candle(self, candle: SyntheticCandle) -> ProcessCandleResult:
+        self.candle = candle
+        self._refresh_snapshot_from_book(source="before_process_candle", price=candle.close)
+
+        candle_fills = process_candle_fills(
+            book=self.book,
+            runtime_state=self.runtime_state,
+            candle=candle,
+        )
+        on_fill_intents: list[StrategyIntent] = []
+
+        for fill_event in candle_fills:
+            self._refresh_snapshot_from_book(source="after_candle_fill", price=candle.close)
+            intents = self.strategy.on_fill(
+                fill_event,
+                self.snapshot,
+                self.runtime_state,
+                self.context,
+            )
+            on_fill_intents.extend(intents)
+            self.submit_intents_to_book(intents)
+
+        self._refresh_snapshot_from_book(source="before_on_tick", price=candle.close)
+        tick_intents = self.strategy.on_tick(
+            self.snapshot,
+            self.runtime_state,
+            self.context,
+        ) or []
+        self.submit_intents_to_book(tick_intents)
+        self._refresh_snapshot_from_book(source="after_on_tick", price=candle.close)
+
+        return ProcessCandleResult(
+            candle=candle,
+            candle_fills=candle_fills,
+            on_fill_intents=on_fill_intents,
+            tick_intents=list(tick_intents),
+            snapshot=self.snapshot,
+            strategy_state=dict(self.runtime_state.strategy_state),
+        )
 
     def run_entry_smoke(self) -> SimulationResult:
         entry_intents = self.strategy.on_start(self.snapshot, self.runtime_state, self.context)

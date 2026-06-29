@@ -22,6 +22,8 @@ class SyntheticCandle:
     open: float | None = None
     high: float | None = None
     low: float | None = None
+    timestamp: datetime | None = None
+    volume: float | None = None
 
     def __post_init__(self) -> None:
         if self.open is None:
@@ -30,6 +32,18 @@ class SyntheticCandle:
             self.high = self.close
         if self.low is None:
             self.low = self.close
+
+    @classmethod
+    def from_row(cls, symbol: str, row: dict[str, Any]) -> SyntheticCandle:
+        return cls(
+            symbol=symbol,
+            timestamp=row.get("timestamp"),
+            open=float(row["open"]),
+            high=float(row["high"]),
+            low=float(row["low"]),
+            close=float(row["close"]),
+            volume=row.get("volume"),
+        )
 
 
 @dataclass
@@ -171,13 +185,13 @@ class SimulatedOrderBook:
             runtime_state.exchange_to_client_id[order.exchange_order_id] = order.order_id
             runtime_state.client_to_exchange_id[order.order_id] = order.exchange_order_id
 
-    def apply_market_fill(
+    def apply_fill(
         self,
         *,
         order_id: str,
         fill_price: float,
         qty: float | None = None,
-    ) -> VirtualOrder:
+    ) -> tuple[VirtualOrder, float]:
         order = self._orders.get(order_id)
         if order is None:
             raise KeyError(f"unknown simulated order: {order_id}")
@@ -186,31 +200,65 @@ class SimulatedOrderBook:
 
         fill_qty = float(qty if qty is not None else order.qty)
         side = str(order.side).lower()
+        realized_pnl = 0.0
+
         if side == "long":
-            prev_qty = self.long_qty
-            new_qty = prev_qty + fill_qty
-            if new_qty > 0:
-                self.long_avg = (
-                    (prev_qty * self.long_avg + fill_qty * fill_price) / new_qty
-                    if prev_qty > 0
-                    else fill_price
-                )
-            self.long_qty = new_qty
+            if order.reduce_only:
+                close_qty = min(fill_qty, self.long_qty)
+                if close_qty > 0 and self.long_avg > 0:
+                    realized_pnl = (float(fill_price) - self.long_avg) * close_qty
+                self.long_qty = max(0.0, self.long_qty - close_qty)
+                if self.long_qty <= 1e-12:
+                    self.long_qty = 0.0
+                    self.long_avg = 0.0
+            else:
+                prev_qty = self.long_qty
+                new_qty = prev_qty + fill_qty
+                if new_qty > 0:
+                    self.long_avg = (
+                        (prev_qty * self.long_avg + fill_qty * fill_price) / new_qty
+                        if prev_qty > 0
+                        else fill_price
+                    )
+                self.long_qty = new_qty
         elif side == "short":
-            prev_qty = self.short_qty
-            new_qty = prev_qty + fill_qty
-            if new_qty > 0:
-                self.short_avg = (
-                    (prev_qty * self.short_avg + fill_qty * fill_price) / new_qty
-                    if prev_qty > 0
-                    else fill_price
-                )
-            self.short_qty = new_qty
+            if order.reduce_only:
+                close_qty = min(fill_qty, self.short_qty)
+                if close_qty > 0 and self.short_avg > 0:
+                    realized_pnl = (self.short_avg - float(fill_price)) * close_qty
+                self.short_qty = max(0.0, self.short_qty - close_qty)
+                if self.short_qty <= 1e-12:
+                    self.short_qty = 0.0
+                    self.short_avg = 0.0
+            else:
+                prev_qty = self.short_qty
+                new_qty = prev_qty + fill_qty
+                if new_qty > 0:
+                    self.short_avg = (
+                        (prev_qty * self.short_avg + fill_qty * fill_price) / new_qty
+                        if prev_qty > 0
+                        else fill_price
+                    )
+                self.short_qty = new_qty
         else:
             raise ValueError(f"unsupported simulated fill side: {side}")
 
         order.status = "FILLED"
         order.filled_qty = fill_qty
         order.remaining_qty = 0.0
-        order.metadata.setdefault("fill_price", fill_price)
+        order.metadata["fill_price"] = float(fill_price)
+        order.metadata["confirmed_closed_pnl"] = float(realized_pnl)
+        order.metadata["closed_pnl"] = float(realized_pnl)
+        order.metadata["runtime_calculated_pnl"] = float(realized_pnl)
+        order.metadata["exec_pnl"] = float(realized_pnl)
+        return order, float(realized_pnl)
+
+    def apply_market_fill(
+        self,
+        *,
+        order_id: str,
+        fill_price: float,
+        qty: float | None = None,
+    ) -> VirtualOrder:
+        order, _ = self.apply_fill(order_id=order_id, fill_price=fill_price, qty=qty)
         return order

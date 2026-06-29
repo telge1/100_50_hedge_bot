@@ -1,6 +1,10 @@
-"""Phase-1/2 smoke tests: original hedge strategies without Bybit."""
+"""Phase-1/2/3 smoke tests: original hedge strategies without Bybit."""
 
 from __future__ import annotations
+
+import csv
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -10,12 +14,23 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 )
 from fixed_cycle_hedge_bot.models import RuntimeState, StrategyIntent
 
+from research.backtests.candle_loader import (
+    DEFAULT_DATA_DIR,
+    load_candles,
+    load_candles_for_symbol,
+    symbol_to_feather_name,
+)
 from research.backtests.hedge_bot_original_simulator import (
     HedgeBotOriginalSimulator,
     KNOWN_STRUCTURE_PURPOSE_PREFIXES,
     KNOWN_STRUCTURE_PURPOSE_SUFFIXES,
 )
-from research.backtests.simulated_order_book import SimulatedOrderBook
+from research.backtests.simulated_execution import (
+    fill_order_at_price,
+    process_candle_fills,
+    should_fill_order_on_candle,
+)
+from research.backtests.simulated_order_book import SimulatedOrderBook, SyntheticCandle
 
 
 @pytest.fixture
@@ -215,3 +230,224 @@ def test_submit_same_purpose_replaces_existing_order() -> None:
     assert book.get_order(old_order.order_id).status == "CANCELED"
     assert len(runtime_state.active_orders) == 1
     assert new_order.order_id in runtime_state.active_orders
+
+
+def _candle(symbol: str, *, open_: float, high: float, low: float, close: float) -> SyntheticCandle:
+    return SyntheticCandle(symbol=symbol, open=open_, high=high, low=low, close=close)
+
+
+def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+    order = book.submit_intent(
+        StrategyIntent(
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            order_type="Market",
+            trigger_price=99.0,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    book.long_qty = 1.0
+    book.long_avg = 100.0
+    book.short_qty = 0.5
+    book.short_avg = 100.0
+    book.sync_runtime_state(runtime_state)
+
+    candle = _candle("BTCUSDT", open_=100.0, high=101.0, low=98.0, close=100.0)
+    assert should_fill_order_on_candle(order, candle)
+
+    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    assert len(fills) == 1
+    assert fills[0].status == "FILLED"
+    assert fills[0].purpose == "SHORT_SL_EXIT"
+    assert book.active_orders() == []
+    assert order.order_id not in runtime_state.active_orders
+
+
+def test_phase3_sell_order_fills_when_candle_high_reaches_trigger() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+    order = book.submit_intent(
+        StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            order_type="Market",
+            trigger_price=101.0,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    book.long_qty = 1.0
+    book.long_avg = 100.0
+    book.sync_runtime_state(runtime_state)
+
+    candle = _candle("BTCUSDT", open_=100.0, high=102.0, low=99.0, close=100.0)
+    assert should_fill_order_on_candle(order, candle)
+
+    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    assert len(fills) == 1
+    assert fills[0].purpose == "LONG_TP_EXIT"
+    assert book.active_orders() == []
+
+
+def test_phase3_orders_stay_active_when_candle_does_not_reach_trigger() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+
+    buy_order = book.submit_intent(
+        StrategyIntent(
+            side="short",
+            qty=0.5,
+            purpose="SHORT_SL_EXIT",
+            order_type="Limit",
+            price=95.0,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    sell_order = book.submit_intent(
+        StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            order_type="Limit",
+            price=105.0,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    book.sync_runtime_state(runtime_state)
+
+    candle = _candle("BTCUSDT", open_=100.0, high=102.0, low=98.0, close=100.0)
+    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+
+    assert fills == []
+    active_ids = {order.order_id for order in book.active_orders()}
+    assert buy_order.order_id in active_ids
+    assert sell_order.order_id in active_ids
+    assert len(runtime_state.active_orders) == 2
+
+
+def test_phase3_reduce_fill_updates_position_and_pnl() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+    book.long_qty = 1.0
+    book.long_avg = 100.0
+    order = book.submit_intent(
+        StrategyIntent(
+            side="long",
+            qty=1.0,
+            purpose="LONG_TP_EXIT",
+            order_type="Market",
+            trigger_price=101.0,
+            reduce_only=True,
+        ),
+        replace=False,
+    )
+    fill = fill_order_at_price(
+        book=book,
+        runtime_state=runtime_state,
+        order_id=order.order_id,
+        fill_price=101.0,
+    )
+    assert book.long_qty == 0.0
+    assert fill.metadata.get("confirmed_closed_pnl") == pytest.approx(1.0)
+
+
+def test_long_phase3_strategy_integration_fills_active_order(long_simulator) -> None:
+    entry_result = long_simulator.run_entry_smoke()
+    assert entry_result.resting_orders, "expected resting orders before candle processing"
+
+    before_state = dict(long_simulator.runtime_state.strategy_state)
+    active_before = len(long_simulator.book.active_orders())
+    assert active_before > 0
+
+    candle = _candle(
+        long_simulator.symbol,
+        open_=100.0,
+        high=102.0,
+        low=100.0,
+        close=100.5,
+    )
+    candle_result = long_simulator.process_candle(candle)
+
+    assert candle_result.candle_fills, "expected at least one virtual order fill on trigger candle"
+    assert candle_result.snapshot is not None
+    assert candle_result.snapshot.active_orders is not None
+
+    after_state = candle_result.strategy_state
+    state_changed = after_state != before_state
+    has_post_fill_intents = bool(candle_result.on_fill_intents or candle_result.tick_intents)
+    has_active_orders = bool(long_simulator.book.active_orders())
+    assert state_changed or has_post_fill_intents or has_active_orders
+
+
+def test_short_phase3_strategy_integration_fills_active_order(short_simulator) -> None:
+    entry_result = short_simulator.run_entry_smoke()
+    assert entry_result.resting_orders
+
+    candle = _candle(
+        short_simulator.symbol,
+        open_=100.0,
+        high=102.0,
+        low=100.0,
+        close=100.5,
+    )
+    candle_result = short_simulator.process_candle(candle)
+
+    assert candle_result.candle_fills
+    assert candle_result.snapshot is not None
+
+
+def test_load_candles_from_temp_csv_last_n_rows() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.csv"
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["date", "open", "high", "low", "close", "volume"],
+            )
+            writer.writeheader()
+            writer.writerow(
+                {
+                    "date": "2026-01-01T00:00:00+00:00",
+                    "open": 1,
+                    "high": 2,
+                    "low": 0.5,
+                    "close": 1.5,
+                    "volume": 10,
+                }
+            )
+            writer.writerow(
+                {
+                    "date": "2026-01-01T00:05:00+00:00",
+                    "open": 1.5,
+                    "high": 2.5,
+                    "low": 1.0,
+                    "close": 2.0,
+                    "volume": 12,
+                }
+            )
+
+        rows = load_candles(path, limit=1)
+        assert len(rows) == 1
+        assert rows[0]["close"] == 2.0
+        assert rows[0]["volume"] == 12.0
+        assert "timestamp" in rows[0]
+
+
+def test_load_candles_for_symbol_apt_feather_if_available() -> None:
+    pytest.importorskip("pyarrow")
+    apt_path = DEFAULT_DATA_DIR / symbol_to_feather_name("APTUSDT")
+    if not apt_path.exists():
+        pytest.skip(f"external APT feather file not present: {apt_path}")
+
+    rows = load_candles_for_symbol("APTUSDT", limit=5)
+    assert len(rows) == 5
+    for row in rows:
+        assert {"timestamp", "open", "high", "low", "close", "volume"} <= set(row.keys())
+        assert row["high"] >= row["low"]
