@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 
+from .fill_models import is_exit_purpose, normalize_fill_model
 from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 from .simulated_pnl import attach_closed_pnl_metadata
@@ -212,6 +213,69 @@ def rank_conservative_fill_orders(
     return sorted(touchable, key=_sort_key)
 
 
+def _select_paired_exit_orders(
+    touchable: list[VirtualOrder],
+    candle: SyntheticCandle,
+    *,
+    max_fills_per_candle: int,
+) -> tuple[list[VirtualOrder], int]:
+    """Fill up to ``max_fills_per_candle`` touchable exit orders when possible."""
+    exit_orders = [order for order in touchable if is_exit_purpose(order.purpose)]
+    if len(exit_orders) >= 2:
+        selected = sorted(exit_orders, key=lambda item: (item.created_index, item.order_id))[
+            :max_fills_per_candle
+        ]
+        paired_count = len(selected) if len(selected) >= 2 else 0
+        return selected, paired_count
+
+    if len(exit_orders) == 1:
+        selected = list(exit_orders)
+        if max_fills_per_candle > 1:
+            remaining = [
+                order for order in touchable if order.order_id != exit_orders[0].order_id
+            ]
+            extra = rank_conservative_fill_orders(remaining, candle)[
+                : max(0, max_fills_per_candle - 1)
+            ]
+            selected.extend(extra)
+        return selected[:max_fills_per_candle], 0
+
+    ranked = rank_conservative_fill_orders(touchable, candle)
+    return ranked[:max_fills_per_candle], 0
+
+
+def select_orders_for_fill_model(
+    eligible_orders: list[VirtualOrder],
+    candle: SyntheticCandle,
+    *,
+    fill_model: str,
+    max_fills_per_candle: int,
+) -> tuple[list[VirtualOrder], dict[str, int]]:
+    """Select candle-start eligible orders to fill under the requested model."""
+    stats = {"paired_exit_fills_count": 0}
+    if max_fills_per_candle <= 0:
+        return [], stats
+
+    touchable = [
+        order for order in eligible_orders if should_fill_order_on_candle(order, candle)
+    ]
+    if not touchable:
+        return [], stats
+
+    model = normalize_fill_model(fill_model)
+    if model == "paired_exit":
+        selected, paired_count = _select_paired_exit_orders(
+            touchable,
+            candle,
+            max_fills_per_candle=max_fills_per_candle,
+        )
+        stats["paired_exit_fills_count"] = paired_count
+        return selected, stats
+
+    ranked = rank_conservative_fill_orders(eligible_orders, candle)
+    return ranked[:max_fills_per_candle], stats
+
+
 def select_orders_to_fill_on_candle(
     orders: list[VirtualOrder],
     candle: SyntheticCandle,
@@ -242,21 +306,45 @@ def process_candle_fills(
     book: SimulatedOrderBook,
     runtime_state: RuntimeState,
     candle: SyntheticCandle,
+    eligible_orders: list[VirtualOrder] | None = None,
+    fill_model: str = "conservative",
     max_fills_per_candle: int | None = None,
     conservative_fill_order: bool = True,
-) -> list[FillEvent]:
-    """Check active resting orders against candle high/low and emit FillEvents.
+) -> tuple[list[FillEvent], dict[str, int]]:
+    """Check eligible resting orders against candle high/low and emit FillEvents.
 
-    Phase 4 default for historical backtests: ``max_fills_per_candle=1`` so
-    new orders from ``on_fill`` are not eligible until the next candle.
-    Pass ``max_fills_per_candle=None`` for legacy unlimited fills (smoke tests).
+    Phase 7: only orders in ``eligible_orders`` (candle-start snapshot) may fill.
+    New orders submitted during ``on_fill`` in the same candle are not eligible.
+    Pass ``eligible_orders=None`` and ``max_fills_per_candle=None`` for legacy
+    unlimited fills from all active orders (smoke tests).
     """
-    candidates = select_orders_to_fill_on_candle(
-        list(book.active_orders()),
-        candle,
-        max_fills_per_candle=max_fills_per_candle,
-        conservative_fill_order=conservative_fill_order,
-    )
+    stats = {"same_candle_fill_count": 0, "paired_exit_fills_count": 0}
+
+    if eligible_orders is None:
+        order_pool = list(book.active_orders())
+    else:
+        active_ids = {order.order_id for order in book.active_orders()}
+        order_pool = [order for order in eligible_orders if order.order_id in active_ids]
+
+    if max_fills_per_candle is None:
+        candidates = [order for order in order_pool if should_fill_order_on_candle(order, candle)]
+    elif max_fills_per_candle <= 0:
+        return [], stats
+    elif conservative_fill_order and fill_model in {"conservative", "conservative_multi", "paired_exit"}:
+        candidates, model_stats = select_orders_for_fill_model(
+            order_pool,
+            candle,
+            fill_model=fill_model,
+            max_fills_per_candle=int(max_fills_per_candle),
+        )
+        stats.update(model_stats)
+    else:
+        candidates = [
+            order
+            for order in sorted(order_pool, key=lambda item: (item.created_index, item.order_id))
+            if should_fill_order_on_candle(order, candle)
+        ][: int(max_fills_per_candle)]
+
     fill_events: list[FillEvent] = []
     for order in candidates:
         _, fill_price = resolve_order_check_and_fill_prices(order)
@@ -269,7 +357,9 @@ def process_candle_fills(
                 occurred_at=candle.timestamp,
             )
         )
-    return fill_events
+
+    stats["same_candle_fill_count"] = len(fill_events)
+    return fill_events, stats
 
 
 # Backward-compatible aliases for Phase-1 callers.

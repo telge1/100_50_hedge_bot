@@ -173,6 +173,11 @@ def print_debug_report(
     tail: int = 5,
 ) -> None:
     print(f"--- debug {result.direction} ---")
+    print(
+        f"fill_model={result.fill_model} max_fills_per_candle={result.max_fills_per_candle} "
+        f"same_candle_fills_count={result.same_candle_fills_count} "
+        f"paired_exit_fills_count={result.paired_exit_fills_count}"
+    )
     print(f"final_status={result.final_status}")
     print(f"exit_reason={result.exit_reason}")
     print(f"open_reason_detail={result.open_reason_detail}")

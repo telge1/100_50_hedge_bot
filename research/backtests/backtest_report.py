@@ -34,6 +34,10 @@ SUMMARY_CSV_FIELDS = (
     "final_long_qty",
     "final_short_qty",
     "final_active_order_purposes",
+    "fill_model",
+    "max_fills_per_candle",
+    "same_candle_fills_count",
+    "paired_exit_fills_count",
 )
 
 
@@ -144,6 +148,10 @@ class BacktestResult:
     first_fill_time: str | None = None
     last_fill_time: str | None = None
     open_reason_detail: str = ""
+    fill_model: str = "conservative"
+    max_fills_per_candle: int = 1
+    same_candle_fills_count: int = 0
+    paired_exit_fills_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -211,4 +219,12 @@ def default_output_paths(output_dir: str | Path, symbol: str) -> tuple[Path, Pat
     symbol_upper = symbol.upper()
     json_path = base / f"{symbol_upper}_original_hedge_5m_results.json"
     csv_path = base / f"{symbol_upper}_original_hedge_5m_summary.csv"
+    return json_path, csv_path
+
+
+def comparison_output_paths(output_dir: str | Path, symbol: str) -> tuple[Path, Path]:
+    base = Path(output_dir)
+    symbol_upper = symbol.upper()
+    json_path = base / f"{symbol_upper}_original_hedge_5m_fill_model_comparison_results.json"
+    csv_path = base / f"{symbol_upper}_original_hedge_5m_fill_model_comparison_summary.csv"
     return json_path, csv_path

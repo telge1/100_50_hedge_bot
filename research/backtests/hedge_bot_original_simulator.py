@@ -23,6 +23,7 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
 from .backtest_report import build_order_log_entry
+from .fill_models import FillModelConfig, resolve_fill_model_config
 from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -53,6 +54,8 @@ class ProcessCandleResult:
     tick_intents: list[StrategyIntent] = field(default_factory=list)
     snapshot: HedgeSnapshot | None = None
     strategy_state: dict[str, Any] = field(default_factory=dict)
+    same_candle_fill_count: int = 0
+    paired_exit_fills_count: int = 0
 
 
 def _default_instrument_rules(symbol: str) -> dict[str, Decimal]:
@@ -312,17 +315,25 @@ class HedgeBotOriginalSimulator:
         self,
         candle: SyntheticCandle,
         *,
+        fill_model: str = "conservative",
         max_fills_per_candle: int | None = None,
         conservative_fill_order: bool = True,
     ) -> ProcessCandleResult:
         self.candle = candle
         self._refresh_snapshot_from_book(source="before_process_candle", price=candle.close)
 
-        candle_fills = process_candle_fills(
+        fill_config = resolve_fill_model_config(
+            fill_model=fill_model,
+            max_fills_per_candle=max_fills_per_candle,
+        )
+        eligible_orders = list(self.book.active_orders())
+        candle_fills, fill_stats = process_candle_fills(
             book=self.book,
             runtime_state=self.runtime_state,
             candle=candle,
-            max_fills_per_candle=max_fills_per_candle,
+            eligible_orders=eligible_orders,
+            fill_model=fill_config.fill_model,
+            max_fills_per_candle=fill_config.max_fills_per_candle,
             conservative_fill_order=conservative_fill_order,
         )
         on_fill_intents: list[StrategyIntent] = []
@@ -361,6 +372,8 @@ class HedgeBotOriginalSimulator:
             tick_intents=list(tick_intents),
             snapshot=self.snapshot,
             strategy_state=dict(self.runtime_state.strategy_state),
+            same_candle_fill_count=int(fill_stats.get("same_candle_fill_count", len(candle_fills))),
+            paired_exit_fills_count=int(fill_stats.get("paired_exit_fills_count", 0)),
         )
 
     def run_entry_smoke(self) -> SimulationResult:

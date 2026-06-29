@@ -1,4 +1,4 @@
-"""Historical mini-backtest runner over 5m candle series (Phase 4/6)."""
+"""Historical mini-backtest runner over 5m candle series (Phase 4/7)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,9 @@ from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
-from .backtest_report import BacktestResult, build_fill_log_entry, build_order_log_entry
+from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
+from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
 from .simulated_order_book import SyntheticCandle
 
@@ -79,14 +80,19 @@ def run_historical_backtest(
     candles: Iterable[Any],
     *,
     max_candles: int | None = None,
-    max_fills_per_candle: int = 1,
+    fill_model: str = "conservative",
+    max_fills_per_candle: int | None = None,
     conservative_fill_order: bool = True,
     initial_notional_usdt: float = 100.0,
 ) -> BacktestResult:
-    """Run a conservative mini-backtest over a 5m candle series."""
+    """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
     symbol_upper = symbol.upper()
     candle_list = normalize_candles(symbol_upper, candles)
+    fill_config = resolve_fill_model_config(
+        fill_model=fill_model,
+        max_fills_per_candle=max_fills_per_candle,
+    )
     if not candle_list:
         return BacktestResult(
             symbol=symbol_upper,
@@ -95,6 +101,8 @@ def run_historical_backtest(
             exit_reason="no_candles",
             error="candle series is empty",
             open_reason_detail="no_candles",
+            fill_model=fill_config.fill_model,
+            max_fills_per_candle=fill_config.max_fills_per_candle,
         )
 
     first_candle = candle_list[0]
@@ -109,6 +117,8 @@ def run_historical_backtest(
         direction=signal,
         start_time=first_candle.timestamp,
         entry_price=float(first_candle.close),
+        fill_model=fill_config.fill_model,
+        max_fills_per_candle=fill_config.max_fills_per_candle,
     )
 
     cumulative_pnl = 0.0
@@ -142,11 +152,16 @@ def run_historical_backtest(
             sim.candle_index = loop_index
             candle_result = sim.process_candle(
                 candle,
-                max_fills_per_candle=max_fills_per_candle,
+                fill_model=fill_config.fill_model,
+                max_fills_per_candle=fill_config.max_fills_per_candle,
                 conservative_fill_order=conservative_fill_order,
             )
             result.candles_processed += 1
             result.end_time = candle.timestamp
+
+            if candle_result.same_candle_fill_count > 1:
+                result.same_candle_fills_count += 1
+            result.paired_exit_fills_count += candle_result.paired_exit_fills_count
 
             pnl_delta = _append_fill_logs(
                 result,

@@ -260,7 +260,7 @@ def test_phase3_buy_order_fills_when_candle_low_reaches_trigger() -> None:
     candle = _candle("BTCUSDT", open_=100.0, high=101.0, low=98.0, close=100.0)
     assert should_fill_order_on_candle(order, candle)
 
-    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
     assert len(fills) == 1
     assert fills[0].status == "FILLED"
     assert fills[0].purpose == "SHORT_SL_EXIT"
@@ -289,7 +289,7 @@ def test_phase3_sell_order_fills_when_candle_high_reaches_trigger() -> None:
     candle = _candle("BTCUSDT", open_=100.0, high=102.0, low=99.0, close=100.0)
     assert should_fill_order_on_candle(order, candle)
 
-    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
     assert len(fills) == 1
     assert fills[0].purpose == "LONG_TP_EXIT"
     assert book.active_orders() == []
@@ -324,7 +324,7 @@ def test_phase3_orders_stay_active_when_candle_does_not_reach_trigger() -> None:
     book.sync_runtime_state(runtime_state)
 
     candle = _candle("BTCUSDT", open_=100.0, high=102.0, low=98.0, close=100.0)
-    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
 
     assert fills == []
     active_ids = {order.order_id for order in book.active_orders()}

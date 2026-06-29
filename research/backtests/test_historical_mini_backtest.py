@@ -110,7 +110,7 @@ def test_max_fills_per_candle_limits_intra_candle_chain() -> None:
         close=100.0,
     )
 
-    fills = process_candle_fills(
+    fills, _ = process_candle_fills(
         book=book,
         runtime_state=runtime_state,
         candle=candle,

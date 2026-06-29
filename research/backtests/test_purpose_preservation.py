@@ -79,7 +79,7 @@ def test_fill_purpose_preservation_on_reduce() -> None:
     )
 
     candle = SyntheticCandle(symbol="APTUSDT", open=1.0, high=1.0, low=0.94, close=0.98)
-    fills = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
+    fills, _ = process_candle_fills(book=book, runtime_state=runtime_state, candle=candle)
     assert len(fills) == 1
 
     fill = fills[0]
