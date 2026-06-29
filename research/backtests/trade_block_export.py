@@ -259,8 +259,23 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     rows = sort_trade_block_rows(rows)
-    rows = drop_stale_submitted_orders_after_flat(rows)
+    rows = drop_stale_rows_after_flat(rows)
     return apply_cumulative_pnl(rows)
+
+
+def _is_initial_entry_purpose(purpose: object) -> bool:
+    return str(purpose or "") in {"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"}
+
+
+def _trade_block_row_sort_group(row: dict[str, Any]) -> int:
+    """
+    Initial entry rows can carry run/export timestamps in simulator logs.
+    Keep them at the beginning of the trade block so they do not appear after
+    final flat exits in CSV/JSON exports.
+    """
+    if _is_initial_entry_purpose(row.get("purpose")):
+        return 0
+    return 1
 
 
 def sort_trade_block_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -270,6 +285,7 @@ def sort_trade_block_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         main_rows,
         key=lambda row: (
             str(row.get("trade_block_id") or ""),
+            _trade_block_row_sort_group(row),
             str(row.get("timestamp") or ""),
             int(row.get("candle_index") if row.get("candle_index") is not None else -1),
             ROW_TYPE_ORDER.get(str(row.get("row_type") or ""), 99),
@@ -312,13 +328,17 @@ def _is_flat_fill_export_row(row: dict[str, Any]) -> bool:
     )
 
 
-def _is_stale_submitted_order_after_flat(row: dict[str, Any]) -> bool:
-    if row.get("row_type") != "order":
-        return False
-
+def _is_stale_row_after_flat(row: dict[str, Any]) -> bool:
+    row_type = str(row.get("row_type") or "")
     event_type = str(row.get("event_type") or "")
     status = str(row.get("status") or "")
     purpose = str(row.get("purpose") or "")
+
+    if row_type == "fill" and _is_initial_entry_purpose(purpose):
+        return True
+
+    if row_type != "order":
+        return False
 
     if event_type != "submitted":
         return False
@@ -326,7 +346,8 @@ def _is_stale_submitted_order_after_flat(row: dict[str, Any]) -> bool:
         return False
 
     return (
-        purpose.startswith("CYCLE_")
+        _is_initial_entry_purpose(purpose)
+        or purpose.startswith("CYCLE_")
         or purpose
         in {
             "LONG_TP_EXIT",
@@ -337,11 +358,11 @@ def _is_stale_submitted_order_after_flat(row: dict[str, Any]) -> bool:
     )
 
 
-def drop_stale_submitted_orders_after_flat(
+def drop_stale_rows_after_flat(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """
-    Remove stale submitted/NEW order-log rows after a trade block is already flat.
+    Remove stale rows after a trade block is already flat.
 
     These rows can be old order-log entries whose timestamp is generated during
     export/report creation. They make the CSV look as if cycle/exit orders stayed
@@ -353,7 +374,7 @@ def drop_stale_submitted_orders_after_flat(
     for row in rows:
         key = _trade_block_export_key(row)
 
-        if key in flat_seen and _is_stale_submitted_order_after_flat(row):
+        if key in flat_seen and _is_stale_row_after_flat(row):
             continue
 
         filtered.append(row)
