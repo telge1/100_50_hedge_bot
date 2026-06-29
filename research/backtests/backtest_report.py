@@ -12,6 +12,7 @@ from typing import Any, Iterable
 from fixed_cycle_hedge_bot.models import FillEvent
 
 from .intent_diagnostics import last_intent_summary, summarize_exit_diagnostics
+from .backtest_config_loader import HIGHLIGHT_BOT_CONFIG_KEYS
 from .config_diagnostics import config_diagnostics_summary_fields
 from .purpose_utils import purpose_log_fields
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
@@ -51,6 +52,19 @@ SUMMARY_CSV_FIELDS = (
     "initial_exit_trigger_distance_pct",
     "nearest_config_candidate",
     "nearest_config_candidate_source",
+    "config_path",
+    "config_loaded",
+    "config_load_warning",
+    "price_tick_size",
+    "tp_profit_target_pct",
+    "long_fill_distance_pct",
+    "short_fill_distance_pct",
+    "base_notional_usdt",
+    "hedge_ratio_short",
+    "recovery_activation_timing",
+    "recovery_mode_trigger_override_enabled",
+    "recovery_mode_trigger_override_pct",
+    "time_distance_refill_trigger_minutes",
 )
 
 
@@ -177,6 +191,22 @@ class BacktestResult:
     live_config_comparison: dict[str, Any] = field(default_factory=dict)
     exit_level_diagnostics: list[dict[str, Any]] = field(default_factory=list)
     config_source: str = ""
+    config_path: str | None = None
+    config_loaded: bool = False
+    config_load_warning: str | None = None
+    config_unknown_keys: list[str] = field(default_factory=list)
+    config_overlay_missing_keys: list[str] = field(default_factory=list)
+    loaded_bot_config: dict[str, Any] = field(default_factory=dict)
+    price_tick_size: float | None = None
+    tp_profit_target_pct: float | None = None
+    long_fill_distance_pct: float | None = None
+    short_fill_distance_pct: float | None = None
+    base_notional_usdt: float | None = None
+    hedge_ratio_short: float | None = None
+    recovery_activation_timing: str | None = None
+    recovery_mode_trigger_override_enabled: bool | None = None
+    recovery_mode_trigger_override_pct: float | None = None
+    time_distance_refill_trigger_minutes: int | None = None
     initial_exit_trigger: float | None = None
     initial_exit_trigger_distance_abs: float | None = None
     initial_exit_trigger_distance_pct: float | None = None
@@ -201,6 +231,8 @@ def result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
     )
     if result.config_diagnostics:
         payload.update(config_diagnostics_summary_fields(result.config_diagnostics))
+    if result.loaded_bot_config:
+        payload.update(result.loaded_bot_config)
     row: dict[str, Any] = {}
     for key in SUMMARY_CSV_FIELDS:
         value = payload.get(key)

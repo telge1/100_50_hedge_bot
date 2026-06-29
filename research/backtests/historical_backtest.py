@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
+from .backtest_config_loader import (
+    DEFAULT_LONG_CONFIG_PATH,
+    DEFAULT_SHORT_CONFIG_PATH,
+    ConfigSource,
+    apply_config_load_result_to_backtest_result,
+    resolve_backtest_config,
+)
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
 from .fill_models import resolve_fill_model_config
@@ -84,6 +92,10 @@ def run_historical_backtest(
     max_fills_per_candle: int | None = None,
     conservative_fill_order: bool = True,
     initial_notional_usdt: float = 100.0,
+    config_source: ConfigSource = "test",
+    long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
+    short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
+    file_config_path: str | Path | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -106,10 +118,19 @@ def run_historical_backtest(
         )
 
     first_candle = candle_list[0]
+    config_load = resolve_backtest_config(
+        config_source=config_source,
+        signal=signal,
+        symbol=symbol_upper,
+        long_config_path=long_config_path,
+        short_config_path=short_config_path,
+        file_config_path=file_config_path,
+    )
     sim = HedgeBotOriginalSimulator(
         signal=signal,
         symbol=symbol_upper,
         candle_close=float(first_candle.close),
+        config_load=config_load,
     )
     sim.candle_index = 0
     result = BacktestResult(
@@ -120,6 +141,7 @@ def run_historical_backtest(
         fill_model=fill_config.fill_model,
         max_fills_per_candle=fill_config.max_fills_per_candle,
     )
+    apply_config_load_result_to_backtest_result(result, config_load)
 
     cumulative_pnl = 0.0
     peak_pnl = 0.0

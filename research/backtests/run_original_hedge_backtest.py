@@ -7,6 +7,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .backtest_config_loader import (
+    DEFAULT_LONG_CONFIG_PATH,
+    DEFAULT_SHORT_CONFIG_PATH,
+)
 from .backtest_report import (
     BacktestResult,
     comparison_output_paths,
@@ -56,6 +60,10 @@ def run_original_hedge_backtests(
     output_dir: str | Path = "research/backtests/results",
     fill_model: str = "conservative",
     max_fills_per_candle: int | None = None,
+    config_source: ConfigSource = "test",
+    long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
+    short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
+    file_config_path: str | Path | None = None,
     write_json: bool = True,
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
@@ -81,6 +89,10 @@ def run_original_hedge_backtests(
             max_candles=effective_max_candles,
             fill_model=fill_config.fill_model,
             max_fills_per_candle=fill_config.max_fills_per_candle,
+            config_source=config_source,
+            long_config_path=long_config_path,
+            short_config_path=short_config_path,
+            file_config_path=file_config_path,
         )
 
     json_path, csv_path = default_output_paths(output_dir, symbol_upper)
@@ -99,6 +111,10 @@ def run_original_hedge_backtests(
                     "fill_model": fill_config.fill_model,
                     "max_fills_per_candle": fill_config.max_fills_per_candle,
                     "directions": directions,
+                    "config_source": config_source,
+                    "long_config_path": str(long_config_path),
+                    "short_config_path": str(short_config_path),
+                    "file_config_path": str(file_config_path) if file_config_path else None,
                 },
             )
         )
@@ -113,6 +129,7 @@ def run_original_hedge_backtests(
         "candles_loaded": len(candle_rows),
         "fill_model": fill_config.fill_model,
         "max_fills_per_candle": fill_config.max_fills_per_candle,
+        "config_source": config_source,
         "results": results,
         "output_files": written,
     }
@@ -128,6 +145,10 @@ def run_fill_model_comparison(
     output_dir: str | Path = "research/backtests/results",
     write_json: bool = True,
     write_csv: bool = True,
+    config_source: ConfigSource = "test",
+    long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
+    short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
+    file_config_path: str | Path | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -149,6 +170,10 @@ def run_fill_model_comparison(
                 max_candles=effective_max_candles,
                 fill_model=fill_config.fill_model,
                 max_fills_per_candle=fill_config.max_fills_per_candle,
+                config_source=config_source,
+                long_config_path=long_config_path,
+                short_config_path=short_config_path,
+                file_config_path=file_config_path,
             )
 
     json_path, csv_path = comparison_output_paths(output_dir, symbol_upper)
@@ -284,6 +309,27 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="With --debug, print full config and exit-level diagnostics",
     )
+    parser.add_argument(
+        "--config-source",
+        default="test",
+        choices=["test", "live", "file"],
+        help="Config source: test defaults, live bot JSON, or explicit file",
+    )
+    parser.add_argument(
+        "--long-config-path",
+        default=str(DEFAULT_LONG_CONFIG_PATH),
+        help="Long bot live config path for --config-source live",
+    )
+    parser.add_argument(
+        "--short-config-path",
+        default=str(DEFAULT_SHORT_CONFIG_PATH),
+        help="Short bot live config path for --config-source live",
+    )
+    parser.add_argument(
+        "--config-path",
+        default=None,
+        help="Config file path for --config-source file",
+    )
     return parser
 
 
@@ -296,7 +342,8 @@ def _print_run_summary(payload: dict[str, Any]) -> None:
     else:
         print(
             f"{header} fill_model={payload.get('fill_model')} "
-            f"max_fills_per_candle={payload.get('max_fills_per_candle')}"
+            f"max_fills_per_candle={payload.get('max_fills_per_candle')} "
+            f"config_source={payload.get('config_source')}"
         )
 
     for key, result in payload["results"].items():
@@ -305,7 +352,8 @@ def _print_run_summary(payload: dict[str, Any]) -> None:
             f"  {label}: status={result.final_status} "
             f"fills={result.fills_count} pnl={result.realized_pnl:.4f} "
             f"candles={result.candles_processed} exit={result.exit_reason} "
-            f"fill_model={result.fill_model} max_fills={result.max_fills_per_candle}"
+            f"fill_model={result.fill_model} max_fills={result.max_fills_per_candle} "
+            f"config_source={result.config_source} price_tick_size={result.price_tick_size}"
         )
     if payload["output_files"]["json"]:
         print(f"json={payload['output_files']['json']}")
@@ -338,6 +386,10 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=args.output_dir,
                 write_json=write_json,
                 write_csv=write_csv,
+                config_source=args.config_source,
+                long_config_path=args.long_config_path,
+                short_config_path=args.short_config_path,
+                file_config_path=args.config_path,
             )
         else:
             payload = run_original_hedge_backtests(
@@ -351,6 +403,10 @@ def main(argv: list[str] | None = None) -> int:
                 max_fills_per_candle=args.max_fills_per_candle,
                 write_json=write_json,
                 write_csv=write_csv,
+                config_source=args.config_source,
+                long_config_path=args.long_config_path,
+                short_config_path=args.short_config_path,
+                file_config_path=args.config_path,
             )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

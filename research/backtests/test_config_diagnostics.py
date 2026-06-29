@@ -157,7 +157,7 @@ def test_cli_json_contains_config_diagnostics(tmp_path: Path) -> None:
     payload = json.loads((tmp_path / "BTCUSDT_original_hedge_5m_results.json").read_text())
     run = payload["runs"]["long"]
     assert "config_diagnostics" in run
-    assert run["config_diagnostics"]["config_source"]
+    assert run["config_diagnostics"]["config_source"] == "test"
 
 
 def test_summary_csv_contains_config_fields() -> None:
@@ -198,7 +198,7 @@ def test_apt_optional_config_diagnostics() -> None:
         pytest.skip(f"external APT feather file not present: {apt_path}")
 
     candles = load_candles_for_symbol("APTUSDT", limit=1000)
-    result = run_historical_backtest("APTUSDT", "long", candles, max_candles=999)
+    result = run_historical_backtest("APTUSDT", "long", candles, max_candles=999, config_source="test")
     assert result.config_diagnostics
     assert result.initial_exit_trigger == pytest.approx(0.8518, rel=1e-4)
     assert result.nearest_config_candidate == pytest.approx(0.8518, rel=1e-4)

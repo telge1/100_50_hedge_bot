@@ -9,6 +9,7 @@ from typing import Any
 
 from fixed_cycle_hedge_bot.models import StrategyIntent
 
+from .backtest_config_loader import extract_highlight_bot_config
 from .purpose_utils import preserve_bot_purpose
 
 EXIT_PURPOSES = frozenset(
@@ -286,6 +287,11 @@ def build_backtest_config_diagnostics(
     symbol: str,
     entry_price: float | None,
     config_source: str,
+    config_path: str | None = None,
+    config_loaded: bool | None = None,
+    config_load_warning: str | None = None,
+    config_unknown_keys: list[str] | tuple[str, ...] | None = None,
+    loaded_bot_config: dict[str, Any] | None = None,
     strategy_state: dict[str, Any] | None = None,
     exit_trigger_price: float | None = None,
     long_qty: float | None = None,
@@ -310,9 +316,14 @@ def build_backtest_config_diagnostics(
     diagnostics: dict[str, Any] = {
         "strategy_class": type(strategy).__name__,
         "config_source": config_source,
+        "config_path": config_path,
+        "config_loaded": config_loaded,
+        "config_load_warning": config_load_warning,
+        "config_unknown_keys": list(config_unknown_keys or []),
         "symbol": symbol.upper(),
         "entry_price": entry,
         "relevant_config": relevant_config,
+        "loaded_bot_config": loaded_bot_config or extract_highlight_bot_config(config),
         "strategy_attributes": scan_strategy_attributes(strategy),
         "computed_candidates": candidates,
         "exit_trigger_price": trigger,

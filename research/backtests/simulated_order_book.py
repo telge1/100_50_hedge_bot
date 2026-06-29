@@ -12,6 +12,14 @@ from fixed_cycle_hedge_bot.models import ManagedOrder, RuntimeState, StrategyInt
 from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
 
+
+def _coerce_timestamp(value: object | None) -> datetime | None:
+    if value is None:
+        return None
+    from .candle_loader import _parse_timestamp
+
+    return _parse_timestamp(value)
+
 ACTIVE_ORDER_STATUSES = frozenset(
     {"NEW", "OPEN", "UNTRIGGERED", "SUBMITTED", "PARTIALLY_FILLED", "PENDING_SUBMIT"}
 )
@@ -40,7 +48,7 @@ class SyntheticCandle:
     def from_row(cls, symbol: str, row: dict[str, Any]) -> SyntheticCandle:
         return cls(
             symbol=symbol,
-            timestamp=row.get("timestamp"),
+            timestamp=_coerce_timestamp(row.get("timestamp")),
             open=float(row["open"]),
             high=float(row["high"]),
             low=float(row["low"]),

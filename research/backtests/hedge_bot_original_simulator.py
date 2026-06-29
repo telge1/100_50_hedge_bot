@@ -23,6 +23,7 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
 from .backtest_report import build_order_log_entry
+from .backtest_config_loader import BacktestConfigLoadResult, extract_highlight_bot_config
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
 from .purpose_utils import preserve_bot_purpose
@@ -60,12 +61,13 @@ class ProcessCandleResult:
     paired_exit_fills_count: int = 0
 
 
-def _default_instrument_rules(symbol: str) -> dict[str, Decimal]:
+def _default_instrument_rules(symbol: str, *, price_tick_size: float | None = None) -> dict[str, Decimal]:
+    tick = Decimal(str(price_tick_size if price_tick_size is not None else 0.1))
     return {
         "min_order_qty": Decimal("0.001"),
         "min_notional": Decimal("5"),
         "qty_step": Decimal("0.001"),
-        "tick_size": Decimal("0.1"),
+        "tick_size": tick,
     }
 
 
@@ -97,9 +99,12 @@ def build_strategy(signal: Signal, config: FixedCycleHedgeConfig | None = None):
     return ShortFixedCycleHedgeStrategy(cfg)
 
 
-def build_runtime_state(*, symbol: str) -> RuntimeState:
+def build_runtime_state(*, symbol: str, price_tick_size: float | None = None) -> RuntimeState:
     runtime_state = RuntimeState(strategy_state={})
-    runtime_state.instrument_rules[symbol.upper()] = _default_instrument_rules(symbol)
+    runtime_state.instrument_rules[symbol.upper()] = _default_instrument_rules(
+        symbol,
+        price_tick_size=price_tick_size,
+    )
     return runtime_state
 
 
@@ -161,6 +166,7 @@ class HedgeBotOriginalSimulator:
         symbol: str = "BTCUSDT",
         candle_close: float = 100.0,
         config: FixedCycleHedgeConfig | None = None,
+        config_load: BacktestConfigLoadResult | None = None,
         temp_dir: Path | None = None,
     ) -> None:
         self.signal = signal
@@ -168,10 +174,36 @@ class HedgeBotOriginalSimulator:
         self.candle = SyntheticCandle(symbol=self.symbol, close=float(candle_close))
         self._temp_dir = temp_dir
         self._owned_temp_dir: tempfile.TemporaryDirectory[str] | None = None
-        self.config = config or build_test_config(signal=signal, symbol=self.symbol)
-        self.config_source = "research.backtests.build_test_config"
+        if config_load is not None:
+            self.config = config_load.config
+            self.config_source = config_load.config_source
+            self.config_path = config_load.config_path
+            self.config_loaded = config_load.config_loaded
+            self.config_load_warning = config_load.config_load_warning
+            self.config_unknown_keys = list(config_load.config_unknown_keys)
+            self.config_overlay_missing_keys = list(config_load.config_overlay_missing_keys)
+        elif config is not None:
+            self.config = config
+            self.config_source = "custom"
+            self.config_path = None
+            self.config_loaded = False
+            self.config_load_warning = None
+            self.config_unknown_keys = []
+            self.config_overlay_missing_keys = []
+        else:
+            self.config = build_test_config(signal=signal, symbol=self.symbol)
+            self.config_source = "test"
+            self.config_path = None
+            self.config_loaded = False
+            self.config_load_warning = None
+            self.config_unknown_keys = []
+            self.config_overlay_missing_keys = []
+        self.loaded_bot_config = extract_highlight_bot_config(self.config)
         self.strategy = build_strategy(signal, self.config)
-        self.runtime_state = build_runtime_state(symbol=self.symbol)
+        self.runtime_state = build_runtime_state(
+            symbol=self.symbol,
+            price_tick_size=float(self.config.price_tick_size),
+        )
         self.book = SimulatedOrderBook(symbol=self.symbol)
         self.snapshot = build_flat_snapshot(
             symbol=self.symbol,

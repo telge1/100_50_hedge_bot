@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .backtest_config_loader import BacktestConfigLoadResult, apply_config_load_result_to_backtest_result
 from .backtest_report import BacktestResult
 from .config_diagnostics import (
     build_backtest_config_diagnostics,
@@ -196,6 +197,19 @@ def finalize_backtest_debug(
 
     result.open_reason_detail = explain_open_reason(result)
 
+    apply_config_load_result_to_backtest_result(
+        result,
+        BacktestConfigLoadResult(
+            config=sim.config,
+            config_source=getattr(sim, "config_source", "unknown"),
+            config_path=getattr(sim, "config_path", None),
+            config_loaded=bool(getattr(sim, "config_loaded", False)),
+            config_load_warning=getattr(sim, "config_load_warning", None),
+            config_unknown_keys=tuple(getattr(sim, "config_unknown_keys", []) or []),
+            config_overlay_missing_keys=tuple(getattr(sim, "config_overlay_missing_keys", []) or []),
+        ),
+    )
+
     exit_trigger = extract_initial_exit_trigger(result.intent_log)
     result.config_diagnostics = build_backtest_config_diagnostics(
         sim.strategy,
@@ -203,6 +217,11 @@ def finalize_backtest_debug(
         symbol=result.symbol,
         entry_price=result.entry_price,
         config_source=getattr(sim, "config_source", "unknown"),
+        config_path=getattr(sim, "config_path", None),
+        config_loaded=bool(getattr(sim, "config_loaded", False)),
+        config_load_warning=getattr(sim, "config_load_warning", None),
+        config_unknown_keys=getattr(sim, "config_unknown_keys", []),
+        loaded_bot_config=getattr(sim, "loaded_bot_config", {}),
         strategy_state=dict(sim.runtime_state.strategy_state),
         exit_trigger_price=exit_trigger,
         long_qty=float(sim.book.long_qty),
@@ -242,6 +261,11 @@ def print_config_diagnostics_report(result: BacktestResult) -> None:
     for key in (
         "strategy_class",
         "config_source",
+        "config_path",
+        "config_loaded",
+        "config_load_warning",
+        "config_unknown_keys",
+        "config_overlay_missing_keys",
         "entry_price",
         "exit_trigger_price",
         "trigger_minus_entry",
@@ -252,6 +276,12 @@ def print_config_diagnostics_report(result: BacktestResult) -> None:
     ):
         if key in diagnostics:
             print(f"  {format_config_diagnostics_line(key, diagnostics.get(key))}")
+
+    loaded_bot = diagnostics.get("loaded_bot_config") or {}
+    if loaded_bot:
+        print("  loaded_bot_config:")
+        for cfg_key, cfg_value in sorted(loaded_bot.items()):
+            print(f"    {cfg_key}={cfg_value}")
 
     nearest = diagnostics.get("nearest_candidate_to_exit_trigger")
     if nearest:
@@ -315,10 +345,11 @@ def print_debug_report(
 
     if config_summary and getattr(result, "config_source", None):
         print(
-            f"config_source={result.config_source} "
+            f"config_source={result.config_source} config_path={getattr(result, 'config_path', None)} "
+            f"price_tick_size={getattr(result, 'price_tick_size', None)} "
+            f"tp_profit_target_pct={getattr(result, 'tp_profit_target_pct', None)} "
             f"initial_exit_trigger={getattr(result, 'initial_exit_trigger', None)} "
             f"trigger_dist_abs={getattr(result, 'initial_exit_trigger_distance_abs', None)} "
-            f"trigger_dist_pct={getattr(result, 'initial_exit_trigger_distance_pct', None)} "
             f"nearest_candidate={getattr(result, 'nearest_config_candidate', None)}"
         )
 
