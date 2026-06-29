@@ -31,6 +31,7 @@ from research.backtests.simulated_execution import (
     should_fill_order_on_candle,
 )
 from research.backtests.simulated_order_book import SimulatedOrderBook, SyntheticCandle
+from research.backtests.simulated_pnl import calculate_simulated_closed_pnl
 
 
 @pytest.fixture
@@ -356,6 +357,123 @@ def test_phase3_reduce_fill_updates_position_and_pnl() -> None:
     )
     assert book.long_qty == 0.0
     assert fill.metadata.get("confirmed_closed_pnl") == pytest.approx(1.0)
+    assert fill.metadata.get("closed_pnl") == pytest.approx(1.0)
+    assert fill.metadata.get("runtime_calculated_pnl") == pytest.approx(1.0)
+
+
+def test_phase35_long_reduce_loss_pnl() -> None:
+    pnl, _ = calculate_simulated_closed_pnl(
+        side="long",
+        avg_entry_price=100.0,
+        fill_price=98.0,
+        qty=1.0,
+        reduce_only=True,
+    )
+    assert pnl == pytest.approx(-2.0)
+
+
+def test_phase35_long_reduce_profit_pnl() -> None:
+    pnl, _ = calculate_simulated_closed_pnl(
+        side="long",
+        avg_entry_price=100.0,
+        fill_price=103.0,
+        qty=1.0,
+        reduce_only=True,
+    )
+    assert pnl == pytest.approx(3.0)
+
+
+def test_phase35_short_reduce_loss_pnl() -> None:
+    pnl, _ = calculate_simulated_closed_pnl(
+        side="short",
+        avg_entry_price=100.0,
+        fill_price=102.0,
+        qty=1.0,
+        reduce_only=True,
+    )
+    assert pnl == pytest.approx(-2.0)
+
+
+def test_phase35_short_reduce_profit_pnl() -> None:
+    pnl, _ = calculate_simulated_closed_pnl(
+        side="short",
+        avg_entry_price=100.0,
+        fill_price=97.0,
+        qty=1.0,
+        reduce_only=True,
+    )
+    assert pnl == pytest.approx(3.0)
+
+
+def test_phase35_opening_fill_has_zero_closed_pnl() -> None:
+    pnl, details = calculate_simulated_closed_pnl(
+        side="long",
+        avg_entry_price=100.0,
+        fill_price=100.0,
+        qty=1.0,
+        reduce_only=False,
+    )
+    assert pnl == pytest.approx(0.0)
+    assert details["pnl_calc_source"] == "simulated_opening_zero"
+
+
+def test_phase35_reduce_fill_metadata_matches_pnl_function() -> None:
+    book = SimulatedOrderBook(symbol="BTCUSDT")
+    runtime_state = RuntimeState(strategy_state={})
+    book.short_qty = 1.0
+    book.short_avg = 100.0
+    order = book.submit_intent(
+        StrategyIntent(
+            side="short",
+            qty=1.0,
+            purpose="SHORT_TP_EXIT",
+            order_type="Market",
+            trigger_price=97.0,
+            reduce_only=True,
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
+        ),
+        replace=False,
+    )
+    expected_pnl, _ = calculate_simulated_closed_pnl(
+        side="short",
+        avg_entry_price=100.0,
+        fill_price=97.0,
+        qty=1.0,
+        reduce_only=True,
+    )
+    fill = fill_order_at_price(
+        book=book,
+        runtime_state=runtime_state,
+        order_id=order.order_id,
+        fill_price=97.0,
+    )
+    assert expected_pnl == pytest.approx(3.0)
+    assert fill.metadata.get("confirmed_closed_pnl") == pytest.approx(expected_pnl)
+    assert fill.metadata.get("closed_pnl") == pytest.approx(expected_pnl)
+    assert fill.metadata.get("runtime_calculated_pnl") == pytest.approx(expected_pnl)
+    assert fill.metadata.get("cycle_index") == 1
+    assert fill.metadata.get("cycle_role") == "short_reduce"
+    assert fill.metadata.get("order_id") == order.order_id
+
+
+def test_phase35_fee_aware_pnl_matches_runtime_formula() -> None:
+    fee_rate = 0.00055
+    gross = (103.0 - 100.0) * 1.0
+    entry_fee = abs(100.0 * 1.0) * fee_rate
+    exit_fee = abs(103.0 * 1.0) * fee_rate
+    expected_net = gross - entry_fee - exit_fee
+
+    pnl, details = calculate_simulated_closed_pnl(
+        side="long",
+        avg_entry_price=100.0,
+        fill_price=103.0,
+        qty=1.0,
+        reduce_only=True,
+        fee_rate=fee_rate,
+    )
+    assert pnl == pytest.approx(expected_net)
+    assert details["pnl_calc_source"] == "simulated_calculate_pnl_with_fees"
+    assert details["gross_pnl"] == pytest.approx(gross)
 
 
 def test_long_phase3_strategy_integration_fills_active_order(long_simulator) -> None:

@@ -8,6 +8,7 @@ from uuid import uuid4
 from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
+from .simulated_pnl import attach_closed_pnl_metadata
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
 
@@ -91,11 +92,14 @@ def virtual_order_to_fill_event(
     metadata.setdefault("symbol", order.symbol)
     metadata.setdefault("order_id", order.order_id)
     metadata.setdefault("exchange_order_id", order.exchange_order_id)
+    metadata.setdefault("purpose", order.purpose)
+    if metadata.get("cycle_index") is None and order.metadata.get("cycle_index") is not None:
+        metadata["cycle_index"] = order.metadata.get("cycle_index")
+    if metadata.get("cycle_role") is None and order.metadata.get("cycle_role") is not None:
+        metadata["cycle_role"] = order.metadata.get("cycle_role")
+
     pnl = float(metadata.get("confirmed_closed_pnl") or metadata.get("closed_pnl") or 0.0)
-    metadata.setdefault("confirmed_closed_pnl", pnl)
-    metadata.setdefault("closed_pnl", pnl)
-    metadata.setdefault("runtime_calculated_pnl", pnl)
-    metadata.setdefault("exec_pnl", pnl)
+    attach_closed_pnl_metadata(metadata, pnl)
 
     return FillEvent(
         exchange_order_id=order.exchange_order_id,

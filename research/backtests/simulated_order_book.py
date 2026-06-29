@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from fixed_cycle_hedge_bot.models import ManagedOrder, RuntimeState, StrategyIntent
 
+from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
+
 ACTIVE_ORDER_STATUSES = frozenset(
     {"NEW", "OPEN", "UNTRIGGERED", "SUBMITTED", "PARTIALLY_FILLED", "PENDING_SUBMIT"}
 )
@@ -96,6 +98,7 @@ class SimulatedOrderBook:
     short_qty: float = 0.0
     long_avg: float = 0.0
     short_avg: float = 0.0
+    fee_rate: float | None = None
     _orders: dict[str, VirtualOrder] = field(default_factory=dict)
     _order_seq: int = 0
 
@@ -200,13 +203,13 @@ class SimulatedOrderBook:
 
         fill_qty = float(qty if qty is not None else order.qty)
         side = str(order.side).lower()
-        realized_pnl = 0.0
+        close_qty = fill_qty
+        avg_for_pnl = 0.0
 
         if side == "long":
             if order.reduce_only:
                 close_qty = min(fill_qty, self.long_qty)
-                if close_qty > 0 and self.long_avg > 0:
-                    realized_pnl = (float(fill_price) - self.long_avg) * close_qty
+                avg_for_pnl = self.long_avg
                 self.long_qty = max(0.0, self.long_qty - close_qty)
                 if self.long_qty <= 1e-12:
                     self.long_qty = 0.0
@@ -224,8 +227,7 @@ class SimulatedOrderBook:
         elif side == "short":
             if order.reduce_only:
                 close_qty = min(fill_qty, self.short_qty)
-                if close_qty > 0 and self.short_avg > 0:
-                    realized_pnl = (self.short_avg - float(fill_price)) * close_qty
+                avg_for_pnl = self.short_avg
                 self.short_qty = max(0.0, self.short_qty - close_qty)
                 if self.short_qty <= 1e-12:
                     self.short_qty = 0.0
@@ -243,14 +245,22 @@ class SimulatedOrderBook:
         else:
             raise ValueError(f"unsupported simulated fill side: {side}")
 
+        realized_pnl, pnl_details = closed_pnl_for_virtual_order_fill(
+            side=side,
+            reduce_only=bool(order.reduce_only),
+            avg_entry_price=float(avg_for_pnl),
+            fill_price=float(fill_price),
+            qty=float(close_qty if order.reduce_only else fill_qty),
+            fee_rate=self.fee_rate,
+        )
+
         order.status = "FILLED"
         order.filled_qty = fill_qty
         order.remaining_qty = 0.0
         order.metadata["fill_price"] = float(fill_price)
-        order.metadata["confirmed_closed_pnl"] = float(realized_pnl)
-        order.metadata["closed_pnl"] = float(realized_pnl)
-        order.metadata["runtime_calculated_pnl"] = float(realized_pnl)
-        order.metadata["exec_pnl"] = float(realized_pnl)
+        if order.reduce_only and avg_for_pnl > 0:
+            order.metadata["entry_price_for_pnl"] = float(avg_for_pnl)
+        attach_closed_pnl_metadata(order.metadata, realized_pnl, pnl_details=pnl_details)
         return order, float(realized_pnl)
 
     def apply_market_fill(
