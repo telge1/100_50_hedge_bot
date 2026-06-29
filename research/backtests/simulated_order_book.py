@@ -66,6 +66,7 @@ class VirtualOrder:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     created_index: int = 0
+    created_candle_index: int | None = None
     filled_qty: float = 0.0
     remaining_qty: float = 0.0
 

@@ -195,14 +195,14 @@ def run_historical_backtest(
             result.realized_pnl_pct = (cumulative_pnl / float(initial_notional_usdt)) * 100.0
             result.max_drawdown_pct = (max_drawdown / float(initial_notional_usdt)) * 100.0
         result.cycles_seen = _cycles_seen(dict(sim.runtime_state.strategy_state))
-        finalize_backtest_debug(result, sim)
+        finalize_backtest_debug(result, sim, candles=candle_list)
     except Exception as exc:
         result.final_status = "error"
         result.exit_reason = "exception"
         result.error = str(exc)
         result.open_reason_detail = f"error:{exc}"
         try:
-            finalize_backtest_debug(result, sim)
+            finalize_backtest_debug(result, sim, candles=candle_list)
         except Exception:
             pass
     finally:

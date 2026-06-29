@@ -11,6 +11,7 @@ from typing import Any, Iterable
 
 from fixed_cycle_hedge_bot.models import FillEvent
 
+from .intent_diagnostics import last_intent_summary, summarize_exit_diagnostics
 from .purpose_utils import purpose_log_fields
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -38,6 +39,11 @@ SUMMARY_CSV_FIELDS = (
     "max_fills_per_candle",
     "same_candle_fills_count",
     "paired_exit_fills_count",
+    "final_active_order_diagnostics_summary",
+    "last_intent_purpose",
+    "last_intent_trigger_price",
+    "last_intent_price",
+    "last_intent_source_fill_purpose",
 )
 
 
@@ -92,6 +98,7 @@ def build_order_log_entry(
     status: str | None = None,
     replaced_old_order_id: str | None = None,
     new_order_id: str | None = None,
+    intent_mapping: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     ts = timestamp or order.created_at
     purpose_fields = purpose_log_fields(order.purpose, order.metadata)
@@ -113,6 +120,8 @@ def build_order_log_entry(
         entry["replaced_old_order_id"] = replaced_old_order_id
     if new_order_id:
         entry["new_order_id"] = new_order_id
+    if intent_mapping:
+        entry.update(intent_mapping)
     return entry
 
 
@@ -152,6 +161,8 @@ class BacktestResult:
     max_fills_per_candle: int = 1
     same_candle_fills_count: int = 0
     paired_exit_fills_count: int = 0
+    intent_log: list[dict[str, Any]] = field(default_factory=list)
+    final_active_order_diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -164,6 +175,11 @@ class BacktestResult:
 
 def result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
     payload = result.to_dict()
+    intent_summary = last_intent_summary(result.intent_log or [])
+    payload.update(intent_summary)
+    payload["final_active_order_diagnostics_summary"] = summarize_exit_diagnostics(
+        result.final_active_order_diagnostics or []
+    )
     row: dict[str, Any] = {}
     for key in SUMMARY_CSV_FIELDS:
         value = payload.get(key)

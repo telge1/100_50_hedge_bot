@@ -6,8 +6,9 @@ from typing import Any
 
 from .backtest_report import BacktestResult
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator
+from .intent_diagnostics import compute_final_active_order_diagnostics
 from .purpose_utils import purpose_log_fields, preserve_bot_purpose
-from .simulated_order_book import VirtualOrder
+from .simulated_order_book import SyntheticCandle, VirtualOrder
 
 STRATEGY_STATE_EXCERPT_KEYS = (
     "active_cycle_index",
@@ -111,7 +112,34 @@ def explain_open_reason(result: BacktestResult) -> str:
     return "unknown"
 
 
-def finalize_backtest_debug(result: BacktestResult, sim: HedgeBotOriginalSimulator) -> None:
+def format_intent_line(intent: dict[str, Any]) -> str:
+    return (
+        f"{intent.get('candle_index')} {intent.get('timestamp')} "
+        f"{intent.get('purpose')} {intent.get('side')} qty={intent.get('qty')} "
+        f"price={intent.get('price')} trigger={intent.get('trigger_price')} "
+        f"source_fill={intent.get('source_fill_purpose')}"
+    )
+
+
+def format_exit_diagnostic_line(item: dict[str, Any]) -> str:
+    return (
+        f"{item.get('final_order_purpose')} side={item.get('final_order_side')} "
+        f"trigger={item.get('final_order_trigger_price')} "
+        f"created_candle={item.get('created_candle_index')} "
+        f"max_high={item.get('max_high_after_created')} "
+        f"min_low={item.get('min_low_after_created')} "
+        f"touchable={item.get('was_touchable_after_created')} "
+        f"first_touch={item.get('first_touch_time_after_created')} "
+        f"dist_max_high_pct={item.get('distance_to_max_high_pct')}"
+    )
+
+
+def finalize_backtest_debug(
+    result: BacktestResult,
+    sim: HedgeBotOriginalSimulator,
+    *,
+    candles: list[SyntheticCandle] | None = None,
+) -> None:
     """Populate debug fields on ``result`` from simulator/book/state."""
     result.final_long_qty = float(sim.book.long_qty)
     result.final_short_qty = float(sim.book.short_qty)
@@ -132,6 +160,18 @@ def finalize_backtest_debug(result: BacktestResult, sim: HedgeBotOriginalSimulat
         for entry in sim.order_log:
             if entry not in result.order_log:
                 result.order_log.append(entry)
+
+    result.intent_log = list(sim.intent_log)
+
+    active_virtual_orders = list(sim.book.active_orders())
+    if candles is not None and active_virtual_orders:
+        result.final_active_order_diagnostics = compute_final_active_order_diagnostics(
+            active_virtual_orders,
+            all_candles=candles,
+            state=sim.runtime_state,
+        )
+    else:
+        result.final_active_order_diagnostics = []
 
     if result.fill_log:
         result.last_fill = dict(result.fill_log[-1])
@@ -170,7 +210,10 @@ def print_debug_report(
     *,
     print_fill_log: bool = False,
     print_order_log: bool = False,
+    print_intent_log: bool = False,
+    print_exit_diagnostics: bool = False,
     tail: int = 5,
+    intent_tail: int = 10,
 ) -> None:
     print(f"--- debug {result.direction} ---")
     print(
@@ -220,3 +263,26 @@ def print_debug_report(
         print("order_log:")
         for order in result.order_log:
             print(f"  {format_order_line(order)}")
+
+    recent_intents = result.intent_log[-intent_tail:] if result.intent_log else []
+    if recent_intents:
+        print(f"last_{len(recent_intents)}_intents:")
+        for intent in recent_intents:
+            print(f"  {format_intent_line(intent)}")
+
+    if result.final_active_order_diagnostics:
+        print("final_active_order_diagnostics:")
+        for item in result.final_active_order_diagnostics:
+            print(f"  {format_exit_diagnostic_line(item)}")
+    else:
+        print("final_active_order_diagnostics: none")
+
+    if print_intent_log and result.intent_log:
+        print("intent_log:")
+        for intent in result.intent_log:
+            print(f"  {format_intent_line(intent)}")
+
+    if print_exit_diagnostics and result.final_active_order_diagnostics:
+        print("exit_diagnostics_full:")
+        for item in result.final_active_order_diagnostics:
+            print(f"  {format_exit_diagnostic_line(item)}")

@@ -24,6 +24,8 @@ from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState,
 
 from .backtest_report import build_order_log_entry
 from .fill_models import FillModelConfig, resolve_fill_model_config
+from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
+from .purpose_utils import preserve_bot_purpose
 from .simulated_execution import fill_entry_intents_at_candle_close, process_candle_fills
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
@@ -182,6 +184,7 @@ class HedgeBotOriginalSimulator:
         )
         self.orders_submitted = 0
         self.order_log: list[dict[str, Any]] = []
+        self.intent_log: list[dict[str, Any]] = []
         self.candle_index = 0
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
@@ -215,6 +218,7 @@ class HedgeBotOriginalSimulator:
         event_type: str,
         status: str | None = None,
         replaced_old_order_id: str | None = None,
+        intent_mapping: dict[str, Any] | None = None,
     ) -> None:
         self.order_log.append(
             build_order_log_entry(
@@ -225,14 +229,49 @@ class HedgeBotOriginalSimulator:
                 status=status,
                 replaced_old_order_id=replaced_old_order_id,
                 new_order_id=order.order_id if event_type == "replaced" else None,
+                intent_mapping=intent_mapping,
             )
         )
+
+    def _log_intent(
+        self,
+        intent: StrategyIntent,
+        *,
+        event_source: str,
+        source_fill_purpose: str | None = None,
+    ) -> int:
+        entry = build_intent_log_entry(
+            intent,
+            timestamp=self.candle.timestamp,
+            candle_index=self.candle_index,
+            event_source=event_source,
+            source_fill_purpose=source_fill_purpose,
+        )
+        self.intent_log.append(entry)
+        return len(self.intent_log) - 1
+
+    def _log_intents(
+        self,
+        intents: list[StrategyIntent],
+        *,
+        event_source: str,
+        source_fill_purpose: str | None = None,
+    ) -> list[int]:
+        return [
+            self._log_intent(
+                intent,
+                event_source=event_source,
+                source_fill_purpose=source_fill_purpose,
+            )
+            for intent in intents
+        ]
 
     def _submit_intent_with_logging(
         self,
         intent: StrategyIntent,
         *,
         replace: bool,
+        intent_log_index: int | None = None,
     ) -> VirtualOrder | None:
         if str(intent.purpose or "").strip().upper() in {
             "INITIAL_LONG_ENTRY",
@@ -240,6 +279,12 @@ class HedgeBotOriginalSimulator:
         }:
             return None
         order, replaced_ids = self.book.submit_intent(intent, replace=replace)
+        order.created_candle_index = self.candle_index
+        intent_mapping = build_intent_to_order_mapping(
+            intent,
+            order,
+            intent_log_index=intent_log_index,
+        )
         for old_id in replaced_ids:
             old_order = self.book.get_order(old_id)
             if old_order is not None:
@@ -253,11 +298,20 @@ class HedgeBotOriginalSimulator:
                     event_type="replaced",
                     status=order.status,
                     replaced_old_order_id=old_id,
+                    intent_mapping=intent_mapping,
                 )
             else:
-                self._record_order_event(order, event_type="submitted")
+                self._record_order_event(
+                    order,
+                    event_type="submitted",
+                    intent_mapping=intent_mapping,
+                )
         if not replaced_ids:
-            self._record_order_event(order, event_type="submitted")
+            self._record_order_event(
+                order,
+                event_type="submitted",
+                intent_mapping=intent_mapping,
+            )
         return order
 
     def _configure_isolated_paths(self) -> None:
@@ -290,19 +344,52 @@ class HedgeBotOriginalSimulator:
         self.runtime_state.last_snapshot = self.snapshot
         return self.snapshot
 
+    def _resolve_intent_log_index(self, intent: StrategyIntent) -> int | None:
+        purpose = preserve_bot_purpose(intent.purpose)
+        for idx in range(len(self.intent_log) - 1, -1, -1):
+            entry = self.intent_log[idx]
+            if entry.get("purpose") != purpose:
+                continue
+            if float(entry.get("qty") or 0.0) != float(intent.qty):
+                continue
+            entry_trigger = entry.get("trigger_price")
+            intent_trigger = float(intent.trigger_price) if intent.trigger_price is not None else None
+            if entry_trigger != intent_trigger:
+                continue
+            return idx
+        return None
+
     def submit_intents_to_book(
         self,
         intents: list[StrategyIntent],
         *,
         replace: bool = True,
         log_orders: bool = True,
+        event_source: str = "unknown",
+        source_fill_purpose: str | None = None,
+        log_intents: bool = True,
     ) -> list[VirtualOrder]:
+        intent_indices = (
+            self._log_intents(
+                intents,
+                event_source=event_source,
+                source_fill_purpose=source_fill_purpose,
+            )
+            if log_intents
+            else [self._resolve_intent_log_index(intent) for intent in intents]
+        )
         resting: list[VirtualOrder] = []
-        for intent in intents:
+        for intent, intent_log_index in zip(intents, intent_indices):
             if log_orders:
-                order = self._submit_intent_with_logging(intent, replace=replace)
+                order = self._submit_intent_with_logging(
+                    intent,
+                    replace=replace,
+                    intent_log_index=intent_log_index,
+                )
             else:
                 order, _ = self.book.submit_intent(intent, replace=replace)
+                if order is not None:
+                    order.created_candle_index = self.candle_index
             if order is None:
                 continue
             resting.append(order)
@@ -354,7 +441,11 @@ class HedgeBotOriginalSimulator:
                 self.context,
             )
             on_fill_intents.extend(intents)
-            self.submit_intents_to_book(intents)
+            self.submit_intents_to_book(
+                intents,
+                event_source="after_fill",
+                source_fill_purpose=fill_event.purpose,
+            )
 
         self._refresh_snapshot_from_book(source="before_on_tick", price=candle.close)
         tick_intents = self.strategy.on_tick(
@@ -362,7 +453,7 @@ class HedgeBotOriginalSimulator:
             self.runtime_state,
             self.context,
         ) or []
-        self.submit_intents_to_book(tick_intents)
+        self.submit_intents_to_book(tick_intents, event_source="after_candle")
         self._refresh_snapshot_from_book(source="after_on_tick", price=candle.close)
 
         return ProcessCandleResult(
@@ -378,6 +469,7 @@ class HedgeBotOriginalSimulator:
 
     def run_entry_smoke(self) -> SimulationResult:
         entry_intents = self.strategy.on_start(self.snapshot, self.runtime_state, self.context)
+        self._log_intents(entry_intents, event_source="initial")
         if not entry_intents:
             state = dict(self.runtime_state.strategy_state)
             return SimulationResult(
@@ -410,17 +502,33 @@ class HedgeBotOriginalSimulator:
 
         if long_fill is not None:
             self._refresh_snapshot_from_book(source="before_long_entry_on_fill")
-            post_fill_intents.extend(
-                self.strategy.on_fill(long_fill, self.snapshot, self.runtime_state, self.context)
+            long_post_intents = self.strategy.on_fill(
+                long_fill, self.snapshot, self.runtime_state, self.context
             )
+            self._log_intents(
+                long_post_intents,
+                event_source="after_fill",
+                source_fill_purpose=long_fill.purpose,
+            )
+            post_fill_intents.extend(long_post_intents)
 
         if short_fill is not None:
             self._refresh_snapshot_from_book(source="before_short_entry_on_fill")
-            post_fill_intents.extend(
-                self.strategy.on_fill(short_fill, self.snapshot, self.runtime_state, self.context)
+            short_post_intents = self.strategy.on_fill(
+                short_fill, self.snapshot, self.runtime_state, self.context
             )
+            self._log_intents(
+                short_post_intents,
+                event_source="after_fill",
+                source_fill_purpose=short_fill.purpose,
+            )
+            post_fill_intents.extend(short_post_intents)
 
-        resting_orders = self.submit_intents_to_book(post_fill_intents)
+        resting_orders = self.submit_intents_to_book(
+            post_fill_intents,
+            event_source="after_fill",
+            log_intents=False,
+        )
 
         state = dict(self.runtime_state.strategy_state)
         return SimulationResult(
