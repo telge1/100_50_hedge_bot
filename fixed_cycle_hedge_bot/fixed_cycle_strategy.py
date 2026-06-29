@@ -4924,15 +4924,101 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return True
         return False
 
+    def _iter_active_orders_for_purpose(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        purpose: str,
+    ):
+        normalized = (purpose or "").upper()
+        for order in snapshot.active_orders:
+            order_purpose = str(getattr(order, "purpose", "") or "").upper()
+            if order_purpose == normalized and not self._is_terminal_order_status(
+                getattr(order, "status", None)
+            ):
+                yield order
+        for order in runtime_state.active_orders.values():
+            order_purpose = str(getattr(order, "purpose", "") or "").upper()
+            if order_purpose == normalized and not self._is_terminal_order_status(
+                getattr(order, "status", None)
+            ):
+                yield order
+
+    def _missing_normal_split_stage_indices(
+        self,
+        state: dict[str, Any],
+        runtime_state: RuntimeState,
+        snapshot: HedgeSnapshot,
+        *,
+        cycle_index: int,
+        purpose: str,
+        cycle_role: str,
+    ) -> list[int]:
+        cycle_key = str(cycle_index)
+        stage_count_map = state.get("normal_cycle_second_leg_split_stage_count") or {}
+        filled_map = state.get("normal_cycle_second_leg_split_filled_stages") or {}
+        stage_count = int(stage_count_map.get(cycle_key) or 0)
+        filled_stages = {int(idx) for idx in (filled_map.get(cycle_key) or [])}
+        active_stage_indices: set[int] = set()
+
+        for order in self._iter_active_orders_for_purpose(snapshot, runtime_state, purpose):
+            metadata = getattr(order, "metadata", None)
+            metadata = metadata if isinstance(metadata, dict) else {}
+            if not bool(metadata.get("normal_cycle_second_leg_split")):
+                continue
+            try:
+                split_stage_index = int(metadata.get("split_stage_index"))
+            except (TypeError, ValueError):
+                continue
+            active_stage_indices.add(split_stage_index)
+            if stage_count <= 0:
+                try:
+                    stage_count = int(
+                        metadata.get("split_stage_count") or metadata.get("stage_count") or 0
+                    )
+                except (TypeError, ValueError):
+                    stage_count = 0
+
+        if stage_count <= 0:
+            return []
+
+        covered = filled_stages | active_stage_indices
+        return sorted(idx for idx in range(stage_count) if idx not in covered)
+
     def _should_attach_replace_open_purpose(
         self,
         snapshot: HedgeSnapshot,
         runtime_state: RuntimeState,
         purpose: str,
+        *,
+        cycle_index: int | None = None,
+        cycle_role: str | None = None,
     ) -> bool:
         state = runtime_state.strategy_state
         if state.get("exit_orders_submitted_once"):
+            if cycle_index is not None:
+                missing_stages = self._missing_normal_split_stage_indices(
+                    state,
+                    runtime_state,
+                    snapshot,
+                    cycle_index=cycle_index,
+                    purpose=purpose,
+                    cycle_role=cycle_role or self._get_second_leg_cycle_role(),
+                )
+                if missing_stages:
+                    return False
             return True
+        if cycle_index is not None:
+            missing_stages = self._missing_normal_split_stage_indices(
+                state,
+                runtime_state,
+                snapshot,
+                cycle_index=cycle_index,
+                purpose=purpose,
+                cycle_role=cycle_role or self._get_second_leg_cycle_role(),
+            )
+            if missing_stages:
+                return False
         return self._has_active_order_for_purpose(snapshot, runtime_state, purpose)
 
     def _mark_exit_orders_stale_after_structure_fill(
@@ -6284,7 +6370,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             reference_purpose=reference_purpose,
             reference_price=reference_price_for_long_add,
             replace_open_purpose=purpose
-            if self._should_attach_replace_open_purpose(snapshot, runtime_state, purpose)
+            if self._should_attach_replace_open_purpose(
+                snapshot,
+                runtime_state,
+                purpose,
+                cycle_index=cycle_index,
+                cycle_role=self._get_first_leg_cycle_role(),
+            )
             else None,
         )
         return intent
@@ -7697,7 +7789,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             **(
                                 {"replace_open_purpose": purpose}
                                 if self._should_attach_replace_open_purpose(
-                                    snapshot, runtime_state, purpose
+                                    snapshot,
+                                    runtime_state,
+                                    purpose,
+                                    cycle_index=long_cycle_number,
+                                    cycle_role=first_leg_cycle_role,
                                 )
                                 else {}
                             ),
@@ -10095,7 +10191,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "symbol": active_trade_symbol,
             **(
                 {"replace_open_purpose": purpose}
-                if self._should_attach_replace_open_purpose(snapshot, runtime_state, purpose)
+                if self._should_attach_replace_open_purpose(
+                    snapshot,
+                    runtime_state,
+                    purpose,
+                    cycle_index=cycle_index,
+                    cycle_role="short_reduce",
+                )
                 else {}
             ),
             "entry_reference_price": float(state.get("entry_reference_price") or 0.0),
@@ -20960,6 +21062,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         filled_map.setdefault(cycle_key, [])
 
         split_metadata = dict(metadata or {})
+        split_metadata.pop("replace_open_purpose", None)
         split_metadata.update(
             {
                 "normal_cycle_second_leg_split": True,
@@ -21314,6 +21417,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "remaining_qty": float(getattr(order, "remaining_qty", 0.0) or 0.0),
                 "qty": float(getattr(order, "qty", 0.0) or 0.0),
                 "filled_qty": float(getattr(order, "filled_qty", 0.0) or 0.0),
+                "split_stage_index": metadata.get("split_stage_index"),
+                "split_stage_count": metadata.get("split_stage_count"),
+                "normal_cycle_second_leg_split": bool(metadata.get("normal_cycle_second_leg_split")),
             }
 
         runtime_matches = [
@@ -25249,21 +25355,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
                 return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
             if active_same_purpose:
-                reason = f"{first_leg_cycle_role}_order_still_open"
-                expected_next_action = "await_existing_long_reduce"
-                _log_event(
-                    "fixed_cycle_first_leg_gate_blocked",
-                    {
-                        **details,
-                        "allowed_purposes": allowed_purposes,
-                        "expected_cycle_index": expected_cycle_index,
-                        "expected_next_action": expected_next_action,
-                        "is_first_leg_purpose": True,
-                        "is_second_leg_purpose": is_second_leg_purpose,
-                        "reason": reason,
-                    },
+                missing_split_stages = self._missing_normal_split_stage_indices(
+                    state,
+                    runtime_state,
+                    snapshot,
+                    cycle_index=cycle_index,
+                    purpose=purpose,
+                    cycle_role=first_leg_cycle_role,
                 )
-                return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
+                if not missing_split_stages:
+                    reason = f"{first_leg_cycle_role}_order_still_open"
+                    expected_next_action = "await_existing_long_reduce"
+                    _log_event(
+                        "fixed_cycle_first_leg_gate_blocked",
+                        {
+                            **details,
+                            "allowed_purposes": allowed_purposes,
+                            "expected_cycle_index": expected_cycle_index,
+                            "expected_next_action": expected_next_action,
+                            "is_first_leg_purpose": True,
+                            "is_second_leg_purpose": is_second_leg_purpose,
+                            "reason": reason,
+                        },
+                    )
+                    return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
             _log_event(
                 "fixed_cycle_first_leg_gate_allowed",
                 {
@@ -25287,17 +25402,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             waiting_for_short = waiting_short_active and short_tp_pending == cycle_index
             details["allowed_purposes"] = allowed_purposes
+            missing_split_stages = self._missing_normal_split_stage_indices(
+                state,
+                runtime_state,
+                snapshot,
+                cycle_index=cycle_index,
+                purpose=purpose,
+                cycle_role=second_leg_cycle_role,
+            )
             if not waiting_for_short or not first_leg_processed:
                 reason = "short_followup_not_ready"
                 expected_next_action = "build_short_followup"
                 expected_cycle_index = short_tp_pending
                 details["expected_cycle_index"] = expected_cycle_index
                 return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
-            if (
-                second_leg_fill_exists
-                or normalized_purpose in processed_purposes
-                or self._cycle_status_blocks_build(entry_status)
-            ):
+            if second_leg_fill_exists or normalized_purpose in processed_purposes:
+                reason = f"{second_leg_cycle_role}_already_processed"
+                expected_next_action = "await_existing_second_leg"
+                return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
+            if self._cycle_status_blocks_build(entry_status) and not missing_split_stages:
                 reason = (
                     f"{second_leg_cycle_role}_slot_reserved"
                     if entry_status in {"INTENT_BUILT", "SUBMITTING", "SUBMITTED", "OPEN", "NEW", "UNTRIGGERED", "PARTIALLY_FILLED"}
@@ -25305,7 +25428,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
                 expected_next_action = "await_existing_second_leg"
                 return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}
-            if active_same_purpose:
+            if active_same_purpose and not missing_split_stages:
                 reason = f"{second_leg_cycle_role}_order_still_open"
                 expected_next_action = "await_existing_second_leg"
                 return False, reason, {**details, **{"expected_next_action": expected_next_action, "allowed_purposes": allowed_purposes}}

@@ -21,6 +21,7 @@ from .math_utils import calculate_pnl
 
 from .audit_logger import AuditLogger
 from .base import HedgeStrategy, StrategyContext
+from .cycle_submit_identity import cycle_submit_identity
 from .fixed_cycle_strategy import ShortFixedCycleHedgeStrategy
 from .models import (
     FillEvent,
@@ -62,6 +63,18 @@ class GenericHedgeRuntime:
     EXPECTED_EXIT_CANCEL_TIMEOUT_SECONDS = 10.0
     PENDING_FINAL_EXIT_SUBMISSIONS_KEY = "pending_final_exit_submissions"
     PENDING_FINAL_EXIT_MAX_AGE_MS = 60_000
+    _REPLACE_CANCEL_REASONS = frozenset(
+        {
+            "trigger_diff",
+            "qty_diff",
+            "position_idx_mismatch",
+            "trigger_direction_mismatch",
+            "trigger_by_mismatch",
+            "close_on_trigger_mismatch",
+            "order_filter_mismatch",
+            "final_exit_signature_mismatch",
+        }
+    )
 
     def __init__(
         self,
@@ -1842,8 +1855,9 @@ class GenericHedgeRuntime:
             )
             return None
         self._ensure_max_leverage_before_trading()
+        equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
         duplicate_order, duplicate_source = self._find_duplicate_open_cycle_purpose(intent, snapshot)
-        if duplicate_order is not None:
+        if duplicate_order is not None and equivalent_order is None and reason not in self._REPLACE_CANCEL_REASONS:
             existing_status = str(getattr(duplicate_order, "status", None) or "").upper()
             existing_trigger_price = getattr(duplicate_order, "trigger_price", None)
             self.audit.log_event(
@@ -1859,8 +1873,12 @@ class GenericHedgeRuntime:
                 source=duplicate_source,
             )
             return getattr(duplicate_order, "client_order_id", None)
-        equivalent_order, reason, candidate_id, existing_trigger, existing_qty = self._find_equivalent_open_order(intent)
-        decision = "reuse" if equivalent_order is not None else "replace"
+        if equivalent_order is not None:
+            decision = "reuse"
+        elif reason == "no_candidate":
+            decision = "create"
+        else:
+            decision = "replace"
         exit_purposes = set(self.strategy._exit_purposes())
         metadata = getattr(intent, "metadata", {}) or {}
         purpose = getattr(intent, "purpose", None)
@@ -2126,8 +2144,8 @@ class GenericHedgeRuntime:
                     cycle_index=cycle_index_value,
                     replace_open_purposes=replace_purposes,
                 )
-            replace_context = (
-                {
+            if reason in self._REPLACE_CANCEL_REASONS:
+                replace_context = {
                     "reason": reason,
                     "existing_trigger_price": existing_trigger,
                     "new_trigger_price": intent.trigger_price,
@@ -2135,10 +2153,11 @@ class GenericHedgeRuntime:
                     "new_qty": intent.qty,
                     "replacement_purpose": intent.purpose,
                 }
-                if reason != "match"
-                else None
-            )
-            self._cancel_open_orders_by_purpose_internal(replace_purposes, replace_context)
+                self._cancel_open_orders_by_purpose_internal(
+                    replace_purposes,
+                    replace_context,
+                    intent=intent,
+                )
         purpose_upper = str(intent.purpose or "").upper()
         if purpose_upper == getattr(self.strategy, "RECOVERY_RELOAD_LONG_ENTRY", "RECOVERY_RELOAD_LONG_ENTRY"):
             prefix = "fc-rrl"
@@ -2146,6 +2165,12 @@ class GenericHedgeRuntime:
             prefix = "fc-rrs"
         else:
             prefix = f"{self.strategy.name}-{str(intent.purpose or '').lower()}"
+        if bool(metadata.get("normal_cycle_second_leg_split")):
+            try:
+                split_stage_index = int(metadata.get("split_stage_index"))
+                prefix = f"{prefix}-split{split_stage_index}"
+            except (TypeError, ValueError):
+                pass
         client_id = f"{prefix}-{uuid4().hex[:8]}"
         current_price = snapshot.current_price
         strategy_state = self.runtime_state.strategy_state
@@ -2866,6 +2891,8 @@ class GenericHedgeRuntime:
         last_reason = "no_candidate"
         candidate_count = 0
         rejected_count = 0
+        stage_mismatch_reject_count = 0
+        same_identity_reject_reason: str | None = None
         intent_metadata = getattr(intent, "metadata", {}) or {}
         intent_identity: tuple | None = None
         for order in self.runtime_state.active_orders.values():
@@ -2897,6 +2924,7 @@ class GenericHedgeRuntime:
                 last_candidate_id = order.client_order_id
                 last_reason = "stage_identity_mismatch"
                 rejected_count += 1
+                stage_mismatch_reject_count += 1
                 self.audit.log_event(
                     "intent_equivalence_reject",
                     strategy=self.strategy.name,
@@ -3038,6 +3066,7 @@ class GenericHedgeRuntime:
             if existing_trigger is None or abs(existing_trigger - target_trigger) > trigger_limit:
                 last_reason = "trigger_diff"
                 rejected_count += 1
+                same_identity_reject_reason = "trigger_diff"
                 self.audit.log_event(
                     "intent_equivalence_reject",
                     strategy=self.strategy.name,
@@ -3056,6 +3085,7 @@ class GenericHedgeRuntime:
             if abs(existing_qty - intent.qty) > qty_limit:
                 last_reason = "qty_diff"
                 rejected_count += 1
+                same_identity_reject_reason = "qty_diff"
                 self.audit.log_event(
                     "intent_equivalence_reject",
                     strategy=self.strategy.name,
@@ -3114,7 +3144,12 @@ class GenericHedgeRuntime:
                     pending_qty,
                 )
 
-        final_reason = last_reason if candidate_count > 0 else "no_candidate"
+        if same_identity_reject_reason:
+            final_reason = same_identity_reject_reason
+        elif candidate_count > 0 and rejected_count == stage_mismatch_reject_count:
+            final_reason = "no_candidate"
+        else:
+            final_reason = last_reason if candidate_count > 0 else "no_candidate"
         equivalence_summary_payload = {
             "purpose": intent.purpose,
             "total_candidates": candidate_count,
@@ -3224,16 +3259,32 @@ class GenericHedgeRuntime:
         self,
         purposes: list[str],
         replace_context: dict[str, Any] | None = None,
+        *,
+        intent: StrategyIntent | None = None,
     ) -> None:
         purposes_set = {purpose for purpose in purposes if purpose}
         if not purposes_set:
             return
+        intent_metadata = dict(getattr(intent, "metadata", None) or {}) if intent else {}
+        intent_identity: tuple | None = None
+        if intent and bool(intent_metadata.get("normal_cycle_second_leg_split")):
+            intent_identity = cycle_submit_identity(
+                str(intent.purpose or "").upper(),
+                intent_metadata,
+            )
         snapshot = self.runtime_state.last_snapshot
         long_qty = float(snapshot.long_qty or 0.0) if snapshot else 0.0
         short_qty = float(snapshot.short_qty or 0.0) if snapshot else 0.0
         for client_id, order in list(self.runtime_state.active_orders.items()):
             if order.purpose not in purposes_set or self._is_terminal_order_status(order.status):
                 continue
+            if intent_identity is not None:
+                order_identity = cycle_submit_identity(
+                    str(order.purpose or "").upper(),
+                    dict(order.metadata or {}),
+                )
+                if order_identity != intent_identity:
+                    continue
             # Trading-stop basierte Exit-Orders werden nicht über den normalen
             # /v5/order/cancel-Pfad gecancelt. Stattdessen werden sie nur aus dem
             # lokalen Runtime-State entfernt, wenn ein neuer Trading-Stop gesetzt
@@ -5324,70 +5375,7 @@ class GenericHedgeRuntime:
         return str(status or "").upper() in {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}
 
     def _cycle_submit_identity(self, purpose_upper: str, metadata: dict[str, Any]) -> tuple:
-        """
-        Build a submit-identity for cycle orders which is stable across intents
-        and open orders, and split-/stage-aware.
-
-        - Normale Cycle-Orders: (PURPOSE, "single")
-        - Gestagte Second-Leg-TPs: (PURPOSE, "staged", cycle_index, stage_index)
-        - Normale Second-Leg-Splits: (PURPOSE, "normal_split", cycle_index, split_stage_index, split_stage_count)
-        - Fallbacks bei unvollständigen Metadaten: (PURPOSE, "staged_fallback") / (PURPOSE, "normal_split_fallback")
-        """
-        base = (purpose_upper,)
-        if not purpose_upper.startswith("CYCLE_"):
-            return base
-
-        staged_flag = bool(metadata.get("is_staged_second_leg_tp"))
-        normal_split_flag = bool(metadata.get("normal_cycle_second_leg_split"))
-
-        if staged_flag:
-            try:
-                cycle_index = int(metadata.get("cycle_index"))
-            except (TypeError, ValueError):
-                cycle_index = None
-            try:
-                stage_index = int(metadata.get("stage_index"))
-            except (TypeError, ValueError):
-                stage_index = None
-            if cycle_index is not None and stage_index is not None:
-                return (purpose_upper, "staged", cycle_index, stage_index)
-            return (purpose_upper, "staged_fallback")
-
-        if normal_split_flag:
-            # Für normale Second-Leg-Splits bevorzugt split_cycle_index, ansonsten cycle_index.
-            split_cycle_val = metadata.get("split_cycle_index")
-            if split_cycle_val is None:
-                split_cycle_val = metadata.get("cycle_index")
-            try:
-                cycle_index = int(split_cycle_val)
-            except (TypeError, ValueError):
-                cycle_index = None
-            try:
-                split_stage_index = int(metadata.get("split_stage_index"))
-            except (TypeError, ValueError):
-                split_stage_index = None
-            try:
-                split_stage_count = int(
-                    metadata.get("split_stage_count") or metadata.get("stage_count")
-                )
-            except (TypeError, ValueError):
-                split_stage_count = None
-            if (
-                cycle_index is not None
-                and split_stage_index is not None
-                and split_stage_count is not None
-            ):
-                return (
-                    purpose_upper,
-                    "normal_split",
-                    cycle_index,
-                    split_stage_index,
-                    split_stage_count,
-                )
-            return (purpose_upper, "normal_split_fallback")
-
-        # Standard-Cycle-Order ohne spezielle Staging-/Split-Metadata.
-        return (purpose_upper, "single")
+        return cycle_submit_identity(purpose_upper, metadata)
 
     def _find_duplicate_open_cycle_purpose(
         self, intent: StrategyIntent, snapshot: HedgeSnapshot
@@ -5582,16 +5570,21 @@ class GenericHedgeRuntime:
         if client_id.startswith(prefix):
             remainder = client_id[len(prefix):]
             if "-" in remainder:
-                return remainder.rsplit("-", 1)[0].upper()
+                purpose_part = remainder.rsplit("-", 1)[0]
+                purpose_part = re.sub(r"-split\d+$", "", purpose_part)
+                return purpose_part.upper()
         recovered_prefix = f"recovered-{self.strategy.name}-"
         if client_id.startswith(recovered_prefix):
             remainder = client_id[len(recovered_prefix):]
             if remainder.startswith("-") and "--" in remainder[1:]:
                 purpose_part = remainder[1:].split("--", 1)[0]
                 if purpose_part:
+                    purpose_part = re.sub(r"-split\d+$", "", purpose_part)
                     return purpose_part.upper()
             if "-" in remainder:
-                return remainder.rsplit("-", 1)[0].upper()
+                purpose_part = remainder.rsplit("-", 1)[0]
+                purpose_part = re.sub(r"-split\d+$", "", purpose_part)
+                return purpose_part.upper()
         return "RECOVERED_ORDER"
 
     def _classify_unknown_order_purpose(self, exchange_order: dict[str, Any]) -> str:
