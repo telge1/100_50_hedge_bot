@@ -1,4 +1,4 @@
-"""Minimal Phase-1 harness: run original hedge strategies without Bybit."""
+"""Minimal Phase-1/2 harness: run original hedge strategies without Bybit."""
 
 from __future__ import annotations
 
@@ -22,10 +22,13 @@ from fixed_cycle_hedge_bot.fixed_cycle_strategy import (
 )
 from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState, StrategyIntent, snapshot_from_mapping
 
-from .simulated_execution import fill_intent_at_candle_close, fill_intents_at_candle_close
-from .simulated_order_book import SimulatedOrderBook, SyntheticCandle
+from .simulated_execution import fill_entry_intents_at_candle_close, submit_resting_intents
+from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 
 Signal = Literal["long", "short"]
+
+KNOWN_STRUCTURE_PURPOSE_PREFIXES = ("CYCLE_",)
+KNOWN_STRUCTURE_PURPOSE_SUFFIXES = ("_EXIT",)
 
 
 @dataclass
@@ -35,6 +38,7 @@ class SimulationResult:
     entry_intents: list[StrategyIntent] = field(default_factory=list)
     entry_fills: list[FillEvent] = field(default_factory=list)
     post_fill_intents: list[StrategyIntent] = field(default_factory=list)
+    resting_orders: list[VirtualOrder] = field(default_factory=list)
     final_snapshot: HedgeSnapshot | None = None
     runtime_state: RuntimeState | None = None
     strategy_state: dict[str, Any] = field(default_factory=dict)
@@ -114,9 +118,6 @@ def build_context(
             source="backtest_smoke_refresh_fallback",
         )
 
-    def _cancel_open_orders_by_purpose(_purposes: list[str]) -> None:
-        return None
-
     stub_order_manager = mock.Mock()
     stub_order_manager.fetch_closed_pnl.return_value = []
     stub_order_manager.fetch_wallet_balance.return_value = (None, "unavailable")
@@ -130,7 +131,7 @@ def build_context(
         min_order_value=5.0,
         order_manager=stub_order_manager,
         refresh_snapshot=_refresh_snapshot,
-        cancel_open_orders_by_purpose=_cancel_open_orders_by_purpose,
+        cancel_open_orders_by_purpose=None,
     )
 
 
@@ -165,7 +166,17 @@ class HedgeBotOriginalSimulator:
             symbol=self.symbol,
             runtime_state=self.runtime_state,
         )
+        self._wire_order_book_callbacks()
         self._configure_isolated_paths()
+
+    def _wire_order_book_callbacks(self) -> None:
+        def _cancel_open_orders_by_purpose(purposes: list[str]) -> None:
+            for purpose in purposes:
+                self.book.cancel_by_purpose(purpose)
+            self.book.sync_runtime_state(self.runtime_state)
+            self._refresh_snapshot_from_book(source="after_cancel_by_purpose")
+
+        self.context.cancel_open_orders_by_purpose = _cancel_open_orders_by_purpose
 
     def _configure_isolated_paths(self) -> None:
         if self._temp_dir is None:
@@ -185,6 +196,7 @@ class HedgeBotOriginalSimulator:
             self._owned_temp_dir = None
 
     def _refresh_snapshot_from_book(self, *, source: str) -> HedgeSnapshot:
+        self.book.sync_runtime_state(self.runtime_state)
         self.snapshot = snapshot_from_mapping(
             symbol=self.symbol,
             current_price=self.candle.close,
@@ -194,6 +206,21 @@ class HedgeBotOriginalSimulator:
         )
         self.runtime_state.last_snapshot = self.snapshot
         return self.snapshot
+
+    def submit_intents_to_book(
+        self,
+        intents: list[StrategyIntent],
+        *,
+        replace: bool = True,
+    ) -> list[VirtualOrder]:
+        resting = submit_resting_intents(
+            self.book,
+            self.runtime_state,
+            intents,
+            replace=replace,
+        )
+        self._refresh_snapshot_from_book(source="after_submit_intents")
+        return resting
 
     def run_entry_smoke(self) -> SimulationResult:
         entry_intents = self.strategy.on_start(self.snapshot, self.runtime_state, self.context)
@@ -208,13 +235,14 @@ class HedgeBotOriginalSimulator:
                 strategy_state=state,
             )
 
-        filled_pairs = fill_intents_at_candle_close(
+        filled_pairs = fill_entry_intents_at_candle_close(
             book=self.book,
             runtime_state=self.runtime_state,
             intents=entry_intents,
             candle=self.candle,
         )
         entry_fills = [fill for _, fill in filled_pairs]
+        self._refresh_snapshot_from_book(source="after_entry_fills")
 
         post_fill_intents: list[StrategyIntent] = []
         long_fill = next(
@@ -227,16 +255,18 @@ class HedgeBotOriginalSimulator:
         )
 
         if long_fill is not None:
-            self._refresh_snapshot_from_book(source="after_long_entry_fill")
+            self._refresh_snapshot_from_book(source="before_long_entry_on_fill")
             post_fill_intents.extend(
                 self.strategy.on_fill(long_fill, self.snapshot, self.runtime_state, self.context)
             )
 
         if short_fill is not None:
-            self._refresh_snapshot_from_book(source="after_short_entry_fill")
+            self._refresh_snapshot_from_book(source="before_short_entry_on_fill")
             post_fill_intents.extend(
                 self.strategy.on_fill(short_fill, self.snapshot, self.runtime_state, self.context)
             )
+
+        resting_orders = self.submit_intents_to_book(post_fill_intents)
 
         state = dict(self.runtime_state.strategy_state)
         return SimulationResult(
@@ -245,6 +275,7 @@ class HedgeBotOriginalSimulator:
             entry_intents=list(entry_intents),
             entry_fills=entry_fills,
             post_fill_intents=list(post_fill_intents),
+            resting_orders=resting_orders,
             final_snapshot=self.snapshot,
             runtime_state=self.runtime_state,
             strategy_state=state,

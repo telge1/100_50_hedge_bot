@@ -1,9 +1,18 @@
-"""In-memory position book for Phase-1 backtest smoke tests."""
+"""In-memory order book and positions for backtest harness (Phase 2)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
+
+from fixed_cycle_hedge_bot.models import ManagedOrder, RuntimeState, StrategyIntent
+
+ACTIVE_ORDER_STATUSES = frozenset(
+    {"NEW", "OPEN", "UNTRIGGERED", "SUBMITTED", "PARTIALLY_FILLED", "PENDING_SUBMIT"}
+)
+TERMINAL_ORDER_STATUSES = frozenset({"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED", "DEACTIVATED"})
 
 
 @dataclass
@@ -24,13 +33,56 @@ class SyntheticCandle:
 
 
 @dataclass
+class VirtualOrder:
+    order_id: str
+    exchange_order_id: str
+    symbol: str
+    side: str
+    qty: float
+    price: float | None
+    trigger_price: float | None
+    trigger_direction: int | None
+    order_type: str
+    reduce_only: bool
+    purpose: str
+    status: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_index: int = 0
+    filled_qty: float = 0.0
+    remaining_qty: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.remaining_qty <= 0:
+            self.remaining_qty = float(self.qty)
+
+    def to_managed_order(self) -> ManagedOrder:
+        return ManagedOrder(
+            client_order_id=self.order_id,
+            exchange_order_id=self.exchange_order_id,
+            side=self.side,
+            qty=float(self.qty),
+            purpose=self.purpose,
+            price=self.price,
+            order_type=self.order_type,
+            reduce_only=self.reduce_only,
+            status=self.status,
+            filled_qty=float(self.filled_qty),
+            remaining_qty=float(self.remaining_qty),
+            metadata=dict(self.metadata),
+            created_at=self.created_at,
+            updated_at=self.created_at,
+        )
+
+
+@dataclass
 class SimulatedOrderBook:
     symbol: str
     long_qty: float = 0.0
     short_qty: float = 0.0
     long_avg: float = 0.0
     short_avg: float = 0.0
-    open_orders: dict[str, dict[str, Any]] = field(default_factory=dict)
+    _orders: dict[str, VirtualOrder] = field(default_factory=dict)
     _order_seq: int = 0
 
     def positions_mapping(self) -> dict[str, float]:
@@ -46,42 +98,94 @@ class SimulatedOrderBook:
         slug = str(purpose or "order").lower().replace("_", "-")
         return f"sim-fixed_cycle-{slug}-{self._order_seq}"
 
-    def register_intent(
-        self,
-        *,
-        client_order_id: str,
-        side: str,
-        qty: float,
-        purpose: str,
-        price: float | None,
-        order_type: str,
-        reduce_only: bool,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
-        self.open_orders[client_order_id] = {
-            "client_order_id": client_order_id,
-            "side": side,
-            "qty": float(qty),
-            "purpose": purpose,
-            "price": price,
-            "order_type": order_type,
-            "reduce_only": reduce_only,
-            "status": "NEW",
-            "metadata": dict(metadata or {}),
-        }
+    def submit_intent(self, intent: StrategyIntent, *, replace: bool = True) -> VirtualOrder:
+        purpose = str(intent.purpose or "").strip()
+        if replace and purpose:
+            self.cancel_by_purpose(purpose)
+        order_id = self.next_client_order_id(purpose or "order")
+        exchange_order_id = f"sim-ex-{uuid4().hex[:12]}"
+        initial_status = "NEW"
+        order_type = str(intent.order_type or "Market")
+        order = VirtualOrder(
+            order_id=order_id,
+            exchange_order_id=exchange_order_id,
+            symbol=self.symbol,
+            side=str(intent.side),
+            qty=float(intent.qty),
+            price=float(intent.price) if intent.price is not None else None,
+            trigger_price=float(intent.trigger_price) if intent.trigger_price is not None else None,
+            trigger_direction=intent.trigger_direction,
+            order_type=order_type,
+            reduce_only=bool(intent.reduce_only),
+            purpose=purpose,
+            status=initial_status,
+            metadata=dict(intent.metadata or {}),
+            created_index=self._order_seq,
+        )
+        self._orders[order_id] = order
+        return order
+
+    def get_order(self, order_id: str) -> VirtualOrder | None:
+        return self._orders.get(order_id)
+
+    def cancel_by_purpose(self, purpose: str) -> list[str]:
+        normalized = str(purpose or "").strip()
+        canceled: list[str] = []
+        for order_id, order in list(self._orders.items()):
+            if order.purpose != normalized:
+                continue
+            if order.status not in ACTIVE_ORDER_STATUSES:
+                continue
+            order.status = "CANCELED"
+            order.remaining_qty = 0.0
+            canceled.append(order_id)
+        return canceled
+
+    def cancel_by_order_id(self, order_id: str) -> bool:
+        order = self._orders.get(order_id)
+        if order is None or order.status not in ACTIVE_ORDER_STATUSES:
+            return False
+        order.status = "CANCELED"
+        order.remaining_qty = 0.0
+        return True
+
+    def active_orders(self) -> list[VirtualOrder]:
+        return [
+            order
+            for order in self._orders.values()
+            if order.status in ACTIVE_ORDER_STATUSES
+        ]
+
+    def active_orders_by_purpose(self, purpose: str) -> list[VirtualOrder]:
+        normalized = str(purpose or "").strip()
+        return [order for order in self.active_orders() if order.purpose == normalized]
+
+    def sync_runtime_state(self, runtime_state: RuntimeState) -> None:
+        active_ids = {order.order_id for order in self.active_orders()}
+        for client_id in list(runtime_state.active_orders.keys()):
+            if client_id not in active_ids:
+                runtime_state.active_orders.pop(client_id, None)
+        for order in self.active_orders():
+            managed = order.to_managed_order()
+            runtime_state.active_orders[order.order_id] = managed
+            runtime_state.exchange_to_client_id[order.exchange_order_id] = order.order_id
+            runtime_state.client_to_exchange_id[order.order_id] = order.exchange_order_id
 
     def apply_market_fill(
         self,
         *,
-        client_order_id: str,
+        order_id: str,
         fill_price: float,
         qty: float | None = None,
-    ) -> dict[str, Any]:
-        order = self.open_orders.pop(client_order_id, None)
+    ) -> VirtualOrder:
+        order = self._orders.get(order_id)
         if order is None:
-            raise KeyError(f"unknown simulated order: {client_order_id}")
-        fill_qty = float(qty if qty is not None else order["qty"])
-        side = str(order["side"]).lower()
+            raise KeyError(f"unknown simulated order: {order_id}")
+        if order.status not in ACTIVE_ORDER_STATUSES:
+            raise ValueError(f"order not fillable: {order_id} status={order.status}")
+
+        fill_qty = float(qty if qty is not None else order.qty)
+        side = str(order.side).lower()
         if side == "long":
             prev_qty = self.long_qty
             new_qty = prev_qty + fill_qty
@@ -104,9 +208,9 @@ class SimulatedOrderBook:
             self.short_qty = new_qty
         else:
             raise ValueError(f"unsupported simulated fill side: {side}")
-        return {
-            **order,
-            "exec_qty": fill_qty,
-            "exec_price": float(fill_price),
-            "status": "FILLED",
-        }
+
+        order.status = "FILLED"
+        order.filled_qty = fill_qty
+        order.remaining_qty = 0.0
+        order.metadata.setdefault("fill_price", fill_price)
+        return order

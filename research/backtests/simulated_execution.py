@@ -1,104 +1,74 @@
-"""Virtual fill execution for Phase-1 backtest smoke tests."""
+"""Virtual fill execution for backtest harness (Phase 2)."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
 from uuid import uuid4
 
-from fixed_cycle_hedge_bot.models import FillEvent, ManagedOrder, RuntimeState, StrategyIntent
+from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 
-from .simulated_order_book import SimulatedOrderBook, SyntheticCandle
+from .simulated_order_book import (
+    ACTIVE_ORDER_STATUSES,
+    SimulatedOrderBook,
+    SyntheticCandle,
+    VirtualOrder,
+)
+
+INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
 
 
-def register_intent_in_book(
+def is_immediate_market_fill(intent: StrategyIntent) -> bool:
+    """Only initial hedge entries are filled immediately in Phase 2."""
+    purpose = str(intent.purpose or "").strip().upper()
+    return purpose in INITIAL_ENTRY_PURPOSES
+
+
+def submit_intent_to_book(
     book: SimulatedOrderBook,
-    intent: StrategyIntent,
-    *,
-    client_order_id: str | None = None,
-) -> str:
-    cid = client_order_id or book.next_client_order_id(intent.purpose)
-    book.register_intent(
-        client_order_id=cid,
-        side=intent.side,
-        qty=float(intent.qty),
-        purpose=intent.purpose,
-        price=intent.price,
-        order_type=intent.order_type,
-        reduce_only=bool(intent.reduce_only),
-        metadata=dict(intent.metadata or {}),
-    )
-    return cid
-
-
-def register_intent_in_runtime(
     runtime_state: RuntimeState,
     intent: StrategyIntent,
     *,
-    client_order_id: str,
-    exchange_order_id: str | None = None,
-) -> ManagedOrder:
-    exchange_id = exchange_order_id or f"sim-ex-{uuid4().hex[:12]}"
-    managed = ManagedOrder(
-        client_order_id=client_order_id,
-        exchange_order_id=exchange_id,
-        side=intent.side,
-        qty=float(intent.qty),
-        purpose=intent.purpose,
-        price=intent.price,
-        order_type=intent.order_type,
-        reduce_only=bool(intent.reduce_only),
-        status="NEW",
-        metadata=dict(intent.metadata or {}),
-    )
-    runtime_state.active_orders[client_order_id] = managed
-    runtime_state.exchange_to_client_id[exchange_id] = client_order_id
-    runtime_state.client_to_exchange_id[client_order_id] = exchange_id
-    return managed
+    replace: bool = True,
+) -> VirtualOrder:
+    order = book.submit_intent(intent, replace=replace)
+    book.sync_runtime_state(runtime_state)
+    return order
 
 
-def fill_intent_at_candle_close(
-    *,
+def submit_resting_intents(
     book: SimulatedOrderBook,
     runtime_state: RuntimeState,
-    client_order_id: str,
-    candle: SyntheticCandle,
-) -> FillEvent:
-    fill_price = float(candle.close)
-    fill_payload = book.apply_market_fill(client_order_id=client_order_id, fill_price=fill_price)
-    managed = runtime_state.active_orders.get(client_order_id)
-    exchange_order_id = (
-        str(managed.exchange_order_id)
-        if managed and managed.exchange_order_id
-        else f"sim-ex-{client_order_id}"
-    )
-    if managed is not None:
-        managed.status = "FILLED"
-        managed.filled_qty = float(fill_payload["exec_qty"])
-        managed.remaining_qty = 0.0
-        runtime_state.active_orders.pop(client_order_id, None)
-        runtime_state.terminal_client_ids.add(client_order_id)
-        if exchange_order_id:
-            runtime_state.terminal_exchange_ids.add(exchange_order_id)
+    intents: list[StrategyIntent],
+    *,
+    replace: bool = True,
+) -> list[VirtualOrder]:
+    submitted: list[VirtualOrder] = []
+    for intent in intents:
+        if is_immediate_market_fill(intent):
+            continue
+        submitted.append(submit_intent_to_book(book, runtime_state, intent, replace=replace))
+    return submitted
 
-    metadata = dict(fill_payload.get("metadata") or {})
+
+def virtual_order_to_fill_event(order: VirtualOrder, *, fill_price: float) -> FillEvent:
+    metadata = dict(order.metadata or {})
     metadata.setdefault("source", "simulated_execution")
     metadata.setdefault("fill_price", fill_price)
     metadata.setdefault("confirmed_closed_pnl", 0.0)
     metadata.setdefault("closed_pnl", 0.0)
     metadata.setdefault("runtime_calculated_pnl", 0.0)
     metadata.setdefault("exec_pnl", 0.0)
-    metadata.setdefault("symbol", candle.symbol)
+    metadata.setdefault("symbol", order.symbol)
 
     return FillEvent(
-        exchange_order_id=exchange_order_id,
-        client_order_id=client_order_id,
-        side=str(fill_payload["side"]),
-        purpose=str(fill_payload["purpose"]),
-        exec_qty=float(fill_payload["exec_qty"]),
-        exec_price=float(fill_payload["exec_price"]),
-        order_type=str(fill_payload.get("order_type") or "Market"),
-        reduce_only=bool(fill_payload.get("reduce_only")),
+        exchange_order_id=order.exchange_order_id,
+        client_order_id=order.order_id,
+        side=order.side,
+        purpose=order.purpose,
+        exec_qty=float(order.qty),
+        exec_price=float(fill_price),
+        order_type=order.order_type,
+        reduce_only=bool(order.reduce_only),
         status="FILLED",
         exec_id=f"sim-exec-{uuid4().hex[:12]}",
         metadata=metadata,
@@ -106,7 +76,24 @@ def fill_intent_at_candle_close(
     )
 
 
-def fill_intents_at_candle_close(
+def fill_order_at_candle_close(
+    *,
+    book: SimulatedOrderBook,
+    runtime_state: RuntimeState,
+    order_id: str,
+    candle: SyntheticCandle,
+) -> FillEvent:
+    fill_price = float(candle.close)
+    order = book.apply_market_fill(order_id=order_id, fill_price=fill_price)
+    runtime_state.active_orders.pop(order_id, None)
+    if order.exchange_order_id:
+        runtime_state.terminal_exchange_ids.add(order.exchange_order_id)
+    runtime_state.terminal_client_ids.add(order_id)
+    book.sync_runtime_state(runtime_state)
+    return virtual_order_to_fill_event(order, fill_price=fill_price)
+
+
+def fill_entry_intents_at_candle_close(
     *,
     book: SimulatedOrderBook,
     runtime_state: RuntimeState,
@@ -115,13 +102,20 @@ def fill_intents_at_candle_close(
 ) -> list[tuple[str, FillEvent]]:
     filled: list[tuple[str, FillEvent]] = []
     for intent in intents:
-        client_order_id = register_intent_in_book(book, intent)
-        register_intent_in_runtime(runtime_state, intent, client_order_id=client_order_id)
-        fill_event = fill_intent_at_candle_close(
+        if not is_immediate_market_fill(intent):
+            submit_intent_to_book(book, runtime_state, intent)
+            continue
+        order = submit_intent_to_book(book, runtime_state, intent, replace=False)
+        fill_event = fill_order_at_candle_close(
             book=book,
             runtime_state=runtime_state,
-            client_order_id=client_order_id,
+            order_id=order.order_id,
             candle=candle,
         )
-        filled.append((client_order_id, fill_event))
+        filled.append((order.order_id, fill_event))
     return filled
+
+
+# Backward-compatible aliases for Phase-1 callers.
+fill_intent_at_candle_close = fill_order_at_candle_close
+fill_intents_at_candle_close = fill_entry_intents_at_candle_close
