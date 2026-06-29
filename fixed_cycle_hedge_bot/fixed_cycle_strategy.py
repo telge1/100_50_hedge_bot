@@ -42,7 +42,17 @@ from .confirmed_pnl_path_logic import (
     purpose_implies_bot_side,
     should_skip_foreign_confirmed_pnl_write,
 )
-from .trade_block_id_resolver import resolve_active_trade_block_id
+from .confirmed_pnl_fill_context import (
+    classify_exit_fill_for_audit as classify_exit_fill_for_confirmed_pnl,
+    enrich_fill_for_confirmed_pnl,
+    purpose_requires_confirmed_history_row,
+    recover_purpose_from_client_order_id,
+    cycle_index_from_purpose,
+)
+from .trade_block_id_resolver import (
+    resolve_active_trade_block_id,
+    resolve_trade_block_id_with_source,
+)
 from . import log_throttle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -1680,6 +1690,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if self._is_recovery_reload_purpose(purpose):
             self._handle_recovery_refill_fill(fill_event, snapshot, runtime_state, context)
             return []
+        self._enrich_fill_event_for_confirmed_pnl(fill_event)
         try:
             self._audit_exit_pnl_summary(fill_event, runtime_state, context)
         except Exception as exc:  # pragma: no cover - audit must never block
@@ -2377,37 +2388,19 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         return True
 
+    def _enrich_fill_event_for_confirmed_pnl(self, fill_event: FillEvent) -> None:
+        enrich_fill_for_confirmed_pnl(
+            fill_event,
+            strategy_name=self.name,
+            direction=getattr(self, "_direction_config", None),
+        )
+
     def _classify_exit_fill_for_audit(self, fill_event: FillEvent) -> tuple[str, int]:
-        metadata = fill_event.metadata or {}
-        cycle_role = (metadata.get("cycle_role") or "").lower()
-        try:
-            cycle_index = int(metadata.get("cycle_index") or 0)
-        except (TypeError, ValueError):
-            cycle_index = 0
-        if cycle_role == "long_reduce":
-            return "cycle_long_reduce", cycle_index
-        if cycle_role == "short_reduce":
-            return "cycle_short_tp", cycle_index
-        purpose = (fill_event.purpose or "").upper()
-        if (
-            purpose in {self.LONG_TP_EXIT_PURPOSE, self.LONG_SL_EXIT_PURPOSE}
-            or "LONG_TP" in purpose
-            or "LONG_SL" in purpose
-        ):
-            return "final_long_exit", 0
-        if (
-            purpose
-            in {
-                self.SHORT_TP_EXIT_PURPOSE,
-                self.SHORT_SL_EXIT_PURPOSE,
-                self.SHORT_HARD_STOP_PURPOSE,
-            }
-            or "SHORT_TP" in purpose
-            or "SHORT_SL" in purpose
-            or "SHORT_HARD_STOP" in purpose
-        ):
-            return "final_short_exit", 0
-        return "ignore", 0
+        return classify_exit_fill_for_confirmed_pnl(
+            fill_event.purpose or "",
+            fill_event.metadata or {},
+            direction=getattr(self, "_direction_config", None),
+        )
 
     @staticmethod
     def _is_confirmed_cycle_pnl_source(source: str) -> bool:
@@ -2532,7 +2525,198 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return False
         dedupe_key = f"{exchange_order_id}:{purpose}"
         processed = runtime_state.strategy_state.get("processed_confirmed_order_keys") or []
-        return dedupe_key in processed
+        if dedupe_key in processed:
+            return True
+        return self._confirmed_history_file_has_dedupe_key(dedupe_key)
+
+    def _confirmed_history_file_has_dedupe_key(self, dedupe_key: str) -> bool:
+        if not dedupe_key:
+            return False
+        path = confirmed_order_pnl_history_path
+        if not path.exists():
+            return False
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return False
+        for line in lines[-1000:]:
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            existing_key = str(payload.get("dedupe_key") or "").strip()
+            if not existing_key:
+                existing_key = f"{payload.get('exchange_order_id')}:{payload.get('purpose')}"
+            if existing_key == dedupe_key:
+                return True
+        return False
+
+    def _confirmed_history_has_purpose(
+        self,
+        runtime_state: RuntimeState,
+        purpose: str,
+        *,
+        exchange_order_id: str | None = None,
+    ) -> bool:
+        normalized_purpose = str(purpose or "").strip().upper()
+        if not normalized_purpose:
+            return False
+        if exchange_order_id and self._cycle_order_confirmed(
+            runtime_state,
+            exchange_order_id,
+            normalized_purpose,
+        ):
+            return True
+        path = confirmed_order_pnl_history_path
+        if not path.exists():
+            return False
+        trade_block_id = self._resolve_active_trade_block_id(runtime_state.strategy_state)
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return False
+        for line in lines[-1000:]:
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if str(payload.get("purpose") or "").upper() != normalized_purpose:
+                continue
+            if exchange_order_id and str(payload.get("exchange_order_id") or "") != str(exchange_order_id):
+                continue
+            if trade_block_id and str(payload.get("trade_block_id") or "") not in {
+                str(trade_block_id),
+                "unknown",
+            }:
+                continue
+            return True
+        return False
+
+    def _reconcile_processed_cycle_purposes_confirmed_history(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+    ) -> None:
+        state = runtime_state.strategy_state
+        processed = list(state.get("processed_cycle_purposes") or [])
+        if not processed:
+            return
+        stale_purposes: list[str] = []
+        for purpose in processed:
+            normalized = str(purpose or "").strip().upper()
+            if not purpose_requires_confirmed_history_row(normalized):
+                continue
+            if self._confirmed_history_has_purpose(runtime_state, normalized):
+                continue
+            stale_purposes.append(normalized)
+        if not stale_purposes:
+            return
+        _log_warning_event(
+            "fixed_cycle_processed_purpose_missing_confirmed_history",
+            {
+                "stale_purposes": stale_purposes,
+                "processed_cycle_purposes": processed,
+                "trade_block_id": state.get("trade_block_id"),
+                "last_trade_block_id": state.get("last_trade_block_id"),
+            },
+        )
+        queue = state.setdefault("pending_cycle_closed_pnl_fills", [])
+        for purpose in stale_purposes:
+            backfilled = self._attempt_confirmed_history_backfill_for_purpose(
+                runtime_state,
+                context,
+                purpose=purpose,
+            )
+            if backfilled:
+                continue
+            processed_set = {
+                str(item or "").upper() for item in (state.get("processed_cycle_purposes") or [])
+            }
+            if purpose in processed_set:
+                processed_set.discard(purpose)
+                state["processed_cycle_purposes"] = sorted(processed_set)
+
+    def _attempt_confirmed_history_backfill_for_purpose(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        purpose: str,
+    ) -> bool:
+        normalized_purpose = str(purpose or "").strip().upper()
+        if not normalized_purpose or self._confirmed_history_has_purpose(runtime_state, normalized_purpose):
+            return True
+        pending = runtime_state.strategy_state.get("pending_cycle_closed_pnl_fills") or []
+        for payload in pending:
+            fill = dict(payload.get("fill") or {})
+            if str(fill.get("purpose") or "").upper() != normalized_purpose:
+                continue
+            fill_event = self._pending_cycle_fill_from_payload(payload)
+            self._enrich_fill_event_for_confirmed_pnl(fill_event)
+            try:
+                self._audit_exit_pnl_summary(fill_event, runtime_state, context)
+            except Exception:
+                return False
+            return self._confirmed_history_has_purpose(
+                runtime_state,
+                normalized_purpose,
+                exchange_order_id=fill_event.exchange_order_id,
+            )
+        managed_order = self._find_filled_managed_order_for_purpose(runtime_state, normalized_purpose)
+        if managed_order is None:
+            return False
+        fill_event = FillEvent(
+            exchange_order_id=str(managed_order.exchange_order_id or ""),
+            client_order_id=managed_order.client_order_id,
+            side=str(managed_order.side or ""),
+            purpose=str(managed_order.purpose or normalized_purpose),
+            exec_qty=float(managed_order.qty or 0.0),
+            exec_price=float(managed_order.price or 0.0),
+            order_type=str(managed_order.order_type or "Limit"),
+            reduce_only=bool(managed_order.reduce_only),
+            status="FILLED",
+            metadata=dict(managed_order.metadata or {}),
+        )
+        self._enrich_fill_event_for_confirmed_pnl(fill_event)
+        try:
+            self._audit_exit_pnl_summary(fill_event, runtime_state, context)
+        except Exception:
+            return False
+        return self._confirmed_history_has_purpose(
+            runtime_state,
+            normalized_purpose,
+            exchange_order_id=fill_event.exchange_order_id,
+        )
+
+    def _find_filled_managed_order_for_purpose(
+        self,
+        runtime_state: RuntimeState,
+        purpose: str,
+    ) -> ManagedOrder | None:
+        normalized_purpose = str(purpose or "").strip().upper()
+        snapshot = runtime_state.last_snapshot
+        candidates: list[ManagedOrder] = []
+        for order in runtime_state.active_orders.values():
+            candidates.append(order)
+        if snapshot is not None:
+            candidates.extend(snapshot.active_orders)
+        for order in candidates:
+            order_purpose = str(order.purpose or "").strip().upper()
+            if not order_purpose:
+                recovered = recover_purpose_from_client_order_id(
+                    str(order.client_order_id or ""),
+                    self.name,
+                )
+                order_purpose = recovered.upper()
+            if order_purpose != normalized_purpose:
+                continue
+            if str(order.status or "").upper() in {"FILLED", "PROCESSED"}:
+                return order
+        return None
 
     def _remove_pending_cycle_closed_pnl_for_order(
         self,
@@ -2593,9 +2777,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self,
         runtime_state: RuntimeState,
         context: StrategyContext,
+        *,
+        _reconcile_depth: int = 0,
     ) -> None:
         state = runtime_state.strategy_state
         pending = list(state.get("pending_cycle_closed_pnl_fills") or [])
+        if not pending and _reconcile_depth == 0:
+            self._reconcile_processed_cycle_purposes_confirmed_history(runtime_state, context)
+            return
         if not pending:
             return
         remaining: list[dict[str, Any]] = []
@@ -2696,8 +2885,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 continue
             filtered_remaining.append(entry)
         state["pending_cycle_closed_pnl_fills"] = filtered_remaining
-
-    def _recompute_cycle_pnl_ledger_totals(self, ledger: dict[str, Any]) -> None:
+        if _reconcile_depth == 0:
+            self._reconcile_processed_cycle_purposes_confirmed_history(runtime_state, context)
         cycle_long_reduce_totals: dict[str, float] = {}
         cycle_short_tp_totals: dict[str, float] = {}
         for entry_key, entry in (ledger.get("cycle_pnl_entries") or {}).items():
@@ -2792,6 +2981,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if fill_type not in {"cycle_long_reduce", "cycle_short_tp"}:
             return
         if cycle_index <= 0:
+            cycle_index = cycle_index_from_purpose(fill_event.purpose or "")
+        if cycle_index <= 0:
             return
         if not self._is_confirmed_cycle_pnl_source(pnl_source):
             return
@@ -2824,6 +3015,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         status = str(fill_event.status or "").upper()
         if status not in {"FILLED", "PARTIAL", "PARTIALLY_FILLED", "PARTIAL_FILLED"}:
             return
+        self._enrich_fill_event_for_confirmed_pnl(fill_event)
         state = runtime_state.strategy_state
         processed = state.setdefault("audit_processed_exit_fill_ids", [])
         metadata = fill_event.metadata or {}
@@ -18826,20 +19018,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return
         strategy_state = runtime_state.strategy_state if runtime_state is not None else {}
         payload_trade_block_id = str(record.get("trade_block_id") or "").strip()
-        trade_block_id = payload_trade_block_id or self._resolve_active_trade_block_id(strategy_state)
+        trade_block_id, trade_block_id_source = resolve_trade_block_id_with_source(
+            strategy_state,
+            payload_trade_block_id=payload_trade_block_id or None,
+        )
         if not trade_block_id:
+            trade_block_id = "unknown"
+            record["trade_block_id_source"] = "missing_fallback"
             _log_warning_event(
-                "confirmed_order_pnl_missing_trade_block_id",
+                "confirmed_order_pnl_trade_block_id_missing_wrote_anyway",
                 {
                     "exchange_order_id": exchange_order_id,
                     "purpose": purpose,
                     "client_order_id": record.get("client_order_id"),
                     "pnl_scope": record.get("pnl_scope"),
-                    "trade_block_id": record.get("trade_block_id"),
+                    "payload_trade_block_id": payload_trade_block_id or None,
                     "last_trade_block_id": strategy_state.get("last_trade_block_id"),
                 },
             )
-            return
+        else:
+            record["trade_block_id_source"] = trade_block_id_source
         record["trade_block_id"] = trade_block_id
         record["dedupe_key"] = f"{exchange_order_id}:{purpose}"
         dedupe_key = record["dedupe_key"]
@@ -21793,17 +21991,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     self._complete_cycle_entry_if_done(runtime_state, cycle_index, purpose)
                     return
             if normalized_purpose not in processed:
-                processed.add(normalized_purpose)
-                state["processed_cycle_purposes"] = sorted(processed)
-                _log_event(
-                    "fixed_cycle_cycle_purpose_marked_processed",
-                    {
-                        "cycle_index": cycle_index,
-                        "purpose": purpose,
-                        "normalized_purpose": normalized_purpose,
-                        "phase": field_name,
-                    },
+                exchange_order_id = str((metadata or {}).get("exchange_order_id") or "").strip()
+                requires_confirmed_row = purpose_requires_confirmed_history_row(normalized_purpose)
+                has_confirmed_row = (
+                    not requires_confirmed_row
+                    or self._confirmed_history_has_purpose(
+                        runtime_state,
+                        normalized_purpose,
+                        exchange_order_id=exchange_order_id or None,
+                    )
                 )
+                if has_confirmed_row:
+                    processed.add(normalized_purpose)
+                    state["processed_cycle_purposes"] = sorted(processed)
+                    _log_event(
+                        "fixed_cycle_cycle_purpose_marked_processed",
+                        {
+                            "cycle_index": cycle_index,
+                            "purpose": purpose,
+                            "normalized_purpose": normalized_purpose,
+                            "phase": field_name,
+                        },
+                    )
+                else:
+                    _log_warning_event(
+                        "fixed_cycle_cycle_purpose_deferred_until_confirmed_history",
+                        {
+                            "cycle_index": cycle_index,
+                            "purpose": purpose,
+                            "normalized_purpose": normalized_purpose,
+                            "phase": field_name,
+                            "exchange_order_id": exchange_order_id or None,
+                        },
+                    )
             cycle_index, _ = self._extract_cycle_sequence_target(purpose, metadata)
             if cycle_index > 0 and self._is_cycle_first_leg_field(field_name):
                 self._purge_filled_long_add_orders(runtime_state, cycle_index)
@@ -23664,6 +23884,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         context: StrategyContext,
         cycle_index: int,
     ) -> bool:
+        self._enrich_fill_event_for_confirmed_pnl(fill_event)
+        if cycle_index <= 0:
+            cycle_index = cycle_index_from_purpose(fill_event.purpose or "")
         metadata = fill_event.metadata or {}
         processed_key = "processed_closed_pnl_signatures"
         cycle_state = self._ensure_cycle_state(runtime_state)

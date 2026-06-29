@@ -101,7 +101,7 @@ class ConfirmedWriterTradeBlockIdTests(unittest.TestCase):
         row = json.loads(lines[0])
         self.assertEqual(row["trade_block_id"], LAST_TBID)
 
-    def test_skips_write_and_logs_when_no_trade_block_id(self) -> None:
+    def test_writes_with_unknown_trade_block_id_when_missing(self) -> None:
         with mock.patch(
             "fixed_cycle_hedge_bot.fixed_cycle_strategy._log_warning_event"
         ) as warning_mock:
@@ -111,8 +111,12 @@ class ConfirmedWriterTradeBlockIdTests(unittest.TestCase):
             )
             warning_mock.assert_called()
             event_name = warning_mock.call_args[0][0]
-            self.assertEqual(event_name, "confirmed_order_pnl_missing_trade_block_id")
-        self.assertFalse(self.history_path.exists())
+            self.assertEqual(event_name, "confirmed_order_pnl_trade_block_id_missing_wrote_anyway")
+        lines = self.history_path.read_text(encoding="utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        row = json.loads(lines[0])
+        self.assertEqual(row["trade_block_id"], "unknown")
+        self.assertEqual(row["trade_block_id_source"], "missing_fallback")
 
 
 class FinalizeTradeBlockIdTests(unittest.TestCase):

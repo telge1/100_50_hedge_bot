@@ -17,18 +17,34 @@ def _context_trade_block_id(context: object) -> str | None:
 
 
 def resolve_active_trade_block_id(state: dict[str, Any] | None) -> str | None:
-    if not state:
-        return None
+    trade_block_id, _source = resolve_trade_block_id_with_source(state)
+    return trade_block_id
 
-    for key in ("trade_block_id", "last_trade_block_id"):
+
+def resolve_trade_block_id_with_source(
+    state: dict[str, Any] | None,
+    *,
+    payload_trade_block_id: object = None,
+) -> tuple[str | None, str]:
+    explicit = _coerce_trade_block_id(payload_trade_block_id)
+    if explicit:
+        return explicit, "payload"
+
+    if not state:
+        return None, "missing"
+
+    for key, source in (
+        ("trade_block_id", "state_trade_block_id"),
+        ("last_trade_block_id", "state_last_trade_block_id"),
+    ):
         trade_block_id = _coerce_trade_block_id(state.get(key))
         if trade_block_id:
-            return trade_block_id
+            return trade_block_id, source
 
     trading_stop_context = state.get("final_exit_trading_stop_context")
     trade_block_id = _context_trade_block_id(trading_stop_context)
     if trade_block_id:
-        return trade_block_id
+        return trade_block_id, "final_exit_trading_stop_context"
 
     for context_key in (
         "final_long_exit_order_context",
@@ -36,9 +52,15 @@ def resolve_active_trade_block_id(state: dict[str, Any] | None) -> str | None:
     ):
         trade_block_id = _context_trade_block_id(state.get(context_key))
         if trade_block_id:
-            return trade_block_id
+            return trade_block_id, context_key
 
-    return None
+    cycle_state = state.get("cycle_state")
+    if isinstance(cycle_state, dict):
+        trade_block_id = _coerce_trade_block_id(cycle_state.get("trade_block_id"))
+        if trade_block_id:
+            return trade_block_id, "cycle_state"
+
+    return None, "missing"
 
 
 def preserve_last_trade_block_id_before_clear(state: dict[str, Any]) -> None:
