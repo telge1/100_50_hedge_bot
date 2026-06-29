@@ -7,7 +7,7 @@
   "dynamic_symbol_hold_minutes": 0,
   
   "time_distance_refill_trigger_minutes": 60,
-  "recovery_mode_trigger_override_enabled": true,
+  "recovery_mode_trigger_override_enabled": false,
   "recovery_mode_trigger_override_pct": 50.0,
   "recovery_mode_trigger_override_ticks": null,
   
