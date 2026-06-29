@@ -322,9 +322,19 @@ def _trade_block_export_key(row: dict[str, Any]) -> tuple[str, str, str]:
 def _is_flat_fill_export_row(row: dict[str, Any]) -> bool:
     if row.get("row_type") != "fill":
         return False
+
+    long_qty_after = row.get("long_qty_after")
+    short_qty_after = row.get("short_qty_after")
+
+    # Missing position-after fields must not be interpreted as flat. Some
+    # synthetic/unit-test rows do not carry snapshot quantities, and treating
+    # empty values as zero would incorrectly drop later legitimate rows.
+    if long_qty_after in (None, "") or short_qty_after in (None, ""):
+        return False
+
     return (
-        _row_float_or_zero(row.get("long_qty_after")) == 0.0
-        and _row_float_or_zero(row.get("short_qty_after")) == 0.0
+        _row_float_or_zero(long_qty_after) == 0.0
+        and _row_float_or_zero(short_qty_after) == 0.0
     )
 
 
