@@ -10,6 +10,7 @@ from typing import Any
 from .backtest_config_loader import (
     DEFAULT_LONG_CONFIG_PATH,
     DEFAULT_SHORT_CONFIG_PATH,
+    ConfigSource,
 )
 from .backtest_report import (
     BacktestResult,
@@ -22,6 +23,7 @@ from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
 from .debug_report import print_debug_report
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
+from .multi_start_backtest import print_multi_start_summary, run_multi_start_backtests
 
 
 def resolve_directions(direction: str) -> list[str]:
@@ -330,6 +332,39 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Config file path for --config-source file",
     )
+    parser.add_argument(
+        "--multi-start",
+        action="store_true",
+        help="Run multiple backtests at staggered start points",
+    )
+    parser.add_argument(
+        "--start-step-candles",
+        type=int,
+        default=100,
+        help="Candle step between multi-start windows (default: 100)",
+    )
+    parser.add_argument(
+        "--window-candles",
+        type=int,
+        default=1000,
+        help="Max candles per multi-start window (default: 1000)",
+    )
+    parser.add_argument(
+        "--max-starts",
+        type=int,
+        default=20,
+        help="Maximum number of multi-start runs per direction (default: 20)",
+    )
+    parser.add_argument(
+        "--multi-fill-models",
+        action="store_true",
+        help="With --multi-start, run conservative, conservative_multi, and paired_exit",
+    )
+    parser.add_argument(
+        "--include-logs",
+        action="store_true",
+        help="With --multi-start JSON output, include full fill/order/intent logs",
+    )
     return parser
 
 
@@ -376,7 +411,34 @@ def main(argv: list[str] | None = None) -> int:
         write_csv = True
 
     try:
-        if args.compare_fill_models:
+        if args.multi_start:
+            if args.compare_fill_models:
+                raise ValueError("--multi-start cannot be combined with --compare-fill-models")
+            candle_rows = _load_candles(
+                symbol=args.symbol,
+                limit=args.limit,
+                data_dir=args.data_dir,
+            )
+            payload = run_multi_start_backtests(
+                symbol=args.symbol,
+                direction=args.direction,
+                candles=candle_rows,
+                config_source=args.config_source,
+                fill_model=args.fill_model,
+                max_fills_per_candle=args.max_fills_per_candle,
+                multi_fill_models=args.multi_fill_models,
+                start_step_candles=args.start_step_candles,
+                window_candles=args.window_candles,
+                max_starts=args.max_starts,
+                long_config_path=args.long_config_path,
+                short_config_path=args.short_config_path,
+                file_config_path=args.config_path,
+                output_dir=args.output_dir,
+                write_json=write_json,
+                write_csv=write_csv,
+                include_logs=args.include_logs or args.debug,
+            )
+        elif args.compare_fill_models:
             payload = run_fill_model_comparison(
                 symbol=args.symbol,
                 direction=args.direction,
@@ -412,9 +474,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    _print_run_summary(payload)
+    if payload.get("multi_start"):
+        print_multi_start_summary(payload)
+    else:
+        _print_run_summary(payload)
 
-    if args.debug:
+    if args.debug and not payload.get("multi_start"):
         for _, result in payload["results"].items():
             print_debug_report(
                 result,

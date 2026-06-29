@@ -212,6 +212,8 @@ class BacktestResult:
     initial_exit_trigger_distance_pct: float | None = None
     nearest_config_candidate: float | None = None
     nearest_config_candidate_source: str = ""
+    start_index: int | None = None
+    window_candles: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
