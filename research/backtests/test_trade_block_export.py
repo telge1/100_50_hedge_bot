@@ -17,6 +17,7 @@ from research.backtests.trade_block_export import (
     TRADE_BLOCK_ROW_FIELDS,
     build_trade_block_rows,
     build_trade_block_summary_rows,
+    drop_stale_runtime_submitted_order_rows,
     export_trade_blocks_for_results,
     parse_trade_block_start_indices,
     sort_trade_block_rows,
@@ -98,7 +99,116 @@ def test_missing_trade_block_id_uses_fallback() -> None:
     rows = build_trade_block_rows(result)
     assert rows
     assert rows[0]["trade_block_id"] == "backtest_long_start0"
-    assert rows[0]["trade_block_id_missing"] is True
+    assert rows[0]["trade_block_id_missing"] is False
+    summary = build_trade_block_summary_rows(result)[0]
+    assert summary["has_missing_trade_block_id"] is False
+
+
+def test_canonical_trade_block_id_from_state_not_missing() -> None:
+    result = _result_with_logs(trade_block_id=None)
+    result.final_strategy_state_excerpt = {"active_trade_block_id": "live-tb-apt-800"}
+    rows = build_trade_block_rows(result)
+    assert rows
+    assert all(row["trade_block_id"] == "live-tb-apt-800" for row in rows)
+    assert all(row["trade_block_id_missing"] is False for row in rows)
+    summary = build_trade_block_summary_rows(result)[0]
+    assert summary["has_missing_trade_block_id"] is False
+
+
+def test_drop_runtime_submitted_rows_after_later_fills() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        start_index=800,
+        end_time=datetime(2026, 6, 27, 11, 35, tzinfo=timezone.utc),
+        fill_log=[
+            {
+                "timestamp": "2026-06-27T11:35:00+00:00",
+                "candle_index": 186,
+                "purpose": "CYCLE_2_LONG_ADD",
+                "closed_pnl": -0.3,
+            }
+        ],
+        order_log=[
+            {
+                "timestamp": "2026-06-30T07:02:00+00:00",
+                "candle_index": 0,
+                "event_type": "submitted",
+                "order_id": "sim-old-long-add",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "status": "NEW",
+            },
+            {
+                "timestamp": "2026-06-27T11:35:00+00:00",
+                "candle_index": 186,
+                "event_type": "filled",
+                "order_id": "sim-old-long-add",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "status": "FILLED",
+            },
+        ],
+    )
+    rows = build_trade_block_rows(result)
+    order_rows = [row for row in rows if row["row_type"] == "order"]
+    assert len(order_rows) == 1
+    assert order_rows[0]["event_type"] == "filled"
+    assert order_rows[0]["candle_index"] == 186
+
+
+def test_final_active_orders_exported_once() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        start_index=800,
+        final_strategy_state_excerpt={"active_trade_block_id": "tb-open"},
+        order_log=[
+            {
+                "timestamp": "2026-06-27T11:35:00+00:00",
+                "candle_index": 186,
+                "event_type": "submitted",
+                "order_id": "sim-tp-10",
+                "purpose": "LONG_TP_EXIT",
+                "status": "NEW",
+            }
+        ],
+        final_active_orders=[
+            {
+                "order_id": "sim-tp-10",
+                "purpose": "LONG_TP_EXIT",
+                "side": "long",
+                "qty": 124.213,
+                "trigger_price": 0.6088,
+                "status": "NEW",
+            }
+        ],
+        final_active_order_purposes=["LONG_TP_EXIT"],
+    )
+    rows = build_trade_block_rows(result)
+    tp_rows = [row for row in rows if row.get("purpose") == "LONG_TP_EXIT"]
+    assert len(tp_rows) == 1
+    assert tp_rows[0]["row_type"] == "final_active_order"
+
+
+def test_drop_stale_runtime_submitted_order_rows_helper() -> None:
+    rows = drop_stale_runtime_submitted_order_rows(
+        [
+            {
+                "row_type": "fill",
+                "candle_index": 10,
+                "timestamp": "2026-01-01T01:00:00+00:00",
+            },
+            {
+                "row_type": "order",
+                "event_type": "submitted",
+                "candle_index": 0,
+                "timestamp": "2026-06-30T07:02:00+00:00",
+                "order_id": "old",
+            },
+        ],
+        result_end_time=datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc),
+    )
+    assert len(rows) == 1
+    assert rows[0]["row_type"] == "fill"
 
 
 def test_cumulative_pnl_on_fills() -> None:

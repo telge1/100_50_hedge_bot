@@ -25,6 +25,7 @@ from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState,
 from .backtest_report import build_order_log_entry
 from .backtest_config_loader import BacktestConfigLoadResult, extract_highlight_bot_config
 from .cycle_fill_reference_repair import install_cycle_fill_reference_repair
+from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
 from .purpose_utils import preserve_bot_purpose
@@ -207,6 +208,7 @@ class HedgeBotOriginalSimulator:
         self.loaded_bot_config = extract_highlight_bot_config(self.config)
         self.strategy = build_strategy(signal, self.config)
         install_cycle_fill_reference_repair(self.strategy)
+        install_exit_pnl_audit_shim(self.strategy)
         self.runtime_state = build_runtime_state(
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),

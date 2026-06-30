@@ -124,19 +124,42 @@ def fallback_trade_block_id(result: BacktestResult) -> str:
     return f"backtest_{result.direction}_start{start}"
 
 
-def resolve_trade_block_id(
-    record: dict[str, Any],
-    result: BacktestResult,
-) -> tuple[str, bool]:
-    found = _extract_trade_block_id_from_record(record)
-    if found:
-        return found, False
+def _explicit_trade_block_id_from_result(result: BacktestResult) -> str | None:
+    for log in (result.intent_log, result.order_log, result.fill_log):
+        for record in log or []:
+            found = _extract_trade_block_id_from_record(record)
+            if found:
+                return found
     state = result.final_strategy_state_excerpt or {}
     for key in ("trade_block_id", "active_trade_block_id"):
         value = state.get(key)
         if value:
-            return str(value), True
-    return fallback_trade_block_id(result), True
+            return str(value)
+    return None
+
+
+def resolve_canonical_trade_block_id(result: BacktestResult) -> tuple[str, bool]:
+    """Return the export trade block id and whether any row lacked an explicit id."""
+    explicit = _explicit_trade_block_id_from_result(result)
+    if explicit:
+        return explicit, False
+    # Backtest exports assign one synthetic id consistently across all rows.
+    return fallback_trade_block_id(result), False
+
+
+def resolve_trade_block_id(
+    record: dict[str, Any],
+    result: BacktestResult,
+    *,
+    canonical_trade_block_id: str | None = None,
+    canonical_trade_block_id_missing: bool | None = None,
+) -> tuple[str, bool]:
+    found = _extract_trade_block_id_from_record(record)
+    if found:
+        return found, False
+    if canonical_trade_block_id is not None and canonical_trade_block_id_missing is not None:
+        return canonical_trade_block_id, canonical_trade_block_id_missing
+    return resolve_canonical_trade_block_id(result)
 
 
 def _empty_row(result: BacktestResult) -> dict[str, Any]:
@@ -205,10 +228,15 @@ def _base_row(
 
 def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
     """Build flat rows from intent/order/fill logs grouped by trade_block_id."""
+    canonical_trade_block_id, canonical_missing = resolve_canonical_trade_block_id(result)
+    resolve_kwargs = {
+        "canonical_trade_block_id": canonical_trade_block_id,
+        "canonical_trade_block_id_missing": canonical_missing,
+    }
     rows: list[dict[str, Any]] = []
 
     for record in result.intent_log or []:
-        trade_block_id, missing = resolve_trade_block_id(record, result)
+        trade_block_id, missing = resolve_trade_block_id(record, result, **resolve_kwargs)
         rows.append(
             _base_row(
                 result,
@@ -220,7 +248,7 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     for record in result.order_log or []:
-        trade_block_id, missing = resolve_trade_block_id(record, result)
+        trade_block_id, missing = resolve_trade_block_id(record, result, **resolve_kwargs)
         rows.append(
             _base_row(
                 result,
@@ -232,7 +260,7 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     for record in result.fill_log or []:
-        trade_block_id, missing = resolve_trade_block_id(record, result)
+        trade_block_id, missing = resolve_trade_block_id(record, result, **resolve_kwargs)
         rows.append(
             _base_row(
                 result,
@@ -244,7 +272,7 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     for order in result.final_active_orders or []:
-        trade_block_id, missing = resolve_trade_block_id(order, result)
+        trade_block_id, missing = resolve_trade_block_id(order, result, **resolve_kwargs)
         record = dict(order)
         record.setdefault("event_type", "final_active")
         record.setdefault("status", order.get("status") or "ACTIVE")
@@ -259,6 +287,9 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
         )
 
     rows = sort_trade_block_rows(rows)
+    rows = drop_superseded_submitted_order_rows(rows)
+    rows = drop_duplicate_final_active_order_rows(rows)
+    rows = drop_stale_runtime_submitted_order_rows(rows, result_end_time=result.end_time)
     rows = drop_stale_rows_after_flat(rows)
     return apply_cumulative_pnl(rows)
 
@@ -338,6 +369,116 @@ def _is_flat_fill_export_row(row: dict[str, Any]) -> bool:
     )
 
 
+def _row_candle_index(row: dict[str, Any]) -> int:
+    value = row.get("candle_index")
+    if value in (None, ""):
+        return -1
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return -1
+
+
+def _is_runtime_export_timestamp(timestamp: object, result_end_time: object) -> bool:
+    ts = str(timestamp or "").strip()
+    if not ts:
+        return False
+    end = str(result_end_time or "").strip()
+    if end and ts > end:
+        return True
+    if "T" in ts and "+" in ts:
+        date_part = ts.split("T", 1)[0]
+        if end and date_part not in end and ts[:4].isdigit() and end[:4].isdigit():
+            if date_part[:4] != end[:4]:
+                return True
+    return False
+
+
+def drop_superseded_submitted_order_rows(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Drop initial submitted rows superseded by later lifecycle events for the same order."""
+    order_rows: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if row.get("row_type") != "order":
+            continue
+        order_id = str(row.get("order_id") or "").strip()
+        if order_id:
+            order_rows.setdefault(order_id, []).append(row)
+
+    drop_ids: set[int] = set()
+    for events in order_rows.values():
+        submitted = [event for event in events if str(event.get("event_type") or "") == "submitted"]
+        if not submitted:
+            continue
+        later_events = [
+            event
+            for event in events
+            if str(event.get("event_type") or "")
+            in {"filled", "cancelled", "replaced"}
+        ]
+        if not later_events:
+            continue
+        max_later_candle = max(_row_candle_index(event) for event in later_events)
+        for event in submitted:
+            if _row_candle_index(event) < max_later_candle:
+                drop_ids.add(id(event))
+
+    if not drop_ids:
+        return rows
+    return [row for row in rows if id(row) not in drop_ids]
+
+
+def drop_duplicate_final_active_order_rows(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep final active orders only in ``final_active_order`` rows."""
+    final_active_ids = {
+        str(row.get("order_id") or "").strip()
+        for row in rows
+        if row.get("row_type") == "final_active_order" and row.get("order_id")
+    }
+    if not final_active_ids:
+        return rows
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("row_type") != "order":
+            filtered.append(row)
+            continue
+        order_id = str(row.get("order_id") or "").strip()
+        if order_id in final_active_ids:
+            continue
+        filtered.append(row)
+    return filtered
+
+
+def drop_stale_runtime_submitted_order_rows(
+    rows: list[dict[str, Any]],
+    *,
+    result_end_time: object = None,
+) -> list[dict[str, Any]]:
+    """Drop submitted rows logged with export/runtime timestamps after the backtest window."""
+    filtered: list[dict[str, Any]] = []
+    max_fill_candle = max(
+        (_row_candle_index(row) for row in rows if row.get("row_type") == "fill"),
+        default=-1,
+    )
+    for row in rows:
+        if row.get("row_type") != "order":
+            filtered.append(row)
+            continue
+        if str(row.get("event_type") or "") != "submitted":
+            filtered.append(row)
+            continue
+        candle_index = _row_candle_index(row)
+        timestamp = row.get("timestamp")
+        if candle_index == 0 and max_fill_candle > 0:
+            if _is_runtime_export_timestamp(timestamp, result_end_time):
+                continue
+        filtered.append(row)
+    return filtered
+
+
 def _is_stale_row_after_flat(row: dict[str, Any]) -> bool:
     row_type = str(row.get("row_type") or "")
     event_type = str(row.get("event_type") or "")
@@ -414,7 +555,7 @@ def apply_cumulative_pnl(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def build_trade_block_summary_rows(result: BacktestResult) -> list[dict[str, Any]]:
     rows = build_trade_block_rows(result)
     if not rows:
-        trade_block_id, missing = resolve_trade_block_id({}, result)
+        trade_block_id, missing = resolve_canonical_trade_block_id(result)
         purposes_joined = "|".join(
             preserve_bot_purpose(purpose)
             for purpose in (result.final_active_order_purposes or [])

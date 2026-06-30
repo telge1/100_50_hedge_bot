@@ -132,6 +132,7 @@ def run_historical_backtest(
         candle_close=float(first_candle.close),
         config_load=config_load,
     )
+    sim.candle = first_candle
     sim.candle_index = 0
     result = BacktestResult(
         symbol=symbol_upper,
