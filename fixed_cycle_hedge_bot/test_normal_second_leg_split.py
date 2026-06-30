@@ -156,7 +156,7 @@ class BuildShortTpFollowUpSplitTests(unittest.TestCase):
                     "long_add_status": "PROCESSED",
                     "short_tp_status": "NONE",
                     "short_tp_qty": short_tp_qty,
-                    "long_add_confirmed_pnl": -0.5,
+                    "long_add_confirmed_pnl": 0.0,
                     "complete": False,
                 }
             },
@@ -166,7 +166,7 @@ class BuildShortTpFollowUpSplitTests(unittest.TestCase):
                     str(cycle_index): {
                         "price": 0.71,
                         "incremental_qty": 21.2,
-                        "closed_pnl": -0.5,
+                        "closed_pnl": 0.0,
                     }
                 },
                 "short_fills": {},

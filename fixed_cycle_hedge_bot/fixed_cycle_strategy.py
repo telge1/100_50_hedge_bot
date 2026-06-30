@@ -79,6 +79,7 @@ def _is_per_bot_runtime_config(path_obj: Path) -> bool:
     parts = relative.parts
     return len(parts) >= 4 and parts[-2] == "run" and parts[-1] == "fixed_cycle_config.runtime.json"
 PNL_VALIDATION_THRESHOLD_USDT = 0.01
+SHORT_REDUCE_COVER_NET_EPS = 1e-9
 POST_EXIT_CLEANUP_MAX_ATTEMPTS = 5
 CONFIRMED_CLOSED_PNL_RETRY_INITIAL_DELAY_MS = 2000
 CONFIRMED_CLOSED_PNL_RETRY_INTERVAL_MS = 2000
@@ -10012,6 +10013,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         planned_short_tp_qty = self._safe_float(
             cycle_sequence_entry.get("short_tp_qty"), None
         )
+        fresh_short_cycle_qty = float(short_qty or 0.0)
         current_short_qty = (
             float(snapshot.short_qty or 0.0)
             if float(snapshot.short_qty or 0.0) > 0
@@ -10024,8 +10026,17 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         short_followup_qty = planned_short_tp_qty
         short_followup_qty_source = "cycle_sequence_entry.short_tp_qty"
+        if (
+            planned_short_tp_qty is not None
+            and planned_short_tp_qty > 0
+            and fresh_short_cycle_qty > 0
+            and planned_short_tp_qty > fresh_short_cycle_qty + 1e-9
+        ):
+            # Reserved short_tp_qty can aggregate prior split totals; re-anchor to cycle pct.
+            short_followup_qty = fresh_short_cycle_qty
+            short_followup_qty_source = "configured_short_cycle_qty_stale_reserved_qty_ignored"
         if short_followup_qty is None or short_followup_qty <= 0:
-            short_followup_qty = short_qty
+            short_followup_qty = fresh_short_cycle_qty
             short_followup_qty_source = "configured_short_cycle_qty"
         if short_followup_qty is None or short_followup_qty <= 0:
             short_followup_qty = normalized_current_short_qty
@@ -10312,6 +10323,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
 
         trigger_price = self._normalize_price(raw_trigger_price, runtime_state)
+        short_reduce_cover_adjustment: dict[str, Any] = {}
+        if self._get_second_leg_cycle_role() == "short_reduce" and required_net > 0:
+            trigger_price, short_qty, short_reduce_cover_adjustment = (
+                self._enforce_short_reduce_loss_cover_invariant(
+                    trigger_price=trigger_price,
+                    short_qty=short_qty,
+                    short_entry_price=short_entry_price,
+                    required_net=required_net,
+                    fee_rate=fee_rate,
+                    runtime_state=runtime_state,
+                    snapshot=snapshot,
+                    price_tick_size=price_tick_size,
+                )
+            )
+            if short_reduce_cover_adjustment.get("adjusted"):
+                raw_trigger_price = trigger_price
+                _log_event(
+                    "fixed_cycle_short_reduce_loss_cover_invariant_adjusted",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "purpose": purpose,
+                        **short_reduce_cover_adjustment,
+                    },
+                )
         state["last_expected_short_tp_net"] = required_net
         state["last_short_tp_trigger_price"] = trigger_price
         state["last_short_tp_qty"] = short_qty
@@ -10644,6 +10680,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "threshold_pct": threshold_pct,
             "stage_count": stage_count,
             "use_market_fallback": use_market_fallback,
+            "short_reduce_loss_cover_invariant_adjusted": bool(
+                short_reduce_cover_adjustment.get("adjusted")
+            ),
+            **(
+                {
+                    key: short_reduce_cover_adjustment[key]
+                    for key in (
+                        "original_short_qty",
+                        "adjusted_short_qty",
+                        "original_trigger_price",
+                        "adjusted_trigger_price",
+                        "expected_net_after_adjustment",
+                        "reason",
+                    )
+                    if key in short_reduce_cover_adjustment
+                }
+                if short_reduce_cover_adjustment.get("adjusted")
+                else {}
+            ),
         }
         if use_market_fallback:
             metadata.update(
@@ -10707,6 +10762,67 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 trigger_direction=2,
                 metadata=metadata,
             )
+            if split_intents and required_net > SHORT_REDUCE_COVER_NET_EPS:
+                split_intents, short_qty, trigger_price, split_adjustment = (
+                    self._ensure_short_reduce_split_stages_cover_loss(
+                        split_intents=split_intents,
+                        trigger_price=trigger_price,
+                        short_qty=short_qty,
+                        short_entry_price=short_entry_price,
+                        required_net=required_net,
+                        fee_rate=fee_rate,
+                        runtime_state=runtime_state,
+                        snapshot=snapshot,
+                        price_tick_size=price_tick_size,
+                        cycle_index=cycle_index,
+                        purpose=purpose,
+                        side="short",
+                        position_idx=2,
+                        trigger_direction=2,
+                        metadata=metadata,
+                    )
+                )
+                if split_adjustment.get("adjusted"):
+                    short_reduce_cover_adjustment = {
+                        **short_reduce_cover_adjustment,
+                        **split_adjustment,
+                        "adjusted": True,
+                        "reason": split_adjustment.get(
+                            "reason",
+                            "short_reduce_loss_cover_split_min_stage_adjusted",
+                        ),
+                    }
+                    raw_trigger_price = trigger_price
+                    state["last_short_tp_trigger_price"] = trigger_price
+                    state["last_short_tp_qty"] = short_qty
+                    metadata.update(
+                        {
+                            "short_reduce_loss_cover_invariant_adjusted": True,
+                            "original_short_qty": split_adjustment.get(
+                                "original_short_qty",
+                                short_reduce_cover_adjustment.get("original_short_qty"),
+                            ),
+                            "adjusted_short_qty": short_qty,
+                            "original_trigger_price": split_adjustment.get(
+                                "original_trigger_price",
+                                short_reduce_cover_adjustment.get("original_trigger_price"),
+                            ),
+                            "adjusted_trigger_price": trigger_price,
+                            "expected_net_after_adjustment": split_adjustment.get(
+                                "expected_net_after_adjustment"
+                            ),
+                            "reason": split_adjustment.get("reason"),
+                        }
+                    )
+                    _log_event(
+                        "fixed_cycle_short_reduce_loss_cover_invariant_adjusted",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "cycle_index": cycle_index,
+                            "purpose": purpose,
+                            **short_reduce_cover_adjustment,
+                        },
+                    )
             if split_intents:
                 return split_intents
             _, rules, _ = self._resolve_instrument_rules(runtime_state)
@@ -11760,6 +11876,335 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         numerator = short_entry_price - (required_net_profit / short_qty)
         denominator = 1.0 + fee_rate
         return numerator / denominator
+
+    @staticmethod
+    def _compute_short_reduce_net(
+        *,
+        short_entry_price: float,
+        trigger_price: float,
+        qty: float,
+        fee_rate: float,
+    ) -> float:
+        if qty <= 0 or short_entry_price <= 0 or trigger_price <= 0:
+            return 0.0
+        return (
+            (short_entry_price - trigger_price) * qty
+            - (short_entry_price * qty * fee_rate)
+            - (trigger_price * qty * fee_rate)
+        )
+
+    @staticmethod
+    def _floor_normalize_trigger_price(price: float, *, price_tick_size: float) -> float:
+        if price <= 0:
+            return 0.0
+        tick = price_tick_size if price_tick_size > 0 else 0.0001
+        return math.floor((price / tick) + 1e-12) * tick
+
+    def _enforce_short_reduce_loss_cover_invariant(
+        self,
+        *,
+        trigger_price: float,
+        short_qty: float,
+        short_entry_price: float,
+        required_net: float,
+        fee_rate: float,
+        runtime_state: RuntimeState,
+        snapshot: HedgeSnapshot,
+        price_tick_size: float,
+    ) -> tuple[float, float, dict[str, Any]]:
+        """Ensure submitted short-reduce (trigger, qty) covers required_net after rounding."""
+        eps = SHORT_REDUCE_COVER_NET_EPS
+        original_short_qty = float(short_qty)
+        original_trigger_price = float(trigger_price)
+        tick = price_tick_size if price_tick_size > 0 else float(self.config.price_tick_size or 0.0001)
+        if tick <= 0:
+            tick = 0.0001
+        floor_price = tick
+
+        adjustment: dict[str, Any] = {
+            "original_short_qty": original_short_qty,
+            "original_trigger_price": original_trigger_price,
+            "adjusted_short_qty": original_short_qty,
+            "adjusted_trigger_price": original_trigger_price,
+            "required_net": float(required_net),
+            "expected_net_after_adjustment": self._compute_short_reduce_net(
+                short_entry_price=short_entry_price,
+                trigger_price=original_trigger_price,
+                qty=original_short_qty,
+                fee_rate=fee_rate,
+            ),
+            "adjusted": False,
+            "reason": "",
+        }
+
+        if (
+            required_net <= eps
+            or original_short_qty <= 0
+            or short_entry_price <= 0
+            or original_trigger_price <= 0
+        ):
+            return original_trigger_price, original_short_qty, adjustment
+
+        adjusted_trigger = self._floor_normalize_trigger_price(
+            original_trigger_price,
+            price_tick_size=tick,
+        )
+        adjusted_qty = original_short_qty
+
+        def net_at(tp: float, qty: float) -> float:
+            return self._compute_short_reduce_net(
+                short_entry_price=short_entry_price,
+                trigger_price=tp,
+                qty=qty,
+                fee_rate=fee_rate,
+            )
+
+        def deepen_trigger(*, max_iterations: int = 500) -> None:
+            nonlocal adjusted_trigger
+            iterations = 0
+            while (
+                net_at(adjusted_trigger, adjusted_qty) + eps < required_net
+                and adjusted_trigger > floor_price + eps
+                and iterations < max_iterations
+            ):
+                adjusted_trigger = self._floor_normalize_trigger_price(
+                    adjusted_trigger - tick,
+                    price_tick_size=tick,
+                )
+                iterations += 1
+
+        deepen_trigger()
+
+        if net_at(adjusted_trigger, adjusted_qty) + eps < required_net:
+            per_unit_net = net_at(adjusted_trigger, 1.0)
+            if per_unit_net > eps:
+                _, rules, _ = self._resolve_instrument_rules(runtime_state)
+                min_order_qty = float(
+                    rules["min_order_qty"]
+                    if rules and rules.get("min_order_qty")
+                    else float(self.config.min_order_qty or 0.0)
+                )
+                min_notional = float(
+                    rules["min_notional"]
+                    if rules and rules.get("min_notional")
+                    else float(self.config.min_notional_usdt or 0.0)
+                )
+                available_short_qty = float(snapshot.short_qty or 0.0)
+                if available_short_qty <= 0:
+                    available_short_qty = float(
+                        runtime_state.strategy_state.get("initial_short_qty") or 0.0
+                    )
+                available_short_qty = self._normalize_qty(available_short_qty, runtime_state)
+
+                desired_qty = self._normalize_qty(required_net / per_unit_net, runtime_state)
+                if min_notional > 0 and adjusted_trigger > 0:
+                    min_notional_qty = self._normalize_qty(
+                        min_notional / adjusted_trigger,
+                        runtime_state,
+                    )
+                    if min_notional_qty > desired_qty:
+                        desired_qty = min_notional_qty
+                if min_order_qty > 0 and desired_qty + 1e-12 < min_order_qty:
+                    if min_order_qty <= available_short_qty + 1e-12:
+                        desired_qty = min_order_qty
+                    else:
+                        desired_qty = adjusted_qty
+                desired_qty = min(desired_qty, available_short_qty)
+
+                if desired_qty > adjusted_qty + eps:
+                    adjusted_qty = desired_qty
+                    adjustment["reason"] = "short_reduce_loss_cover_qty_increased"
+                    deepen_trigger()
+
+        final_net = net_at(adjusted_trigger, adjusted_qty)
+        adjustment["adjusted_short_qty"] = adjusted_qty
+        adjustment["adjusted_trigger_price"] = adjusted_trigger
+        adjustment["expected_net_after_adjustment"] = final_net
+
+        if (
+            abs(adjusted_trigger - original_trigger_price) > eps
+            or abs(adjusted_qty - original_short_qty) > eps
+        ):
+            adjustment["adjusted"] = True
+            if not adjustment["reason"]:
+                adjustment["reason"] = "short_reduce_loss_cover_trigger_deepened"
+
+        return adjusted_trigger, adjusted_qty, adjustment
+
+    def _ensure_short_reduce_split_stages_cover_loss(
+        self,
+        *,
+        split_intents: list[StrategyIntent],
+        trigger_price: float,
+        short_qty: float,
+        short_entry_price: float,
+        required_net: float,
+        fee_rate: float,
+        runtime_state: RuntimeState,
+        snapshot: HedgeSnapshot,
+        price_tick_size: float,
+        cycle_index: int,
+        purpose: str,
+        side: str,
+        position_idx: int,
+        trigger_direction: int,
+        metadata: dict[str, Any] | None,
+    ) -> tuple[list[StrategyIntent], float, float, dict[str, Any]]:
+        """Conservative fill model: any single split stage must cover required_net alone."""
+        eps = SHORT_REDUCE_COVER_NET_EPS
+        original_short_qty = float(short_qty)
+        original_trigger_price = float(trigger_price)
+        adjustment: dict[str, Any] = {
+            "original_short_qty": original_short_qty,
+            "original_trigger_price": original_trigger_price,
+            "required_net": float(required_net),
+            "adjusted": False,
+            "reason": "",
+        }
+        if not split_intents or required_net <= eps:
+            adjustment["expected_net_after_adjustment"] = self._compute_short_reduce_net(
+                short_entry_price=short_entry_price,
+                trigger_price=trigger_price,
+                qty=min((intent.qty for intent in split_intents), default=short_qty),
+                fee_rate=fee_rate,
+            )
+            return split_intents, trigger_price, short_qty, adjustment
+
+        available_short_qty = float(snapshot.short_qty or 0.0)
+        if available_short_qty <= 0:
+            available_short_qty = float(
+                runtime_state.strategy_state.get("initial_short_qty") or 0.0
+            )
+        available_short_qty = self._normalize_qty(available_short_qty, runtime_state)
+
+        adjusted_trigger = float(trigger_price)
+        adjusted_qty = float(short_qty)
+        stage_count = len(split_intents)
+
+        def min_stage_net() -> tuple[float, float]:
+            min_qty = min(float(intent.qty or 0.0) for intent in split_intents)
+            net = self._compute_short_reduce_net(
+                short_entry_price=short_entry_price,
+                trigger_price=adjusted_trigger,
+                qty=min_qty,
+                fee_rate=fee_rate,
+            )
+            return min_qty, net
+
+        min_qty, min_net = min_stage_net()
+        if min_net + eps >= required_net:
+            adjustment["expected_net_after_adjustment"] = min_net
+            return split_intents, adjusted_trigger, adjusted_qty, adjustment
+
+        per_unit_net = self._compute_short_reduce_net(
+            short_entry_price=short_entry_price,
+            trigger_price=adjusted_trigger,
+            qty=1.0,
+            fee_rate=fee_rate,
+        )
+        if per_unit_net > eps:
+            needed_min_stage_qty = self._normalize_qty(
+                required_net / per_unit_net,
+                runtime_state,
+            )
+            needed_total_qty = self._normalize_qty(
+                needed_min_stage_qty * float(stage_count),
+                runtime_state,
+            )
+            if needed_total_qty > adjusted_qty:
+                adjusted_qty = min(needed_total_qty, available_short_qty)
+
+        adjusted_trigger, adjusted_qty, inner_adjustment = (
+            self._enforce_short_reduce_loss_cover_invariant(
+                trigger_price=adjusted_trigger,
+                short_qty=adjusted_qty,
+                short_entry_price=short_entry_price,
+                required_net=required_net,
+                fee_rate=fee_rate,
+                runtime_state=runtime_state,
+                snapshot=snapshot,
+                price_tick_size=price_tick_size,
+            )
+        )
+
+        rebuilt = self._maybe_build_normal_cycle_second_leg_split_intents(
+            cycle_index=cycle_index,
+            purpose=purpose,
+            qty=adjusted_qty,
+            trigger_price=adjusted_trigger,
+            snapshot=snapshot,
+            runtime_state=runtime_state,
+            side=side,
+            position_idx=position_idx,
+            trigger_direction=trigger_direction,
+            metadata=metadata,
+        )
+        if rebuilt:
+            split_intents = rebuilt
+            min_qty, min_net = min_stage_net()
+            if min_net + eps < required_net and adjusted_qty < available_short_qty - eps:
+                per_unit_net = self._compute_short_reduce_net(
+                    short_entry_price=short_entry_price,
+                    trigger_price=adjusted_trigger,
+                    qty=1.0,
+                    fee_rate=fee_rate,
+                )
+                if per_unit_net > eps:
+                    needed_min_stage_qty = self._normalize_qty(
+                        required_net / per_unit_net,
+                        runtime_state,
+                    )
+                    adjusted_qty = min(
+                        available_short_qty,
+                        self._normalize_qty(
+                            needed_min_stage_qty * float(len(split_intents)),
+                            runtime_state,
+                        ),
+                    )
+                    adjusted_trigger, adjusted_qty, inner_adjustment = (
+                        self._enforce_short_reduce_loss_cover_invariant(
+                            trigger_price=adjusted_trigger,
+                            short_qty=adjusted_qty,
+                            short_entry_price=short_entry_price,
+                            required_net=required_net,
+                            fee_rate=fee_rate,
+                            runtime_state=runtime_state,
+                            snapshot=snapshot,
+                            price_tick_size=price_tick_size,
+                        )
+                    )
+                    rebuilt = self._maybe_build_normal_cycle_second_leg_split_intents(
+                        cycle_index=cycle_index,
+                        purpose=purpose,
+                        qty=adjusted_qty,
+                        trigger_price=adjusted_trigger,
+                        snapshot=snapshot,
+                        runtime_state=runtime_state,
+                        side=side,
+                        position_idx=position_idx,
+                        trigger_direction=trigger_direction,
+                        metadata=metadata,
+                    )
+                    if rebuilt:
+                        split_intents = rebuilt
+                        min_qty, min_net = min_stage_net()
+
+        adjustment["adjusted"] = (
+            abs(adjusted_trigger - original_trigger_price) > eps
+            or abs(adjusted_qty - original_short_qty) > eps
+            or bool(inner_adjustment.get("adjusted"))
+        )
+        if adjustment["adjusted"]:
+            adjustment["reason"] = (
+                inner_adjustment.get("reason")
+                or "short_reduce_loss_cover_split_min_stage_adjusted"
+            )
+        adjustment["adjusted_short_qty"] = adjusted_qty
+        adjustment["adjusted_trigger_price"] = adjusted_trigger
+        adjustment["expected_net_after_adjustment"] = min_net
+        adjustment["split_min_stage_qty"] = min_qty
+        adjustment["split_stage_count"] = len(split_intents)
+        return split_intents, adjusted_trigger, adjusted_qty, adjustment
 
     def _calculate_break_even(
         self,
