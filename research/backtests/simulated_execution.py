@@ -15,6 +15,9 @@ from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_or
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
 REFILL_MARKET_FILL_PURPOSES = frozenset({"REFILL_LONG", "REFILL_SHORT"})
+STUCK_RECOVERY_RELOAD_MARKET_FILL_PURPOSES = frozenset(
+    {"STUCK_RECOVERY_RELOAD_LONG_ENTRY", "STUCK_RECOVERY_RELOAD_SHORT_ENTRY"}
+)
 
 
 @dataclass(frozen=True)
@@ -35,10 +38,21 @@ def is_immediate_refill_market_fill(intent: StrategyIntent) -> bool:
     return order_type == "MARKET" and intent.price is None and intent.trigger_price is None
 
 
+def is_stuck_recovery_reload_market_fill(intent: StrategyIntent) -> bool:
+    """Backtest-only stuck recovery reload entries fill at candle close."""
+    purpose = str(intent.purpose or "").strip().upper()
+    if purpose not in STUCK_RECOVERY_RELOAD_MARKET_FILL_PURPOSES:
+        return False
+    order_type = str(intent.order_type or "Market").strip().upper()
+    return order_type == "MARKET" and intent.price is None and intent.trigger_price is None
+
+
 def is_immediate_market_fill(intent: StrategyIntent) -> bool:
-    """Initial hedge entries and cycle refill market orders fill at candle close."""
+    """Initial hedge entries and immediate market cycle/refill/reload orders."""
     purpose = str(intent.purpose or "").strip().upper()
     if purpose in INITIAL_ENTRY_PURPOSES:
+        return True
+    if is_stuck_recovery_reload_market_fill(intent):
         return True
     return is_immediate_refill_market_fill(intent)
 

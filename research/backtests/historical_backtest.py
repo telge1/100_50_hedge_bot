@@ -17,6 +17,8 @@ from .backtest_config_loader import (
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
+from .stuck_recovery_reload import StuckRecoveryReloadConfig
+from .stuck_recovery_reload_shim import maybe_execute_stuck_recovery_reload
 from .trade_block_export import ensure_backtest_trade_block_ids
 from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
@@ -99,6 +101,7 @@ def run_historical_backtest(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
+    stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -135,6 +138,7 @@ def run_historical_backtest(
         candle_close=float(first_candle.close),
         config_load=config_load,
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
+        stuck_recovery_reload_config=stuck_recovery_reload_config,
     )
     sim.candle = first_candle
     sim.candle_index = 0
@@ -151,6 +155,7 @@ def run_historical_backtest(
     cumulative_pnl = 0.0
     peak_pnl = 0.0
     max_drawdown = 0.0
+    reload_tracker = sim.stuck_recovery_reload_tracker
 
     try:
         entry_result = sim.run_entry_smoke()
@@ -164,6 +169,8 @@ def run_historical_backtest(
             candle_index=0,
         )
         cumulative_pnl += entry_pnl
+        if reload_tracker is not None:
+            reload_tracker.note_fills(candle_index=0, fill_count=len(entry_result.entry_fills))
         peak_pnl, max_drawdown = _update_drawdown(
             cumulative_pnl=cumulative_pnl,
             peak_pnl=peak_pnl,
@@ -198,12 +205,41 @@ def run_historical_backtest(
                 candle_index=loop_index,
             )
             cumulative_pnl += pnl_delta
+            if reload_tracker is not None:
+                reload_tracker.note_fills(
+                    candle_index=loop_index,
+                    fill_count=len(candle_result.candle_fills),
+                )
             peak_pnl, max_drawdown = _update_drawdown(
                 cumulative_pnl=cumulative_pnl,
                 peak_pnl=peak_pnl,
                 max_drawdown=max_drawdown,
             )
             result.orders_submitted = sim.orders_submitted
+
+            if reload_tracker is not None and not _is_trade_closed(sim):
+                reload_fills = maybe_execute_stuck_recovery_reload(
+                    sim,
+                    reload_tracker,
+                    cumulative_pnl=cumulative_pnl,
+                    candle_index=loop_index,
+                    trade_closed=False,
+                )
+                if reload_fills:
+                    reload_pnl = _append_fill_logs(
+                        result,
+                        sim,
+                        reload_fills,
+                        candle=candle,
+                        candle_index=loop_index,
+                    )
+                    cumulative_pnl += reload_pnl
+                    peak_pnl, max_drawdown = _update_drawdown(
+                        cumulative_pnl=cumulative_pnl,
+                        peak_pnl=peak_pnl,
+                        max_drawdown=max_drawdown,
+                    )
+                    result.orders_submitted = sim.orders_submitted
 
             if _is_trade_closed(sim):
                 result.final_status = "closed"

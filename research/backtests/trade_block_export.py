@@ -69,7 +69,24 @@ DYNAMIC_CYCLE_SCALING_ROW_FIELDS = (
     "dynamic_cycle_scaling_band",
 )
 
-TRADE_BLOCK_ROW_FIELDS = TRADE_BLOCK_ROW_FIELDS + DYNAMIC_CYCLE_SCALING_ROW_FIELDS
+STUCK_RECOVERY_RELOAD_ROW_FIELDS = (
+    "stuck_recovery_reload_enabled",
+    "stuck_recovery_reload_triggered",
+    "stuck_recovery_reload_config_name",
+    "reload_cycle_index",
+    "reload_reason",
+    "reload_candles_since_last_fill",
+    "reload_realized_pnl_before",
+    "reload_long_notional_usdt",
+    "reload_short_notional_usdt",
+    "reload_long_qty",
+    "reload_short_qty",
+    "reload_count_for_trade",
+    "active_purpose_before_reload",
+    "active_purposes_after_reload",
+)
+
+TRADE_BLOCK_ROW_FIELDS = TRADE_BLOCK_ROW_FIELDS + DYNAMIC_CYCLE_SCALING_ROW_FIELDS + STUCK_RECOVERY_RELOAD_ROW_FIELDS
 
 TRADE_BLOCK_SUMMARY_FIELDS = (
     "symbol",
@@ -270,10 +287,10 @@ def _base_row(
             row["cycle_index"] = excerpt.get("cycle_index")
         if not row.get("cycle_role") and excerpt.get("cycle_role"):
             row["cycle_role"] = excerpt.get("cycle_role")
-        for key in DYNAMIC_CYCLE_SCALING_ROW_FIELDS:
+        for key in DYNAMIC_CYCLE_SCALING_ROW_FIELDS + STUCK_RECOVERY_RELOAD_ROW_FIELDS:
             if row.get(key) in (None, "") and key in excerpt:
                 value = excerpt.get(key)
-                if isinstance(value, dict):
+                if isinstance(value, (dict, list)):
                     row[key] = json.dumps(value, ensure_ascii=False)
                 else:
                     row[key] = value

@@ -28,12 +28,15 @@ from .cycle_fill_reference_repair import install_cycle_fill_reference_repair
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .dynamic_cycle_order_scaling_shim import install_dynamic_cycle_order_scaling
 from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
+from .stuck_recovery_reload import StuckRecoveryReloadConfig
+from .stuck_recovery_reload_shim import attach_stuck_recovery_reload_tracker
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
 from .purpose_utils import preserve_bot_purpose
 from .simulated_execution import (
     fill_entry_intents_at_candle_close,
     fill_order_at_candle_close,
+    is_immediate_market_fill,
     is_immediate_refill_market_fill,
     process_candle_fills,
 )
@@ -178,6 +181,7 @@ class HedgeBotOriginalSimulator:
         config_load: BacktestConfigLoadResult | None = None,
         temp_dir: Path | None = None,
         dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
+        stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     ) -> None:
         self.signal = signal
         self.symbol = symbol.upper()
@@ -214,6 +218,11 @@ class HedgeBotOriginalSimulator:
         install_exit_pnl_audit_shim(self.strategy)
         install_dynamic_cycle_order_scaling(self.strategy, dynamic_cycle_scaling_config)
         self.dynamic_cycle_scaling_config = dynamic_cycle_scaling_config
+        self.stuck_recovery_reload_tracker = attach_stuck_recovery_reload_tracker(
+            self,
+            stuck_recovery_reload_config,
+        )
+        self.stuck_recovery_reload_config = stuck_recovery_reload_config
         self.runtime_state = build_runtime_state(
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),
@@ -579,7 +588,7 @@ class HedgeBotOriginalSimulator:
         self.orders_submitted += len(submitted_pairs)
         self._refresh_snapshot_from_book(source="after_submit_intents")
         for intent, order in submitted_pairs:
-            if is_immediate_refill_market_fill(intent):
+            if is_immediate_market_fill(intent):
                 self._fill_immediate_refill_market_intent(
                     intent,
                     order,

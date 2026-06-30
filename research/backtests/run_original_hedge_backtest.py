@@ -23,8 +23,13 @@ from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
 from .debug_report import print_debug_report
 from .dynamic_cycle_order_scaling import (
     DynamicCycleOrderScalingConfig,
-    config_from_json_string,
+    config_from_json_string as dynamic_scaling_config_from_json_string,
     default_dynamic_cycle_order_scaling_config,
+)
+from .stuck_recovery_reload import (
+    StuckRecoveryReloadConfig,
+    config_from_json_string as stuck_reload_config_from_json_string,
+    default_stuck_recovery_reload_config,
 )
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
@@ -50,9 +55,18 @@ from .trade_block_export import (
 def resolve_dynamic_cycle_scaling_config(args: argparse.Namespace) -> DynamicCycleOrderScalingConfig | None:
     json_payload = getattr(args, "dynamic_cycle_order_scaling_config_json", None)
     if json_payload:
-        return config_from_json_string(str(json_payload))
+        return dynamic_scaling_config_from_json_string(str(json_payload))
     if bool(getattr(args, "dynamic_cycle_order_scaling", False)):
         return default_dynamic_cycle_order_scaling_config()
+    return None
+
+
+def resolve_stuck_recovery_reload_config(args: argparse.Namespace) -> StuckRecoveryReloadConfig | None:
+    json_payload = getattr(args, "stuck_recovery_reload_config_json", None)
+    if json_payload:
+        return stuck_reload_config_from_json_string(str(json_payload))
+    if bool(getattr(args, "stuck_recovery_reload", False)):
+        return default_stuck_recovery_reload_config()
     return None
 
 
@@ -459,6 +473,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON config for dynamic cycle order scaling (overrides default bands)",
     )
+    parser.add_argument(
+        "--stuck-recovery-reload",
+        action="store_true",
+        help="Backtest-only: reload trades stuck on CYCLE_N_SHORT_REDUCE",
+    )
+    parser.add_argument(
+        "--stuck-recovery-reload-config-json",
+        default=None,
+        help="JSON config for stuck recovery reload (overrides defaults)",
+    )
     return parser
 
 
@@ -580,6 +604,7 @@ def main(argv: list[str] | None = None) -> int:
                 write_csv=write_csv,
                 include_logs=args.include_logs or args.debug,
                 dynamic_cycle_scaling_config=resolve_dynamic_cycle_scaling_config(args),
+                stuck_recovery_reload_config=resolve_stuck_recovery_reload_config(args),
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(

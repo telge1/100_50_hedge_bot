@@ -94,6 +94,22 @@ INTENT_METADATA_EXCERPT_KEYS = (
     "cycle_scaling_started",
     "cycle_scaling_reason",
     "dynamic_cycle_scaling_band",
+
+    # Stuck recovery reload (backtest-only)
+    "stuck_recovery_reload_enabled",
+    "stuck_recovery_reload_triggered",
+    "stuck_recovery_reload_config_name",
+    "reload_cycle_index",
+    "reload_reason",
+    "reload_candles_since_last_fill",
+    "reload_realized_pnl_before",
+    "reload_long_notional_usdt",
+    "reload_short_notional_usdt",
+    "reload_long_qty",
+    "reload_short_qty",
+    "reload_count_for_trade",
+    "active_purpose_before_reload",
+    "active_purposes_after_reload",
 )
 
 TRIGGER_ORDER_TYPES = frozenset({"STOP", "STOP_MARKET", "TAKE_PROFIT", "TAKE_PROFIT_MARKET"})
