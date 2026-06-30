@@ -255,3 +255,23 @@ PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
   --debug \
   --print-config-diagnostics
 
+
+
+
+Aktuell passiert ungefähr:
+
+Cycle wird tiefer
+Long-Add/Reduce wird relativ groß
+realized_pnl wird stärker negativ
+Short-Reduce muss mehr Gewinn holen
+Short-Reduce-Preis liegt weiter weg
+Trade hängt
+
+Deine Idee dreht das um:
+
+Cycle wird tiefer
+Long-Reduce/Add wird kleiner
+realized_pnl-Verlust wird kleiner
+Short-Reduce muss weniger Gewinn holen
+Short-Reduce-Preis liegt näher am Markt
+Trade kann eher schließen
