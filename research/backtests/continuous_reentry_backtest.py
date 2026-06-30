@@ -19,6 +19,7 @@ from .fill_models import resolve_fill_model_config
 from .historical_backtest import normalize_candles, run_historical_backtest
 from .pnl_coverage_audit import apply_trade_exit_quality
 from .multi_start_backtest import compact_result_dict, resolve_directions
+from .trade_block_export import ensure_backtest_trade_block_ids, stamp_trade_block_id
 
 CONTINUOUS_SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -72,18 +73,6 @@ CONTINUOUS_AGGREGATE_CSV_FIELDS = (
 
 def continuous_trade_block_id(direction: str, trade_number: int) -> str:
     return f"backtest_{direction}_continuous_trade_{trade_number:04d}"
-
-
-def stamp_trade_block_id(result: BacktestResult, trade_block_id: str) -> None:
-    result.trade_block_id = trade_block_id
-    for log in (result.fill_log, result.order_log, result.intent_log):
-        for record in log or []:
-            record.setdefault("trade_block_id", trade_block_id)
-    for order in result.final_active_orders or []:
-        order.setdefault("trade_block_id", trade_block_id)
-    excerpt = dict(result.final_strategy_state_excerpt or {})
-    excerpt["active_trade_block_id"] = trade_block_id
-    result.final_strategy_state_excerpt = excerpt
 
 
 def _format_timestamp(value: datetime | None) -> str:
@@ -291,7 +280,6 @@ def run_continuous_reentry_for_direction(
             break
 
         trade_number += 1
-        block_id = continuous_trade_block_id(signal, trade_number)
 
         result = run_historical_backtest(
             symbol_upper,
@@ -309,7 +297,7 @@ def run_continuous_reentry_for_direction(
         result.end_index = _trade_end_index(start_index, result)
         result.trade_number = trade_number
         apply_trade_exit_quality(result)
-        stamp_trade_block_id(result, block_id)
+        ensure_backtest_trade_block_ids(result)
         results.append(result)
 
         if result.exit_reason != "flat_no_active_orders":

@@ -16,6 +16,7 @@ from .backtest_config_loader import (
 )
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
+from .trade_block_export import ensure_backtest_trade_block_ids
 from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
 from .simulated_order_book import SyntheticCandle
@@ -233,4 +234,5 @@ def run_historical_backtest(
 
     if result.end_time is None:
         result.end_time = first_candle.timestamp
+    ensure_backtest_trade_block_ids(result)
     return result

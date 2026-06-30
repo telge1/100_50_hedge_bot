@@ -18,6 +18,7 @@ from research.backtests.trade_block_export import (
     build_trade_block_rows,
     build_trade_block_summary_rows,
     drop_stale_runtime_submitted_order_rows,
+    ensure_backtest_trade_block_ids,
     export_trade_blocks_for_results,
     parse_trade_block_start_indices,
     sort_trade_block_rows,
@@ -110,6 +111,37 @@ def test_canonical_trade_block_id_from_state_not_missing() -> None:
     rows = build_trade_block_rows(result)
     assert rows
     assert all(row["trade_block_id"] == "live-tb-apt-800" for row in rows)
+    assert all(row["trade_block_id_missing"] is False for row in rows)
+    summary = build_trade_block_summary_rows(result)[0]
+    assert summary["has_missing_trade_block_id"] is False
+
+
+def test_ensure_backtest_trade_block_ids_stamps_all_logs() -> None:
+    result = _result_with_logs(trade_block_id=None)
+    result.intent_log = [
+        {"purpose": "INITIAL_LONG_ENTRY", "timestamp": "t", "candle_index": 0},
+        {"purpose": "INITIAL_SHORT_ENTRY", "timestamp": "t", "candle_index": 0},
+    ]
+    result.fill_log = [
+        {
+            "purpose": "CYCLE_1_LONG_ADD",
+            "timestamp": "t",
+            "candle_index": 1,
+            "closed_pnl": -0.12,
+        }
+    ]
+    result.order_log = [
+        {"purpose": "LONG_TP_EXIT", "event_type": "submitted", "timestamp": "t", "candle_index": 2},
+    ]
+
+    block_id = ensure_backtest_trade_block_ids(result)
+
+    assert block_id == "backtest_long_start0"
+    assert result.trade_block_id == block_id
+    for log in (result.intent_log, result.order_log, result.fill_log):
+        assert all(record.get("trade_block_id") == block_id for record in log)
+    rows = build_trade_block_rows(result)
+    assert all(row["trade_block_id"] == block_id for row in rows)
     assert all(row["trade_block_id_missing"] is False for row in rows)
     summary = build_trade_block_summary_rows(result)[0]
     assert summary["has_missing_trade_block_id"] is False

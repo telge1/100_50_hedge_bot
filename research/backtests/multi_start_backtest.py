@@ -19,6 +19,7 @@ from .backtest_config_loader import (
 from .backtest_report import BacktestResult
 from .fill_models import FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
+from .trade_block_export import ensure_backtest_trade_block_ids
 
 MULTI_START_SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -440,6 +441,7 @@ def run_multi_start_backtest(
         )
         result.start_index = start_index
         result.window_candles = min(window_candles, len(window))
+        ensure_backtest_trade_block_ids(result)
         results.append(result)
     return results
 

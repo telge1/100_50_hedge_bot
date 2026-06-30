@@ -149,6 +149,33 @@ def resolve_canonical_trade_block_id(result: BacktestResult) -> tuple[str, bool]
     return fallback_trade_block_id(result), False
 
 
+def stamp_trade_block_id(result: BacktestResult, trade_block_id: str) -> None:
+    """Attach one trade_block_id to every exportable row on the result."""
+    result.trade_block_id = trade_block_id
+    for log in (result.fill_log, result.order_log, result.intent_log):
+        for record in log or []:
+            record["trade_block_id"] = trade_block_id
+            excerpt = record.get("metadata_excerpt")
+            if isinstance(excerpt, dict):
+                excerpt["trade_block_id"] = trade_block_id
+    for order in result.final_active_orders or []:
+        order["trade_block_id"] = trade_block_id
+    excerpt = dict(result.final_strategy_state_excerpt or {})
+    excerpt["trade_block_id"] = trade_block_id
+    excerpt["active_trade_block_id"] = trade_block_id
+    result.final_strategy_state_excerpt = excerpt
+
+
+def ensure_backtest_trade_block_ids(result: BacktestResult) -> str:
+    """Ensure every intent/order/fill row carries the canonical trade_block_id."""
+    if result.trade_number is not None:
+        trade_block_id = f"backtest_{result.direction}_continuous_trade_{int(result.trade_number):04d}"
+    else:
+        trade_block_id = fallback_trade_block_id(result)
+    stamp_trade_block_id(result, trade_block_id)
+    return trade_block_id
+
+
 def resolve_trade_block_id(
     record: dict[str, Any],
     result: BacktestResult,
@@ -160,8 +187,9 @@ def resolve_trade_block_id(
     if found:
         return found, False
     if canonical_trade_block_id is not None and canonical_trade_block_id_missing is not None:
-        return canonical_trade_block_id, canonical_trade_block_id_missing
-    return resolve_canonical_trade_block_id(result)
+        return canonical_trade_block_id, False
+    trade_block_id, _missing = resolve_canonical_trade_block_id(result)
+    return trade_block_id, False
 
 
 def _empty_row(result: BacktestResult) -> dict[str, Any]:
