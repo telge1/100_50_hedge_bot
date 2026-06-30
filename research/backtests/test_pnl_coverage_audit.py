@@ -13,8 +13,11 @@ from research.backtests.backtest_report import BacktestResult
 from research.backtests.candle_loader import DEFAULT_DATA_DIR, symbol_to_feather_name
 from research.backtests.pnl_coverage_audit import (
     PNL_COVERAGE_AUDIT_FIELDS,
+    apply_trade_exit_quality,
     build_pnl_coverage_audit,
+    classify_trade_exit_quality,
     expected_cover_qty,
+    has_undercovered_final_exit,
     inspect_qty_mapping,
     write_pnl_coverage_audit,
 )
@@ -359,3 +362,47 @@ def test_cycle_loss_can_be_covered_by_final_exit_basket() -> None:
     assert row["cover_pnl"] == 0.2608208000000012
     assert row["net_pnl"] == 0.13424930000000235
     assert row["coverage_ratio"] > 2.0
+
+
+def test_classify_trade_exit_quality_undercovered_final_exit() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        final_status="closed",
+        exit_reason="flat_no_active_orders",
+        realized_pnl=-0.5,
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:05:00+00:00",
+                "purpose": "CYCLE_3_LONG_ADD",
+                "cycle_index": 3,
+                "closed_pnl": -1.0,
+                "side": "long",
+            },
+            {
+                "timestamp": "2026-01-01T00:10:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "closed_pnl": 0.1,
+                "side": "long",
+            },
+            {
+                "timestamp": "2026-01-01T00:10:00+00:00",
+                "purpose": "SHORT_SL_EXIT",
+                "closed_pnl": -0.05,
+                "side": "short",
+            },
+        ],
+    )
+    assert has_undercovered_final_exit(result)
+    quality = apply_trade_exit_quality(result)
+    assert quality == "closed_undercovered_final_exit"
+    assert result.final_status == "closed_undercovered_final_exit"
+
+
+def test_classify_trade_exit_quality_closed_ok() -> None:
+    result = _cycle_result(loss_pnl=-0.1, cover_pnl=0.12)
+    result.final_status = "closed"
+    result.exit_reason = "flat_no_active_orders"
+    result.realized_pnl = 0.02
+    quality = classify_trade_exit_quality(result)
+    assert quality == "closed_ok"

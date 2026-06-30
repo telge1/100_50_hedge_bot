@@ -125,6 +125,8 @@ def fallback_trade_block_id(result: BacktestResult) -> str:
 
 
 def _explicit_trade_block_id_from_result(result: BacktestResult) -> str | None:
+    if result.trade_block_id:
+        return str(result.trade_block_id)
     for log in (result.intent_log, result.order_log, result.fill_log):
         for record in log or []:
             found = _extract_trade_block_id_from_record(record)
@@ -654,9 +656,14 @@ def build_trade_block_summary_rows(result: BacktestResult) -> list[dict[str, Any
 
 
 def trade_block_export_base_name(result: BacktestResult) -> str:
-    start = result.start_index if result.start_index is not None else 0
     config_source = result.config_source or "unknown"
     fill_model = result.fill_model or "conservative"
+    if result.trade_number is not None:
+        return (
+            f"{result.symbol.upper()}_{result.direction}_continuous_trade_"
+            f"{int(result.trade_number):04d}_{fill_model}_{config_source}"
+        )
+    start = result.start_index if result.start_index is not None else 0
     return f"{result.symbol.upper()}_{result.direction}_start{start}_{fill_model}_{config_source}"
 
 

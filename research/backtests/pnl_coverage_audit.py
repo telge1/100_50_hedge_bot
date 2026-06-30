@@ -318,6 +318,31 @@ def _final_exit_coverage_status(
     return "undercovered_by_final_exit"
 
 
+def has_undercovered_final_exit(result: BacktestResult) -> bool:
+    return any(
+        row.get("status") == "undercovered_by_final_exit"
+        for row in build_pnl_coverage_audit(result)
+    )
+
+
+def classify_trade_exit_quality(result: BacktestResult) -> str:
+    if result.final_status != "closed":
+        return str(result.final_status or "")
+    if has_undercovered_final_exit(result):
+        return "closed_undercovered_final_exit"
+    if float(result.realized_pnl or 0.0) < -COVER_TOLERANCE:
+        return "closed_negative_pnl"
+    return "closed_ok"
+
+
+def apply_trade_exit_quality(result: BacktestResult) -> str:
+    quality = classify_trade_exit_quality(result)
+    result.exit_quality = quality
+    if quality in {"closed_undercovered_final_exit", "closed_negative_pnl"}:
+        result.final_status = quality
+    return quality
+
+
 def build_pnl_coverage_audit(result: BacktestResult) -> list[dict[str, Any]]:
     """Audit cycle loss fills against cover fills within the same cycle_index."""
     fills = list(result.fill_log or [])

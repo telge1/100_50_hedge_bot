@@ -220,7 +220,11 @@ class BacktestResult:
     nearest_config_candidate: float | None = None
     nearest_config_candidate_source: str = ""
     start_index: int | None = None
+    end_index: int | None = None
     window_candles: int | None = None
+    trade_number: int | None = None
+    trade_block_id: str | None = None
+    exit_quality: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

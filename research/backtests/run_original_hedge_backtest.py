@@ -23,6 +23,10 @@ from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
 from .debug_report import print_debug_report
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
+from .continuous_reentry_backtest import (
+    print_continuous_reentry_summary,
+    run_continuous_reentry_backtests,
+)
 from .multi_start_backtest import print_multi_start_summary, run_multi_start_backtests
 from .unfinished_deep_dive import (
     parse_deep_dive_start_indices,
@@ -408,6 +412,29 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Export cycle PnL coverage audit CSV/JSON",
     )
+    parser.add_argument(
+        "--continuous-reentry",
+        action="store_true",
+        help="Chain backtests: start a new trade after each closed trade block",
+    )
+    parser.add_argument(
+        "--continuous-start-index",
+        type=int,
+        default=0,
+        help="First candle index for continuous re-entry (default: 0)",
+    )
+    parser.add_argument(
+        "--continuous-window-candles",
+        type=int,
+        default=None,
+        help="Candle horizon for continuous re-entry (default: --limit candles loaded)",
+    )
+    parser.add_argument(
+        "--continuous-max-trades",
+        type=int,
+        default=None,
+        help="Optional cap on consecutive trade blocks in continuous re-entry",
+    )
     return parser
 
 
@@ -454,7 +481,35 @@ def main(argv: list[str] | None = None) -> int:
         write_csv = True
 
     try:
-        if args.multi_start:
+        if args.continuous_reentry:
+            if args.multi_start:
+                raise ValueError("--continuous-reentry cannot be combined with --multi-start")
+            if args.compare_fill_models:
+                raise ValueError("--continuous-reentry cannot be combined with --compare-fill-models")
+            candle_rows = _load_candles(
+                symbol=args.symbol,
+                limit=args.limit,
+                data_dir=args.data_dir,
+            )
+            payload = run_continuous_reentry_backtests(
+                symbol=args.symbol,
+                direction=args.direction,
+                candles=candle_rows,
+                continuous_start_index=args.continuous_start_index,
+                continuous_window_candles=args.continuous_window_candles,
+                continuous_max_trades=args.continuous_max_trades,
+                config_source=args.config_source,
+                fill_model=args.fill_model,
+                max_fills_per_candle=args.max_fills_per_candle,
+                long_config_path=args.long_config_path,
+                short_config_path=args.short_config_path,
+                file_config_path=args.config_path,
+                output_dir=args.output_dir,
+                write_json=write_json,
+                write_csv=write_csv,
+                include_logs=args.include_logs or args.debug,
+            )
+        elif args.multi_start:
             if args.compare_fill_models:
                 raise ValueError("--multi-start cannot be combined with --compare-fill-models")
             if args.deep_dive_unfinished and args.extended_window_candles <= args.window_candles:
@@ -577,7 +632,9 @@ def main(argv: list[str] | None = None) -> int:
             start_indices=audit_start_indices,
         )
 
-    if payload.get("multi_start"):
+    if payload.get("continuous_reentry"):
+        print_continuous_reentry_summary(payload)
+    elif payload.get("multi_start"):
         print_multi_start_summary(payload)
         if payload.get("deep_dive"):
             print_unfinished_deep_dive_summary(payload["deep_dive"])
@@ -590,7 +647,7 @@ def main(argv: list[str] | None = None) -> int:
     if pnl_audit_written:
         print_pnl_coverage_audit_summary(pnl_audit_written, pnl_audit_rows)
 
-    if args.debug and not payload.get("multi_start"):
+    if args.debug and not payload.get("multi_start") and not payload.get("continuous_reentry"):
         for _, result in payload["results"].items():
             print_debug_report(
                 result,
