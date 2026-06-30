@@ -21,6 +21,7 @@ from .dynamic_cycle_order_scaling import (
 from .purpose_utils import preserve_bot_purpose
 
 _CYCLE_INDEX_RE = re.compile(r"^CYCLE_(\d+)_(LONG_ADD|SHORT_REDUCE)$", re.I)
+_DCOS_AUDIT_KEY = "_dcos_backtest_audit_events"
 
 
 @dataclass
@@ -32,6 +33,262 @@ class _ScalingSession:
     target_profit_usdt_before: float | None = None
     qty_before: float | None = None
     qty_after: float | None = None
+
+
+def _append_dcos_audit_event(runtime_state: RuntimeState, event: dict[str, Any]) -> None:
+    state = runtime_state.strategy_state
+    events = state.setdefault(_DCOS_AUDIT_KEY, [])
+    if isinstance(events, list):
+        events.append(event)
+
+
+def _active_order_purposes(strategy: Any, runtime_state: RuntimeState) -> list[str]:
+    snapshot = runtime_state.last_snapshot
+    purposes: list[str] = []
+    if snapshot is not None:
+        for order in getattr(snapshot, "active_orders", []) or []:
+            purpose = preserve_bot_purpose(getattr(order, "purpose", "") or "")
+            if purpose:
+                purposes.append(purpose)
+    for order in runtime_state.active_orders.values():
+        purpose = preserve_bot_purpose(getattr(order, "purpose", "") or "")
+        if purpose and purpose not in purposes:
+            purposes.append(purpose)
+    return purposes
+
+
+def _leg_flags_snapshot(state: dict[str, Any]) -> dict[str, bool]:
+    return {
+        "cycle_long_add_filled": bool(state.get("cycle_long_add_filled")),
+        "cycle_short_tp_filled": bool(state.get("cycle_short_tp_filled")),
+        "long_add_rebuild_allowed": bool(state.get("long_add_rebuild_allowed", True)),
+    }
+
+
+def _second_leg_effectively_filled(strategy: Any, runtime_state: RuntimeState, cycle_index: int) -> bool:
+    state = runtime_state.strategy_state
+    if bool(state.get("cycle_short_tp_filled")):
+        return True
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    second_leg_status = str(strategy._get_second_leg_status(entry) or "").upper()
+    if second_leg_status in {"FILLED", "PROCESSED"}:
+        return True
+    fill_price_field = strategy._second_leg_fill_price_field()
+    if float(entry.get(fill_price_field) or 0.0) > 0.0:
+        return True
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    processed = {
+        str(purpose or "").upper()
+        for purpose in (state.get("processed_cycle_purposes") or [])
+    }
+    return second_leg_purpose.upper() in processed
+
+
+def _sequencer_expects_next_cycle(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    cycle_index: int,
+) -> bool:
+    state = runtime_state.strategy_state
+    next_required = str(state.get("next_required_purpose") or "").upper()
+    if not next_required:
+        return False
+    next_cycle_la = strategy._normalize_cycle_purpose(
+        strategy._get_first_leg_purpose(cycle_index + 1),
+        {"cycle_index": cycle_index + 1, "cycle_role": strategy._get_first_leg_cycle_role()},
+    ).upper()
+    if next_required == next_cycle_la:
+        return True
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    ).upper()
+    if (
+        next_required == second_leg_purpose
+        and str(strategy._get_second_leg_status(entry) or "").upper() in {"FILLED", "PROCESSED"}
+    ):
+        return True
+    return False
+
+
+def _has_active_split_stage_orders(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    cycle_index: int,
+) -> bool:
+    snapshot = runtime_state.last_snapshot
+    if snapshot is None:
+        return False
+    purpose = strategy._get_second_leg_purpose(cycle_index)
+    for order in strategy._iter_active_orders_for_purpose(snapshot, runtime_state, purpose):
+        metadata = getattr(order, "metadata", None)
+        if isinstance(metadata, dict) and metadata.get("normal_cycle_second_leg_split"):
+            return True
+    return False
+
+
+def _sync_stale_normal_split_state(
+    state: dict[str, Any],
+    cycle_index: int,
+) -> tuple[int, int]:
+    cycle_key = str(cycle_index)
+    stage_count_map = state.get("normal_cycle_second_leg_split_stage_count") or {}
+    stage_count = int(stage_count_map.get(cycle_key) or 0)
+    filled_map = state.setdefault("normal_cycle_second_leg_split_filled_stages", {})
+    filled_stages = list(filled_map.get(cycle_key) or [])
+    if stage_count > 0:
+        filled_map[cycle_key] = list(range(stage_count))
+    else:
+        stage_count_map.pop(cycle_key, None)
+        filled_map.pop(cycle_key, None)
+        state["normal_cycle_second_leg_split_stage_count"] = stage_count_map
+        state["normal_cycle_second_leg_split_filled_stages"] = filled_map
+    return stage_count, len(filled_stages)
+
+
+def _maybe_apply_stale_split_completion_fallback(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    cycle_index: int,
+    trigger_purpose: str | None,
+    *,
+    config: DynamicCycleOrderScalingConfig,
+) -> None:
+    if cycle_index <= 0 or cycle_index < int(config.start_cycle_index):
+        return
+
+    state = runtime_state.strategy_state
+    cycle_key = str(cycle_index)
+    stage_count_map = state.get("normal_cycle_second_leg_split_stage_count") or {}
+    if cycle_key not in stage_count_map:
+        return
+
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    if bool(entry.get("complete")):
+        return
+    if not bool(state.get("cycle_long_add_filled")):
+        return
+    if not _second_leg_effectively_filled(strategy, runtime_state, cycle_index):
+        return
+    if not _sequencer_expects_next_cycle(strategy, runtime_state, cycle_index):
+        return
+    if _has_active_split_stage_orders(strategy, runtime_state, cycle_index):
+        return
+
+    snapshot = runtime_state.last_snapshot
+    if snapshot is None:
+        return
+    purpose = strategy._get_second_leg_purpose(cycle_index)
+    missing_stages = strategy._missing_normal_split_stage_indices(
+        state,
+        runtime_state,
+        snapshot,
+        cycle_index=cycle_index,
+        purpose=purpose,
+        cycle_role=strategy._get_second_leg_cycle_role(),
+    )
+    split_complete, _ = strategy._is_normal_cycle_second_leg_split_complete(state, cycle_index)
+    if not missing_stages and split_complete:
+        return
+
+    next_required_before = state.get("next_required_purpose")
+    flags_before = _leg_flags_snapshot(state)
+    active_before = _active_order_purposes(strategy, runtime_state)
+    filled_stage_count_before = len(
+        (state.get("normal_cycle_second_leg_split_filled_stages") or {}).get(cycle_key) or []
+    )
+    stage_count_before = int(stage_count_map.get(cycle_key) or 0)
+
+    stage_count, filled_stage_count_after_sync = _sync_stale_normal_split_state(state, cycle_index)
+
+    resolved_trigger = str(trigger_purpose or strategy._get_second_leg_purpose(cycle_index))
+    cycle_state = strategy._ensure_cycle_state(runtime_state)
+    counts_before = {
+        "cycle_completed_count": int(state.get("cycle_completed_count") or 0),
+        "cycle_pair_count": int(state.get("cycle_pair_count") or 0),
+        "current_effective_cycle": int(state.get("current_effective_cycle") or 0),
+        "current_short_cycle_index": int(state.get("current_short_cycle_index") or 0),
+    }
+    counts_after = {
+        "cycle_completed_count": max(counts_before["cycle_completed_count"], cycle_index),
+        "cycle_pair_count": max(counts_before["cycle_pair_count"], cycle_index),
+        "current_effective_cycle": max(counts_before["current_effective_cycle"], cycle_index),
+        "current_short_cycle_index": max(counts_before["current_short_cycle_index"], cycle_index),
+    }
+    followup_before = {
+        "cycle_waiting_for_short_tp": strategy._get_second_leg_waiting(state, cycle_state),
+        "short_tp_pending_cycle": strategy._get_second_leg_pending_cycle(state, cycle_state),
+        "pending_short_cycle_index": int(state.get("pending_short_cycle_index") or 0),
+        "long_add_pending": strategy._get_first_leg_pending(state, cycle_state),
+        "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+    }
+
+    strategy._force_commit_short_reduce_completion_even_if_duplicate(
+        runtime_state,
+        cycle_index,
+        followup_before=followup_before,
+        counts_before=counts_before,
+        counts_after=counts_after,
+        trigger_purpose=resolved_trigger,
+        reason="dcos_stale_split_completion_fix",
+    )
+
+    _append_dcos_audit_event(
+        runtime_state,
+        {
+            "event": "dcos_stale_split_completion_fix_applied",
+            "cycle_index": cycle_index,
+            "split_stage_count": stage_count_before,
+            "filled_stage_count_before": filled_stage_count_before,
+            "filled_stage_count_after_sync": filled_stage_count_after_sync,
+            "last_fill_purpose": (state.get("last_fill_info") or {}).get("purpose")
+            or trigger_purpose,
+            "next_required_purpose_before": next_required_before,
+            "next_required_purpose_after": state.get("next_required_purpose"),
+            "flags_before": flags_before,
+            "flags_after": _leg_flags_snapshot(state),
+            "active_order_purposes_before": active_before,
+            "active_order_purposes_after": _active_order_purposes(strategy, runtime_state),
+            "trigger_purpose": resolved_trigger,
+            "missing_split_stage_indices": missing_stages,
+        },
+    )
+
+
+def _install_stale_split_completion_shim(strategy: Any, config: DynamicCycleOrderScalingConfig) -> None:
+    if getattr(strategy, "_backtest_dcos_stale_split_completion_shim_installed", False):
+        return
+
+    original_try_complete = strategy._try_complete_cycle_pair_after_confirmed_pnl
+
+    def wrapped_try_complete(
+        runtime_state: RuntimeState,
+        cycle_index: int,
+        trigger_purpose: str | None,
+    ) -> Any:
+        original_try_complete(runtime_state, cycle_index, trigger_purpose)
+        active_config: DynamicCycleOrderScalingConfig | None = getattr(
+            strategy,
+            "_dynamic_cycle_order_scaling_config",
+            None,
+        )
+        if active_config is None or not active_config.enabled:
+            return None
+        _maybe_apply_stale_split_completion_fallback(
+            strategy,
+            runtime_state,
+            cycle_index,
+            trigger_purpose,
+            config=active_config,
+        )
+        return None
+
+    strategy._try_complete_cycle_pair_after_confirmed_pnl = wrapped_try_complete
+    strategy._backtest_dcos_stale_split_completion_shim_installed = True
 
 
 def _cycle_index_from_purpose(purpose: str | None) -> int:
@@ -96,6 +353,7 @@ def install_dynamic_cycle_order_scaling(
         return
     if getattr(strategy, "_backtest_dynamic_cycle_order_scaling_installed", False):
         strategy._dynamic_cycle_order_scaling_config = config
+        _install_stale_split_completion_shim(strategy, config)
         return
 
     original_build_long_add = strategy._build_cycle_long_add_intent
@@ -246,3 +504,4 @@ def install_dynamic_cycle_order_scaling(
 
     strategy._build_cycle_long_add_intent = wrapped_build_long_add
     strategy._build_short_tp_follow_up = wrapped_build_short_follow_up
+    _install_stale_split_completion_shim(strategy, config)

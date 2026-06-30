@@ -115,6 +115,9 @@ class DynamicCycleOrderScalingBaselineTests(unittest.TestCase):
         self.assertTrue(
             getattr(sim.strategy, "_backtest_dynamic_cycle_order_scaling_installed", False)
         )
+        self.assertTrue(
+            getattr(sim.strategy, "_backtest_dcos_stale_split_completion_shim_installed", False)
+        )
         sim.close()
 
     def test_install_with_disabled_config_is_noop(self) -> None:
