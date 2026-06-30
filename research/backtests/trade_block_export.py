@@ -54,6 +54,23 @@ TRADE_BLOCK_ROW_FIELDS = (
     "open_reason_detail",
 )
 
+DYNAMIC_CYCLE_SCALING_ROW_FIELDS = (
+    "dynamic_cycle_order_scaling_enabled",
+    "dynamic_cycle_scaling_config_name",
+    "cycle_target_profit_pct_used",
+    "cycle_qty_factor_used",
+    "cycle_long_add_distance_pct_used",
+    "planned_cycle_qty_before_scaling",
+    "planned_cycle_qty_after_scaling",
+    "planned_long_add_distance_pct_before_scaling",
+    "planned_long_add_distance_pct_after_scaling",
+    "cycle_scaling_started",
+    "cycle_scaling_reason",
+    "dynamic_cycle_scaling_band",
+)
+
+TRADE_BLOCK_ROW_FIELDS = TRADE_BLOCK_ROW_FIELDS + DYNAMIC_CYCLE_SCALING_ROW_FIELDS
+
 TRADE_BLOCK_SUMMARY_FIELDS = (
     "symbol",
     "direction",
@@ -253,6 +270,13 @@ def _base_row(
             row["cycle_index"] = excerpt.get("cycle_index")
         if not row.get("cycle_role") and excerpt.get("cycle_role"):
             row["cycle_role"] = excerpt.get("cycle_role")
+        for key in DYNAMIC_CYCLE_SCALING_ROW_FIELDS:
+            if row.get(key) in (None, "") and key in excerpt:
+                value = excerpt.get(key)
+                if isinstance(value, dict):
+                    row[key] = json.dumps(value, ensure_ascii=False)
+                else:
+                    row[key] = value
     return row
 
 

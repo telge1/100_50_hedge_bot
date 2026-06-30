@@ -80,6 +80,20 @@ INTENT_METADATA_EXCERPT_KEYS = (
 
     # Split disable diagnostics
     "normal_cycle_second_leg_split_disabled",
+
+    # Dynamic cycle order scaling (backtest-only)
+    "dynamic_cycle_order_scaling_enabled",
+    "dynamic_cycle_scaling_config_name",
+    "cycle_target_profit_pct_used",
+    "cycle_qty_factor_used",
+    "cycle_long_add_distance_pct_used",
+    "planned_cycle_qty_before_scaling",
+    "planned_cycle_qty_after_scaling",
+    "planned_long_add_distance_pct_before_scaling",
+    "planned_long_add_distance_pct_after_scaling",
+    "cycle_scaling_started",
+    "cycle_scaling_reason",
+    "dynamic_cycle_scaling_band",
 )
 
 TRIGGER_ORDER_TYPES = frozenset({"STOP", "STOP_MARKET", "TAKE_PROFIT", "TAKE_PROFIT_MARKET"})

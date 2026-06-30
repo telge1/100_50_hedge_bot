@@ -21,6 +21,11 @@ from .backtest_report import (
 )
 from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
 from .debug_report import print_debug_report
+from .dynamic_cycle_order_scaling import (
+    DynamicCycleOrderScalingConfig,
+    config_from_json_string,
+    default_dynamic_cycle_order_scaling_config,
+)
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .continuous_reentry_backtest import (
@@ -40,6 +45,15 @@ from .trade_block_export import (
     parse_trade_block_start_indices,
     print_trade_block_export_summary,
 )
+
+
+def resolve_dynamic_cycle_scaling_config(args: argparse.Namespace) -> DynamicCycleOrderScalingConfig | None:
+    json_payload = getattr(args, "dynamic_cycle_order_scaling_config_json", None)
+    if json_payload:
+        return config_from_json_string(str(json_payload))
+    if bool(getattr(args, "dynamic_cycle_order_scaling", False)):
+        return default_dynamic_cycle_order_scaling_config()
+    return None
 
 
 def resolve_directions(direction: str) -> list[str]:
@@ -435,6 +449,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional cap on consecutive trade blocks in continuous re-entry",
     )
+    parser.add_argument(
+        "--dynamic-cycle-order-scaling",
+        action="store_true",
+        help="Backtest-only: apply dynamic scaling to CYCLE_X_LONG_ADD and CYCLE_X_SHORT_REDUCE",
+    )
+    parser.add_argument(
+        "--dynamic-cycle-order-scaling-config-json",
+        default=None,
+        help="JSON config for dynamic cycle order scaling (overrides default bands)",
+    )
     return parser
 
 
@@ -555,6 +579,7 @@ def main(argv: list[str] | None = None) -> int:
                 write_json=write_json,
                 write_csv=write_csv,
                 include_logs=args.include_logs or args.debug,
+                dynamic_cycle_scaling_config=resolve_dynamic_cycle_scaling_config(args),
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(

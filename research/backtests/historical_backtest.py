@@ -16,6 +16,7 @@ from .backtest_config_loader import (
 )
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
+from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .trade_block_export import ensure_backtest_trade_block_ids
 from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
@@ -97,6 +98,7 @@ def run_historical_backtest(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -132,6 +134,7 @@ def run_historical_backtest(
         symbol=symbol_upper,
         candle_close=float(first_candle.close),
         config_load=config_load,
+        dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
     )
     sim.candle = first_candle
     sim.candle_index = 0

@@ -25,6 +25,8 @@ from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState,
 from .backtest_report import build_order_log_entry
 from .backtest_config_loader import BacktestConfigLoadResult, extract_highlight_bot_config
 from .cycle_fill_reference_repair import install_cycle_fill_reference_repair
+from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
+from .dynamic_cycle_order_scaling_shim import install_dynamic_cycle_order_scaling
 from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
@@ -175,6 +177,7 @@ class HedgeBotOriginalSimulator:
         config: FixedCycleHedgeConfig | None = None,
         config_load: BacktestConfigLoadResult | None = None,
         temp_dir: Path | None = None,
+        dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     ) -> None:
         self.signal = signal
         self.symbol = symbol.upper()
@@ -209,6 +212,8 @@ class HedgeBotOriginalSimulator:
         self.strategy = build_strategy(signal, self.config)
         install_cycle_fill_reference_repair(self.strategy)
         install_exit_pnl_audit_shim(self.strategy)
+        install_dynamic_cycle_order_scaling(self.strategy, dynamic_cycle_scaling_config)
+        self.dynamic_cycle_scaling_config = dynamic_cycle_scaling_config
         self.runtime_state = build_runtime_state(
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),
