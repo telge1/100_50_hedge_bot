@@ -233,3 +233,25 @@ Aber: Closed-PnL-Retry für alte Reduce-Orders muss noch gefixt oder begrenzt we
 
 
 
+############################################## Backtester ################################################################
+
+cd /home/telgenbuescher/projects/spread_recovery_hedge_short_dev || exit 1
+
+PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
+  --symbol APTUSDT \
+  --direction long \
+  --limit 20000 \
+  --continuous-reentry \
+  --fill-model conservative \
+  --config-source live \
+  --pnl-coverage-audit
+
+PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
+  --symbol APTUSDT \
+  --direction long \
+  --limit 20000 \
+  --continuous-reentry \
+  --config-source live \
+  --debug \
+  --print-config-diagnostics
+
