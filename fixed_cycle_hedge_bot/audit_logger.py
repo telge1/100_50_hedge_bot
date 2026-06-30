@@ -78,7 +78,28 @@ class AuditLogger:
             return strategy_state
         return None
 
-    def log_event(self, event: str, **payload: Any) -> None:
+    def log_event(self, event: str, *payload_args: Any, **payload: Any) -> None:
+        """
+        Log audit event.
+
+        Accepts both the current call style:
+
+            log_event("event_name", key=value)
+
+        and the legacy/backtest style:
+
+            log_event("event_name", {"key": "value"})
+
+        so replay/backtest adapters cannot crash the strategy because of
+        positional payload dictionaries.
+        """
+        if payload_args:
+            if len(payload_args) != 1 or not isinstance(payload_args[0], dict):
+                raise TypeError(
+                    "AuditLogger.log_event() accepts at most one positional "
+                    "payload dict after event"
+                )
+            payload = {**payload_args[0], **payload}
         record = {"event": event, **self.extra_fields, **payload}
         if log_throttle.is_throttled_info_event(event):
             strategy_state = self._resolve_strategy_state()

@@ -390,19 +390,49 @@ class HedgeBotOriginalSimulator:
         return self.snapshot
 
     def _cancel_active_orders_when_flat(self, *, source: str) -> list[str]:
-        """Cancel all remaining simulated active orders after both legs are flat.
+        """Cancel simulated active orders that are invalid after a leg is flat.
 
-        This keeps the historical simulator aligned with live behavior: once the
-        trade is flat, stale resting cycle/exit orders must not fill later with
-        zero PnL.
+        If both legs are flat, cancel every remaining active order.
+
+        If only one leg is flat, cancel only orders that would reduce that flat
+        leg. Otherwise stale cycle orders can fill later with zero quantity/PnL,
+        e.g. LONG_TP_EXIT closes the long side and an old CYCLE_*_LONG_ADD
+        still fills after long_qty is already zero.
         """
-        if float(self.book.long_qty or 0.0) > 1e-12:
+        long_flat = float(self.book.long_qty or 0.0) <= 1e-12
+        short_flat = float(self.book.short_qty or 0.0) <= 1e-12
+
+        if not long_flat and not short_flat:
             return []
-        if float(self.book.short_qty or 0.0) > 1e-12:
-            return []
+
+        def should_cancel(order) -> bool:
+            purpose = str(getattr(order, "purpose", "") or "").upper()
+
+            if long_flat and short_flat:
+                return True
+
+            if long_flat:
+                if purpose == "LONG_TP_EXIT":
+                    return True
+                if purpose.startswith("CYCLE_") and purpose.endswith("_LONG_ADD"):
+                    return True
+                if purpose in {"REFILL_LONG", "RECOVERY_REFILL_LONG"}:
+                    return True
+
+            if short_flat:
+                if purpose == "SHORT_SL_EXIT":
+                    return True
+                if purpose.startswith("CYCLE_") and purpose.endswith("_SHORT_REDUCE"):
+                    return True
+                if purpose in {"REFILL_SHORT", "RECOVERY_REFILL_SHORT"}:
+                    return True
+
+            return False
 
         cancelled: list[str] = []
         for order in list(self.book.active_orders()):
+            if not should_cancel(order):
+                continue
             if not self.book.cancel_by_order_id(order.order_id):
                 continue
             cancelled.append(order.order_id)
