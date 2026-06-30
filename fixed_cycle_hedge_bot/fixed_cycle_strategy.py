@@ -20,7 +20,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from .base import HedgeStrategy, StrategyContext
 from .models import CalculationTrace, FillEvent, HedgeSnapshot, ManagedOrder, RuntimeState, StrategyIntent
-from .hedge_exit_math import calculate_hedge_exit_price
+from .hedge_exit_math import HedgeExitComponents, calculate_hedge_exit_price
 from .post_flat_runtime_reset import perform_verified_flat_runtime_reset
 from .trailing_fallback import (
     ShortTpFallbackState,
@@ -60,6 +60,33 @@ EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.jso
 PER_BOT_CONFIG_ROOT = PROJECT_ROOT / "live_bots"
 
 FINAL_EXIT_PNL_FETCH_MAX_ATTEMPTS = 3
+
+
+@dataclass(frozen=True)
+class TpProjection:
+    tp_price: float
+    target_delta_usdt: float
+    expected_total_net_after_exit: float
+    target_total_profit_usdt: float
+    required_profit_to_cover_loss: float
+    min_profit_target_usdt: float
+    min_required_total_usdt: float
+    components: HedgeExitComponents
+    fee_rate: float
+    entry_fee_usdt: float
+    close_fee_usdt: float
+    pending_cycle_loss_usdt: float
+    realized_cycle_net: float
+
+
+@dataclass(frozen=True)
+class FinalExitEconomics:
+    expected_total_net_after_exit: float
+    target_delta_usdt: float
+    required_profit_to_cover_loss: float
+    min_profit_target_usdt: float
+    min_required_total_usdt: float
+    sufficient: bool
 
 
 def _is_per_bot_config(path_obj: Path) -> bool:
@@ -6338,6 +6365,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     state["force_exit_rebuild"] = False
                     state["exit_rebuild_allowed"] = False
                     state["exit_orders_stale_after_structure_fill"] = False
+                elif state.get("exit_orders_stale_after_structure_fill"):
+                    state["force_exit_rebuild"] = True
+                    state["exit_rebuild_allowed"] = True
         downside_intents = self._annotate_post_refill_structure_intents(
             runtime_state, downside_intents
         )
@@ -11346,6 +11376,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
+        if state.get("exit_orders_stale_after_structure_fill"):
+            if context.cancel_open_orders_by_purpose:
+                self._register_expected_exit_order_deactivations(runtime_state)
+                context.cancel_open_orders_by_purpose(self._exit_purposes())
+                _log_event(
+                    "fixed_cycle_stale_final_exits_cancelled_after_structure_fill",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "pending_cycle_loss_usdt": float(
+                            state.get("pending_cycle_loss_usdt") or 0.0
+                        ),
+                        "exit_orders_stale_after_structure_fill": True,
+                    },
+                )
+
         waiting_short = self._get_second_leg_waiting(state)
         short_tp_pending_cycle = self._get_second_leg_pending_cycle(state)
         long_add_pending = self._get_first_leg_pending(state, cycle_state)
@@ -11427,6 +11472,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "cycle_waiting_for_short_tp": waiting_short,
                         },
                     )
+                    state["force_exit_rebuild"] = True
+                    state["exit_rebuild_allowed"] = True
+                    if context.cancel_open_orders_by_purpose:
+                        self._register_expected_exit_order_deactivations(runtime_state)
+                        context.cancel_open_orders_by_purpose(self._exit_purposes())
                     return intents
 
         open_initial_orders = [
@@ -11588,6 +11638,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_sl_valid, short_sl_trigger_direction = _resolve_exit_trigger(
             short_sl_price, short_exit_purpose
         )
+        tp_projection = self._calculate_tp_projection(
+            break_even_price, snapshot, runtime_state
+        )
+        final_exit_economics = self._evaluate_final_exit_economics(
+            long_tp_price=long_tp_price,
+            short_sl_price=short_sl_price,
+            snapshot=snapshot,
+            runtime_state=runtime_state,
+            projection=tp_projection,
+        )
+        strict_final_exit_gate = (
+            tp_projection.pending_cycle_loss_usdt > 1e-6
+            or bool(state.get("exit_orders_stale_after_structure_fill"))
+        )
+        if strict_final_exit_gate and not final_exit_economics.sufficient:
+            self._defer_final_exit_insufficient_coverage(
+                runtime_state,
+                context,
+                economics=final_exit_economics,
+                tp_price=tp_price,
+                long_tp_price=long_tp_price,
+                short_sl_price=short_sl_price,
+                snapshot=snapshot,
+            )
+            _log_event(
+                "fixed_cycle_exit_intent_build_skipped",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "reason": "insufficient_target_delta",
+                    "target_delta_usdt": final_exit_economics.target_delta_usdt,
+                    "expected_total_net_after_exit": (
+                        final_exit_economics.expected_total_net_after_exit
+                    ),
+                    "min_required_total_usdt": final_exit_economics.min_required_total_usdt,
+                },
+            )
+            return []
+
         signature = {
             "basket_tp_price": tp_price,
             "basket_break_even_price": break_even_price,
@@ -12271,12 +12359,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         structure_penalty = max(spread_penalty, ratio_penalty)
         return 0.75 + (0.5 * structure_penalty)
 
-    def _calculate_tp_price(
+    def _calculate_tp_projection(
         self,
         break_even_price: float,
         snapshot: HedgeSnapshot | None = None,
         runtime_state: RuntimeState | None = None,
-    ) -> float:
+    ) -> TpProjection:
         state = runtime_state.strategy_state if runtime_state else {}
         snapshot_long_avg = snapshot.long_avg if snapshot else float(state.get("long_avg") or 0.0)
         snapshot_short_avg = snapshot.short_avg if snapshot else float(state.get("short_avg") or 0.0)
@@ -12285,6 +12373,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         realized_long_pnl = float((runtime_state.realized_long_pnl_total if runtime_state else 0.0) or 0.0)
         realized_short_pnl = float((runtime_state.realized_short_pnl_total if runtime_state else 0.0) or 0.0)
         realized_cycle_net = realized_long_pnl + realized_short_pnl
+        pending_cycle_loss_usdt = float(state.get("pending_cycle_loss_usdt") or 0.0)
         components = calculate_hedge_exit_price(
             long_avg=snapshot_long_avg,
             long_qty=snapshot_long_qty,
@@ -12293,6 +12382,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             tp_profit_target_pct=float(self.config.tp_profit_target_pct or 0.0),
             tp_buffer_pct=float(self.config.tp_buffer_pct or 0.0),
             realized_cycle_net=realized_cycle_net,
+            pending_cycle_loss_usdt=pending_cycle_loss_usdt,
         )
         fee_rate = max(float(self.config.order_fee_rate_pct or 0.0), 0.0) / 100.0
         long_notional = snapshot_long_avg * snapshot_long_qty
@@ -12315,8 +12405,10 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         total_fee_adjustment_usdt = entry_fee_usdt + close_fee_usdt
         open_hedge_net_after_fees = open_hedge_net_at_exit - total_fee_adjustment_usdt
         expected_total_net_after_exit = open_hedge_net_after_fees + components.realized_cycle_net
-        target_total_profit_usdt = components.target_profit_usdt + components.buffer_usdt
-        target_delta_usdt = expected_total_net_after_exit - target_total_profit_usdt
+        min_profit_target_usdt = components.target_profit_usdt + components.buffer_usdt
+        required_profit_to_cover_loss = max(pending_cycle_loss_usdt, 0.0)
+        min_required_total_usdt = required_profit_to_cover_loss + min_profit_target_usdt
+        target_delta_usdt = expected_total_net_after_exit - min_required_total_usdt
         logger.debug(
             "fixed_cycle_tp_components %s",
             {
@@ -12327,6 +12419,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "target_profit_usdt": components.target_profit_usdt,
                 "buffer_usdt": components.buffer_usdt,
                 "realized_cycle_net": components.realized_cycle_net,
+                "pending_cycle_loss_usdt": components.pending_cycle_loss_usdt,
                 "required_profit_usdt": components.required_profit_usdt,
                 "net_qty": components.net_qty,
                 "entry_fee_usdt": entry_fee_usdt,
@@ -12339,12 +12432,110 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "open_hedge_net_at_exit": open_hedge_net_at_exit,
                 "open_hedge_net_after_fees": open_hedge_net_after_fees,
                 "expected_total_net_after_exit": expected_total_net_after_exit,
-                "target_total_profit_usdt": target_total_profit_usdt,
+                "target_total_profit_usdt": min_profit_target_usdt,
+                "required_profit_to_cover_loss": required_profit_to_cover_loss,
+                "min_required_total_usdt": min_required_total_usdt,
                 "target_delta_usdt": target_delta_usdt,
                 "tp_price": tp_price,
             },
         )
-        return tp_price
+        return TpProjection(
+            tp_price=tp_price,
+            target_delta_usdt=target_delta_usdt,
+            expected_total_net_after_exit=expected_total_net_after_exit,
+            target_total_profit_usdt=min_profit_target_usdt,
+            required_profit_to_cover_loss=required_profit_to_cover_loss,
+            min_profit_target_usdt=min_profit_target_usdt,
+            min_required_total_usdt=min_required_total_usdt,
+            components=components,
+            fee_rate=fee_rate,
+            entry_fee_usdt=entry_fee_usdt,
+            close_fee_usdt=close_fee_usdt,
+            pending_cycle_loss_usdt=pending_cycle_loss_usdt,
+            realized_cycle_net=realized_cycle_net,
+        )
+
+    def _calculate_tp_price(
+        self,
+        break_even_price: float,
+        snapshot: HedgeSnapshot | None = None,
+        runtime_state: RuntimeState | None = None,
+    ) -> float:
+        return self._calculate_tp_projection(
+            break_even_price, snapshot, runtime_state
+        ).tp_price
+
+    def _evaluate_final_exit_economics(
+        self,
+        *,
+        long_tp_price: float,
+        short_sl_price: float,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        projection: TpProjection,
+    ) -> FinalExitEconomics:
+        fee_rate = projection.fee_rate
+        long_avg = float(snapshot.long_avg or 0.0)
+        short_avg = float(snapshot.short_avg or 0.0)
+        long_qty = float(snapshot.long_qty or 0.0)
+        short_qty = float(snapshot.short_qty or 0.0)
+        long_profit_at_exit = (long_tp_price - long_avg) * long_qty
+        short_loss_at_exit = (short_sl_price - short_avg) * short_qty
+        open_hedge_net_at_exit = long_profit_at_exit - short_loss_at_exit
+        close_fee_usdt = fee_rate * (
+            long_tp_price * long_qty + short_sl_price * short_qty
+        )
+        open_hedge_net_after_fees = (
+            open_hedge_net_at_exit - projection.entry_fee_usdt - close_fee_usdt
+        )
+        expected_total_net_after_exit = (
+            open_hedge_net_after_fees + projection.realized_cycle_net
+        )
+        min_required_total_usdt = projection.min_required_total_usdt
+        target_delta_usdt = expected_total_net_after_exit - min_required_total_usdt
+        return FinalExitEconomics(
+            expected_total_net_after_exit=expected_total_net_after_exit,
+            target_delta_usdt=target_delta_usdt,
+            required_profit_to_cover_loss=projection.required_profit_to_cover_loss,
+            min_profit_target_usdt=projection.min_profit_target_usdt,
+            min_required_total_usdt=min_required_total_usdt,
+            sufficient=target_delta_usdt >= -1e-6,
+        )
+
+    def _defer_final_exit_insufficient_coverage(
+        self,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        economics: FinalExitEconomics,
+        tp_price: float,
+        long_tp_price: float,
+        short_sl_price: float,
+        snapshot: HedgeSnapshot,
+    ) -> None:
+        state = runtime_state.strategy_state
+        state["force_exit_rebuild"] = True
+        state["exit_rebuild_allowed"] = True
+        if context.cancel_open_orders_by_purpose:
+            self._register_expected_exit_order_deactivations(runtime_state)
+            context.cancel_open_orders_by_purpose(self._exit_purposes())
+        _log_event(
+            "final_exit_deferred_insufficient_target_delta",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "tp_price": tp_price,
+                "long_tp_price": long_tp_price,
+                "short_sl_price": short_sl_price,
+                "target_delta_usdt": economics.target_delta_usdt,
+                "expected_total_net_after_exit": economics.expected_total_net_after_exit,
+                "required_profit_to_cover_loss": economics.required_profit_to_cover_loss,
+                "min_profit_target_usdt": economics.min_profit_target_usdt,
+                "min_required_total_usdt": economics.min_required_total_usdt,
+                "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+                "current_price": snapshot.current_price,
+            },
+            runtime_state=runtime_state,
+        )
 
     def _calculate_tp_components(
         self,
@@ -12391,7 +12582,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _loss_recovery_price_component(
         self, snapshot: HedgeSnapshot | None, runtime_state: RuntimeState | None
     ) -> float:
-        return 0.0
+        pending_cycle_loss_usdt = float(
+            (runtime_state.strategy_state.get("pending_cycle_loss_usdt") if runtime_state else 0.0)
+            or 0.0
+        )
+        if pending_cycle_loss_usdt <= 0 or not snapshot:
+            return 0.0
+        net_qty = float(snapshot.long_qty or 0.0) - float(snapshot.short_qty or 0.0)
+        if abs(net_qty) <= 1e-9:
+            return 0.0
+        return pending_cycle_loss_usdt / net_qty
 
     def _get_realized_long_loss_total(
         self, runtime_state: RuntimeState | None

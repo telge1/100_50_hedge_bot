@@ -7,6 +7,7 @@ class HedgeExitComponents:
     target_profit_usdt: float
     buffer_usdt: float
     realized_cycle_net: float
+    pending_cycle_loss_usdt: float
     required_profit_usdt: float
     net_qty: float
     exit_price: float
@@ -20,11 +21,16 @@ def calculate_hedge_exit_price(
     tp_profit_target_pct: float,
     tp_buffer_pct: float,
     realized_cycle_net: float,
+    pending_cycle_loss_usdt: float = 0.0,
 ) -> HedgeExitComponents:
     profit_basis_usdt = long_avg * long_qty
     target_profit_usdt = profit_basis_usdt * tp_profit_target_pct / 100.0
     buffer_usdt = profit_basis_usdt * tp_buffer_pct / 100.0
-    required_profit_usdt = target_profit_usdt + buffer_usdt - realized_cycle_net
+    pending_loss = max(float(pending_cycle_loss_usdt or 0.0), 0.0)
+    realized_profit_credit = max(float(realized_cycle_net or 0.0), 0.0)
+    required_profit_usdt = (
+        target_profit_usdt + buffer_usdt + pending_loss - realized_profit_credit
+    )
     net_qty = long_qty - short_qty
     base_diff = (long_avg * long_qty) - (short_avg * short_qty)
     exit_price = base_diff + required_profit_usdt
@@ -34,6 +40,7 @@ def calculate_hedge_exit_price(
         target_profit_usdt=target_profit_usdt,
         buffer_usdt=buffer_usdt,
         realized_cycle_net=realized_cycle_net,
+        pending_cycle_loss_usdt=pending_loss,
         required_profit_usdt=required_profit_usdt,
         net_qty=net_qty,
         exit_price=exit_price,
