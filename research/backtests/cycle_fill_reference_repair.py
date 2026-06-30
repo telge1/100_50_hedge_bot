@@ -13,6 +13,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from fixed_cycle_hedge_bot.cycle_sequence import (
+    STEP_WAITING_FOR_PAIR_SECOND_LEG,
+    advance_cycle_sequence_after_fill,
+)
 from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState
 
 _CYCLE_INDEX_RE = re.compile(r"CYCLE_(\d+)_")
@@ -79,6 +83,220 @@ def _sync_cycle_sequence_fill_price(
         strategy._persist_cycle_sequence_state(runtime_state)
 
 
+def _ensure_second_leg_sequence_commit(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    fill_event: FillEvent,
+    *,
+    cycle_index: int,
+) -> None:
+    """Ensure simulated terminal second-leg fills are committed like live fills.
+
+    The live strategy relies on ``cycle_sequence_entry[N]`` containing
+    ``short_reduce_fill_price`` and ``short_reduce_fill_confirmed`` before it
+    can build ``CYCLE_(N+1)_LONG_ADD``. Backtests can see the fill in the
+    simulated order book while the sequence entry remains incomplete after
+    commit/advance/repair edge cases, especially around immediate refills.
+    """
+    purpose = str(fill_event.purpose or "").upper()
+    status = str(getattr(fill_event, "status", "") or "").upper()
+    exec_price = float(getattr(fill_event, "exec_price", 0.0) or 0.0)
+    exec_qty = float(getattr(fill_event, "exec_qty", 0.0) or 0.0)
+
+    if (
+        cycle_index <= 0
+        or (status and status != "FILLED")
+        or exec_price <= 0
+        or "SHORT_REDUCE" not in purpose
+    ):
+        return
+
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    fill_price_field = strategy._second_leg_fill_price_field()
+    fill_confirmed_field = strategy._second_leg_fill_confirmed_field()
+
+    existing_price = float(entry.get(fill_price_field) or 0.0)
+    existing_confirmed = bool(entry.get(fill_confirmed_field))
+    if existing_confirmed and existing_price > 0:
+        return
+
+    strategy._commit_short_reduce_terminal_fill(
+        runtime_state,
+        cycle_index,
+        fill_event=fill_event,
+        avg_price=exec_price,
+        filled_qty=exec_qty if exec_qty > 0 else None,
+        source="backtest_ensure",
+    )
+
+
+def _backtest_cycle_entry_confirms_purpose(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    normalized_purpose: str,
+) -> bool:
+    cycle_index = _cycle_index_from_purpose(normalized_purpose)
+    if cycle_index <= 0:
+        return False
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    first_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_first_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_first_leg_cycle_role()},
+    )
+    if normalized_purpose == second_leg_purpose:
+        fill_price_field = strategy._second_leg_fill_price_field()
+        fill_confirmed_field = strategy._second_leg_fill_confirmed_field()
+        return bool(entry.get(fill_confirmed_field)) and float(entry.get(fill_price_field) or 0.0) > 0
+    if normalized_purpose == first_leg_purpose:
+        first_leg_field = strategy._get_first_leg_status_field()
+        return str(entry.get(first_leg_field) or "").upper() in {"FILLED", "PROCESSED"}
+    return False
+
+
+def _reconcile_backtest_normal_split_for_terminal_fill(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    fill_event: FillEvent,
+    *,
+    cycle_index: int,
+) -> None:
+    """Close normal split tracking after a committed terminal second-leg fill.
+
+    Conservative backtests often fill only the first split stage per candle. The
+    live bot would submit/fill remaining stages separately, but the committed
+    terminal fill price is already authoritative for the next cycle reference.
+    """
+    metadata = dict(fill_event.metadata or {})
+    if not bool(metadata.get("normal_cycle_second_leg_split")):
+        return
+
+    state = runtime_state.strategy_state
+    cycle_key = str(cycle_index)
+    stage_count_map = state.get("normal_cycle_second_leg_split_stage_count") or {}
+    stage_count = int(
+        stage_count_map.get(cycle_key)
+        or metadata.get("split_stage_count")
+        or metadata.get("stage_count")
+        or 0
+    )
+    if stage_count <= 1:
+        return
+
+    complete, _ = strategy._is_normal_cycle_second_leg_split_complete(state, cycle_index)
+    if complete:
+        return
+
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    fill_confirmed_field = strategy._second_leg_fill_confirmed_field()
+    fill_price_field = strategy._second_leg_fill_price_field()
+    if not bool(entry.get(fill_confirmed_field)):
+        return
+    if float(entry.get(fill_price_field) or 0.0) <= 0:
+        return
+
+    filled_map = state.setdefault("normal_cycle_second_leg_split_filled_stages", {})
+    filled_map[cycle_key] = list(range(1, stage_count + 1))
+    state["normal_cycle_second_leg_split_filled_stages"] = filled_map
+    state["cycle_short_tp_filled"] = True
+
+
+def _sync_backtest_processed_cycle_purposes(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    *,
+    cycle_index: int,
+) -> None:
+    state = runtime_state.strategy_state
+    first_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_first_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_first_leg_cycle_role()},
+    )
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    processed = {
+        str(purpose or "").upper()
+        for purpose in (state.get("processed_cycle_purposes") or [])
+        if str(purpose or "")
+    }
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    first_leg_field = strategy._get_first_leg_status_field()
+    first_leg_done = str(entry.get(first_leg_field) or "").upper() in {"FILLED", "PROCESSED"}
+    second_leg_done = strategy._get_second_leg_status(entry) in {"FILLED", "PROCESSED"}
+    fill_confirmed = bool(entry.get(strategy._second_leg_fill_confirmed_field()))
+    if first_leg_done:
+        processed.add(first_leg_purpose)
+    if second_leg_done or fill_confirmed:
+        processed.add(second_leg_purpose)
+    if processed:
+        state["processed_cycle_purposes"] = sorted(processed)
+
+
+def _advance_backtest_cycle_sequence_after_second_leg(
+    strategy: Any,
+    runtime_state: RuntimeState,
+    fill_event: FillEvent,
+    *,
+    cycle_index: int,
+) -> None:
+    purpose = str(fill_event.purpose or "").upper()
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    if purpose != second_leg_purpose:
+        return
+    if str(getattr(fill_event, "status", "") or "").upper() not in {"", "FILLED"}:
+        return
+
+    state = runtime_state.strategy_state
+    entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
+    if not bool(entry.get(strategy._second_leg_fill_confirmed_field())):
+        return
+    if float(entry.get(strategy._second_leg_fill_price_field()) or 0.0) <= 0:
+        return
+
+    _reconcile_backtest_normal_split_for_terminal_fill(
+        strategy,
+        runtime_state,
+        fill_event,
+        cycle_index=cycle_index,
+    )
+
+    active_cycle_index = int(state.get("active_cycle_index") or cycle_index)
+    cycle_step = str(state.get("cycle_step") or "")
+    if (
+        active_cycle_index != cycle_index
+        or cycle_step != STEP_WAITING_FOR_PAIR_SECOND_LEG
+    ):
+        if active_cycle_index > cycle_index:
+            _sync_backtest_processed_cycle_purposes(strategy, runtime_state, cycle_index=cycle_index)
+            return
+        state["active_cycle_index"] = cycle_index
+        state["cycle_step"] = STEP_WAITING_FOR_PAIR_SECOND_LEG
+
+    sequence_result = advance_cycle_sequence_after_fill(
+        purpose,
+        state,
+        strategy._sequence_config,
+    )
+    if sequence_result.get("success"):
+        state["cycle_completed_count"] = max(
+            int(state.get("cycle_completed_count") or 0),
+            cycle_index,
+        )
+        state["cycle_pair_count"] = max(int(state.get("cycle_pair_count") or 0), cycle_index)
+        state["cycle_waiting_for_short_tp"] = False
+        state["short_tp_pending_cycle"] = 0
+        _sync_backtest_processed_cycle_purposes(strategy, runtime_state, cycle_index=cycle_index)
+        strategy._persist_cycle_sequence_state(runtime_state)
+
+
 def repair_cycle_fill_maps_after_advance(
     strategy: Any,
     runtime_state: RuntimeState,
@@ -89,6 +307,19 @@ def repair_cycle_fill_maps_after_advance(
     cycle_index = _cycle_index_from_purpose(purpose)
     if cycle_index <= 0:
         return
+
+    _ensure_second_leg_sequence_commit(
+        strategy,
+        runtime_state,
+        fill_event,
+        cycle_index=cycle_index,
+    )
+    _advance_backtest_cycle_sequence_after_second_leg(
+        strategy,
+        runtime_state,
+        fill_event,
+        cycle_index=cycle_index,
+    )
 
     cycle_state = strategy._ensure_cycle_state(runtime_state)
 
@@ -133,6 +364,26 @@ def install_cycle_fill_reference_repair(strategy: Any) -> None:
 
     original_commit = strategy._commit_short_reduce_terminal_fill
     original_advance = strategy._advance_cycle_from_fill
+    original_confirmed_history_has_purpose = strategy._confirmed_history_has_purpose
+
+    def wrapped_confirmed_history_has_purpose(
+        runtime_state: RuntimeState,
+        purpose: str,
+        *,
+        exchange_order_id: str | None = None,
+    ) -> bool:
+        normalized_purpose = str(purpose or "").strip().upper()
+        if normalized_purpose and _backtest_cycle_entry_confirms_purpose(
+            strategy,
+            runtime_state,
+            normalized_purpose,
+        ):
+            return True
+        return original_confirmed_history_has_purpose(
+            runtime_state,
+            purpose,
+            exchange_order_id=exchange_order_id,
+        )
 
     def wrapped_commit(
         runtime_state: RuntimeState,
@@ -201,4 +452,5 @@ def install_cycle_fill_reference_repair(strategy: Any) -> None:
 
     strategy._commit_short_reduce_terminal_fill = wrapped_commit
     strategy._advance_cycle_from_fill = wrapped_advance
+    strategy._confirmed_history_has_purpose = wrapped_confirmed_history_has_purpose
     strategy._backtest_cycle_fill_reference_repair_installed = True
