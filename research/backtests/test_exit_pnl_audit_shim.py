@@ -39,3 +39,24 @@ def test_exit_pnl_audit_does_not_warn_on_cycle_fill(caplog) -> None:
         if record.message == "exit_pnl_audit_failed_non_blocking"
     ]
     assert audit_warnings == []
+
+
+def test_short_primary_backtest_does_not_emit_short_tp_pnl_mismatch(caplog) -> None:
+    """Short-primary first-leg SHORT_REDUCE losses must not hit cover-leg validation."""
+    candles = normalize_candles("APTUSDT", load_candles_for_symbol("APTUSDT", limit=1000))
+    window = candles[800 : 800 + 800]
+    caplog.set_level(logging.WARNING, logger="fixed_cycle_hedge_bot.fixed_cycle_strategy")
+    run_historical_backtest(
+        "APTUSDT",
+        "short",
+        window,
+        max_candles=799,
+        config_source="live",
+        fill_model="conservative",
+    )
+    mismatch_warnings = [
+        record.message
+        for record in caplog.records
+        if record.message == "short_tp_pnl_mismatch"
+    ]
+    assert mismatch_warnings == []

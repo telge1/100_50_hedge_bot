@@ -89,7 +89,7 @@ def expected_cover_purpose(loss_purpose: str) -> str:
     if leg in {"LONG_ADD", "LONG_REDUCE"}:
         return f"CYCLE_{cycle_no}_SHORT_REDUCE"
     if leg in {"SHORT_REDUCE", "SHORT_ADD"}:
-        return f"CYCLE_{cycle_no}_LONG_ADD"
+        return f"CYCLE_{cycle_no}_LONG_REDUCE"
     return ""
 
 

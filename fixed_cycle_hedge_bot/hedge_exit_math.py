@@ -28,8 +28,10 @@ def calculate_hedge_exit_price(
     buffer_usdt = profit_basis_usdt * tp_buffer_pct / 100.0
     pending_loss = max(float(pending_cycle_loss_usdt or 0.0), 0.0)
     realized_profit_credit = max(float(realized_cycle_net or 0.0), 0.0)
+    realized_loss_usdt = max(-float(realized_cycle_net or 0.0), 0.0)
+    loss_recovery_usdt = max(pending_loss, realized_loss_usdt if pending_loss <= 0.0 else 0.0)
     required_profit_usdt = (
-        target_profit_usdt + buffer_usdt + pending_loss - realized_profit_credit
+        target_profit_usdt + buffer_usdt + loss_recovery_usdt - realized_profit_credit
     )
     net_qty = long_qty - short_qty
     base_diff = (long_avg * long_qty) - (short_avg * short_qty)

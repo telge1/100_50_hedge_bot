@@ -466,9 +466,25 @@ def _print_run_summary(payload: dict[str, Any]) -> None:
         print(f"csv={payload['output_files']['csv']}")
 
 
+def _warn_if_test_config_for_research(symbol: str, config_source: str) -> None:
+    """Warn when research backtests use fallback test config instead of live bot JSON."""
+    normalized_source = str(config_source or "test").strip().lower()
+    smoke_symbols = {"BTCUSDT"}
+    if normalized_source != "test":
+        return
+    if str(symbol or "").upper() in smoke_symbols:
+        return
+    print(
+        "WARNING: config_source=test uses fallback price_tick_size (typically 0.1). "
+        "Research backtests for production symbols should use --config-source live.",
+        file=sys.stderr,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    _warn_if_test_config_for_research(args.symbol, args.config_source)
 
     write_json = not args.no_json
     write_csv = not args.no_csv

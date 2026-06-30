@@ -60,6 +60,8 @@ EXPECTED_CONFIG_PATH = Path("fixed_cycle_hedge_bot/config/fixed_cycle_config.jso
 PER_BOT_CONFIG_ROOT = PROJECT_ROOT / "live_bots"
 
 FINAL_EXIT_PNL_FETCH_MAX_ATTEMPTS = 3
+FINAL_EXIT_MIN_PROFIT_FEE_TOLERANCE_PCT = 0.05
+FINAL_EXIT_MIN_PROFIT_FEE_TOLERANCE_FLOOR_USDT = 0.02
 
 
 @dataclass(frozen=True)
@@ -1916,38 +1918,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     },
                 )
 
-        if (
+        is_short_reduce_cover_leg = (
             isinstance(purpose, str)
             and "SHORT" in purpose
             and metadata.get("cycle_role") == "short_reduce"
-        ):
+            and self._get_second_leg_cycle_role() == "short_reduce"
+        )
+        if is_short_reduce_cover_leg:
             is_staged = bool(metadata.get("is_staged_second_leg_tp"))
-            if not is_staged:
+            is_normal_split = bool(metadata.get("normal_cycle_second_leg_split"))
+            expected = 0.0
+            if not is_staged and not is_normal_split:
                 expected = float(state.get("last_expected_short_tp_net") or 0.0)
-                total_required = expected
 
-            if not is_staged:
+            if (
+                not is_staged
+                and not is_normal_split
+                and expected > PNL_VALIDATION_THRESHOLD_USDT
+            ):
                 actual, actual_source = self._extract_realized_fill_pnl(fill_event, fill_type)
                 delta = actual - expected
                 delta_pct = (delta / expected) if expected > 0 else 0.0
                 filled_price = float(fill_event.exec_price or 0.0)
                 filled_qty = float(fill_event.exec_qty or 0.0)
                 expected_qty = float(state.get("last_short_tp_qty") or 0.0)
+                validation_payload = {
+                    "expected_profit_usdt": expected,
+                    "actual_profit_usdt": actual,
+                    "actual_source": actual_source,
+                    "delta": delta,
+                    "delta_pct": delta_pct,
+                    "trigger_price": state.get("last_short_tp_trigger_price"),
+                    "filled_price": filled_price,
+                    "qty": filled_qty,
+                    "cycle_index": metadata.get("cycle_index"),
+                    "purpose": purpose,
+                }
 
-                logger.debug(
-                    "short_tp_pnl_validation %s",
-                    {
-                        "expected_profit_usdt": expected,
-                        "actual_profit_usdt": actual,
-                        "actual_source": actual_source,
-                        "delta": delta,
-                        "delta_pct": delta_pct,
-                        "trigger_price": state.get("last_short_tp_trigger_price"),
-                        "filled_price": filled_price,
-                        "qty": filled_qty,
-                        "cycle_index": metadata.get("cycle_index"),
-                    },
-                )
+                logger.debug("short_reduce_cover_pnl_validation %s", validation_payload)
                 _audit_calc(
                     "short_tp_fill_validation",
                     {
@@ -1969,36 +1977,28 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "order_id": fill_event.client_order_id,
                         "metadata": metadata,
                     },
+                    level=logging.DEBUG,
                 )
                 if abs(delta) > PNL_VALIDATION_THRESHOLD_USDT:
-                    logger.warning(
-                        "short_tp_pnl_mismatch",
-                        {
-                            "expected": expected,
-                            "actual": actual,
-                            "delta": delta,
-                            "delta_pct": delta_pct,
-                            "threshold": PNL_VALIDATION_THRESHOLD_USDT,
-                            "cycle_index": metadata.get("cycle_index"),
-                            "trigger_price": state.get("last_short_tp_trigger_price"),
-                            "filled_price": filled_price,
-                            "qty": filled_qty,
-                        },
-                    )
+                    mismatch_payload = {
+                        "expected": expected,
+                        "actual": actual,
+                        "delta": delta,
+                        "delta_pct": delta_pct,
+                        "threshold": PNL_VALIDATION_THRESHOLD_USDT,
+                        "cycle_index": metadata.get("cycle_index"),
+                        "trigger_price": state.get("last_short_tp_trigger_price"),
+                        "filled_price": filled_price,
+                        "qty": filled_qty,
+                        "purpose": purpose,
+                        "actual_source": actual_source,
+                        "validation_scope": "long_primary_short_reduce_cover_leg",
+                    }
+                    logger.debug("short_tp_pnl_mismatch %s", mismatch_payload)
                     _audit_calc(
                         "short_tp_pnl_mismatch",
-                        {
-                            "expected": expected,
-                            "actual": actual,
-                            "delta": delta,
-                            "delta_pct": delta_pct,
-                            "threshold": PNL_VALIDATION_THRESHOLD_USDT,
-                            "cycle_index": metadata.get("cycle_index"),
-                            "trigger_price": state.get("last_short_tp_trigger_price"),
-                            "filled_price": filled_price,
-                            "qty": filled_qty,
-                        },
-                        level=logging.WARNING,
+                        mismatch_payload,
+                        level=logging.DEBUG,
                     )
         if fill_type == "cycle_long_reduce":
             cycle_order_already_confirmed = self._cycle_order_confirmed(
@@ -9041,6 +9041,33 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if _evaluate_post_short_reduce_recovery(trigger_price):
                 return []
 
+            trigger_price, long_reduce_qty, long_reduce_cover_adjustment = (
+                self._enforce_long_reduce_loss_cover_invariant(
+                    trigger_price=trigger_price,
+                    long_qty=long_reduce_qty,
+                    long_entry_price=long_entry_price,
+                    required_net=required_profit_to_cover_loss,
+                    fee_rate=fee_rate,
+                    runtime_state=runtime_state,
+                    snapshot=snapshot,
+                    price_tick_size=price_tick_size,
+                )
+            )
+            expected_long_reduce_profit = compute_expected_long_reduce_profit(
+                trigger_price,
+                long_reduce_qty,
+            )
+            if long_reduce_cover_adjustment.get("adjusted"):
+                _log_event(
+                    "fixed_cycle_long_reduce_loss_cover_invariant_adjusted",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "purpose": purpose,
+                        **long_reduce_cover_adjustment,
+                    },
+                )
+
             _log_event(
                 "fixed_cycle_long_reduce_sized_from_confirmed_loss",
                 {
@@ -9085,6 +9112,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "pending_cycle_loss_usdt": pending_cycle_loss_usdt,
                 "expected_long_reduce_profit": expected_long_reduce_profit,
                 "qty": long_reduce_qty,
+                "long_reduce_loss_cover_invariant_adjusted": bool(
+                    long_reduce_cover_adjustment.get("adjusted")
+                ),
+                **(
+                    {
+                        key: long_reduce_cover_adjustment[key]
+                        for key in (
+                            "original_long_qty",
+                            "adjusted_long_qty",
+                            "original_trigger_price",
+                            "adjusted_trigger_price",
+                            "expected_net_after_adjustment",
+                            "reason",
+                        )
+                        if key in long_reduce_cover_adjustment
+                    }
+                    if long_reduce_cover_adjustment.get("adjusted")
+                    else {}
+                ),
             }
 
             gate_allowed, gate_reason, gate_payload = self._can_submit_cycle_intent(
@@ -11508,6 +11554,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return intents
 
+        tp_projection = self._calculate_tp_projection(
+            break_even_price, snapshot, runtime_state
+        )
+        effective_tp_price = tp_projection.tp_price
+
         current_price = snapshot.current_price
         symbol, rules, source = self._resolve_instrument_rules(runtime_state)
         tick_decimal = rules["tick_size"] if rules and rules.get("tick_size", Decimal("0")) > 0 else Decimal(
@@ -11516,8 +11567,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         tick_size = float(tick_decimal)
         final_exit_tick_offset_ticks = max(float(self.config.final_exit_tick_offset or 0.0), 0.0)
         final_exit_tick_offset_price = tick_size * final_exit_tick_offset_ticks
-        long_tp_price = tp_price
-        short_sl_price = max(tp_price - final_exit_tick_offset_price, tick_size)
+        long_tp_price = effective_tp_price
+        short_sl_price = max(effective_tp_price - final_exit_tick_offset_price, tick_size)
         logger.debug(
             "exit_tick_size %s",
             {
@@ -11529,7 +11580,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         long_tp_valid = False
         short_sl_valid = False
-        if current_price < tp_price:
+        if current_price < effective_tp_price:
             if current_price > 0:
                 min_short_trigger = current_price + tick_size
                 min_long_trigger = current_price + (2 * tick_size)
@@ -11568,7 +11619,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         _log_event(
             "fixed_cycle_final_exit_tick_offset_config_applied",
             {
-                "base_exit_price": tp_price,
+                "base_exit_price": effective_tp_price,
                 "long_tp_trigger_price": long_tp_price,
                 "short_sl_trigger_price": short_sl_price,
                 "price_tick_size": float(tick_size),
@@ -11594,7 +11645,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "symbol": snapshot.symbol or self.config.symbol,
                     "purpose": purpose,
                     "current_price": float(current_price or 0.0),
-                    "reference_price": float(tp_price or 0.0),
+                    "reference_price": float(effective_tp_price or 0.0),
                     "avg_price": float(
                         snapshot.long_avg
                         if purpose == self._get_final_long_exit_purpose()
@@ -11618,7 +11669,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         "symbol": snapshot.symbol or self.config.symbol,
                         "purpose": purpose,
                         "current_price": float(current_price or 0.0),
-                    "reference_price": float(tp_price or 0.0),
+                    "reference_price": float(effective_tp_price or 0.0),
                     "avg_price": float(
                         snapshot.long_avg
                         if purpose == self._get_final_long_exit_purpose()
@@ -11638,9 +11689,6 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         short_sl_valid, short_sl_trigger_direction = _resolve_exit_trigger(
             short_sl_price, short_exit_purpose
         )
-        tp_projection = self._calculate_tp_projection(
-            break_even_price, snapshot, runtime_state
-        )
         final_exit_economics = self._evaluate_final_exit_economics(
             long_tp_price=long_tp_price,
             short_sl_price=short_sl_price,
@@ -11648,16 +11696,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             runtime_state=runtime_state,
             projection=tp_projection,
         )
-        strict_final_exit_gate = (
-            tp_projection.pending_cycle_loss_usdt > 1e-6
-            or bool(state.get("exit_orders_stale_after_structure_fill"))
-        )
-        if strict_final_exit_gate and not final_exit_economics.sufficient:
+        if not final_exit_economics.sufficient:
             self._defer_final_exit_insufficient_coverage(
                 runtime_state,
                 context,
                 economics=final_exit_economics,
-                tp_price=tp_price,
+                tp_price=effective_tp_price,
                 long_tp_price=long_tp_price,
                 short_sl_price=short_sl_price,
                 snapshot=snapshot,
@@ -11677,7 +11721,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return []
 
         signature = {
-            "basket_tp_price": tp_price,
+            "basket_tp_price": effective_tp_price,
             "basket_break_even_price": break_even_price,
             "long_tp_price": long_tp_price,
             "short_sl_price": short_sl_price,
@@ -11795,7 +11839,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_idx = int(state.get("current_effective_cycle") or 0)
         metadata_base = {
             "basket_break_even_price": break_even_price,
-            "basket_tp_price": tp_price,
+            "basket_tp_price": effective_tp_price,
             "exit_mode": "basket_exit",
         }
 
@@ -11982,11 +12026,34 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
 
     @staticmethod
+    def _compute_long_reduce_net(
+        *,
+        long_entry_price: float,
+        trigger_price: float,
+        qty: float,
+        fee_rate: float,
+    ) -> float:
+        if qty <= 0 or long_entry_price <= 0 or trigger_price <= 0:
+            return 0.0
+        return (
+            (trigger_price - long_entry_price) * qty
+            - (long_entry_price * qty * fee_rate)
+            - (trigger_price * qty * fee_rate)
+        )
+
+    @staticmethod
     def _floor_normalize_trigger_price(price: float, *, price_tick_size: float) -> float:
         if price <= 0:
             return 0.0
         tick = price_tick_size if price_tick_size > 0 else 0.0001
         return math.floor((price / tick) + 1e-12) * tick
+
+    @staticmethod
+    def _ceil_normalize_trigger_price(price: float, *, price_tick_size: float) -> float:
+        if price <= 0:
+            return 0.0
+        tick = price_tick_size if price_tick_size > 0 else 0.0001
+        return math.ceil((price / tick) - 1e-12) * tick
 
     def _enforce_short_reduce_loss_cover_invariant(
         self,
@@ -12116,6 +12183,135 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             adjustment["adjusted"] = True
             if not adjustment["reason"]:
                 adjustment["reason"] = "short_reduce_loss_cover_trigger_deepened"
+
+        return adjusted_trigger, adjusted_qty, adjustment
+
+    def _enforce_long_reduce_loss_cover_invariant(
+        self,
+        *,
+        trigger_price: float,
+        long_qty: float,
+        long_entry_price: float,
+        required_net: float,
+        fee_rate: float,
+        runtime_state: RuntimeState,
+        snapshot: HedgeSnapshot,
+        price_tick_size: float,
+    ) -> tuple[float, float, dict[str, Any]]:
+        """Ensure submitted long-reduce (trigger, qty) covers required_net after rounding."""
+        eps = SHORT_REDUCE_COVER_NET_EPS
+        original_long_qty = float(long_qty)
+        original_trigger_price = float(trigger_price)
+        tick = price_tick_size if price_tick_size > 0 else float(self.config.price_tick_size or 0.0001)
+        if tick <= 0:
+            tick = 0.0001
+
+        adjustment: dict[str, Any] = {
+            "original_long_qty": original_long_qty,
+            "original_trigger_price": original_trigger_price,
+            "adjusted_long_qty": original_long_qty,
+            "adjusted_trigger_price": original_trigger_price,
+            "required_net": float(required_net),
+            "expected_net_after_adjustment": self._compute_long_reduce_net(
+                long_entry_price=long_entry_price,
+                trigger_price=original_trigger_price,
+                qty=original_long_qty,
+                fee_rate=fee_rate,
+            ),
+            "adjusted": False,
+            "reason": "",
+        }
+
+        if (
+            required_net <= eps
+            or original_long_qty <= 0
+            or long_entry_price <= 0
+            or original_trigger_price <= 0
+        ):
+            return original_trigger_price, original_long_qty, adjustment
+
+        adjusted_trigger = self._ceil_normalize_trigger_price(
+            original_trigger_price,
+            price_tick_size=tick,
+        )
+        adjusted_qty = original_long_qty
+
+        def net_at(tp: float, qty: float) -> float:
+            return self._compute_long_reduce_net(
+                long_entry_price=long_entry_price,
+                trigger_price=tp,
+                qty=qty,
+                fee_rate=fee_rate,
+            )
+
+        def deepen_trigger(*, max_iterations: int = 500) -> None:
+            nonlocal adjusted_trigger
+            iterations = 0
+            while (
+                net_at(adjusted_trigger, adjusted_qty) + eps < required_net
+                and iterations < max_iterations
+            ):
+                adjusted_trigger = self._ceil_normalize_trigger_price(
+                    adjusted_trigger + tick,
+                    price_tick_size=tick,
+                )
+                iterations += 1
+
+        deepen_trigger()
+
+        if net_at(adjusted_trigger, adjusted_qty) + eps < required_net:
+            per_unit_net = net_at(adjusted_trigger, 1.0)
+            if per_unit_net > eps:
+                _, rules, _ = self._resolve_instrument_rules(runtime_state)
+                min_order_qty = float(
+                    rules["min_order_qty"]
+                    if rules and rules.get("min_order_qty")
+                    else float(self.config.min_order_qty or 0.0)
+                )
+                min_notional = float(
+                    rules["min_notional"]
+                    if rules and rules.get("min_notional")
+                    else float(self.config.min_notional_usdt or 0.0)
+                )
+                available_long_qty = float(snapshot.long_qty or 0.0)
+                if available_long_qty <= 0:
+                    available_long_qty = float(
+                        runtime_state.strategy_state.get("initial_long_qty") or 0.0
+                    )
+                available_long_qty = self._normalize_qty(available_long_qty, runtime_state)
+
+                desired_qty = self._normalize_qty(required_net / per_unit_net, runtime_state)
+                if min_notional > 0 and adjusted_trigger > 0:
+                    min_notional_qty = self._normalize_qty(
+                        min_notional / adjusted_trigger,
+                        runtime_state,
+                    )
+                    if min_notional_qty > desired_qty:
+                        desired_qty = min_notional_qty
+                if min_order_qty > 0 and desired_qty + 1e-12 < min_order_qty:
+                    if min_order_qty <= available_long_qty + 1e-12:
+                        desired_qty = min_order_qty
+                    else:
+                        desired_qty = adjusted_qty
+                desired_qty = min(desired_qty, available_long_qty)
+
+                if desired_qty > adjusted_qty + eps:
+                    adjusted_qty = desired_qty
+                    adjustment["reason"] = "long_reduce_loss_cover_qty_increased"
+                    deepen_trigger()
+
+        final_net = net_at(adjusted_trigger, adjusted_qty)
+        adjustment["adjusted_long_qty"] = adjusted_qty
+        adjustment["adjusted_trigger_price"] = adjusted_trigger
+        adjustment["expected_net_after_adjustment"] = final_net
+
+        if (
+            abs(adjusted_trigger - original_trigger_price) > eps
+            or abs(adjusted_qty - original_long_qty) > eps
+        ):
+            adjustment["adjusted"] = True
+            if not adjustment["reason"]:
+                adjustment["reason"] = "long_reduce_loss_cover_trigger_raised"
 
         return adjusted_trigger, adjusted_qty, adjustment
 
@@ -12465,6 +12661,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             break_even_price, snapshot, runtime_state
         ).tp_price
 
+    def _final_exit_coverage_tolerance_usdt(self, projection: TpProjection) -> float:
+        min_profit_target = max(float(projection.min_profit_target_usdt or 0.0), 0.0)
+        return max(
+            FINAL_EXIT_MIN_PROFIT_FEE_TOLERANCE_FLOOR_USDT,
+            min_profit_target * FINAL_EXIT_MIN_PROFIT_FEE_TOLERANCE_PCT,
+        )
+
     def _evaluate_final_exit_economics(
         self,
         *,
@@ -12493,13 +12696,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         min_required_total_usdt = projection.min_required_total_usdt
         target_delta_usdt = expected_total_net_after_exit - min_required_total_usdt
+        coverage_tolerance = self._final_exit_coverage_tolerance_usdt(projection)
         return FinalExitEconomics(
             expected_total_net_after_exit=expected_total_net_after_exit,
             target_delta_usdt=target_delta_usdt,
             required_profit_to_cover_loss=projection.required_profit_to_cover_loss,
             min_profit_target_usdt=projection.min_profit_target_usdt,
             min_required_total_usdt=min_required_total_usdt,
-            sufficient=target_delta_usdt >= -1e-6,
+            sufficient=target_delta_usdt >= -coverage_tolerance,
         )
 
     def _defer_final_exit_insufficient_coverage(

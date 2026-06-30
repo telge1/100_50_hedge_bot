@@ -16,6 +16,7 @@ from research.backtests.pnl_coverage_audit import (
     apply_trade_exit_quality,
     build_pnl_coverage_audit,
     classify_trade_exit_quality,
+    expected_cover_purpose,
     expected_cover_qty,
     has_undercovered_final_exit,
     inspect_qty_mapping,
@@ -406,3 +407,100 @@ def test_classify_trade_exit_quality_closed_ok() -> None:
     result.realized_pnl = 0.02
     quality = classify_trade_exit_quality(result)
     assert quality == "closed_ok"
+
+
+def _short_primary_cycle_result(
+    *,
+    loss_pnl: float,
+    cover_pnl: float,
+    loss_purpose: str = "CYCLE_1_SHORT_REDUCE",
+    cover_purpose: str = "CYCLE_1_LONG_REDUCE",
+) -> BacktestResult:
+    return BacktestResult(
+        symbol="APTUSDT",
+        direction="short",
+        start_index=0,
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:05:00+00:00",
+                "purpose": loss_purpose,
+                "purpose_original": loss_purpose,
+                "cycle_index": 1,
+                "cycle_role": "short_reduce",
+                "side": "short",
+                "qty": 10.0,
+                "fill_price": 1.0,
+                "closed_pnl": loss_pnl,
+                "long_avg_after": 0.6518,
+            },
+            {
+                "timestamp": "2026-01-01T00:10:00+00:00",
+                "purpose": cover_purpose,
+                "purpose_original": cover_purpose,
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "side": "long",
+                "qty": 6.0,
+                "fill_price": 0.655,
+                "closed_pnl": cover_pnl,
+            },
+        ],
+    )
+
+
+def test_short_primary_audit_expects_long_reduce_as_cover_purpose() -> None:
+    assert expected_cover_purpose("CYCLE_1_SHORT_REDUCE") == "CYCLE_1_LONG_REDUCE"
+    assert expected_cover_purpose("CYCLE_1_SHORT_ADD") == "CYCLE_1_LONG_REDUCE"
+
+
+def test_short_primary_audit_does_not_misclassify_long_reduce_cover_as_missing() -> None:
+    rows = build_pnl_coverage_audit(
+        _short_primary_cycle_result(loss_pnl=-10.0, cover_pnl=10.5)
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["cover_purpose"] == "CYCLE_1_LONG_REDUCE"
+    assert row["status"] == "overcovered"
+    assert row["missing_pnl"] == pytest.approx(0.0)
+
+
+def test_short_primary_audit_role_fallback_matches_runtime_purpose() -> None:
+    """Role fallback still classifies cover when purpose naming was wrong (LONG_ADD)."""
+    rows = build_pnl_coverage_audit(
+        _short_primary_cycle_result(
+            loss_pnl=-10.0,
+            cover_pnl=10.5,
+            cover_purpose="CYCLE_1_LONG_REDUCE",
+        )
+    )
+    assert rows[0]["status"] == "overcovered"
+    wrong_name_rows = build_pnl_coverage_audit(
+        BacktestResult(
+            symbol="APTUSDT",
+            direction="short",
+            start_index=0,
+            fill_log=[
+                {
+                    "timestamp": "2026-01-01T00:05:00+00:00",
+                    "purpose": "CYCLE_1_SHORT_REDUCE",
+                    "cycle_index": 1,
+                    "cycle_role": "short_reduce",
+                    "side": "short",
+                    "qty": 10.0,
+                    "closed_pnl": -10.0,
+                    "long_avg_after": 0.6518,
+                },
+                {
+                    "timestamp": "2026-01-01T00:10:00+00:00",
+                    "purpose": "CYCLE_1_LONG_REDUCE",
+                    "cycle_index": 1,
+                    "cycle_role": "long_reduce",
+                    "side": "long",
+                    "qty": 6.0,
+                    "closed_pnl": 10.5,
+                },
+            ],
+        )
+    )
+    assert wrong_name_rows[0]["status"] == "overcovered"
+    assert wrong_name_rows[0]["cover_purpose"] == "CYCLE_1_LONG_REDUCE"

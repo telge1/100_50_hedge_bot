@@ -35,6 +35,34 @@ class HedgeExitMathTests(unittest.TestCase):
             places=6,
         )
 
+    def test_realized_loss_without_pending_increases_required_exit_price(self) -> None:
+        neutral = calculate_hedge_exit_price(
+            long_avg=1.0,
+            long_qty=100.0,
+            short_avg=0.95,
+            short_qty=80.0,
+            tp_profit_target_pct=1.0,
+            tp_buffer_pct=0.5,
+            realized_cycle_net=0.0,
+            pending_cycle_loss_usdt=0.0,
+        )
+        with_realized_loss = calculate_hedge_exit_price(
+            long_avg=1.0,
+            long_qty=100.0,
+            short_avg=0.95,
+            short_qty=80.0,
+            tp_profit_target_pct=1.0,
+            tp_buffer_pct=0.5,
+            realized_cycle_net=-2.0,
+            pending_cycle_loss_usdt=0.0,
+        )
+        self.assertGreater(with_realized_loss.exit_price, neutral.exit_price)
+        self.assertAlmostEqual(
+            with_realized_loss.required_profit_usdt - neutral.required_profit_usdt,
+            2.0,
+            places=6,
+        )
+
     def test_realized_profit_reduces_required_exit_price(self) -> None:
         neutral = calculate_hedge_exit_price(
             long_avg=1.0,

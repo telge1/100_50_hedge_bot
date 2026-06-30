@@ -134,6 +134,249 @@ class NormalSecondLegSplitHelperTests(unittest.TestCase):
         self.assertIsNone(intents)
 
 
+class ShortTpFollowUpSplitIntegrationTests(unittest.TestCase):
+    def _long_bot_followup_state(self, *, cycle_index: int = 3, short_tp_qty: float = 21.2) -> dict:
+        return BuildShortTpFollowUpSplitTests._long_bot_followup_state(
+            self,
+            cycle_index=cycle_index,
+            short_tp_qty=short_tp_qty,
+        )
+
+    def test_short_tp_follow_up_builds_two_stage_split_from_runtime_path(self) -> None:
+        strategy = _long_bot_strategy()
+        runtime_state = _runtime_with_rules(
+            strategy_state=self._long_bot_followup_state(short_tp_qty=14.2)
+        )
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_short_cycle_qty",
+            return_value=14.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 2)
+        self.assertAlmostEqual(sum(intent.qty for intent in intents), 14.2)
+        self.assertTrue(all(intent.metadata.get("normal_cycle_second_leg_split") for intent in intents))
+        for intent in intents:
+            self.assertEqual(intent.purpose, "CYCLE_3_SHORT_REDUCE")
+            self.assertEqual(intent.side, "short")
+            self.assertTrue(intent.reduce_only)
+            self.assertEqual(intent.metadata.get("cycle_index"), 3)
+            self.assertIn("required_net", intent.metadata)
+
+    def test_short_tp_follow_up_builds_three_stage_split_from_runtime_path(self) -> None:
+        strategy = _long_bot_strategy()
+        runtime_state = _runtime_with_rules(strategy_state=self._long_bot_followup_state())
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_short_cycle_qty",
+            return_value=21.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 3)
+        self.assertAlmostEqual(sum(intent.qty for intent in intents), 21.2)
+        self.assertEqual(
+            sorted(intent.metadata.get("split_stage_index") for intent in intents),
+            [0, 1, 2],
+        )
+
+    def test_short_reduce_split_disabled_when_full_qty_required_for_loss_cover(self) -> None:
+        from fixed_cycle_hedge_bot.cycle_sequence import STEP_WAITING_FOR_PAIR_SECOND_LEG
+
+        long_loss = 0.1275507199999988
+        short_tp_qty = 72.472
+        short_qty = 289.888
+        cycle_index = 1
+        strategy = FixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                bot_name="long_bot_1",
+                strategy_side="long",
+                symbol="ENAUSDT",
+                restart=False,
+                qty_step=0.001,
+                min_order_qty=0.001,
+                min_notional_usdt=5.0,
+                price_tick_size=0.0001,
+                target_profit_usdt=0.015,
+                reduction_pct_per_fill=25,
+            )
+        )
+        runtime_state = RuntimeState(
+            strategy_state={
+                "cycle_waiting_for_short_tp": True,
+                "short_tp_pending_cycle": cycle_index,
+                "pending_short_cycle_index": cycle_index,
+                "initial_short_qty": short_qty,
+                "initial_long_qty": short_qty,
+                "entry_reference_price": 0.0858,
+                "cycle_step": STEP_WAITING_FOR_PAIR_SECOND_LEG,
+                "next_required_purpose": "CYCLE_1_SHORT_REDUCE",
+                "active_cycle_index": cycle_index,
+                "current_short_cycle_index": 0,
+                "current_long_cycle_index": cycle_index,
+                "processed_cycle_purposes": ["CYCLE_1_LONG_ADD"],
+                "initial_entry_confirmed": True,
+                "pending_cycle_loss_usdt": long_loss,
+                "cycle_states": {
+                    str(cycle_index): {
+                        "long_add_status": "PROCESSED",
+                        "short_tp_status": "NONE",
+                        "short_tp_qty": short_tp_qty,
+                        "long_add_confirmed_pnl": -long_loss,
+                        "complete": False,
+                    }
+                },
+                "cycle_state": {
+                    "symbol": "ENAUSDT",
+                    "long_fills": {
+                        str(cycle_index): {
+                            "price": 0.0858,
+                            "incremental_qty": short_qty,
+                            "closed_pnl": -long_loss,
+                            "confirmed_closed_pnl": -long_loss,
+                        }
+                    },
+                    "short_fills": {},
+                    "long_cycle_index": cycle_index,
+                    "short_cycle_index": 0,
+                },
+            }
+        )
+        runtime_state.instrument_rules["ENAUSDT"] = {
+            "min_order_qty": Decimal("0.001"),
+            "min_notional": Decimal("5"),
+            "qty_step": Decimal("0.001"),
+            "tick_size": Decimal("0.0001"),
+        }
+        snapshot = HedgeSnapshot(
+            symbol="ENAUSDT",
+            current_price=0.087,
+            long_qty=short_qty,
+            short_qty=short_qty,
+            long_avg=0.0858,
+            short_avg=0.08624,
+        )
+        context = StrategyContext(
+            audit=AuditLogger(logging.getLogger("test_normal_second_leg_split")),
+            runtime_name="test_runtime",
+            symbol="ENAUSDT",
+            category="linear",
+            min_order_value=5.0,
+        )
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_short_cycle_qty",
+            return_value=short_tp_qty,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 1)
+        self.assertAlmostEqual(intents[0].qty, short_tp_qty)
+        self.assertFalse(intents[0].metadata.get("normal_cycle_second_leg_split"))
+        self.assertEqual(intents[0].purpose, "CYCLE_1_SHORT_REDUCE")
+        self.assertTrue(intents[0].reduce_only)
+
+    def test_split_orders_preserve_cycle_purpose_and_reduce_only(self) -> None:
+        strategy = _long_bot_strategy()
+        runtime_state = _runtime_with_rules(strategy_state=self._long_bot_followup_state())
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_short_cycle_qty",
+            return_value=21.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertGreaterEqual(len(intents), 2)
+        for intent in intents:
+            self.assertEqual(intent.purpose, "CYCLE_3_SHORT_REDUCE")
+            self.assertEqual(intent.side, "short")
+            self.assertTrue(intent.reduce_only)
+            self.assertEqual(intent.metadata.get("cycle_index"), 3)
+            self.assertEqual(intent.metadata.get("cycle_role"), "short_reduce")
+            self.assertIn("required_net", intent.metadata)
+            self.assertIsNotNone(intent.trigger_price)
+            self.assertGreater(float(intent.trigger_price or 0.0), 0.0)
+
+    def test_split_min_notional_gate_blocks_tiny_qty_from_runtime_path(self) -> None:
+        strategy = _long_bot_strategy()
+        runtime_state = _runtime_with_rules(
+            strategy_state=self._long_bot_followup_state(short_tp_qty=2.0)
+        )
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+        strategy_logs: list[tuple[str, dict]] = []
+
+        with mock.patch(
+            "fixed_cycle_hedge_bot.fixed_cycle_strategy._log_event",
+            side_effect=lambda event, payload: strategy_logs.append((event, dict(payload))),
+        ), mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_short_cycle_qty",
+            return_value=2.0,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 1)
+        disabled = [
+            payload
+            for event, payload in strategy_logs
+            if event == "fixed_cycle_normal_second_leg_split_disabled_for_short_reduce"
+        ]
+        self.assertEqual(len(disabled), 1)
+        self.assertEqual(disabled[0].get("reason"), "split_disabled_min_order_or_notional")
+
+
 class BuildShortTpFollowUpSplitTests(unittest.TestCase):
     def _long_bot_followup_state(self, *, cycle_index: int = 3, short_tp_qty: float = 21.2) -> dict:
         return {
@@ -372,6 +615,195 @@ class ProfitStagingShortReduceTests(unittest.TestCase):
         self.assertEqual(len(staged_disabled), 1)
         self.assertEqual(staged_disabled[0].get("reason"), "single_25pct_reduce_required")
         self.assertFalse(any(intent.metadata.get("is_staged_second_leg_tp") for intent in intents))
+
+
+class ShortPrimaryLongReduceSplitIntegrationTests(unittest.TestCase):
+    def _split_strategy(self) -> ShortFixedCycleHedgeStrategy:
+        return ShortFixedCycleHedgeStrategy(
+            FixedCycleHedgeConfig(
+                bot_name="short_bot_1",
+                strategy_side="short",
+                symbol="JTOUSDT",
+                restart=False,
+                qty_step=0.1,
+                min_order_qty=0.1,
+                min_notional_usdt=5.0,
+                price_tick_size=0.0001,
+                target_profit_usdt=0.0,
+            )
+        )
+
+    def _short_bot_followup_state(
+        self, *, cycle_index: int = 3, long_reduce_qty: float = 21.2
+    ) -> dict:
+        return {
+            "cycle_waiting_for_long_reduce": True,
+            "long_reduce_pending_cycle": cycle_index,
+            "pending_long_cycle_index": cycle_index,
+            "initial_short_qty": 84.8,
+            "initial_long_qty": 67.2,
+            "entry_reference_price": 0.744,
+            "cycle_step": STEP_WAITING_FOR_PAIR_SECOND_LEG,
+            "next_required_purpose": f"CYCLE_{cycle_index}_LONG_REDUCE",
+            "active_cycle_index": cycle_index,
+            "current_short_cycle_index": cycle_index,
+            "current_long_cycle_index": 0,
+            "processed_cycle_purposes": [f"CYCLE_{cycle_index}_SHORT_REDUCE"],
+            "initial_entry_confirmed": True,
+            "pending_cycle_loss_usdt": 0.0,
+            "cycle_states": {
+                str(cycle_index): {
+                    "short_reduce_status": "PROCESSED",
+                    "long_reduce_status": "NONE",
+                    "long_add_confirmed_pnl": 0.0,
+                    "short_reduce_fill_price": 0.7438,
+                    "complete": False,
+                }
+            },
+            "cycle_state": {
+                "symbol": "JTOUSDT",
+                "short_fills": {
+                    str(cycle_index): {
+                        "price": 0.7438,
+                        "incremental_qty": long_reduce_qty,
+                        "closed_pnl": 0.0,
+                    }
+                },
+                "long_fills": {},
+                "short_cycle_index": cycle_index,
+                "long_cycle_index": 0,
+            },
+        }
+
+    def test_short_primary_long_reduce_builds_two_stage_split_from_runtime_path(self) -> None:
+        strategy = self._split_strategy()
+        runtime_state = _runtime_with_rules(
+            strategy_state=self._short_bot_followup_state(long_reduce_qty=14.2)
+        )
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_long_cycle_qty",
+            return_value=14.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 2)
+        self.assertAlmostEqual(sum(intent.qty for intent in intents), 14.2)
+        self.assertTrue(all(intent.metadata.get("normal_cycle_second_leg_split") for intent in intents))
+        for intent in intents:
+            self.assertEqual(intent.purpose, "CYCLE_3_LONG_REDUCE")
+            self.assertEqual(intent.side, "long")
+            self.assertTrue(intent.reduce_only)
+
+    def test_short_primary_long_reduce_builds_three_stage_split_from_runtime_path(self) -> None:
+        strategy = self._split_strategy()
+        runtime_state = _runtime_with_rules(strategy_state=self._short_bot_followup_state())
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_long_cycle_qty",
+            return_value=21.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 3)
+        self.assertAlmostEqual(sum(intent.qty for intent in intents), 21.2)
+
+    def test_short_primary_long_reduce_split_disabled_when_full_qty_required_for_loss_cover(
+        self,
+    ) -> None:
+        short_loss = 0.1275507199999988
+        long_reduce_qty = 21.2
+        strategy = _short_bot_strategy()
+        runtime_state = _runtime_with_rules(
+            strategy_state={
+                **self._short_bot_followup_state(
+                    cycle_index=1,
+                    long_reduce_qty=long_reduce_qty,
+                ),
+                "pending_cycle_loss_usdt": short_loss,
+                "cycle_states": {
+                    "1": {
+                        "short_reduce_status": "PROCESSED",
+                        "long_reduce_status": "NONE",
+                        "long_add_confirmed_pnl": -short_loss,
+                        "short_reduce_fill_price": 0.7438,
+                        "complete": False,
+                    }
+                },
+            }
+        )
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_long_cycle_qty",
+            return_value=long_reduce_qty,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertEqual(len(intents), 1)
+        self.assertFalse(intents[0].metadata.get("normal_cycle_second_leg_split"))
+        self.assertEqual(intents[0].purpose, "CYCLE_1_LONG_REDUCE")
+
+    def test_short_primary_split_preserves_long_reduce_purpose_and_reduce_only(self) -> None:
+        strategy = self._split_strategy()
+        runtime_state = _runtime_with_rules(strategy_state=self._short_bot_followup_state())
+        context = _context()
+        snapshot = _snapshot(current_price=0.75)
+
+        with mock.patch.object(
+            strategy,
+            "_maybe_activate_recovery_after_first_leg_fill",
+            return_value=False,
+        ), mock.patch.object(
+            strategy,
+            "_can_submit_cycle_intent",
+            return_value=(True, "ok", {}),
+        ), mock.patch.object(
+            strategy,
+            "_fixed_long_cycle_qty",
+            return_value=21.2,
+        ):
+            intents = strategy._build_short_tp_follow_up(snapshot, runtime_state, context)
+
+        self.assertGreaterEqual(len(intents), 2)
+        for intent in intents:
+            self.assertEqual(intent.purpose, "CYCLE_3_LONG_REDUCE")
+            self.assertEqual(intent.side, "long")
+            self.assertTrue(intent.reduce_only)
+            self.assertEqual(intent.metadata.get("cycle_index"), 3)
+            self.assertEqual(intent.metadata.get("cycle_role"), "long_reduce")
 
 
 if __name__ == "__main__":
