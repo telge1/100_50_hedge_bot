@@ -19,6 +19,7 @@ from .backtest_config_loader import (
 from .backtest_report import BacktestResult
 from .fill_models import FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
+from .cycle_short_tp_relief import CycleShortTpReliefConfig
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .trade_block_export import ensure_backtest_trade_block_ids
@@ -410,6 +411,7 @@ def run_multi_start_backtest(
     file_config_path: str | Path | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
+    cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
 ) -> list[BacktestResult]:
     """Run multiple backtests at staggered start points over the candle series."""
     symbol_upper = symbol.upper()
@@ -444,6 +446,7 @@ def run_multi_start_backtest(
             file_config_path=file_config_path,
             dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
             stuck_recovery_reload_config=stuck_recovery_reload_config,
+            cycle_short_tp_relief_config=cycle_short_tp_relief_config,
         )
         result.start_index = start_index
         result.window_candles = min(window_candles, len(window))
@@ -483,6 +486,7 @@ def run_multi_start_backtests(
     include_logs: bool = False,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
+    cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
 ) -> dict[str, Any]:
     """Run multi-start backtests for one or more directions and fill models."""
     symbol_upper = symbol.upper()
@@ -511,6 +515,7 @@ def run_multi_start_backtests(
                     file_config_path=file_config_path,
                     dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
                     stuck_recovery_reload_config=stuck_recovery_reload_config,
+                    cycle_short_tp_relief_config=cycle_short_tp_relief_config,
                 )
             )
 

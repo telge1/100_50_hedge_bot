@@ -69,6 +69,20 @@ DYNAMIC_CYCLE_SCALING_ROW_FIELDS = (
     "dynamic_cycle_scaling_band",
 )
 
+CYCLE_SHORT_TP_RELIEF_ROW_FIELDS = (
+    "cycle_short_tp_relief_enabled",
+    "normal_short_reduce_price",
+    "capped_short_reduce_price",
+    "required_profit",
+    "covered_profit",
+    "uncovered_loss",
+    "cumulative_carry_loss",
+    "exit_adjustment_pct",
+    "max_short_reduce_distance_pct_from_long_fill",
+    "short_tp_relief_cap_applied",
+    "carry_uncovered_loss_to_exit",
+)
+
 STUCK_RECOVERY_RELOAD_ROW_FIELDS = (
     "stuck_recovery_reload_enabled",
     "stuck_recovery_reload_triggered",
@@ -86,7 +100,12 @@ STUCK_RECOVERY_RELOAD_ROW_FIELDS = (
     "active_purposes_after_reload",
 )
 
-TRADE_BLOCK_ROW_FIELDS = TRADE_BLOCK_ROW_FIELDS + DYNAMIC_CYCLE_SCALING_ROW_FIELDS + STUCK_RECOVERY_RELOAD_ROW_FIELDS
+TRADE_BLOCK_ROW_FIELDS = (
+    TRADE_BLOCK_ROW_FIELDS
+    + DYNAMIC_CYCLE_SCALING_ROW_FIELDS
+    + CYCLE_SHORT_TP_RELIEF_ROW_FIELDS
+    + STUCK_RECOVERY_RELOAD_ROW_FIELDS
+)
 
 TRADE_BLOCK_SUMMARY_FIELDS = (
     "symbol",
@@ -287,7 +306,11 @@ def _base_row(
             row["cycle_index"] = excerpt.get("cycle_index")
         if not row.get("cycle_role") and excerpt.get("cycle_role"):
             row["cycle_role"] = excerpt.get("cycle_role")
-        for key in DYNAMIC_CYCLE_SCALING_ROW_FIELDS + STUCK_RECOVERY_RELOAD_ROW_FIELDS:
+        for key in (
+            DYNAMIC_CYCLE_SCALING_ROW_FIELDS
+            + CYCLE_SHORT_TP_RELIEF_ROW_FIELDS
+            + STUCK_RECOVERY_RELOAD_ROW_FIELDS
+        ):
             if row.get(key) in (None, "") and key in excerpt:
                 value = excerpt.get(key)
                 if isinstance(value, (dict, list)):

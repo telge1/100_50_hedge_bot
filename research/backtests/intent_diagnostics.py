@@ -95,6 +95,19 @@ INTENT_METADATA_EXCERPT_KEYS = (
     "cycle_scaling_reason",
     "dynamic_cycle_scaling_band",
 
+    # Cycle short-TP distance relief (backtest-only)
+    "cycle_short_tp_relief_enabled",
+    "normal_short_reduce_price",
+    "capped_short_reduce_price",
+    "required_profit",
+    "covered_profit",
+    "uncovered_loss",
+    "cumulative_carry_loss",
+    "exit_adjustment_pct",
+    "max_short_reduce_distance_pct_from_long_fill",
+    "short_tp_relief_cap_applied",
+    "carry_uncovered_loss_to_exit",
+
     # Stuck recovery reload (backtest-only)
     "stuck_recovery_reload_enabled",
     "stuck_recovery_reload_triggered",

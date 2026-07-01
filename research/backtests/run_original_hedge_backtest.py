@@ -26,6 +26,11 @@ from .dynamic_cycle_order_scaling import (
     config_from_json_string as dynamic_scaling_config_from_json_string,
     default_dynamic_cycle_order_scaling_config,
 )
+from .cycle_short_tp_relief import (
+    CycleShortTpReliefConfig,
+    config_from_json_string as cycle_short_tp_relief_config_from_json_string,
+    default_cycle_short_tp_relief_config,
+)
 from .stuck_recovery_reload import (
     StuckRecoveryReloadConfig,
     config_from_json_string as stuck_reload_config_from_json_string,
@@ -67,6 +72,15 @@ def resolve_stuck_recovery_reload_config(args: argparse.Namespace) -> StuckRecov
         return stuck_reload_config_from_json_string(str(json_payload))
     if bool(getattr(args, "stuck_recovery_reload", False)):
         return default_stuck_recovery_reload_config()
+    return None
+
+
+def resolve_cycle_short_tp_relief_config(args: argparse.Namespace) -> CycleShortTpReliefConfig | None:
+    json_payload = getattr(args, "cycle_short_tp_relief_config_json", None)
+    if json_payload:
+        return cycle_short_tp_relief_config_from_json_string(str(json_payload))
+    if bool(getattr(args, "cycle_short_tp_relief", False)):
+        return default_cycle_short_tp_relief_config()
     return None
 
 
@@ -483,6 +497,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON config for stuck recovery reload (overrides defaults)",
     )
+    parser.add_argument(
+        "--cycle-short-tp-relief",
+        action="store_true",
+        help="Backtest-only: cap cycle short-reduce distance and carry uncovered loss to exits",
+    )
+    parser.add_argument(
+        "--cycle-short-tp-relief-config-json",
+        default=None,
+        help="JSON config for cycle short-TP relief (overrides defaults)",
+    )
     return parser
 
 
@@ -605,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
                 include_logs=args.include_logs or args.debug,
                 dynamic_cycle_scaling_config=resolve_dynamic_cycle_scaling_config(args),
                 stuck_recovery_reload_config=resolve_stuck_recovery_reload_config(args),
+                cycle_short_tp_relief_config=resolve_cycle_short_tp_relief_config(args),
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(

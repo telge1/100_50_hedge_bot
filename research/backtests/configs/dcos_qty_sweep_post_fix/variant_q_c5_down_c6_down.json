@@ -1,0 +1,31 @@
+{
+  "enabled": true,
+  "name": "variant_q_c5_down_c6_down",
+  "start_cycle_index": 5,
+  "min_cycle_qty_factor": 0.25,
+  "max_short_reduce_distance_pct": 3.0,
+  "reachability_guard_enabled": false,
+  "bands": [
+    {
+      "min_cycle_index": 5,
+      "max_cycle_index": 5,
+      "target_profit_pct": 0.25,
+      "cycle_qty_factor": 0.98,
+      "long_add_distance_pct": 0.5
+    },
+    {
+      "min_cycle_index": 6,
+      "max_cycle_index": 6,
+      "target_profit_pct": 0.25,
+      "cycle_qty_factor": 0.92,
+      "long_add_distance_pct": 0.5
+    },
+    {
+      "min_cycle_index": 7,
+      "max_cycle_index": null,
+      "target_profit_pct": 0.25,
+      "cycle_qty_factor": 0.85,
+      "long_add_distance_pct": 0.5
+    }
+  ]
+}

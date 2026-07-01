@@ -257,6 +257,26 @@ PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
 
 
 
+Rebound Recovery Reload
+
+Trigger:
+
+Wenn active_order = CYCLE_N_SHORT_REDUCE
+und Preis steigt wieder bis ca. 0.75% unter Long Avg / Exit Avg,
+dann cancel CYCLE_N_SHORT_REDUCE,
+führe Recovery Reload aus,
+z.B. +100 Long / +50 Short oder ratio-adjusted +109.454 / +50,
+danach Exit Orders neu berechnen.
+
+Wichtig:
+
+nur 1x pro Trade
+nur ab erstem Refill oder ab Cycle 3+
+nur wenn Mindestorder erfüllt
+nur wenn Wallet-Transfer im Backtest sauber simuliert wird
+danach Debt / offenen Verlust in Exit neu einrechnen
+
+
 
 Aktuell passiert ungefähr:
 
@@ -275,3 +295,164 @@ realized_pnl-Verlust wird kleiner
 Short-Reduce muss weniger Gewinn holen
 Short-Reduce-Preis liegt näher am Markt
 Trade kann eher schließen
+
+
+
+## Idee: Rebound Recovery Reload nahe Avg
+
+Wenn ein Trade nach mehreren Cycles tief gelaufen ist und aktuell in einer weit entfernten `CYCLE_N_SHORT_REDUCE` hängt, soll der Bot nicht starr auf diesen tiefen Short-Reduce warten.
+
+Stattdessen prüfen wir bei einem Rebound:
+
+* aktive Order ist `CYCLE_N_SHORT_REDUCE`
+* Preis steigt wieder bis ca. `0.75%` unter den aktuellen Avg-/Exit-Bereich
+* Trade hatte bereits mindestens einen Refill
+* Position ist durch vorherige Long-/Short-Reduces kleiner oder ratio-schief geworden
+
+Dann wird die offene Short-Reduce-Order gecancelt und ein **Recovery Reload** gesetzt.
+
+Ziel:
+
+* Position wieder vergrößern
+* Long/Short-Ratio möglichst nahe an der Zielstruktur halten, z.B. `2:1`
+* Long-Avg und Short-Avg neu berechnen
+* offene Recovery-Verluste/Debt auf die neuen Exit-Orders umlegen
+* dadurch Exit-Orders deutlich näher an den neuen Avg bringen
+
+Beispiel aus aktuellem Trade:
+
+Vor Reload:
+
+```text
+Long qty:  28.366
+Short qty: 18.910
+```
+
+Recovery Reload nahe Avg:
+
+```text
++100 Long qty
++50 Short qty
+```
+
+oder ratio-sicher:
+
+```text
++109.454 Long qty
++50 Short qty
+```
+
+Danach wird alles neu berechnet:
+
+```text
+neuer Long avg
+neuer Short avg
+neue Ratio
+neue Exit-Orders inklusive offenem Recovery-Druck
+```
+
+Wichtig: Diese Logik soll nur Backtest-only getestet werden, mit Guardrails:
+
+* maximal 1 Rebound Recovery Reload pro Trade
+* nur nahe Avg, z.B. `0.75%` darunter
+* nur nach mindestens einem normalen Refill
+* Mindestorder beachten
+* offene Cycle-Order vorher canceln
+* danach Exits sauber neu setzen
+* PnL/Debt transparent im Backtest ausweisen
+
+
+########################################################
+
+Variante B: progressiv weniger decken
+
+Das wäre eher dein Vorschlag:
+
+Cycle 3: 80% decken, 20% Debt
+Cycle 4: 75% decken, 25% Debt
+Cycle 5: 70% decken, 30% Debt
+Cycle 6: 65% decken, 35% Debt
+
+
+| Cycle | Cover Ratio | Required Now | neuer SR Trigger | Abstand vom Long-Add-Fill | neuer Debt | Debt total |
+| ----: | ----------: | -----------: | ---------------: | ------------------------: | ---------: | ---------: |
+|     3 |         80% |       0.5564 |           1.8651 |                     1.82% |     0.1353 |     0.1353 |
+|     4 |         75% |       0.8736 |           1.7687 |                     3.47% |     0.2862 |     0.4216 |
+|     5 |         70% |       1.0804 |           1.6471 |                     2.98% |     0.4566 |     0.8782 |
+|     6 |         65% |       1.5732 |           1.4857 |                     5.06% |     0.8390 |     1.7172 |
+
+
+
+####################################### TRade Stuck ##############################################
+
+| Reihenfolge | Zeit             | Cycle | Order                | Seite | Fill / Order Preis | Bedeutung                 |
+| ----------: | ---------------- | ----: | -------------------- | ----- | -----------------: | ------------------------- |
+|           1 | 2026-01-05 18:55 | Start | INITIAL_LONG_ENTRY   | Long  |         **1.9830** | Start Long                |
+|           2 | 2026-01-05 18:55 | Start | INITIAL_SHORT_ENTRY  | Short |         **1.9830** | Start Short               |
+|           3 | 2026-01-05 19:05 |    C1 | CYCLE_1_LONG_ADD     | Long  |         **1.9731** | Long Reduce / Cycle 1     |
+|           4 | 2026-01-05 19:50 |    C1 | CYCLE_1_SHORT_REDUCE | Short |         **1.9585** | Short deckt C1            |
+|           5 | 2026-01-05 20:50 |    C2 | CYCLE_2_LONG_ADD     | Long  |         **1.9487** | Long Reduce / Cycle 2     |
+|           6 | 2026-01-06 16:05 |    C2 | CYCLE_2_SHORT_REDUCE | Short |         **1.9092** | Short deckt C2            |
+|           7 | 2026-01-06 16:40 |    C3 | CYCLE_3_LONG_ADD     | Long  |         **1.8997** | Long Reduce / Cycle 3     |
+|           8 | 2026-01-08 06:05 |    C3 | CYCLE_3_SHORT_REDUCE | Short |         **1.8415** | Short deckt C3            |
+|           9 | 2026-01-08 06:15 |    C4 | CYCLE_4_LONG_ADD     | Long  |         **1.8323** | Long Reduce / Cycle 4     |
+|          10 | 2026-01-19 00:00 |    C4 | CYCLE_4_SHORT_REDUCE | Short |         **1.7061** | Short deckt C4            |
+|          11 | 2026-01-19 00:05 |    C5 | CYCLE_5_LONG_ADD     | Long  |         **1.6976** | Long Reduce / Cycle 5     |
+|          12 | 2026-01-20 08:10 |    C5 | CYCLE_5_SHORT_REDUCE | Short |         **1.5727** | Short deckt C5            |
+|          13 | 2026-01-20 08:35 |    C6 | CYCLE_6_LONG_ADD     | Long  |         **1.5648** | Long Reduce / Cycle 6     |
+|          14 | offen / stuck    |    C6 | CYCLE_6_SHORT_REDUCE | Short |         **1.3064** | **nicht gefüllt / stuck** |
+
+
+| Zeitpunkt                 | Auslöser                      | Long Qty danach | Short Qty danach | Neuer Long Avg | Neuer Short Avg |
+| ------------------------- | ----------------------------- | --------------: | ---------------: | -------------: | --------------: |
+| Start                     | Initial Entry                 |          50.428 |           25.214 |     **1.9830** |      **1.9830** |
+| Nach erstem Refill-Block  | nach C2 Short Reduce / Refill |          50.427 |           25.214 | **1.95338234** |  **1.95347019** |
+| Nach zweitem Refill-Block | nach C4 Short Reduce / Refill |          50.427 |           25.213 | **1.81833879** |  **1.81846513** |
+| Stuck Zustand             | nach C6 Long Reduce           |          28.366 |           18.910 | **1.81833879** |  **1.81846513** |
+
+
+
+
+
+| Linie                           |               Preis |
+| ------------------------------- | ------------------: |
+| Start Avg                       |          **1.9830** |
+| Avg nach Refill 1               |          **1.9534** |
+| Avg nach Refill 2               | **1.8183 / 1.8185** |
+| C1 Long Fill                    |          **1.9731** |
+| C1 Short Fill                   |          **1.9585** |
+| C2 Long Fill                    |          **1.9487** |
+| C2 Short Fill                   |          **1.9092** |
+| C3 Long Fill                    |          **1.8997** |
+| C3 Short Fill                   |          **1.8415** |
+| C4 Long Fill                    |          **1.8323** |
+| C4 Short Fill                   |          **1.7061** |
+| C5 Long Fill                    |          **1.6976** |
+| C5 Short Fill                   |          **1.5727** |
+| C6 Long Fill                    |          **1.5648** |
+| C6 Short Reduce Trigger / Stuck |          **1.3064** |
+
+
+
+| Level                 |  Preis | Abstand zu 1.81833879 |
+| --------------------- | -----: | --------------------: |
+| C4 Short Reduce       | 1.7061 |            **-6.17%** |
+| C5 Long Add           | 1.6976 |            **-6.64%** |
+| C5 Short Reduce       | 1.5727 |           **-13.51%** |
+| C6 Long Add           | 1.5648 |           **-13.94%** |
+| C6 Short Reduce Stuck | 1.3064 |           **-28.15%** |
+
+
+ab der CYCLE_2_LONG_ADD order  fur short tp auf 1% reduzieren verlust umlegen 
+
+und vor avg price bei unter 0.75% recovery reload 
+
+Relief Cap = 1.55%
+
+
+C1: Long Add 1.2310  -> Short Reduce 1.2219   Abstand ca. 0.74%
+C2: Long Add 1.2158  -> Short Reduce 1.1911   Abstand ca. 2.03%
+C3: Long Add 1.1851  -> Short Reduce 1.1494   Abstand ca. 3.01%
+C4: Long Add 1.1437  -> Short Reduce 1.0662   Abstand ca. 6.78%
+C5: Long Add 1.0609  -> Short Reduce 0.9725   Abstand ca. 8.33%
+C6: Long Add 0.9676  -> Short Reduce 0.7853   Abstand ca. 18.84%

@@ -16,6 +16,7 @@ from .backtest_config_loader import (
 )
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
+from .cycle_short_tp_relief import CycleShortTpReliefConfig
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .stuck_recovery_reload_shim import maybe_execute_stuck_recovery_reload
@@ -102,6 +103,7 @@ def run_historical_backtest(
     file_config_path: str | Path | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
+    cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -139,6 +141,7 @@ def run_historical_backtest(
         config_load=config_load,
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
         stuck_recovery_reload_config=stuck_recovery_reload_config,
+        cycle_short_tp_relief_config=cycle_short_tp_relief_config,
     )
     sim.candle = first_candle
     sim.candle_index = 0

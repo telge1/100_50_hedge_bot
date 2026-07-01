@@ -25,6 +25,8 @@ from fixed_cycle_hedge_bot.models import FillEvent, HedgeSnapshot, RuntimeState,
 from .backtest_report import build_order_log_entry
 from .backtest_config_loader import BacktestConfigLoadResult, extract_highlight_bot_config
 from .cycle_fill_reference_repair import install_cycle_fill_reference_repair
+from .cycle_short_tp_relief import CycleShortTpReliefConfig
+from .cycle_short_tp_relief_shim import install_cycle_short_tp_relief
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .dynamic_cycle_order_scaling_shim import install_dynamic_cycle_order_scaling
 from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
@@ -182,6 +184,7 @@ class HedgeBotOriginalSimulator:
         temp_dir: Path | None = None,
         dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
         stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
+        cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     ) -> None:
         self.signal = signal
         self.symbol = symbol.upper()
@@ -217,7 +220,9 @@ class HedgeBotOriginalSimulator:
         install_cycle_fill_reference_repair(self.strategy)
         install_exit_pnl_audit_shim(self.strategy)
         install_dynamic_cycle_order_scaling(self.strategy, dynamic_cycle_scaling_config)
+        install_cycle_short_tp_relief(self.strategy, cycle_short_tp_relief_config)
         self.dynamic_cycle_scaling_config = dynamic_cycle_scaling_config
+        self.cycle_short_tp_relief_config = cycle_short_tp_relief_config
         self.stuck_recovery_reload_tracker = attach_stuck_recovery_reload_tracker(
             self,
             stuck_recovery_reload_config,

@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "variant_n_flat_090",
+  "start_cycle_index": 5,
+  "min_cycle_qty_factor": 0.25,
+  "max_short_reduce_distance_pct": 3.0,
+  "reachability_guard_enabled": false,
+  "bands": [
+    {
+      "min_cycle_index": 5,
+      "max_cycle_index": null,
+      "target_profit_pct": 0.25,
+      "cycle_qty_factor": 0.9,
+      "long_add_distance_pct": 0.5
+    }
+  ]
+}
