@@ -488,6 +488,16 @@ def _is_runtime_export_timestamp(timestamp: object, result_end_time: object) -> 
     return False
 
 
+_FINAL_EXIT_EXPORT_PURPOSES = frozenset(
+    {
+        "LONG_TP_EXIT",
+        "SHORT_SL_EXIT",
+        "LONG_SL_EXIT",
+        "SHORT_TP_EXIT",
+    }
+)
+
+
 def drop_superseded_submitted_order_rows(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -515,6 +525,9 @@ def drop_superseded_submitted_order_rows(
             continue
         max_later_candle = max(_row_candle_index(event) for event in later_events)
         for event in submitted:
+            purpose = str(event.get("purpose") or "")
+            if purpose in _FINAL_EXIT_EXPORT_PURPOSES:
+                continue
             if _row_candle_index(event) < max_later_candle:
                 drop_ids.add(id(event))
 

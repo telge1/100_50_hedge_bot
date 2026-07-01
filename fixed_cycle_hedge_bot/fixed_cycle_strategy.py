@@ -5452,6 +5452,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return False
         return self._has_active_order_for_purpose(snapshot, runtime_state, purpose)
 
+    def _short_followup_pending_in_intents(
+        self,
+        cycle_index: int,
+        pending_intents: list[StrategyIntent] | None,
+    ) -> bool:
+        if cycle_index <= 0 or not pending_intents:
+            return False
+        expected_purpose = self._normalize_cycle_purpose(self._cycle_purpose("short", cycle_index))
+        for intent in pending_intents:
+            intent_purpose = self._normalize_cycle_purpose(getattr(intent, "purpose", "") or "")
+            if intent_purpose == expected_purpose:
+                return True
+        return False
+
     def _mark_exit_orders_stale_after_structure_fill(
         self,
         runtime_state: RuntimeState,
@@ -6311,70 +6325,55 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         exit_intents: list[StrategyIntent] = []
         if not refill_required:
-            pending_second_pair_short_reduce = self._pending_second_pair_short_reduce_exit_defer_payload(
-                snapshot, runtime_state, recent_cycle_fill=pending_loss_updated
+            exit_intents = self._build_exit_intents(
+                snapshot,
+                runtime_state,
+                current_cycle,
+                break_even_price,
+                tp_price,
+                hard_stop_active,
+                context,
+                force_exit_rebuild=force_exit_rebuild,
+                pending_loss_old_signature=pending_loss_old_signature,
+                pending_cycle_intents=downside_intents,
             )
-            if pending_second_pair_short_reduce is not None:
+            if pending_loss_updated and exit_intents:
                 _log_event(
-                    "fixed_cycle_exit_deferred_pending_second_pair_short_reduce",
+                    "fixed_cycle_exit_orders_replaced_after_cycle_fill",
                     {
-                        "reason": reason,
-                        "tp_price": tp_price,
+                        "symbol": snapshot.symbol or self.config.symbol,
                         "break_even_price": break_even_price,
-                        "current_price": snapshot.current_price,
-                        **pending_second_pair_short_reduce,
+                        "tp_price": tp_price,
+                        "pending_cycle_loss_usdt": float(
+                            state.get("pending_cycle_loss_usdt") or 0.0
+                        ),
+                        "exit_purposes": [intent.purpose for intent in exit_intents],
+                        "reason": "pending_cycle_loss_rebuild",
                     },
-                    runtime_state=runtime_state,
                 )
-            else:
-                exit_intents = self._build_exit_intents(
-                    snapshot,
-                    runtime_state,
-                    current_cycle,
-                    break_even_price,
-                    tp_price,
-                    hard_stop_active,
-                    context,
-                    force_exit_rebuild=force_exit_rebuild,
-                    pending_loss_old_signature=pending_loss_old_signature,
+            if exit_intents and state.get("exit_orders_stale_after_structure_fill"):
+                _log_event(
+                    "fixed_cycle_structure_fill_exit_rebuild_completed",
+                    {
+                        "symbol": snapshot.symbol or self.config.symbol,
+                        "force_exit_rebuild": bool(state.get("force_exit_rebuild")),
+                        "exit_orders_stale_after_structure_fill": True,
+                        "exit_purposes": [intent.purpose for intent in exit_intents],
+                    },
                 )
-                if pending_loss_updated and exit_intents:
-                    _log_event(
-                        "fixed_cycle_exit_orders_replaced_after_cycle_fill",
-                        {
-                            "symbol": snapshot.symbol or self.config.symbol,
-                            "break_even_price": break_even_price,
-                            "tp_price": tp_price,
-                            "pending_cycle_loss_usdt": float(
-                                state.get("pending_cycle_loss_usdt") or 0.0
-                            ),
-                            "exit_purposes": [intent.purpose for intent in exit_intents],
-                            "reason": "pending_cycle_loss_rebuild",
-                        },
-                    )
-                if exit_intents and state.get("exit_orders_stale_after_structure_fill"):
-                    _log_event(
-                        "fixed_cycle_structure_fill_exit_rebuild_completed",
-                        {
-                            "symbol": snapshot.symbol or self.config.symbol,
-                            "force_exit_rebuild": bool(state.get("force_exit_rebuild")),
-                            "exit_orders_stale_after_structure_fill": True,
-                            "exit_purposes": [intent.purpose for intent in exit_intents],
-                        },
-                    )
-                    state["force_exit_rebuild"] = False
-                    state["exit_rebuild_allowed"] = False
-                    state["exit_orders_stale_after_structure_fill"] = False
-                elif state.get("exit_orders_stale_after_structure_fill"):
-                    state["force_exit_rebuild"] = True
-                    state["exit_rebuild_allowed"] = True
+                state["force_exit_rebuild"] = False
+                state["exit_rebuild_allowed"] = False
+                state["exit_orders_stale_after_structure_fill"] = False
+            elif state.get("exit_orders_stale_after_structure_fill"):
+                state["force_exit_rebuild"] = True
+                state["exit_rebuild_allowed"] = True
         downside_intents = self._annotate_post_refill_structure_intents(
             runtime_state, downside_intents
         )
         exit_intents = self._annotate_post_refill_structure_intents(
             runtime_state, exit_intents
         )
-        intents = downside_intents + exit_intents
+        intents = exit_intents + downside_intents
         if (
             (snapshot.long_qty > 0 or snapshot.short_qty > 0)
             and not self._has_active_strategy_orders(snapshot, runtime_state)
@@ -11196,6 +11195,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         *,
         force_exit_rebuild: bool = False,
         pending_loss_old_signature: Any = None,
+        pending_cycle_intents: list[StrategyIntent] | None = None,
     ) -> list[StrategyIntent]:
         intents: list[StrategyIntent] = []
         state = runtime_state.strategy_state
@@ -11470,8 +11470,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
         short_tp_status = self._get_second_leg_status(short_cycle_entry)
         if waiting_short and short_tp_pending_cycle > 0 and short_pending_purpose:
-            short_followup_active = self._short_followup_active_for_cycle(
-                short_tp_pending_cycle, runtime_state, snapshot
+            short_followup_active = (
+                self._short_followup_active_for_cycle(
+                    short_tp_pending_cycle, runtime_state, snapshot
+                )
+                or self._short_followup_pending_in_intents(
+                    short_tp_pending_cycle, pending_cycle_intents
+                )
             )
             if not self._has_cycle_purpose_already_filled_or_processed(
                 runtime_state,
@@ -11495,35 +11500,37 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                             "reason": "short_followup_active",
                         },
                     )
-                else:
+                elif force_exit_rebuild:
                     _log_event(
-                        "fixed_cycle_exit_rebuild_deferred_until_short_followup_missing",
+                        "fixed_cycle_exit_rebuild_forced_with_pending_short_followup",
                         {
                             "symbol": snapshot.symbol or self.config.symbol,
                             "short_tp_pending_cycle": short_tp_pending_cycle,
+                            "short_pending_purpose": short_pending_purpose,
+                            "cycle_waiting_for_short_tp": waiting_short,
+                            "force_exit_rebuild": force_exit_rebuild,
+                            "pending_cycle_loss_usdt": float(
+                                state.get("pending_cycle_loss_usdt") or 0.0
+                            ),
+                            "reason": "cycle_fill_requires_exit_rebuild",
+                        },
+                    )
+                else:
+                    _log_event(
+                        "fixed_cycle_exit_rebuild_with_pending_short_followup",
+                        {
+                            "symbol": snapshot.symbol or self.config.symbol,
+                            "short_tp_pending_cycle": short_tp_pending_cycle,
+                            "short_pending_purpose": short_pending_purpose,
                             "cycle_waiting_for_short_tp": waiting_short,
                             "pending_cycle_loss_usdt": float(
                                 state.get("pending_cycle_loss_usdt") or 0.0
                             ),
-                            "short_tp_status": short_tp_status,
-                            "reason": "short_followup_missing",
-                        },
-                    )
-                    _log_event(
-                        "fixed_cycle_exit_intent_build_skipped",
-                        {
-                            "symbol": snapshot.symbol or self.config.symbol,
-                            "reason": "short_followup_missing",
-                            "short_tp_pending_cycle": short_tp_pending_cycle,
-                            "cycle_waiting_for_short_tp": waiting_short,
+                            "reason": "maintain_exits_alongside_short_followup",
                         },
                     )
                     state["force_exit_rebuild"] = True
                     state["exit_rebuild_allowed"] = True
-                    if context.cancel_open_orders_by_purpose:
-                        self._register_expected_exit_order_deactivations(runtime_state)
-                        context.cancel_open_orders_by_purpose(self._exit_purposes())
-                    return intents
 
         open_initial_orders = [
             {
