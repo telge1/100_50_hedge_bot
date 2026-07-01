@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Iterable, Optional
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from .base import HedgeStrategy, StrategyContext
@@ -8674,6 +8674,177 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return True
             return False
 
+        def _resolve_second_leg_eps() -> tuple[float, float]:
+            symbol, rules, _ = self._resolve_instrument_rules(runtime_state)
+            tick_decimal = (
+                rules.get("tick_size")
+                if isinstance(rules, dict) and rules.get("tick_size")
+                else None
+            )
+            try:
+                price_tick_size = float(tick_decimal) if tick_decimal is not None else float(
+                    self.config.price_tick_size or 0.0
+                )
+            except (TypeError, ValueError):
+                price_tick_size = float(self.config.price_tick_size or 0.0)
+            if price_tick_size <= 0:
+                price_tick_size = 1e-8
+            price_epsilon = max(price_tick_size * 0.5, 1e-10)
+
+            qty_step_decimal = (
+                rules.get("qty_step")
+                if isinstance(rules, dict) and rules.get("qty_step")
+                else None
+            )
+            try:
+                qty_step = float(qty_step_decimal) if qty_step_decimal is not None else 0.0
+            except (TypeError, ValueError):
+                qty_step = 0.0
+            qty_epsilon = max((qty_step or 0.0) * 0.5, 1e-12)
+            return price_epsilon, qty_epsilon
+
+        def _has_equivalent_second_leg_order(
+            trigger_price: float,
+            qty: float,
+        ) -> bool:
+            """
+            Guard against duplicate second-leg rebuilds for the same cycle
+            based on already active orders.
+            """
+            if cycle_index <= 0 or not purpose or trigger_price <= 0 or qty <= 0:
+                return False
+
+            normalized_purpose = self._normalize_cycle_purpose(
+                purpose,
+                {
+                    "cycle_index": cycle_index,
+                    "cycle_role": self._get_second_leg_cycle_role(),
+                },
+            )
+
+            price_epsilon, qty_epsilon = _resolve_second_leg_eps()
+
+            def _iter_candidate_orders() -> Iterable[Any]:
+                for order in runtime_state.active_orders.values():
+                    yield order
+                for order in snapshot.active_orders:
+                    yield order
+
+            for order in _iter_candidate_orders():
+                order_purpose = getattr(order, "purpose", None)
+                if not order_purpose:
+                    continue
+                normalized_order_purpose = self._normalize_cycle_purpose(order_purpose)
+                if normalized_order_purpose != normalized_purpose:
+                    continue
+                status = str(getattr(order, "status", "") or "").upper()
+                if status in {"FILLED", "CANCELED", "CANCELLED", "REJECTED", "EXPIRED"}:
+                    continue
+                remaining_qty = getattr(order, "remaining_qty", None)
+                if remaining_qty is not None and float(remaining_qty or 0.0) <= 0:
+                    continue
+                order_trigger_price = getattr(order, "trigger_price", None)
+                if order_trigger_price is None:
+                    order_trigger_price = getattr(order, "price", None)
+                if order_trigger_price is None:
+                    continue
+                order_qty = getattr(order, "qty", None)
+                if order_qty is None:
+                    continue
+                try:
+                    if abs(float(order_trigger_price) - float(trigger_price)) > price_epsilon:
+                        continue
+                    if abs(float(order_qty) - float(qty)) > qty_epsilon:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                return True
+            return False
+
+        def _equivalent_second_leg_followup_planned(
+            normalized_purpose: str,
+            trigger_price: float,
+            qty: float,
+        ) -> bool:
+            """Check state-based followup signature for this cycle."""
+            if cycle_index <= 0 or trigger_price <= 0 or qty <= 0:
+                return False
+            planned = state.get("planned_second_leg_followups") or {}
+            entry = planned.get(str(cycle_index))
+            if not isinstance(entry, dict):
+                return False
+            if str(entry.get("purpose") or "") != normalized_purpose:
+                return False
+            price_epsilon, qty_epsilon = _resolve_second_leg_eps()
+            try:
+                if abs(float(entry.get("trigger_price") or 0.0) - float(trigger_price)) > price_epsilon:
+                    return False
+                if abs(float(entry.get("qty") or 0.0) - float(qty)) > qty_epsilon:
+                    return False
+            except (TypeError, ValueError):
+                return False
+            return True
+
+        def _record_second_leg_followup_planned(
+            normalized_purpose: str,
+            trigger_price: float,
+            qty: float,
+        ) -> None:
+            if cycle_index <= 0 or trigger_price <= 0 or qty <= 0:
+                return
+            planned = state.setdefault("planned_second_leg_followups", {})
+            planned[str(cycle_index)] = {
+                "purpose": normalized_purpose,
+                "trigger_price": float(trigger_price or 0.0),
+                "qty": float(qty or 0.0),
+            }
+
+        def _dedupe_second_leg_intents(intents: list[StrategyIntent]) -> list[StrategyIntent]:
+            """
+            Collapse duplicate second-leg intents within a single builder pass.
+
+            Only applies to the current second-leg purpose for this cycle; staging
+            and split-intents with distinct trigger/qty combinations are preserved.
+            """
+            if not intents or cycle_index <= 0 or not purpose:
+                return intents
+            normalized_second_leg = self._normalize_cycle_purpose(
+                self._get_second_leg_purpose(cycle_index),
+                {"cycle_index": cycle_index, "cycle_role": self._get_second_leg_cycle_role()},
+            )
+            price_epsilon, qty_epsilon = _resolve_second_leg_eps()
+            seen: list[tuple[float, float]] = []
+            deduped: list[StrategyIntent] = []
+            for intent in intents:
+                intent_purpose = getattr(intent, "purpose", None)
+                normalized_intent_purpose = self._normalize_cycle_purpose(intent_purpose)
+                if normalized_intent_purpose != normalized_second_leg:
+                    deduped.append(intent)
+                    continue
+                try:
+                    tp = float(getattr(intent, "trigger_price", 0.0) or 0.0)
+                    q = float(getattr(intent, "qty", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    deduped.append(intent)
+                    continue
+                duplicate = False
+                for seen_tp, seen_q in seen:
+                    if abs(tp - seen_tp) <= price_epsilon and abs(q - seen_q) <= qty_epsilon:
+                        duplicate = True
+                        break
+                if duplicate:
+                    _emit_short_tp_follow_up_skip(
+                        "duplicate_second_leg_intent_collapsed_in_builder",
+                        symbol=snapshot.symbol or self.config.symbol,
+                        duplicate_purpose=normalized_intent_purpose,
+                        duplicate_trigger_price=tp,
+                        duplicate_qty=q,
+                    )
+                    continue
+                seen.append((tp, q))
+                deduped.append(intent)
+            return deduped
+
         def _long_pending_should_block() -> bool:
             if not _has_pending_order(long_purpose):
                 return False
@@ -9154,19 +9325,45 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return []
             gate_payload["reason"] = "long_reduce_followup_allowed"
             _log_event("fixed_cycle_state_gate_intent_allowed", gate_payload)
+            normalized_second_leg_purpose = self._normalize_cycle_purpose(
+                purpose,
+                {
+                    "cycle_index": cycle_index,
+                    "cycle_role": self._get_second_leg_cycle_role(),
+                },
+            )
+            if _equivalent_second_leg_followup_planned(
+                normalized_second_leg_purpose,
+                trigger_price,
+                long_reduce_qty,
+            ):
+                _emit_short_tp_follow_up_skip(
+                    "equivalent_second_leg_followup_already_planned",
+                    blocking_purpose=purpose,
+                    blocking_trigger_price=trigger_price,
+                    blocking_qty=long_reduce_qty,
+                )
+                return []
+            if _has_equivalent_second_leg_order(trigger_price, long_reduce_qty):
+                _emit_short_tp_follow_up_skip(
+                    "equivalent_second_leg_order_already_active",
+                    blocking_purpose=purpose,
+                    blocking_trigger_price=trigger_price,
+                    blocking_qty=long_reduce_qty,
+                )
+                return []
             self._reserve_cycle_intent_slot(
                 runtime_state,
                 cycle_index=cycle_index,
                 field_name=self._get_second_leg_status_field(),
-                normalized_purpose=self._normalize_cycle_purpose(
-                    purpose,
-                    {
-                        "cycle_index": cycle_index,
-                        "cycle_role": self._get_second_leg_cycle_role(),
-                    },
-                ),
+                normalized_purpose=normalized_second_leg_purpose,
                 qty=long_reduce_qty,
                 trigger_price=trigger_price,
+            )
+            _record_second_leg_followup_planned(
+                normalized_second_leg_purpose,
+                trigger_price,
+                long_reduce_qty,
             )
             use_loss_based_staging_plan = bool(
                 metadata_long_reduce.get("source") == "loss_based_second_leg_recovery"
@@ -10813,16 +11010,42 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             return []
         gate_payload["reason"] = "short_followup_allowed"
         _log_event("fixed_cycle_state_gate_intent_allowed", gate_payload)
+        normalized_second_leg_purpose = self._normalize_cycle_purpose(
+            purpose,
+            {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
+        )
+        if _equivalent_second_leg_followup_planned(
+            normalized_second_leg_purpose,
+            trigger_price,
+            short_qty,
+        ):
+            _emit_short_tp_follow_up_skip(
+                "equivalent_second_leg_followup_already_planned",
+                blocking_purpose=purpose,
+                blocking_trigger_price=trigger_price,
+                blocking_qty=short_qty,
+            )
+            return []
+        if _has_equivalent_second_leg_order(trigger_price, short_qty):
+            _emit_short_tp_follow_up_skip(
+                "equivalent_second_leg_order_already_active",
+                blocking_purpose=purpose,
+                blocking_trigger_price=trigger_price,
+                blocking_qty=short_qty,
+            )
+            return []
         self._reserve_cycle_intent_slot(
             runtime_state,
             cycle_index=cycle_index,
             field_name=self._get_second_leg_status_field(),
-            normalized_purpose=self._normalize_cycle_purpose(
-                purpose,
-                {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
-            ),
+            normalized_purpose=normalized_second_leg_purpose,
             qty=short_qty,
             trigger_price=trigger_price,
+        )
+        _record_second_leg_followup_planned(
+            normalized_second_leg_purpose,
+            trigger_price,
+            short_qty,
         )
         if not use_market_fallback:
             split_intents = self._maybe_build_normal_cycle_second_leg_split_intents(
@@ -10899,6 +11122,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         },
                     )
             if split_intents:
+                split_intents = _dedupe_second_leg_intents(split_intents)
                 return split_intents
             _, rules, _ = self._resolve_instrument_rules(runtime_state)
             min_order_qty = float(
@@ -11012,6 +11236,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     intents.append(intent)
 
             if intents:
+                intents = _dedupe_second_leg_intents(intents)
                 _log_event(
                     "staged_second_leg_tp_intents_created",
                     {

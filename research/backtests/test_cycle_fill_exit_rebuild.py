@@ -240,6 +240,36 @@ class CycleFillExitRebuildBacktestTests(unittest.TestCase):
         ]
         self.assertTrue(exit_submit_rows)
 
+        # Second-leg short reduce should not be rebuilt multiple times with
+        # equivalent trigger/qty after the same first-leg fill.
+        after_c1 = _rows_after_fill(rows, fill_purpose_substr="CYCLE_1_LONG_ADD")
+        short_intents = [
+            row
+            for row in after_c1
+            if row.get("row_type") == "intent"
+            and row.get("event_type") == "after_fill"
+            and str(row.get("purpose") or "") == "CYCLE_1_SHORT_REDUCE"
+        ]
+        short_submitted = [
+            row
+            for row in after_c1
+            if row.get("row_type") == "order"
+            and row.get("event_type") == "submitted"
+            and str(row.get("purpose") or "") == "CYCLE_1_SHORT_REDUCE"
+        ]
+        short_replaced = [
+            row
+            for row in after_c1
+            if row.get("row_type") == "order"
+            and row.get("event_type") == "replaced"
+            and str(row.get("purpose") or "") == "CYCLE_1_SHORT_REDUCE"
+        ]
+        # At most one intent and one submitted short-reduce order should exist
+        # after the C1 long add fill, and we should not see a replace cascade.
+        self.assertLessEqual(len(short_intents), 1)
+        self.assertLessEqual(len(short_submitted), 1)
+        self.assertLessEqual(len(short_replaced), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
