@@ -17,8 +17,8 @@ class CycleShortTpReliefBand:
 @dataclass
 class CycleShortTpReliefConfig:
     enabled: bool = False
-    start_cycle_index: int = 2
-    max_short_reduce_distance_pct_from_long_fill: float = 1.0
+    start_cycle_index: int = 4
+    max_short_reduce_distance_pct_from_long_fill: float = 4.0
     carry_uncovered_loss_to_exit: bool = True
     bands: list[CycleShortTpReliefBand] = field(default_factory=list)
     name: str = "default"
@@ -42,8 +42,8 @@ class ShortTpReliefComputation:
 def default_cycle_short_tp_relief_config() -> CycleShortTpReliefConfig:
     return CycleShortTpReliefConfig(
         enabled=True,
-        start_cycle_index=2,
-        max_short_reduce_distance_pct_from_long_fill=1.0,
+        start_cycle_index=4,
+        max_short_reduce_distance_pct_from_long_fill=4.0,
         carry_uncovered_loss_to_exit=True,
         name="default",
     )
@@ -69,9 +69,9 @@ def config_from_dict(payload: Mapping[str, Any]) -> CycleShortTpReliefConfig:
     )
     return CycleShortTpReliefConfig(
         enabled=bool(payload.get("enabled", False)),
-        start_cycle_index=int(payload.get("start_cycle_index", 2)),
+        start_cycle_index=int(payload.get("start_cycle_index", 4)),
         max_short_reduce_distance_pct_from_long_fill=float(
-            payload.get("max_short_reduce_distance_pct_from_long_fill", 1.0)
+            payload.get("max_short_reduce_distance_pct_from_long_fill", 4.0)
         ),
         carry_uncovered_loss_to_exit=bool(payload.get("carry_uncovered_loss_to_exit", True)),
         bands=bands,
@@ -131,7 +131,11 @@ def compute_short_tp_relief(
         capped_short_reduce_price if cap_applied else normal_short_reduce_price
     )
     covered_profit = max(short_reduce_qty * (short_avg_price - final_short_price), 0.0)
-    uncovered_loss = max(required_profit - covered_profit, 0.0) if cap_applied else 0.0
+    uncovered_loss = (
+        max(short_reduce_qty * (capped_short_reduce_price - normal_short_reduce_price), 0.0)
+        if cap_applied
+        else 0.0
+    )
     return ShortTpReliefComputation(
         cycle_index=cycle_index,
         long_fill_price=long_fill_price,
