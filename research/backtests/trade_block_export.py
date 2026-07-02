@@ -379,7 +379,6 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
                 trade_block_id_missing=missing,
             )
         )
-
     rows = sort_trade_block_rows(rows)
     rows = drop_superseded_submitted_order_rows(rows)
     rows = drop_duplicate_final_active_order_rows(rows)

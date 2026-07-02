@@ -142,6 +142,108 @@ def format_exit_diagnostic_line(item: dict[str, Any]) -> str:
     )
 
 
+
+def _safe_float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _final_price_from_candles(candles: list[Any] | tuple[Any, ...] | None) -> float | None:
+    if not candles:
+        return None
+
+    candle = candles[-1]
+
+    for name in ("close", "close_price", "price"):
+        value = getattr(candle, name, None)
+        parsed = _safe_float_or_none(value)
+        if parsed is not None:
+            return parsed
+
+    if isinstance(candle, dict):
+        for key in ("close", "close_price", "price"):
+            parsed = _safe_float_or_none(candle.get(key))
+            if parsed is not None:
+                return parsed
+
+    return None
+
+
+def calculate_unrealized_pnl(
+    long_qty: float | None,
+    long_avg_price: float | None,
+    short_qty: float | None,
+    short_avg_price: float | None,
+    last_price: float | None,
+) -> tuple[float | None, float | None, float | None]:
+    """
+    Calculate unrealized PnL components for a hedge position.
+
+    - long_unrealized  = long_qty * (last_price - long_avg_price)
+    - short_unrealized = short_qty * (short_avg_price - last_price)
+    - total_unrealized = sum of both components when defined
+    """
+    final_price = _safe_float_or_none(last_price)
+    long_qty_val = _safe_float_or_none(long_qty) or 0.0
+    short_qty_val = _safe_float_or_none(short_qty) or 0.0
+    long_avg_val = _safe_float_or_none(long_avg_price)
+    short_avg_val = _safe_float_or_none(short_avg_price)
+
+    if final_price is None:
+        return None, None, None
+
+    unrealized_long_pnl: float | None = None
+    unrealized_short_pnl: float | None = None
+
+    if long_avg_val is not None:
+        unrealized_long_pnl = long_qty_val * (final_price - long_avg_val)
+
+    if short_avg_val is not None:
+        unrealized_short_pnl = short_qty_val * (short_avg_val - final_price)
+
+    parts: list[float] = []
+    if unrealized_long_pnl is not None:
+        parts.append(unrealized_long_pnl)
+    if unrealized_short_pnl is not None:
+        parts.append(unrealized_short_pnl)
+
+    total_unrealized = sum(parts) if parts else None
+    return unrealized_long_pnl, unrealized_short_pnl, total_unrealized
+
+
+def _set_unrealized_and_overall_pnl(result: BacktestResult, *, final_price: float | None) -> None:
+    result.final_price = final_price
+
+    realized_pnl = _safe_float_or_none(result.realized_pnl)
+    final_long_qty = _safe_float_or_none(result.final_long_qty)
+    final_short_qty = _safe_float_or_none(result.final_short_qty)
+    final_long_avg_price = _safe_float_or_none(result.final_long_avg_price)
+    final_short_avg_price = _safe_float_or_none(result.final_short_avg_price)
+
+    unrealized_long_pnl, unrealized_short_pnl, total_unrealized = calculate_unrealized_pnl(
+        final_long_qty,
+        final_long_avg_price,
+        final_short_qty,
+        final_short_avg_price,
+        final_price,
+    )
+
+    result.unrealized_long_pnl = unrealized_long_pnl
+    result.unrealized_short_pnl = unrealized_short_pnl
+    result.unrealized_pnl = total_unrealized
+
+    if realized_pnl is not None and result.unrealized_pnl is not None:
+        result.overall_pnl = realized_pnl + result.unrealized_pnl
+    else:
+        # Wenn keine saubere Kombination aus realized/unrealized vorliegt,
+        # bleibt overall_pnl None.
+        result.overall_pnl = None
+
+
 def finalize_backtest_debug(
     result: BacktestResult,
     sim: HedgeBotOriginalSimulator,
@@ -153,6 +255,10 @@ def finalize_backtest_debug(
     result.final_short_qty = float(sim.book.short_qty)
     result.final_long_avg_price = float(sim.book.long_avg) if sim.book.long_qty > 1e-12 else 0.0
     result.final_short_avg_price = float(sim.book.short_avg) if sim.book.short_qty > 1e-12 else 0.0
+    _set_unrealized_and_overall_pnl(
+        result,
+        final_price=_final_price_from_candles(candles),
+    )
 
     active_orders = [active_order_to_dict(order) for order in sim.book.active_orders()]
     result.final_active_orders = active_orders

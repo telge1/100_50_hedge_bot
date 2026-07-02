@@ -44,12 +44,27 @@ MULTI_START_SUMMARY_CSV_FIELDS = (
     "final_active_order_purposes",
     "final_long_qty",
     "final_short_qty",
+    "final_long_avg_price",
+    "final_short_avg_price",
+    "final_price",
+    "unrealized_long_pnl",
+    "unrealized_short_pnl",
+    "unrealized_pnl",
+    "overall_pnl",
     "candles_processed",
     "initial_exit_trigger",
     "price_tick_size",
     "tp_profit_target_pct",
     "base_notional_usdt",
     "hedge_ratio_short",
+    # Convenience aliases for end-of-trade position/PnL
+    "end_last_price",
+    "end_long_qty",
+    "end_long_avg_price",
+    "end_short_qty",
+    "end_short_avg_price",
+    "end_unrealized_pnl",
+    "end_overall_pnl",
 )
 
 MULTI_START_AGGREGATE_CSV_FIELDS = (
@@ -102,6 +117,13 @@ MULTI_START_UNFINISHED_CSV_FIELDS = (
     "final_active_order_purposes",
     "final_long_qty",
     "final_short_qty",
+    "final_long_avg_price",
+    "final_short_avg_price",
+    "final_price",
+    "unrealized_long_pnl",
+    "unrealized_short_pnl",
+    "unrealized_pnl",
+    "overall_pnl",
     "initial_exit_trigger",
     "price_tick_size",
     "tp_profit_target_pct",
@@ -170,6 +192,27 @@ def multi_start_result_to_summary_row(result: BacktestResult) -> dict[str, Any]:
     for key in MULTI_START_SUMMARY_CSV_FIELDS:
         if key == "final_active_order_purposes":
             row[key] = _purposes_joined(result.final_active_order_purposes)
+            continue
+        if key == "end_last_price":
+            row[key] = "" if result.final_price is None else result.final_price
+            continue
+        if key == "end_long_qty":
+            row[key] = "" if result.final_long_qty is None else result.final_long_qty
+            continue
+        if key == "end_long_avg_price":
+            row[key] = "" if result.final_long_avg_price is None else result.final_long_avg_price
+            continue
+        if key == "end_short_qty":
+            row[key] = "" if result.final_short_qty is None else result.final_short_qty
+            continue
+        if key == "end_short_avg_price":
+            row[key] = "" if result.final_short_avg_price is None else result.final_short_avg_price
+            continue
+        if key == "end_unrealized_pnl":
+            row[key] = "" if result.unrealized_pnl is None else result.unrealized_pnl
+            continue
+        if key == "end_overall_pnl":
+            row[key] = "" if result.overall_pnl is None else result.overall_pnl
             continue
         if key == "start_time":
             row[key] = _format_timestamp(result.start_time)

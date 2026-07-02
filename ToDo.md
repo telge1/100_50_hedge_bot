@@ -449,62 +449,115 @@ und vor avg price bei unter 0.75% recovery reload
 
 Relief Cap = 1.55%
 
+cd /home/telgenbuescher/projects/spread_recovery_hedge_short_dev || exit 1
 
-===== NUR CYCLE FILL PREISE FÜR CHART =====
-1.231000  # CYCLE_1_LONG_ADD long qty=20.206000
-1.231000  # CYCLE_1_LONG_ADD long qty=20.206000
-1.221900  # CYCLE_1_SHORT_REDUCE short qty=10.057000
-1.221900  # CYCLE_1_SHORT_REDUCE short qty=10.057000
-1.215800  # CYCLE_2_LONG_ADD long qty=15.155000
-1.215800  # CYCLE_2_LONG_ADD long qty=15.155000
-1.191100  # CYCLE_2_SHORT_REDUCE short qty=7.589000
-1.191100  # CYCLE_2_SHORT_REDUCE short qty=7.589000
-1.185100  # CYCLE_3_LONG_ADD long qty=20.206000
-1.185100  # CYCLE_3_LONG_ADD long qty=20.206000
-1.149400  # CYCLE_3_SHORT_REDUCE short qty=10.095000
-1.149400  # CYCLE_3_SHORT_REDUCE short qty=10.095000
-1.143700  # CYCLE_4_LONG_ADD long qty=15.155000
-1.143700  # CYCLE_4_LONG_ADD long qty=15.155000
-1.098000  # CYCLE_4_SHORT_REDUCE short qty=7.579000
-1.098000  # CYCLE_4_SHORT_REDUCE short qty=7.579000
-1.092500  # CYCLE_5_LONG_ADD long qty=20.206000
-1.092500  # CYCLE_5_LONG_ADD long qty=20.206000
-1.048800  # CYCLE_5_SHORT_REDUCE short qty=10.096000
-1.048800  # CYCLE_5_SHORT_REDUCE short qty=10.096000
+rm -rf research/backtests/results/recheck_c6_runtime_confirmed_start250
 
-===== NUR REFILL FILLS + AVG DANACH =====
+PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
+  --symbol APTUSDT \
+  --direction long \
+  --limit 50000 \
+  --multi-start \
+  --start-step-candles 250 \
+  --window-candles 15000 \
+  --max-starts 120 \
+  --fill-model conservative \
+  --config-source live \
+  --pnl-coverage-audit \
+  --trade-block-export \
+  --trade-block-start-indices 250 \
+  --output-dir research/backtests/results/recheck_c6_runtime_confirmed_start250
 
-===== LETZTER REKONSTRUIERTER AVG / POSITION =====
-long_qty:  262.683000
-long_avg:  1.192712
-short_qty: 0.000000
-short_avg: 0.000000
 
-===== FINAL ACTIVE EXIT ORDERS =====
-LONG_TP_EXIT @ 1.248700 qty=60.621000 status=NEW
-SHORT_SL_EXIT @ 1.248700 qty=30.316000 status=NEW
+#################################################  Starte Summary Script ################################################
 
-===== LETZTE EXIT INTENTS MIT CARRY LOSS =====
-2026-02-01T16:45:00+00:00 | LONG_TP_EXIT @ 1.247500 qty=80.827000 carry=0.0 exit_adj_pct=
-2026-02-01T16:45:00+00:00 | SHORT_SL_EXIT @ 1.247500 qty=40.413000 carry=0.0 exit_adj_pct=
-2026-02-01T17:20:00+00:00 | LONG_TP_EXIT @ 1.247500 qty=80.827000 carry=0.0 exit_adj_pct=
-2026-02-01T17:20:00+00:00 | SHORT_SL_EXIT @ 1.247500 qty=40.413000 carry=0.0 exit_adj_pct=
-2026-02-01T23:05:00+00:00 | LONG_TP_EXIT @ 1.247500 qty=60.621000 carry=0.0 exit_adj_pct=
-2026-02-01T23:05:00+00:00 | SHORT_SL_EXIT @ 1.247500 qty=30.356000 carry=0.0 exit_adj_pct=
-2026-02-01T23:10:00+00:00 | LONG_TP_EXIT @ 1.247500 qty=60.621000 carry=0.0 exit_adj_pct=
-2026-02-01T23:10:00+00:00 | SHORT_SL_EXIT @ 1.247500 qty=30.356000 carry=0.0 exit_adj_pct=
-2026-02-05T05:20:00+00:00 | LONG_TP_EXIT @ 1.228100 qty=80.827000 carry=0.0 exit_adj_pct=
-2026-02-05T05:20:00+00:00 | SHORT_SL_EXIT @ 1.228100 qty=40.412000 carry=0.0 exit_adj_pct=
-2026-02-05T10:05:00+00:00 | LONG_TP_EXIT @ 1.228100 qty=80.827000 carry=0.0 exit_adj_pct=
-2026-02-05T10:05:00+00:00 | SHORT_SL_EXIT @ 1.228100 qty=40.412000 carry=0.0 exit_adj_pct=
-2026-02-05T11:20:00+00:00 | LONG_TP_EXIT @ 1.228100 qty=60.621000 carry=0.0 exit_adj_pct=
-2026-02-05T11:20:00+00:00 | SHORT_SL_EXIT @ 1.228100 qty=30.317000 carry=0.0 exit_adj_pct=
-2026-02-05T11:25:00+00:00 | LONG_TP_EXIT @ 1.228100 qty=60.621000 carry=0.0 exit_adj_pct=
-2026-02-05T11:25:00+00:00 | SHORT_SL_EXIT @ 1.228100 qty=30.317000 carry=0.0 exit_adj_pct=
-2026-02-05T15:20:00+00:00 | LONG_TP_EXIT @ 1.184200 qty=80.827000 carry=0.24064840799999831 exit_adj_pct=1.3436029097132924
-2026-02-05T15:20:00+00:00 | SHORT_SL_EXIT @ 1.184200 qty=40.412000 carry=0.24064840799999831 exit_adj_pct=1.3436029097132924
-2026-02-05T15:25:00+00:00 | LONG_TP_EXIT @ 1.184200 qty=80.827000 carry=0.24064840799999831 exit_adj_pct=1.3436029097132924
-2026-02-05T15:25:00+00:00 | SHORT_SL_EXIT @ 1.184200 qty=40.412000 carry=0.24064840799999831 exit_adj_pct=1.3436029097132924
-2026-02-05T20:20:00+00:00 | LONG_TP_EXIT @ 1.248700 qty=60.621000 carry=0.5950180079999974 exit_adj_pct=6.863500213949493
-2026-02-05T20:20:00+00:00 | SHORT_SL_EXIT @ 1.248700 qty=30.316000 carry=0.5950180079999974 exit_adj_pct=6.863500213949493
-(base) telgenbuescher@server-telgenbuescher:~/projects/spread_recovery_hedge_short_dev$ 
+  cd /home/telgenbuescher/projects/spread_recovery_hedge_short_dev || exit 1
+
+rm -rf research/backtests/results/recheck_single_trade_refill_export_start500_v2
+
+PYTHONPATH=. python3 -m research.backtests.run_original_hedge_backtest \
+  --symbol APTUSDT \
+  --direction long \
+  --limit 50000 \
+  --multi-start \
+  --start-step-candles 250 \
+  --window-candles 15000 \
+  --max-starts 120 \
+  --fill-model conservative \
+  --config-source live \
+  --pnl-coverage-audit \
+  --trade-block-export \
+  --trade-block-start-indices 500 \
+  --output-dir research/backtests/results/recheck_single_trade_refill_export_start500_v2
+
+
+--cycle-short-tp-relief \
+
+
+
+python3 research/backtests/tools/analyze_backtest_result.py \
+  --output-dir research/backtests/results/recheck_c6_runtime_confirmed_start250_with_overall_pnl
+
+
+
+########################################### Einzelnen Trade analysieren ##############################################
+
+###################### exit distance open trades 
+
+python3 research/backtests/tools/analyze_single_trade_timeline.py \
+  --output-dir research/backtests/results/recheck_exit_distance_all_unfinished \
+  --symbol APTUSDT \
+  --direction long \
+  --start-index 500
+
+###################### Singel trade analyse
+
+python3 research/backtests/tools/analyze_single_trade_timeline.py \
+  --output-dir research/backtests/results/recheck_single_trade_refill_export_start500 \
+  --symbol APTUSDT \
+  --direction long \
+  --start-index 500
+
+
+====================================================================================================
+CHART POINTS
+====================================================================================================
+timestamp                 label                             price    order_qty long_size_after short_size_after long_avg_after short_avg_after
+------------------------------------------------------------------------------------------------------------------------
+2026-01-06T15:45:00+00:00 INITIAL_LONG_ENTRY                 1.92        52.02          52.02          26.01           1.92           1.92
+2026-01-06T15:45:00+00:00 INITIAL_SHORT_ENTRY                1.92        26.01          52.02          26.01           1.92           1.92
+2026-01-06T16:05:00+00:00 CYCLE_1_LONG_ADD                   1.91        13.00          39.01          26.01           1.92           1.92
+2026-01-06T16:40:00+00:00 CYCLE_1_SHORT_REDUCE               1.90         6.47          39.01          19.53           1.92           1.92
+2026-01-06T16:45:00+00:00 CYCLE_2_LONG_ADD                   1.89         9.75          29.26          19.53           1.92           1.92
+2026-01-08T06:05:00+00:00 REFILL_LONG                        1.84        22.76          52.02          14.65           1.89           1.92
+2026-01-08T06:05:00+00:00 REFILL_SHORT                       1.84        11.36          52.02          26.01           1.89           1.89
+2026-01-08T06:05:00+00:00 CYCLE_2_SHORT_REDUCE               1.85         4.88          52.02          26.01           1.89           1.89
+2026-01-08T06:10:00+00:00 CYCLE_3_LONG_ADD                   1.84        13.00          39.01          26.01           1.89           1.89
+2026-01-08T12:10:00+00:00 CYCLE_3_SHORT_REDUCE               1.79         6.50          39.01          19.51           1.89           1.89
+2026-01-08T12:40:00+00:00 CYCLE_4_LONG_ADD                   1.78         9.75          29.26          19.51           1.89           1.89
+2026-01-19T00:00:00+00:00 REFILL_LONG                        1.64        22.76          52.02          14.63           1.78           1.89
+2026-01-19T00:00:00+00:00 REFILL_SHORT                       1.64        11.38          52.02          26.01           1.78           1.78
+2026-01-19T00:00:00+00:00 CYCLE_4_SHORT_REDUCE               1.67         4.88          52.02          26.01           1.78           1.78
+2026-01-19T00:05:00+00:00 CYCLE_5_LONG_ADD                   1.66        13.00          39.01          26.01           1.78           1.78
+2026-01-20T17:45:00+00:00 CYCLE_5_SHORT_REDUCE               1.54         6.50          39.01          19.51           1.78           1.78
+                          FINAL_ACTIVE_LONG_TP_EXIT          1.88        39.01                                                            
+                          FINAL_ACTIVE_SHORT_SL_EXIT         1.88        19.51     
+
+
+
+Wenn ein Trade lange läuft oder stuck ist,
+prüfen wir zuerst, ob wir ihn bei Break-Even schließen können.
+
+Wenn BE noch nicht möglich ist,
+simulieren wir einen Recovery Reload.
+
+Der Reload darf nur ausgeführt werden,
+wenn der neue Final Exit nach dem Reload wirklich nahe genug am aktuellen Preis liegt.
+
+Zusätzlich verhindern wir doppelte oder unnötige Final-Exit-Orders.
+
+
+1. Long-Running-BE-Exit-Guard
+2. Avg-Distance-Guard
+3. Final-Exit-Distance-after-Reload-Guard
+4. Pending-Final-Exit-Guard

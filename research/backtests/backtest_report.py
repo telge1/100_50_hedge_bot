@@ -180,6 +180,11 @@ class BacktestResult:
     final_short_qty: float | None = None
     final_long_avg_price: float | None = None
     final_short_avg_price: float | None = None
+    final_price: float | None = None
+    unrealized_long_pnl: float | None = None
+    unrealized_short_pnl: float | None = None
+    unrealized_pnl: float | None = None
+    overall_pnl: float | None = None
     final_active_orders: list[dict[str, Any]] = field(default_factory=list)
     final_active_order_purposes: list[str] = field(default_factory=list)
     final_strategy_state_excerpt: dict[str, Any] = field(default_factory=dict)

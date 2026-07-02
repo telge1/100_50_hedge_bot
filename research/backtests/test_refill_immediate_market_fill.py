@@ -141,7 +141,19 @@ def test_submit_refill_market_intent_fills_immediately(purpose: str) -> None:
             if entry.get("purpose") == purpose and entry.get("event_type") == "filled"
         ]
         assert len(filled_events) == 1
-        assert filled_events[0].get("status") == "FILLED"
+        filled = filled_events[0]
+        assert filled.get("status") == "FILLED"
+        # Trade-block export analyzers expect REFILL filled rows to carry price,
+        # fill_price and position-after fields.
+        for key in (
+            "price",
+            "fill_price",
+            "long_qty_after",
+            "long_avg_after",
+            "short_qty_after",
+            "short_avg_after",
+        ):
+            assert filled.get(key) not in ("", None)
     finally:
         sim.close()
 
