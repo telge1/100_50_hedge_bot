@@ -263,11 +263,11 @@ def print_chart_points(rows):
     )
     print("-" * 120)
 
-    def _fmt2(value: object) -> str:
+    def _fmt4(value: object) -> str:
         if value in ("", None):
             return ""
         try:
-            return f"{float(value):.2f}"
+            return f"{float(value):.4f}"
         except (TypeError, ValueError):
             return str(value)
 
@@ -281,7 +281,43 @@ def print_chart_points(rows):
         if oid:
             fill_order_ids.add(oid)
 
-    for r in rows:
+    def _num(value: object, default: int = 10**12) -> float:
+        if value in ("", None):
+            return float(default)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    def _chart_priority(r: dict) -> int:
+        purpose = r.get("purpose") or r.get("purpose_original") or ""
+        row_type = r.get("row_type")
+        event_type = r.get("event_type")
+        status = r.get("status")
+        is_refill = purpose in {"REFILL_LONG", "REFILL_SHORT"}
+        is_fill_row = row_type == "fill"
+        is_filled_order = row_type == "order" and (event_type == "filled" or status == "FILLED")
+
+        # Bei gleicher Kerze zuerst echte Cycle-/Entry-Fills,
+        # danach REFILL-Fills. So springt der Chart nicht scheinbar
+        # zuerst zum Refill und danach zurück zur Cycle-Reduce-Order.
+        if is_fill_row:
+            return 0
+        if is_refill and is_filled_order:
+            return 1
+        return 9
+
+    chart_rows = sorted(
+        enumerate(rows),
+        key=lambda item: (
+            str(item[1].get("timestamp") or ""),
+            _num(item[1].get("candle_index", item[1].get("idx"))),
+            _chart_priority(item[1]),
+            item[0],
+        ),
+    )
+
+    for _, r in chart_rows:
         purpose = r.get("purpose") or r.get("purpose_original") or ""
         if not is_relevant_purpose(purpose):
             continue
@@ -302,8 +338,10 @@ def print_chart_points(rows):
             if oid and oid in fill_order_ids:
                 continue
 
-        # Für Chart: normale Fills (fill), REFILL-Fills (order filled) und finale aktive Orders.
-        if not (is_fill_row or (is_refill and is_filled_order) or is_final_active):
+        # Für Chart nur echte ausgeführte Punkte anzeigen.
+        # Finale aktive Orders sind nur offene Ziel-/SL-Orders und erzeugen sonst
+        # einen falschen Preissprung im Chart.
+        if not (is_fill_row or (is_refill and is_filled_order)):
             continue
 
         price = row_price(r)
@@ -311,12 +349,12 @@ def print_chart_points(rows):
         if is_final_active:
             label = f"FINAL_ACTIVE_{purpose}"
 
-        price_str = _fmt2(price)
-        order_qty_str = _fmt2(r.get("qty"))
-        long_size_after_str = _fmt2(r.get("long_qty_after"))
-        short_size_after_str = _fmt2(r.get("short_qty_after"))
-        long_avg_after_str = _fmt2(r.get("long_avg_after"))
-        short_avg_after_str = _fmt2(r.get("short_avg_after"))
+        price_str = _fmt4(price)
+        order_qty_str = _fmt4(r.get("qty"))
+        long_size_after_str = _fmt4(r.get("long_qty_after"))
+        short_size_after_str = _fmt4(r.get("short_qty_after"))
+        long_avg_after_str = _fmt4(r.get("long_avg_after"))
+        short_avg_after_str = _fmt4(r.get("short_avg_after"))
 
         print(
             f"{r.get('timestamp',''):<25} "
