@@ -25072,7 +25072,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         active_exit_orders = [
             order
             for order in runtime_state.active_orders.values()
-            if order.purpose in exit_purposes and self._is_unsettled_strategy_order(order)
+            if (
+                order.purpose in exit_purposes
+                or self._is_refill_stale_cycle_reduce_purpose(order.purpose)
+            )
+            and self._is_unsettled_strategy_order(order)
         ]
         active_order_purposes = sorted(
             {order.purpose for order in runtime_state.active_orders.values() if order.purpose}
@@ -26027,6 +26031,18 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             or "_SHORT_REDUCE" in normalized
             or "_SHORT_TP" in normalized
         )
+
+    def _is_refill_stale_cycle_reduce_purpose(self, purpose: str | None) -> bool:
+        """Return whether a cycle reduce order must be rebuilt after refill.
+
+        Refill changes long_avg/short_avg and position sizes. Open cycle-reduce
+        orders are therefore stale because their coverage was calculated from
+        the pre-refill position state.
+        """
+        if not purpose:
+            return False
+        normalized = str(purpose).upper()
+        return bool(re.fullmatch(r"CYCLE_\d+_(SHORT_REDUCE|LONG_REDUCE)", normalized))
 
     def _is_staged_second_leg_cycle_complete(
         self,
