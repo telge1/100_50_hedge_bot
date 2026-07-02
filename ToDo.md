@@ -537,12 +537,9 @@ timestamp                 label                             price    order_qty l
 2026-01-08T12:40:00+00:00 CYCLE_4_LONG_ADD                   1.78         9.75          29.26          19.51           1.89           1.89
 2026-01-19T00:00:00+00:00 REFILL_LONG                        1.64        22.76          52.02          14.63           1.78           1.89
 2026-01-19T00:00:00+00:00 REFILL_SHORT                       1.64        11.38          52.02          26.01           1.78           1.78
-2026-01-19T00:00:00+00:00 CYCLE_4_SHORT_REDUCE               1.67         4.88          52.02          26.01           1.78           1.78
-2026-01-19T00:05:00+00:00 CYCLE_5_LONG_ADD                   1.66        13.00          39.01          26.01           1.78           1.78
-2026-01-20T17:45:00+00:00 CYCLE_5_SHORT_REDUCE               1.54         6.50          39.01          19.51           1.78           1.78
-                          FINAL_ACTIVE_LONG_TP_EXIT          1.88        39.01                                                            
-                          FINAL_ACTIVE_SHORT_SL_EXIT         1.88        19.51     
-
+2026-01-19T00:00:00+00:00 CYCLE_4_SHORT_REDUCE               1.71         4.88          52.02          26.01           1.78           1.78
+2026-01-19T00:05:00+00:00 CYCLE_5_LONG_ADD                   1.70        13.00          39.01          26.01           1.78           1.78
+2026-01-19T00:10:00+00:00 CYCLE_5_SHORT_REDUCE               1.63         6.50          39.01          19.51           1.78           1.78
 
 
 Wenn ein Trade lange läuft oder stuck ist,
