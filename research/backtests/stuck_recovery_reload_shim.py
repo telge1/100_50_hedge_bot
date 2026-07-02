@@ -150,6 +150,7 @@ def execute_stuck_recovery_reload(
     )
 
     fills: list[FillEvent] = []
+    deferred_on_fill_followups: list[StrategyIntent] = []
     for side, purpose, qty in (
         ("long", STUCK_RELOAD_LONG_PURPOSE, long_qty),
         ("short", STUCK_RELOAD_SHORT_PURPOSE, short_qty),
@@ -193,6 +194,14 @@ def execute_stuck_recovery_reload(
                     event_type="filled",
                     status="FILLED",
                 )
+            sim.book.sync_runtime_state(runtime_state)
+            sim._refresh_snapshot_from_book(
+                source="after_stuck_recovery_reload_fill",
+                price=fill_price,
+            )
+            # Keep strategy state in sync, but defer any per-fill follow-up intents
+            # until both reload legs are filled. Submitting exits after only the
+            # long reload would build SHORT_SL_EXIT against stale short qty.
             follow_up = strategy.on_fill(
                 fill_event,
                 sim.snapshot,
@@ -200,11 +209,7 @@ def execute_stuck_recovery_reload(
                 sim.context,
             ) or []
             if follow_up:
-                sim.submit_intents_to_book(
-                    follow_up,
-                    event_source="after_stuck_recovery_reload_fill",
-                    source_fill_purpose=fill_event.purpose,
-                )
+                deferred_on_fill_followups.extend(follow_up)
             fills.append(fill_event)
 
     sim._refresh_snapshot_from_book(source="after_stuck_recovery_reload_fills", price=fill_price)

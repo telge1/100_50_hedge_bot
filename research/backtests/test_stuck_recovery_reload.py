@@ -21,6 +21,8 @@ from research.backtests.stuck_recovery_reload import (
     should_trigger_stuck_recovery_reload,
 )
 from research.backtests.stuck_recovery_reload_shim import (
+    STUCK_RELOAD_LONG_PURPOSE,
+    STUCK_RELOAD_SHORT_PURPOSE,
     StuckRecoveryReloadTracker,
     execute_stuck_recovery_reload,
     maybe_execute_stuck_recovery_reload,
@@ -252,7 +254,171 @@ class StuckRecoveryReloadExecutionTests(unittest.TestCase):
         self.assertGreater(record.reload_long_qty or 0.0, 0.0)
 
 
-class StuckRecoveryReloadBaselineTests(unittest.TestCase):
+    def test_execute_reload_defers_per_fill_exits_until_atomic_tick_rebuild(self) -> None:
+        sim = _apt_sim(close=10.0, reload_config=default_stuck_recovery_reload_config())
+        state = sim.runtime_state.strategy_state
+        state.update(
+            {
+                "trade_block_id": "tb-stuck-atomic",
+                "initial_entry_confirmed": True,
+                "initial_structure_built": True,
+                "initial_long_qty": 100.0,
+                "initial_short_qty": 50.0,
+                "entry_reference_price": 10.0,
+                "active_cycle_index": 5,
+            }
+        )
+
+        old_long_qty = 80.0
+        old_short_qty = 40.0
+        sim.book.long_qty = old_long_qty
+        sim.book.short_qty = old_short_qty
+        sim.book.long_avg = 10.0
+        sim.book.short_avg = 10.0
+
+        sim.book._orders["exit-long-old"] = _virtual_order(
+            order_id="exit-long-old",
+            purpose="LONG_TP_EXIT",
+            side="long",
+            qty=old_long_qty,
+        )
+        sim.book._orders["exit-short-old"] = _virtual_order(
+            order_id="exit-short-old",
+            purpose="SHORT_SL_EXIT",
+            side="short",
+            qty=old_short_qty,
+        )
+        sim.book._orders["cycle-5"] = _virtual_order(
+            order_id="cycle-5",
+            purpose="CYCLE_5_SHORT_REDUCE",
+            side="short",
+            qty=10.0,
+        )
+        sim.book.sync_runtime_state(sim.runtime_state)
+        sim._refresh_snapshot_from_book(source="setup", price=10.0)
+
+        submitted: list[tuple[str | None, list[StrategyIntent]]] = []
+        original_submit = sim.submit_intents_to_book
+
+        def capture_submit(intents, *args, **kwargs):
+            event_source = kwargs.get("event_source")
+            submitted.append((event_source, list(intents)))
+            return original_submit(intents, *args, **kwargs)
+
+        sim.submit_intents_to_book = capture_submit  # type: ignore[method-assign]
+
+        original_on_fill = sim.strategy.on_fill
+        original_on_tick = sim.strategy.on_tick
+        on_fill_calls: list[str] = []
+
+        def fake_on_fill(fill_event, snapshot, runtime_state, context):
+            original_on_fill(fill_event, snapshot, runtime_state, context)
+            on_fill_calls.append(str(fill_event.purpose or ""))
+            # This simulates the bug source: after the long reload fill, strategy
+            # may try to build exits while the short reload leg is still stale.
+            # execute_stuck_recovery_reload() must ignore these per-fill intents.
+            return [
+                StrategyIntent(
+                    side="long",
+                    qty=old_long_qty,
+                    purpose="LONG_TP_EXIT",
+                    order_type="Limit",
+                    price=10.1,
+                    reduce_only=True,
+                    position_idx=1,
+                ),
+                StrategyIntent(
+                    side="short",
+                    qty=old_short_qty,
+                    purpose="SHORT_SL_EXIT",
+                    order_type="Limit",
+                    price=10.1,
+                    reduce_only=True,
+                    position_idx=2,
+                ),
+            ]
+
+        def fake_on_tick(snapshot, runtime_state, context):
+            return [
+                StrategyIntent(
+                    side="long",
+                    qty=sim.book.long_qty,
+                    purpose="LONG_TP_EXIT",
+                    order_type="Limit",
+                    price=10.1,
+                    reduce_only=True,
+                    position_idx=1,
+                ),
+                StrategyIntent(
+                    side="short",
+                    qty=sim.book.short_qty,
+                    purpose="SHORT_SL_EXIT",
+                    order_type="Limit",
+                    price=10.1,
+                    reduce_only=True,
+                    position_idx=2,
+                ),
+            ]
+
+        sim.strategy.on_fill = fake_on_fill  # type: ignore[method-assign]
+        sim.strategy.on_tick = fake_on_tick  # type: ignore[method-assign]
+
+        from research.backtests.stuck_recovery_reload import StuckRecoveryReloadTrigger
+
+        trigger = StuckRecoveryReloadTrigger(
+            cycle_index=5,
+            active_purpose="CYCLE_5_SHORT_REDUCE",
+            candles_since_last_fill=500,
+            realized_pnl_before=-0.5,
+        )
+
+        fills, _record = execute_stuck_recovery_reload(
+            sim,
+            config=default_stuck_recovery_reload_config(),
+            trigger=trigger,
+            reload_count_for_trade=1,
+        )
+
+        self.assertEqual(
+            [fill.purpose for fill in fills],
+            [STUCK_RELOAD_LONG_PURPOSE, STUCK_RELOAD_SHORT_PURPOSE],
+        )
+        self.assertEqual(on_fill_calls, [STUCK_RELOAD_LONG_PURPOSE, STUCK_RELOAD_SHORT_PURPOSE])
+
+        self.assertFalse(
+            any(event_source == "after_stuck_recovery_reload_fill" for event_source, _ in submitted),
+            "Reload follow-up exits must not be submitted after an individual reload fill.",
+        )
+
+        tick_submits = [
+            intents
+            for event_source, intents in submitted
+            if event_source == "after_stuck_recovery_reload_tick"
+        ]
+        self.assertTrue(tick_submits, "Reload exits must be rebuilt only after both reload fills.")
+
+        tick_intents = tick_submits[-1]
+        tick_by_purpose = {str(intent.purpose or ""): intent for intent in tick_intents}
+        self.assertIn("LONG_TP_EXIT", tick_by_purpose)
+        self.assertIn("SHORT_SL_EXIT", tick_by_purpose)
+
+        self.assertAlmostEqual(tick_by_purpose["LONG_TP_EXIT"].qty, sim.book.long_qty)
+        self.assertAlmostEqual(tick_by_purpose["SHORT_SL_EXIT"].qty, sim.book.short_qty)
+        self.assertGreater(tick_by_purpose["SHORT_SL_EXIT"].qty, old_short_qty)
+
+        active_by_purpose = {
+            str(order.purpose or ""): order
+            for order in sim.book.active_orders()
+            if str(order.purpose or "") in {"LONG_TP_EXIT", "SHORT_SL_EXIT"}
+        }
+
+        self.assertIn("LONG_TP_EXIT", active_by_purpose)
+        self.assertIn("SHORT_SL_EXIT", active_by_purpose)
+        self.assertAlmostEqual(active_by_purpose["LONG_TP_EXIT"].qty, sim.book.long_qty)
+        self.assertAlmostEqual(active_by_purpose["SHORT_SL_EXIT"].qty, sim.book.short_qty)
+        self.assertGreater(active_by_purpose["SHORT_SL_EXIT"].qty, old_short_qty)
+
+
     def test_disabled_config_does_not_attach_tracker(self) -> None:
         sim = _apt_sim(reload_config=StuckRecoveryReloadConfig(enabled=False))
         self.assertIsNone(sim.stuck_recovery_reload_tracker)
