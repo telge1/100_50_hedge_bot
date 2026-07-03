@@ -37,6 +37,20 @@ def _strategy() -> FixedCycleHedgeStrategy:
     )
 
 
+def _short_strategy() -> FixedCycleHedgeStrategy:
+    return FixedCycleHedgeStrategy(
+        FixedCycleHedgeConfig(
+            bot_name="short_bot_1",
+            strategy_side="short",
+            symbol="APTUSDT",
+            price_tick_size=0.0001,
+            tp_profit_target_pct=0.25,
+            tp_buffer_pct=0.125,
+            order_fee_rate_pct=0.055,
+        )
+    )
+
+
 class RecomputeCyclePnlLedgerTotalsTests(unittest.TestCase):
     def test_recompute_cycle_pnl_ledger_totals_updates_aggregates(self) -> None:
         strategy = _strategy()
@@ -147,6 +161,48 @@ class AdvanceCycleFromFillVwapRepairTests(unittest.TestCase):
         self.assertAlmostEqual(short_fill["total_qty"], 20.664)
         self.assertAlmostEqual(short_fill["avg_price"], 0.5975)
         self.assertAlmostEqual(float(seq_entry["short_reduce_fill_price"]), 0.5975)
+
+    def test_commit_and_advance_in_single_call_uses_single_vwap(self) -> None:
+        strategy = _strategy()
+        exec_price = 0.5975
+        exec_qty = 20.664
+        runtime = RuntimeState(
+            strategy_state={
+                "trade_block_id": "tb-1",
+                "active_cycle_index": 1,
+                "cycle_step": "waiting_for_pair_second_leg",
+                "processed_cycle_purposes": [],
+            },
+            last_snapshot=HedgeSnapshot(
+                symbol="APTUSDT",
+                current_price=exec_price,
+                long_qty=100.0,
+                short_qty=50.0,
+                long_avg=0.61,
+                short_avg=0.61,
+            ),
+        )
+        fill_event = FillEvent(
+            exchange_order_id="ex-short-reduce",
+            client_order_id="cli-short-reduce",
+            side="short",
+            purpose="CYCLE_1_SHORT_REDUCE",
+            exec_qty=exec_qty,
+            exec_price=exec_price,
+            order_type="Market",
+            reduce_only=True,
+            status="FILLED",
+            metadata={"cycle_index": 1, "cycle_role": "short_reduce"},
+        )
+
+        strategy._advance_cycle_from_fill(fill_event, runtime, _context())
+
+        cycle_state = strategy._ensure_cycle_state(runtime)
+        short_fill = cycle_state["short_fills"]["1"]
+        self.assertAlmostEqual(short_fill["total_qty"], exec_qty)
+        self.assertAlmostEqual(short_fill["avg_price"], exec_price)
+        seq_entry = strategy._get_cycle_sequence_entry(runtime, 1)
+        self.assertAlmostEqual(float(seq_entry["short_reduce_fill_price"]), exec_price)
 
 
 if __name__ == "__main__":
