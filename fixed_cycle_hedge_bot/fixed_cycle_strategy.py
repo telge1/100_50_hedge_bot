@@ -164,6 +164,12 @@ class FixedCycleHedgeConfig:
     target_profit_usdt: float = 0.002
     net_realized_pnl_target: float = 0.0
 
+    # Live short-TP relief (disabled by default).
+    cycle_short_tp_relief_enabled: bool = False
+    cycle_short_tp_relief_start_cycle_index: int = 4
+    cycle_short_tp_relief_max_distance_pct_from_long_fill: float = 4.0
+    cycle_short_tp_relief_carry_uncovered_loss_to_exit: bool = True
+
     hard_stop_cycle: int = 8
     hard_stop_pct: float = 1.0
     max_cycles: int = 10
@@ -3161,6 +3167,269 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             if value is not None
         )
         ledger["total_realized_pnl"] = cycle_net + final_exit_net
+
+    def _get_short_tp_relief_state(self, runtime_state: RuntimeState) -> dict[str, Any]:
+        state = runtime_state.strategy_state
+        relief = state.setdefault(
+            "short_tp_relief_state",
+            {
+                "carry_loss_by_trade_block": {},
+                "cumulative_carry_loss": 0.0,
+                "applied_relief_keys_by_trade_block": {},
+                "cycle_records": [],
+            },
+        )
+        relief.setdefault("carry_loss_by_trade_block", {})
+        relief.setdefault("cumulative_carry_loss", 0.0)
+        relief.setdefault("applied_relief_keys_by_trade_block", {})
+        relief.setdefault("cycle_records", [])
+        return relief
+
+    def _get_short_tp_relief_carry_loss_usdt(self, runtime_state: RuntimeState | None) -> float:
+        if (
+            not runtime_state
+            or not getattr(self.config, "cycle_short_tp_relief_enabled", False)
+            or str(getattr(self.config, "strategy_side", "") or "").lower() != "long"
+        ):
+            return 0.0
+        state = runtime_state.strategy_state
+        trade_block_id = str(state.get("trade_block_id") or "")
+        if not trade_block_id:
+            return 0.0
+        relief = state.get("short_tp_relief_state") or {}
+        by_block = relief.get("carry_loss_by_trade_block") or {}
+        return float(by_block.get(trade_block_id) or 0.0)
+
+    def _get_effective_pending_cycle_loss_usdt(self, runtime_state: RuntimeState | None) -> float:
+        if not runtime_state:
+            return 0.0
+        state = runtime_state.strategy_state
+        base_pending = float(state.get("pending_cycle_loss_usdt") or 0.0)
+        carry = self._get_short_tp_relief_carry_loss_usdt(runtime_state)
+        return base_pending + carry
+
+    def _short_tp_relief_build_applied_key(
+        self,
+        *,
+        trade_block_id: str,
+        cycle_index: int,
+        purpose: str,
+        capped_short_reduce_price: float,
+        short_reduce_qty: float,
+        order_id: str | None = None,
+    ) -> str:
+        normalized_purpose = str(purpose or "").upper()
+        if order_id:
+            return f"{trade_block_id}|order:{order_id}"
+        return (
+            f"{trade_block_id}|cycle:{cycle_index}|{normalized_purpose}|"
+            f"cap:{float(capped_short_reduce_price):.8f}|qty:{float(short_reduce_qty):.8f}"
+        )
+
+    def _short_tp_relief_register_carry_loss(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        trade_block_id: str,
+        applied_key: str,
+        uncovered_loss: float,
+        record: dict[str, Any],
+    ) -> tuple[float, bool]:
+        relief = self._get_short_tp_relief_state(runtime_state)
+        applied_by_block: dict[str, dict[str, bool]] = relief.setdefault(
+            "applied_relief_keys_by_trade_block", {}
+        )
+        block_applied: dict[str, bool] = applied_by_block.setdefault(trade_block_id, {})
+        by_block: dict[str, float] = relief.setdefault("carry_loss_by_trade_block", {})
+        cumulative = float(by_block.get(trade_block_id) or 0.0)
+        if block_applied.get(applied_key):
+            return cumulative, False
+        block_applied[applied_key] = True
+        cumulative = cumulative + float(uncovered_loss or 0.0)
+        by_block[trade_block_id] = cumulative
+        relief["cumulative_carry_loss"] = float(
+            sum(float(value or 0.0) for value in by_block.values())
+        )
+        records: list[dict[str, Any]] = relief.setdefault("cycle_records", [])
+        records.append(dict(record))
+        return cumulative, True
+
+    def _apply_live_short_tp_relief(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        intents: list[StrategyIntent],
+    ) -> list[StrategyIntent]:
+        if not intents:
+            return intents
+        if not getattr(self.config, "cycle_short_tp_relief_enabled", False):
+            return intents
+        if str(getattr(self.config, "strategy_side", "") or "").lower() != "long":
+            return intents
+
+        state = runtime_state.strategy_state
+        trade_block_id = str(state.get("trade_block_id") or "")
+        if not trade_block_id:
+            return intents
+
+        start_cycle_index = int(
+            getattr(self.config, "cycle_short_tp_relief_start_cycle_index", 0) or 0
+        )
+        max_distance_pct = float(
+            getattr(
+                self.config,
+                "cycle_short_tp_relief_max_distance_pct_from_long_fill",
+                0.0,
+            )
+            or 0.0
+        )
+        carry_enabled = bool(
+            getattr(
+                self.config,
+                "cycle_short_tp_relief_carry_uncovered_loss_to_exit",
+                True,
+            )
+        )
+        if max_distance_pct <= 0:
+            return intents
+
+        updated: list[StrategyIntent] = []
+        for intent in intents:
+            purpose = str(getattr(intent, "purpose", "") or "")
+            purpose_upper = purpose.upper()
+            if not purpose_upper.startswith("CYCLE_") or "SHORT_REDUCE" not in purpose_upper:
+                updated.append(intent)
+                continue
+
+            metadata = dict(getattr(intent, "metadata", {}) or {})
+            cycle_index = int(metadata.get("cycle_index") or 0)
+            if cycle_index <= 0:
+                match = re.match(r"^CYCLE_(\d+)_", purpose_upper)
+                if match:
+                    try:
+                        cycle_index = int(match.group(1))
+                    except (TypeError, ValueError):
+                        cycle_index = 0
+            if cycle_index < start_cycle_index or cycle_index <= 0:
+                updated.append(intent)
+                continue
+
+            # Resolve prices and quantities with conservative guards.
+            long_fill_price = float(
+                metadata.get("first_leg_fill_price")
+                or metadata.get("long_fill_price")
+                or self._get_first_leg_fill_price(runtime_state, cycle_index)
+                or 0.0
+            )
+            normal_short_reduce_price = float(
+                getattr(intent, "trigger_price", None)
+                or metadata.get("trigger_price")
+                or metadata.get("trigger_price_normalized")
+                or metadata.get("raw_trigger_price")
+                or getattr(intent, "price", None)
+                or 0.0
+            )
+            short_avg_price = float(
+                metadata.get("short_entry_price")
+                or getattr(snapshot, "short_avg", 0.0)
+                or state.get("short_avg")
+                or 0.0
+            )
+            short_reduce_qty = float(
+                getattr(intent, "qty", None)
+                or metadata.get("short_qty")
+                or metadata.get("qty")
+                or 0.0
+            )
+            pending_cycle_loss_usdt = float(state.get("pending_cycle_loss_usdt") or 0.0)
+            target_profit_usdt = float(self.config.target_profit_usdt or 0.0)
+            required_profit = max(pending_cycle_loss_usdt + target_profit_usdt, 0.0)
+
+            if (
+                long_fill_price <= 0
+                or normal_short_reduce_price <= 0
+                or short_avg_price <= 0
+                or short_reduce_qty <= 0
+            ):
+                updated.append(intent)
+                continue
+
+            capped_price_theoretical = long_fill_price * (1.0 - max_distance_pct / 100.0)
+            # Relief greift nur, wenn der normale Short-TP tiefer liegt als der Cap.
+            if normal_short_reduce_price + 1e-12 >= capped_price_theoretical:
+                updated.append(intent)
+                continue
+
+            uncovered_loss = max(
+                short_reduce_qty * (capped_price_theoretical - normal_short_reduce_price),
+                0.0,
+            )
+            if uncovered_loss <= 0:
+                updated.append(intent)
+                continue
+
+            capped_price_normalized = self._normalize_price(
+                capped_price_theoretical, runtime_state
+            )
+            intent.trigger_price = capped_price_normalized
+            metadata["trigger_price"] = capped_price_normalized
+            metadata["raw_trigger_price"] = capped_price_normalized
+
+            cumulative_carry_loss = 0.0
+            newly_applied = False
+            if carry_enabled:
+                applied_key = self._short_tp_relief_build_applied_key(
+                    trade_block_id=trade_block_id,
+                    cycle_index=cycle_index,
+                    purpose=purpose,
+                    capped_short_reduce_price=capped_price_normalized,
+                    short_reduce_qty=short_reduce_qty,
+                    order_id=str(
+                        metadata.get("order_id")
+                        or metadata.get("client_order_id")
+                        or ""
+                    )
+                    or None,
+                )
+                record = {
+                    "cycle_index": cycle_index,
+                    "trade_block_id": trade_block_id,
+                    "purpose": purpose,
+                    "normal_short_reduce_price": normal_short_reduce_price,
+                    "capped_short_reduce_price": capped_price_normalized,
+                    "short_reduce_qty": short_reduce_qty,
+                    "required_profit": required_profit,
+                    "uncovered_loss": uncovered_loss,
+                }
+                cumulative_carry_loss, newly_applied = self._short_tp_relief_register_carry_loss(
+                    runtime_state,
+                    trade_block_id=trade_block_id,
+                    applied_key=applied_key,
+                    uncovered_loss=uncovered_loss,
+                    record=record,
+                )
+
+            effective_pending = self._get_effective_pending_cycle_loss_usdt(runtime_state)
+            metadata.update(
+                {
+                    "cycle_short_tp_relief_enabled": True,
+                    "short_tp_relief_cap_applied": True,
+                    "normal_short_reduce_price": normal_short_reduce_price,
+                    "capped_short_reduce_price": capped_price_normalized,
+                    "max_short_reduce_distance_pct_from_long_fill": max_distance_pct,
+                    "uncovered_loss": uncovered_loss,
+                    "cumulative_carry_loss": cumulative_carry_loss,
+                    "carry_uncovered_loss_to_exit": carry_enabled,
+                    "effective_pending_cycle_loss_usdt": effective_pending,
+                }
+            )
+            if carry_enabled and uncovered_loss > 0 and not newly_applied:
+                metadata["short_tp_relief_carry_already_applied"] = True
+
+            intent.metadata = metadata
+            updated.append(intent)
+
+        return updated
 
     def _record_cycle_pnl_entry(
         self,
@@ -7218,11 +7487,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     {
                         "symbol": snapshot.symbol or self.config.symbol,
                         "short_tp_pending_cycle": short_tp_pending_cycle,
-                        "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
+                        "cycle_waiting_for_short_tp": short_followup_pending,
                         "processed_cycle_purposes": list(state.get("processed_cycle_purposes") or []),
                     },
                 )
                 short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
+                short_intents = self._apply_live_short_tp_relief(
+                    snapshot,
+                    runtime_state,
+                    short_intents,
+                )
                 intents.extend(short_intents)
                 if not short_intents:
                     short_followup_active = self._short_followup_active_for_cycle(
@@ -7493,6 +7767,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             },
         )
         short_intents = self._build_short_tp_follow_up(snapshot, runtime_state, context)
+        short_intents = self._apply_live_short_tp_relief(
+            snapshot,
+            runtime_state,
+            short_intents,
+        )
         intents.extend(short_intents)
         sequence_state = get_cycle_sequence_state(state, self._sequence_config)
 
@@ -12847,6 +13126,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         realized_short_pnl = float((runtime_state.realized_short_pnl_total if runtime_state else 0.0) or 0.0)
         realized_cycle_net = realized_long_pnl + realized_short_pnl
         pending_cycle_loss_usdt = float(state.get("pending_cycle_loss_usdt") or 0.0)
+        effective_pending_loss_usdt = self._get_effective_pending_cycle_loss_usdt(runtime_state)
         components = calculate_hedge_exit_price(
             long_avg=snapshot_long_avg,
             long_qty=snapshot_long_qty,
@@ -12855,7 +13135,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             tp_profit_target_pct=float(self.config.tp_profit_target_pct or 0.0),
             tp_buffer_pct=float(self.config.tp_buffer_pct or 0.0),
             realized_cycle_net=realized_cycle_net,
-            pending_cycle_loss_usdt=pending_cycle_loss_usdt,
+            pending_cycle_loss_usdt=effective_pending_loss_usdt,
         )
         fee_rate = max(float(self.config.order_fee_rate_pct or 0.0), 0.0) / 100.0
         long_notional = snapshot_long_avg * snapshot_long_qty
@@ -12879,7 +13159,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         open_hedge_net_after_fees = open_hedge_net_at_exit - total_fee_adjustment_usdt
         expected_total_net_after_exit = open_hedge_net_after_fees + components.realized_cycle_net
         min_profit_target_usdt = components.target_profit_usdt + components.buffer_usdt
-        required_profit_to_cover_loss = max(pending_cycle_loss_usdt, 0.0)
+        required_profit_to_cover_loss = max(effective_pending_loss_usdt, 0.0)
         min_required_total_usdt = required_profit_to_cover_loss + min_profit_target_usdt
         target_delta_usdt = expected_total_net_after_exit - min_required_total_usdt
         logger.debug(
@@ -12924,7 +13204,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             fee_rate=fee_rate,
             entry_fee_usdt=entry_fee_usdt,
             close_fee_usdt=close_fee_usdt,
-            pending_cycle_loss_usdt=pending_cycle_loss_usdt,
+            pending_cycle_loss_usdt=effective_pending_loss_usdt,
             realized_cycle_net=realized_cycle_net,
         )
 
@@ -13026,13 +13306,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         reference_price = self._tp_reference_price(snapshot, runtime_state)
         loss_recovery = self._loss_recovery_price_component(snapshot, runtime_state)
         pending_cycle_loss_usdt = float(
-            (runtime_state.strategy_state.get("pending_cycle_loss_usdt") if runtime_state else 0.0) or 0.0
+            (runtime_state.strategy_state.get("pending_cycle_loss_usdt") if runtime_state else 0.0)
+            if runtime_state
+            else 0.0
         )
+        effective_pending_loss_usdt = self._get_effective_pending_cycle_loss_usdt(runtime_state)
         pending_loss_price_component = 0.0
         if snapshot:
             net_qty = float(snapshot.long_qty or 0.0) - float(snapshot.short_qty or 0.0)
-            if pending_cycle_loss_usdt > 0 and abs(net_qty) > 1e-9:
-                pending_loss_price_component = pending_cycle_loss_usdt / net_qty
+            if effective_pending_loss_usdt > 0 and abs(net_qty) > 1e-9:
+                pending_loss_price_component = effective_pending_loss_usdt / net_qty
         goal_profit = reference_price * self._pct(self.config.tp_profit_target_pct)
         buffer = reference_price * self._pct(self.config.tp_buffer_pct)
         return {
