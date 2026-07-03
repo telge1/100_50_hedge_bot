@@ -194,6 +194,58 @@ class CycleShortTpReliefIdempotencyTests(unittest.TestCase):
             cycle_short_tp_relief_config=self._relief_config(),
         )
 
+
+@unittest.skipUnless(
+    (DEFAULT_DATA_DIR / symbol_to_feather_name("APTUSDT")).exists(),
+    "APTUSDT candle data unavailable",
+)
+class LiveShortTpReliefBacktestPathTests(unittest.TestCase):
+    def test_live_relief_path_uses_live_strategy_without_shim(self) -> None:
+        """Backtest-Pfad nutzt bei use_live_short_tp_relief ausschließlich den Live-Strategiepfad."""
+        from fixed_cycle_hedge_bot.fixed_cycle_strategy import FixedCycleHedgeStrategy
+
+        calls: list[dict] = []
+        original_apply = FixedCycleHedgeStrategy._apply_live_short_tp_relief
+
+        def wrapped_apply(self, snapshot, runtime_state, intents):
+            calls.append(
+                {
+                    "snapshot_price": float(getattr(snapshot, "current_price", 0.0) or 0.0),
+                    "intent_count": len(intents or []),
+                }
+            )
+            return original_apply(self, snapshot, runtime_state, intents)
+
+        FixedCycleHedgeStrategy._apply_live_short_tp_relief = wrapped_apply
+        try:
+            # Kleines Fenster aus APTUSDT-Candles; run_historical_backtest normalisiert selbst.
+            candles = load_candles_for_symbol("APTUSDT", limit=900)[800:860]
+            baseline = run_historical_backtest(
+                "APTUSDT",
+                "long",
+                candles,
+                max_candles=59,
+                config_source="live",
+            )
+            live_relief = run_historical_backtest(
+                "APTUSDT",
+                "long",
+                candles,
+                max_candles=59,
+                config_source="live",
+                cycle_short_tp_relief_config=None,
+                use_live_short_tp_relief=True,
+            )
+            # Backtests sollten regulär laufen.
+            self.assertIn(baseline.final_status, {"closed", "open", "max_candles"})
+            self.assertIn(live_relief.final_status, {"closed", "open", "max_candles"})
+            # Shim-spezifischer State-Schlüssel darf im Live-Relief-Pfad nicht existieren.
+            self.assertNotIn("_backtest_cycle_short_tp_relief", dict(live_relief.strategy_state or {}))
+            # Live-Hook muss mindestens einmal aufgerufen worden sein.
+            self.assertTrue(calls, "expected _apply_live_short_tp_relief to be called in backtest path")
+        finally:
+            FixedCycleHedgeStrategy._apply_live_short_tp_relief = original_apply
+
     def _short_reduce_intent(
         self,
         *,

@@ -105,6 +105,7 @@ def run_historical_backtest(
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+    use_live_short_tp_relief: bool = False,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -138,6 +139,13 @@ def run_historical_backtest(
     if tp_profit_target_pct is not None:
         config_load.config.tp_profit_target_pct = float(tp_profit_target_pct)
 
+    if use_live_short_tp_relief:
+        # Aktiviert das Live-Short-TP-Relief-Feature auf Config-Ebene, ohne den
+        # Backtest-Shim zu installieren. Optional können die Live-Parameter
+        # später aus CLI/JSON verfeinert werden.
+        config = config_load.config
+        config.cycle_short_tp_relief_enabled = True
+
     sim = HedgeBotOriginalSimulator(
         signal=signal,
         symbol=symbol_upper,
@@ -145,7 +153,7 @@ def run_historical_backtest(
         config_load=config_load,
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
         stuck_recovery_reload_config=stuck_recovery_reload_config,
-        cycle_short_tp_relief_config=cycle_short_tp_relief_config,
+        cycle_short_tp_relief_config=None if use_live_short_tp_relief else cycle_short_tp_relief_config,
     )
     sim.candle = first_candle
     sim.candle_index = 0
