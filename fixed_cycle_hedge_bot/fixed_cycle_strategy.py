@@ -3102,6 +3102,36 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         state["pending_cycle_closed_pnl_fills"] = filtered_remaining
         if _reconcile_depth == 0:
             self._reconcile_processed_cycle_purposes_confirmed_history(runtime_state, context)
+        self._recompute_cycle_pnl_ledger_totals(ledger)
+
+    @staticmethod
+    def _repair_vwap_fill_entry(entry: dict[str, Any]) -> dict[str, Any]:
+        """Fix doubled total_qty when commit and advance both counted the same fill."""
+        if not entry:
+            return entry
+        repaired = dict(entry)
+        weighted_price_sum = float(repaired.get("weighted_price_sum") or 0.0)
+        fill_qty = float(repaired.get("qty") or repaired.get("exec_qty") or 0.0)
+        total_qty = float(repaired.get("total_qty") or 0.0)
+        price = float(repaired.get("price") or 0.0)
+
+        if fill_qty <= 0:
+            return repaired
+
+        if weighted_price_sum > 0 and total_qty > fill_qty * 1.001:
+            repaired["total_qty"] = fill_qty
+            repaired["avg_price"] = weighted_price_sum / fill_qty
+            repaired["price"] = float(repaired["avg_price"])
+            return repaired
+
+        if weighted_price_sum > 0:
+            expected_avg = weighted_price_sum / fill_qty
+            if price > 0 and price < expected_avg * 0.75:
+                repaired["avg_price"] = expected_avg
+                repaired["price"] = expected_avg
+        return repaired
+
+    def _recompute_cycle_pnl_ledger_totals(self, ledger: dict[str, Any]) -> None:
         cycle_long_reduce_totals: dict[str, float] = {}
         cycle_short_tp_totals: dict[str, float] = {}
         for entry_key, entry in (ledger.get("cycle_pnl_entries") or {}).items():
@@ -3111,11 +3141,26 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 continue
             pnl = float((entry or {}).get("pnl") or 0.0)
             if fill_type == "cycle_long_reduce":
-                cycle_long_reduce_totals[cycle_key] = cycle_long_reduce_totals.get(cycle_key, 0.0) + pnl
+                cycle_long_reduce_totals[cycle_key] = (
+                    cycle_long_reduce_totals.get(cycle_key, 0.0) + pnl
+                )
             elif fill_type == "cycle_short_tp":
-                cycle_short_tp_totals[cycle_key] = cycle_short_tp_totals.get(cycle_key, 0.0) + pnl
+                cycle_short_tp_totals[cycle_key] = (
+                    cycle_short_tp_totals.get(cycle_key, 0.0) + pnl
+                )
         ledger["cycle_long_reduce_pnl"] = cycle_long_reduce_totals
         ledger["cycle_short_tp_pnl"] = cycle_short_tp_totals
+
+        cycle_net = sum(cycle_long_reduce_totals.values()) + sum(cycle_short_tp_totals.values())
+        final_exit_net = sum(
+            float(value)
+            for value in (
+                ledger.get("final_long_exit_pnl"),
+                ledger.get("final_short_exit_pnl"),
+            )
+            if value is not None
+        )
+        ledger["total_realized_pnl"] = cycle_net + final_exit_net
 
     def _record_cycle_pnl_entry(
         self,
@@ -13547,26 +13592,46 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
         short_fills = cycle_state.setdefault("short_fills", {})
         fill_entry = short_fills.setdefault(str(cycle_index), {})
+        fill_confirmed_field = self._second_leg_fill_confirmed_field()
+        fill_price_field = self._second_leg_fill_price_field()
 
         normalized_purpose = self._normalize_cycle_purpose(
             self._cycle_purpose("short", cycle_index),
             {"cycle_index": cycle_index, "cycle_role": "short_reduce"},
         )
 
+        if source == "force_commit" and fill_event is None:
+            existing_price = float(entry.get(fill_price_field) or 0.0)
+            repaired = self._repair_vwap_fill_entry(dict(fill_entry))
+            repaired_avg = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+            repaired_qty = float(repaired.get("qty") or repaired.get("exec_qty") or 0.0)
+            if (
+                existing_price > 0
+                and bool(entry.get(fill_confirmed_field))
+                and repaired_avg > 0
+                and abs(existing_price - repaired_avg) / repaired_avg <= 0.005
+            ):
+                return
+            if repaired_avg > 0:
+                short_fills[str(cycle_index)] = repaired
+                fill_entry = repaired
+
         price = self._safe_float(avg_price, None)
-        if price is None:
-            price = self._safe_float(fill_entry.get("avg_price"), None)
         if price is None and fill_event is not None:
             price = self._safe_float(getattr(fill_event, "exec_price", None), None)
+        if price is None:
+            repaired_entry = self._repair_vwap_fill_entry(dict(fill_entry))
+            price = self._safe_float(repaired_entry.get("avg_price"), None)
         price = float(price or 0.0)
 
         qty = self._safe_float(filled_qty, None)
+        if qty is None and fill_event is not None:
+            qty = self._safe_float(getattr(fill_event, "exec_qty", None), None)
         if qty is None:
-            qty = self._safe_float(fill_entry.get("total_qty"), None)
+            repaired_entry = self._repair_vwap_fill_entry(dict(fill_entry))
+            qty = self._safe_float(repaired_entry.get("total_qty"), None)
         if qty is None:
             qty = self._safe_float(fill_entry.get("qty"), None)
-        if qty is None and fill_event is not None:
-            qty = self._safe_float(getattr(fill_event, "exec_qty", None), 0.0)
         qty = float(qty or 0.0)
 
         previous_short_reduce_fill_price = self._safe_float(entry.get("short_reduce_fill_price"), 0.0)
@@ -14797,18 +14862,44 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 )
             fills = cycle_state.setdefault("short_fills", {})
             entry = dict(fills.get(str(cycle_index)) or {})
-            total_qty = float(entry.get("total_qty") or 0.0) + float(fill_event.exec_qty or 0.0)
-            weighted_price_sum = float(entry.get("weighted_price_sum") or 0.0) + (
-                float(fill_event.exec_price or 0.0) * float(fill_event.exec_qty or 0.0)
+            sequence_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+            fill_confirmed_field = self._second_leg_fill_confirmed_field()
+            fill_price_field = self._second_leg_fill_price_field()
+            terminal_second_leg_committed = (
+                order_fully_completed
+                and normalized_purpose == second_leg_purpose
+                and bool(sequence_entry.get(fill_confirmed_field))
+                and float(sequence_entry.get(fill_price_field) or 0.0) > 0
             )
-            avg_price = weighted_price_sum / total_qty if total_qty > 0 else 0.0
-            fills[str(cycle_index)] = {
-                "price": fill_event.exec_price,
-                "qty": fill_event.exec_qty,
-                "total_qty": total_qty,
-                "weighted_price_sum": weighted_price_sum,
-                "avg_price": avg_price,
-            }
+            if terminal_second_leg_committed:
+                committed_price = float(sequence_entry.get(fill_price_field) or 0.0)
+                fill_qty = self._safe_float(fill_event.exec_qty, 0.0) or float(entry.get("qty") or 0.0)
+                if float(entry.get("total_qty") or 0.0) > fill_qty * 1.001:
+                    entry = self._repair_vwap_fill_entry(entry)
+                if float(entry.get("avg_price") or 0.0) <= 0:
+                    entry = {
+                        **entry,
+                        "price": committed_price,
+                        "qty": fill_qty,
+                        "total_qty": fill_qty,
+                        "weighted_price_sum": committed_price * fill_qty,
+                        "avg_price": committed_price,
+                    }
+                avg_price = float(entry.get("avg_price") or committed_price)
+                fills[str(cycle_index)] = entry
+            else:
+                total_qty = float(entry.get("total_qty") or 0.0) + float(fill_event.exec_qty or 0.0)
+                weighted_price_sum = float(entry.get("weighted_price_sum") or 0.0) + (
+                    float(fill_event.exec_price or 0.0) * float(fill_event.exec_qty or 0.0)
+                )
+                avg_price = weighted_price_sum / total_qty if total_qty > 0 else 0.0
+                fills[str(cycle_index)] = {
+                    "price": fill_event.exec_price,
+                    "qty": fill_event.exec_qty,
+                    "total_qty": total_qty,
+                    "weighted_price_sum": weighted_price_sum,
+                    "avg_price": avg_price,
+                }
             cycle_state["last_cycle_reference_price"] = avg_price
             if order_fully_completed:
                 state["current_short_cycle_index"] = max(int(state.get("current_short_cycle_index") or 0), cycle_index)
