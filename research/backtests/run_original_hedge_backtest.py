@@ -124,6 +124,7 @@ def run_original_hedge_backtests(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    tp_profit_target_pct: float | None = None,
     write_json: bool = True,
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
@@ -153,6 +154,7 @@ def run_original_hedge_backtests(
             long_config_path=long_config_path,
             short_config_path=short_config_path,
             file_config_path=file_config_path,
+            tp_profit_target_pct=tp_profit_target_pct,
         )
 
     json_path, csv_path = default_output_paths(output_dir, symbol_upper)
@@ -209,6 +211,7 @@ def run_fill_model_comparison(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    tp_profit_target_pct: float | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -389,6 +392,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--config-path",
         default=None,
         help="Config file path for --config-source file",
+    )
+    parser.add_argument(
+        "--tp-profit-target-pct",
+        type=float,
+        default=None,
+        help="Backtest-only: override config.tp_profit_target_pct. Example: 0.50 means 0.50%%",
     )
     parser.add_argument(
         "--multi-start",
@@ -592,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
                 long_config_path=args.long_config_path,
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
+                tp_profit_target_pct=args.tp_profit_target_pct,
                 output_dir=args.output_dir,
                 write_json=write_json,
                 write_csv=write_csv,
@@ -623,6 +633,7 @@ def main(argv: list[str] | None = None) -> int:
                 long_config_path=args.long_config_path,
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
+                tp_profit_target_pct=args.tp_profit_target_pct,
                 output_dir=args.output_dir,
                 write_json=write_json,
                 write_csv=write_csv,
@@ -666,6 +677,7 @@ def main(argv: list[str] | None = None) -> int:
                 long_config_path=args.long_config_path,
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
+                tp_profit_target_pct=args.tp_profit_target_pct,
             )
         else:
             payload = run_original_hedge_backtests(
@@ -683,6 +695,7 @@ def main(argv: list[str] | None = None) -> int:
                 long_config_path=args.long_config_path,
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
+                tp_profit_target_pct=args.tp_profit_target_pct,
             )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

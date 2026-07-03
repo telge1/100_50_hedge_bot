@@ -173,6 +173,49 @@ class ShortPrimaryFinalExitCoverageGateTests(unittest.TestCase):
         apply_trade_exit_quality(result)
         self.assertEqual(result.final_status, "closed_undercovered_final_exit")
 
+    def test_short_primary_tp_profit_target_pct_affects_short_tp_exit_price(self) -> None:
+        """tp_profit_target_pct muss bei Short-Primary den SHORT_TP_EXIT-Preis verschieben."""
+
+        def _short_tp_trigger_price(tp_pct: float) -> float:
+            strategy = ShortFixedCycleHedgeStrategy(
+                FixedCycleHedgeConfig(
+                    price_tick_size=0.0001,
+                    tp_profit_target_pct=tp_pct,
+                    tp_buffer_pct=0.125,
+                    order_fee_rate_pct=0.055,
+                )
+            )
+            runtime_state = RuntimeState(strategy_state=_exit_build_state())
+            snapshot = HedgeSnapshot(
+                symbol="APTUSDT",
+                current_price=0.905,
+                long_qty=109.721,
+                short_qty=54.860,
+                long_avg=0.9114,
+                short_avg=0.9114,
+            )
+            break_even, _ = strategy._calculate_break_even(snapshot, runtime_state)
+            context = _context()
+            intents = strategy._build_exit_intents(
+                snapshot,
+                runtime_state,
+                current_cycle=1,
+                break_even_price=break_even,
+                tp_price=0.9000,
+                hard_stop_active=False,
+                context=context,
+                force_exit_rebuild=True,
+            )
+            short_intents = [intent for intent in intents if intent.purpose == "SHORT_TP_EXIT"]
+            self.assertTrue(short_intents, "SHORT_TP_EXIT intent missing")
+            return float(short_intents[0].trigger_price or 0.0)
+
+        price_low = _short_tp_trigger_price(0.25)
+        price_high = _short_tp_trigger_price(5.0)
+
+        self.assertNotAlmostEqual(price_low, price_high, places=10)
+        self.assertGreater(price_high, price_low)
+
 
 class FinalExitCoverageGateTests(unittest.TestCase):
     def setUp(self) -> None:

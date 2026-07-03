@@ -325,6 +325,7 @@ def run_continuous_reentry_backtests(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    tp_profit_target_pct: float | None = None,
     output_dir: str | Path = "research/backtests/results",
     write_json: bool = True,
     write_csv: bool = True,
@@ -357,6 +358,7 @@ def run_continuous_reentry_backtests(
                 long_config_path=long_config_path,
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
+                tp_profit_target_pct=tp_profit_target_pct,
             )
         )
 

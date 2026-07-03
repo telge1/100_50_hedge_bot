@@ -415,6 +415,42 @@ def test_multi_start_summary_and_aggregate_csv_writers(tmp_path: Path) -> None:
     assert aggregate_path.exists()
 
 
+def test_multi_start_passes_tp_profit_target_pct_to_historical_backtest() -> None:
+    """tp_profit_target_pct-Override muss im Multi-Start-Ergebnis ankommen."""
+    candles = _flat_candles(30)
+
+    results_low = run_multi_start_backtest(
+        "BTCUSDT",
+        "short",
+        candles,
+        config_source="test",
+        start_step_candles=10,
+        window_candles=20,
+        max_starts=1,
+        tp_profit_target_pct=0.25,
+    )
+    results_high = run_multi_start_backtest(
+        "BTCUSDT",
+        "short",
+        candles,
+        config_source="test",
+        start_step_candles=10,
+        window_candles=20,
+        max_starts=1,
+        tp_profit_target_pct=5.0,
+    )
+
+    assert len(results_low) == 1
+    assert len(results_high) == 1
+
+    low = results_low[0]
+    high = results_high[0]
+
+    # BacktestResult.tp_profit_target_pct spiegelt die effektiv genutzte Config.
+    assert low.tp_profit_target_pct == pytest.approx(0.25)
+    assert high.tp_profit_target_pct == pytest.approx(5.0)
+
+
 @pytest.mark.skipif(
     not (DEFAULT_DATA_DIR / symbol_to_feather_name("APTUSDT")).exists(),
     reason="APT feather file not available",

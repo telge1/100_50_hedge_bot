@@ -101,6 +101,7 @@ def run_historical_backtest(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    tp_profit_target_pct: float | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
@@ -134,6 +135,9 @@ def run_historical_backtest(
         short_config_path=short_config_path,
         file_config_path=file_config_path,
     )
+    if tp_profit_target_pct is not None:
+        config_load.config.tp_profit_target_pct = float(tp_profit_target_pct)
+
     sim = HedgeBotOriginalSimulator(
         signal=signal,
         symbol=symbol_upper,
