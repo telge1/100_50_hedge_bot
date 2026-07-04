@@ -456,6 +456,7 @@ def run_multi_start_backtest(
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+    use_live_short_tp_relief: bool = False,
 ) -> list[BacktestResult]:
     """Run multiple backtests at staggered start points over the candle series."""
     symbol_upper = symbol.upper()
@@ -472,6 +473,12 @@ def run_multi_start_backtest(
     )
 
     results: list[BacktestResult] = []
+    effective_cycle_short_tp_relief_config: CycleShortTpReliefConfig | None
+    if use_live_short_tp_relief:
+        # Live-Relief-Pfad: Shim-Konfiguration darf nicht installiert werden.
+        effective_cycle_short_tp_relief_config = None
+    else:
+        effective_cycle_short_tp_relief_config = cycle_short_tp_relief_config
     max_loop_candles = max(0, window_candles - 1)
     for start_index in start_indices:
         window = candles[start_index : start_index + window_candles]
@@ -491,7 +498,8 @@ def run_multi_start_backtest(
             tp_profit_target_pct=tp_profit_target_pct,
             dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
             stuck_recovery_reload_config=stuck_recovery_reload_config,
-            cycle_short_tp_relief_config=cycle_short_tp_relief_config,
+            cycle_short_tp_relief_config=effective_cycle_short_tp_relief_config,
+            use_live_short_tp_relief=use_live_short_tp_relief,
         )
         result.start_index = start_index
         result.window_candles = min(window_candles, len(window))
@@ -533,6 +541,7 @@ def run_multi_start_backtests(
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+    use_live_short_tp_relief: bool = False,
 ) -> dict[str, Any]:
     """Run multi-start backtests for one or more directions and fill models."""
     symbol_upper = symbol.upper()
@@ -563,6 +572,7 @@ def run_multi_start_backtests(
                     dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
                     stuck_recovery_reload_config=stuck_recovery_reload_config,
                     cycle_short_tp_relief_config=cycle_short_tp_relief_config,
+                    use_live_short_tp_relief=use_live_short_tp_relief,
                 )
             )
 

@@ -666,6 +666,7 @@ def main(argv: list[str] | None = None) -> int:
                 dynamic_cycle_scaling_config=resolve_dynamic_cycle_scaling_config(args),
                 stuck_recovery_reload_config=resolve_stuck_recovery_reload_config(args),
                 cycle_short_tp_relief_config=resolve_cycle_short_tp_relief_config(args),
+                use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(

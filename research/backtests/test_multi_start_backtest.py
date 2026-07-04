@@ -451,6 +451,140 @@ def test_multi_start_passes_tp_profit_target_pct_to_historical_backtest() -> Non
     assert high.tp_profit_target_pct == pytest.approx(5.0)
 
 
+def test_run_multi_start_backtest_forwards_use_live_short_tp_relief(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Live-Relief-Flag wird bis run_historical_backtest weitergereicht und Shim-Config unterdrückt."""
+    candles = _flat_candles(15)
+    calls: list[dict[str, object]] = []
+
+    def _fake_run_historical_backtest(*args, **kwargs):
+        calls.append(kwargs)
+        return BacktestResult(symbol="BTCUSDT", direction="long")
+
+    monkeypatch.setattr(
+        "research.backtests.multi_start_backtest.run_historical_backtest",
+        _fake_run_historical_backtest,
+    )
+
+    # cycle_short_tp_relief_config wird im Live-Pfad bewusst ignoriert.
+    run_multi_start_backtest(
+        "BTCUSDT",
+        "long",
+        candles,
+        config_source="test",
+        start_step_candles=10,
+        window_candles=10,
+        max_starts=1,
+        tp_profit_target_pct=0.5,
+        cycle_short_tp_relief_config="shim-config-should-be-ignored",  # type: ignore[arg-type]
+        use_live_short_tp_relief=True,
+    )
+
+    assert calls, "expected run_historical_backtest to be called"
+    first = calls[0]
+    assert first.get("use_live_short_tp_relief") is True
+    # Im Live-Pfad darf kein Shim-Config-Objekt weitergereicht werden.
+    assert first.get("cycle_short_tp_relief_config") is None
+
+
+def test_run_multi_start_backtests_forwards_use_live_short_tp_relief(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    candles = _flat_candles(15)
+    captured: dict[str, object] = {}
+
+    def _fake_run_multi_start_backtest(*args, **kwargs):
+        captured.update(kwargs)
+        return [BacktestResult(symbol="BTCUSDT", direction="long")]
+
+    monkeypatch.setattr(
+        "research.backtests.multi_start_backtest.run_multi_start_backtest",
+        _fake_run_multi_start_backtest,
+    )
+
+    run_multi_start_backtests(
+        symbol="BTCUSDT",
+        direction="long",
+        candles=candles,
+        config_source="test",
+        output_dir=tmp_path,
+        write_json=False,
+        write_csv=False,
+        use_live_short_tp_relief=True,
+    )
+
+    assert captured.get("use_live_short_tp_relief") is True
+
+
+def test_cli_accepts_multi_start_with_use_live_short_tp_relief(tmp_path: Path) -> None:
+    candles = [
+        {
+            "timestamp": "2026-01-01T00:00:00+00:00",
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.0,
+        }
+        for _ in range(25)
+    ]
+
+    captured: dict[str, object] = {}
+
+    with patch(
+        "research.backtests.run_original_hedge_backtest.load_candles_for_symbol",
+        return_value=candles,
+    ), patch(
+        "research.backtests.run_original_hedge_backtest.run_multi_start_backtests"
+    ) as mock_runner:
+        def _record_call(*args, **kwargs):
+            captured.update(kwargs)
+            # Minimales Payload-Gerüst, damit CLI sauber durchläuft.
+            return {
+                "symbol": "BTCUSDT",
+                "directions": ["long"],
+                "candles_loaded": len(candles),
+                "multi_start": True,
+                "config_source": "test",
+                "fill_models": ["conservative"],
+                "start_step_candles": 5,
+                "window_candles": 10,
+                "max_starts": 3,
+                "results": [],
+                "aggregate": [],
+                "output_files": {
+                    "summary_csv": None,
+                    "json": None,
+                    "aggregate_csv": None,
+                    "unfinished_csv": None,
+                },
+            }
+
+        mock_runner.side_effect = _record_call
+
+        exit_code = cli_main(
+            [
+                "--symbol",
+                "BTCUSDT",
+                "--direction",
+                "long",
+                "--limit",
+                "25",
+                "--multi-start",
+                "--start-step-candles",
+                "5",
+                "--window-candles",
+                "10",
+                "--max-starts",
+                "3",
+                "--config-source",
+                "test",
+                "--output-dir",
+                str(tmp_path),
+                "--use-live-short-tp-relief",
+            ]
+        )
+
+    assert exit_code == 0
+    assert captured.get("use_live_short_tp_relief") is True
+
+
 @pytest.mark.skipif(
     not (DEFAULT_DATA_DIR / symbol_to_feather_name("APTUSDT")).exists(),
     reason="APT feather file not available",
