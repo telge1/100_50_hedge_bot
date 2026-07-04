@@ -18,7 +18,11 @@ from research.backtests.backtest_report import (
     write_summary_csv,
 )
 from research.backtests.candle_loader import DEFAULT_DATA_DIR, symbol_to_feather_name
-from research.backtests.run_original_hedge_backtest import run_original_hedge_backtests
+from research.backtests.run_original_hedge_backtest import (
+    run_original_hedge_backtests,
+    _build_parser,
+    main as cli_main,
+)
 from research.backtests.simulated_order_book import SyntheticCandle
 
 
@@ -176,3 +180,59 @@ def test_aptusdt_runner_with_real_data_if_available(tmp_path: Path) -> None:
     json_payload = json.loads(Path(payload["output_files"]["json"]).read_text(encoding="utf-8"))
     assert "long" in json_payload["runs"]
     assert json_payload["runs"]["long"]["error"] is None
+
+
+def test_parser_recognizes_use_live_short_tp_relief_flag() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["--use-live-short-tp-relief"])
+    assert getattr(args, "use_live_short_tp_relief", False) is True
+
+
+def test_run_original_hedge_backtests_forwards_use_live_short_tp_relief(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_run_historical_backtest(*args, **kwargs):
+        calls.update(kwargs)
+        # Minimal BacktestResult stub for this unit test
+        return BacktestResult(symbol="BTCUSDT", direction="long")
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_historical_backtest",
+        _fake_run_historical_backtest,
+    )
+
+    run_original_hedge_backtests(
+        symbol="BTCUSDT",
+        direction="long",
+        limit=10,
+        max_candles=5,
+        output_dir=".",
+        write_json=False,
+        write_csv=False,
+        candles=[{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}],
+        use_live_short_tp_relief=True,
+    )
+
+    assert calls.get("use_live_short_tp_relief") is True
+
+
+def test_cli_rejects_conflicting_live_and_shim_relief_flags(capsys: pytest.CaptureFixture[str]) -> None:
+    code = cli_main(
+        [
+            "--symbol",
+            "APTUSDT",
+            "--direction",
+            "long",
+            "--limit",
+            "10",
+            "--max-candles",
+            "10",
+            "--use-live-short-tp-relief",
+            "--cycle-short-tp-relief",
+            "--no-json",
+            "--no-csv",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "cannot be combined" in captured.err

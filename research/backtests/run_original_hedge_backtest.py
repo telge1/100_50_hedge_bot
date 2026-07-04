@@ -128,6 +128,7 @@ def run_original_hedge_backtests(
     write_json: bool = True,
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
+    use_live_short_tp_relief: bool = False,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -155,6 +156,7 @@ def run_original_hedge_backtests(
             short_config_path=short_config_path,
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
+            use_live_short_tp_relief=use_live_short_tp_relief,
         )
 
     json_path, csv_path = default_output_paths(output_dir, symbol_upper)
@@ -509,12 +511,23 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cycle-short-tp-relief",
         action="store_true",
-        help="Backtest-only: cap cycle short-reduce distance and carry uncovered loss to exits",
+        help=(
+            "Backtest-only shim: cap cycle short-reduce distance and carry uncovered loss to exits "
+            "via backtest-only wrapper (does not use live strategy code path)"
+        ),
     )
     parser.add_argument(
         "--cycle-short-tp-relief-config-json",
         default=None,
-        help="JSON config for cycle short-TP relief (overrides defaults)",
+        help="JSON config for cycle short-TP relief shim (overrides defaults)",
+    )
+    parser.add_argument(
+        "--use-live-short-tp-relief",
+        action="store_true",
+        help=(
+            "Use live Short-TP-Relief feature from fixed_cycle_strategy.py "
+            "(bypasses backtest shim; requires live feature enabled in strategy)"
+        ),
     )
     return parser
 
@@ -566,6 +579,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     _warn_if_test_config_for_research(args.symbol, args.config_source)
+
+    # Short-TP-Relief mode selection: live feature vs. backtest shim must be exclusive.
+    if getattr(args, "use_live_short_tp_relief", False) and (
+        getattr(args, "cycle_short_tp_relief", False)
+        or getattr(args, "cycle_short_tp_relief_config_json", None)
+    ):
+        print(
+            "error: --use-live-short-tp-relief cannot be combined with "
+            "--cycle-short-tp-relief or --cycle-short-tp-relief-config-json",
+            file=sys.stderr,
+        )
+        return 1
 
     write_json = not args.no_json
     write_csv = not args.no_csv
@@ -696,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
             )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
