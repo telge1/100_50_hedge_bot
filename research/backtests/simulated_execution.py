@@ -20,6 +20,14 @@ STUCK_RECOVERY_RELOAD_MARKET_FILL_PURPOSES = frozenset(
 )
 
 
+def _is_cycle_second_leg_reduce_purpose(purpose: str) -> bool:
+    """Return True for CYCLE_N_SHORT_REDUCE / CYCLE_N_LONG_REDUCE purposes."""
+    normalized = preserve_bot_purpose(purpose).strip().upper()
+    if not normalized.startswith("CYCLE_"):
+        return False
+    return normalized.endswith("_SHORT_REDUCE") or normalized.endswith("_LONG_REDUCE")
+
+
 @dataclass(frozen=True)
 class OrderTouchResult:
     touched: bool
@@ -47,6 +55,18 @@ def is_stuck_recovery_reload_market_fill(intent: StrategyIntent) -> bool:
     return order_type == "MARKET" and intent.price is None and intent.trigger_price is None
 
 
+def is_immediate_cycle_second_leg_market_fill(intent: StrategyIntent) -> bool:
+    """Immediate fills for cycle second-leg reduce-only MARKET fallbacks without price/trigger."""
+    order_type = str(intent.order_type or "Market").strip().upper()
+    if order_type != "MARKET":
+        return False
+    if intent.price is not None or intent.trigger_price is not None:
+        return False
+    if not bool(getattr(intent, "reduce_only", False)):
+        return False
+    return _is_cycle_second_leg_reduce_purpose(str(intent.purpose or ""))
+
+
 def is_immediate_market_fill(intent: StrategyIntent) -> bool:
     """Initial hedge entries and immediate market cycle/refill/reload orders."""
     purpose = str(intent.purpose or "").strip().upper()
@@ -54,7 +74,9 @@ def is_immediate_market_fill(intent: StrategyIntent) -> bool:
         return True
     if is_stuck_recovery_reload_market_fill(intent):
         return True
-    return is_immediate_refill_market_fill(intent)
+    if is_immediate_refill_market_fill(intent):
+        return True
+    return is_immediate_cycle_second_leg_market_fill(intent)
 
 
 def order_trigger_side(order: VirtualOrder) -> str:
