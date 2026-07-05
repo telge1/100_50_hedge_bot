@@ -166,7 +166,7 @@ class FixedCycleHedgeConfig:
 
     # Live short-TP relief (disabled by default).
     cycle_short_tp_relief_enabled: bool = False
-    cycle_short_tp_relief_start_cycle_index: int = 4
+    cycle_short_tp_relief_start_cycle_index: int = 3
     cycle_short_tp_relief_max_distance_pct_from_long_fill: float = 4.0
     cycle_short_tp_relief_carry_uncovered_loss_to_exit: bool = True
 

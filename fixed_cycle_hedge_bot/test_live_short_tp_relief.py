@@ -33,7 +33,7 @@ def _long_strategy(relief_enabled: bool = False) -> FixedCycleHedgeStrategy:
         tp_buffer_pct=0.125,
         order_fee_rate_pct=0.055,
         cycle_short_tp_relief_enabled=relief_enabled,
-        cycle_short_tp_relief_start_cycle_index=4,
+        cycle_short_tp_relief_start_cycle_index=3,
         cycle_short_tp_relief_max_distance_pct_from_long_fill=4.0,
         cycle_short_tp_relief_carry_uncovered_loss_to_exit=True,
     )
@@ -50,7 +50,7 @@ def _short_strategy(relief_enabled: bool = True) -> FixedCycleHedgeStrategy:
         tp_buffer_pct=0.125,
         order_fee_rate_pct=0.055,
         cycle_short_tp_relief_enabled=relief_enabled,
-        cycle_short_tp_relief_start_cycle_index=4,
+        cycle_short_tp_relief_start_cycle_index=3,
         cycle_short_tp_relief_max_distance_pct_from_long_fill=4.0,
         cycle_short_tp_relief_carry_uncovered_loss_to_exit=True,
     )
@@ -104,12 +104,12 @@ class LiveShortTpReliefTests(unittest.TestCase):
         intent = StrategyIntent(
             side="short",
             qty=10.0,
-            purpose="CYCLE_3_SHORT_REDUCE",
+            purpose="CYCLE_2_SHORT_REDUCE",
             order_type="Limit",
             trigger_price=normal_trigger,
         )
         intent.metadata = {
-            "cycle_index": 3,
+            "cycle_index": 2,
             "first_leg_fill_price": 1.8323,
             "short_entry_price": 1.82,
         }
@@ -136,12 +136,12 @@ class LiveShortTpReliefTests(unittest.TestCase):
         intent = StrategyIntent(
             side="short",
             qty=qty,
-            purpose="CYCLE_4_SHORT_REDUCE",
+            purpose="CYCLE_3_SHORT_REDUCE",
             order_type="Limit",
             trigger_price=normal_trigger,
         )
         intent.metadata = {
-            "cycle_index": 4,
+            "cycle_index": 3,
             "first_leg_fill_price": long_fill,
             "short_entry_price": 1.818,
         }
@@ -251,12 +251,12 @@ class LiveShortTpReliefTests(unittest.TestCase):
         intent = StrategyIntent(
             side="short",
             qty=10.0,
-            purpose="CYCLE_4_SHORT_REDUCE",
+            purpose="CYCLE_3_SHORT_REDUCE",
             order_type="Limit",
             trigger_price=normal_trigger,
         )
         intent.metadata = {
-            "cycle_index": 4,
+            "cycle_index": 3,
             "first_leg_fill_price": 1.8323,
             "short_entry_price": 1.82,
         }
