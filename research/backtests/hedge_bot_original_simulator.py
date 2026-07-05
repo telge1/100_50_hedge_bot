@@ -533,33 +533,33 @@ class HedgeBotOriginalSimulator:
                 event_type="filled",
                 status="FILLED",
             )
-            # Enrich REFILL_LONG/REFILL_SHORT filled order-log rows with fill price
-            # and position-after fields so trade-block exports can show them even
+            # Enrich filled order-log rows with fill price, and for REFILL_* also
+            # position-after fields so trade-block exports can show them even
             # when no separate fill_log entry exists.
             purpose = str(fill_event.purpose or "")
-            if purpose in {"REFILL_LONG", "REFILL_SHORT"}:
-                metadata = dict(fill_event.metadata or {})
-                fill_price = float(
-                    metadata.get("fill_price") if metadata.get("fill_price") is not None else fill_event.exec_price
-                )
-                long_qty_after = float(self.book.long_qty or 0.0)
-                short_qty_after = float(self.book.short_qty or 0.0)
-                long_avg_after = float(self.book.long_avg or 0.0)
-                short_avg_after = float(self.book.short_avg or 0.0)
+            metadata = dict(fill_event.metadata or {})
+            fill_price = float(
+                metadata.get("fill_price") if metadata.get("fill_price") is not None else fill_event.exec_price
+            )
+            long_qty_after = float(self.book.long_qty or 0.0)
+            short_qty_after = float(self.book.short_qty or 0.0)
+            long_avg_after = float(self.book.long_avg or 0.0)
+            short_avg_after = float(self.book.short_avg or 0.0)
 
-                for row in reversed(self.order_log):
-                    if row.get("order_id") != filled_order.order_id:
-                        continue
-                    if str(row.get("event_type") or "") != "filled":
-                        continue
-                    if row.get("price") in (None, ""):
-                        row["price"] = fill_price
-                    row.setdefault("fill_price", fill_price)
+            for row in reversed(self.order_log):
+                if row.get("order_id") != filled_order.order_id:
+                    continue
+                if str(row.get("event_type") or "") != "filled":
+                    continue
+                if row.get("price") in (None, ""):
+                    row["price"] = fill_price
+                row.setdefault("fill_price", fill_price)
+                if purpose in {"REFILL_LONG", "REFILL_SHORT"}:
                     row.setdefault("long_qty_after", long_qty_after)
                     row.setdefault("short_qty_after", short_qty_after)
                     row.setdefault("long_avg_after", long_avg_after)
                     row.setdefault("short_avg_after", short_avg_after)
-                    break
+                break
         self._dispatch_fill_to_strategy(
             fill_event,
             event_source=event_source,
