@@ -19,6 +19,7 @@ from .fill_models import resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .intent_diagnostics import summarize_exit_diagnostics
 from .multi_start_backtest import filter_unfinished_results
+from .recovery_bot.config import RecoveryBotConfig
 
 DEEP_DIVE_CSV_FIELDS = (
     "symbol",
@@ -128,6 +129,7 @@ def _run_backtest_window(
     long_config_path: str | Path,
     short_config_path: str | Path,
     file_config_path: str | Path | None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> BacktestResult:
     fill_config = resolve_fill_model_config(
         fill_model=fill_model,
@@ -147,6 +149,7 @@ def _run_backtest_window(
         long_config_path=long_config_path,
         short_config_path=short_config_path,
         file_config_path=file_config_path,
+        recovery_bot_config=recovery_bot_config,
     )
     result.start_index = start_index
     result.window_candles = min(window_candles, len(window))
@@ -269,6 +272,7 @@ def run_unfinished_deep_dive(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> list[dict[str, Any]]:
     """Re-run unfinished multi-start windows with an extended candle horizon."""
     symbol_upper = symbol.upper()
@@ -291,6 +295,7 @@ def run_unfinished_deep_dive(
             long_config_path=long_config_path,
             short_config_path=short_config_path,
             file_config_path=file_config_path,
+            recovery_bot_config=recovery_bot_config,
         )
         rows.append(
             build_deep_dive_comparison_row(
@@ -391,6 +396,7 @@ def run_unfinished_deep_dive_after_multi_start(
     write_json: bool = True,
     write_csv: bool = True,
     include_logs: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> dict[str, Any]:
     """Run deep-dive comparisons for unfinished runs from a multi-start payload."""
     symbol_upper = str(multi_start_payload["symbol"]).upper()
@@ -425,6 +431,7 @@ def run_unfinished_deep_dive_after_multi_start(
             long_config_path=long_config_path,
             short_config_path=short_config_path,
             file_config_path=file_config_path,
+            recovery_bot_config=recovery_bot_config,
         )
         extended_results.append(extended)
         rows.append(

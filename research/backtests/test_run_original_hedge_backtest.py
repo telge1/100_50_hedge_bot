@@ -22,7 +22,9 @@ from research.backtests.run_original_hedge_backtest import (
     run_original_hedge_backtests,
     _build_parser,
     main as cli_main,
+    resolve_recovery_bot_config,
 )
+from research.backtests.recovery_bot.config import RecoveryBotConfig
 from research.backtests.simulated_order_book import SyntheticCandle
 
 
@@ -236,3 +238,174 @@ def test_cli_rejects_conflicting_live_and_shim_relief_flags(capsys: pytest.Captu
     captured = capsys.readouterr()
     assert code == 1
     assert "cannot be combined" in captured.err
+
+
+def test_parser_accepts_recovery_bot_flag() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["--recovery-bot"])
+    assert args.recovery_bot is True
+
+
+def test_parser_accepts_recovery_bot_config_json() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["--recovery-bot-config-json", '{"trigger_order":"CYCLE_4_SHORT_REDUCE"}'])
+    assert args.recovery_bot_config_json == '{"trigger_order":"CYCLE_4_SHORT_REDUCE"}'
+
+
+def test_recovery_bot_config_none_without_flag() -> None:
+    parser = _build_parser()
+    args = parser.parse_args([])
+    assert resolve_recovery_bot_config(args) is None
+
+
+def test_recovery_bot_flag_enables_default_config() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["--recovery-bot"])
+    config = resolve_recovery_bot_config(args)
+    assert isinstance(config, RecoveryBotConfig)
+    assert config.enabled is True
+
+
+def test_recovery_bot_json_overrides_values_and_forces_enabled() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(
+        [
+            "--recovery-bot",
+            "--recovery-bot-config-json",
+            '{"enabled": false, "trigger_order": "CYCLE_4_SHORT_REDUCE", "pair_reduce_pct": 25.0}',
+        ]
+    )
+    config = resolve_recovery_bot_config(args)
+    assert isinstance(config, RecoveryBotConfig)
+    assert config.enabled is True
+    assert config.trigger_order == "CYCLE_4_SHORT_REDUCE"
+    assert config.pair_reduce_pct == pytest.approx(25.0)
+
+
+def test_cli_rejects_recovery_bot_with_stuck_recovery_reload(capsys: pytest.CaptureFixture[str]) -> None:
+    code = cli_main(
+        [
+            "--recovery-bot",
+            "--stuck-recovery-reload",
+            "--symbol",
+            "BTCUSDT",
+            "--direction",
+            "long",
+            "--limit",
+            "5",
+            "--no-json",
+            "--no-csv",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "--recovery-bot cannot be combined with --stuck-recovery-reload" in captured.err
+
+
+def test_run_original_hedge_backtests_defaults_to_no_recovery_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_run_historical_backtest(*args, **kwargs):
+        calls.update(kwargs)
+        return BacktestResult(symbol="BTCUSDT", direction="long")
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_historical_backtest",
+        _fake_run_historical_backtest,
+    )
+
+    run_original_hedge_backtests(
+        symbol="BTCUSDT",
+        direction="long",
+        limit=10,
+        max_candles=5,
+        output_dir=".",
+        write_json=False,
+        write_csv=False,
+        candles=[{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}],
+    )
+
+    assert calls.get("recovery_bot_config") is None
+
+
+def test_run_original_hedge_backtests_forwards_recovery_config_single_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_run_historical_backtest(*args, **kwargs):
+        calls.update(kwargs)
+        return BacktestResult(symbol="BTCUSDT", direction="long")
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_historical_backtest",
+        _fake_run_historical_backtest,
+    )
+
+    recovery_config = RecoveryBotConfig(enabled=True, trigger_order="CYCLE_4_SHORT_REDUCE")
+    run_original_hedge_backtests(
+        symbol="BTCUSDT",
+        direction="long",
+        limit=10,
+        max_candles=5,
+        output_dir=".",
+        write_json=False,
+        write_csv=False,
+        candles=[{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}],
+        recovery_bot_config=recovery_config,
+    )
+
+    assert calls.get("recovery_bot_config") is recovery_config
+
+
+def test_cli_multi_start_forwards_recovery_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_load(*args, **kwargs):
+        return [{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}]
+
+    def _fake_run_multi_start_backtests(**kwargs):
+        calls.update(kwargs)
+        return {
+            "symbol": "BTCUSDT",
+            "directions": ["long"],
+            "multi_start": True,
+            "results": [],
+            "aggregate": [],
+            "output_files": {"summary_csv": None, "json": None, "aggregate_csv": None, "unfinished_csv": None},
+            "candles_loaded": 1,
+        }
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest._load_candles",
+        _fake_load,
+    )
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_multi_start_backtests",
+        _fake_run_multi_start_backtests,
+    )
+
+    code = cli_main(
+        [
+            "--multi-start",
+            "--recovery-bot",
+            "--recovery-bot-config-json",
+            '{"trigger_order":"CYCLE_4_SHORT_REDUCE","pair_reduce_pct":25.0}',
+            "--symbol",
+            "BTCUSDT",
+            "--direction",
+            "long",
+            "--limit",
+            "5",
+            "--window-candles",
+            "1",
+            "--max-starts",
+            "1",
+            "--no-json",
+            "--no-csv",
+        ]
+    )
+
+    assert code == 0
+    config = calls.get("recovery_bot_config")
+    assert isinstance(config, RecoveryBotConfig)
+    assert config.enabled is True
+    assert config.trigger_order == "CYCLE_4_SHORT_REDUCE"

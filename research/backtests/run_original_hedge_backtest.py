@@ -36,7 +36,12 @@ from .stuck_recovery_reload import (
     config_from_json_string as stuck_reload_config_from_json_string,
     default_stuck_recovery_reload_config,
 )
-from .recovery_bot.config import RecoveryBotConfig
+from .recovery_bot.config import (
+    RecoveryBotConfig,
+    config_from_dict as recovery_bot_config_from_dict,
+    config_from_json_string as recovery_bot_config_from_json_string,
+    config_to_dict as recovery_bot_config_to_dict,
+)
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .continuous_reentry_backtest import (
@@ -83,6 +88,23 @@ def resolve_cycle_short_tp_relief_config(args: argparse.Namespace) -> CycleShort
     if bool(getattr(args, "cycle_short_tp_relief", False)):
         return default_cycle_short_tp_relief_config()
     return None
+
+
+def resolve_recovery_bot_config(args: argparse.Namespace) -> RecoveryBotConfig | None:
+    json_payload = getattr(args, "recovery_bot_config_json", None)
+    enabled_flag = bool(getattr(args, "recovery_bot", False))
+    if json_payload and not enabled_flag:
+        raise ValueError("--recovery-bot-config-json requires --recovery-bot")
+    if not enabled_flag:
+        return None
+    if json_payload:
+        parsed = recovery_bot_config_from_json_string(str(json_payload))
+        if parsed.enabled:
+            return parsed
+        payload = recovery_bot_config_to_dict(parsed)
+        payload["enabled"] = True
+        return recovery_bot_config_from_dict(payload)
+    return RecoveryBotConfig(enabled=True)
 
 
 def resolve_directions(direction: str) -> list[str]:
@@ -217,6 +239,7 @@ def run_fill_model_comparison(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -242,6 +265,7 @@ def run_fill_model_comparison(
                 long_config_path=long_config_path,
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
+                recovery_bot_config=recovery_bot_config,
             )
 
     json_path, csv_path = comparison_output_paths(output_dir, symbol_upper)
@@ -512,6 +536,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="JSON config for stuck recovery reload (overrides defaults)",
     )
     parser.add_argument(
+        "--recovery-bot",
+        action="store_true",
+        help="Backtest-only: enable emergency recovery bot",
+    )
+    parser.add_argument(
+        "--recovery-bot-config-json",
+        default=None,
+        help="JSON configuration for the backtest-only emergency recovery bot",
+    )
+    parser.add_argument(
         "--cycle-short-tp-relief",
         action="store_true",
         help=(
@@ -606,6 +640,15 @@ def main(argv: list[str] | None = None) -> int:
         write_csv = True
 
     try:
+        recovery_bot_config = resolve_recovery_bot_config(args)
+        stuck_recovery_reload_config = resolve_stuck_recovery_reload_config(args)
+        if recovery_bot_config is not None and stuck_recovery_reload_config is not None:
+            raise ValueError(
+                "--recovery-bot cannot be combined with --stuck-recovery-reload "
+                "or --stuck-recovery-reload-config-json"
+            )
+        dynamic_cycle_scaling_config = resolve_dynamic_cycle_scaling_config(args)
+        cycle_short_tp_relief_config = resolve_cycle_short_tp_relief_config(args)
         if args.continuous_reentry:
             if args.multi_start:
                 raise ValueError("--continuous-reentry cannot be combined with --multi-start")
@@ -634,6 +677,7 @@ def main(argv: list[str] | None = None) -> int:
                 write_json=write_json,
                 write_csv=write_csv,
                 include_logs=args.include_logs or args.debug,
+                recovery_bot_config=recovery_bot_config,
             )
         elif args.multi_start:
             if args.compare_fill_models:
@@ -666,11 +710,11 @@ def main(argv: list[str] | None = None) -> int:
                 write_json=write_json,
                 write_csv=write_csv,
                 include_logs=args.include_logs or args.debug,
-                dynamic_cycle_scaling_config=resolve_dynamic_cycle_scaling_config(args),
-                stuck_recovery_reload_config=resolve_stuck_recovery_reload_config(args),
-                cycle_short_tp_relief_config=resolve_cycle_short_tp_relief_config(args),
+                dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
+                stuck_recovery_reload_config=stuck_recovery_reload_config,
+                cycle_short_tp_relief_config=cycle_short_tp_relief_config,
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
-                recovery_bot_config=None,
+                recovery_bot_config=recovery_bot_config,
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(
@@ -691,6 +735,7 @@ def main(argv: list[str] | None = None) -> int:
                     write_json=write_json,
                     write_csv=write_csv,
                     include_logs=args.include_logs or args.debug,
+                    recovery_bot_config=recovery_bot_config,
                 )
                 payload["deep_dive"] = deep_dive_payload
         elif args.compare_fill_models:
@@ -708,6 +753,7 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                recovery_bot_config=recovery_bot_config,
             )
         else:
             payload = run_original_hedge_backtests(
@@ -727,7 +773,7 @@ def main(argv: list[str] | None = None) -> int:
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
-                recovery_bot_config=None,
+                recovery_bot_config=recovery_bot_config,
             )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

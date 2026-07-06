@@ -17,6 +17,7 @@ from .backtest_config_loader import (
 from .backtest_report import BacktestResult
 from .fill_models import resolve_fill_model_config
 from .historical_backtest import normalize_candles, run_historical_backtest
+from .recovery_bot.config import RecoveryBotConfig
 from .pnl_coverage_audit import apply_trade_exit_quality
 from .multi_start_backtest import compact_result_dict, resolve_directions
 from .trade_block_export import ensure_backtest_trade_block_ids, stamp_trade_block_id
@@ -252,6 +253,7 @@ def run_continuous_reentry_for_direction(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
     symbol_upper = symbol.upper()
@@ -292,6 +294,7 @@ def run_continuous_reentry_for_direction(
             long_config_path=long_config_path,
             short_config_path=short_config_path,
             file_config_path=file_config_path,
+            recovery_bot_config=recovery_bot_config,
         )
         result.start_index = start_index
         result.end_index = _trade_end_index(start_index, result)
@@ -330,6 +333,7 @@ def run_continuous_reentry_backtests(
     write_json: bool = True,
     write_csv: bool = True,
     include_logs: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> dict[str, Any]:
     """Run continuous re-entry backtests for one or more directions."""
     symbol_upper = symbol.upper()
@@ -359,6 +363,7 @@ def run_continuous_reentry_backtests(
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
                 tp_profit_target_pct=tp_profit_target_pct,
+                recovery_bot_config=recovery_bot_config,
             )
         )
 
