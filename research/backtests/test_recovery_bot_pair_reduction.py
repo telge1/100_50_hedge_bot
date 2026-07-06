@@ -213,7 +213,7 @@ class RecoveryBotPairReductionTests(unittest.TestCase):
 
         advanced = maybe_advance_minimum_pair_state(sim, tracker, current_price=101.0)
         self.assertTrue(advanced)
-        self.assertIn(tracker.state, {RecoveryState.READY_TO_CLOSE, RecoveryState.WAITING_FOR_RELOAD})
+        self.assertEqual(tracker.state, RecoveryState.READY_TO_CLOSE)
 
     def test_pair_not_neutral_blocks(self) -> None:
         sim = self._sim(close=101.0, long_qty=70.1, short_qty=70.0)

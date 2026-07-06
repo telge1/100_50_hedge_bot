@@ -11,7 +11,7 @@ from .calculations import (
     matches_configured_trigger,
 )
 from .config import RecoveryBotConfig
-from .state import RecoveryBotTracker, RecoveryState
+from .state import RecoveryBotTracker, RecoveryState, append_recovery_trace
 
 
 def attach_recovery_bot_tracker(
@@ -32,6 +32,12 @@ def observe_recovery_trigger_fills(
     *,
     fills: Iterable[Any],
     candle_index: int,
+    timestamp: Any | None = None,
+    symbol: str | None = None,
+    current_long_qty: float = 0.0,
+    current_short_qty: float = 0.0,
+    current_long_avg: float = 0.0,
+    current_short_avg: float = 0.0,
 ) -> bool:
     """Inspect filled events for the configured trigger purpose.
 
@@ -68,6 +74,40 @@ def observe_recovery_trigger_fills(
         tracker.trigger_candle_index = int(candle_index)
         tracker.state = RecoveryState.TRIGGER_OBSERVED
         tracker.last_action_candle_index = int(candle_index)
+        append_recovery_trace(
+            tracker,
+            sim=type(
+                "RecoveryTraceContext",
+                (),
+                {
+                    "symbol": symbol or "RECOVERY",
+                    "book": type(
+                        "BookContext",
+                        (),
+                        {
+                            "long_qty": current_long_qty,
+                            "short_qty": current_short_qty,
+                            "long_avg": current_long_avg,
+                            "short_avg": current_short_avg,
+                            "active_orders": staticmethod(lambda: []),
+                        },
+                    )(),
+                    "runtime_state": type("StateContext", (), {"strategy_state": tracker.extra})(),
+                    "candle": type(
+                        "CandleContext",
+                        (),
+                        {"close": price_value, "timestamp": timestamp or getattr(fill, "occurred_at", None)},
+                    )(),
+                    "candle_index": candle_index,
+                },
+            )(),
+            action="RECOVERY_TRIGGER_OBSERVED",
+            reason=str(purpose or ""),
+            state_before=RecoveryState.WAITING_FOR_TRIGGER,
+            state_after=tracker.state,
+            candle_index=candle_index,
+            current_price=price_value,
+        )
         return True
 
     return False
@@ -80,6 +120,10 @@ def maybe_activate_recovery(
     candle_index: int,
     current_long_qty: float,
     current_short_qty: float,
+    current_long_avg: float = 0.0,
+    current_short_avg: float = 0.0,
+    timestamp: Any | None = None,
+    symbol: str | None = None,
 ) -> bool:
     """Transition TRIGGER_OBSERVED -> NEUTRALIZING when conditions are met.
 
@@ -112,6 +156,7 @@ def maybe_activate_recovery(
         return False
 
     # Preconditions satisfied: activate NEUTRALIZING without touching orders.
+    state_before = tracker.state
     tracker.state = RecoveryState.NEUTRALIZING
     tracker.recovery_runs_for_trade += 1
     tracker.recovery_start_price = float(current_price)
@@ -133,5 +178,35 @@ def maybe_activate_recovery(
     tracker.loss_budget_usdt = compute_loss_budget_usdt(config)
     tracker.loss_budget_used_usdt = 0.0
     tracker.last_action_candle_index = int(candle_index)
+    append_recovery_trace(
+        tracker,
+        sim=type(
+            "RecoveryTraceContext",
+            (),
+            {
+                "symbol": symbol or "RECOVERY",
+                "book": type(
+                    "BookContext",
+                    (),
+                    {
+                        "long_qty": current_long_qty,
+                        "short_qty": current_short_qty,
+                        "long_avg": current_long_avg,
+                        "short_avg": current_short_avg,
+                        "active_orders": staticmethod(lambda: []),
+                    },
+                )(),
+                "runtime_state": type("StateContext", (), {"strategy_state": tracker.extra})(),
+                "candle": type("CandleContext", (), {"close": current_price, "timestamp": timestamp})(),
+                "candle_index": candle_index,
+            },
+        )(),
+        action="RECOVERY_TRIGGERED",
+        reason="trigger_conditions_met",
+        state_before=state_before,
+        state_after=tracker.state,
+        candle_index=candle_index,
+        current_price=current_price,
+    )
     return True
 

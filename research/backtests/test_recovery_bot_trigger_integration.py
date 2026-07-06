@@ -46,7 +46,13 @@ class RecoveryBotTriggerIntegrationTests(unittest.TestCase):
         # Capture tracker state transitions inside the patched hooks.
         states: list[RecoveryState] = []
 
-        def _observe_side_effect(tracker, *, fills, candle_index: int) -> bool:  # type: ignore[override]
+        def _observe_side_effect(
+            tracker,
+            *,
+            fills,
+            candle_index: int,
+            **_kwargs,
+        ) -> bool:  # type: ignore[override]
             if tracker is None:
                 return False
             # Simulate TRIGGER_OBSERVED without touching simulator/backtest.
@@ -61,6 +67,7 @@ class RecoveryBotTriggerIntegrationTests(unittest.TestCase):
             candle_index: int,
             current_long_qty: float,
             current_short_qty: float,
+            **_kwargs,
         ) -> bool:  # type: ignore[override]
             if tracker is None:
                 return False

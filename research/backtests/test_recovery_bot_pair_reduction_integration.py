@@ -103,7 +103,7 @@ class RecoveryBotPairReductionIntegrationTests(unittest.TestCase):
         tracker.minimum_pair_reached = True
         advanced = maybe_advance_minimum_pair_state(sim, tracker, current_price=90.0)
         self.assertTrue(advanced)
-        self.assertEqual(tracker.state, RecoveryState.WAITING_FOR_RELOAD)
+        self.assertEqual(tracker.state, RecoveryState.READY_TO_CLOSE)
 
     def test_historical_backtest_keeps_normal_strategy_frozen_during_pair_reduction(self) -> None:
         candles = [

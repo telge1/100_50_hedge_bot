@@ -16,6 +16,7 @@ from .config_diagnostics import (
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator
 from .intent_diagnostics import compute_final_active_order_diagnostics
 from .purpose_utils import purpose_log_fields, preserve_bot_purpose
+from .recovery_bot.state import build_recovery_summary, recovery_trace_entries
 from .simulated_order_book import SyntheticCandle, VirtualOrder
 
 STRATEGY_STATE_EXCERPT_KEYS = (
@@ -286,6 +287,13 @@ def finalize_backtest_debug(
         )
     else:
         result.final_active_order_diagnostics = []
+
+    recovery_tracker = getattr(sim, "recovery_bot_tracker", None)
+    result.recovery_trace = recovery_trace_entries(recovery_tracker)
+    result.recovery_summary = build_recovery_summary(
+        recovery_tracker,
+        active_orders_remaining=len(active_virtual_orders),
+    )
 
     if result.fill_log:
         result.last_fill = dict(result.fill_log[-1])

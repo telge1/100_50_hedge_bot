@@ -25,11 +25,13 @@ from .recovery_bot.engine import (
     ensure_recovery_exclusive_order_state,
     is_recovery_strategy_frozen,
     maybe_advance_minimum_pair_state,
+    maybe_execute_recovery_final_exit,
     maybe_execute_neutralization_step,
     maybe_execute_pair_reduction_step,
+    maybe_execute_recovery_reload,
     validate_recovery_mode_exclusivity,
 )
-from .recovery_bot.state import RecoveryState
+from .recovery_bot.state import RecoveryState, append_recovery_trace
 from .recovery_bot.events import (
     maybe_activate_recovery,
     observe_recovery_trigger_fills,
@@ -274,10 +276,43 @@ def run_historical_backtest(
             # orders or generate additional fills; it only updates tracker
             # state based on filled purposes and prices.
             if recovery_tracker is not None:
+                max_recovery_candles = int(recovery_tracker.config.max_recovery_candles_per_trade or 0)
+                if (
+                    max_recovery_candles > 0
+                    and recovery_tracker.recovery_start_candle_index is not None
+                    and recovery_tracker.state
+                    in {
+                        RecoveryState.NEUTRALIZING,
+                        RecoveryState.PAIR_REDUCING,
+                        RecoveryState.MINIMUM_PAIR_REACHED,
+                        RecoveryState.READY_TO_CLOSE,
+                        RecoveryState.WAITING_FOR_RELOAD,
+                    }
+                    and loop_index - int(recovery_tracker.recovery_start_candle_index) > max_recovery_candles
+                ):
+                    state_before = recovery_tracker.state
+                    recovery_tracker.state = RecoveryState.FAILED
+                    recovery_tracker.blocked_reason = "max_recovery_candles_exceeded"
+                    append_recovery_trace(
+                        recovery_tracker,
+                        sim=sim,
+                        action="RECOVERY_FAILED",
+                        reason=recovery_tracker.blocked_reason,
+                        state_before=state_before,
+                        state_after=recovery_tracker.state,
+                        candle_index=loop_index,
+                        current_price=float(candle.close),
+                    )
                 observe_recovery_trigger_fills(
                     recovery_tracker,
                     fills=candle_result.candle_fills,
                     candle_index=loop_index,
+                    timestamp=candle.timestamp,
+                    symbol=sim.symbol,
+                    current_long_qty=float(sim.book.long_qty or 0.0),
+                    current_short_qty=float(sim.book.short_qty or 0.0),
+                    current_long_avg=float(sim.book.long_avg or 0.0),
+                    current_short_avg=float(sim.book.short_avg or 0.0),
                 )
                 activated = maybe_activate_recovery(
                     recovery_tracker,
@@ -285,6 +320,10 @@ def run_historical_backtest(
                     candle_index=loop_index,
                     current_long_qty=float(sim.book.long_qty or 0.0),
                     current_short_qty=float(sim.book.short_qty or 0.0),
+                    current_long_avg=float(sim.book.long_avg or 0.0),
+                    current_short_avg=float(sim.book.short_avg or 0.0),
+                    timestamp=candle.timestamp,
+                    symbol=sim.symbol,
                 )
                 if activated:
                     ensure_recovery_exclusive_order_state(sim, recovery_tracker)
@@ -309,6 +348,21 @@ def run_historical_backtest(
                         sim,
                         recovery_tracker,
                         current_price=float(candle.close),
+                        candle_index=loop_index,
+                    )
+                elif current_recovery_state == RecoveryState.READY_TO_CLOSE:
+                    recovery_fills = maybe_execute_recovery_final_exit(
+                        sim,
+                        recovery_tracker,
+                        current_price=float(candle.close),
+                        candle_index=loop_index,
+                    )
+                elif current_recovery_state == RecoveryState.WAITING_FOR_RELOAD:
+                    recovery_fills = maybe_execute_recovery_reload(
+                        sim,
+                        recovery_tracker,
+                        current_price=float(candle.close),
+                        candle_index=loop_index,
                     )
                 if recovery_fills:
                     recovery_pnl = _append_fill_logs(

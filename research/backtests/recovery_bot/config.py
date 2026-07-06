@@ -53,8 +53,17 @@ class RecoveryBotConfig:
     slippage_buffer_pct: float = 0.0
 
     close_when_within_loss_budget: bool = True
+    max_recovery_candles_per_trade: int = 0
 
     reload_enabled: bool = False
+    max_reloads_per_trade: int = 0
+    reload_wait_candles: int = 0
+    reload_long_notional_usdt: float | None = None
+    reload_short_notional_usdt: float | None = None
+    reload_max_total_notional_usdt: float | None = None
+    reload_slippage_pct: float = 0.0
+
+    # Backward-compatibility fields from the earlier placeholder reload config.
     reload_max_count: int = 0
     reload_min_exit_improvement_pct: float = 0.0
     reload_max_additional_capital_usdt: float = 0.0
@@ -279,9 +288,48 @@ def validate_config(payload: Mapping[str, Any]) -> None:
     slippage_buffer_pct = float(payload.get("slippage_buffer_pct", 0.0) or 0.0)
     _require_non_negative("slippage_buffer_pct", slippage_buffer_pct)
 
+    max_recovery_candles_per_trade = int(
+        payload.get("max_recovery_candles_per_trade", 0) or 0
+    )
+    if max_recovery_candles_per_trade < 0:
+        raise ValueError(
+            "max_recovery_candles_per_trade must be >= 0 "
+            f"(got {max_recovery_candles_per_trade})"
+        )
+
     reload_max_count = int(payload.get("reload_max_count", 0) or 0)
     if reload_max_count < 0:
         raise ValueError(f"reload_max_count must be >= 0 (got {reload_max_count})")
+
+    max_reloads_per_trade = int(
+        payload.get("max_reloads_per_trade", payload.get("reload_max_count", 0)) or 0
+    )
+    if max_reloads_per_trade < 0:
+        raise ValueError(
+            f"max_reloads_per_trade must be >= 0 (got {max_reloads_per_trade})"
+        )
+
+    reload_wait_candles = int(payload.get("reload_wait_candles", 0) or 0)
+    if reload_wait_candles < 0:
+        raise ValueError(f"reload_wait_candles must be >= 0 (got {reload_wait_candles})")
+
+    reload_long_notional_usdt = payload.get("reload_long_notional_usdt")
+    if reload_long_notional_usdt is not None:
+        _require_positive("reload_long_notional_usdt", float(reload_long_notional_usdt))
+
+    reload_short_notional_usdt = payload.get("reload_short_notional_usdt")
+    if reload_short_notional_usdt is not None:
+        _require_positive("reload_short_notional_usdt", float(reload_short_notional_usdt))
+
+    reload_max_total_notional_usdt = payload.get("reload_max_total_notional_usdt")
+    if reload_max_total_notional_usdt is not None:
+        _require_positive(
+            "reload_max_total_notional_usdt",
+            float(reload_max_total_notional_usdt),
+        )
+
+    reload_slippage_pct = float(payload.get("reload_slippage_pct", 0.0) or 0.0)
+    _require_non_negative("reload_slippage_pct", reload_slippage_pct)
 
     reload_min_exit_improvement_pct = float(
         payload.get("reload_min_exit_improvement_pct", 0.0) or 0.0
@@ -298,6 +346,21 @@ def validate_config(payload: Mapping[str, Any]) -> None:
         "reload_max_additional_capital_usdt",
         reload_max_additional_capital_usdt,
     )
+
+    reload_enabled = bool(payload.get("reload_enabled", False))
+    if reload_enabled:
+        if max_reloads_per_trade <= 0:
+            raise ValueError(
+                "max_reloads_per_trade must be > 0 when reload_enabled is True"
+            )
+        if reload_long_notional_usdt is None or float(reload_long_notional_usdt) <= 0:
+            raise ValueError(
+                "reload_long_notional_usdt must be set and > 0 when reload_enabled is True"
+            )
+        if reload_short_notional_usdt is None or float(reload_short_notional_usdt) <= 0:
+            raise ValueError(
+                "reload_short_notional_usdt must be set and > 0 when reload_enabled is True"
+            )
 
 
 def config_from_dict(payload: Mapping[str, Any]) -> RecoveryBotConfig:
@@ -383,7 +446,30 @@ def config_from_dict(payload: Mapping[str, Any]) -> RecoveryBotConfig:
         close_when_within_loss_budget=bool(
             payload.get("close_when_within_loss_budget", True)
         ),
+        max_recovery_candles_per_trade=int(
+            payload.get("max_recovery_candles_per_trade", 0) or 0
+        ),
         reload_enabled=bool(payload.get("reload_enabled", False)),
+        max_reloads_per_trade=int(
+            payload.get("max_reloads_per_trade", payload.get("reload_max_count", 0)) or 0
+        ),
+        reload_wait_candles=int(payload.get("reload_wait_candles", 0) or 0),
+        reload_long_notional_usdt=(
+            None
+            if payload.get("reload_long_notional_usdt") is None
+            else float(payload.get("reload_long_notional_usdt"))
+        ),
+        reload_short_notional_usdt=(
+            None
+            if payload.get("reload_short_notional_usdt") is None
+            else float(payload.get("reload_short_notional_usdt"))
+        ),
+        reload_max_total_notional_usdt=(
+            None
+            if payload.get("reload_max_total_notional_usdt") is None
+            else float(payload.get("reload_max_total_notional_usdt"))
+        ),
+        reload_slippage_pct=float(payload.get("reload_slippage_pct", 0.0) or 0.0),
         reload_max_count=int(payload.get("reload_max_count", 0) or 0),
         reload_min_exit_improvement_pct=float(
             payload.get("reload_min_exit_improvement_pct", 0.0) or 0.0

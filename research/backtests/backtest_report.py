@@ -230,6 +230,8 @@ class BacktestResult:
     trade_number: int | None = None
     trade_block_id: str | None = None
     exit_quality: str = ""
+    recovery_trace: list[dict[str, Any]] = field(default_factory=list)
+    recovery_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

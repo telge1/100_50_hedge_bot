@@ -115,6 +115,37 @@ class RecoveryBotConfigTests(unittest.TestCase):
         budget = compute_loss_budget_usdt(cfg)
         self.assertAlmostEqual(budget, 0.0, places=6)
 
+    def test_reload_enabled_requires_explicit_limits_and_notionals(self) -> None:
+        base = RecoveryBotConfig().__dict__
+        with self.assertRaises(ValueError):
+            validate_config({**base, "reload_enabled": True})
+        with self.assertRaises(ValueError):
+            validate_config(
+                {
+                    **base,
+                    "reload_enabled": True,
+                    "max_reloads_per_trade": 1,
+                    "reload_long_notional_usdt": 100.0,
+                }
+            )
+
+        validate_config(
+            {
+                **base,
+                "reload_enabled": True,
+                "max_reloads_per_trade": 1,
+                "reload_wait_candles": 2,
+                "reload_long_notional_usdt": 100.0,
+                "reload_short_notional_usdt": 50.0,
+                "reload_slippage_pct": 0.2,
+            }
+        )
+
+    def test_reload_max_total_notional_must_be_positive_when_set(self) -> None:
+        base = RecoveryBotConfig().__dict__
+        with self.assertRaises(ValueError):
+            validate_config({**base, "reload_max_total_notional_usdt": 0.0})
+
 
 
 if __name__ == "__main__":
