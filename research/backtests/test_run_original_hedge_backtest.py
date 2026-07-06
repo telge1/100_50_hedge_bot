@@ -409,3 +409,128 @@ def test_cli_multi_start_forwards_recovery_config(monkeypatch: pytest.MonkeyPatc
     assert isinstance(config, RecoveryBotConfig)
     assert config.enabled is True
     assert config.trigger_order == "CYCLE_4_SHORT_REDUCE"
+
+
+def test_cli_continuous_reentry_forwards_tp_override_and_recovery_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_load(*args, **kwargs):
+        return [{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}]
+
+    def _fake_run_continuous_reentry_backtests(**kwargs):
+        calls.update(kwargs)
+        return {
+            "symbol": "BTCUSDT",
+            "directions": ["long"],
+            "continuous_reentry": True,
+            "results": [],
+            "aggregate": [],
+            "output_files": {"summary_csv": None, "aggregate_csv": None, "json": None},
+            "candles_loaded": 1,
+            "fill_model": kwargs.get("fill_model"),
+            "config_source": kwargs.get("config_source"),
+            "continuous_start_index": kwargs.get("continuous_start_index"),
+            "continuous_window_candles": kwargs.get("continuous_window_candles"),
+            "continuous_max_trades": kwargs.get("continuous_max_trades"),
+        }
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest._load_candles",
+        _fake_load,
+    )
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_continuous_reentry_backtests",
+        _fake_run_continuous_reentry_backtests,
+    )
+
+    code = cli_main(
+        [
+            "--continuous-reentry",
+            "--symbol",
+            "BTCUSDT",
+            "--direction",
+            "long",
+            "--limit",
+            "5",
+            "--continuous-start-index",
+            "0",
+            "--continuous-window-candles",
+            "1",
+            "--continuous-max-trades",
+            "1",
+            "--tp-profit-target-pct",
+            "0.5",
+            "--recovery-bot",
+            "--recovery-bot-config-json",
+            '{"trigger_order":"CYCLE_4_SHORT_REDUCE","pair_reduce_pct":25.0}',
+            "--no-json",
+            "--no-csv",
+        ]
+    )
+
+    assert code == 0
+    assert calls.get("tp_profit_target_pct") == pytest.approx(0.5)
+    config = calls.get("recovery_bot_config")
+    assert isinstance(config, RecoveryBotConfig)
+    assert config.enabled is True
+    assert config.trigger_order == "CYCLE_4_SHORT_REDUCE"
+
+
+def test_cli_continuous_reentry_without_recovery_keeps_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    def _fake_load(*args, **kwargs):
+        return [{"timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "open": 1, "high": 1, "low": 1, "close": 1}]
+
+    def _fake_run_continuous_reentry_backtests(**kwargs):
+        calls.update(kwargs)
+        return {
+            "symbol": "BTCUSDT",
+            "directions": ["long"],
+            "continuous_reentry": True,
+            "results": [],
+            "aggregate": [],
+            "output_files": {"summary_csv": None, "aggregate_csv": None, "json": None},
+            "candles_loaded": 1,
+            "fill_model": kwargs.get("fill_model"),
+            "config_source": kwargs.get("config_source"),
+            "continuous_start_index": kwargs.get("continuous_start_index"),
+            "continuous_window_candles": kwargs.get("continuous_window_candles"),
+            "continuous_max_trades": kwargs.get("continuous_max_trades"),
+        }
+
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest._load_candles",
+        _fake_load,
+    )
+    monkeypatch.setattr(
+        "research.backtests.run_original_hedge_backtest.run_continuous_reentry_backtests",
+        _fake_run_continuous_reentry_backtests,
+    )
+
+    code = cli_main(
+        [
+            "--continuous-reentry",
+            "--symbol",
+            "BTCUSDT",
+            "--direction",
+            "long",
+            "--limit",
+            "5",
+            "--continuous-start-index",
+            "0",
+            "--continuous-window-candles",
+            "1",
+            "--continuous-max-trades",
+            "1",
+            "--no-json",
+            "--no-csv",
+        ]
+    )
+
+    assert code == 0
+    assert calls.get("recovery_bot_config") is None
