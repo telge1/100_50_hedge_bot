@@ -19,6 +19,7 @@ from .backtest_config_loader import (
 from .backtest_report import BacktestResult
 from .fill_models import FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
+from .recovery_bot.config import RecoveryBotConfig
 from .cycle_short_tp_relief import CycleShortTpReliefConfig
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
@@ -457,6 +458,7 @@ def run_multi_start_backtest(
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     use_live_short_tp_relief: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> list[BacktestResult]:
     """Run multiple backtests at staggered start points over the candle series."""
     symbol_upper = symbol.upper()
@@ -500,6 +502,7 @@ def run_multi_start_backtest(
             stuck_recovery_reload_config=stuck_recovery_reload_config,
             cycle_short_tp_relief_config=effective_cycle_short_tp_relief_config,
             use_live_short_tp_relief=use_live_short_tp_relief,
+            recovery_bot_config=recovery_bot_config,
         )
         result.start_index = start_index
         result.window_candles = min(window_candles, len(window))
@@ -542,6 +545,7 @@ def run_multi_start_backtests(
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     use_live_short_tp_relief: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> dict[str, Any]:
     """Run multi-start backtests for one or more directions and fill models."""
     symbol_upper = symbol.upper()
@@ -573,6 +577,7 @@ def run_multi_start_backtests(
                     stuck_recovery_reload_config=stuck_recovery_reload_config,
                     cycle_short_tp_relief_config=cycle_short_tp_relief_config,
                     use_live_short_tp_relief=use_live_short_tp_relief,
+                    recovery_bot_config=recovery_bot_config,
                 )
             )
 

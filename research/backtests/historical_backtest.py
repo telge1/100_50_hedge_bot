@@ -20,9 +20,24 @@ from .cycle_short_tp_relief import CycleShortTpReliefConfig
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .stuck_recovery_reload_shim import maybe_execute_stuck_recovery_reload
+from .recovery_bot.config import RecoveryBotConfig
+from .recovery_bot.engine import (
+    ensure_recovery_exclusive_order_state,
+    is_recovery_strategy_frozen,
+    maybe_advance_minimum_pair_state,
+    maybe_execute_neutralization_step,
+    maybe_execute_pair_reduction_step,
+    validate_recovery_mode_exclusivity,
+)
+from .recovery_bot.state import RecoveryState
+from .recovery_bot.events import (
+    maybe_activate_recovery,
+    observe_recovery_trigger_fills,
+)
 from .trade_block_export import ensure_backtest_trade_block_ids
 from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
+from .hedge_bot_original_simulator import ProcessCandleResult
 from .simulated_order_book import SyntheticCandle
 
 
@@ -87,6 +102,19 @@ def _append_fill_logs(
     return pnl_delta
 
 
+def _empty_candle_result(candle: SyntheticCandle) -> ProcessCandleResult:
+    return ProcessCandleResult(
+        candle=candle,
+        candle_fills=[],
+        on_fill_intents=[],
+        tick_intents=[],
+        snapshot=None,
+        strategy_state={},
+        same_candle_fill_count=0,
+        paired_exit_fills_count=0,
+    )
+
+
 def run_historical_backtest(
     symbol: str,
     direction: str,
@@ -106,8 +134,13 @@ def run_historical_backtest(
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     use_live_short_tp_relief: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
+    validate_recovery_mode_exclusivity(
+        recovery_bot_config=recovery_bot_config,
+        stuck_recovery_reload_config=stuck_recovery_reload_config,
+    )
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
     symbol_upper = symbol.upper()
     candle_list = normalize_candles(symbol_upper, candles)
@@ -154,6 +187,7 @@ def run_historical_backtest(
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
         stuck_recovery_reload_config=stuck_recovery_reload_config,
         cycle_short_tp_relief_config=None if use_live_short_tp_relief else cycle_short_tp_relief_config,
+        recovery_bot_config=recovery_bot_config,
     )
     sim.candle = first_candle
     sim.candle_index = 0
@@ -171,6 +205,7 @@ def run_historical_backtest(
     peak_pnl = 0.0
     max_drawdown = 0.0
     reload_tracker = sim.stuck_recovery_reload_tracker
+    recovery_tracker = sim.recovery_bot_tracker
 
     try:
         entry_result = sim.run_entry_smoke()
@@ -199,12 +234,21 @@ def run_historical_backtest(
         for loop_index, candle in enumerate(loop_candles, start=1):
             sim.candle = candle
             sim.candle_index = loop_index
-            candle_result = sim.process_candle(
-                candle,
-                fill_model=fill_config.fill_model,
-                max_fills_per_candle=fill_config.max_fills_per_candle,
-                conservative_fill_order=conservative_fill_order,
-            )
+            if is_recovery_strategy_frozen(recovery_tracker):
+                # While recovery actively controls the trade we intentionally do
+                # not run the normal strategy candle path. Market prices still
+                # advance via the current candle so recovery conditions can be
+                # evaluated, but no normal fills or new strategy intents may be
+                # produced.
+                sim._refresh_snapshot_from_book(source="recovery_frozen_before_candle", price=candle.close)
+                candle_result = _empty_candle_result(candle)
+            else:
+                candle_result = sim.process_candle(
+                    candle,
+                    fill_model=fill_config.fill_model,
+                    max_fills_per_candle=fill_config.max_fills_per_candle,
+                    conservative_fill_order=conservative_fill_order,
+                )
             result.candles_processed += 1
             result.end_time = candle.timestamp
 
@@ -225,11 +269,56 @@ def run_historical_backtest(
                     candle_index=loop_index,
                     fill_count=len(candle_result.candle_fills),
                 )
-            peak_pnl, max_drawdown = _update_drawdown(
-                cumulative_pnl=cumulative_pnl,
-                peak_pnl=peak_pnl,
-                max_drawdown=max_drawdown,
-            )
+            # Recovery bot Phase 2: observe actual fills and, if configured,
+            # possibly transition into NEUTRALIZING. This must not submit
+            # orders or generate additional fills; it only updates tracker
+            # state based on filled purposes and prices.
+            if recovery_tracker is not None:
+                observe_recovery_trigger_fills(
+                    recovery_tracker,
+                    fills=candle_result.candle_fills,
+                    candle_index=loop_index,
+                )
+                activated = maybe_activate_recovery(
+                    recovery_tracker,
+                    current_price=float(candle.close),
+                    candle_index=loop_index,
+                    current_long_qty=float(sim.book.long_qty or 0.0),
+                    current_short_qty=float(sim.book.short_qty or 0.0),
+                )
+                if activated:
+                    ensure_recovery_exclusive_order_state(sim, recovery_tracker)
+                recovery_fills: list[FillEvent] = []
+                current_recovery_state = recovery_tracker.state
+                if current_recovery_state == RecoveryState.NEUTRALIZING:
+                    recovery_fills = maybe_execute_neutralization_step(
+                        sim,
+                        recovery_tracker,
+                        current_price=float(candle.close),
+                        candle_index=loop_index,
+                    )
+                elif current_recovery_state == RecoveryState.PAIR_REDUCING:
+                    recovery_fills = maybe_execute_pair_reduction_step(
+                        sim,
+                        recovery_tracker,
+                        current_price=float(candle.close),
+                        candle_index=loop_index,
+                    )
+                elif current_recovery_state == RecoveryState.MINIMUM_PAIR_REACHED:
+                    maybe_advance_minimum_pair_state(
+                        sim,
+                        recovery_tracker,
+                        current_price=float(candle.close),
+                    )
+                if recovery_fills:
+                    recovery_pnl = _append_fill_logs(
+                        result,
+                        sim,
+                        recovery_fills,
+                        candle=candle,
+                        candle_index=loop_index,
+                    )
+                    cumulative_pnl += recovery_pnl
             result.orders_submitted = sim.orders_submitted
 
             if reload_tracker is not None and not _is_trade_closed(sim):
@@ -249,12 +338,13 @@ def run_historical_backtest(
                         candle_index=loop_index,
                     )
                     cumulative_pnl += reload_pnl
-                    peak_pnl, max_drawdown = _update_drawdown(
-                        cumulative_pnl=cumulative_pnl,
-                        peak_pnl=peak_pnl,
-                        max_drawdown=max_drawdown,
-                    )
                     result.orders_submitted = sim.orders_submitted
+
+            peak_pnl, max_drawdown = _update_drawdown(
+                cumulative_pnl=cumulative_pnl,
+                peak_pnl=peak_pnl,
+                max_drawdown=max_drawdown,
+            )
 
             if _is_trade_closed(sim):
                 result.final_status = "closed"

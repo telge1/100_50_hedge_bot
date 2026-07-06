@@ -32,6 +32,8 @@ from .dynamic_cycle_order_scaling_shim import install_dynamic_cycle_order_scalin
 from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .stuck_recovery_reload_shim import attach_stuck_recovery_reload_tracker
+from .recovery_bot.config import RecoveryBotConfig
+from .recovery_bot.events import attach_recovery_bot_tracker
 from .fill_models import FillModelConfig, resolve_fill_model_config
 from .intent_diagnostics import build_intent_log_entry, build_intent_to_order_mapping
 from .purpose_utils import preserve_bot_purpose
@@ -185,6 +187,7 @@ class HedgeBotOriginalSimulator:
         dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
         stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
         cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+        recovery_bot_config: RecoveryBotConfig | None = None,
     ) -> None:
         self.signal = signal
         self.symbol = symbol.upper()
@@ -228,6 +231,11 @@ class HedgeBotOriginalSimulator:
             stuck_recovery_reload_config,
         )
         self.stuck_recovery_reload_config = stuck_recovery_reload_config
+        # Backtest-only recovery bot tracker. When recovery_bot_config is None
+        # or disabled the tracker is None and the simulator behaves exactly as
+        # before.
+        self.recovery_bot_tracker = attach_recovery_bot_tracker(recovery_bot_config)
+        self.recovery_bot_config = recovery_bot_config
         self.runtime_state = build_runtime_state(
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),

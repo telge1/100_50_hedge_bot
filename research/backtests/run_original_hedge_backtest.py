@@ -36,6 +36,7 @@ from .stuck_recovery_reload import (
     config_from_json_string as stuck_reload_config_from_json_string,
     default_stuck_recovery_reload_config,
 )
+from .recovery_bot.config import RecoveryBotConfig
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .continuous_reentry_backtest import (
@@ -129,6 +130,7 @@ def run_original_hedge_backtests(
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
     use_live_short_tp_relief: bool = False,
+    recovery_bot_config: RecoveryBotConfig | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -157,6 +159,7 @@ def run_original_hedge_backtests(
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
             use_live_short_tp_relief=use_live_short_tp_relief,
+            recovery_bot_config=recovery_bot_config,
         )
 
     json_path, csv_path = default_output_paths(output_dir, symbol_upper)
@@ -667,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
                 stuck_recovery_reload_config=resolve_stuck_recovery_reload_config(args),
                 cycle_short_tp_relief_config=resolve_cycle_short_tp_relief_config(args),
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
+                recovery_bot_config=None,
             )
             if args.deep_dive_unfinished:
                 deep_dive_payload = run_unfinished_deep_dive_after_multi_start(
@@ -723,6 +727,7 @@ def main(argv: list[str] | None = None) -> int:
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
+                recovery_bot_config=None,
             )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
