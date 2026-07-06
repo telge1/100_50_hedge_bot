@@ -99,6 +99,7 @@ def append_recovery_trace(
     candle_index: int | None = None,
     timestamp: datetime | None = None,
     current_price: float | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     if tracker is None:
         return
@@ -113,30 +114,31 @@ def append_recovery_trace(
 
     candle = getattr(sim, "candle", None)
     trace = tracker.extra.setdefault("recovery_trace", [])
-    trace.append(
-        {
-            "trade_id": trade_id,
-            "candle_index": int(candle_index) if candle_index is not None else getattr(sim, "candle_index", None),
-            "timestamp": (
-                timestamp or getattr(candle, "timestamp", None)
-            ).isoformat()
-            if (timestamp or getattr(candle, "timestamp", None)) is not None
-            else None,
-            "state_before": str(state_before or tracker.state),
-            "state_after": str(state_after or tracker.state),
-            "action": str(action),
-            "reason": reason,
-            "current_price": float(current_price) if current_price is not None else float(getattr(candle, "close", 0.0) or 0.0),
-            "long_qty": float(getattr(getattr(sim, "book", None), "long_qty", 0.0) or 0.0),
-            "short_qty": float(getattr(getattr(sim, "book", None), "short_qty", 0.0) or 0.0),
-            "long_avg": float(getattr(getattr(sim, "book", None), "long_avg", 0.0) or 0.0),
-            "short_avg": float(getattr(getattr(sim, "book", None), "short_avg", 0.0) or 0.0),
-            "loss_budget_usdt": tracker.loss_budget_usdt,
-            "loss_budget_used_usdt": tracker.loss_budget_used_usdt,
-            "reload_count": int(tracker.reload_count),
-            "active_order_count": len(getattr(getattr(sim, "book", None), "active_orders", lambda: [])()),
-        }
-    )
+    entry: dict[str, Any] = {
+        "trade_id": trade_id,
+        "candle_index": int(candle_index) if candle_index is not None else getattr(sim, "candle_index", None),
+        "timestamp": (
+            timestamp or getattr(candle, "timestamp", None)
+        ).isoformat()
+        if (timestamp or getattr(candle, "timestamp", None)) is not None
+        else None,
+        "state_before": str(state_before or tracker.state),
+        "state_after": str(state_after or tracker.state),
+        "action": str(action),
+        "reason": reason,
+        "current_price": float(current_price) if current_price is not None else float(getattr(candle, "close", 0.0) or 0.0),
+        "long_qty": float(getattr(getattr(sim, "book", None), "long_qty", 0.0) or 0.0),
+        "short_qty": float(getattr(getattr(sim, "book", None), "short_qty", 0.0) or 0.0),
+        "long_avg": float(getattr(getattr(sim, "book", None), "long_avg", 0.0) or 0.0),
+        "short_avg": float(getattr(getattr(sim, "book", None), "short_avg", 0.0) or 0.0),
+        "loss_budget_usdt": tracker.loss_budget_usdt,
+        "loss_budget_used_usdt": tracker.loss_budget_used_usdt,
+        "reload_count": int(tracker.reload_count),
+        "active_order_count": len(getattr(getattr(sim, "book", None), "active_orders", lambda: [])()),
+    }
+    if extra:
+        entry.update(extra)
+    trace.append(entry)
 
 
 def recovery_trace_entries(tracker: RecoveryBotTracker | None) -> list[dict[str, Any]]:

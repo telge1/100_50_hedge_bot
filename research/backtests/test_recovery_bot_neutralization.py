@@ -7,9 +7,15 @@ from research.backtests.hedge_bot_original_simulator import HedgeBotOriginalSimu
 from research.backtests.recovery_bot.config import RecoveryBotConfig
 from research.backtests.recovery_bot.engine import (
     RECOVERY_NEUTRALIZE_LONG_PURPOSE,
+    _compute_neutralization_reduce_qty,
+    _estimate_recovery_loss_usdt,
     maybe_execute_neutralization_step,
 )
-from research.backtests.recovery_bot.state import RecoveryBotTracker, RecoveryState
+from research.backtests.recovery_bot.state import (
+    RecoveryBotTracker,
+    RecoveryState,
+    recovery_trace_entries,
+)
 from research.backtests.simulated_order_book import SyntheticCandle
 
 
@@ -196,14 +202,107 @@ class RecoveryBotNeutralizationTests(unittest.TestCase):
         self.assertEqual(len(sim.order_log), before_orders)
         self.assertEqual(tracker.blocked_reason, "neutralization_untradeable_residual")
 
-    def test_budget_blocks_too_expensive_step(self) -> None:
+    def test_full_step_within_budget_keeps_original_quantity(self) -> None:
         sim = self._sim(close=89.1, long_avg=100.0)
-        tracker = self._tracker(loss_budget_usdt=1.0)
+        tracker = self._tracker(loss_budget_usdt=1_000.0, loss_budget_used_usdt=0.0)
+        planned_qty = _compute_neutralization_reduce_qty(sim, tracker)
+        self.assertGreater(planned_qty, 0.0)
+        expected_loss = _estimate_recovery_loss_usdt(sim, tracker, qty=float(planned_qty), current_price=89.1)
+        self.assertGreater(expected_loss, 0.0)
+        self.assertLess(expected_loss, float(tracker.loss_budget_usdt or 0.0))
+
+        fills = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
+        self.assertEqual(len(fills), 1)
+        self.assertAlmostEqual(fills[0].exec_qty, planned_qty, places=6)
+
+    def test_step_is_adjusted_to_fit_remaining_budget(self) -> None:
+        sim = self._sim(close=89.1, long_avg=100.0)
+        tracker = self._tracker(loss_budget_usdt=1_000.0, loss_budget_used_usdt=0.0)
+        planned_qty = _compute_neutralization_reduce_qty(sim, tracker)
+        self.assertGreater(planned_qty, 0.0)
+        full_loss = _estimate_recovery_loss_usdt(sim, tracker, qty=float(planned_qty), current_price=89.1)
+        self.assertGreater(full_loss, 0.0)
+
+        remaining_budget = float(full_loss) * 0.5
+        tracker.loss_budget_usdt = remaining_budget
+
+        fills = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
+        self.assertEqual(len(fills), 1)
+        exec_qty = float(fills[0].exec_qty)
+        self.assertLess(exec_qty, planned_qty)
+
+        rules = sim.runtime_state.instrument_rules[sim.symbol]
+        qty_step = float(rules.get("qty_step") or 0.001)
+        units = exec_qty / qty_step
+        self.assertAlmostEqual(units, round(units), places=6)
+
+        loss_after = _estimate_recovery_loss_usdt(sim, tracker, qty=exec_qty, current_price=89.1)
+        self.assertLessEqual(loss_after, remaining_budget + 1e-8)
+
+    def test_rest_budget_too_small_blocks_with_budget_reason(self) -> None:
+        sim = self._sim(close=89.1, long_avg=100.0)
+        tracker = self._tracker(loss_budget_usdt=1e-6, loss_budget_used_usdt=0.0)
         before_orders = len(sim.order_log)
         fills = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
         self.assertEqual(fills, [])
         self.assertEqual(len(sim.order_log), before_orders)
         self.assertEqual(tracker.blocked_reason, "neutralization_blocked_by_loss_budget")
+
+    def test_waiting_candle_does_not_clear_budget_blocker(self) -> None:
+        sim = self._sim(close=89.1, long_avg=100.0)
+        tracker = self._tracker(loss_budget_usdt=1e-6, loss_budget_used_usdt=0.0)
+
+        fills_first = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
+        self.assertEqual(fills_first, [])
+        self.assertEqual(tracker.blocked_reason, "neutralization_blocked_by_loss_budget")
+
+        self._set_candle(sim, close=89.5, index=2)
+        fills_second = maybe_execute_neutralization_step(sim, tracker, current_price=89.5, candle_index=2)
+        self.assertEqual(fills_second, [])
+        self.assertEqual(tracker.blocked_reason, "neutralization_blocked_by_loss_budget")
+
+    def test_later_low_price_does_not_overwrite_budget_block_with_untradeable(self) -> None:
+        sim = self._sim(close=89.1, long_avg=100.0)
+        tracker = self._tracker(loss_budget_usdt=1e-6, loss_budget_used_usdt=0.0)
+
+        fills_first = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
+        self.assertEqual(fills_first, [])
+        self.assertEqual(tracker.blocked_reason, "neutralization_blocked_by_loss_budget")
+
+        sim.runtime_state.instrument_rules[sim.symbol]["min_notional"] = Decimal("1000")
+        self._set_candle(sim, close=80.0, index=2)
+        fills_second = maybe_execute_neutralization_step(sim, tracker, current_price=80.0, candle_index=2)
+        self.assertEqual(fills_second, [])
+        self.assertEqual(tracker.blocked_reason, "neutralization_blocked_by_loss_budget")
+
+    def test_budget_adjustment_traces_diagnostics_fields(self) -> None:
+        sim = self._sim(close=89.1, long_avg=100.0)
+        tracker = self._tracker(loss_budget_usdt=1_000.0, loss_budget_used_usdt=0.0)
+        planned_qty = _compute_neutralization_reduce_qty(sim, tracker)
+        full_loss = _estimate_recovery_loss_usdt(sim, tracker, qty=float(planned_qty), current_price=89.1)
+        remaining_budget = float(full_loss) * 0.5
+        tracker.loss_budget_usdt = remaining_budget
+
+        fills = maybe_execute_neutralization_step(sim, tracker, current_price=89.1, candle_index=1)
+        self.assertEqual(len(fills), 1)
+
+        trace = recovery_trace_entries(tracker)
+        diag_entries = [entry for entry in trace if str(entry.get("action") or "") == "NEUTRALIZATION_FILLED"]
+        self.assertTrue(diag_entries)
+        entry = diag_entries[-1]
+
+        self.assertIn("planned_reduce_qty", entry)
+        self.assertIn("adjusted_reduce_qty", entry)
+        self.assertIn("expected_loss_before_adjustment", entry)
+        self.assertIn("expected_loss_after_adjustment", entry)
+        self.assertIn("remaining_loss_budget_usdt", entry)
+
+        self.assertGreater(float(entry["planned_reduce_qty"]), float(entry["adjusted_reduce_qty"]))
+        self.assertGreaterEqual(
+            float(entry["expected_loss_before_adjustment"]),
+            float(entry["expected_loss_after_adjustment"]),
+        )
+        self.assertAlmostEqual(float(entry["remaining_loss_budget_usdt"]), remaining_budget, places=6)
 
     def test_successful_step_creates_order_and_fill_and_updates_budget(self) -> None:
         sim = self._sim(close=89.1, long_avg=100.0)

@@ -39,6 +39,14 @@ RECOVERY_FROZEN_STATES = frozenset(
     }
 )
 
+PERSISTENT_NEUTRALIZATION_BLOCKED_REASONS = frozenset(
+    {
+        "neutralization_blocked_by_loss_budget",
+        "neutralization_untradeable_residual",
+        "neutralization_order_submit_failed",
+    }
+)
+
 
 def validate_recovery_mode_exclusivity(
     *,
@@ -296,6 +304,87 @@ def _compute_neutralization_reduce_qty(sim, tracker: RecoveryBotTracker) -> floa
         return 0.0
     # Hard guard: never over-neutralize.
     return min(float(rounded_qty), float(current_net_long))
+
+
+def _adjust_neutralization_qty_for_budget(
+    sim,
+    tracker: RecoveryBotTracker,
+    *,
+    desired_qty: float,
+    current_net_long: float,
+    current_price: float,
+    remaining_budget: float,
+) -> float:
+    """Return the largest tradeable qty within the remaining loss budget.
+
+    The result:
+    - is step-aligned,
+    - respects min_order_qty and min_notional,
+    - never exceeds ``desired_qty`` or ``current_net_long``,
+    - never causes the estimated loss to exceed ``remaining_budget``.
+    """
+    if remaining_budget <= 0.0:
+        return 0.0
+
+    rules = _instrument_rules(sim)
+    qty_step = float(_rule_decimal(rules, "qty_step", "0.001"))
+    min_order_qty = float(_rule_decimal(rules, "min_order_qty", "0.001"))
+    min_notional = float(_rule_decimal(rules, "min_notional", "5"))
+    if qty_step <= 0.0 or current_price <= 0.0:
+        return 0.0
+
+    max_qty = min(max(float(desired_qty), 0.0), max(float(current_net_long), 0.0))
+    hi = _round_down_to_step(max_qty, qty_step)
+    if hi <= 0.0:
+        return 0.0
+
+    # Compute the minimal number of step units required by qty and notional.
+    qty_step_abs = abs(qty_step)
+    min_units_qty = 1
+    if min_order_qty > 0.0:
+        min_units_qty = max(min_units_qty, int(math.ceil(min_order_qty / qty_step_abs)))
+    min_units_notional = 1
+    min_notional_per_unit = current_price * qty_step_abs
+    if min_notional > 0.0 and min_notional_per_unit > 0.0:
+        min_units_notional = max(
+            min_units_notional,
+            int(math.ceil(min_notional / min_notional_per_unit)),
+        )
+    min_units = max(1, min_units_qty, min_units_notional)
+
+    hi_units = int(math.floor(hi / qty_step_abs))
+    if hi_units < min_units:
+        return 0.0
+
+    best_units = 0
+    low_units = min_units
+    high_units = hi_units
+    while low_units <= high_units:
+        mid_units = (low_units + high_units) // 2
+        qty = qty_step_abs * float(mid_units)
+        loss = _estimate_recovery_loss_usdt(
+            sim,
+            tracker,
+            qty=float(qty),
+            current_price=float(current_price),
+        )
+        if loss <= float(remaining_budget):
+            best_units = mid_units
+            low_units = mid_units + 1
+        else:
+            high_units = mid_units - 1
+
+    if best_units <= 0:
+        return 0.0
+
+    adjusted_qty = qty_step_abs * float(best_units)
+    if adjusted_qty < min_order_qty:
+        return 0.0
+    if adjusted_qty * current_price < min_notional:
+        return 0.0
+    if adjusted_qty > max_qty:
+        adjusted_qty = _round_down_to_step(max_qty, qty_step_abs)
+    return max(0.0, float(adjusted_qty))
 
 
 def _current_pair_qty(sim) -> float:
@@ -635,7 +724,8 @@ def maybe_execute_neutralization_step(
     if compute_price_drop_pct(float(current_price), anchor_price) < float(
         tracker.config.neutralize_step_price_drop_pct or 0.0
     ):
-        tracker.blocked_reason = None
+        if tracker.blocked_reason not in PERSISTENT_NEUTRALIZATION_BLOCKED_REASONS:
+            tracker.blocked_reason = None
         return []
 
     reduce_qty = _compute_neutralization_reduce_qty(sim, tracker)
@@ -644,7 +734,11 @@ def maybe_execute_neutralization_step(
         if current_net_long <= tolerance:
             _maybe_mark_pair_reducing(sim, tracker, anchor_price=float(current_price))
         else:
-            tracker.blocked_reason = "neutralization_untradeable_residual"
+            if tracker.blocked_reason not in {
+                "neutralization_blocked_by_loss_budget",
+                "neutralization_order_submit_failed",
+            }:
+                tracker.blocked_reason = "neutralization_untradeable_residual"
         return []
 
     expected_loss = _estimate_recovery_loss_usdt(
@@ -653,13 +747,89 @@ def maybe_execute_neutralization_step(
         qty=float(reduce_qty),
         current_price=float(current_price),
     )
-    if would_exceed_loss_budget(
-        tracker.loss_budget_usdt,
+    loss_budget_usdt = tracker.loss_budget_usdt
+    remaining_budget = (
+        max(float(loss_budget_usdt) - float(tracker.loss_budget_used_usdt), 0.0)
+        if loss_budget_usdt is not None
+        else None
+    )
+    planned_reduce_qty = float(reduce_qty)
+    expected_loss_before = float(expected_loss)
+    adjusted_reduce_qty = float(reduce_qty)
+    expected_loss_after = float(expected_loss)
+    budget_exceeded = would_exceed_loss_budget(
+        loss_budget_usdt,
         tracker.loss_budget_used_usdt,
         expected_loss,
-    ):
-        tracker.blocked_reason = "neutralization_blocked_by_loss_budget"
-        return []
+    )
+    if budget_exceeded:
+        if remaining_budget is None or remaining_budget <= 0.0:
+            tracker.blocked_reason = "neutralization_blocked_by_loss_budget"
+            append_recovery_trace(
+                tracker,
+                sim=sim,
+                action="NEUTRALIZATION_BLOCKED",
+                reason=tracker.blocked_reason,
+                state_before=tracker.state,
+                state_after=tracker.state,
+                candle_index=candle_index,
+                current_price=current_price,
+                extra={
+                    "planned_reduce_qty": planned_reduce_qty,
+                    "adjusted_reduce_qty": 0.0,
+                    "expected_loss_before_adjustment": expected_loss_before,
+                    "expected_loss_after_adjustment": 0.0,
+                    "remaining_loss_budget_usdt": 0.0,
+                },
+            )
+            return []
+
+        adjusted_reduce_qty = _adjust_neutralization_qty_for_budget(
+            sim,
+            tracker,
+            desired_qty=float(reduce_qty),
+            current_net_long=current_net_long,
+            current_price=float(current_price),
+            remaining_budget=float(remaining_budget),
+        )
+        if adjusted_reduce_qty <= 0.0:
+            tracker.blocked_reason = "neutralization_blocked_by_loss_budget"
+            append_recovery_trace(
+                tracker,
+                sim=sim,
+                action="NEUTRALIZATION_BLOCKED",
+                reason=tracker.blocked_reason,
+                state_before=tracker.state,
+                state_after=tracker.state,
+                candle_index=candle_index,
+                current_price=current_price,
+                extra={
+                    "planned_reduce_qty": planned_reduce_qty,
+                    "adjusted_reduce_qty": 0.0,
+                    "expected_loss_before_adjustment": expected_loss_before,
+                    "expected_loss_after_adjustment": 0.0,
+                    "remaining_loss_budget_usdt": float(remaining_budget),
+                },
+            )
+            return []
+
+        reduce_qty = float(adjusted_reduce_qty)
+        expected_loss_after = _estimate_recovery_loss_usdt(
+            sim,
+            tracker,
+            qty=float(reduce_qty),
+            current_price=float(current_price),
+        )
+
+    budget_trace_extra: dict[str, Any] | None = None
+    if remaining_budget is not None and expected_loss_before > 0.0:
+        budget_trace_extra = {
+            "planned_reduce_qty": planned_reduce_qty,
+            "adjusted_reduce_qty": float(reduce_qty),
+            "expected_loss_before_adjustment": expected_loss_before,
+            "expected_loss_after_adjustment": float(expected_loss_after),
+            "remaining_loss_budget_usdt": float(remaining_budget),
+        }
 
     intent = StrategyIntent(
         side="long",
@@ -699,6 +869,7 @@ def maybe_execute_neutralization_step(
         state_after=tracker.state,
         candle_index=candle_index,
         current_price=current_price,
+        extra=budget_trace_extra,
     )
     sim.orders_submitted += 1
     fill_event = fill_order_at_candle_close(
@@ -754,6 +925,7 @@ def maybe_execute_neutralization_step(
         state_after=tracker.state,
         candle_index=candle_index,
         current_price=float(fill_event.exec_price),
+        extra=budget_trace_extra,
     )
 
     closed_pnl = float((fill_event.metadata or {}).get("closed_pnl") or 0.0)
