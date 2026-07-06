@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import unittest
 
@@ -7,7 +8,14 @@ from research.backtests.historical_backtest import run_historical_backtest
 from research.backtests.recovery_bot.config import RecoveryBotConfig
 
 
-APT_FEATHER_PATH = Path("/home/ralf/Dokumente/hedge_bot_clean/APT_USDT_USDT-5m-futures.feather")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+APT_FEATHER_PATH = Path(
+    os.environ.get(
+        "APT_FEATHER_PATH",
+        str(REPO_ROOT / "APT_USDT_USDT-5m-futures.feather"),
+    )
+)
 APT_RECOVERY_START_INDEX = 8000
 APT_RECOVERY_WINDOW = 5000
 
@@ -62,7 +70,7 @@ class RecoveryBotHistoricalE2ETests(unittest.TestCase):
             pair_reduce_move_pct=0.5,
             pair_reduce_mode="percent",
             pair_reduce_pct=25.0,
-            minimum_pair_qty=13.5,
+            minimum_pair_qty=20.0,
             minimum_pair_notional_usdt=0.0,
             loss_budget_mode="fixed",
             fixed_loss_budget_usdt=20.0,
@@ -102,7 +110,7 @@ class RecoveryBotHistoricalE2ETests(unittest.TestCase):
             minimum_pair_qty=13.5,
             minimum_pair_notional_usdt=0.0,
             loss_budget_mode="fixed",
-            fixed_loss_budget_usdt=1.08,
+            fixed_loss_budget_usdt=1.07,
             reload_enabled=True,
             max_reloads_per_trade=1,
             reload_wait_candles=1,
@@ -120,8 +128,10 @@ class RecoveryBotHistoricalE2ETests(unittest.TestCase):
             recovery_bot_config=config,
         )
         self.assertTrue(any(entry.get("action") == "FINAL_EXIT_BLOCKED" for entry in result.recovery_trace))
+        reload_filled = [entry for entry in result.recovery_trace if entry.get("action") == "RELOAD_FILLED"]
         self.assertTrue(any(entry.get("action") == "RELOAD_FILLED" for entry in result.recovery_trace))
         self.assertEqual((result.recovery_summary or {}).get("reload_count"), 1)
+        self.assertEqual(len(reload_filled), 1)
 
     def test_historical_scenario_3_no_duplicate_main_phase_per_candle(self) -> None:
         config = RecoveryBotConfig(
