@@ -72,6 +72,10 @@ def compute_loss_budget_usdt(config: RecoveryBotConfig) -> float:
     mode = str(config.loss_budget_mode or "fixed").strip()
     base = 0.0
 
+    if mode == "disabled":
+        # In disabled mode the budget is not used for blocking decisions.
+        # We still return a non-negative value for diagnostic purposes.
+        return max(0.0, float(config.fixed_loss_budget_usdt or 0.0))
     if mode == "fixed":
         base = float(config.fixed_loss_budget_usdt or 0.0)
     elif mode in {"profit_share", "hybrid"}:

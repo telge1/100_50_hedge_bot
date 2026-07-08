@@ -229,7 +229,7 @@ def validate_config(payload: Mapping[str, Any]) -> None:
     )
 
     loss_budget_mode = str(payload.get("loss_budget_mode") or "profit_share").strip()
-    allowed_budget_modes = {"fixed", "profit_share", "hybrid"}
+    allowed_budget_modes = {"fixed", "profit_share", "hybrid", "disabled"}
     if loss_budget_mode not in allowed_budget_modes:
         raise ValueError(
             "loss_budget_mode must be one of "

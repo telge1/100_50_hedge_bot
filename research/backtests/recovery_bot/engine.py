@@ -757,11 +757,14 @@ def maybe_execute_neutralization_step(
     expected_loss_before = float(expected_loss)
     adjusted_reduce_qty = float(reduce_qty)
     expected_loss_after = float(expected_loss)
-    budget_exceeded = would_exceed_loss_budget(
-        loss_budget_usdt,
-        tracker.loss_budget_used_usdt,
-        expected_loss,
-    )
+    # Optional Loss-Budget-Governance; im Modus "disabled" wird nicht geblockt.
+    budget_exceeded = False
+    if str(getattr(tracker.config, "loss_budget_mode", "")).strip() != "disabled":
+        budget_exceeded = would_exceed_loss_budget(
+            loss_budget_usdt,
+            tracker.loss_budget_used_usdt,
+            expected_loss,
+        )
     if budget_exceeded:
         if remaining_budget is None or remaining_budget <= 0.0:
             tracker.blocked_reason = "neutralization_blocked_by_loss_budget"

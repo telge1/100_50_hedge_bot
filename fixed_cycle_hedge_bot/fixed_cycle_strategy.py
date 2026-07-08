@@ -206,6 +206,12 @@ class FixedCycleHedgeConfig:
     recovery_mode_trigger_override_pct: float | None = None
     recovery_mode_trigger_override_ticks: int | None = None
 
+    # Backtest-only guards: im Live-Betrieb bleiben diese Felder auf False und
+    # verändern das Verhalten nicht. Für spezielle Backtests können sie genutzt
+    # werden, um Refill-Pfade vollständig zu deaktivieren.
+    disable_cycle_refill: bool = False
+    disable_recovery_refill: bool = False
+
     # Optional interner Safety-Watchdog, standardmäßig nur Logging.
     internal_safety_watchdog_enabled: bool = False
     internal_safety_watchdog_mode: str = "log_only"
@@ -451,6 +457,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     FINAL_EXIT_MISSING_FRESH_ENTRY_BLOCK_SEC = 8.0
     FINAL_EXIT_MISSING_REBUILD_BLOCK_SEC = 3.0
     FINAL_EXIT_MISSING_FORCE_BLOCK_SEC = 4.0
+
+    def _log_event(self, event: str, payload: dict[str, Any]) -> None:
+        """Lightweight adapter so legacy instance calls keep working.
+
+        The actual logging helper is the module-level `_log_event` function
+        defined above; this method simply forwards to it.
+        """
+        _log_event(event, payload)
 
     def _set_final_exit_missing_block(self, runtime_state: RuntimeState, duration_seconds: float) -> None:
         if duration_seconds <= 0:
@@ -20913,6 +20927,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         payload: dict[str, Any],
     ) -> None:
         """
+        if getattr(self.config, "disable_recovery_refill", False):
+            return []
         Append a synthetic dashboard event record to the confirmed_order_pnl_history
         file without affecting trading logic or PnL calculations.
         """
@@ -21171,6 +21187,8 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         return self._normalize_cycle_order_status(status) in self._cycle_build_blocking_statuses()
 
     def _cycle_build_block_active(self, state: dict[str, Any]) -> bool:
+        if getattr(self.config, "disable_cycle_refill", False):
+            return False
         return bool(
             state.get("refill_pending")
             or state.get("refill_required")
@@ -21197,6 +21215,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         This is the "recovery mode" midpoint trigger and is intended to re-use the
         normal refill lifecycle while skipping the next regular cycle-refill once.
         """
+        # Backtest-only Guard: wenn Recovery-Refill explizit deaktiviert ist,
+        # wird der Time-Distance-Trigger vollständig übersprungen.
+        if getattr(self.config, "disable_recovery_refill", False):
+            return False
+
         cfg_minutes = getattr(self.config, "time_distance_refill_trigger_minutes", 0)
         if cfg_minutes <= 0 or snapshot is None:
             return False

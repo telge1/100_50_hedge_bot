@@ -599,6 +599,7 @@ class HedgeBotOriginalSimulator:
         event_source: str = "unknown",
         source_fill_purpose: str | None = None,
         log_intents: bool = True,
+        immediate_fills: list[FillEvent] | None = None,
     ) -> list[VirtualOrder]:
         intent_indices = (
             self._log_intents(
@@ -630,12 +631,14 @@ class HedgeBotOriginalSimulator:
         self._refresh_snapshot_from_book(source="after_submit_intents")
         for intent, order in submitted_pairs:
             if is_immediate_market_fill(intent):
-                self._fill_immediate_refill_market_intent(
+                fill_event = self._fill_immediate_refill_market_intent(
                     intent,
                     order,
                     event_source=event_source,
                     source_fill_purpose=source_fill_purpose,
                 )
+                if immediate_fills is not None:
+                    immediate_fills.append(fill_event)
                 continue
             resting.append(order)
         return resting
@@ -666,6 +669,7 @@ class HedgeBotOriginalSimulator:
             conservative_fill_order=conservative_fill_order,
         )
         on_fill_intents: list[StrategyIntent] = []
+        immediate_fills: list[FillEvent] = []
 
         for fill_event in candle_fills:
             self._refresh_snapshot_from_book(source="after_candle_fill", price=candle.close)
@@ -687,6 +691,7 @@ class HedgeBotOriginalSimulator:
                 intents,
                 event_source="after_fill",
                 source_fill_purpose=fill_event.purpose,
+                immediate_fills=immediate_fills,
             )
             self._cancel_active_orders_when_flat(source="after_fill_flat_cleanup")
 
@@ -696,17 +701,23 @@ class HedgeBotOriginalSimulator:
             self.runtime_state,
             self.context,
         ) or []
-        self.submit_intents_to_book(tick_intents, event_source="after_candle")
+        self.submit_intents_to_book(
+            tick_intents,
+            event_source="after_candle",
+            immediate_fills=immediate_fills,
+        )
         self._refresh_snapshot_from_book(source="after_on_tick", price=candle.close)
+
+        all_fills = list(candle_fills) + list(immediate_fills)
 
         return ProcessCandleResult(
             candle=candle,
-            candle_fills=candle_fills,
+            candle_fills=all_fills,
             on_fill_intents=on_fill_intents,
             tick_intents=list(tick_intents),
             snapshot=self.snapshot,
             strategy_state=dict(self.runtime_state.strategy_state),
-            same_candle_fill_count=int(fill_stats.get("same_candle_fill_count", len(candle_fills))),
+            same_candle_fill_count=int(fill_stats.get("same_candle_fill_count", len(all_fills))),
             paired_exit_fills_count=int(fill_stats.get("paired_exit_fills_count", 0)),
         )
 
