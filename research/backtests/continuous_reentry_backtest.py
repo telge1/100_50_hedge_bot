@@ -252,6 +252,7 @@ def run_continuous_reentry_for_direction(
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
+    tp_profit_target_pct: float | None = None,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
     symbol_upper = symbol.upper()
@@ -292,6 +293,7 @@ def run_continuous_reentry_for_direction(
             long_config_path=long_config_path,
             short_config_path=short_config_path,
             file_config_path=file_config_path,
+            tp_profit_target_pct=tp_profit_target_pct,
         )
         result.start_index = start_index
         result.end_index = _trade_end_index(start_index, result)
