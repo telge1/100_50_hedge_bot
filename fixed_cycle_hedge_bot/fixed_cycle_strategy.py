@@ -7487,7 +7487,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     {
                         "symbol": snapshot.symbol or self.config.symbol,
                         "short_tp_pending_cycle": short_tp_pending_cycle,
-                        "cycle_waiting_for_short_tp": short_followup_pending,
+                        "cycle_waiting_for_short_tp": cycle_waiting_for_short_tp,
                         "processed_cycle_purposes": list(state.get("processed_cycle_purposes") or []),
                     },
                 )
