@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 from unittest import mock
 
 from fixed_cycle_hedge_bot.audit_logger import AuditLogger
@@ -43,6 +43,7 @@ from .simulated_execution import (
     process_candle_fills,
 )
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
+from .backtest_audit_recorder import BacktestAuditRecorder
 
 Signal = Literal["long", "short"]
 
@@ -185,6 +186,7 @@ class HedgeBotOriginalSimulator:
         dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
         stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
         cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+        audit_recorder: BacktestAuditRecorder | None = None,
     ) -> None:
         self.signal = signal
         self.symbol = symbol.upper()
@@ -232,7 +234,8 @@ class HedgeBotOriginalSimulator:
             symbol=self.symbol,
             price_tick_size=float(self.config.price_tick_size),
         )
-        self.book = SimulatedOrderBook(symbol=self.symbol)
+        self.audit_recorder = audit_recorder
+        self.book = SimulatedOrderBook(symbol=self.symbol, audit_recorder=audit_recorder)
         self.snapshot = build_flat_snapshot(
             symbol=self.symbol,
             price=self.candle.close,
@@ -244,10 +247,16 @@ class HedgeBotOriginalSimulator:
             runtime_state=self.runtime_state,
         )
         self.orders_submitted = 0
+        # Optional backtest-only hook: when set, this predicate is used to
+        # filter strategy intents before they are converted into simulated
+        # orders. Live-bot code does not depend on this attribute.
+        self.intent_filter: Callable[[StrategyIntent], bool] | None = None
         self.order_log: list[dict[str, Any]] = []
         self.intent_log: list[dict[str, Any]] = []
         self.entry_price: float | None = float(candle_close)
         self.candle_index = 0
+        # Keep book in sync with current candle index for audit purposes.
+        self.book.current_candle_index = self.candle_index
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
 
@@ -604,6 +613,8 @@ class HedgeBotOriginalSimulator:
         resting: list[VirtualOrder] = []
         submitted_pairs: list[tuple[StrategyIntent, VirtualOrder]] = []
         for intent, intent_log_index in zip(intents, intent_indices):
+            if self.intent_filter is not None and not self.intent_filter(intent):
+                continue
             if log_orders:
                 order = self._submit_intent_with_logging(
                     intent,
@@ -641,6 +652,8 @@ class HedgeBotOriginalSimulator:
         conservative_fill_order: bool = True,
     ) -> ProcessCandleResult:
         self.candle = candle
+        # Keep book's candle index in sync for audit sequencing.
+        self.book.current_candle_index = self.candle_index
         self._refresh_snapshot_from_book(source="before_process_candle", price=candle.close)
 
         fill_config = resolve_fill_model_config(

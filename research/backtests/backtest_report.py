@@ -66,7 +66,45 @@ SUMMARY_CSV_FIELDS = (
     "recovery_mode_trigger_override_enabled",
     "recovery_mode_trigger_override_pct",
     "time_distance_refill_trigger_minutes",
+    # Addon Short Recovery (backtest-only)
+    "addon_short_recovery_enabled",
+    "addon_short_recovery_activation_order",
+    "addon_short_recovery_activated",
+    "addon_short_recovery_activation_candle_index",
+    "addon_short_recovery_activation_price",
+    "addon_short_recovery_long_qty_at_activation",
+    "addon_short_recovery_normal_short_qty_at_activation",
+    "addon_short_recovery_gap_at_activation",
+    "addon_short_recovery_completed",
+    "addon_short_recovery_completion_reason",
+    "addon_short_recovery_completed_candle_index",
+    "addon_short_realized_profit",
+    "addon_short_realized_loss",
+    "addon_short_net_realized_pnl",
+    "addon_short_trade_count",
+    "addon_short_tp_count",
+    "addon_short_rebound_exit_count",
+    "addon_short_hard_stop_count",
+    "addon_short_long_reduce_total_qty",
+    "addon_short_long_reduce_total_pnl",
 )
+
+
+def resolve_net_closed_pnl(record: dict[str, Any]) -> float | None:
+    """Prefer confirmed_closed_pnl; fall back to closed_pnl only when confirmed is None."""
+    confirmed_closed_pnl = record.get("confirmed_closed_pnl")
+    if confirmed_closed_pnl is not None:
+        try:
+            return float(confirmed_closed_pnl)
+        except (TypeError, ValueError):
+            return None
+    closed_pnl = record.get("closed_pnl")
+    if closed_pnl is not None:
+        try:
+            return float(closed_pnl)
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def build_fill_log_entry(
@@ -226,10 +264,36 @@ class BacktestResult:
     nearest_config_candidate_source: str = ""
     start_index: int | None = None
     end_index: int | None = None
+    input_slice_start_index: int | None = None
     window_candles: int | None = None
     trade_number: int | None = None
     trade_block_id: str | None = None
     exit_quality: str = ""
+    # Addon Short Recovery (backtest-only aggregates and flags)
+    addon_short_recovery_enabled: bool | None = None
+    addon_short_recovery_activation_order: str | None = None
+    addon_short_recovery_activated: bool | None = None
+    addon_short_recovery_activation_candle_index: int | None = None
+    addon_short_recovery_activation_price: float | None = None
+    addon_short_recovery_long_qty_at_activation: float | None = None
+    addon_short_recovery_normal_short_qty_at_activation: float | None = None
+    addon_short_recovery_gap_at_activation: float | None = None
+    addon_short_recovery_completed: bool | None = None
+    addon_short_recovery_completion_reason: str | None = None
+    addon_short_recovery_completed_candle_index: int | None = None
+    addon_short_realized_profit: float | None = None
+    addon_short_realized_loss: float | None = None
+    addon_short_net_realized_pnl: float | None = None
+    addon_short_trade_count: int | None = None
+    addon_short_tp_count: int | None = None
+    addon_short_rebound_exit_count: int | None = None
+    addon_short_hard_stop_count: int | None = None
+    addon_short_long_reduce_total_qty: float | None = None
+    addon_short_long_reduce_total_pnl: float | None = None
+    addon_short_events: list[dict[str, Any]] = field(default_factory=list)
+    # Optional snapshot for the state immediately after CYCLE_3_SHORT_REDUCE
+    # (used by long-gap-reduction offline audits and continuous exports).
+    cycle3_snapshot: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

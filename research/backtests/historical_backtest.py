@@ -14,6 +14,13 @@ from .backtest_config_loader import (
     apply_config_load_result_to_backtest_result,
     resolve_backtest_config,
 )
+from .addon_short_recovery import AddonShortRecoveryConfig
+from .addon_short_recovery_shim import (
+    AddonShortRecoveryTracker,
+    attach_addon_short_recovery_tracker,
+    process_addon_short_recovery_on_candle,
+    record_addon_recovery_series_end,
+)
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
 from .cycle_short_tp_relief import CycleShortTpReliefConfig
@@ -23,6 +30,7 @@ from .stuck_recovery_reload_shim import maybe_execute_stuck_recovery_reload
 from .trade_block_export import ensure_backtest_trade_block_ids
 from .fill_models import resolve_fill_model_config
 from .hedge_bot_original_simulator import HedgeBotOriginalSimulator, Signal
+from .backtest_audit_recorder import BacktestAuditRecorder
 from .simulated_order_book import SyntheticCandle
 
 
@@ -106,6 +114,8 @@ def run_historical_backtest(
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     use_live_short_tp_relief: bool = False,
+    addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
+    audit_recorder: BacktestAuditRecorder | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -154,6 +164,7 @@ def run_historical_backtest(
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
         stuck_recovery_reload_config=stuck_recovery_reload_config,
         cycle_short_tp_relief_config=None if use_live_short_tp_relief else cycle_short_tp_relief_config,
+        audit_recorder=audit_recorder,
     )
     sim.candle = first_candle
     sim.candle_index = 0
@@ -171,6 +182,12 @@ def run_historical_backtest(
     peak_pnl = 0.0
     max_drawdown = 0.0
     reload_tracker = sim.stuck_recovery_reload_tracker
+    addon_tracker: AddonShortRecoveryTracker | None = attach_addon_short_recovery_tracker(
+        sim,
+        addon_short_recovery_config,
+    )
+    last_candle = first_candle
+    last_candle_index = 0
 
     try:
         entry_result = sim.run_entry_smoke()
@@ -199,6 +216,8 @@ def run_historical_backtest(
         for loop_index, candle in enumerate(loop_candles, start=1):
             sim.candle = candle
             sim.candle_index = loop_index
+            last_candle = candle
+            last_candle_index = loop_index
             candle_result = sim.process_candle(
                 candle,
                 fill_model=fill_config.fill_model,
@@ -256,6 +275,17 @@ def run_historical_backtest(
                     )
                     result.orders_submitted = sim.orders_submitted
 
+            # Backtest-only Blocker Addon Short Recovery (subaccount + long reduce).
+            if addon_tracker is not None and addon_tracker.config.enabled:
+                process_addon_short_recovery_on_candle(
+                    sim=sim,
+                    result=result,
+                    tracker=addon_tracker,
+                    candle=candle,
+                    candle_index=loop_index,
+                    candle_fills=candle_result.candle_fills,
+                )
+
             if _is_trade_closed(sim):
                 result.final_status = "closed"
                 result.exit_reason = "flat_no_active_orders"
@@ -274,6 +304,52 @@ def run_historical_backtest(
             result.max_drawdown_pct = (max_drawdown / float(initial_notional_usdt)) * 100.0
         result.cycles_seen = _cycles_seen(dict(sim.runtime_state.strategy_state))
         finalize_backtest_debug(result, sim, candles=candle_list)
+        # Populate addon short recovery aggregates on the BacktestResult.
+        if addon_tracker is not None and addon_tracker.config.enabled:
+            from dataclasses import asdict as _asdict
+
+            state = addon_tracker.state
+            result.addon_short_recovery_enabled = True
+            result.addon_short_recovery_activation_order = addon_tracker.config.activation_order
+            result.addon_short_recovery_activated = state.activated
+            result.addon_short_recovery_activation_candle_index = (
+                state.activation_candle_index
+            )
+            result.addon_short_recovery_activation_price = state.activation_price
+            result.addon_short_recovery_long_qty_at_activation = (
+                state.long_qty_at_activation
+            )
+            result.addon_short_recovery_normal_short_qty_at_activation = (
+                state.normal_short_qty_at_activation
+            )
+            result.addon_short_recovery_gap_at_activation = state.recovery_gap_at_activation
+            result.addon_short_recovery_completed = state.recovery_completed
+            result.addon_short_recovery_completion_reason = (
+                state.recovery_completion_reason
+            )
+            result.addon_short_recovery_completed_candle_index = (
+                state.recovery_completed_candle_index
+            )
+            result.addon_short_realized_profit = state.addon_short_realized_profit
+            result.addon_short_realized_loss = state.addon_short_realized_loss
+            result.addon_short_net_realized_pnl = (
+                state.addon_short_realized_profit - state.addon_short_realized_loss
+            )
+            result.addon_short_trade_count = state.addon_short_trade_count
+            result.addon_short_tp_count = state.addon_short_tp_count
+            result.addon_short_rebound_exit_count = state.addon_short_rebound_exit_count
+            result.addon_short_hard_stop_count = state.addon_short_hard_stop_count
+            result.addon_short_long_reduce_total_qty = state.long_reduce_total_qty
+            result.addon_short_long_reduce_total_pnl = state.long_reduce_total_pnl
+            result.addon_short_events = [_asdict(ev) for ev in addon_tracker.events]
+            # Backtest-only: emit a final RECOVERY_SERIES_END audit record when recorder is enabled.
+            record_addon_recovery_series_end(
+                sim=sim,
+                tracker=addon_tracker,
+                result=result,
+                last_candle=last_candle,
+                last_candle_index=last_candle_index,
+            )
     except Exception as exc:
         result.final_status = "error"
         result.exit_reason = "exception"

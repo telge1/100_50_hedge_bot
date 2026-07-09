@@ -11,6 +11,7 @@ from fixed_cycle_hedge_bot.models import ManagedOrder, RuntimeState, StrategyInt
 
 from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
+from .backtest_audit_recorder import BacktestAuditRecorder, FillAuditRecord
 
 
 def _coerce_timestamp(value: object | None) -> datetime | None:
@@ -111,6 +112,9 @@ class SimulatedOrderBook:
     fee_rate: float | None = None
     _orders: dict[str, VirtualOrder] = field(default_factory=dict)
     _order_seq: int = 0
+    # Backtest-only audit recorder and candle index context.
+    audit_recorder: BacktestAuditRecorder | None = None
+    current_candle_index: int | None = None
 
     def positions_mapping(self) -> dict[str, float]:
         return {
@@ -213,6 +217,12 @@ class SimulatedOrderBook:
         if order.status not in ACTIVE_ORDER_STATUSES:
             raise ValueError(f"order not fillable: {order_id} status={order.status}")
 
+        # Snapshot main position state before mutation for audit purposes.
+        pre_long_qty = float(self.long_qty)
+        pre_long_avg = float(self.long_avg)
+        pre_short_qty = float(self.short_qty)
+        pre_short_avg = float(self.short_avg)
+
         fill_qty = float(qty if qty is not None else order.qty)
         side = str(order.side).lower()
         close_qty = fill_qty
@@ -273,6 +283,72 @@ class SimulatedOrderBook:
         if order.reduce_only and avg_for_pnl > 0:
             order.metadata["entry_price_for_pnl"] = float(avg_for_pnl)
         attach_closed_pnl_metadata(order.metadata, realized_pnl, pnl_details=pnl_details)
+
+        # Snapshot main position state after mutation.
+        post_long_qty = float(self.long_qty)
+        post_long_avg = float(self.long_avg)
+        post_short_qty = float(self.short_qty)
+        post_short_avg = float(self.short_avg)
+
+        # Backtest-only audit record (if recorder is attached and enabled).
+        if self.audit_recorder is not None and self.audit_recorder.enabled:
+            global_seq, candle_seq = self.audit_recorder.next_event_sequence(
+                self.current_candle_index
+            )
+            created_candle_index = getattr(order, "created_candle_index", None)
+            fee_rate_value = None
+            if pnl_details is not None:
+                fee_rate_value = (
+                    float(pnl_details.get("fee_rate"))
+                    if pnl_details.get("fee_rate") is not None
+                    else None
+                )
+            record = FillAuditRecord(
+                global_event_sequence=global_seq,
+                event_sequence_in_candle=candle_seq,
+                candle_index=self.current_candle_index,
+                order_created_timestamp=order.created_at.isoformat() if order.created_at else None,
+                fill_timestamp=None,
+                event_type="fill",
+                order_id=order.order_id,
+                order_purpose=order.purpose,
+                order_side=side,
+                reduce_only=bool(order.reduce_only),
+                requested_qty=fill_qty,
+                executed_qty=float(close_qty if order.reduce_only else fill_qty),
+                fill_price=float(fill_price),
+                created_candle_index=created_candle_index,
+                fill_candle_index=self.current_candle_index,
+                long_qty_before=pre_long_qty,
+                long_avg_before=pre_long_avg,
+                short_qty_before=pre_short_qty,
+                short_avg_before=pre_short_avg,
+                long_qty_after=post_long_qty,
+                long_avg_after=post_long_avg,
+                short_qty_after=post_short_qty,
+                short_avg_after=post_short_avg,
+                closed_pnl=float(realized_pnl),
+                gross_pnl=(
+                    float(pnl_details.get("gross_pnl"))
+                    if pnl_details and pnl_details.get("gross_pnl") is not None
+                    else None
+                ),
+                entry_fee=(
+                    float(pnl_details.get("entry_fee"))
+                    if pnl_details and pnl_details.get("entry_fee") is not None
+                    else None
+                ),
+                exit_fee=(
+                    float(pnl_details.get("exit_fee"))
+                    if pnl_details and pnl_details.get("exit_fee") is not None
+                    else None
+                ),
+                fee_rate=fee_rate_value,
+                record_source="SimulatedOrderBook.apply_fill",
+                runtime_logged=True,
+            )
+            self.audit_recorder.record_fill(record)
+
         return order, float(realized_pnl)
 
     def apply_market_fill(

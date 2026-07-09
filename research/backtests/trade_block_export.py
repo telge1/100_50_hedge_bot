@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .backtest_report import BacktestResult
+from .backtest_report import BacktestResult, resolve_net_closed_pnl
 from .purpose_utils import preserve_bot_purpose
 
 ROW_TYPE_ORDER = {
@@ -24,7 +24,12 @@ TRADE_BLOCK_ROW_FIELDS = (
     "trade_block_id_missing",
     "row_type",
     "timestamp",
-    "candle_index",
+    "candle_index",          # local candle index within the trade window
+    "local_candle_index",    # explicit alias for local index within trade window
+    "slice_candle_index",    # index relative to backtest input slice
+    "global_candle_index",   # backward-compatible alias for absolute feather index
+    "absolute_candle_index", # absolute index in the unmodified input feather file
+    "trade_number",
     "event_type",
     "order_id",
     "purpose",
@@ -33,6 +38,7 @@ TRADE_BLOCK_ROW_FIELDS = (
     "cycle_role",
     "side",
     "qty",
+    "filled_qty",
     "price",
     "trigger_price",
     "trigger_direction",
@@ -42,7 +48,14 @@ TRADE_BLOCK_ROW_FIELDS = (
     "runtime_calculated_pnl",
     "confirmed_closed_pnl",
     "exec_pnl",
+    "gross_realized_pnl_event",
+    "net_realized_pnl_event",
+    "entry_fee",
+    "exit_fee",
+    "closing_fee",
+    "fee_rate",
     "cumulative_pnl",
+    "cumulative_realized_pnl_net",
     "long_qty_after",
     "short_qty_after",
     "long_avg_after",
@@ -262,13 +275,27 @@ def _base_row(
     trade_block_id_missing: bool,
 ) -> dict[str, Any]:
     row = _empty_row(result)
+    local_idx = record.get("candle_index")
+    try:
+        local_idx_int = int(local_idx) if local_idx is not None else None
+    except (TypeError, ValueError):
+        local_idx_int = None
+    start_index = result.start_index or 0
+    input_slice_start = result.input_slice_start_index or 0
+    slice_idx = start_index + local_idx_int if local_idx_int is not None else None
+    absolute_idx = input_slice_start + slice_idx if slice_idx is not None else None
     row.update(
         {
             "trade_block_id": trade_block_id,
             "trade_block_id_missing": trade_block_id_missing,
             "row_type": row_type,
             "timestamp": _format_timestamp(record.get("timestamp")),
-            "candle_index": record.get("candle_index"),
+            "candle_index": local_idx_int,
+            "local_candle_index": local_idx_int,
+            "slice_candle_index": slice_idx,
+            "global_candle_index": absolute_idx,
+            "absolute_candle_index": absolute_idx,
+            "trade_number": result.trade_number,
             "event_type": record.get("event_type") or record.get("event_source") or "",
             "order_id": record.get("order_id") or "",
             "purpose": preserve_bot_purpose(record.get("purpose")),
@@ -279,6 +306,7 @@ def _base_row(
             "cycle_role": record.get("cycle_role"),
             "side": record.get("side"),
             "qty": record.get("qty"),
+            "filled_qty": record.get("qty"),
             "price": record.get("price"),
             "trigger_price": record.get("trigger_price"),
             "trigger_direction": record.get("trigger_direction"),
@@ -288,6 +316,12 @@ def _base_row(
             "runtime_calculated_pnl": record.get("runtime_calculated_pnl"),
             "confirmed_closed_pnl": record.get("confirmed_closed_pnl"),
             "exec_pnl": record.get("exec_pnl"),
+            "gross_realized_pnl_event": None,
+            "net_realized_pnl_event": resolve_net_closed_pnl(record),
+            "entry_fee": None,
+            "exit_fee": None,
+            "closing_fee": None,
+            "fee_rate": None,
             "long_qty_after": record.get("long_qty_after"),
             "short_qty_after": record.get("short_qty_after"),
             "long_avg_after": record.get("long_avg_after"),
@@ -306,6 +340,23 @@ def _base_row(
             row["cycle_index"] = excerpt.get("cycle_index")
         if not row.get("cycle_role") and excerpt.get("cycle_role"):
             row["cycle_role"] = excerpt.get("cycle_role")
+        # PnL / fee details for fills.
+        if row_type == "fill":
+            gross = excerpt.get("gross_pnl")
+            if gross is not None and row.get("gross_realized_pnl_event") is None:
+                row["gross_realized_pnl_event"] = gross
+            entry_fee = excerpt.get("entry_fee")
+            exit_fee = excerpt.get("exit_fee")
+            if entry_fee is not None:
+                row["entry_fee"] = entry_fee
+            if exit_fee is not None:
+                row["exit_fee"] = exit_fee
+            fee_rate = excerpt.get("runtime_fee_rate") or excerpt.get("fee_rate")
+            if fee_rate is not None:
+                row["fee_rate"] = fee_rate
+            if entry_fee is not None or exit_fee is not None:
+                row["closing_fee"] = (entry_fee or 0.0) + (exit_fee or 0.0)
+
         for key in (
             DYNAMIC_CYCLE_SCALING_ROW_FIELDS
             + CYCLE_SHORT_TP_RELIEF_ROW_FIELDS
@@ -654,6 +705,8 @@ def apply_cumulative_pnl(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             row_copy["cumulative_pnl"] = running[block_id]
         else:
             row_copy["cumulative_pnl"] = running.get(block_id, 0.0) if block_id else None
+        # Alias for clarity: cumulative realized net PnL.
+        row_copy["cumulative_realized_pnl_net"] = row_copy.get("cumulative_pnl")
         updated.append(row_copy)
     return updated
 

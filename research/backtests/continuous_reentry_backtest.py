@@ -16,10 +16,12 @@ from .backtest_config_loader import (
 )
 from .backtest_report import BacktestResult
 from .fill_models import resolve_fill_model_config
+from .backtest_report import resolve_net_closed_pnl
 from .historical_backtest import normalize_candles, run_historical_backtest
 from .pnl_coverage_audit import apply_trade_exit_quality
 from .multi_start_backtest import compact_result_dict, resolve_directions
 from .trade_block_export import ensure_backtest_trade_block_ids, stamp_trade_block_id
+from .addon_short_recovery import AddonShortRecoveryConfig
 
 CONTINUOUS_SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -239,6 +241,169 @@ def write_continuous_results_json(
     return path_obj
 
 
+def _snapshot_float(value: object) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _cycle3_order_key(entry: dict[str, Any]) -> tuple[str, str] | None:
+    order_id = entry.get("order_id")
+    if order_id:
+        return ("order_id", str(order_id))
+    excerpt = entry.get("metadata_excerpt") or {}
+    order_link_id = excerpt.get("order_link_id")
+    if order_link_id:
+        return ("order_link_id", str(order_link_id))
+    return None
+
+
+def _select_cycle3_fill_from_fill_log(fill_log: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """
+    Select the final CYCLE_3_SHORT_REDUCE fill representing post-order state.
+
+    When partial fills share an order_id or order_link_id, the last fill of that
+    order group is the authoritative end state after the Cycle-3 order completes.
+    """
+    c3_fills = [
+        entry
+        for entry in fill_log
+        if str(entry.get("purpose") or "") == "CYCLE_3_SHORT_REDUCE"
+    ]
+    if not c3_fills:
+        return None
+
+    last_fill = c3_fills[-1]
+    order_key = _cycle3_order_key(last_fill)
+    if order_key is None:
+        return last_fill
+
+    same_order_fills = [entry for entry in c3_fills if _cycle3_order_key(entry) == order_key]
+    return same_order_fills[-1]
+
+
+def _validate_cycle3_snapshot_fields(snapshot: dict[str, Any]) -> bool:
+    filled_qty = snapshot.get("filled_qty")
+    if filled_qty is None or filled_qty <= 0:
+        return False
+
+    fill_price = snapshot.get("fill_price")
+    if fill_price is None or fill_price <= 0:
+        return False
+
+    long_qty_after = snapshot.get("long_qty_after")
+    short_qty_after = snapshot.get("short_qty_after")
+    if long_qty_after is None or short_qty_after is None:
+        return False
+    if long_qty_after < 0 or short_qty_after < 0:
+        return False
+
+    long_avg_after = snapshot.get("long_avg_after")
+    short_avg_after = snapshot.get("short_avg_after")
+    if long_qty_after > 0 and (long_avg_after is None or long_avg_after <= 0):
+        return False
+    if short_qty_after > 0 and (short_avg_after is None or short_avg_after <= 0):
+        return False
+
+    return True
+
+
+def _compute_cycle3_snapshot_from_fill_log(result: BacktestResult) -> dict[str, Any] | None:
+    """
+    Derive a CYCLE_3_SHORT_REDUCE snapshot from BacktestResult.fill_log.
+
+    The snapshot represents the state immediately after the confirmed final
+    CYCLE_3_SHORT_REDUCE fill (including the last partial when applicable)
+    and includes net/gross PnL and position state.
+    """
+    if not result.fill_log:
+        return None
+
+    cycle3_fill = _select_cycle3_fill_from_fill_log(result.fill_log)
+    if cycle3_fill is None:
+        return None
+
+    # Compute cumulative realized net PnL up to and including the C3 fill.
+    cumulative_net = 0.0
+    for entry in result.fill_log:
+        pnl = resolve_net_closed_pnl(entry)
+        if pnl is not None:
+            cumulative_net += pnl
+        if entry is cycle3_fill:
+            break
+
+    local_idx = cycle3_fill.get("candle_index")
+    try:
+        local_idx_int = int(local_idx) if local_idx is not None else None
+    except (TypeError, ValueError):
+        local_idx_int = None
+    start_index = result.start_index or 0
+    input_slice_start = result.input_slice_start_index or 0
+    slice_idx = start_index + local_idx_int if local_idx_int is not None else None
+    absolute_idx = input_slice_start + slice_idx if slice_idx is not None else None
+
+    ts = cycle3_fill.get("timestamp")
+    metadata_excerpt = cycle3_fill.get("metadata_excerpt") or {}
+    fee_rate = (
+        metadata_excerpt.get("runtime_fee_rate")
+        or metadata_excerpt.get("fee_rate")
+        or None
+    )
+    entry_fee = metadata_excerpt.get("entry_fee")
+    exit_fee = metadata_excerpt.get("exit_fee")
+    gross_pnl = metadata_excerpt.get("gross_pnl")
+
+    snapshot = {
+        "purpose": "CYCLE_3_SHORT_REDUCE",
+        "local_candle_index": local_idx_int,
+        "slice_candle_index": slice_idx,
+        "absolute_candle_index": absolute_idx,
+        "input_slice_start_index": input_slice_start,
+        # Backward-compatible alias for absolute feather index in new results.
+        "global_candle_index": absolute_idx,
+        "timestamp": ts,
+        "fill_price": _snapshot_float(cycle3_fill.get("fill_price")),
+        "filled_qty": _snapshot_float(cycle3_fill.get("qty")),
+        "fee_rate": _snapshot_float(fee_rate),
+        "entry_fee": _snapshot_float(entry_fee),
+        "exit_fee": _snapshot_float(exit_fee),
+        "closing_fee": (
+            (_snapshot_float(entry_fee) or 0.0) + (_snapshot_float(exit_fee) or 0.0)
+            if entry_fee is not None or exit_fee is not None
+            else None
+        ),
+        "gross_realized_pnl_event": _snapshot_float(gross_pnl),
+        "net_realized_pnl_event": resolve_net_closed_pnl(cycle3_fill),
+        "cumulative_realized_pnl_net": cumulative_net,
+        "long_qty_after": _snapshot_float(cycle3_fill.get("long_qty_after")),
+        "short_qty_after": _snapshot_float(cycle3_fill.get("short_qty_after")),
+        "long_avg_after": _snapshot_float(cycle3_fill.get("long_avg_after")),
+        "short_avg_after": _snapshot_float(cycle3_fill.get("short_avg_after")),
+    }
+
+    # Require minimal mandatory fields for a valid snapshot.
+    mandatory_keys = (
+        "local_candle_index",
+        "slice_candle_index",
+        "absolute_candle_index",
+        "timestamp",
+        "fill_price",
+        "filled_qty",
+        "long_qty_after",
+        "short_qty_after",
+        "long_avg_after",
+        "short_avg_after",
+    )
+    if any(snapshot.get(key) is None for key in mandatory_keys):
+        return None
+    if not _validate_cycle3_snapshot_fields(snapshot):
+        return None
+    return snapshot
+
+
 def run_continuous_reentry_for_direction(
     symbol: str,
     direction: str,
@@ -253,6 +418,8 @@ def run_continuous_reentry_for_direction(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
+    input_slice_start_index: int = 0,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
     symbol_upper = symbol.upper()
@@ -294,12 +461,16 @@ def run_continuous_reentry_for_direction(
             short_config_path=short_config_path,
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
+            addon_short_recovery_config=addon_short_recovery_config,
         )
         result.start_index = start_index
+        result.input_slice_start_index = input_slice_start_index
         result.end_index = _trade_end_index(start_index, result)
         result.trade_number = trade_number
         apply_trade_exit_quality(result)
         ensure_backtest_trade_block_ids(result)
+        # Optional Cycle-3 snapshot for long-gap-reduction audits.
+        result.cycle3_snapshot = _compute_cycle3_snapshot_from_fill_log(result)
         results.append(result)
 
         if result.exit_reason != "flat_no_active_orders":
@@ -328,6 +499,11 @@ def run_continuous_reentry_backtests(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
+    input_slice_start_index: int = 0,
+    candle_source_total_count: int | None = None,
+    input_slice_first_timestamp: str | None = None,
+    input_slice_last_timestamp: str | None = None,
     output_dir: str | Path = "research/backtests/results",
     write_json: bool = True,
     write_csv: bool = True,
@@ -361,6 +537,8 @@ def run_continuous_reentry_backtests(
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
                 tp_profit_target_pct=tp_profit_target_pct,
+                addon_short_recovery_config=addon_short_recovery_config,
+                input_slice_start_index=input_slice_start_index,
             )
         )
 
@@ -382,6 +560,11 @@ def run_continuous_reentry_backtests(
         "continuous_window_candles": continuous_window_candles,
         "continuous_max_trades": continuous_max_trades,
         "candles_loaded": len(candle_rows),
+        "input_slice_start_index": input_slice_start_index,
+        "candle_source_total_count": candle_source_total_count,
+        "input_slice_first_timestamp": input_slice_first_timestamp,
+        "input_slice_last_timestamp": input_slice_last_timestamp,
+        "index_semantics_version": 2,
         "long_config_path": str(long_config_path),
         "short_config_path": str(short_config_path),
         "file_config_path": str(file_config_path) if file_config_path else None,

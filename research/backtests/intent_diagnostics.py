@@ -123,6 +123,11 @@ INTENT_METADATA_EXCERPT_KEYS = (
     "reload_count_for_trade",
     "active_purpose_before_reload",
     "active_purposes_after_reload",
+    # PnL / fee diagnostics from simulated_pnl.attach_closed_pnl_metadata
+    "gross_pnl",
+    "entry_fee",
+    "exit_fee",
+    "runtime_fee_rate",
 )
 
 TRIGGER_ORDER_TYPES = frozenset({"STOP", "STOP_MARKET", "TAKE_PROFIT", "TAKE_PROFIT_MARKET"})

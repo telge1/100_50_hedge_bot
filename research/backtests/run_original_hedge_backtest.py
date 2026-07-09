@@ -19,7 +19,12 @@ from .backtest_report import (
     write_results_json,
     write_summary_csv,
 )
-from .candle_loader import DEFAULT_DATA_DIR, load_candles_for_symbol
+from .candle_loader import (
+    DEFAULT_DATA_DIR,
+    CandleSliceInfo,
+    load_candles_for_symbol,
+    load_candles_for_symbol_with_slice_info,
+)
 from .debug_report import print_debug_report
 from .dynamic_cycle_order_scaling import (
     DynamicCycleOrderScalingConfig,
@@ -35,6 +40,11 @@ from .stuck_recovery_reload import (
     StuckRecoveryReloadConfig,
     config_from_json_string as stuck_reload_config_from_json_string,
     default_stuck_recovery_reload_config,
+)
+from .addon_short_recovery import (
+    AddonShortRecoveryConfig,
+    config_from_json_string as addon_short_recovery_config_from_json_string,
+    default_addon_short_recovery_config,
 )
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
@@ -84,6 +94,17 @@ def resolve_cycle_short_tp_relief_config(args: argparse.Namespace) -> CycleShort
     return None
 
 
+def resolve_addon_short_recovery_config(args: argparse.Namespace) -> AddonShortRecoveryConfig | None:
+    json_payload = getattr(args, "addon_short_recovery_config_json", None)
+    if json_payload:
+        cfg = addon_short_recovery_config_from_json_string(str(json_payload))
+        cfg.enabled = bool(cfg.enabled)
+        return cfg
+    if bool(getattr(args, "addon_short_recovery", False)):
+        return default_addon_short_recovery_config()
+    return None
+
+
 def resolve_directions(direction: str) -> list[str]:
     normalized = str(direction or "both").strip().lower()
     if normalized == "both":
@@ -99,7 +120,21 @@ def _load_candles(
     limit: int,
     data_dir: str | Path,
 ) -> list[dict[str, Any]]:
-    candles = load_candles_for_symbol(
+    candles, _slice_info = _load_candles_with_slice_info(
+        symbol=symbol,
+        limit=limit,
+        data_dir=data_dir,
+    )
+    return candles
+
+
+def _load_candles_with_slice_info(
+    *,
+    symbol: str,
+    limit: int,
+    data_dir: str | Path,
+) -> tuple[list[dict[str, Any]], CandleSliceInfo]:
+    candles, slice_info = load_candles_for_symbol_with_slice_info(
         symbol,
         timeframe="5m",
         data_dir=data_dir,
@@ -107,7 +142,7 @@ def _load_candles(
     )
     if not candles:
         raise FileNotFoundError(f"no candles loaded for {symbol.upper()} under {data_dir}")
-    return candles
+    return candles, slice_info
 
 
 def run_original_hedge_backtests(
@@ -129,6 +164,7 @@ def run_original_hedge_backtests(
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
     use_live_short_tp_relief: bool = False,
+    addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -157,6 +193,7 @@ def run_original_hedge_backtests(
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
             use_live_short_tp_relief=use_live_short_tp_relief,
+            addon_short_recovery_config=addon_short_recovery_config,
         )
 
     json_path, csv_path = default_output_paths(output_dir, symbol_upper)
@@ -529,6 +566,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "(bypasses backtest shim; requires live feature enabled in strategy)"
         ),
     )
+    parser.add_argument(
+        "--addon-short-recovery",
+        action="store_true",
+        help="Backtest-only: enable Blocker Addon Short Recovery (subaccount + long reduction)",
+    )
+    parser.add_argument(
+        "--addon-short-recovery-config-json",
+        default=None,
+        help="JSON config for Blocker Addon Short Recovery (overrides defaults)",
+    )
     return parser
 
 
@@ -608,7 +655,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--continuous-reentry cannot be combined with --multi-start")
             if args.compare_fill_models:
                 raise ValueError("--continuous-reentry cannot be combined with --compare-fill-models")
-            candle_rows = _load_candles(
+            candle_rows, slice_info = _load_candles_with_slice_info(
                 symbol=args.symbol,
                 limit=args.limit,
                 data_dir=args.data_dir,
@@ -627,6 +674,11 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                addon_short_recovery_config=resolve_addon_short_recovery_config(args),
+                input_slice_start_index=slice_info.input_slice_start_index,
+                candle_source_total_count=slice_info.candle_source_total_count,
+                input_slice_first_timestamp=slice_info.input_slice_first_timestamp,
+                input_slice_last_timestamp=slice_info.input_slice_last_timestamp,
                 output_dir=args.output_dir,
                 write_json=write_json,
                 write_csv=write_csv,
@@ -722,6 +774,7 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                addon_short_recovery_config=resolve_addon_short_recovery_config(args),
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
             )
     except Exception as exc:
