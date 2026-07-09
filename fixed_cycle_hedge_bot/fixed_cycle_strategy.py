@@ -14491,6 +14491,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     filled_qty=self._safe_float(fill_event.exec_qty, None),
                     source="fill_event",
                 )
+            if (
+                self._get_first_leg_cycle_role() == "short_reduce"
+                and self._get_second_leg_cycle_role() == "long_reduce"
+            ):
+                self._maybe_persist_short_first_leg_cycle_loss_from_fill(
+                    runtime_state,
+                    cycle_index=cycle_index,
+                    fill_event=fill_event,
+                    source_label="runtime_fill_closed_pnl",
+                )
         first_leg_purpose = self._normalize_cycle_purpose(
             self._get_first_leg_purpose(cycle_index),
             {
@@ -25589,6 +25599,139 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 return True
         return False
 
+    def _extract_short_first_leg_confirmed_closed_pnl(
+        self, fill_event: FillEvent
+    ) -> tuple[float | None, str]:
+        """Return finite signed closed PnL for short-primary first-leg reduce fills."""
+        confirmed = self._safe_float(getattr(fill_event, "confirmed_pnl", None), None)
+        if confirmed is not None and math.isfinite(confirmed):
+            return float(confirmed), "confirmed_pnl"
+        metadata = fill_event.metadata or {}
+        for key in (
+            "confirmed_closed_pnl",
+            "short_reduce_closed_pnl",
+            "short_closed_pnl",
+            "closed_pnl",
+        ):
+            candidate = self._safe_float(metadata.get(key), None)
+            if candidate is not None and math.isfinite(candidate):
+                return float(candidate), key
+        return None, ""
+
+    def _persist_short_first_leg_cycle_loss_state(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        cycle_index: int,
+        closed_pnl: float,
+        source: str,
+        fill_event: FillEvent | None = None,
+        allow_overwrite: bool = False,
+    ) -> bool:
+        """
+        Persist short-primary first-leg loss into the same cycle fields used after
+        a successful closed-PnL API refresh.
+
+        Semantics mirror _refresh_short_reduce_closed_pnl:
+        - long_add_confirmed_pnl: signed realized PnL (negative for loss)
+        - long_add_loss_usdt / pending_cycle_loss_usdt: positive loss magnitude
+        """
+        if cycle_index <= 0:
+            return False
+        if not math.isfinite(closed_pnl):
+            return False
+        if (
+            self._get_first_leg_cycle_role() != "short_reduce"
+            or self._get_second_leg_cycle_role() != "long_reduce"
+        ):
+            return False
+
+        state = runtime_state.strategy_state
+        cycle_state = self._ensure_cycle_state(runtime_state)
+        cycle_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+        existing = self._safe_float(cycle_entry.get("long_add_confirmed_pnl"), None)
+        if existing is not None and abs(existing - closed_pnl) > 1e-9:
+            if not allow_overwrite:
+                _log_event(
+                    "fixed_cycle_short_first_leg_confirmed_pnl_mismatch",
+                    {
+                        "symbol": self.config.symbol,
+                        "cycle_index": cycle_index,
+                        "existing_long_add_confirmed_pnl": existing,
+                        "incoming_closed_pnl": closed_pnl,
+                        "source": source,
+                    },
+                )
+                return False
+        elif existing is not None:
+            long_add_loss_usdt = max(-float(closed_pnl), 0.0)
+            current_pending = float(state.get("pending_cycle_loss_usdt") or 0.0)
+            if (
+                long_add_loss_usdt > 0.0
+                and current_pending <= 0.0
+            ):
+                state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+                cycle_state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+                state["pending_short_cycle_index"] = cycle_index
+                cycle_state["pending_short_cycle_index"] = cycle_index
+                self._persist_cycle_sequence_state(runtime_state)
+            return False
+
+        long_add_loss_usdt = max(-float(closed_pnl), 0.0)
+        cycle_entry["long_add_confirmed_pnl"] = float(closed_pnl)
+        cycle_entry["long_add_loss_usdt"] = long_add_loss_usdt
+        cycle_entry["short_followup_pnl_source"] = source
+        if long_add_loss_usdt > 0.0:
+            state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+            cycle_state["pending_cycle_loss_usdt"] = long_add_loss_usdt
+            state["pending_short_cycle_index"] = cycle_index
+            cycle_state["pending_short_cycle_index"] = cycle_index
+
+        if fill_event is not None:
+            metadata = dict(fill_event.metadata or {})
+            metadata["short_reduce_closed_pnl"] = closed_pnl
+            metadata["short_closed_pnl"] = closed_pnl
+            metadata["closed_pnl"] = closed_pnl
+            metadata["confirmed_closed_pnl"] = closed_pnl
+            metadata.setdefault("cycle_role", "short_reduce")
+            metadata["cycle_index"] = int(cycle_index)
+            fill_event.metadata = metadata
+            fill_event.confirmed_pnl = closed_pnl
+
+        self._persist_cycle_sequence_state(runtime_state)
+        _log_event(
+            "fixed_cycle_short_first_leg_cycle_loss_persisted",
+            {
+                "symbol": self.config.symbol,
+                "cycle_index": cycle_index,
+                "long_add_confirmed_pnl": float(closed_pnl),
+                "long_add_loss_usdt": long_add_loss_usdt,
+                "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+                "source": source,
+            },
+        )
+        return True
+
+    def _maybe_persist_short_first_leg_cycle_loss_from_fill(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        cycle_index: int,
+        fill_event: FillEvent,
+        source_label: str = "runtime_fill_closed_pnl",
+    ) -> bool:
+        closed_pnl, pnl_key = self._extract_short_first_leg_confirmed_closed_pnl(fill_event)
+        if closed_pnl is None:
+            return False
+        persist_source = f"{source_label}:{pnl_key}" if pnl_key else source_label
+        return self._persist_short_first_leg_cycle_loss_state(
+            runtime_state,
+            cycle_index=cycle_index,
+            closed_pnl=closed_pnl,
+            source=persist_source,
+            fill_event=fill_event,
+        )
+
     def _refresh_short_reduce_closed_pnl(
         self,
         *,
@@ -25701,6 +25844,22 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         closed_pnl = self._safe_float(matched.get("closedPnl"), None)
         if closed_pnl is None:
             return False
+        cycle_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
+        existing_confirmed = self._safe_float(cycle_entry.get("long_add_confirmed_pnl"), None)
+        if (
+            existing_confirmed is not None
+            and math.isfinite(existing_confirmed)
+            and abs(existing_confirmed - float(closed_pnl)) <= 1e-9
+        ):
+            metadata = dict(fill_event.metadata or {})
+            metadata["short_reduce_closed_pnl"] = closed_pnl
+            metadata["short_closed_pnl"] = closed_pnl
+            metadata["closed_pnl"] = closed_pnl
+            metadata["confirmed_closed_pnl"] = closed_pnl
+            metadata["closed_pnl_source"] = match_source or "confirmed_closed_pnl"
+            fill_event.metadata = metadata
+            fill_event.confirmed_pnl = closed_pnl
+            return True
         metadata["short_reduce_closed_pnl"] = closed_pnl
         metadata["short_closed_pnl"] = closed_pnl
         metadata["closed_pnl"] = closed_pnl
@@ -25724,9 +25883,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             cycle_role="short_reduce",
         )
         cycle_entry = self._get_cycle_sequence_entry(runtime_state, cycle_index)
-        cycle_entry["long_add_confirmed_pnl"] = float(closed_pnl)
-        cycle_entry["long_add_loss_usdt"] = max(-float(closed_pnl), 0.0)
-        cycle_entry["short_followup_pnl_source"] = match_source or "confirmed_closed_pnl"
+        self._persist_short_first_leg_cycle_loss_state(
+            runtime_state,
+            cycle_index=cycle_index,
+            closed_pnl=float(closed_pnl),
+            source=match_source or "confirmed_closed_pnl",
+            fill_event=fill_event,
+            allow_overwrite=True,
+        )
         if (
             str(fill_event.status or "").upper() == "FILLED"
             and self._get_first_leg_cycle_role() == "short_reduce"
