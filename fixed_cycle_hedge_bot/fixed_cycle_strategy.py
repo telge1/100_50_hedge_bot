@@ -13136,6 +13136,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             tp_buffer_pct=float(self.config.tp_buffer_pct or 0.0),
             realized_cycle_net=realized_cycle_net,
             pending_cycle_loss_usdt=effective_pending_loss_usdt,
+            primary_side=self._get_primary_position_side(),
         )
         fee_rate = max(float(self.config.order_fee_rate_pct or 0.0), 0.0) / 100.0
         long_notional = snapshot_long_avg * snapshot_long_qty
@@ -23210,6 +23211,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     def _get_first_leg_side(self) -> str:
         return "long"
 
+    def _get_primary_position_side(self) -> str:
+        return direction_config.LONG_PRIMARY_DIRECTION.primary_position_side
+
     def _get_first_leg_position_idx(self) -> int:
         return 1
 
@@ -28335,6 +28339,9 @@ class ShortFixedCycleHedgeStrategy(FixedCycleHedgeStrategy):
 
     def _get_first_leg_side(self) -> str:
         return "short"
+
+    def _get_primary_position_side(self) -> str:
+        return direction_config.SHORT_PRIMARY_DIRECTION.primary_position_side
 
     def _get_first_leg_position_idx(self) -> int:
         return 2
