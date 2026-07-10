@@ -6,12 +6,25 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from typing import Any
+
 from fixed_cycle_hedge_bot.models import FillEvent, RuntimeState, StrategyIntent
 
 from .fill_models import is_exit_purpose, normalize_fill_model
 from .purpose_utils import enrich_purpose_metadata, preserve_bot_purpose
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
 from .simulated_pnl import attach_closed_pnl_metadata, closed_pnl_for_virtual_order_fill
+
+DEFAULT_SIMULATED_FEE_RATE = 0.00055
+
+
+def resolve_simulated_fee_rate(config: Any | None = None) -> float:
+    """Return decimal fee rate aligned with strategy ``order_fee_rate_pct`` (0.055 => 0.00055)."""
+    if config is not None:
+        pct = getattr(config, "order_fee_rate_pct", None)
+        if pct is not None:
+            return float(pct) / 100.0
+    return DEFAULT_SIMULATED_FEE_RATE
 
 INITIAL_ENTRY_PURPOSES = frozenset({"INITIAL_LONG_ENTRY", "INITIAL_SHORT_ENTRY"})
 REFILL_MARKET_FILL_PURPOSES = frozenset({"REFILL_LONG", "REFILL_SHORT"})
@@ -306,6 +319,8 @@ def fill_order_at_price(
         fee_rate_raw = (order_before.metadata or {}).get("fee_rate")
         if fee_rate_raw is None:
             fee_rate_raw = (order_before.metadata or {}).get("runtime_fee_rate")
+        if fee_rate_raw is None:
+            fee_rate_raw = book.fee_rate
         fee_rate = float(fee_rate_raw) if fee_rate_raw is not None else None
 
         simulated_closed_pnl, simulated_pnl_details = closed_pnl_for_virtual_order_fill(

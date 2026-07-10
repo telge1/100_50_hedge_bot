@@ -227,6 +227,8 @@ def compute_exit_price_candidates(
         l_qty = long_qty if long_qty is not None else _safe_float(state.get("open_long_qty"))
         s_qty = short_qty if short_qty is not None else _safe_float(state.get("open_short_qty"))
         if l_qty and s_qty and tp_pct is not None:
+            strategy_side = str(config.get("strategy_side") or config.get("side") or "long").strip().lower()
+            primary_side = "short" if strategy_side == "short" else "long"
             components = calculate_hedge_exit_price(
                 long_avg=l_avg,
                 long_qty=l_qty,
@@ -235,6 +237,7 @@ def compute_exit_price_candidates(
                 tp_profit_target_pct=tp_pct,
                 tp_buffer_pct=_safe_float(config.get("tp_buffer_pct")) or 0.0,
                 realized_cycle_net=0.0,
+                primary_side=primary_side,
             )
             item = _candidate(
                 name="hedge_exit_math.exit_price",

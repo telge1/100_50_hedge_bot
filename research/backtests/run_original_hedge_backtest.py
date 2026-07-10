@@ -46,6 +46,11 @@ from .addon_short_recovery import (
     config_from_json_string as addon_short_recovery_config_from_json_string,
     default_addon_short_recovery_config,
 )
+from .recovery_bot_config import (
+    RecoveryBotConfig,
+    config_from_json_string as recovery_bot_config_from_json_string,
+    default_recovery_bot_config,
+)
 from .fill_models import COMPARE_FILL_MODELS, resolve_fill_model_config
 from .historical_backtest import run_historical_backtest
 from .continuous_reentry_backtest import (
@@ -91,6 +96,25 @@ def resolve_cycle_short_tp_relief_config(args: argparse.Namespace) -> CycleShort
         return cycle_short_tp_relief_config_from_json_string(str(json_payload))
     if bool(getattr(args, "cycle_short_tp_relief", False)):
         return default_cycle_short_tp_relief_config()
+    return None
+
+
+def resolve_recovery_bot_config(args: argparse.Namespace) -> RecoveryBotConfig | None:
+    json_payload = getattr(args, "recovery_bot_config_json", None)
+    if json_payload:
+        cfg = recovery_bot_config_from_json_string(str(json_payload))
+        cfg.enabled = bool(cfg.enabled)
+        return cfg
+    if bool(getattr(args, "no_recovery_bot", False)):
+        return None
+    if bool(getattr(args, "recovery_bot", False)):
+        cfg = default_recovery_bot_config()
+        cfg.enabled = True
+        if getattr(args, "recovery_start_purpose", None):
+            cfg.recovery_start_purpose = str(args.recovery_start_purpose)
+        if getattr(args, "recovery_wait_candles", None) is not None:
+            cfg.recovery_wait_candles = max(0, int(args.recovery_wait_candles))
+        return cfg
     return None
 
 
@@ -576,6 +600,32 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON config for Blocker Addon Short Recovery (overrides defaults)",
     )
+    parser.add_argument(
+        "--recovery-bot",
+        action="store_true",
+        help="Backtest-only: enable integrated long-gap recovery bot in continuous runs",
+    )
+    parser.add_argument(
+        "--no-recovery-bot",
+        action="store_true",
+        help="Explicitly disable integrated long-gap recovery bot",
+    )
+    parser.add_argument(
+        "--recovery-start-purpose",
+        default="CYCLE_4_LONG_ADD",
+        help="Bot purpose fill that arms recovery wait timer (default: CYCLE_4_LONG_ADD)",
+    )
+    parser.add_argument(
+        "--recovery-wait-candles",
+        type=int,
+        default=144,
+        help="5m candles to wait after reference fill before recovery activation (default: 144)",
+    )
+    parser.add_argument(
+        "--recovery-bot-config-json",
+        default=None,
+        help="JSON config for integrated long-gap recovery bot (overrides CLI defaults)",
+    )
     return parser
 
 
@@ -675,6 +725,7 @@ def main(argv: list[str] | None = None) -> int:
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
                 addon_short_recovery_config=resolve_addon_short_recovery_config(args),
+                recovery_bot_config=resolve_recovery_bot_config(args),
                 input_slice_start_index=slice_info.input_slice_start_index,
                 candle_source_total_count=slice_info.candle_source_total_count,
                 input_slice_first_timestamp=slice_info.input_slice_first_timestamp,

@@ -21,6 +21,14 @@ from .addon_short_recovery_shim import (
     process_addon_short_recovery_on_candle,
     record_addon_recovery_series_end,
 )
+from .recovery_bot_config import RecoveryBotConfig
+from .recovery_bot_shim import (
+    attach_recovery_bot_tracker,
+    populate_recovery_bot_result_fields,
+    process_recovery_bot_after_normal_candle,
+    process_recovery_bot_recovery_only_candle,
+    trade_absolute_candle_index,
+)
 from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
 from .cycle_short_tp_relief import CycleShortTpReliefConfig
@@ -116,6 +124,9 @@ def run_historical_backtest(
     use_live_short_tp_relief: bool = False,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
     audit_recorder: BacktestAuditRecorder | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
+    absolute_trade_start_index: int = 0,
+    input_slice_start_index: int = 0,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -186,8 +197,10 @@ def run_historical_backtest(
         sim,
         addon_short_recovery_config,
     )
+    recovery_tracker = attach_recovery_bot_tracker(sim, recovery_bot_config)
     last_candle = first_candle
     last_candle_index = 0
+    recovery_closed = False
 
     try:
         entry_result = sim.run_entry_smoke()
@@ -218,6 +231,35 @@ def run_historical_backtest(
             sim.candle_index = loop_index
             last_candle = candle
             last_candle_index = loop_index
+            absolute_candle_index = trade_absolute_candle_index(
+                input_slice_start_index=input_slice_start_index,
+                absolute_trade_start_index=absolute_trade_start_index,
+                local_candle_index=loop_index,
+            )
+
+            if recovery_tracker is not None and recovery_tracker.state.recovery_mode_active:
+                recovery_pnl_delta, recovery_closed = process_recovery_bot_recovery_only_candle(
+                    recovery_tracker,
+                    sim,
+                    candle=candle,
+                    local_candle_index=loop_index,
+                    absolute_candle_index=absolute_candle_index,
+                    cumulative_pnl=cumulative_pnl,
+                )
+                cumulative_pnl += recovery_pnl_delta
+                result.candles_processed += 1
+                result.end_time = candle.timestamp
+                peak_pnl, max_drawdown = _update_drawdown(
+                    cumulative_pnl=cumulative_pnl,
+                    peak_pnl=peak_pnl,
+                    max_drawdown=max_drawdown,
+                )
+                if recovery_closed:
+                    result.final_status = "closed"
+                    result.exit_reason = "recovery_joint_exit"
+                    break
+                continue
+
             candle_result = sim.process_candle(
                 candle,
                 fill_model=fill_config.fill_model,
@@ -286,9 +328,34 @@ def run_historical_backtest(
                     candle_fills=candle_result.candle_fills,
                 )
 
+            trade_still_open = not _is_trade_closed(sim)
+            if recovery_tracker is not None and recovery_tracker.config.enabled:
+                recovery_pnl_delta, recovery_closed = process_recovery_bot_after_normal_candle(
+                    recovery_tracker,
+                    sim,
+                    result=result,
+                    candle=candle,
+                    local_candle_index=loop_index,
+                    absolute_candle_index=absolute_candle_index,
+                    candle_fills=candle_result.candle_fills,
+                    cumulative_pnl=cumulative_pnl,
+                    trade_still_open=trade_still_open,
+                )
+                cumulative_pnl += recovery_pnl_delta
+                peak_pnl, max_drawdown = _update_drawdown(
+                    cumulative_pnl=cumulative_pnl,
+                    peak_pnl=peak_pnl,
+                    max_drawdown=max_drawdown,
+                )
+                if recovery_closed:
+                    result.final_status = "closed"
+                    result.exit_reason = "recovery_joint_exit"
+                    break
+
             if _is_trade_closed(sim):
                 result.final_status = "closed"
-                result.exit_reason = "flat_no_active_orders"
+                if not result.exit_reason:
+                    result.exit_reason = "flat_no_active_orders"
                 break
         else:
             if max_candles is not None and result.candles_processed >= int(max_candles):
@@ -303,6 +370,7 @@ def run_historical_backtest(
             result.realized_pnl_pct = (cumulative_pnl / float(initial_notional_usdt)) * 100.0
             result.max_drawdown_pct = (max_drawdown / float(initial_notional_usdt)) * 100.0
         result.cycles_seen = _cycles_seen(dict(sim.runtime_state.strategy_state))
+        populate_recovery_bot_result_fields(result, recovery_tracker)
         finalize_backtest_debug(result, sim, candles=candle_list)
         # Populate addon short recovery aggregates on the BacktestResult.
         if addon_tracker is not None and addon_tracker.config.enabled:
@@ -364,5 +432,7 @@ def run_historical_backtest(
 
     if result.end_time is None:
         result.end_time = first_candle.timestamp
+    result.input_slice_start_index = input_slice_start_index
+    result.start_index = absolute_trade_start_index
     ensure_backtest_trade_block_ids(result)
     return result

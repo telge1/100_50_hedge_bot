@@ -37,6 +37,7 @@ TRADE_BLOCK_ROW_FIELDS = (
     "cycle_index",
     "cycle_role",
     "side",
+    "reduce_only",
     "qty",
     "filled_qty",
     "price",
@@ -65,6 +66,10 @@ TRADE_BLOCK_ROW_FIELDS = (
     "mapping_warning",
     "trigger_warning",
     "open_reason_detail",
+    "candle_open",
+    "candle_high",
+    "candle_low",
+    "candle_close",
 )
 
 DYNAMIC_CYCLE_SCALING_ROW_FIELDS = (
@@ -305,6 +310,7 @@ def _base_row(
             "cycle_index": record.get("cycle_index"),
             "cycle_role": record.get("cycle_role"),
             "side": record.get("side"),
+            "reduce_only": record.get("reduce_only"),
             "qty": record.get("qty"),
             "filled_qty": record.get("qty"),
             "price": record.get("price"),
@@ -330,6 +336,10 @@ def _base_row(
             "status": record.get("status"),
             "mapping_warning": record.get("mapping_warning"),
             "trigger_warning": record.get("trigger_warning"),
+            "candle_open": record.get("candle_open"),
+            "candle_high": record.get("candle_high"),
+            "candle_low": record.get("candle_low"),
+            "candle_close": record.get("candle_close"),
         }
     )
     excerpt = record.get("metadata_excerpt")
@@ -414,6 +424,22 @@ def build_trade_block_rows(result: BacktestResult) -> list[dict[str, Any]]:
                 trade_block_id=trade_block_id,
                 trade_block_id_missing=missing,
             )
+        )
+
+    for record in getattr(result, "recovery_diagnostic_events", None) or []:
+        trade_block_id, missing = resolve_trade_block_id(record, result, **resolve_kwargs)
+        rows.append(
+            {
+                **_empty_row(result),
+                "trade_block_id": trade_block_id,
+                "trade_block_id_missing": missing,
+                "row_type": str(record.get("row_type") or "diagnostic"),
+                "purpose": record.get("purpose"),
+                "timestamp": record.get("timestamp"),
+                "candle_index": record.get("candle_index"),
+                "absolute_candle_index": record.get("absolute_candle_index"),
+                "metadata_json": json.dumps(record.get("metadata") or {}, ensure_ascii=False),
+            }
         )
 
     for order in result.final_active_orders or []:

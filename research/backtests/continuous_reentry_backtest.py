@@ -22,6 +22,7 @@ from .pnl_coverage_audit import apply_trade_exit_quality
 from .multi_start_backtest import compact_result_dict, resolve_directions
 from .trade_block_export import ensure_backtest_trade_block_ids, stamp_trade_block_id
 from .addon_short_recovery import AddonShortRecoveryConfig
+from .recovery_bot_config import RecoveryBotConfig, recovery_bot_config_dict
 
 CONTINUOUS_SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -43,6 +44,13 @@ CONTINUOUS_SUMMARY_CSV_FIELDS = (
     "active_orders_count",
     "final_active_order_purposes",
     "exit_quality",
+    "recovery_bot_enabled",
+    "recovery_activated",
+    "recovery_reference_timestamp",
+    "recovery_activation_timestamp",
+    "recovery_exit_timestamp",
+    "recovery_final_pnl",
+    "recovery_gap_fully_closed",
 )
 
 CONTINUOUS_AGGREGATE_CSV_FIELDS = (
@@ -70,6 +78,23 @@ CONTINUOUS_AGGREGATE_CSV_FIELDS = (
     "total_candles_processed",
     "first_start_time",
     "last_end_time",
+    "normal_closed_count",
+    "recovery_activated_count",
+    "recovery_closed_count",
+    "recovery_failed_count",
+    "open_after_recovery_count",
+    "recovery_false_positive_candidate_count",
+    "total_normal_pnl",
+    "total_recovery_trade_pnl",
+    "avg_recovery_duration_candles",
+    "max_recovery_duration_candles",
+)
+
+CONTINUOUS_SUCCESSFUL_EXIT_REASONS = frozenset(
+    {
+        "flat_no_active_orders",
+        "recovery_joint_exit",
+    }
 )
 
 
@@ -155,6 +180,35 @@ def aggregate_continuous_results(results: Iterable[BacktestResult]) -> list[dict
         successful_closed_count = len(successful_closed)
         closed_rate_pct = (successful_closed_count / trade_count * 100.0) if trade_count else 0.0
 
+        recovery_activated_runs = [run for run in runs if bool(run.recovery_activated)]
+        recovery_closed_runs = [
+            run
+            for run in runs
+            if str(run.exit_reason or "") == "recovery_joint_exit"
+        ]
+        normal_closed_runs = [
+            run
+            for run in flat_closed
+            if run.exit_reason == "flat_no_active_orders"
+        ]
+        recovery_failed_runs = [
+            run
+            for run in recovery_activated_runs
+            if run not in recovery_closed_runs
+        ]
+        open_after_recovery_runs = [
+            run
+            for run in open_runs
+            if bool(run.recovery_activated)
+        ]
+        recovery_durations = [
+            int(run.recovery_duration_candles)
+            for run in recovery_closed_runs
+            if run.recovery_duration_candles is not None
+        ]
+        total_normal_pnl = sum(float(run.realized_pnl) for run in normal_closed_runs)
+        total_recovery_trade_pnl = sum(float(run.realized_pnl) for run in recovery_closed_runs)
+
         aggregates.append(
             {
                 "symbol": symbol,
@@ -181,6 +235,18 @@ def aggregate_continuous_results(results: Iterable[BacktestResult]) -> list[dict
                 "total_candles_processed": total_candles,
                 "first_start_time": _format_timestamp(min(start_times)) if start_times else "",
                 "last_end_time": _format_timestamp(max(end_times)) if end_times else "",
+                "normal_closed_count": len(normal_closed_runs),
+                "recovery_activated_count": len(recovery_activated_runs),
+                "recovery_closed_count": len(recovery_closed_runs),
+                "recovery_failed_count": len(recovery_failed_runs),
+                "open_after_recovery_count": len(open_after_recovery_runs),
+                "recovery_false_positive_candidate_count": 0,
+                "total_normal_pnl": total_normal_pnl,
+                "total_recovery_trade_pnl": total_recovery_trade_pnl,
+                "avg_recovery_duration_candles": statistics.mean(recovery_durations)
+                if recovery_durations
+                else 0.0,
+                "max_recovery_duration_candles": max(recovery_durations) if recovery_durations else 0,
             }
         )
     return aggregates
@@ -419,6 +485,7 @@ def run_continuous_reentry_for_direction(
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
     input_slice_start_index: int = 0,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
@@ -462,6 +529,9 @@ def run_continuous_reentry_for_direction(
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
             addon_short_recovery_config=addon_short_recovery_config,
+            recovery_bot_config=recovery_bot_config,
+            absolute_trade_start_index=start_index,
+            input_slice_start_index=input_slice_start_index,
         )
         result.start_index = start_index
         result.input_slice_start_index = input_slice_start_index
@@ -473,7 +543,7 @@ def run_continuous_reentry_for_direction(
         result.cycle3_snapshot = _compute_cycle3_snapshot_from_fill_log(result)
         results.append(result)
 
-        if result.exit_reason != "flat_no_active_orders":
+        if result.exit_reason not in CONTINUOUS_SUCCESSFUL_EXIT_REASONS:
             break
 
         next_start = int(result.end_index) + 1
@@ -500,6 +570,7 @@ def run_continuous_reentry_backtests(
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
+    recovery_bot_config: RecoveryBotConfig | None = None,
     input_slice_start_index: int = 0,
     candle_source_total_count: int | None = None,
     input_slice_first_timestamp: str | None = None,
@@ -538,6 +609,7 @@ def run_continuous_reentry_backtests(
                 file_config_path=file_config_path,
                 tp_profit_target_pct=tp_profit_target_pct,
                 addon_short_recovery_config=addon_short_recovery_config,
+                recovery_bot_config=recovery_bot_config,
                 input_slice_start_index=input_slice_start_index,
             )
         )
@@ -565,6 +637,9 @@ def run_continuous_reentry_backtests(
         "input_slice_first_timestamp": input_slice_first_timestamp,
         "input_slice_last_timestamp": input_slice_last_timestamp,
         "index_semantics_version": 2,
+        "recovery_bot": recovery_bot_config_dict(recovery_bot_config)
+        if recovery_bot_config is not None
+        else None,
         "long_config_path": str(long_config_path),
         "short_config_path": str(short_config_path),
         "file_config_path": str(file_config_path) if file_config_path else None,

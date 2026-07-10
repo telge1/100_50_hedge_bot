@@ -127,6 +127,7 @@ def build_fill_log_entry(
         "timestamp": ts.isoformat() if ts is not None else None,
         "symbol": metadata.get("symbol") or book.symbol,
         "side": fill.side,
+        "reduce_only": bool(fill.reduce_only),
         "qty": float(fill.exec_qty),
         "order_check_price": order_check_price or metadata.get("order_check_price"),
         "fill_price": float(fill.exec_price),
@@ -152,6 +153,15 @@ def build_fill_log_entry(
         entry["candle_high"] = float(candle.high if candle.high is not None else candle.close)
         entry["candle_low"] = float(candle.low if candle.low is not None else candle.close)
         entry["candle_close"] = float(candle.close)
+    if metadata.get("gross_pnl") is not None:
+        entry["gross_realized_pnl_event"] = float(metadata.get("gross_pnl"))
+    if metadata.get("entry_fee") is not None:
+        entry["entry_fee"] = float(metadata.get("entry_fee"))
+    if metadata.get("exit_fee") is not None:
+        entry["exit_fee"] = float(metadata.get("exit_fee"))
+    fee_rate = metadata.get("runtime_fee_rate") or metadata.get("fee_rate") or book.fee_rate
+    if fee_rate is not None:
+        entry["fee_rate"] = float(fee_rate)
     return entry
 
 
@@ -294,6 +304,27 @@ class BacktestResult:
     # Optional snapshot for the state immediately after CYCLE_3_SHORT_REDUCE
     # (used by long-gap-reduction offline audits and continuous exports).
     cycle3_snapshot: dict[str, Any] | None = None
+    # Integrated long-gap recovery bot (backtest-only)
+    recovery_bot_enabled: bool | None = None
+    recovery_activated: bool | None = None
+    recovery_reference_purpose: str | None = None
+    recovery_reference_absolute_candle_index: int | None = None
+    recovery_reference_timestamp: str | None = None
+    recovery_activation_absolute_candle_index: int | None = None
+    recovery_activation_timestamp: str | None = None
+    recovery_exit_absolute_candle_index: int | None = None
+    recovery_exit_timestamp: str | None = None
+    recovery_wait_candles: int | None = None
+    recovery_initial_gap_qty: float | None = None
+    recovery_total_reduced_qty: float | None = None
+    recovery_remaining_gap_qty: float | None = None
+    recovery_gap_fully_closed: bool | None = None
+    recovery_total_gap_reduction_net_pnl: float | None = None
+    recovery_final_pnl: float | None = None
+    recovery_duration_candles: int | None = None
+    recovery_duration_minutes: int | None = None
+    recovery_diagnostic_events: list[dict[str, Any]] = field(default_factory=list)
+    recovery_gap_reduction_events: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

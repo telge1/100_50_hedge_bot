@@ -41,8 +41,9 @@ from .simulated_execution import (
     is_immediate_market_fill,
     is_immediate_refill_market_fill,
     process_candle_fills,
+    resolve_simulated_fee_rate,
 )
-from .simulated_order_book import SimulatedOrderBook, SyntheticCandle, VirtualOrder
+from .simulated_order_book import SimulatedOrderBook, SyntheticCandle
 from .backtest_audit_recorder import BacktestAuditRecorder
 
 Signal = Literal["long", "short"]
@@ -236,6 +237,7 @@ class HedgeBotOriginalSimulator:
         )
         self.audit_recorder = audit_recorder
         self.book = SimulatedOrderBook(symbol=self.symbol, audit_recorder=audit_recorder)
+        self.book.fee_rate = resolve_simulated_fee_rate(self.config)
         self.snapshot = build_flat_snapshot(
             symbol=self.symbol,
             price=self.candle.close,
