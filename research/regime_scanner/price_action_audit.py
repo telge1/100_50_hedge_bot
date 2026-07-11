@@ -84,6 +84,9 @@ def walk_price_action(
 
     for i in range(start_idx, len(frame)):
         candle = frame.iloc[i].to_dict()
+        candle["candle_index"] = int(i)
+        if "atr" not in candle:
+            candle["atr"] = None
         ts = candle["timestamp"]
         usable = filter_swings_as_of(all_swings, ts)
         processed = {

@@ -46,8 +46,24 @@ def _swing(
     }
 
 
-def _candle(ts: str, *, o: float, h: float, l: float, c: float) -> dict:
-    return {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": 1.0}
+def _candle(ts: str, *, o: float, h: float, l: float, c: float, **extra) -> dict:
+    row = {"timestamp": ts, "open": o, "high": h, "low": l, "close": c, "volume": 1.0}
+    row.update(extra)
+    return row
+
+
+def _approx(value: float, rel: float = 1e-9):
+    class _Approx:
+        def __eq__(self, other: object) -> bool:
+            try:
+                return abs(float(other) - value) <= rel * max(1.0, abs(value))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return False
+
+        def __repr__(self) -> str:
+            return f"approx({value})"
+
+    return _Approx()
 
 
 def _short_setup(**kwargs) -> dict:
@@ -613,3 +629,373 @@ def test_reference_missing_warning_not_crash() -> None:
     state = initialize_price_action_state(setup, CFG, [])
     assert state["state"] == "waiting_for_pullback"
     assert "REFERENCE_SWING_MISSING" in state["warnings"]
+
+
+# ---------------------------------------------------------------------------
+# Hardening: same-bar, geometry, FBD/FBO binding, ATR buffer, age docs
+# ---------------------------------------------------------------------------
+
+
+def test_same_bar_lower_high_does_not_confirm() -> None:
+    h1, low, h2 = _short_lh_swings()
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    # Close already through confirmation on the arming candle.
+    state = update_price_action_state(
+        state,
+        _candle(h2["confirmation_timestamp"], o=96, h=98.5, l=94.0, c=94.5, candle_index=23),
+        [low, h2],
+    )
+    assert state["structure_confirmed"] is True
+    assert state["structure_armed_timestamp"] == h2["confirmation_timestamp"]
+    assert state["state"] == "waiting_for_structure_break"
+    assert evaluate_price_action_confirmation(state) is None
+    assert state["same_bar_confirmation_blocked"] is True
+    assert any(e["event"] == "same_bar_confirmation_blocked" for e in state["event_log"])
+
+
+def test_next_candle_after_same_bar_block_may_confirm() -> None:
+    h1, low, h2 = _short_lh_swings()
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state,
+        _candle(h2["confirmation_timestamp"], o=96, h=98.5, l=94.0, c=94.5, candle_index=23),
+        [low, h2],
+    )
+    assert state["same_bar_confirmation_blocked"] is True
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T02:00:00+00:00", o=94, h=94.5, l=93.5, c=94.0, candle_index=24),
+        [],
+    )
+    assert state["state"] == "price_action_confirmed"
+    conf = evaluate_price_action_confirmation(state)
+    assert conf is not None
+    assert conf["structure_armed_timestamp"] == h2["confirmation_timestamp"]
+    assert conf["same_bar_confirmation_blocked"] is True
+
+
+def test_same_bar_higher_low_does_not_confirm() -> None:
+    l1, high, l2 = _long_hl_swings()
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state,
+        _candle(l2["confirmation_timestamp"], o=104, h=106, l=101.5, c=105.5, candle_index=23),
+        [high, l2],
+    )
+    assert state["pattern_type"] == "higher_low"
+    assert state["state"] == "waiting_for_structure_break"
+    assert evaluate_price_action_confirmation(state) is None
+    assert state["same_bar_confirmation_blocked"] is True
+
+
+def test_same_bar_failed_breakout_does_not_confirm() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    low = _swing(side="low", price=94.0, pivot_index=10, confirmation_index=13)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:10:00+00:00", o=99.5, h=100.8, l=93.0, c=93.5, candle_index=14),
+        [low],
+    )
+    assert state["pattern_type"] == "failed_breakout"
+    assert state["structure_confirmed"] is True
+    assert state["state"] == "waiting_for_structure_break"
+    assert evaluate_price_action_confirmation(state) is None
+    assert state["same_bar_confirmation_blocked"] is True
+
+
+def test_same_bar_failed_breakdown_does_not_confirm() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    high = _swing(side="high", price=106.0, pivot_index=10, confirmation_index=13)
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:10:00+00:00", o=100.5, h=107.0, l=99.2, c=106.5, candle_index=14),
+        [high],
+    )
+    assert state["pattern_type"] == "failed_breakdown"
+    assert state["state"] == "waiting_for_structure_break"
+    assert evaluate_price_action_confirmation(state) is None
+    assert state["same_bar_confirmation_blocked"] is True
+
+
+def test_short_conf_equals_inv_rejected() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    # Intermediate low equals candidate high → conf == inv
+    low = _swing(side="low", price=98.0, pivot_index=12, confirmation_index=15)
+    h2 = _swing(side="high", price=98.0, pivot_index=20, confirmation_index=23)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state, _candle(h2["confirmation_timestamp"], o=98, h=98.5, l=97, c=97.5), [low, h2]
+    )
+    assert state["state"] == "invalidated"
+    assert state["invalidation_reason"] == "INVALID_STRUCTURE_GEOMETRY"
+    assert state["invalid_structure_geometry"] is True
+
+
+def test_short_inv_below_conf_rejected() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    # Intermediate low ABOVE candidate high → inv < conf (invalid for short)
+    low = _swing(side="low", price=99.0, pivot_index=12, confirmation_index=15)
+    h2 = _swing(side="high", price=97.0, pivot_index=20, confirmation_index=23)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state, _candle(h2["confirmation_timestamp"], o=97, h=97.5, l=96, c=96.5), [low, h2]
+    )
+    assert state["state"] == "invalidated"
+    assert state["invalidation_reason"] == "INVALID_STRUCTURE_GEOMETRY"
+
+
+def test_long_conf_equals_inv_rejected() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    high = _swing(side="high", price=102.0, pivot_index=12, confirmation_index=15)
+    l2 = _swing(side="low", price=102.0, pivot_index=20, confirmation_index=23)
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state, _candle(l2["confirmation_timestamp"], o=102, h=103, l=101.5, c=102.2), [high, l2]
+    )
+    assert state["state"] == "invalidated"
+    assert state["invalidation_reason"] == "INVALID_STRUCTURE_GEOMETRY"
+
+
+def test_long_inv_above_conf_rejected() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    # Intermediate high BELOW candidate low → inv > conf (invalid for long)
+    high = _swing(side="high", price=101.0, pivot_index=12, confirmation_index=15)
+    l2 = _swing(side="low", price=103.0, pivot_index=20, confirmation_index=23)
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state, _candle(l2["confirmation_timestamp"], o=103, h=104, l=102.5, c=103.2), [high, l2]
+    )
+    assert state["state"] == "invalidated"
+    assert state["invalidation_reason"] == "INVALID_STRUCTURE_GEOMETRY"
+
+
+def test_valid_short_geometry_still_allowed() -> None:
+    h1, low, h2 = _short_lh_swings()
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state, _candle(h2["confirmation_timestamp"], o=98, h=98.5, l=97, c=97.5), [low, h2]
+    )
+    assert state["state"] == "waiting_for_structure_break"
+    assert state["invalidation_level"] > state["confirmation_level"]
+
+
+def test_valid_long_geometry_still_allowed() -> None:
+    l1, high, l2 = _long_hl_swings()
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state, _candle(l2["confirmation_timestamp"], o=102, h=103, l=101.5, c=102.2), [high, l2]
+    )
+    assert state["state"] == "waiting_for_structure_break"
+    assert state["invalidation_level"] < state["confirmation_level"]
+
+
+def test_fbd_without_local_swing_high_waits() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    # Ancient high BEFORE reference — must not arm FBD.
+    old_high = _swing(side="high", price=110.0, pivot_index=1, confirmation_index=4)
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1, old_high])
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:10:00+00:00", o=100.5, h=101.0, l=99.2, c=100.4),
+        [],
+    )
+    assert state["pattern_type"] == "failed_breakdown"
+    assert state["state"] == "waiting_for_confirmation_level"
+    assert state["waiting_for_confirmation_level"] is True
+    assert state["structure_confirmed"] is False
+    assert state["confirmation_level"] is None
+
+
+def test_later_confirmed_swing_high_arms_fbd() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [l1])
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:10:00+00:00", o=100.5, h=101.0, l=99.2, c=100.4),
+        [],
+    )
+    assert state["state"] == "waiting_for_confirmation_level"
+    later_high = _swing(
+        side="high",
+        price=102.5,
+        pivot_index=16,
+        confirmation_index=19,
+        pivot_ts="2026-03-01T01:20:00+00:00",
+        conf_ts="2026-03-01T01:35:00+00:00",
+    )
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:35:00+00:00", o=101.5, h=102.8, l=101.0, c=102.0),
+        [later_high],
+    )
+    assert state["structure_confirmed"] is True
+    assert state["pattern_type"] == "failed_breakdown"
+    assert state["confirmation_level"] == 102.5
+    assert state["state"] == "waiting_for_structure_break"
+
+
+def test_fbo_waits_then_arms_mirrored() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, CFG, [h1])
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:10:00+00:00", o=99.5, h=100.8, l=99.0, c=99.2),
+        [],
+    )
+    assert state["state"] == "waiting_for_confirmation_level"
+    later_low = _swing(
+        side="low",
+        price=96.0,
+        pivot_index=16,
+        confirmation_index=19,
+        pivot_ts="2026-03-01T01:20:00+00:00",
+        conf_ts="2026-03-01T01:35:00+00:00",
+    )
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:35:00+00:00", o=97, h=97.5, l=95.5, c=96.2),
+        [later_low],
+    )
+    assert state["structure_confirmed"] is True
+    assert state["pattern_type"] == "failed_breakout"
+    assert state["confirmation_level"] == 96.0
+
+
+def test_atr_buffer_long_fbd() -> None:
+    from research.regime_scanner.price_action import compute_failed_break_invalidation_level
+
+    cfg = PriceActionConfig(failed_break_invalidation_atr_buffer=0.1)
+    pack = compute_failed_break_invalidation_level(
+        side="long", extreme=99.0, atr=2.0, cfg=cfg
+    )
+    assert pack["unbuffered_failed_break_extreme"] == 99.0
+    assert pack["failed_break_invalidation_buffer"] == _approx(0.2)
+    assert pack["final_invalidation_level"] == _approx(98.8)
+
+
+def test_atr_buffer_short_fbo() -> None:
+    from research.regime_scanner.price_action import compute_failed_break_invalidation_level
+
+    cfg = PriceActionConfig(failed_break_invalidation_atr_buffer=0.1)
+    pack = compute_failed_break_invalidation_level(
+        side="short", extreme=101.0, atr=2.0, cfg=cfg
+    )
+    assert pack["final_invalidation_level"] == _approx(101.2)
+
+
+def test_missing_atr_uses_breakout_tolerance_fallback() -> None:
+    from research.regime_scanner.price_action import compute_failed_break_invalidation_level
+
+    cfg = PriceActionConfig(
+        failed_break_invalidation_atr_buffer=0.1,
+        breakout_tolerance_pct=1.0,
+    )
+    pack = compute_failed_break_invalidation_level(
+        side="long", extreme=100.0, atr=None, cfg=cfg
+    )
+    assert pack["failed_break_invalidation_buffer_mode"] == "breakout_tolerance_pct_fallback"
+    assert pack["failed_break_invalidation_buffer"] == _approx(1.0)
+    assert pack["final_invalidation_level"] == _approx(99.0)
+
+
+def test_wick_beyond_buffered_inv_does_not_invalidate() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    high = _swing(side="high", price=106.0, pivot_index=10, confirmation_index=13)
+    cfg = PriceActionConfig(
+        minimum_swing_separation_candles=5,
+        max_setup_age_candles=20,
+        failed_break_invalidation_atr_buffer=0.5,
+    )
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, cfg, [l1])
+    # extreme 99.2, atr=2 → buffer 1.0 → inv = 98.2
+    state = update_price_action_state(
+        state,
+        {
+            **_candle("2026-03-01T01:10:00+00:00", o=100.5, h=101.0, l=99.2, c=100.4),
+            "atr": 2.0,
+            "candle_index": 14,
+        },
+        [high],
+    )
+    assert state["final_invalidation_level"] == _approx(98.2)
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:15:00+00:00", o=100, h=100.5, l=97.5, c=99.0),
+        [],
+    )
+    assert state["state"] == "waiting_for_structure_break"
+
+
+def test_close_beyond_buffered_inv_invalidates() -> None:
+    l1 = _swing(side="low", price=100.0, pivot_index=5, confirmation_index=8)
+    high = _swing(side="high", price=106.0, pivot_index=10, confirmation_index=13)
+    cfg = PriceActionConfig(
+        minimum_swing_separation_candles=5,
+        max_setup_age_candles=20,
+        failed_break_invalidation_atr_buffer=0.5,
+    )
+    setup = _long_setup(setup_activation_timestamp=l1["confirmation_timestamp"])
+    state = initialize_price_action_state(setup, cfg, [l1])
+    state = update_price_action_state(
+        state,
+        {
+            **_candle("2026-03-01T01:10:00+00:00", o=100.5, h=101.0, l=99.2, c=100.4),
+            "atr": 2.0,
+            "candle_index": 14,
+        },
+        [high],
+    )
+    state = update_price_action_state(
+        state,
+        _candle("2026-03-01T01:15:00+00:00", o=99, h=99.5, l=97.0, c=98.0),
+        [],
+    )
+    assert state["state"] == "invalidated"
+
+
+def test_age_96_still_active() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    cfg = PriceActionConfig(max_setup_age_candles=96)
+    state = initialize_price_action_state(setup, cfg, [h1])
+    base = pd.Timestamp("2026-03-01T01:05:00+00:00")
+    for i in range(96):
+        ts = (base + pd.Timedelta(minutes=5 * i)).isoformat()
+        state = update_price_action_state(
+            state, _candle(ts, o=99, h=100, l=98, c=99), []
+        )
+    assert state["age_candles"] == 96
+    assert state["state"] != "expired"
+
+
+def test_age_97_expired() -> None:
+    h1 = _swing(side="high", price=100.0, pivot_index=5, confirmation_index=8)
+    setup = _short_setup(setup_activation_timestamp=h1["confirmation_timestamp"])
+    cfg = PriceActionConfig(max_setup_age_candles=96)
+    state = initialize_price_action_state(setup, cfg, [h1])
+    base = pd.Timestamp("2026-03-01T01:05:00+00:00")
+    for i in range(97):
+        ts = (base + pd.Timedelta(minutes=5 * i)).isoformat()
+        state = update_price_action_state(
+            state, _candle(ts, o=99, h=100, l=98, c=99), []
+        )
+    assert state["age_candles"] == 97
+    assert state["state"] == "expired"
+    assert state["invalidation_reason"] == "MAX_SETUP_AGE"
