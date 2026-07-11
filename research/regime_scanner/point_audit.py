@@ -13,6 +13,10 @@ import numpy as np
 import pandas as pd
 
 from .classifier import build_regime_summary, classify_market_state, summarize_timeframe_regime
+from .regime_snapshot import (
+    build_regime_snapshot_from_point_audit,
+    evaluate_setup_activation,
+)
 from .config import RegimeScannerConfig, default_regime_scanner_config
 from .data_loader import feather_path_for_symbol, load_closed_candles_as_of
 from .divergence import (
@@ -377,11 +381,16 @@ def build_point_audit(
     candles: pd.DataFrame | None = None,
     history_candles: int = 144,
     timeframes: str | list[str] | tuple[str, ...] | None = None,
+    previous_combined_regime: object | None = None,
+    include_setup_activation: bool = True,
 ) -> dict[str, Any]:
     """Build a causal point audit payload for ``decision_time``.
 
     When multiple timeframes are requested, indicators/pivots/divergences are
     recomputed independently on each causally aggregated OHLCV frame.
+
+    Phase 1 also attaches ``regime_snapshot`` and optionally ``setup_activation``
+    (no entry / TP). Pass ``previous_combined_regime`` for regime-change edges.
     """
     cfg = config or default_regime_scanner_config()
     decision_ts = parse_decision_time(decision_time)
@@ -430,6 +439,13 @@ def build_point_audit(
                 "combined_regime": combined,
             }
         )
+        snapshot = build_regime_snapshot_from_point_audit(
+            payload,
+            previous_combined_regime=previous_combined_regime,
+        )
+        payload["regime_snapshot"] = snapshot
+        if include_setup_activation:
+            payload["setup_activation"] = evaluate_setup_activation(snapshot)
         return payload
 
     comparison = build_comparison_table(tf_payloads)
@@ -469,6 +485,13 @@ def build_point_audit(
                 "summary": base.get("summary"),
             }
         )
+    snapshot = build_regime_snapshot_from_point_audit(
+        out,
+        previous_combined_regime=previous_combined_regime,
+    )
+    out["regime_snapshot"] = snapshot
+    if include_setup_activation:
+        out["setup_activation"] = evaluate_setup_activation(snapshot)
     return out
 
 
