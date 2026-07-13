@@ -191,11 +191,16 @@ def build_regime_snapshot(
     by_timeframe: dict[str, Any] | None = None,
     reason_codes: list[Any] | None = None,
     point_audit: dict[str, Any] | None = None,
+    market_regime_context: object | None = None,
 ) -> dict[str, Any]:
     """Build a serialisable RegimeSnapshot (no entry / TP fields).
 
     Prefer explicit regime strings for unit tests. When ``point_audit`` is
     provided, TF/combined fields are taken from it unless overridden.
+
+    ``market_regime_context`` (optional ``MarketRegimeContext``) is stored
+    read-only beside legacy combined_regime fields and must never feed
+    allow_long / allow_short / setup activation.
     """
     audit = point_audit or {}
     combined_payload = audit.get("combined_regime") or audit.get("regime_summary") or {}
@@ -278,6 +283,10 @@ def build_regime_snapshot(
         "lower_timeframe_alignment": _alignment(direction, r5),
         "by_timeframe": tf_map,
     }
+    if market_regime_context is not None:
+        from research.regime_scanner.market_regime import attach_readonly_market_regime
+
+        snapshot = attach_readonly_market_regime(snapshot, market_regime_context)  # type: ignore[arg-type]
     _assert_no_entry_fields(snapshot)
     return snapshot
 
