@@ -1,7 +1,7 @@
-"""Historical pipeline audit: RegimeSnapshot → Setup → PriceActionConfirmation.
+"""Historical pipeline audit: RegimeSnapshot → Setup → PriceAction → Momentum.
 
-Research-only candle walk. No momentum, entry, or TP.
-Price Action uses **5m pivots only**; 15m/30m enter solely via RegimeSnapshot /
+Research-only candle walk. No entry or TP.
+Price Action / Momentum use **5m** only; 15m/30m enter solely via RegimeSnapshot /
 SetupActivation context.
 """
 
@@ -21,6 +21,8 @@ import pandas as pd
 from .config import RegimeScannerConfig, default_regime_scanner_config
 from .data_loader import load_symbol_candles
 from .indicators import atr_wilder
+from .momentum import MomentumConfig, default_momentum_config
+from .momentum_audit import run_momentum_audit, write_momentum_audit_outputs
 from .point_audit import build_point_audit, json_safe
 from .price_action import (
     PriceActionConfig,
@@ -152,10 +154,12 @@ def run_pipeline_audit(
     progress_every: int = 200,
     prefetch_batch_size: int = 32,
     pa_config: PriceActionConfig | None = None,
+    momentum_config: MomentumConfig | None = None,
+    enable_momentum: bool = True,
     data_dir: str | Path | None = None,
     scanner_config: RegimeScannerConfig | None = None,
 ) -> dict[str, Any]:
-    """Causal week walk: snapshot → setup → PA confirmation (5m PA only)."""
+    """Causal week walk: snapshot → setup → PA confirmation → optional Momentum."""
     t0 = time.perf_counter()
     cfg = scanner_config or default_regime_scanner_config()
     pa_cfg = pa_config or default_price_action_config()
@@ -745,14 +749,28 @@ def run_pipeline_audit(
         pa_config=pa_cfg,
         timeframes=timeframes,
     )
-    return {
+    result: dict[str, Any] = {
         "summary": summary,
         "regime_snapshots": snapshot_rows,
         "setup_activations": setup_rows,
         "price_action_events": event_rows,
         "price_action_confirmations": confirmation_rows,
         "detail_cases": detail_cases,
+        "candles": frame,
     }
+
+    if enable_momentum:
+        mom_cfg = momentum_config or default_momentum_config()
+        momentum_payload = run_momentum_audit(
+            price_action_confirmations=confirmation_rows,
+            candles=frame,
+            momentum_config=mom_cfg,
+            setup_activations=setup_rows,
+            atr_period=int(getattr(cfg, "atr_period", 14) or 14),
+        )
+        result["momentum"] = momentum_payload
+        summary["momentum"] = momentum_payload.get("summary")
+    return result
 
 
 def build_pipeline_summary(
@@ -1008,6 +1026,12 @@ def format_pipeline_summary_md(summary: dict[str, Any]) -> str:
             f"- same-bar confirmation: `{summary.get('same_bar_confirmation_policy')}`",
             f"- age: `{summary.get('age_policy_note')}`",
             "",
+            "## Momentum (Phase 3)",
+            "",
+            "```json",
+            json.dumps(json_safe(summary.get("momentum")), indent=2),
+            "```",
+            "",
             "## Detail cases",
             "",
             "```json",
@@ -1073,6 +1097,9 @@ def write_pipeline_audit_outputs(
         "confirmations_json",
         payload.get("price_action_confirmations") or [],
     )
+    if payload.get("momentum"):
+        mom_paths = write_momentum_audit_outputs(payload["momentum"], out)
+        paths.update({f"momentum_{k}": v for k, v in mom_paths.items()})
     return paths
 
 
@@ -1117,9 +1144,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     paths = write_pipeline_audit_outputs(payload, args.output_dir)
     summary = payload.get("summary") or {}
+    mom = summary.get("momentum") or {}
     print(
         f"Pipeline audit complete: setups={summary.get('setup_activations')} "
-        f"confirmations={summary.get('price_action_confirmations')} "
+        f"pa_confirmations={summary.get('price_action_confirmations')} "
+        f"momentum={mom.get('momentum_confirmations')} "
         f"elapsed={summary.get('elapsed_seconds'):.1f}s"
     )
     for path in paths.values():
