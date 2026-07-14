@@ -1,0 +1,42 @@
+{
+  "all_windows_complete": 1,
+  "expected_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "expected_phase_b_hash": "b4d4437cba11d26d3772f814793c8f2425f5a5a2634f874b672171fc68cbf7cd",
+  "observed_phase_b_hash": "b4d4437cba11d26d3772f814793c8f2425f5a5a2634f874b672171fc68cbf7cd",
+  "ok": 1,
+  "phase_b_validation": {
+    "config_hash_match": 1,
+    "config_id": "2eab613f172d928e",
+    "expected": {
+      "full": 2696,
+      "in_sample": 1824,
+      "out_of_sample": 872
+    },
+    "phase_a_dir": "research/liquidation_level/results/APTUSDT_5m_sweep_scanner_phase_a",
+    "reproduced": {
+      "full": 2696,
+      "in_sample": 1824,
+      "out_of_sample": 872
+    }
+  },
+  "reproduced_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "reproduced_events_after_filter": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "snapshot_rows": 8088,
+  "windows_by_size": {
+    "12": 2696,
+    "3": 2696,
+    "6": 2696
+  }
+}

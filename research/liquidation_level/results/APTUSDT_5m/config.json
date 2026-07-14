@@ -1,0 +1,12 @@
+{
+  "reference_price": "open",
+  "volume_threshold": 1.7,
+  "volatility_threshold": 10.0,
+  "leverages": [
+    25,
+    50,
+    100
+  ],
+  "volume_sma_period": 13,
+  "max_active_levels": 500
+}

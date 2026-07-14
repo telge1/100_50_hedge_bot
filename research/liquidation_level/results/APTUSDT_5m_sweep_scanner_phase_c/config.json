@@ -1,0 +1,16 @@
+{
+  "expected_phase_b_hash": "b4d4437cba11d26d3772f814793c8f2425f5a5a2634f874b672171fc68cbf7cd",
+  "feather_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather",
+  "max_events": null,
+  "phase_a_dir": "research/liquidation_level/results/APTUSDT_5m_sweep_scanner_phase_a",
+  "phase_b_dir": "research/liquidation_level/results/APTUSDT_5m_sweep_scanner_phase_b",
+  "random_seed": 42,
+  "source_config_id": "2eab613f172d928e",
+  "symbol": "APTUSDT",
+  "timeline_sample_size": 50,
+  "window_sizes": [
+    3,
+    6,
+    12
+  ]
+}

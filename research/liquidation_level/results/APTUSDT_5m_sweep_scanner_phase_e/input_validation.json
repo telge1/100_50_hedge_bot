@@ -1,0 +1,66 @@
+{
+  "candidate_presence": {
+    "R2|loose|off1": 2696,
+    "R2|loose|off3": 2696,
+    "R2|loose|off6": 2696,
+    "R3|loose|off6": 2696,
+    "R4|loose|off6": 2696,
+    "R5|loose|off6": 2696
+  },
+  "decision_offsets_present": [
+    1,
+    3,
+    6,
+    12
+  ],
+  "expected_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "expected_phase_d_hash": "cf301399bde97d95d81016ba14ca0a52471beaa6514a70d9ee241833bec42a2a",
+  "leakage_audit": {
+    "forbidden_fields_found": [],
+    "no_entry_pnl_fields": 1,
+    "passed": 1,
+    "results_eval_columns_present_for_posthoc_only": [
+      "eval_ended_below_level",
+      "eval_ended_above_level",
+      "eval_majority_below",
+      "eval_majority_above",
+      "eval_mixed_path",
+      "eval_new_low_dominant",
+      "eval_new_high_dominant"
+    ],
+    "snapshot_target_like_columns": [],
+    "targets_excluded_from_scores": 1,
+    "timeline_offset_mismatches": 0,
+    "timeline_sample_size": 50,
+    "uses_end_beyond_offset_rows": 0
+  },
+  "leakage_checks_passed": 1,
+  "observed_phase_d_hash": "cf301399bde97d95d81016ba14ca0a52471beaa6514a70d9ee241833bec42a2a",
+  "ok": 1,
+  "phase_b_dir_exists": 1,
+  "phase_c_dir_exists": 1,
+  "phase_d_ready_for_phase_e": 1,
+  "primary_candidate_rows": 2696,
+  "recommended_rule_phase_d": {
+    "bull_precision_new_high_is": 0.7683823529411765,
+    "bull_precision_new_high_oos": 0.8192090395480226,
+    "coverage_pct": 52.85608308605341,
+    "decision_offset": 6,
+    "gate_passed": "short_new_low",
+    "rule_family": "R2",
+    "selection_basis": "predefined_gates_not_oos_search",
+    "short_precision_new_low_is": 1.0,
+    "short_precision_new_low_oos": 1.0,
+    "variant": "loose"
+  },
+  "reproduced_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "technical_invalid_count": 0
+}

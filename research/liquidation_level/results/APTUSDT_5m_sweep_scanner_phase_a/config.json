@@ -1,0 +1,15 @@
+{
+  "candles": 52569,
+  "decision_time_rule": "signal_timestamp_open + 5m = sweep close",
+  "end_date": null,
+  "feather_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather",
+  "max_events": null,
+  "optimizer_dir": "research/liquidation_level/results/APTUSDT_5m_optimizer_v1",
+  "random_seed": 42,
+  "source_config_id": "2eab613f172d928e",
+  "stale_15m_age_minutes": 15.0,
+  "stale_30m_age_minutes": 30.0,
+  "start_date": null,
+  "symbol": "APTUSDT",
+  "timeline_sample_size": 50
+}

@@ -1,0 +1,21 @@
+{
+  "name": "best_robust_path",
+  "schema_version": 1,
+  "reference_price": "close",
+  "volume_sma_period": 13,
+  "volume_threshold": 1.3,
+  "volatility_threshold": 20.0,
+  "leverages": [
+    25,
+    50,
+    100
+  ],
+  "cluster_distance_pct": 0.15,
+  "cluster_min_level_count": 1,
+  "cluster_min_total_strength": 4,
+  "max_active_levels": 500,
+  "minimum_move_divisor": 333.0,
+  "sweep_strict_cross": true,
+  "reclaim_window_candles": 3,
+  "path_horizon_candles": 50
+}

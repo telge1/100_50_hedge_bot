@@ -1,0 +1,15 @@
+{
+  "symbol": "APTUSDT",
+  "feather_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather",
+  "raw_rows_after_filter": 52569,
+  "columns": [
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume"
+  ],
+  "start_timestamp": "2025-12-27 00:00:00+00:00",
+  "end_timestamp": "2026-06-27 12:40:00+00:00"
+}

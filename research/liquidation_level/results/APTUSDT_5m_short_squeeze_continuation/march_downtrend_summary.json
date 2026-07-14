@@ -1,0 +1,10 @@
+{
+  "window": "2026-03-05 .. 2026-03-10 UTC",
+  "n_events_50_25": 144,
+  "n_march_06": 17,
+  "n_reclaim": 140,
+  "n_t2": 0,
+  "n_t3": 2,
+  "disclaimer": "Estimated LuxAlgo levels; not real exchange liquidations.",
+  "t4_trend_state_machine": "omitted \u2014 not reproducibly available without touching protected modules"
+}

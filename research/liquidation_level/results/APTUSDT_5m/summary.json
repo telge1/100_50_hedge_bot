@@ -1,0 +1,30 @@
+{
+  "symbol": "APTUSDT",
+  "timeframe": "5m",
+  "feather_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather",
+  "candle_count": 52569,
+  "created_level_count": 29203,
+  "created_upper_count": 14653,
+  "created_lower_count": 14550,
+  "swept_level_count": 25370,
+  "swept_upper_count": 11913,
+  "swept_lower_count": 13457,
+  "active_level_count_end": 449,
+  "removed_by_limit_count": 3384,
+  "counts_by_leverage": {
+    "25": 9967,
+    "50": 9906,
+    "100": 9330
+  },
+  "counts_by_strength": {
+    "1": 16631,
+    "2": 6864,
+    "3": 5708
+  },
+  "median_age_at_sweep": 115.5,
+  "mean_age_at_sweep": 405.60953882538433,
+  "sweep_rate_percent": 86.87463616751704,
+  "start_timestamp": "2025-12-27 00:00:00+00:00",
+  "end_timestamp": "2026-06-27 12:40:00+00:00",
+  "elapsed_seconds": 6.242002881001099
+}

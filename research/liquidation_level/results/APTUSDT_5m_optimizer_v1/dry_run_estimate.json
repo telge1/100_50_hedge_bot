@@ -1,0 +1,23 @@
+{
+  "axis_counts": {
+    "reference_price": 3,
+    "volume_threshold": 4,
+    "volatility_threshold": 4,
+    "leverage_sets": 3,
+    "cluster_distance_pct": 4,
+    "cluster_min_level_count": 2,
+    "cluster_min_total_strength": 3
+  },
+  "full_grid_combinations": 3456,
+  "search_mode": "screening",
+  "planned_configurations": 200,
+  "unique_level_replays": 111,
+  "estimated_level_replays": 111,
+  "baseline_probe_seconds": 7.207545934001246,
+  "estimated_runtime_seconds": 920.0432384752589,
+  "estimated_runtime_hours": 0.2555675662431275,
+  "estimated_memory_note": "In-memory replay cache keyed by level_generation_key; peak RAM scales with unique leverage/volume configs, not cluster axes.",
+  "output_dir": "research/liquidation_level/results/APTUSDT_5m_optimizer_v1",
+  "resume_data_present": false,
+  "feather_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather"
+}

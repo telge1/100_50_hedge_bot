@@ -1,0 +1,10 @@
+{
+  "experiment_name": "liquidation_sensitivity_grid_v1",
+  "search_mode": "screening",
+  "planned": 1,
+  "full_grid": 3456,
+  "workers": 1,
+  "seed": 42,
+  "code_schema_version": "liquidation_optimizer_v1",
+  "baseline_config_id": "b77cc1b59653fe68"
+}

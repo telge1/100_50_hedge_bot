@@ -1,0 +1,70 @@
+{
+  "15m_update_count_inside_windows": 18872,
+  "30m_update_count_inside_windows": 9453,
+  "average_available_candles": 7.0,
+  "bar_count": 56616,
+  "complete_windows_by_size": {
+    "12": 2696,
+    "3": 2696,
+    "6": 2696
+  },
+  "deterministic_hash": "b4d4437cba11d26d3772f814793c8f2425f5a5a2634f874b672171fc68cbf7cd",
+  "events_with_overlaps": 2526,
+  "expected_event_counts": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "feature_availability": {
+    "bars_with_ema_9": 100.0,
+    "bars_with_pa_state": 0.0,
+    "bars_with_regime": 100.0,
+    "bars_with_volume_ratio": 100.0
+  },
+  "incomplete_windows_by_size": {
+    "12": 0,
+    "3": 0,
+    "6": 0
+  },
+  "maximum_concurrent_windows": 79,
+  "mean_closes_above_level_by_window": {
+    "12": 4.431008902077151,
+    "3": 1.0089020771513353,
+    "6": 2.106824925816024
+  },
+  "mean_closes_below_level_by_window": {
+    "12": 7.568991097922849,
+    "3": 1.9910979228486647,
+    "6": 3.893175074183976
+  },
+  "mean_level_crosses_by_window": {
+    "12": 2.9417655786350148,
+    "3": 1.217359050445104,
+    "6": 1.9143175074183976
+  },
+  "mean_reclaims_by_window": {
+    "12": 1.5548961424332344,
+    "3": 0.6546735905044511,
+    "6": 1.0129821958456973
+  },
+  "median_available_candles": 6.0,
+  "phase_b_ready_for_phase_c": 1,
+  "reproduced_event_counts": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "runtime_seconds": 679.8325531100127,
+  "source_config_id": "2eab613f172d928e",
+  "window_count": 8088,
+  "window_sizes": [
+    3,
+    6,
+    12
+  ],
+  "windows_created_by_size": {
+    "12": 2696,
+    "3": 2696,
+    "6": 2696
+  }
+}

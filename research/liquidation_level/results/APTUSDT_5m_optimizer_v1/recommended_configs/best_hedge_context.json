@@ -1,0 +1,21 @@
+{
+  "name": "best_hedge_context",
+  "schema_version": 1,
+  "reference_price": "hl2",
+  "volume_sma_period": 13,
+  "volume_threshold": 1.7,
+  "volatility_threshold": 10.0,
+  "leverages": [
+    25,
+    50,
+    100
+  ],
+  "cluster_distance_pct": 0.1,
+  "cluster_min_level_count": 2,
+  "cluster_min_total_strength": 3,
+  "max_active_levels": 500,
+  "minimum_move_divisor": 333.0,
+  "sweep_strict_cross": true,
+  "reclaim_window_candles": 3,
+  "path_horizon_candles": 50
+}

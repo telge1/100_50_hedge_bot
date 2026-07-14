@@ -1,0 +1,50 @@
+{
+  "deterministic_hash": "89c3abfa95e8b640ab6354dcf5d5fb514a0ba572a271982d17f5a362377d7995",
+  "exact_5m_match_rate": 100.0,
+  "expected_event_counts": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "feature_availability_percentages": {
+    "15m.ema_20": 100.0,
+    "15m.regime": 100.0,
+    "30m.ema_20": 100.0,
+    "30m.regime": 100.0,
+    "5m.adx": 100.0,
+    "5m.ema_200": 100.0,
+    "5m.ema_9": 100.0,
+    "5m.momentum_state": 0.0,
+    "5m.price_action_state": 0.0,
+    "5m.regime": 100.0,
+    "5m.structure_bias": 100.0,
+    "5m.volume_ratio": 100.0
+  },
+  "join_failure_count": 0,
+  "join_success_count": 2696,
+  "max_15m_age_minutes": 10.0,
+  "max_30m_age_minutes": 25.0,
+  "median_15m_age_minutes": 5.0,
+  "median_30m_age_minutes": 15.0,
+  "missing_15m_count": 0,
+  "missing_30m_count": 0,
+  "missing_5m_count": 0,
+  "phase_b_ready": 1,
+  "reproduced_event_counts": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "runtime_seconds": 528.09307097501,
+  "source_config_id": "2eab613f172d928e",
+  "stale_thresholds_minutes": {
+    "15m": 15.0,
+    "30m": 30.0,
+    "note": "diagnostic only; not a trading threshold"
+  },
+  "warmup_incomplete_counts": {
+    "15m": 45,
+    "30m": 129,
+    "5m": 7
+  }
+}

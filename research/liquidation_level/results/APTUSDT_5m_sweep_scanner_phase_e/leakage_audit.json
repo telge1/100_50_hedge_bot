@@ -1,0 +1,14 @@
+{
+  "confirmation_candle_excluded_from_forward": 1,
+  "forbidden_fields_found": [],
+  "forward_after_confirmation": 1,
+  "issues": [],
+  "momentum_only_after_decision": 1,
+  "no_entry_pnl_fields": 1,
+  "no_oos_threshold_search": 1,
+  "no_target_based_candidate_ranking": 1,
+  "passed": 1,
+  "targets_excluded_from_confirmation": 1,
+  "timeline_sample_mismatches": 0,
+  "timeline_sample_size": 50
+}

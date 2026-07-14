@@ -1,0 +1,15 @@
+{
+  "n_planned": 1,
+  "n_completed": 1,
+  "n_failed": 0,
+  "n_eligible": 1,
+  "cache_hits": 0,
+  "cache_misses": 0,
+  "baseline_config_id": "b77cc1b59653fe68",
+  "baseline_full_n": 2106,
+  "best_robust_path_config_id": "b77cc1b59653fe68",
+  "best_robust_oos_status": "confirmed",
+  "best_sensitive_config_id": "b77cc1b59653fe68",
+  "best_hedge_config_id": "b77cc1b59653fe68",
+  "disclaimer": "Estimated LuxAlgo-style levels; not real exchange liquidations. No trading-edge claim."
+}

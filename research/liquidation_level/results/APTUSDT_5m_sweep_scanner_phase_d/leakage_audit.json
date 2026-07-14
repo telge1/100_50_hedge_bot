@@ -1,0 +1,19 @@
+{
+  "forbidden_fields_found": [],
+  "no_entry_pnl_fields": 1,
+  "passed": 1,
+  "results_eval_columns_present_for_posthoc_only": [
+    "eval_ended_below_level",
+    "eval_ended_above_level",
+    "eval_majority_below",
+    "eval_majority_above",
+    "eval_mixed_path",
+    "eval_new_low_dominant",
+    "eval_new_high_dominant"
+  ],
+  "snapshot_target_like_columns": [],
+  "targets_excluded_from_scores": 1,
+  "timeline_offset_mismatches": 0,
+  "timeline_sample_size": 50,
+  "uses_end_beyond_offset_rows": 0
+}

@@ -1,0 +1,34 @@
+{
+  "n": 14,
+  "window": "2026-03-05..2026-03-10",
+  "flag_06": true,
+  "n_march_06": 14,
+  "median_adverse_h50": 0.07832386919912615,
+  "p75_adverse_h50": 0.6650075926184829,
+  "p90_adverse_h50": 0.7676409802184869,
+  "median_favorable_h50": 3.420641125879609,
+  "median_drop_from_peak_h50": 3.4536548729310166,
+  "share_peak_then_trough_pct": 100.0,
+  "categories": {
+    "immediate_drop": 8,
+    "squeeze_then_drop": 6,
+    "deep_squeeze_then_drop": 0,
+    "squeeze_without_drop": 0,
+    "sideways_noise": 0,
+    "immediate_breakout": 0
+  },
+  "disclaimer": "Estimated LuxAlgo levels; not real exchange liquidations.",
+  "meta": {
+    "n_candles": 52569,
+    "in_sample_cut": 36798,
+    "start_timestamp": "2025-12-27 00:00:00+00:00",
+    "end_timestamp": "2026-06-27 12:40:00+00:00",
+    "n_events": 11913,
+    "n_path_event_rows": 231451,
+    "event_counts": {
+      "upper_50x": 4147,
+      "upper_25x": 3487
+    }
+  },
+  "elapsed": 28.989047327999288
+}

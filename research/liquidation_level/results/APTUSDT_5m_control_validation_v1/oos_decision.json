@@ -1,0 +1,10 @@
+{
+  "status": "confirmed_better_than_matched_control",
+  "reasons": [],
+  "oos_n": 872,
+  "horizons_event_better": 7,
+  "horizons_control_better": 0,
+  "fraction_controls_better_than_event_median_return": 0.0,
+  "note": "Empirical matched-control comparison only. Not a formal significance claim. No trading-edge claim.",
+  "integration_recommended": true
+}

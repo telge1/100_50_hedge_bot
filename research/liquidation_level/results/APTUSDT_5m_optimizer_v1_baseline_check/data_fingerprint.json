@@ -1,0 +1,8 @@
+{
+  "n_candles": 52569,
+  "start_timestamp": "2025-12-27 00:00:00+00:00",
+  "end_timestamp": "2026-06-27 12:40:00+00:00",
+  "content_sha256_16": "333a79efe92ad169",
+  "in_sample_cut": 36798,
+  "code_schema_version": "liquidation_optimizer_v1"
+}

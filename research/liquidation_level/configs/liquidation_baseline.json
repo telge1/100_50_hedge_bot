@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "name": "luxalgo_baseline",
+  "reference_price": "open",
+  "volume_sma_period": 13,
+  "volume_threshold": 1.7,
+  "volatility_threshold": 10,
+  "leverages": [25, 50, 100],
+  "cluster_distance_pct": 0.10,
+  "cluster_min_level_count": 2,
+  "cluster_min_total_strength": 3,
+  "max_active_levels": 500,
+  "minimum_move_divisor": 333,
+  "sweep_strict_cross": true,
+  "reclaim_window_candles": 3,
+  "path_horizon_candles": 50
+}

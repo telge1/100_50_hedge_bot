@@ -1,0 +1,74 @@
+{
+  "15m_state_changes_by_window": {
+    "12": 0.19102373887240356,
+    "3": 0.04228486646884273,
+    "6": 0.08827893175074183
+  },
+  "30m_state_changes_by_window": {
+    "12": 0.16580118694362017,
+    "3": 0.04265578635014837,
+    "6": 0.10571216617210683
+  },
+  "availability_by_timeframe": {
+    "15m": 71.9645493771413,
+    "30m": 71.75794521137058,
+    "5m": 76.81159420289855
+  },
+  "deterministic_hash": "cd56b814599ee6b991a25c2bc84f61e46d01c109e8bdc496853ac986b787f3c6",
+  "event_counts": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "events_with_overlap": 2526,
+  "expected_phase_b_hash": "b4d4437cba11d26d3772f814793c8f2425f5a5a2634f874b672171fc68cbf7cd",
+  "feature_count_by_timeframe": {
+    "15m": 69,
+    "30m": 69,
+    "5m": 69
+  },
+  "feature_count_total": 70,
+  "leakage_checks": {
+    "bad_timing_rows": 0,
+    "no_end_feature_safe_at_sweep": 1,
+    "no_target_cols_in_snapshots": 1,
+    "passed": 1,
+    "snapshot_target_cols": [],
+    "target_row_count": 8088,
+    "targets_marked_target_only": 1
+  },
+  "leakage_checks_passed": 1,
+  "missing_feature_count": 164,
+  "overlap_group_count": 535,
+  "phase_c_ready_for_phase_d": 1,
+  "runtime_seconds": 535.2157124429941,
+  "source_config_id": "2eab613f172d928e",
+  "target_counts_by_window": {
+    "12": {
+      "ended_above": 1031,
+      "ended_below": 1665,
+      "majority_above": 882,
+      "majority_below": 1693,
+      "mixed": 121
+    },
+    "3": {
+      "ended_above": 963,
+      "ended_below": 1733,
+      "majority_above": 883,
+      "majority_below": 1813,
+      "mixed": 0
+    },
+    "6": {
+      "ended_above": 995,
+      "ended_below": 1701,
+      "majority_above": 840,
+      "majority_below": 1671,
+      "mixed": 185
+    }
+  },
+  "window_counts": {
+    "12": 2696,
+    "3": 2696,
+    "6": 2696
+  }
+}

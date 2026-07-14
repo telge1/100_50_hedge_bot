@@ -1,0 +1,78 @@
+{
+  "candidates": [
+    {
+      "decision_offset": 6,
+      "rule_family": "R2",
+      "variant": "loose"
+    },
+    {
+      "decision_offset": 1,
+      "rule_family": "R2",
+      "variant": "loose"
+    },
+    {
+      "decision_offset": 3,
+      "rule_family": "R2",
+      "variant": "loose"
+    },
+    {
+      "decision_offset": 6,
+      "rule_family": "R3",
+      "variant": "loose"
+    },
+    {
+      "decision_offset": 6,
+      "rule_family": "R4",
+      "variant": "loose"
+    },
+    {
+      "decision_offset": 6,
+      "rule_family": "R5",
+      "variant": "loose"
+    }
+  ],
+  "expected_phase_d_hash": "cf301399bde97d95d81016ba14ca0a52471beaa6514a70d9ee241833bec42a2a",
+  "feather": "/home/telgenbuescher/projects/Signal_Generator_Ralf/data/bybit/futures/APT_USDT_USDT-5m-futures.feather",
+  "forward_horizons": [
+    3,
+    6,
+    12,
+    24,
+    48
+  ],
+  "forward_target_thresholds_pct": [
+    0.25,
+    0.5,
+    1.0
+  ],
+  "frozen_momentum_thresholds": {
+    "allow_confirmation_on_break_candle": 1,
+    "max_range_atr_ratio": 3.0,
+    "min_body_to_range_ratio": 0.5,
+    "min_close_location_ratio": 0.6,
+    "min_range_atr_ratio": 0.3,
+    "volume_filter_enabled": 0
+  },
+  "momentum_windows": [
+    2,
+    3
+  ],
+  "no_entry_pnl": 1,
+  "no_oos_grid_search": 1,
+  "no_scanner_mutation": 1,
+  "primary_candidate": {
+    "decision_offset": 6,
+    "rule_family": "R2",
+    "variant": "loose"
+  },
+  "symbol": "APTUSDT",
+  "symbol_note": "caller provides symbol",
+  "timing": {
+    "break_close_forced_to": "decision_close after age0 update",
+    "confirmation_level": "initial_sweep_level",
+    "decision_index": "signal_index + decision_offset",
+    "first_momentum_candle": "decision_index + 1 (= scanner age 0)",
+    "forward_starts_at": "confirming_candle_index + 1",
+    "unconfirmed_theoretical_forward_start": "mom_last_index + 1"
+  }
+}

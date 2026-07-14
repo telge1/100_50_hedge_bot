@@ -1,0 +1,51 @@
+{
+  "expected_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "expected_phase_c_hash": "cd56b814599ee6b991a25c2bc84f61e46d01c109e8bdc496853ac986b787f3c6",
+  "leakage_audit": {
+    "bad_timing_rows": 0,
+    "no_end_feature_safe_at_sweep": 1,
+    "no_target_cols_in_snapshots": 1,
+    "passed": 1,
+    "snapshot_target_cols": [],
+    "target_row_count": 8088,
+    "targets_marked_target_only": 1
+  },
+  "leakage_checks_passed": 1,
+  "observed_phase_c_hash": "cd56b814599ee6b991a25c2bc84f61e46d01c109e8bdc496853ac986b787f3c6",
+  "ok": 1,
+  "phase_c_ready_for_phase_d": 1,
+  "phase_c_summary_keys": [
+    "15m_state_changes_by_window",
+    "30m_state_changes_by_window",
+    "availability_by_timeframe",
+    "deterministic_hash",
+    "event_counts",
+    "events_with_overlap",
+    "expected_phase_b_hash",
+    "feature_count_by_timeframe",
+    "feature_count_total",
+    "leakage_checks",
+    "leakage_checks_passed",
+    "missing_feature_count",
+    "overlap_group_count",
+    "phase_c_ready_for_phase_d",
+    "runtime_seconds",
+    "source_config_id",
+    "target_counts_by_window",
+    "window_counts"
+  ],
+  "reproduced_events": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "windows_by_size": {
+    "12": 2696,
+    "3": 2696,
+    "6": 2696
+  }
+}

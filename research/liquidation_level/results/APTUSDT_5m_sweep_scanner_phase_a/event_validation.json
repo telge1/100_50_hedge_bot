@@ -1,0 +1,14 @@
+{
+  "config_hash_match": 1,
+  "config_id": "2eab613f172d928e",
+  "expected": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  },
+  "reproduced": {
+    "full": 2696,
+    "in_sample": 1824,
+    "out_of_sample": 872
+  }
+}

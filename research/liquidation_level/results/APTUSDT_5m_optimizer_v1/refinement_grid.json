@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "experiment_name": "liquidation_sensitivity_grid_v1_refinement",
+  "search_mode": "grid",
+  "fixed": {
+    "volume_sma_period": 13,
+    "max_active_levels": 500,
+    "minimum_move_divisor": 333,
+    "sweep_strict_cross": true,
+    "reclaim_window_candles": 3,
+    "path_horizon_candles": 50
+  },
+  "grid": {
+    "reference_price": [
+      "close"
+    ],
+    "volume_threshold": [
+      1.3
+    ],
+    "volatility_threshold": [
+      15.0,
+      20.0,
+      30.0
+    ],
+    "leverage_sets": [
+      [
+        25,
+        50,
+        100
+      ]
+    ],
+    "cluster_distance_pct": [
+      0.15,
+      0.3
+    ],
+    "cluster_min_level_count": [
+      1,
+      2
+    ],
+    "cluster_min_total_strength": [
+      3,
+      4
+    ]
+  },
+  "evaluation": {
+    "target_leverages": [
+      25,
+      50,
+      100
+    ],
+    "event_side": "upper",
+    "reclaim_groups": [
+      "immediate_reclaim",
+      "reclaim_within_3"
+    ],
+    "horizons": [
+      10,
+      20,
+      30,
+      40,
+      50
+    ],
+    "minimum_full_events": 200,
+    "minimum_oos_events": 50,
+    "minimum_events_per_month": 10,
+    "minimum_months_with_events": 3,
+    "roundtrip_cost_pct": 0.12,
+    "seed": 42,
+    "is_oos_peak_drop_max_abs_diff": 1.0,
+    "oos_peak_before_trough_min_ratio": 0.75,
+    "top_n_controls": 10
+  },
+  "note": "Stage-B refinement neighborhood around Stage-A winners; not auto-started."
+}

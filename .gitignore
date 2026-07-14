@@ -122,3 +122,15 @@ legacy_backup/
 # Runtime bot state
 live_bots/state/
 live_bots/100_50_hedge_bot/*/state/
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Research runtime files
+research/liquidation_level/results/**/cache/
+research/liquidation_level/results/**/nohup.out
+research/liquidation_level/results/**/pid.txt
+research/liquidation_level/results/**/run.log
+research/liquidation_level/results/**/safe_batch_run.log
+research/liquidation_level/results/**/safe_batch_nohup.out

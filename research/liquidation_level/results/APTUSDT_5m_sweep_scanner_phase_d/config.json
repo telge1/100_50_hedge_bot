@@ -1,0 +1,171 @@
+{
+  "blocker_gate_note": "blocker_score is stored/weighted for transparency; classification gates on R4/R5 use core R2 directional signal + explicit HTF/acceptance blockers to force UNCLEAR.",
+  "decision_offsets": [
+    1,
+    3,
+    6,
+    12
+  ],
+  "feature_usage": {
+    "blocker_score": [
+      "decision_30m_structure_bias",
+      "decision_15m_structure_bias",
+      "decision_15m_di_spread",
+      "decision_30m_di_spread",
+      "longest_above_run",
+      "longest_below_run",
+      "new_bullish_bos_count",
+      "new_bearish_bos_count",
+      "fraction_closes_above_level",
+      "fraction_closes_below_level"
+    ],
+    "context_15m_score": [
+      "decision_15m_regime",
+      "decision_15m_di_spread",
+      "decision_15m_adx",
+      "tf15_regime_changed_since_sweep"
+    ],
+    "context_30m_score": [
+      "decision_30m_regime",
+      "decision_30m_di_spread",
+      "decision_30m_adx",
+      "tf30_regime_changed_since_sweep"
+    ],
+    "level_response_score": [
+      "final_close_relative_to_level_pct",
+      "fraction_closes_below_level",
+      "fraction_closes_above_level",
+      "longest_below_run",
+      "longest_above_run",
+      "number_reclaims_below",
+      "n_accepted_above",
+      "n_rejected_from_level"
+    ],
+    "structure_15m_score": [
+      "decision_15m_structure_bias",
+      "decision_15m_last_bos",
+      "tf15_structure_changed_since_sweep"
+    ],
+    "structure_30m_score": [
+      "decision_30m_structure_bias",
+      "decision_30m_last_bos",
+      "tf30_structure_changed_since_sweep"
+    ],
+    "structure_5m_score": [
+      "decision_5m_structure_bias",
+      "new_bearish_bos_count",
+      "new_bullish_bos_count",
+      "new_bearish_choch_count",
+      "new_bullish_choch_count",
+      "failed_breakout_count",
+      "failed_breakdown_count",
+      "end_structure_bias"
+    ],
+    "trend_5m_score": [
+      "decision_5m_ema_9_20_distance",
+      "decision_5m_di_spread",
+      "decision_5m_adx",
+      "fraction_bearish_ema_ordering",
+      "fraction_bullish_ema_ordering",
+      "fraction_di_minus_gt_plus",
+      "fraction_di_plus_gt_minus",
+      "ema9_ema20_crosses"
+    ],
+    "volatility_5m_score": [
+      "atr_pct_mean",
+      "atr_pct_change_proxy",
+      "max_range_expansion_proxy"
+    ],
+    "volume_5m_score": [
+      "volume_ratio_mean",
+      "volume_spike_count_proxy"
+    ]
+  },
+  "no_entry_pnl": 1,
+  "no_oos_threshold_search": 1,
+  "phase_c_expected_hash": "cd56b814599ee6b991a25c2bc84f61e46d01c109e8bdc496853ac986b787f3c6",
+  "rule_components": {
+    "R1": [
+      "level_response_score"
+    ],
+    "R2": [
+      "level_response_score",
+      "trend_5m_score",
+      "structure_5m_score",
+      "volatility_5m_score",
+      "volume_5m_score"
+    ],
+    "R3": [
+      "level_response_score",
+      "trend_5m_score",
+      "structure_5m_score",
+      "volatility_5m_score",
+      "volume_5m_score",
+      "context_15m_score",
+      "structure_15m_score"
+    ],
+    "R4": [
+      "level_response_score",
+      "trend_5m_score",
+      "structure_5m_score",
+      "volatility_5m_score",
+      "volume_5m_score",
+      "context_15m_score",
+      "structure_15m_score",
+      "context_30m_score",
+      "structure_30m_score",
+      "blocker_score"
+    ],
+    "R5": [
+      "level_response_score",
+      "trend_5m_score",
+      "structure_5m_score",
+      "volatility_5m_score",
+      "volume_5m_score",
+      "context_15m_score",
+      "structure_15m_score",
+      "context_30m_score",
+      "structure_30m_score",
+      "blocker_score"
+    ]
+  },
+  "rule_families": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5"
+  ],
+  "score_weights": {
+    "blocker_score": 1.0,
+    "context_15m_score": 0.6,
+    "context_30m_score": 0.6,
+    "level_response_score": 1.0,
+    "structure_15m_score": 0.5,
+    "structure_30m_score": 0.5,
+    "structure_5m_score": 0.7,
+    "trend_5m_score": 0.8,
+    "volatility_5m_score": 0.25,
+    "volume_5m_score": 0.25
+  },
+  "sign_convention": "negative=SHORT_REVERSAL support; positive=BULLISH_BREAKOUT support",
+  "variant_thresholds": {
+    "loose": {
+      "abs_score_threshold": 0.35,
+      "agreement_min": 0.4
+    },
+    "medium": {
+      "abs_score_threshold": 0.7,
+      "agreement_min": 0.55
+    },
+    "strict": {
+      "abs_score_threshold": 1.2,
+      "agreement_min": 0.75
+    }
+  },
+  "variants": [
+    "strict",
+    "medium",
+    "loose"
+  ]
+}
