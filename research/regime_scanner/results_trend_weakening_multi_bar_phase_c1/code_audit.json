@@ -1,0 +1,37 @@
+{
+  "already_persisted_counter_structure": [
+    "MarketStructureState.last_bos / last_choch / last_failed_breakout|breakdown",
+    "last_high_label / last_low_label and labeled swings (HH/HL/LH/LL)",
+    "protective_high_level / protective_low_level",
+    "recent_events (short buffer, not a multi-bar exit ledger)"
+  ],
+  "current_candle_only_in_propose": [
+    "_propose_transition uses _event_types(events) of this bar's StructureEvent list",
+    "bullish_weakening\u2192topping requires \u22652 of {failed_breakout,bearish_choch,lower_high,bearish_bos} SAME bar",
+    "bearish_weakening\u2192bottoming mirror on same bar",
+    "persisted last_bos/last_choch are NOT consulted in weakening exits"
+  ],
+  "design_choice": "Small state ledger on TrendRuntime; default mode=off preserves C1-A. Exit destination remains topping/bottoming (no new states; no March hardcodes).",
+  "evidence_reset_rules": [
+    "clear on any state enter via _enter",
+    "clear when mode=off or not in *_weakening",
+    "clear on continuation (HH or bullish_bos+HL/HH from bullish_weakening; mirror for bearish)",
+    "expire category when age - seen_age > window",
+    "one slot per category; identical event_key not double-counted; new key refreshes age"
+  ],
+  "files": [
+    "research/regime_scanner/trend_state_machine.py",
+    "research/regime_scanner/trend_structure.py"
+  ],
+  "new_fields_required": [
+    "TrendRuntime.weakening_evidence_keys",
+    "TrendRuntime.weakening_evidence_seen_age",
+    "TrendStateConfig.weakening_multi_bar_mode / window / min_categories"
+  ],
+  "phase": "C1_pre_change_code_audit",
+  "reusable_runtime_fields": [
+    "consecutive_bearish_closes / consecutive_bullish_closes (impulse)",
+    "structure_15m / structure_30m bias (HTF, closed buckets only)",
+    "age_5m_bars (window expiry reference while in state)"
+  ]
+}

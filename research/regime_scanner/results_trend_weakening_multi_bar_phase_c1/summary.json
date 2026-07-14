@@ -1,0 +1,442 @@
+{
+  "analyze_end": "2026-05-31T23:59:59+00:00",
+  "analyze_start": "2026-03-01T00:00:00+00:00",
+  "code_audit": {
+    "already_persisted_counter_structure": [
+      "MarketStructureState.last_bos / last_choch / last_failed_breakout|breakdown",
+      "last_high_label / last_low_label and labeled swings (HH/HL/LH/LL)",
+      "protective_high_level / protective_low_level",
+      "recent_events (short buffer, not a multi-bar exit ledger)"
+    ],
+    "current_candle_only_in_propose": [
+      "_propose_transition uses _event_types(events) of this bar's StructureEvent list",
+      "bullish_weakening\u2192topping requires \u22652 of {failed_breakout,bearish_choch,lower_high,bearish_bos} SAME bar",
+      "bearish_weakening\u2192bottoming mirror on same bar",
+      "persisted last_bos/last_choch are NOT consulted in weakening exits"
+    ],
+    "design_choice": "Small state ledger on TrendRuntime; default mode=off preserves C1-A. Exit destination remains topping/bottoming (no new states; no March hardcodes).",
+    "evidence_reset_rules": [
+      "clear on any state enter via _enter",
+      "clear when mode=off or not in *_weakening",
+      "clear on continuation (HH or bullish_bos+HL/HH from bullish_weakening; mirror for bearish)",
+      "expire category when age - seen_age > window",
+      "one slot per category; identical event_key not double-counted; new key refreshes age"
+    ],
+    "files": [
+      "research/regime_scanner/trend_state_machine.py",
+      "research/regime_scanner/trend_structure.py"
+    ],
+    "new_fields_required": [
+      "TrendRuntime.weakening_evidence_keys",
+      "TrendRuntime.weakening_evidence_seen_age",
+      "TrendStateConfig.weakening_multi_bar_mode / window / min_categories"
+    ],
+    "phase": "C1_pre_change_code_audit",
+    "reusable_runtime_fields": [
+      "consecutive_bearish_closes / consecutive_bullish_closes (impulse)",
+      "structure_15m / structure_30m bias (HTF, closed buckets only)",
+      "age_5m_bars (window expiry reference while in state)"
+    ]
+  },
+  "comparison": [
+    {
+      "bearish_weakening_bars": 4207,
+      "bottoming_bars": 3069,
+      "bullish_weakening_bars": 16074,
+      "mar6_bullish_weakening_share": 1.0,
+      "mar6_first_exit_time": null,
+      "mar6_first_exit_to": null,
+      "mar6_left_bullish_weakening": false,
+      "max_weakening_run_bars": 4484,
+      "mean_weakening_run_bars": 921.8636363636364,
+      "median_weakening_run_bars": 558.0,
+      "mode": "off",
+      "n_long_stuck_runs_ge24": 21,
+      "n_multi_bar_exits": 0,
+      "n_weakening_runs": 22,
+      "ping_pong_quad_patterns": 0,
+      "topping_bars": 2733,
+      "variant": "C1_A_baseline",
+      "weakening_share": 0.7654362922705314
+    },
+    {
+      "bearish_weakening_bars": 1782,
+      "bottoming_bars": 9662,
+      "bullish_weakening_bars": 1694,
+      "mar6_bullish_weakening_share": 0.027777777777777776,
+      "mar6_first_exit_time": "2026-03-06T04:50:00+00:00",
+      "mar6_first_exit_to": "topping",
+      "mar6_left_bullish_weakening": true,
+      "max_weakening_run_bars": 139,
+      "mean_weakening_run_bars": 36.208333333333336,
+      "median_weakening_run_bars": 24.0,
+      "mode": "loose",
+      "n_long_stuck_runs_ge24": 51,
+      "n_multi_bar_exits": 92,
+      "n_weakening_runs": 96,
+      "ping_pong_quad_patterns": 0,
+      "topping_bars": 11235,
+      "variant": "C1_B_loose",
+      "weakening_share": 0.13118961352657005
+    },
+    {
+      "bearish_weakening_bars": 2610,
+      "bottoming_bars": 9502,
+      "bullish_weakening_bars": 2443,
+      "mar6_bullish_weakening_share": 0.027777777777777776,
+      "mar6_first_exit_time": "2026-03-06T04:50:00+00:00",
+      "mar6_first_exit_to": "topping",
+      "mar6_left_bullish_weakening": true,
+      "max_weakening_run_bars": 302,
+      "mean_weakening_run_bars": 59.44705882352941,
+      "median_weakening_run_bars": 35.0,
+      "mode": "strict",
+      "n_long_stuck_runs_ge24": 54,
+      "n_multi_bar_exits": 80,
+      "n_weakening_runs": 85,
+      "ping_pong_quad_patterns": 0,
+      "topping_bars": 10093,
+      "variant": "C1_C_strict",
+      "weakening_share": 0.19070803140096618
+    }
+  ],
+  "deterministic_hash": "ac63acb769d0c4de6b7db9064ca938b0c17407c24c3a1ce3e6d215a21ab9f345",
+  "findings": [
+    {
+      "claim": "Baseline still shows extreme stuck weakening",
+      "evidence": "C1-A max_run=4484 long_stuck_ge24=21",
+      "id": "F1",
+      "severity": "info"
+    },
+    {
+      "claim": "Loose multi-bar evidence can exit weakening without March hardcodes",
+      "evidence": "C1-B multi_bar_exits=92 max_run=139 mar6_left=True first_exit=2026-03-06T04:50:00+00:00",
+      "id": "F2",
+      "severity": "result"
+    },
+    {
+      "claim": "Strict multi-bar is more conservative than loose",
+      "evidence": "C1-C multi_bar_exits=80 max_run=302 mar6_left=True ping_pong=0",
+      "id": "F3",
+      "severity": "result"
+    },
+    {
+      "claim": "Ping-pong / churn check vs baseline",
+      "evidence": "ping_pong A/B/C=0/0/0",
+      "id": "F4",
+      "severity": "caution"
+    },
+    {
+      "claim": "Policy unchanged; weakening may still allow_long under existing policy",
+      "evidence": "trend_state_policy.py not modified in Phase C1",
+      "id": "F5",
+      "severity": "scope"
+    },
+    {
+      "claim": "Mar6 bullish_weakening sticky failure reduced under multi-bar variant",
+      "evidence": "A share=1.000 B share=0.028",
+      "id": "F6",
+      "severity": "positive"
+    }
+  ],
+  "load_end": "2026-06-01T00:00:00+00:00",
+  "load_start": "2025-12-27T00:00:00+00:00",
+  "n_load_bars": 44928,
+  "phase": "C1_weakening_multi_bar",
+  "recommendation": {
+    "metrics_snapshot": {
+      "A_max_run": 4484,
+      "B_max_run": 139,
+      "B_mb_exits": 92,
+      "C_max_run": 302,
+      "C_mb_exits": 80
+    },
+    "policy_change": false,
+    "production_default_remains": "off (C1-A)",
+    "reason": "exits stuck weakening with stricter BOS/CHoCH+impulse/HTF gate",
+    "recommended_research_default": "C1_C_strict"
+  },
+  "safety": {
+    "default_mode_off": true,
+    "did_not_write_forbidden_dirs": true,
+    "no_march_hardcode": true,
+    "policy_unchanged": true
+  },
+  "symbol": "APTUSDT",
+  "variants": {
+    "C1_A_baseline": {
+      "config": {
+        "adx_confirm": 18.0,
+        "allow_violent_reversal": false,
+        "bearish_impulse_min_closes": 2,
+        "bullish_impulse_min_closes": 2,
+        "di_spread_confirm": 5.0,
+        "enabled": false,
+        "exit_opposite_closes": 2,
+        "max_gap_bars": 3,
+        "min_hold_bars": {
+          "bearish_warning": 2,
+          "bearish_weakening": 2,
+          "bottoming": 3,
+          "bullish_warning": 2,
+          "bullish_weakening": 2,
+          "early_bearish": 3,
+          "early_bullish": 3,
+          "neutral": 0,
+          "strong_bearish": 4,
+          "strong_bullish": 4,
+          "topping": 3,
+          "unavailable": 0
+        },
+        "min_warmup_5m_bars": 220,
+        "no_ll_lookback": 6,
+        "structure": {
+          "bos_close_buffer_atr": 0.0,
+          "breakout_tolerance_pct": 0.0,
+          "epsilon_pct": 0.01,
+          "failed_return_max_bars": 3,
+          "history_limit": 64,
+          "retest_atr_tol_mult": 0.05,
+          "retest_max_bars": 8,
+          "valid_break_hold_bars": 2
+        },
+        "weakening_evidence_min_categories": 2,
+        "weakening_evidence_window_bars": 36,
+        "weakening_multi_bar_mode": "off"
+      },
+      "mar6_bars": 288,
+      "mar6_bullish_weakening_share": 1.0,
+      "mar6_first_exit": null,
+      "mar6_left_bullish_weakening": false,
+      "mar6_state_counts": {
+        "bullish_weakening": 288
+      },
+      "max_evidence_cats_seen": 0,
+      "max_weakening_run_bars": 4484,
+      "mean_weakening_run_bars": 921.8636363636364,
+      "median_weakening_run_bars": 558.0,
+      "mode": "off",
+      "n_analyze_bars": 26496,
+      "n_long_stuck_runs_ge24": 21,
+      "n_multi_bar_exits": 0,
+      "n_weakening_runs": 22,
+      "ping_pong_quad_patterns": 0,
+      "state_counts": {
+        "bearish_weakening": 4207,
+        "bottoming": 3069,
+        "bullish_weakening": 16074,
+        "early_bearish": 87,
+        "early_bullish": 192,
+        "strong_bearish": 59,
+        "strong_bullish": 75,
+        "topping": 2733
+      },
+      "transition_counts": {
+        "bearish_weakening->bottoming": 10,
+        "bottoming->early_bearish": 1,
+        "bottoming->early_bullish": 8,
+        "bullish_weakening->early_bullish": 2,
+        "bullish_weakening->topping": 10,
+        "early_bearish->strong_bearish": 9,
+        "early_bullish->strong_bullish": 12,
+        "strong_bearish->bearish_weakening": 9,
+        "strong_bullish->bullish_weakening": 12,
+        "topping->early_bearish": 8,
+        "topping->early_bullish": 2
+      },
+      "weakening_share": 0.7654362922705314
+    },
+    "C1_B_loose": {
+      "config": {
+        "adx_confirm": 18.0,
+        "allow_violent_reversal": false,
+        "bearish_impulse_min_closes": 2,
+        "bullish_impulse_min_closes": 2,
+        "di_spread_confirm": 5.0,
+        "enabled": false,
+        "exit_opposite_closes": 2,
+        "max_gap_bars": 3,
+        "min_hold_bars": {
+          "bearish_warning": 2,
+          "bearish_weakening": 2,
+          "bottoming": 3,
+          "bullish_warning": 2,
+          "bullish_weakening": 2,
+          "early_bearish": 3,
+          "early_bullish": 3,
+          "neutral": 0,
+          "strong_bearish": 4,
+          "strong_bullish": 4,
+          "topping": 3,
+          "unavailable": 0
+        },
+        "min_warmup_5m_bars": 220,
+        "no_ll_lookback": 6,
+        "structure": {
+          "bos_close_buffer_atr": 0.0,
+          "breakout_tolerance_pct": 0.0,
+          "epsilon_pct": 0.01,
+          "failed_return_max_bars": 3,
+          "history_limit": 64,
+          "retest_atr_tol_mult": 0.05,
+          "retest_max_bars": 8,
+          "valid_break_hold_bars": 2
+        },
+        "weakening_evidence_min_categories": 2,
+        "weakening_evidence_window_bars": 36,
+        "weakening_multi_bar_mode": "loose"
+      },
+      "mar6_bars": 288,
+      "mar6_bullish_weakening_share": 0.027777777777777776,
+      "mar6_first_exit": {
+        "allow_long": false,
+        "allow_short": true,
+        "close": 1.0021,
+        "decision_time": "2026-03-06T04:50:00+00:00",
+        "evidence_cats": "",
+        "mode": "loose",
+        "previous_state": "bullish_weakening",
+        "reasons": "weakening_evidence_add:lower_high|multi_bar_topping_structure|mode:loose|bearish_choch|lower_high|has_hard_bearish_structure|enter:topping",
+        "state": "topping"
+      },
+      "mar6_left_bullish_weakening": true,
+      "mar6_state_counts": {
+        "bottoming": 19,
+        "bullish_weakening": 8,
+        "early_bullish": 31,
+        "topping": 230
+      },
+      "max_evidence_cats_seen": 2,
+      "max_weakening_run_bars": 139,
+      "mean_weakening_run_bars": 36.208333333333336,
+      "median_weakening_run_bars": 24.0,
+      "mode": "loose",
+      "n_analyze_bars": 26496,
+      "n_long_stuck_runs_ge24": 51,
+      "n_multi_bar_exits": 92,
+      "n_weakening_runs": 96,
+      "ping_pong_quad_patterns": 0,
+      "state_counts": {
+        "bearish_weakening": 1782,
+        "bottoming": 9662,
+        "bullish_weakening": 1694,
+        "early_bearish": 881,
+        "early_bullish": 653,
+        "strong_bearish": 269,
+        "strong_bullish": 320,
+        "topping": 11235
+      },
+      "transition_counts": {
+        "bearish_weakening->bottoming": 46,
+        "bottoming->early_bearish": 1,
+        "bottoming->early_bullish": 45,
+        "bullish_weakening->topping": 50,
+        "early_bearish->bearish_weakening": 1,
+        "early_bearish->strong_bearish": 45,
+        "early_bullish->bullish_weakening": 1,
+        "early_bullish->strong_bullish": 49,
+        "strong_bearish->bearish_weakening": 45,
+        "strong_bullish->bullish_weakening": 49,
+        "topping->early_bearish": 45,
+        "topping->early_bullish": 5
+      },
+      "weakening_share": 0.13118961352657005
+    },
+    "C1_C_strict": {
+      "config": {
+        "adx_confirm": 18.0,
+        "allow_violent_reversal": false,
+        "bearish_impulse_min_closes": 2,
+        "bullish_impulse_min_closes": 2,
+        "di_spread_confirm": 5.0,
+        "enabled": false,
+        "exit_opposite_closes": 2,
+        "max_gap_bars": 3,
+        "min_hold_bars": {
+          "bearish_warning": 2,
+          "bearish_weakening": 2,
+          "bottoming": 3,
+          "bullish_warning": 2,
+          "bullish_weakening": 2,
+          "early_bearish": 3,
+          "early_bullish": 3,
+          "neutral": 0,
+          "strong_bearish": 4,
+          "strong_bullish": 4,
+          "topping": 3,
+          "unavailable": 0
+        },
+        "min_warmup_5m_bars": 220,
+        "no_ll_lookback": 6,
+        "structure": {
+          "bos_close_buffer_atr": 0.0,
+          "breakout_tolerance_pct": 0.0,
+          "epsilon_pct": 0.01,
+          "failed_return_max_bars": 3,
+          "history_limit": 64,
+          "retest_atr_tol_mult": 0.05,
+          "retest_max_bars": 8,
+          "valid_break_hold_bars": 2
+        },
+        "weakening_evidence_min_categories": 2,
+        "weakening_evidence_window_bars": 36,
+        "weakening_multi_bar_mode": "strict"
+      },
+      "mar6_bars": 288,
+      "mar6_bullish_weakening_share": 0.027777777777777776,
+      "mar6_first_exit": {
+        "allow_long": false,
+        "allow_short": true,
+        "close": 1.0021,
+        "decision_time": "2026-03-06T04:50:00+00:00",
+        "evidence_cats": "",
+        "mode": "strict",
+        "previous_state": "bullish_weakening",
+        "reasons": "weakening_evidence_add:lower_high|multi_bar_topping_structure|mode:strict|bearish_choch|lower_high|has_hard_bearish_structure|enter:topping",
+        "state": "topping"
+      },
+      "mar6_left_bullish_weakening": true,
+      "mar6_state_counts": {
+        "bottoming": 19,
+        "bullish_weakening": 8,
+        "early_bullish": 31,
+        "topping": 230
+      },
+      "max_evidence_cats_seen": 2,
+      "max_weakening_run_bars": 302,
+      "mean_weakening_run_bars": 59.44705882352941,
+      "median_weakening_run_bars": 35.0,
+      "mode": "strict",
+      "n_analyze_bars": 26496,
+      "n_long_stuck_runs_ge24": 54,
+      "n_multi_bar_exits": 80,
+      "n_weakening_runs": 85,
+      "ping_pong_quad_patterns": 0,
+      "state_counts": {
+        "bearish_weakening": 2610,
+        "bottoming": 9502,
+        "bullish_weakening": 2443,
+        "early_bearish": 802,
+        "early_bullish": 530,
+        "strong_bearish": 241,
+        "strong_bullish": 275,
+        "topping": 10093
+      },
+      "transition_counts": {
+        "bearish_weakening->bottoming": 41,
+        "bottoming->early_bearish": 2,
+        "bottoming->early_bullish": 39,
+        "bullish_weakening->topping": 44,
+        "early_bearish->bearish_weakening": 1,
+        "early_bearish->strong_bearish": 40,
+        "early_bullish->bullish_weakening": 2,
+        "early_bullish->strong_bullish": 42,
+        "strong_bearish->bearish_weakening": 40,
+        "strong_bullish->bullish_weakening": 42,
+        "topping->early_bearish": 39,
+        "topping->early_bullish": 5
+      },
+      "weakening_share": 0.19070803140096618
+    }
+  }
+}
