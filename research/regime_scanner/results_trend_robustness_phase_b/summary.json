@@ -1,0 +1,226 @@
+{
+  "audit_class_counts": {
+    "BOTTOMING": 3070,
+    "DOWNTREND": 146,
+    "TOPPING": 2733,
+    "UNCLEAR": 20281,
+    "UPTREND": 267
+  },
+  "audit_class_map": {
+    "bearish_warning": "UNCLEAR",
+    "bearish_weakening": "UNCLEAR",
+    "bottoming": "BOTTOMING",
+    "bullish_warning": "UNCLEAR",
+    "bullish_weakening": "UNCLEAR",
+    "early_bearish": "DOWNTREND",
+    "early_bullish": "UPTREND",
+    "neutral": "SIDEWAYS",
+    "strong_bearish": "DOWNTREND",
+    "strong_bullish": "UPTREND",
+    "topping": "TOPPING",
+    "unavailable": "UNCLEAR"
+  },
+  "classification_vs_gt": {
+    "by_gt": {
+      "CLEAR_DOWNTREND": {
+        "match_rate": 0.013317665491578536,
+        "matches": 34,
+        "mismatch_rate": 0.9866823345084215,
+        "mismatches": 2519,
+        "n": 2553,
+        "top_mismatches": {
+          "BOTTOMING": 340,
+          "TOPPING": 278,
+          "UNCLEAR": 1901
+        }
+      },
+      "CLEAR_SIDEWAYS": {
+        "match_rate": 0.0,
+        "matches": 0,
+        "mismatch_rate": 1.0,
+        "mismatches": 1780,
+        "n": 1780,
+        "top_mismatches": {
+          "BOTTOMING": 204,
+          "DOWNTREND": 10,
+          "TOPPING": 137,
+          "UNCLEAR": 1428,
+          "UPTREND": 1
+        }
+      },
+      "CLEAR_UPTREND": {
+        "match_rate": 0.01902587519025875,
+        "matches": 50,
+        "mismatch_rate": 0.9809741248097412,
+        "mismatches": 2578,
+        "n": 2628,
+        "top_mismatches": {
+          "BOTTOMING": 194,
+          "TOPPING": 276,
+          "UNCLEAR": 2108
+        }
+      }
+    },
+    "n_ambiguous_excluded_from_errors": 19536,
+    "n_clear": 6961,
+    "n_total": 26497,
+    "overall_clear_match_rate": 0.01206723171958052
+  },
+  "countertrend_exposure": [
+    {
+      "bad_audit_class": "UPTREND",
+      "false_grant_runs": 8,
+      "gt_label": "CLEAR_DOWNTREND",
+      "longest_false_grant_bars": 110,
+      "n_bad_audit_class": 0,
+      "n_bars": 2553,
+      "share_bad_audit_class": 0.0,
+      "share_existing_countertrend_grant": 0.6846846846846847,
+      "share_proposed_countertrend_grant": 0.10889150019584802
+    },
+    {
+      "bad_audit_class": "DOWNTREND",
+      "false_grant_runs": 9,
+      "gt_label": "CLEAR_UPTREND",
+      "longest_false_grant_bars": 46,
+      "n_bad_audit_class": 0,
+      "n_bars": 2628,
+      "share_bad_audit_class": 0.0,
+      "share_existing_countertrend_grant": 0.22602739726027396,
+      "share_proposed_countertrend_grant": 0.07382039573820395
+    }
+  ],
+  "detection_delays": {
+    "CLEAR_DOWNTREND_first_match": {
+      "max": 0.0,
+      "median": 0.0,
+      "n_episodes": 335,
+      "n_missed": 332,
+      "n_with_detection": 3,
+      "p75": 0.0,
+      "p90": 0.0
+    },
+    "CLEAR_DOWNTREND_stable": {
+      "max": 1.0,
+      "median": 0.0,
+      "n_episodes": 335,
+      "n_missed": 332,
+      "n_with_detection": 3,
+      "p75": 0.5,
+      "p90": 0.8
+    },
+    "CLEAR_UPTREND_first_match": {
+      "max": 0.0,
+      "median": 0.0,
+      "n_episodes": 306,
+      "n_missed": 302,
+      "n_with_detection": 4,
+      "p75": 0.0,
+      "p90": 0.0
+    },
+    "CLEAR_UPTREND_stable": {
+      "max": 0.0,
+      "median": 0.0,
+      "n_episodes": 306,
+      "n_missed": 302,
+      "n_with_detection": 2,
+      "p75": 0.0,
+      "p90": 0.0
+    }
+  },
+  "ground_truth_rules": {
+    "AMBIGUOUS": "otherwise \u2014 never scored as FP/FN",
+    "CLEAR_DOWNTREND": "has_lh_ll & !has_hh_hl & net_48<-1 & di_spread<0 & adx>=18",
+    "CLEAR_SIDEWAYS": "abs(net_48)<0.5 & abs(net_288)<2 & not exclusive trend structure",
+    "CLEAR_UPTREND": "has_hh_hl & !has_lh_ll & net_48>+1 & di_spread>0 & adx>=18"
+  },
+  "gt_counts": {
+    "AMBIGUOUS": 19536,
+    "CLEAR_DOWNTREND": 2553,
+    "CLEAR_SIDEWAYS": 1780,
+    "CLEAR_UPTREND": 2628
+  },
+  "notes": [
+    "default_trend_state_config(enabled=False) \u2014 SM still steps transitions (enabled unused).",
+    "Proposed policy is evaluated only; existing policy_for_state recorded separately.",
+    "Outputs under results_trend_robustness_phase_b only; results/ not touched."
+  ],
+  "ping_pong": {
+    "n_events_gap_le_6": 0,
+    "top_patterns": []
+  },
+  "proposed_policy": {
+    "BOTTOMING": {
+      "allow_long": false,
+      "allow_short": true
+    },
+    "DOWNTREND": {
+      "allow_long": false,
+      "allow_short": true
+    },
+    "SIDEWAYS": {
+      "allow_long": false,
+      "allow_short": false
+    },
+    "TOPPING": {
+      "allow_long": true,
+      "allow_short": false
+    },
+    "UNCLEAR": {
+      "allow_long": false,
+      "allow_short": false
+    },
+    "UPTREND": {
+      "allow_long": true,
+      "allow_short": false
+    }
+  },
+  "sideways_false_trends": [
+    {
+      "false_downtrend_bars": 10,
+      "false_downtrend_episodes": 2,
+      "false_uptrend_bars": 1,
+      "false_uptrend_episodes": 1,
+      "mean_false_down_duration": 5.0,
+      "mean_false_up_duration": 1.0,
+      "median_false_down_duration": 5.0,
+      "median_false_up_duration": 1.0,
+      "n_sideways_bars": 1780,
+      "p90_false_down_duration": 7.4,
+      "p90_false_up_duration": 1.0,
+      "state_switches": 28
+    }
+  ],
+  "state_counts": {
+    "bearish_weakening": 4207,
+    "bottoming": 3070,
+    "bullish_weakening": 16074,
+    "early_bearish": 87,
+    "early_bullish": 192,
+    "strong_bearish": 59,
+    "strong_bullish": 75,
+    "topping": 2733
+  },
+  "stream_meta": {
+    "analyze_end": "2026-05-31T23:59:59+00:00",
+    "analyze_start": "2026-03-01T00:00:00+00:00",
+    "n_analyze_rows": 26497,
+    "n_frame_bars": 44928,
+    "n_warmup_skipped_writes": 18431,
+    "timeline_path": "research/regime_scanner/results_trend_robustness_phase_b/state_timeline_5m.csv"
+  },
+  "symbol_window": {
+    "analyze_end": "2026-05-31T23:59:59+00:00",
+    "analyze_start": "2026-03-01T00:00:00+00:00",
+    "load_start": "2025-12-27T00:00:00+00:00",
+    "march_case": {
+      "end": "2026-03-10T00:00:00+00:00",
+      "start": "2026-03-05T18:00:00+00:00"
+    },
+    "n_analyze_bars": 26497,
+    "t_max": "2026-06-01T00:00:00+00:00",
+    "t_min": "2026-03-01T00:00:00+00:00"
+  },
+  "timeline_sha256_prefix": "c281f097779f133b",
+  "transition_n_pairs": 11
+}
