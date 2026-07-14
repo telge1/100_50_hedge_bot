@@ -1,0 +1,94 @@
+{
+  "conditions": [
+    {
+      "allows": "topping \u2192 early_bearish",
+      "effect": "Only productive exit from topping toward bearish early trend",
+      "events_needed": [
+        "lower_high (same-bar OR persisted label)",
+        "bearish_bos|bearish_choch (SAME BAR)"
+      ],
+      "id": "topping_to_early_bearish",
+      "if": "(lower_high in types OR s5.last_high_label == 'lower_high') AND (bearish_bos in types OR bearish_choch in types) AND (consecutive_bearish_closes >= bearish_impulse_min_closes OR bear_conf >= 2)",
+      "scope": "mixed: LH label may be persisted; BOS/CHoCH current-bar only; impulse/indicator current"
+    },
+    {
+      "allows": "topping \u2192 neutral",
+      "effect": "neutral is unreachable from topping",
+      "events_needed": [],
+      "id": "topping_to_neutral",
+      "if": "NONE \u2014 no branch exists",
+      "scope": "n/a"
+    },
+    {
+      "allows": "topping \u2192 early_bullish",
+      "effect": "Abort topping back to bullish early",
+      "events_needed": [
+        "higher_high",
+        "bullish_bos|bullish_choch"
+      ],
+      "id": "topping_false_top",
+      "if": "higher_high in types AND (bullish_bos OR bullish_choch) in types",
+      "scope": "same-bar only"
+    },
+    {
+      "allows": "hold topping",
+      "effect": "Sticky topping when BOS/CHoCH rare on same bar as LH satisfaction",
+      "events_needed": [],
+      "id": "topping_hold",
+      "if": "min_hold_topping OR exit conjunction incomplete OR impulse/indicator missing",
+      "scope": "current evaluation"
+    },
+    {
+      "allows": "bottoming \u2192 early_bullish",
+      "effect": "Only productive exit from bottoming toward bullish early",
+      "events_needed": [
+        "HL/HHHL (mixed)",
+        "bullish_bos|choch SAME BAR",
+        "impulse/indicator"
+      ],
+      "id": "bottoming_to_early_bullish",
+      "if": "(higher_low in types OR last_low_label == higher_low OR has_hh_hl(s5)) AND (bullish_bos OR bullish_choch in types) AND NOT (15m_bearish AND bearish_bos same-bar) AND NOT (htf_veto_strong_bearish AND bullish_bos missing) AND (consec_bullish >= bullish_impulse_min_closes OR bull_conf >= 2)",
+      "scope": "mixed + HTF gates"
+    },
+    {
+      "allows": "bottoming \u2192 neutral",
+      "effect": "neutral unreachable from bottoming",
+      "events_needed": [],
+      "id": "bottoming_to_neutral",
+      "if": "NONE \u2014 no branch exists",
+      "scope": "n/a"
+    },
+    {
+      "allows": "bottoming \u2192 early_bearish",
+      "effect": "Abort bottoming back to bearish early",
+      "events_needed": [
+        "lower_low",
+        "bearish_bos|choch"
+      ],
+      "id": "bottoming_false_bottom",
+      "if": "lower_low in types AND (bearish_bos OR bearish_choch) in types",
+      "scope": "same-bar only"
+    },
+    {
+      "allows": "\u2192 neutral",
+      "effect": "After warmup neutral\u2192warning quickly; topping/bottoming cannot return to neutral",
+      "events_needed": [
+        "opposite structure + opposite impulse exits"
+      ],
+      "id": "neutral_entry_sources",
+      "if": "only bearish_warning/bullish_warning invalidation paths",
+      "scope": "warning states only"
+    },
+    {
+      "allows": "n/a",
+      "effect": "Same-candle BOS/CHoCH requirement recreates the C0/C1 stuck pattern one layer later",
+      "events_needed": [],
+      "id": "unused_persisted",
+      "if": "last_bos / last_choch / protective levels unused for topping/bottoming exits",
+      "scope": "persisted but unread for exit conjunction BOS/CHoCH leg"
+    }
+  ],
+  "file": "research/regime_scanner/trend_state_machine.py",
+  "function": "_propose_transition",
+  "phase": "C2A_topping_bottoming_code_audit"
+}

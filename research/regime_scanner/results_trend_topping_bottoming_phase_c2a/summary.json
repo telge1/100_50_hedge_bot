@@ -1,0 +1,322 @@
+{
+  "analyze_end": "2026-05-31T23:59:59+00:00",
+  "analyze_start": "2026-03-01T00:00:00+00:00",
+  "bottoming_run_stats": {
+    "ge24": 38,
+    "ge288": 13,
+    "ge48": 35,
+    "ge96": 29,
+    "maximum": 925,
+    "median": 206.0,
+    "n_runs": 41,
+    "p75": 322.0,
+    "p90": 472.0
+  },
+  "cf_would_bars": {
+    "cf1": 5938,
+    "cf2": 3008,
+    "cf3": 15642
+  },
+  "code_audit": {
+    "conditions": [
+      {
+        "allows": "topping \u2192 early_bearish",
+        "effect": "Only productive exit from topping toward bearish early trend",
+        "events_needed": [
+          "lower_high (same-bar OR persisted label)",
+          "bearish_bos|bearish_choch (SAME BAR)"
+        ],
+        "id": "topping_to_early_bearish",
+        "if": "(lower_high in types OR s5.last_high_label == 'lower_high') AND (bearish_bos in types OR bearish_choch in types) AND (consecutive_bearish_closes >= bearish_impulse_min_closes OR bear_conf >= 2)",
+        "scope": "mixed: LH label may be persisted; BOS/CHoCH current-bar only; impulse/indicator current"
+      },
+      {
+        "allows": "topping \u2192 neutral",
+        "effect": "neutral is unreachable from topping",
+        "events_needed": [],
+        "id": "topping_to_neutral",
+        "if": "NONE \u2014 no branch exists",
+        "scope": "n/a"
+      },
+      {
+        "allows": "topping \u2192 early_bullish",
+        "effect": "Abort topping back to bullish early",
+        "events_needed": [
+          "higher_high",
+          "bullish_bos|bullish_choch"
+        ],
+        "id": "topping_false_top",
+        "if": "higher_high in types AND (bullish_bos OR bullish_choch) in types",
+        "scope": "same-bar only"
+      },
+      {
+        "allows": "hold topping",
+        "effect": "Sticky topping when BOS/CHoCH rare on same bar as LH satisfaction",
+        "events_needed": [],
+        "id": "topping_hold",
+        "if": "min_hold_topping OR exit conjunction incomplete OR impulse/indicator missing",
+        "scope": "current evaluation"
+      },
+      {
+        "allows": "bottoming \u2192 early_bullish",
+        "effect": "Only productive exit from bottoming toward bullish early",
+        "events_needed": [
+          "HL/HHHL (mixed)",
+          "bullish_bos|choch SAME BAR",
+          "impulse/indicator"
+        ],
+        "id": "bottoming_to_early_bullish",
+        "if": "(higher_low in types OR last_low_label == higher_low OR has_hh_hl(s5)) AND (bullish_bos OR bullish_choch in types) AND NOT (15m_bearish AND bearish_bos same-bar) AND NOT (htf_veto_strong_bearish AND bullish_bos missing) AND (consec_bullish >= bullish_impulse_min_closes OR bull_conf >= 2)",
+        "scope": "mixed + HTF gates"
+      },
+      {
+        "allows": "bottoming \u2192 neutral",
+        "effect": "neutral unreachable from bottoming",
+        "events_needed": [],
+        "id": "bottoming_to_neutral",
+        "if": "NONE \u2014 no branch exists",
+        "scope": "n/a"
+      },
+      {
+        "allows": "bottoming \u2192 early_bearish",
+        "effect": "Abort bottoming back to bearish early",
+        "events_needed": [
+          "lower_low",
+          "bearish_bos|choch"
+        ],
+        "id": "bottoming_false_bottom",
+        "if": "lower_low in types AND (bearish_bos OR bearish_choch) in types",
+        "scope": "same-bar only"
+      },
+      {
+        "allows": "\u2192 neutral",
+        "effect": "After warmup neutral\u2192warning quickly; topping/bottoming cannot return to neutral",
+        "events_needed": [
+          "opposite structure + opposite impulse exits"
+        ],
+        "id": "neutral_entry_sources",
+        "if": "only bearish_warning/bullish_warning invalidation paths",
+        "scope": "warning states only"
+      },
+      {
+        "allows": "n/a",
+        "effect": "Same-candle BOS/CHoCH requirement recreates the C0/C1 stuck pattern one layer later",
+        "events_needed": [],
+        "id": "unused_persisted",
+        "if": "last_bos / last_choch / protective levels unused for topping/bottoming exits",
+        "scope": "persisted but unread for exit conjunction BOS/CHoCH leg"
+      }
+    ],
+    "file": "research/regime_scanner/trend_state_machine.py",
+    "function": "_propose_transition",
+    "phase": "C2A_topping_bottoming_code_audit"
+  },
+  "config_mode": "C1_C_strict",
+  "deterministic_hash": "57181840dc83074f6a6868046ca69a926662b14e25198dc7d2c797a0f2f12e53",
+  "findings": [
+    {
+      "claim": "topping/bottoming have no path to neutral",
+      "evidence": "CODE_AUDIT topping_to_neutral / bottoming_to_neutral = NONE",
+      "id": "F1",
+      "severity": "critical"
+    },
+    {
+      "claim": "BOS/CHoCH leg for topping\u2192early_bearish and bottoming\u2192early_bullish is same-bar only",
+      "evidence": "persisted last_bos/last_choch unused; mirrors C1 stuck pattern",
+      "id": "F2",
+      "severity": "critical"
+    },
+    {
+      "claim": "Long TB runs dominate after C1-C weakening exits",
+      "evidence": "topping max=765 ge24=45 median=179.0; bottoming max=925 ge24=38 median=206.0",
+      "id": "F3",
+      "severity": "result"
+    },
+    {
+      "claim": "Most frequent exit blockers",
+      "evidence": "topping:bearish_bos_or_choch_same_bar=9783; bottoming:bullish_bos_or_choch_same_bar=9223; topping:lower_high_or_label=4942; bottoming:higher_low_or_hhhl=4498; topping:bearish_impulse_or_indicator=3210; bottoming:bullish_impulse_or_indicator=3180",
+      "id": "F4",
+      "severity": "result"
+    },
+    {
+      "claim": "neutral nearly absent in analyze window under C1-C replay",
+      "evidence": "neutral_bars=0 neutral_entries=0 / 26496",
+      "id": "F5",
+      "severity": "result"
+    },
+    {
+      "claim": "CF1/CF2 would unlock many sticky bars without March hardcodes",
+      "evidence": "{'cf3': 15642, 'cf1': 5938, 'cf2': 3008}",
+      "id": "F6",
+      "severity": "diagnostic"
+    },
+    {
+      "claim": "Smallest C2B root-fix: multi-bar or persisted BOS/CHoCH for TB exits (mirror C1), optional long-age \u2192 neutral diagnostic next",
+      "evidence": "Do not change policy in C2B; keep default off until validated",
+      "id": "F7",
+      "severity": "proposal"
+    }
+  ],
+  "load_end": "2026-06-01T00:00:00+00:00",
+  "load_start": "2025-12-27T00:00:00+00:00",
+  "march06": {
+    "first_cf_unlock_row": {
+      "age": 208,
+      "block_reasons": "bullish_bos_or_choch_same_bar",
+      "bos_persist": true,
+      "bos_same_bar": false,
+      "cf1_would": true,
+      "cf2_would": false,
+      "cf3_would": true,
+      "close": 1.0,
+      "consec_bearish": 0,
+      "consec_bullish": 2,
+      "decision_time": "2026-03-06T00:35:00+00:00",
+      "evidence_cats": "failed_breakdown,higher_low",
+      "htf_15m": "neutral",
+      "htf_30m": "bullish",
+      "impulse_ok": true,
+      "last_bos": "bullish_bos",
+      "last_choch": "bearish_choch",
+      "last_high_label": "higher_high",
+      "last_low_label": "higher_low",
+      "lh_or_hl_ok": true,
+      "possible_target": "early_bullish",
+      "protective_high": 1.0043,
+      "protective_low": null,
+      "run_length_so_far": 209,
+      "state": "bottoming",
+      "transition_reasons": "hold",
+      "types_5m": ""
+    },
+    "first_topping_row": {
+      "age": 1,
+      "block_reasons": "min_hold_topping",
+      "bos_persist": null,
+      "bos_same_bar": null,
+      "cf1_would": false,
+      "cf2_would": false,
+      "cf3_would": false,
+      "close": 1.0011,
+      "consec_bearish": 4,
+      "consec_bullish": 0,
+      "decision_time": "2026-03-06T04:55:00+00:00",
+      "evidence_cats": null,
+      "htf_15m": null,
+      "htf_30m": null,
+      "impulse_ok": null,
+      "last_bos": null,
+      "last_choch": null,
+      "last_high_label": "lower_high",
+      "last_low_label": "lower_low",
+      "lh_or_hl_ok": null,
+      "possible_target": "early_bearish",
+      "protective_high": null,
+      "protective_low": 1.0032,
+      "run_length_so_far": 2,
+      "state": "topping",
+      "transition_reasons": "min_hold_topping",
+      "types_5m": ""
+    },
+    "state_counts": {
+      "bottoming": 19,
+      "topping": 229
+    }
+  },
+  "n_analyze_bars": 26496,
+  "n_load_bars": 44928,
+  "n_long_bottoming_runs": 38,
+  "n_long_topping_runs": 45,
+  "neutral": {
+    "bars": 0,
+    "entries": 0,
+    "from_counts": {},
+    "path_from_bottoming_exists": false,
+    "path_from_topping_exists": false
+  },
+  "phase": "C2A_topping_bottoming_root_cause",
+  "production_default_still_off": true,
+  "read_only": true,
+  "safety": {
+    "default_weakening_mode_off": true,
+    "did_not_write_forbidden_dirs": true,
+    "no_policy_change": true,
+    "no_sm_transition_change": true
+  },
+  "smallest_c2b_proposal": {
+    "fix": "Allow topping\u2192early_bearish / bottoming\u2192early_bullish when BOS/CHoCH evidence is persisted or multi-bar (mirror C1), still requiring LH/HL + impulse; separately evaluate optional age\u2192neutral for chop without direction.",
+    "risks": [
+      "Earlier early_bearish/bullish may increase false trend entries",
+      "Neutral timeout can skip genuine slow reversals",
+      "Must remain config-gated like C1; default off until validated"
+    ]
+  },
+  "state_counts": {
+    "bearish_weakening": 2610,
+    "bottoming": 9502,
+    "bullish_weakening": 2443,
+    "early_bearish": 802,
+    "early_bullish": 530,
+    "strong_bearish": 241,
+    "strong_bullish": 275,
+    "topping": 10093
+  },
+  "symbol": "APTUSDT",
+  "top_block_reasons": [
+    {
+      "block_key": "topping:bearish_bos_or_choch_same_bar",
+      "count": 9783
+    },
+    {
+      "block_key": "bottoming:bullish_bos_or_choch_same_bar",
+      "count": 9223
+    },
+    {
+      "block_key": "topping:lower_high_or_label",
+      "count": 4942
+    },
+    {
+      "block_key": "bottoming:higher_low_or_hhhl",
+      "count": 4498
+    },
+    {
+      "block_key": "topping:bearish_impulse_or_indicator",
+      "count": 3210
+    },
+    {
+      "block_key": "bottoming:bullish_impulse_or_indicator",
+      "count": 3180
+    },
+    {
+      "block_key": "topping:min_hold_topping",
+      "count": 88
+    },
+    {
+      "block_key": "bottoming:min_hold_bottoming",
+      "count": 82
+    },
+    {
+      "block_key": "topping:hold_unknown",
+      "count": 39
+    },
+    {
+      "block_key": "bottoming:hold_unknown",
+      "count": 34
+    },
+    {
+      "block_key": "bottoming:30m_15m_bearish_veto_early",
+      "count": 10
+    }
+  ],
+  "topping_run_stats": {
+    "ge24": 45,
+    "ge288": 12,
+    "ge48": 40,
+    "ge96": 35,
+    "maximum": 765,
+    "median": 179.0,
+    "n_runs": 45,
+    "p75": 321.0,
+    "p90": 472.20000000000016
+  }
+}
