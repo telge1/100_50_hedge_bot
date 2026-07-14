@@ -1,0 +1,43 @@
+{
+  "deterministic_hash": "3711a8c8fa52543b1372fad7a11f772067a4a51c8da3904a2ff7b7792dd517d1",
+  "error_split": {
+    "audit_mapping": "weakening\u2192UNCLEAR over-punishes match; early\u2192full trend ambiguous",
+    "ground_truth": "sensitive net_48 GT creates fragmented CLEAR episodes",
+    "policy": "long allowed in bullish_weakening (Mar6)",
+    "state_layer": "stuck weakening exits; no direct opposite early from weakening",
+    "structure_layer": "event emission vs persisted labels; concurrent multi-event requirement"
+  },
+  "match_rates": {
+    "existing_map_x_existing_gt": 0.01206723171958052,
+    "existing_map_x_strict_gt": 0.0019212295869356388,
+    "existing_map_x_strong_only_gt": 0.0,
+    "weakening_as_trend_map_x_existing_gt": 0.3332854474931763
+  },
+  "n_segments_available": 16,
+  "n_timeline_bars": 26497,
+  "no_core_files_modified": true,
+  "phase": "C0_mapping_gt_root_cause",
+  "phase_b_confirmed": [
+    "stuck bullish_weakening on Mar6",
+    "policy long exposure during crash",
+    "neutral/SIDEWAYS almost absent",
+    "CLEAR episodes mostly not mirrored by early/strong"
+  ],
+  "phase_b_qualified": [
+    "~1.2% match rate partly definitional (mapping+GT), not pure SM score",
+    "missed episodes count inflated by short-lived GT clears",
+    "bearish structure often present as labels but not transition triggers"
+  ],
+  "phase_b_timeline": "research/regime_scanner/results_trend_robustness_phase_b/state_timeline_5m.csv",
+  "read_only": true,
+  "segments": {
+    "has_down": true,
+    "has_mar06": true,
+    "has_mar08_09": true,
+    "has_side": true,
+    "has_switch": true,
+    "has_up": true,
+    "n_available": 16
+  },
+  "smallest_phase_c1_proposal": "C1a (diagnostics\u2192design only next): redesign bullish_weakening/bearish_weakening exit to accept accumulated multi-bar evidence OR allow weakening\u2192opposite warning/early when exclusive opposite structure + net impulse persist \u2014 without March hardcode; plus separate policy audit for weakening long/short. Do not 'fix' match by remapping weakening\u2192UPTREND in production."
+}
