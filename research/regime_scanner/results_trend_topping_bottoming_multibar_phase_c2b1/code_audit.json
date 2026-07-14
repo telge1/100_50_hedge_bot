@@ -1,0 +1,33 @@
+{
+  "file": "research/regime_scanner/trend_state_machine.py",
+  "new_fields": [
+    "TrendStateConfig.turning_multi_bar_mode / turning_evidence_window_bars",
+    "TrendRuntime.turning_evidence_keys / turning_evidence_seen_age"
+  ],
+  "persistent_available": [
+    "last_bos / last_choch (StructureEvent with event_time)",
+    "last_high_label / last_low_label",
+    "protective levels",
+    "consecutive_*_closes impulse",
+    "structure_15m/30m bias",
+    "C1 weakening_evidence_* ledger (separate; cleared on enter)"
+  ],
+  "phase": "C2B1_pre_fix_code_audit",
+  "reset_rules": [
+    "clear on _enter any state",
+    "clear when mode=off or not in topping|bottoming",
+    "window expiry by age",
+    "continuation HH/LL path clears",
+    "opposite-direction events not admitted into ledger"
+  ],
+  "reuse_c1": [
+    "_accumulate_category_evidence shared helper",
+    "same expire / no-double-key / continuation-reset patterns",
+    "separate turning_evidence_* fields (weakening ledger cleared on enter topping)"
+  ],
+  "same_bar_only_before_fix": [
+    "topping\u2192early_bearish required bearish_bos|choch in types (current bar)",
+    "LH could already use last_high_label (persisted)",
+    "bottoming mirror for bullish_bos|choch"
+  ]
+}

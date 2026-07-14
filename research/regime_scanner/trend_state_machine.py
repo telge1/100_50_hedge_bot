@@ -70,8 +70,10 @@ MIN_HOLD_DEFAULTS: dict[str, int] = {
     "unavailable": 0,
 }
 
-# Multi-bar counter-structure evidence (Phase C1 research; default off = baseline).
+# Multi-bar counter-structure evidence (Phase C1 / C2B research; default off = baseline).
 WeakeningMultiBarMode = Literal["off", "loose", "strict"]
+TurningMultiBarMode = Literal["off", "loose", "strict"]
+VALID_MULTI_BAR_MODES: frozenset[str] = frozenset({"off", "loose", "strict"})
 
 BULLISH_WEAKENING_COUNTER_CATS: frozenset[str] = frozenset(
     {"bearish_choch", "lower_high", "bearish_bos", "failed_breakout"}
@@ -79,9 +81,24 @@ BULLISH_WEAKENING_COUNTER_CATS: frozenset[str] = frozenset(
 BEARISH_WEAKENING_COUNTER_CATS: frozenset[str] = frozenset(
     {"bullish_choch", "higher_low", "bullish_bos", "failed_breakdown"}
 )
-# Hard structure categories required by C1-C (strict).
+# Hard structure categories required by C1-C / C2B (strict hard leg).
 STRICT_HARD_CATS_BEARISH: frozenset[str] = frozenset({"bearish_choch", "bearish_bos"})
 STRICT_HARD_CATS_BULLISH: frozenset[str] = frozenset({"bullish_choch", "bullish_bos"})
+
+# Topping/bottoming exit evidence (Phase C2B1; swing + hard structure).
+TOPPING_TURN_CATS: frozenset[str] = frozenset(
+    {"lower_high", "bearish_choch", "bearish_bos"}
+)
+BOTTOMING_TURN_CATS: frozenset[str] = frozenset(
+    {"higher_low", "bullish_choch", "bullish_bos"}
+)
+
+
+def _validate_multi_bar_mode(value: str, *, field_name: str) -> str:
+    mode = str(value).strip().lower()
+    if mode not in VALID_MULTI_BAR_MODES:
+        raise ValueError(f"{field_name} must be one of {sorted(VALID_MULTI_BAR_MODES)}, got {value!r}")
+    return mode
 
 
 @dataclass(frozen=True)
@@ -105,6 +122,10 @@ class TrendStateConfig:
     weakening_multi_bar_mode: WeakeningMultiBarMode = "off"
     weakening_evidence_window_bars: int = 36
     weakening_evidence_min_categories: int = 2
+    # Phase C2B1: topping/bottoming → early_* via persisted / multi-bar BOS/CHoCH.
+    # "off" preserves pre-C2B same-bar-only exits (bit-compatible baseline).
+    turning_multi_bar_mode: TurningMultiBarMode = "off"
+    turning_evidence_window_bars: int = 24
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -113,13 +134,36 @@ class TrendStateConfig:
 
 
 def default_trend_state_config() -> TrendStateConfig:
-    """Baseline config: multi-bar weakening evidence disabled (C1-A)."""
-    return TrendStateConfig(enabled=False, weakening_multi_bar_mode="off")
+    """Baseline config: all multi-bar evidence modes disabled."""
+    return TrendStateConfig(
+        enabled=False,
+        weakening_multi_bar_mode="off",
+        turning_multi_bar_mode="off",
+    )
 
 
 def trend_state_config_c1(mode: WeakeningMultiBarMode) -> TrendStateConfig:
     """Named Phase-C1 research configs (do not change live policy)."""
-    return TrendStateConfig(enabled=False, weakening_multi_bar_mode=mode)
+    return TrendStateConfig(
+        enabled=False,
+        weakening_multi_bar_mode=_validate_multi_bar_mode(mode, field_name="weakening_multi_bar_mode"),  # type: ignore[arg-type]
+        turning_multi_bar_mode="off",
+    )
+
+
+def trend_state_config_c2b(
+    turning_mode: TurningMultiBarMode,
+    *,
+    weakening_mode: WeakeningMultiBarMode = "strict",
+    turning_window_bars: int = 24,
+) -> TrendStateConfig:
+    """Phase C2B1 research configs (C1-C strict by default; turning mode selectable)."""
+    return TrendStateConfig(
+        enabled=False,
+        weakening_multi_bar_mode=_validate_multi_bar_mode(weakening_mode, field_name="weakening_multi_bar_mode"),  # type: ignore[arg-type]
+        turning_multi_bar_mode=_validate_multi_bar_mode(turning_mode, field_name="turning_multi_bar_mode"),  # type: ignore[arg-type]
+        turning_evidence_window_bars=int(turning_window_bars),
+    )
 
 
 @dataclass
@@ -179,6 +223,9 @@ class TrendRuntime:
     weakening_evidence_keys: dict[str, str] = field(default_factory=dict)
     # category -> age_5m_bars when first accepted (for window expiry)
     weakening_evidence_seen_age: dict[str, int] = field(default_factory=dict)
+    # Phase C2B1 multi-bar / persisted turn evidence while in topping|bottoming.
+    turning_evidence_keys: dict[str, str] = field(default_factory=dict)
+    turning_evidence_seen_age: dict[str, int] = field(default_factory=dict)
 
 
 def _ts(value: object) -> pd.Timestamp:
@@ -443,6 +490,7 @@ def _enter(
     rt.entered_at = decision_time
     rt.age_5m_bars = 0
     clear_weakening_evidence(rt)
+    clear_turning_evidence(rt)
     reasons.append(f"enter:{new_state}")
     return reasons
 
@@ -459,11 +507,62 @@ def clear_weakening_evidence(rt: TrendRuntime) -> None:
     rt.weakening_evidence_seen_age.clear()
 
 
+def clear_turning_evidence(rt: TrendRuntime) -> None:
+    rt.turning_evidence_keys.clear()
+    rt.turning_evidence_seen_age.clear()
+
+
+def _accumulate_category_evidence(
+    *,
+    keys: dict[str, str],
+    seen_age: dict[str, int],
+    allowed: frozenset[str],
+    events: list[StructureEvent],
+    age: int,
+    window: int,
+    note_prefix: str,
+) -> list[str]:
+    """Shared C1/C2B ledger: one slot per category, expire by age, no duplicate event_key."""
+    notes: list[str] = []
+    expired = [
+        cat
+        for cat, sa in list(seen_age.items())
+        if age - int(sa) > window
+    ]
+    for cat in expired:
+        keys.pop(cat, None)
+        seen_age.pop(cat, None)
+        notes.append(f"{note_prefix}_expired:{cat}")
+
+    for ev in events:
+        if ev.event_type not in allowed:
+            continue
+        key = _event_identity(ev)
+        cat = ev.event_type
+        prior = keys.get(cat)
+        if prior == key:
+            continue
+        keys[cat] = key
+        seen_age[cat] = age
+        notes.append(
+            f"{note_prefix}_add:{cat}" if prior is None else f"{note_prefix}_refresh:{cat}"
+        )
+    return notes
+
+
 def _weakening_counter_categories(state: str) -> frozenset[str]:
     if state == "bullish_weakening":
         return BULLISH_WEAKENING_COUNTER_CATS
     if state == "bearish_weakening":
         return BEARISH_WEAKENING_COUNTER_CATS
+    return frozenset()
+
+
+def _turning_counter_categories(state: str) -> frozenset[str]:
+    if state == "topping":
+        return TOPPING_TURN_CATS
+    if state == "bottoming":
+        return BOTTOMING_TURN_CATS
     return frozenset()
 
 
@@ -478,6 +577,35 @@ def _weakening_continuation_reset(state: str, types: set[str]) -> bool:
             "bearish_bos" in types and ("lower_high" in types or "lower_low" in types)
         )
     return False
+
+
+def _turning_continuation_reset(state: str, types: set[str]) -> bool:
+    """Invalidate turn-evidence when original trend clearly resumes."""
+    if state == "topping":
+        # Original bullish continuation / false top ingredients
+        return "higher_high" in types or (
+            "bullish_bos" in types and ("higher_low" in types or "higher_high" in types)
+        )
+    if state == "bottoming":
+        return "lower_low" in types or (
+            "bearish_bos" in types and ("lower_high" in types or "lower_low" in types)
+        )
+    return False
+
+
+def _persisted_fresh(
+    ev: StructureEvent | None,
+    *,
+    decision_time: pd.Timestamp,
+    window_bars: int,
+    allowed: frozenset[str],
+) -> StructureEvent | None:
+    if ev is None or ev.event_type not in allowed:
+        return None
+    age_bars = int(round((decision_time - _ts(ev.event_time)) / pd.Timedelta(minutes=5)))
+    if age_bars < 0 or age_bars > int(window_bars):
+        return None
+    return ev
 
 
 def update_weakening_evidence(
@@ -505,35 +633,79 @@ def update_weakening_evidence(
 
     window = max(1, int(cfg.weakening_evidence_window_bars))
     age = int(rt.age_5m_bars)
-    expired = [
-        cat
-        for cat, seen_age in list(rt.weakening_evidence_seen_age.items())
-        if age - int(seen_age) > window
-    ]
-    for cat in expired:
-        rt.weakening_evidence_keys.pop(cat, None)
-        rt.weakening_evidence_seen_age.pop(cat, None)
-        notes.append(f"weakening_evidence_expired:{cat}")
+    notes.extend(
+        _accumulate_category_evidence(
+            keys=rt.weakening_evidence_keys,
+            seen_age=rt.weakening_evidence_seen_age,
+            allowed=_weakening_counter_categories(rt.state),
+            events=events,
+            age=age,
+            window=window,
+            note_prefix="weakening_evidence",
+        )
+    )
+    return notes
 
-    allowed = _weakening_counter_categories(rt.state)
-    for ev in events:
-        if ev.event_type not in allowed:
+
+def update_turning_evidence(
+    rt: TrendRuntime,
+    *,
+    events: list[StructureEvent],
+    cfg: TrendStateConfig,
+    decision_time: pd.Timestamp,
+) -> list[str]:
+    """Accumulate / seed / expire turning evidence while in topping|bottoming (C2B1)."""
+    notes: list[str] = []
+    if cfg.turning_multi_bar_mode == "off":
+        if rt.turning_evidence_keys:
+            clear_turning_evidence(rt)
+        return notes
+    if rt.state not in {"topping", "bottoming"}:
+        if rt.turning_evidence_keys:
+            clear_turning_evidence(rt)
+        return notes
+
+    types = _event_types(events)
+    if _turning_continuation_reset(rt.state, types):
+        clear_turning_evidence(rt)
+        notes.append("turning_evidence_reset_continuation")
+        return notes
+
+    window = max(1, int(cfg.turning_evidence_window_bars))
+    age = int(rt.age_5m_bars)
+    allowed = _turning_counter_categories(rt.state)
+    notes.extend(
+        _accumulate_category_evidence(
+            keys=rt.turning_evidence_keys,
+            seen_age=rt.turning_evidence_seen_age,
+            allowed=allowed,
+            events=events,
+            age=age,
+            window=window,
+            note_prefix="turning_evidence",
+        )
+    )
+
+    # Seed still-valid persisted hard structure (same category slot; no double count).
+    s5 = rt.structure_5m
+    hard = STRICT_HARD_CATS_BEARISH if rt.state == "topping" else STRICT_HARD_CATS_BULLISH
+    for cand in (s5.last_choch, s5.last_bos):
+        fresh = _persisted_fresh(cand, decision_time=decision_time, window_bars=window, allowed=hard)
+        if fresh is None:
             continue
-        key = _event_identity(ev)
-        cat = ev.event_type
-        prior = rt.weakening_evidence_keys.get(cat)
+        key = _event_identity(fresh)
+        cat = fresh.event_type
+        prior = rt.turning_evidence_keys.get(cat)
         if prior == key:
-            continue  # same structure event already recorded
-        # New distinct event for this category: accept first, or refresh age on new identity
+            continue
         if prior is None:
-            rt.weakening_evidence_keys[cat] = key
-            rt.weakening_evidence_seen_age[cat] = age
-            notes.append(f"weakening_evidence_add:{cat}")
-        else:
-            # Replace with newer distinct event of same category (still one category slot)
-            rt.weakening_evidence_keys[cat] = key
-            rt.weakening_evidence_seen_age[cat] = age
-            notes.append(f"weakening_evidence_refresh:{cat}")
+            rt.turning_evidence_keys[cat] = key
+            # Age so remaining window ≈ freshness left on the persisted event
+            event_age = int(
+                round((decision_time - _ts(fresh.event_time)) / pd.Timedelta(minutes=5))
+            )
+            rt.turning_evidence_seen_age[cat] = max(0, age - max(0, window - event_age))
+            notes.append(f"turning_evidence_seed_persist:{cat}")
     return notes
 
 
@@ -591,12 +763,151 @@ def multi_bar_weakening_exit(
     return "bottoming", reasons
 
 
+def multi_bar_turning_exit(
+    rt: TrendRuntime,
+    *,
+    types: set[str],
+    row: dict[str, Any],
+    cfg: TrendStateConfig,
+    decision_time: pd.Timestamp,
+) -> tuple[TrendState | None, list[str]]:
+    """Optional topping→early_bearish / bottoming→early_bullish via multi-bar/persist evidence."""
+    mode = cfg.turning_multi_bar_mode
+    if mode == "off":
+        return None, []
+    if rt.state not in {"topping", "bottoming"}:
+        return None, []
+
+    cats = set(rt.turning_evidence_keys.keys())
+    s5 = rt.structure_5m
+    s15 = rt.structure_15m
+    s30 = rt.structure_30m
+    window = max(1, int(cfg.turning_evidence_window_bars))
+
+    if rt.state == "topping":
+        if "higher_high" in types and ("bullish_bos" in types or "bullish_choch" in types):
+            return None, ["turning_blocked_false_top_path"]
+        lh_ok = (
+            "lower_high" in types
+            or s5.last_high_label == "lower_high"
+            or "lower_high" in cats
+        )
+        bos_same = "bearish_bos" in types or "bearish_choch" in types
+        bos_evid = bool(cats & STRICT_HARD_CATS_BEARISH)
+        bos_persist = (
+            _persisted_fresh(
+                s5.last_choch,
+                decision_time=decision_time,
+                window_bars=window,
+                allowed=STRICT_HARD_CATS_BEARISH,
+            )
+            is not None
+            or _persisted_fresh(
+                s5.last_bos,
+                decision_time=decision_time,
+                window_bars=window,
+                allowed=STRICT_HARD_CATS_BEARISH,
+            )
+            is not None
+        )
+        hard_ok = bos_same or bos_evid or bos_persist
+        bear_conf, bear_codes = _indicator_confirms(row, side="bearish", cfg=cfg)
+        impulse_closes = rt.consecutive_bearish_closes >= int(cfg.bearish_impulse_min_closes)
+        impulse_ind = bear_conf >= 2
+        impulse_ok = impulse_closes or impulse_ind
+        if not (lh_ok and hard_ok and impulse_ok):
+            return None, []
+        if mode == "strict":
+            extra = (_htf_bias(s15) == "bearish") or impulse_ind
+            if not extra:
+                return None, ["turning_strict_need_htf_or_indicator"]
+        reasons = [
+            "turning_multi_bar_early_bearish",
+            f"mode:{mode}",
+            *sorted(cats),
+        ]
+        if bos_same:
+            reasons.append("hard_same_bar")
+        elif bos_evid:
+            reasons.append("hard_from_evidence")
+        elif bos_persist:
+            reasons.append("hard_from_persist")
+        if impulse_closes:
+            reasons.append("impulse_closes")
+        reasons.extend(bear_codes[:2])
+        return "early_bearish", reasons
+
+    # bottoming → early_bullish
+    if "lower_low" in types and ("bearish_bos" in types or "bearish_choch" in types):
+        return None, ["turning_blocked_false_bottom_path"]
+    hl_ok = (
+        "higher_low" in types
+        or s5.last_low_label == "higher_low"
+        or has_hh_hl(s5)
+        or "higher_low" in cats
+    )
+    bos_same = "bullish_bos" in types or "bullish_choch" in types
+    bos_evid = bool(cats & STRICT_HARD_CATS_BULLISH)
+    bos_persist = (
+        _persisted_fresh(
+            s5.last_choch,
+            decision_time=decision_time,
+            window_bars=window,
+            allowed=STRICT_HARD_CATS_BULLISH,
+        )
+        is not None
+        or _persisted_fresh(
+            s5.last_bos,
+            decision_time=decision_time,
+            window_bars=window,
+            allowed=STRICT_HARD_CATS_BULLISH,
+        )
+        is not None
+    )
+    hard_ok = bos_same or bos_evid or bos_persist
+    bull_conf, bull_codes = _indicator_confirms(row, side="bullish", cfg=cfg)
+    impulse_closes = rt.consecutive_bullish_closes >= int(cfg.bullish_impulse_min_closes)
+    impulse_ind = bull_conf >= 2
+    impulse_ok = impulse_closes or impulse_ind
+    if not (hl_ok and hard_ok and impulse_ok):
+        return None, []
+    # Preserve existing HTF protective gates (not the same-bar bug).
+    if _htf_bias(s15) == "bearish" and "bearish_bos" in types:
+        return None, ["turning_blocked_15m_bearish_bos"]
+    if _htf_veto_strong_bearish(s15, s30) and not (
+        "bullish_bos" in types or "bullish_bos" in cats or bos_persist
+    ):
+        return None, ["turning_blocked_htf_veto_strong_bearish"]
+    if mode == "strict":
+        extra = (_htf_bias(s15) == "bullish") or impulse_ind
+        if not extra:
+            return None, ["turning_strict_need_htf_or_indicator"]
+    reasons = [
+        "turning_multi_bar_early_bullish",
+        f"mode:{mode}",
+        *sorted(cats),
+    ]
+    if bos_same:
+        reasons.append("hard_same_bar")
+    elif bos_evid:
+        reasons.append("hard_from_evidence")
+    elif bos_persist:
+        reasons.append("hard_from_persist")
+    if impulse_closes:
+        reasons.append("impulse_closes")
+    reasons.extend(bull_codes[:2])
+    if _htf_bias(s30) == "bearish" and has_lh_ll(s30) and not cfg.allow_violent_reversal:
+        reasons.append("30m_bearish_context_early_only")
+    return "early_bullish", reasons
+
+
 def _propose_transition(
     rt: TrendRuntime,
     *,
     events: list[StructureEvent],
     row: dict[str, Any],
     cfg: TrendStateConfig,
+    decision_time: pd.Timestamp | None = None,
 ) -> tuple[TrendState | None, list[str]]:
     """Return proposed next state (or None) and reasons. Structure-mandatory."""
     types = _event_types(events)
@@ -607,6 +918,11 @@ def _propose_transition(
     bear_conf, bear_codes = _indicator_confirms(row, side="bearish", cfg=cfg)
     bull_conf, bull_codes = _indicator_confirms(row, side="bullish", cfg=cfg)
     state = rt.state
+    decision_ts = _ts(decision_time) if decision_time is not None else (
+        _ts(row["decision_time"])
+        if row.get("decision_time") is not None
+        else (_ts(row["timestamp"]) + pd.Timedelta(minutes=5) if row.get("timestamp") is not None else _ts("1970-01-01T00:00:00+00:00"))
+    )
 
     def need_hold() -> bool:
         return not _can_leave(rt, cfg)
@@ -699,6 +1015,11 @@ def _propose_transition(
                 if _htf_bias(s30) == "bearish" and has_lh_ll(s30) and not cfg.allow_violent_reversal:
                     reasons.append("30m_bearish_context_early_only")
                 return "early_bullish", reasons
+        turn_state, turn_reasons = multi_bar_turning_exit(
+            rt, types=types, row=row, cfg=cfg, decision_time=decision_ts
+        )
+        if turn_state is not None:
+            return turn_state, turn_reasons
         return None, reasons
 
     if state == "topping":
@@ -712,6 +1033,11 @@ def _propose_transition(
         ):
             if rt.consecutive_bearish_closes >= cfg.bearish_impulse_min_closes or bear_conf >= 2:
                 return "early_bearish", ["lh_or_bos"]
+        turn_state, turn_reasons = multi_bar_turning_exit(
+            rt, types=types, row=row, cfg=cfg, decision_time=decision_ts
+        )
+        if turn_state is not None:
+            return turn_state, turn_reasons
         return None, reasons
 
     if state == "early_bearish":
@@ -1002,11 +1328,16 @@ def step_trend_state(
     _update_impulse_counters(rt, row)
     _update_swing_age(rt, events_5m)
     evidence_notes = update_weakening_evidence(rt, events=events_5m, cfg=config)
+    turning_notes = update_turning_evidence(
+        rt, events=events_5m, cfg=config, decision_time=decision_ts
+    )
 
     scores = _scores(events_5m, rt.structure_5m, row, config)
-    proposed, reasons = _propose_transition(rt, events=events_5m, row=row, cfg=config)
-    if evidence_notes:
-        reasons = [*evidence_notes, *reasons]
+    proposed, reasons = _propose_transition(
+        rt, events=events_5m, row=row, cfg=config, decision_time=decision_ts
+    )
+    if evidence_notes or turning_notes:
+        reasons = [*evidence_notes, *turning_notes, *reasons]
     if proposed is not None and proposed != rt.state:
         reasons = _enter(rt, proposed, decision_time=decision_ts, reasons=reasons)
     else:
@@ -1090,18 +1421,25 @@ __all__ = [
     "TrendState",
     "TrendStateConfig",
     "WeakeningMultiBarMode",
+    "TurningMultiBarMode",
     "default_trend_state_config",
     "trend_state_config_c1",
+    "trend_state_config_c2b",
     "TrendStateSnapshot",
     "TrendRuntime",
     "FORBIDDEN_DIRECT",
     "MIN_HOLD_DEFAULTS",
     "BULLISH_WEAKENING_COUNTER_CATS",
     "BEARISH_WEAKENING_COUNTER_CATS",
+    "TOPPING_TURN_CATS",
+    "BOTTOMING_TURN_CATS",
     "transition_allowed",
     "clear_weakening_evidence",
+    "clear_turning_evidence",
     "update_weakening_evidence",
+    "update_turning_evidence",
     "multi_bar_weakening_exit",
+    "multi_bar_turning_exit",
     "step_trend_state",
     "run_trend_state_timeline",
     "build_snapshot",
