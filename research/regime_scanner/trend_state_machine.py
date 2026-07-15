@@ -73,7 +73,9 @@ MIN_HOLD_DEFAULTS: dict[str, int] = {
 # Multi-bar counter-structure evidence (Phase C1 / C2B research; default off = baseline).
 WeakeningMultiBarMode = Literal["off", "loose", "strict"]
 TurningMultiBarMode = Literal["off", "loose", "strict"]
+NeutralFallbackMode = Literal["off", "on"]
 VALID_MULTI_BAR_MODES: frozenset[str] = frozenset({"off", "loose", "strict"})
+VALID_NEUTRAL_FALLBACK_MODES: frozenset[str] = frozenset({"off", "on"})
 
 BULLISH_WEAKENING_COUNTER_CATS: frozenset[str] = frozenset(
     {"bearish_choch", "lower_high", "bearish_bos", "failed_breakout"}
@@ -98,6 +100,15 @@ def _validate_multi_bar_mode(value: str, *, field_name: str) -> str:
     mode = str(value).strip().lower()
     if mode not in VALID_MULTI_BAR_MODES:
         raise ValueError(f"{field_name} must be one of {sorted(VALID_MULTI_BAR_MODES)}, got {value!r}")
+    return mode
+
+
+def _validate_neutral_fallback_mode(value: str) -> str:
+    mode = str(value).strip().lower()
+    if mode not in VALID_NEUTRAL_FALLBACK_MODES:
+        raise ValueError(
+            f"turning_neutral_fallback_mode must be one of {sorted(VALID_NEUTRAL_FALLBACK_MODES)}, got {value!r}"
+        )
     return mode
 
 
@@ -126,6 +137,9 @@ class TrendStateConfig:
     # "off" preserves pre-C2B same-bar-only exits (bit-compatible baseline).
     turning_multi_bar_mode: TurningMultiBarMode = "off"
     turning_evidence_window_bars: int = 24
+    # Phase C2B2B: optional topping/bottoming → neutral after long no-progress (default off).
+    turning_neutral_fallback_mode: NeutralFallbackMode = "off"
+    turning_neutral_fallback_min_age_bars: int = 48
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -134,11 +148,12 @@ class TrendStateConfig:
 
 
 def default_trend_state_config() -> TrendStateConfig:
-    """Baseline config: all multi-bar evidence modes disabled."""
+    """Baseline config: all multi-bar / neutral-fallback modes disabled."""
     return TrendStateConfig(
         enabled=False,
         weakening_multi_bar_mode="off",
         turning_multi_bar_mode="off",
+        turning_neutral_fallback_mode="off",
     )
 
 
@@ -148,6 +163,7 @@ def trend_state_config_c1(mode: WeakeningMultiBarMode) -> TrendStateConfig:
         enabled=False,
         weakening_multi_bar_mode=_validate_multi_bar_mode(mode, field_name="weakening_multi_bar_mode"),  # type: ignore[arg-type]
         turning_multi_bar_mode="off",
+        turning_neutral_fallback_mode="off",
     )
 
 
@@ -156,13 +172,17 @@ def trend_state_config_c2b(
     *,
     weakening_mode: WeakeningMultiBarMode = "strict",
     turning_window_bars: int = 24,
+    neutral_fallback_mode: NeutralFallbackMode = "off",
+    neutral_fallback_min_age_bars: int = 48,
 ) -> TrendStateConfig:
-    """Phase C2B1 research configs (C1-C strict by default; turning mode selectable)."""
+    """Phase C2B research configs (C1-C strict by default; turning/fallback selectable)."""
     return TrendStateConfig(
         enabled=False,
         weakening_multi_bar_mode=_validate_multi_bar_mode(weakening_mode, field_name="weakening_multi_bar_mode"),  # type: ignore[arg-type]
         turning_multi_bar_mode=_validate_multi_bar_mode(turning_mode, field_name="turning_multi_bar_mode"),  # type: ignore[arg-type]
         turning_evidence_window_bars=int(turning_window_bars),
+        turning_neutral_fallback_mode=_validate_neutral_fallback_mode(neutral_fallback_mode),  # type: ignore[arg-type]
+        turning_neutral_fallback_min_age_bars=int(neutral_fallback_min_age_bars),
     )
 
 
@@ -901,6 +921,84 @@ def multi_bar_turning_exit(
     return "early_bullish", reasons
 
 
+def evaluate_neutral_fallback(
+    rt: TrendRuntime,
+    *,
+    types: set[str],
+    row: dict[str, Any],
+    cfg: TrendStateConfig,
+) -> tuple[TrendState | None, list[str]]:
+    """Optional topping/bottoming → neutral after long no-progress (C2B2B; default off).
+
+    Returns (neutral, reasons) when allowed, else (None, block_reasons) for diagnostics.
+    Never proposes from early_* / other states.
+    """
+    blocks: list[str] = []
+    if cfg.turning_neutral_fallback_mode != "on":
+        return None, ["neutral_fallback_mode_off"]
+    if rt.state not in {"topping", "bottoming"}:
+        return None, ["neutral_fallback_wrong_state"]
+    if not _can_leave(rt, cfg):
+        return None, [f"min_hold_{rt.state}"]
+    min_age = max(0, int(cfg.turning_neutral_fallback_min_age_bars))
+    if int(rt.age_5m_bars) < min_age:
+        return None, [f"neutral_fallback_age<{min_age}"]
+
+    htf = _htf_bias(rt.structure_15m)
+    if htf not in {"neutral", "unknown"}:
+        return None, [f"neutral_fallback_htf_15m_{htf}"]
+
+    cats = set(rt.turning_evidence_keys.keys())
+
+    if rt.state == "topping":
+        # Existing-trend continuation (bullish) blocks neutral
+        if "higher_high" in types or (
+            "bullish_bos" in types and ("higher_low" in types or "higher_high" in types)
+        ):
+            return None, ["neutral_fallback_bullish_continuation"]
+        # Confirmed bearish turn evidence blocks (should prefer early_bearish path)
+        if "bearish_bos" in types or "bearish_choch" in types:
+            return None, ["neutral_fallback_bearish_hard_same_bar"]
+        if cats & STRICT_HARD_CATS_BEARISH:
+            return None, ["neutral_fallback_bearish_hard_evidence"]
+        bear_conf, _ = _indicator_confirms(row, side="bearish", cfg=cfg)
+        impulse = (
+            rt.consecutive_bearish_closes >= int(cfg.bearish_impulse_min_closes) or bear_conf >= 2
+        )
+        if impulse:
+            return None, ["neutral_fallback_bearish_impulse"]
+        return "neutral", [
+            "turning_neutral_fallback",
+            "topping_neutral_fallback",
+            f"age:{rt.age_5m_bars}",
+            f"htf_15m:{htf}",
+            f"evidence:{','.join(sorted(cats)) or 'none'}",
+        ]
+
+    # bottoming
+    if "lower_low" in types or (
+        "bearish_bos" in types and ("lower_high" in types or "lower_low" in types)
+    ):
+        return None, ["neutral_fallback_bearish_continuation"]
+    if "bullish_bos" in types or "bullish_choch" in types:
+        return None, ["neutral_fallback_bullish_hard_same_bar"]
+    if cats & STRICT_HARD_CATS_BULLISH:
+        return None, ["neutral_fallback_bullish_hard_evidence"]
+    bull_conf, _ = _indicator_confirms(row, side="bullish", cfg=cfg)
+    impulse = (
+        rt.consecutive_bullish_closes >= int(cfg.bullish_impulse_min_closes) or bull_conf >= 2
+    )
+    if impulse:
+        return None, ["neutral_fallback_bullish_impulse"]
+    return "neutral", [
+        "turning_neutral_fallback",
+        "bottoming_neutral_fallback",
+        f"age:{rt.age_5m_bars}",
+        f"htf_15m:{htf}",
+        f"evidence:{','.join(sorted(cats)) or 'none'}",
+    ]
+
+
 def _propose_transition(
     rt: TrendRuntime,
     *,
@@ -1020,6 +1118,9 @@ def _propose_transition(
         )
         if turn_state is not None:
             return turn_state, turn_reasons
+        neu_state, neu_reasons = evaluate_neutral_fallback(rt, types=types, row=row, cfg=cfg)
+        if neu_state is not None:
+            return neu_state, neu_reasons
         return None, reasons
 
     if state == "topping":
@@ -1038,6 +1139,9 @@ def _propose_transition(
         )
         if turn_state is not None:
             return turn_state, turn_reasons
+        neu_state, neu_reasons = evaluate_neutral_fallback(rt, types=types, row=row, cfg=cfg)
+        if neu_state is not None:
+            return neu_state, neu_reasons
         return None, reasons
 
     if state == "early_bearish":
@@ -1422,6 +1526,7 @@ __all__ = [
     "TrendStateConfig",
     "WeakeningMultiBarMode",
     "TurningMultiBarMode",
+    "NeutralFallbackMode",
     "default_trend_state_config",
     "trend_state_config_c1",
     "trend_state_config_c2b",
@@ -1440,6 +1545,7 @@ __all__ = [
     "update_turning_evidence",
     "multi_bar_weakening_exit",
     "multi_bar_turning_exit",
+    "evaluate_neutral_fallback",
     "step_trend_state",
     "run_trend_state_timeline",
     "build_snapshot",
