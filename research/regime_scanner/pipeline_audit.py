@@ -158,12 +158,13 @@ def run_pipeline_audit(
     enable_momentum: bool = True,
     data_dir: str | Path | None = None,
     scanner_config: RegimeScannerConfig | None = None,
+    data_source: str = "feather",
 ) -> dict[str, Any]:
     """Causal week walk: snapshot → setup → PA confirmation → optional Momentum."""
     t0 = time.perf_counter()
     cfg = scanner_config or default_regime_scanner_config()
     pa_cfg = pa_config or default_price_action_config()
-    candles_raw = load_symbol_candles(symbol, data_dir=data_dir)
+    candles_raw = load_symbol_candles(symbol, data_dir=data_dir, data_source=data_source)
     prepared = prepare_candle_window(
         candles_raw,
         start=start,
@@ -1120,6 +1121,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-setup-age-candles", type=int, default=96)
     parser.add_argument("--data-dir", default=None)
     parser.add_argument(
+        "--data-source",
+        choices=("feather", "mysql"),
+        default="feather",
+        help="Candle source for 5m input (default: feather)",
+    )
+    parser.add_argument(
         "--output-dir",
         default="research/backtests/results/regime_scanner_pipeline_audit_march_week1",
     )
@@ -1141,6 +1148,7 @@ def main(argv: list[str] | None = None) -> int:
         prefetch_batch_size=args.prefetch_batch_size,
         pa_config=pa_cfg,
         data_dir=args.data_dir,
+        data_source=args.data_source,
     )
     paths = write_pipeline_audit_outputs(payload, args.output_dir)
     summary = payload.get("summary") or {}

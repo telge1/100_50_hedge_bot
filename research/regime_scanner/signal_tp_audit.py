@@ -827,6 +827,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--data-dir", default=None)
     parser.add_argument(
+        "--data-source",
+        choices=("feather", "mysql"),
+        default="feather",
+        help="Candle source for 5m input (default: feather)",
+    )
+    parser.add_argument(
         "--start",
         default=None,
         help="UTC start bound for signals (ISO). Warmup candles before start are kept.",
@@ -850,7 +856,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    candles = load_symbol_candles(args.symbol, data_dir=args.data_dir)
+    candles = load_symbol_candles(args.symbol, data_dir=args.data_dir, data_source=args.data_source)
     payload = scan_bullish_signal_tp(
         candles,
         symbol=args.symbol,

@@ -351,6 +351,7 @@ def run_batch_audit(
     data_dir: str | Path | None = None,
     candles: pd.DataFrame | None = None,
     config: RegimeScannerConfig | None = None,
+    data_source: str = "feather",
 ) -> dict[str, Any]:
     """Audit all CSV rows and return rows + summary payload."""
     cfg = config or default_regime_scanner_config()
@@ -360,7 +361,7 @@ def run_batch_audit(
     # Load full symbol history once; each trade filters causally via decision_time.
     shared_candles = candles
     if shared_candles is None:
-        shared_candles = load_symbol_candles(symbol, data_dir=data_dir, config=cfg)
+        shared_candles = load_symbol_candles(symbol, data_dir=data_dir, config=cfg, data_source=data_source)
 
     rows: list[dict[str, Any]] = []
     for _, series in frame.iterrows():
@@ -1033,6 +1034,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="research/backtests/results/regime_scanner_blocker_batch",
     )
     parser.add_argument("--data-dir", default=None)
+    parser.add_argument(
+        "--data-source",
+        choices=("feather", "mysql"),
+        default="feather",
+        help="Candle source for 5m input (default: feather)",
+    )
     parser.add_argument(
         "--prefix",
         default=None,

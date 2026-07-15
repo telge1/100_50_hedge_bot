@@ -383,6 +383,8 @@ def build_point_audit(
     timeframes: str | list[str] | tuple[str, ...] | None = None,
     previous_combined_regime: object | None = None,
     include_setup_activation: bool = True,
+    data_source: str = "feather",
+    exchange: str = "bybit",
 ) -> dict[str, Any]:
     """Build a causal point audit payload for ``decision_time``.
 
@@ -391,6 +393,9 @@ def build_point_audit(
 
     Phase 1 also attaches ``regime_snapshot`` and optionally ``setup_activation``
     (no entry / TP). Pass ``previous_combined_regime`` for regime-change edges.
+
+    ``data_source`` selects the 5m loader (``feather`` default, or ``mysql``).
+    HTF frames are still aggregated from 5m; scanner logic is unchanged.
     """
     cfg = config or default_regime_scanner_config()
     decision_ts = parse_decision_time(decision_time)
@@ -402,6 +407,8 @@ def build_point_audit(
             decision_ts,
             data_dir=data_dir,
             config=cfg,
+            data_source=data_source,
+            exchange=exchange,
         )
     else:
         frame = candles.copy()
@@ -1030,6 +1037,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Optional override for the Bybit futures feather directory",
     )
     parser.add_argument(
+        "--data-source",
+        choices=("feather", "mysql"),
+        default="feather",
+        help="Candle source for 5m input (default: feather). HTF still aggregated from 5m.",
+    )
+    parser.add_argument(
         "--history-candles",
         type=int,
         default=144,
@@ -1057,6 +1070,7 @@ def main(argv: list[str] | None = None) -> int:
         data_dir=args.data_dir,
         history_candles=args.history_candles,
         timeframes=args.timeframes,
+        data_source=args.data_source,
     )
     if args.json:
         print(json.dumps(json_safe(payload), indent=2, allow_nan=False))
