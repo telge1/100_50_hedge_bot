@@ -21,7 +21,17 @@ from research.regime_scanner.trend_weakening_multi_bar_audit import (
     CODE_AUDIT,
     assert_safe_output_dir,
     config_for_variant,
+    replay_variant,
+    replay_variant_naive,
 )
+from research.regime_scanner.trend_robustness_audit import load_analysis_frame
+from research.regime_scanner.trend_audit_shared_replay import (
+    build_shared_structure_timeline,
+    load_or_build_shared_context,
+    reset_audit_counters,
+)
+import research.regime_scanner.trend_audit_shared_replay as shared_replay_mod
+from research.regime_scanner import swings as swings_mod
 
 
 def _ev(etype: str, t: str, level: float = 1.0) -> SE:
@@ -203,3 +213,63 @@ def test_mode_off_ignores_accumulated_evidence() -> None:
     cfg = default_trend_state_config()
     st, _ = multi_bar_weakening_exit(rt, types=set(), row={}, cfg=cfg)
     assert st is None
+
+
+def _metrics_signature(result: dict) -> dict:
+    skip = {"multi_bar_exits", "weakening_runs", "march_rows", "config", "mar6_first_exit"}
+    sig = {k: v for k, v in result.items() if k not in skip}
+    sig["mar6_first_exit_time"] = (result.get("mar6_first_exit") or {}).get("decision_time")
+    sig["mar6_first_exit_to"] = (result.get("mar6_first_exit") or {}).get("state")
+    return sig
+
+
+@pytest.mark.parametrize("mode", ["off", "loose", "strict"])
+def test_optimized_replay_matches_naive_for_march_window(mode: str) -> None:
+    """Parity: shared structure + policy replay equals full per-variant replay."""
+    try:
+        frame = load_analysis_frame(
+            "APTUSDT",
+            load_start="2026-02-20",
+            load_end="2026-03-15",
+            max_bars=2500,
+        )
+    except Exception as exc:
+        pytest.skip(f"APTUSDT candles unavailable: {exc}")
+
+    reset_audit_counters()
+    swings_mod.FILTER_PIVOTS_AS_OF_CALLS = 0
+    a0 = pd.Timestamp("2026-03-01", tz="UTC")
+    a1 = pd.Timestamp("2026-03-12", tz="UTC")
+    shared = build_shared_structure_timeline(frame)
+    assert shared_replay_mod.SHARED_STRUCTURE_PASS_COUNT == 1
+
+    naive = replay_variant_naive(frame, mode=mode, analyze_start=a0, analyze_end=a1)  # type: ignore[arg-type]
+    calls_during_naive = swings_mod.FILTER_PIVOTS_AS_OF_CALLS
+
+    reset_audit_counters()
+    swings_mod.FILTER_PIVOTS_AS_OF_CALLS = 0
+    shared2 = build_shared_structure_timeline(frame)
+    build_filter_calls = swings_mod.FILTER_PIVOTS_AS_OF_CALLS
+    opt = replay_variant(frame, mode=mode, analyze_start=a0, analyze_end=a1, shared=shared2)  # type: ignore[arg-type]
+    total_filter_calls = swings_mod.FILTER_PIVOTS_AS_OF_CALLS
+
+    assert _metrics_signature(naive) == _metrics_signature(opt)
+    assert build_filter_calls == 0
+    assert total_filter_calls == 0
+    assert calls_during_naive > 0
+
+
+def test_shared_context_disk_cache_reuse(tmp_path: Path) -> None:
+    try:
+        frame = load_analysis_frame("APTUSDT", load_start="2026-02-20", load_end="2026-03-08", max_bars=800)
+    except Exception as exc:
+        pytest.skip(f"APTUSDT candles unavailable: {exc}")
+
+    reset_audit_counters()
+    ctx1 = load_or_build_shared_context(frame, cache_dir=tmp_path)
+    assert shared_replay_mod.SHARED_STRUCTURE_PASS_COUNT == 1
+    reset_audit_counters()
+    ctx2 = load_or_build_shared_context(frame, cache_dir=tmp_path)
+    assert shared_replay_mod.SHARED_STRUCTURE_PASS_COUNT == 0
+    assert ctx1.cache_key == ctx2.cache_key
+    assert len(ctx1.prepared_bars) == len(ctx2.prepared_bars)

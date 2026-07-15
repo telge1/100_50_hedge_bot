@@ -293,6 +293,7 @@ def install_htf_cache(frame_5m: pd.DataFrame, end_decision: pd.Timestamp) -> Non
                 decision_time=_ts(last["__close_time"]),
                 atr=atr,
                 cfg=cfg.structure,
+                pivots_already_causal=True,
             )
             setattr(rt, slot_attr, st)
             setattr(rt, last_attr, bucket)

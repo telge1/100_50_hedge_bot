@@ -28,6 +28,13 @@ import pandas as pd
 from research.regime_scanner.config import default_regime_scanner_config
 from research.regime_scanner.point_audit import json_safe
 from research.regime_scanner.swings import find_confirmed_pivots
+from research.regime_scanner.trend_audit_shared_replay import (
+    SharedReplayContext,
+    load_or_build_shared_context,
+    reset_audit_counters,
+    step_trend_state_from_prepared,
+)
+import research.regime_scanner.trend_audit_shared_replay as shared_replay_mod
 from research.regime_scanner.trend_robustness_audit import (
     ANALYZE_END,
     ANALYZE_START,
@@ -127,14 +134,14 @@ def config_for_variant(mode: WeakeningMultiBarMode) -> TrendStateConfig:
     return trend_state_config_c1(mode)
 
 
-def replay_variant(
+def replay_variant_naive(
     frame: pd.DataFrame,
     *,
     mode: WeakeningMultiBarMode,
     analyze_start: pd.Timestamp,
     analyze_end: pd.Timestamp,
 ) -> dict[str, Any]:
-    """Causal full warmup replay; collect analyze-window metrics."""
+    """Original full replay (structure per variant). Used for parity tests only."""
     end_decision = _ts(frame["decision_time"].iloc[-1])
     install_htf_cache(frame, end_decision)
 
@@ -179,7 +186,6 @@ def replay_variant(
             continue
 
         state_counts[snap.current_state] += 1
-        # After a successful exit,_enter clears evidence; track peak from reasons when needed.
         max_evidence_cats = max(max_evidence_cats, len(rt.weakening_evidence_keys))
 
         if snap.current_state != prev_state:
@@ -217,7 +223,6 @@ def replay_variant(
                     }
                 )
 
-            # Weakening run bookkeeping
             if prev_state in {"bullish_weakening", "bearish_weakening"} and open_run is not None:
                 open_run["end"] = _iso(decision_ts)
                 open_run["end_state"] = snap.current_state
@@ -277,6 +282,31 @@ def replay_variant(
         open_run["multi_bar_exit"] = False
         weakening_runs.append(open_run)
 
+    return _finalize_variant_metrics(
+        mode=mode,
+        cfg=cfg,
+        state_counts=state_counts,
+        transition_counts=transition_counts,
+        multi_bar_exits=multi_bar_exits,
+        weakening_runs=weakening_runs,
+        march_rows=march_rows,
+        ping_pong=ping_pong,
+        max_evidence_cats=max_evidence_cats,
+    )
+
+
+def _finalize_variant_metrics(
+    *,
+    mode: WeakeningMultiBarMode,
+    cfg: TrendStateConfig,
+    state_counts: Counter[str],
+    transition_counts: Counter[str],
+    multi_bar_exits: list[dict[str, Any]],
+    weakening_runs: list[dict[str, Any]],
+    march_rows: list[dict[str, Any]],
+    ping_pong: int,
+    max_evidence_cats: int,
+) -> dict[str, Any]:
     lengths = [int(r["length_bars"]) for r in weakening_runs] or [0]
     long_stuck = [r for r in weakening_runs if int(r["length_bars"]) >= 24]
 
@@ -323,6 +353,156 @@ def replay_variant(
         "march_rows": march_rows,
         "config": cfg.to_dict(),
     }
+
+
+def replay_variant(
+    frame: pd.DataFrame,
+    *,
+    mode: WeakeningMultiBarMode,
+    analyze_start: pd.Timestamp,
+    analyze_end: pd.Timestamp,
+    shared: SharedReplayContext,
+) -> dict[str, Any]:
+    """Policy-only replay on a shared structure timeline (no per-variant structure pass)."""
+    import research.regime_scanner.trend_audit_shared_replay as shared_replay_mod
+
+    shared_replay_mod.VARIANT_POLICY_REPLAY_COUNT += 1
+
+    cfg = config_for_variant(mode)
+    rt = TrendRuntime()
+
+    state_counts: Counter[str] = Counter()
+    transition_counts: Counter[str] = Counter()
+    multi_bar_exits: list[dict[str, Any]] = []
+    weakening_runs: list[dict[str, Any]] = []
+    march_rows: list[dict[str, Any]] = []
+    ping_pong = 0
+    recent_states: list[str] = []
+
+    open_run: dict[str, Any] | None = None
+    max_evidence_cats = 0
+
+    march_start = _ts(MARCH_CASE_START)
+    march_end = _ts(MARCH_CASE_END)
+
+    for prep in shared.prepared_bars:
+        decision_ts = prep.decision_time
+        prev_state = rt.state
+        rt, snap, _ = step_trend_state_from_prepared(rt, prepared=prep, cfg=cfg)
+
+        in_window = analyze_start <= decision_ts <= analyze_end
+        if not in_window:
+            continue
+
+        state_counts[snap.current_state] += 1
+        max_evidence_cats = max(max_evidence_cats, len(rt.weakening_evidence_keys))
+
+        if snap.current_state != prev_state:
+            key = f"{prev_state}->{snap.current_state}"
+            transition_counts[key] += 1
+            reasons = list(snap.active_reasons)
+            is_mb = any(
+                r in {"multi_bar_topping_structure", "multi_bar_bottoming_structure"}
+                for r in reasons
+            )
+            if is_mb and prev_state in {"bullish_weakening", "bearish_weakening"}:
+                known = {
+                    "bearish_choch",
+                    "lower_high",
+                    "bearish_bos",
+                    "failed_breakout",
+                    "bullish_choch",
+                    "higher_low",
+                    "bullish_bos",
+                    "failed_breakdown",
+                }
+                cats = sorted(r for r in reasons if r in known)
+                row = prep.row
+                multi_bar_exits.append(
+                    {
+                        "decision_time": _iso(decision_ts),
+                        "from_state": prev_state,
+                        "to_state": snap.current_state,
+                        "mode": mode,
+                        "evidence_cats": ",".join(cats),
+                        "reasons": "|".join(reasons),
+                        "close": float(row["close"]),
+                        "bias_15m": rt.structure_15m.current_structure_bias,
+                        "consec_bearish": rt.consecutive_bearish_closes,
+                        "consec_bullish": rt.consecutive_bullish_closes,
+                    }
+                )
+
+            if prev_state in {"bullish_weakening", "bearish_weakening"} and open_run is not None:
+                open_run["end"] = _iso(decision_ts)
+                open_run["end_state"] = snap.current_state
+                open_run["exit_reasons"] = "|".join(reasons)
+                open_run["multi_bar_exit"] = bool(is_mb)
+                open_run["length_bars"] = int(open_run.get("length_bars", 0))
+                weakening_runs.append(open_run)
+                open_run = None
+            if snap.current_state in {"bullish_weakening", "bearish_weakening"}:
+                open_run = {
+                    "state": snap.current_state,
+                    "start": _iso(decision_ts),
+                    "length_bars": 1,
+                    "max_evidence_cats": len(rt.weakening_evidence_keys),
+                    "mode": mode,
+                }
+            recent_states.append(snap.current_state)
+            if len(recent_states) >= 4:
+                a, b, c, d = recent_states[-4:]
+                if a == c and b == d and a != b:
+                    ping_pong += 1
+        elif snap.current_state in {"bullish_weakening", "bearish_weakening"}:
+            if open_run is None:
+                open_run = {
+                    "state": snap.current_state,
+                    "start": _iso(decision_ts),
+                    "length_bars": 1,
+                    "max_evidence_cats": len(rt.weakening_evidence_keys),
+                    "mode": mode,
+                }
+            else:
+                open_run["length_bars"] = int(open_run["length_bars"]) + 1
+                open_run["max_evidence_cats"] = max(
+                    int(open_run.get("max_evidence_cats", 0)),
+                    len(rt.weakening_evidence_keys),
+                )
+
+        if march_start <= decision_ts <= march_end:
+            march_rows.append(
+                {
+                    "decision_time": _iso(decision_ts),
+                    "close": float(prep.row["close"]),
+                    "state": snap.current_state,
+                    "previous_state": snap.previous_state,
+                    "reasons": "|".join(snap.active_reasons),
+                    "evidence_cats": ",".join(sorted(rt.weakening_evidence_keys.keys())),
+                    "allow_long": snap.allow_long,
+                    "allow_short": snap.allow_short,
+                    "mode": mode,
+                }
+            )
+
+    if open_run is not None:
+        open_run["end"] = None
+        open_run["end_state"] = open_run["state"]
+        open_run["exit_reasons"] = "still_open_at_analyze_end"
+        open_run["multi_bar_exit"] = False
+        weakening_runs.append(open_run)
+
+    return _finalize_variant_metrics(
+        mode=mode,
+        cfg=cfg,
+        state_counts=state_counts,
+        transition_counts=transition_counts,
+        multi_bar_exits=multi_bar_exits,
+        weakening_runs=weakening_runs,
+        march_rows=march_rows,
+        ping_pong=ping_pong,
+        max_evidence_cats=max_evidence_cats,
+    )
 
 
 def _run_lengths_false_positive_proxy(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -481,13 +661,18 @@ def run_audit(
     assert_safe_output_dir(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    reset_audit_counters()
     frame = load_analysis_frame(symbol, load_start=load_start, load_end=load_end)
     a0 = _ts(analyze_start)
     a1 = _ts(analyze_end)
 
+    shared = load_or_build_shared_context(frame, cache_dir=output_dir / ".cache")
+
     results: dict[str, dict[str, Any]] = {}
     for name, mode in VARIANT_MODES:
-        results[name] = replay_variant(frame, mode=mode, analyze_start=a0, analyze_end=a1)
+        results[name] = replay_variant(
+            frame, mode=mode, analyze_start=a0, analyze_end=a1, shared=shared
+        )
 
     comparison = compare_variants(results)
     findings = build_findings(comparison, results)
@@ -546,6 +731,11 @@ def run_audit(
             "default_mode_off": True,
             "no_march_hardcode": True,
             "did_not_write_forbidden_dirs": True,
+        },
+        "performance": {
+            "shared_structure_passes": shared.structure_pass_count,
+            "variant_policy_replays": shared_replay_mod.VARIANT_POLICY_REPLAY_COUNT,
+            "shared_cache_key": shared.cache_key,
         },
     }
     blob = json.dumps(json_safe(summary), sort_keys=True, separators=(",", ":"))

@@ -125,26 +125,78 @@ def find_confirmed_pivots(
     return pivots
 
 
+def _confirmation_ns(pivot: ConfirmedPivot) -> int:
+    ts = pd.Timestamp(pivot.confirmation_timestamp)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    else:
+        ts = ts.tz_convert("UTC")
+    return int(ts.value)
+
+
+class PivotVisibilityIndex:
+    """O(log n) causal pivot visibility for monotonic decision times."""
+
+    __slots__ = ("pivots", "confirmation_ns")
+
+    def __init__(self, pivots: list[ConfirmedPivot], confirmation_ns: np.ndarray) -> None:
+        self.pivots = pivots
+        self.confirmation_ns = confirmation_ns
+
+    @classmethod
+    def build(cls, pivots: list[ConfirmedPivot]) -> PivotVisibilityIndex:
+        if not pivots:
+            return cls([], np.array([], dtype=np.int64))
+        conf = np.fromiter((_confirmation_ns(p) for p in pivots), dtype=np.int64, count=len(pivots))
+        return cls(pivots, conf)
+
+    def end_index(self, decision_time: pd.Timestamp | str) -> int:
+        """Count of pivots with confirmation strictly before decision_time."""
+        if self.confirmation_ns.size == 0:
+            return 0
+        decision_ts = pd.Timestamp(decision_time)
+        if decision_ts.tzinfo is None:
+            decision_ts = decision_ts.tz_localize("UTC")
+        else:
+            decision_ts = decision_ts.tz_convert("UTC")
+        return int(np.searchsorted(self.confirmation_ns, int(decision_ts.value), side="left"))
+
+    def as_of(self, decision_time: pd.Timestamp | str) -> list[ConfirmedPivot]:
+        return self.pivots[: self.end_index(decision_time)]
+
+    def end_indices_for(self, decision_times: pd.Series | np.ndarray) -> np.ndarray:
+        if self.confirmation_ns.size == 0:
+            n = len(decision_times)
+            return np.zeros(n, dtype=np.int64)
+        series = pd.to_datetime(decision_times, utc=True)
+        values = series.astype("int64").to_numpy()
+        return np.searchsorted(self.confirmation_ns, values, side="left").astype(np.int64)
+
+
+# Research/audit counters (incremented in filter_pivots_as_of when used).
+FILTER_PIVOTS_AS_OF_CALLS = 0
+
+
 def filter_pivots_as_of(
     pivots: list[ConfirmedPivot],
     decision_time: pd.Timestamp | str,
 ) -> list[ConfirmedPivot]:
     """Keep pivots whose confirmation timestamp is strictly before decision_time."""
+    global FILTER_PIVOTS_AS_OF_CALLS
+    FILTER_PIVOTS_AS_OF_CALLS += 1
+    if not pivots:
+        return []
     decision_ts = pd.Timestamp(decision_time)
     if decision_ts.tzinfo is None:
         decision_ts = decision_ts.tz_localize("UTC")
     else:
         decision_ts = decision_ts.tz_convert("UTC")
-    kept: list[ConfirmedPivot] = []
-    for pivot in pivots:
-        conf = pd.Timestamp(pivot.confirmation_timestamp)
-        if conf.tzinfo is None:
-            conf = conf.tz_localize("UTC")
-        else:
-            conf = conf.tz_convert("UTC")
-        if conf < decision_ts:
-            kept.append(pivot)
-    return kept
+    end = int(np.searchsorted(
+        np.fromiter((_confirmation_ns(p) for p in pivots), dtype=np.int64, count=len(pivots)),
+        int(decision_ts.value),
+        side="left",
+    ))
+    return pivots[:end]
 
 
 def pivots_by_type(

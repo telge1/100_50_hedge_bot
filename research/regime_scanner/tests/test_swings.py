@@ -7,7 +7,11 @@ import pytest
 
 from research.regime_scanner.config import RegimeScannerConfig
 from research.regime_scanner.point_audit import build_point_audit
-from research.regime_scanner.swings import filter_pivots_as_of, find_confirmed_pivots
+from research.regime_scanner.swings import (
+    PivotVisibilityIndex,
+    filter_pivots_as_of,
+    find_confirmed_pivots,
+)
 
 
 def _frame_from_highs_lows(highs: list[float], lows: list[float] | None = None) -> pd.DataFrame:
@@ -96,3 +100,14 @@ def test_filter_pivots_as_of_requires_confirmation_before_decision() -> None:
     assert filter_pivots_as_of(pivots, decision) == []
     after = decision + pd.Timedelta(minutes=5)
     assert len(filter_pivots_as_of(pivots, after)) == 1
+
+
+def test_pivot_visibility_index_matches_filter() -> None:
+    cfg = RegimeScannerConfig(pivot_left=3, pivot_right=3)
+    highs = [1, 1, 1, 5, 2, 2, 2, 2, 3, 4, 6, 7]
+    frame = _frame_from_highs_lows(highs)
+    pivots = find_confirmed_pivots(frame, config=cfg)
+    index = PivotVisibilityIndex.build(pivots)
+    for i in range(len(frame)):
+        decision = frame["timestamp"].iloc[i] + pd.Timedelta(minutes=5)
+        assert index.as_of(decision) == filter_pivots_as_of(pivots, decision)

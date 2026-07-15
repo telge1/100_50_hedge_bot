@@ -888,11 +888,12 @@ def update_market_structure(
     decision_time: object,
     atr: float | None = None,
     cfg: TrendStructureConfig | None = None,
+    pivots_already_causal: bool = False,
 ) -> tuple[MarketStructureState, list[StructureEvent]]:
     """Advance structure one closed candle. Pivots must already be causal as-of decision_time."""
     config = cfg or default_trend_structure_config()
     decision_ts = _ts(decision_time)
-    as_of = filter_pivots_as_of(pivots, decision_ts)
+    as_of = pivots if pivots_already_causal else filter_pivots_as_of(pivots, decision_ts)
     row = candle if isinstance(candle, dict) else candle.to_dict()
     close = _finite(row.get("close"))
     high = _finite(row.get("high"))
