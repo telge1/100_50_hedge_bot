@@ -134,3 +134,7 @@ research/liquidation_level/results/**/pid.txt
 research/liquidation_level/results/**/run.log
 research/liquidation_level/results/**/safe_batch_run.log
 research/liquidation_level/results/**/safe_batch_nohup.out
+
+# Regime scanner generated research outputs
+research/regime_scanner/results/
+research/regime_scanner/results_*/
