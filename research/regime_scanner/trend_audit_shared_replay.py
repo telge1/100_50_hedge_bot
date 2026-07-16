@@ -235,6 +235,23 @@ def load_or_build_shared_context(
     return ctx
 
 
+def attach_c32a_indicator_features(
+    ctx: SharedReplayContext,
+    features: pd.DataFrame,
+    *,
+    feature_version: str = "c3.2a_v1",
+) -> SharedReplayContext:
+    """Attach bulk-loaded C3.2A features without altering structure/policy replay.
+
+    Phase C3.2A is supply-only: classifiers must not consume these fields for
+    regime decisions. Attachment is instance-level so old pickle caches remain
+    loadable without a dataclass schema migration.
+    """
+    setattr(ctx, "indicator_features", features)
+    setattr(ctx, "indicator_feature_version", str(feature_version))
+    return ctx
+
+
 def step_trend_state_from_prepared(
     rt: TrendRuntime,
     *,
