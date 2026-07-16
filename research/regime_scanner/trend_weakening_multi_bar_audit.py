@@ -53,6 +53,10 @@ from research.regime_scanner.trend_state_machine import (
     step_trend_state,
     trend_state_config_c1,
 )
+from research.regime_scanner.trend_pine_export import (
+    export_audit_pine_artifacts,
+    marker_rows_from_events,
+)
 
 DEFAULT_OUT = Path("research/regime_scanner/results_trend_weakening_multi_bar_phase_c1")
 FORBIDDEN_OVERWRITE = (
@@ -155,6 +159,7 @@ def replay_variant_naive(
     multi_bar_exits: list[dict[str, Any]] = []
     weakening_runs: list[dict[str, Any]] = []
     march_rows: list[dict[str, Any]] = []
+    timeline_rows: list[dict[str, Any]] = []
     ping_pong = 0
     recent_states: list[str] = []
 
@@ -187,6 +192,16 @@ def replay_variant_naive(
 
         state_counts[snap.current_state] += 1
         max_evidence_cats = max(max_evidence_cats, len(rt.weakening_evidence_keys))
+        timeline_rows.append(
+            {
+                "decision_time": _iso(decision_ts),
+                "state": snap.current_state,
+                "previous_state": prev_state,
+                "close": float(row["close"]),
+                "transition": snap.current_state != prev_state,
+                "reasons": "|".join(snap.active_reasons) if snap.current_state != prev_state else "",
+            }
+        )
 
         if snap.current_state != prev_state:
             key = f"{prev_state}->{snap.current_state}"
@@ -282,17 +297,20 @@ def replay_variant_naive(
         open_run["multi_bar_exit"] = False
         weakening_runs.append(open_run)
 
-    return _finalize_variant_metrics(
-        mode=mode,
-        cfg=cfg,
-        state_counts=state_counts,
-        transition_counts=transition_counts,
-        multi_bar_exits=multi_bar_exits,
-        weakening_runs=weakening_runs,
-        march_rows=march_rows,
-        ping_pong=ping_pong,
-        max_evidence_cats=max_evidence_cats,
-    )
+    return {
+        **_finalize_variant_metrics(
+            mode=mode,
+            cfg=cfg,
+            state_counts=state_counts,
+            transition_counts=transition_counts,
+            multi_bar_exits=multi_bar_exits,
+            weakening_runs=weakening_runs,
+            march_rows=march_rows,
+            ping_pong=ping_pong,
+            max_evidence_cats=max_evidence_cats,
+        ),
+        "timeline_rows": timeline_rows,
+    }
 
 
 def _finalize_variant_metrics(
@@ -376,6 +394,7 @@ def replay_variant(
     multi_bar_exits: list[dict[str, Any]] = []
     weakening_runs: list[dict[str, Any]] = []
     march_rows: list[dict[str, Any]] = []
+    timeline_rows: list[dict[str, Any]] = []
     ping_pong = 0
     recent_states: list[str] = []
 
@@ -396,6 +415,16 @@ def replay_variant(
 
         state_counts[snap.current_state] += 1
         max_evidence_cats = max(max_evidence_cats, len(rt.weakening_evidence_keys))
+        timeline_rows.append(
+            {
+                "decision_time": _iso(decision_ts),
+                "state": snap.current_state,
+                "previous_state": prev_state,
+                "close": float(prep.row["close"]),
+                "transition": snap.current_state != prev_state,
+                "reasons": "|".join(snap.active_reasons) if snap.current_state != prev_state else "",
+            }
+        )
 
         if snap.current_state != prev_state:
             key = f"{prev_state}->{snap.current_state}"
@@ -492,17 +521,20 @@ def replay_variant(
         open_run["multi_bar_exit"] = False
         weakening_runs.append(open_run)
 
-    return _finalize_variant_metrics(
-        mode=mode,
-        cfg=cfg,
-        state_counts=state_counts,
-        transition_counts=transition_counts,
-        multi_bar_exits=multi_bar_exits,
-        weakening_runs=weakening_runs,
-        march_rows=march_rows,
-        ping_pong=ping_pong,
-        max_evidence_cats=max_evidence_cats,
-    )
+    return {
+        **_finalize_variant_metrics(
+            mode=mode,
+            cfg=cfg,
+            state_counts=state_counts,
+            transition_counts=transition_counts,
+            multi_bar_exits=multi_bar_exits,
+            weakening_runs=weakening_runs,
+            march_rows=march_rows,
+            ping_pong=ping_pong,
+            max_evidence_cats=max_evidence_cats,
+        ),
+        "timeline_rows": timeline_rows,
+    }
 
 
 def _run_lengths_false_positive_proxy(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -711,6 +743,26 @@ def run_audit(
                 mar6_rows.append({"variant": name, **row})
     write_csv(output_dir / "march_06_comparison.csv", mar6_rows)
 
+    pine_export = export_audit_pine_artifacts(
+        output_dir=output_dir,
+        phase="C1_weakening_multi_bar",
+        symbol=symbol,
+        analyze_start=analyze_start,
+        analyze_end=analyze_end,
+        variants={
+            name: {
+                "timeline_rows": r.get("timeline_rows") or [],
+                "marker_rows": marker_rows_from_events(
+                    r.get("multi_bar_exits") or [],
+                    label_field="to_state",
+                    extra_suffix="mb_exit",
+                ),
+            }
+            for name, r in results.items()
+        },
+        recommended_variant=recommendation.get("recommended_research_default"),
+    )
+
     summary = {
         "phase": "C1_weakening_multi_bar",
         "symbol": symbol,
@@ -720,11 +772,12 @@ def run_audit(
         "analyze_end": analyze_end,
         "n_load_bars": int(len(frame)),
         "variants": {k: {kk: vv for kk, vv in v.items() if kk not in {
-            "multi_bar_exits", "weakening_runs", "march_rows"
+            "multi_bar_exits", "weakening_runs", "march_rows", "timeline_rows"
         }} for k, v in results.items()},
         "comparison": comparison,
         "findings": findings,
         "recommendation": recommendation,
+        "pine_export": pine_export,
         "code_audit": CODE_AUDIT,
         "safety": {
             "policy_unchanged": True,
@@ -769,6 +822,12 @@ See `code_audit.json`. Weakening exits previously required concurrent same-bar e
 - Policy unchanged
 - No writes into `results/`, Phase-B, or Phase-C0 dirs
 - No live wiring
+
+## TradingView (research)
+- Per-variant: `trend_audit_C1_weakening_multi_bar_<variant>.pine`
+- Recommended: `trend_audit_C1_weakening_multi_bar_recommended.pine`
+- Metadata: `trend_pine_export.json`
+- Use on APTUSDT **5m**, chart timezone **UTC**
 """
     (output_dir / "README_results.md").write_text(readme, encoding="utf-8")
     return summary

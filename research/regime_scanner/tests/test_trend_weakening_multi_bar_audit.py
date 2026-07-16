@@ -216,7 +216,7 @@ def test_mode_off_ignores_accumulated_evidence() -> None:
 
 
 def _metrics_signature(result: dict) -> dict:
-    skip = {"multi_bar_exits", "weakening_runs", "march_rows", "config", "mar6_first_exit"}
+    skip = {"multi_bar_exits", "weakening_runs", "march_rows", "config", "mar6_first_exit", "timeline_rows"}
     sig = {k: v for k, v in result.items() if k not in skip}
     sig["mar6_first_exit_time"] = (result.get("mar6_first_exit") or {}).get("decision_time")
     sig["mar6_first_exit_to"] = (result.get("mar6_first_exit") or {}).get("state")
