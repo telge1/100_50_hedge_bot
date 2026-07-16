@@ -1,0 +1,451 @@
+"""Pine export for clean-regime states — generated from the central rule spec.
+
+Background colors depend ONLY on clean_regime_state (bot reality).
+Raw/diagnostic markers are optional and never feed the clean state.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from pathlib import Path
+from typing import Any, Mapping
+
+from research.regime_scanner.trend_detector_clean_regime import (
+    CLEAN_STATE_CODE,
+    CleanRegimeConfig,
+    build_rule_spec,
+    config_hash,
+    pine_rule_hash,
+    rule_spec_hash,
+)
+from research.regime_scanner.trend_pine_export import (
+    build_pine_header,
+    validate_pine_script,
+)
+
+CLEAN_PINE_NAME = "indicator_combined_trend_detector_clean_regime.pine"
+VARIANT_PINE_NAMES = {
+    "light": "indicator_combined_trend_detector_clean_regime_light.pine",
+    "medium": "indicator_combined_trend_detector_clean_regime_medium.pine",
+    "strong": "indicator_combined_trend_detector_clean_regime_strong.pine",
+}
+
+
+def _timing_consts(cfg: CleanRegimeConfig) -> list[str]:
+    return [
+        f"buildingConf = {int(cfg.building_confirmation)}",
+        f"confirmedConf = {int(cfg.confirmed_confirmation)}",
+        f"neutralConf = {int(cfg.neutral_confirmation)}",
+        f"oppositeConf = {int(cfg.opposite_confirmation)}",
+        f"minBuildingHold = {int(cfg.min_building_hold)}",
+        f"minConfirmedHold = {int(cfg.min_confirmed_hold)}",
+        f"cooldownBars = {int(cfg.cooldown_bars)}",
+        f"minBullComp = {int(cfg.min_bull_components_building)}",
+        f"minBearComp = {int(cfg.min_bear_components_building)}",
+        f"holdNetFloor = {int(cfg.hold_net_score_floor)}",
+        f'diSpreadExpandMin = {float(cfg.di_spread_expand_min)}',
+        f"adxConfirmMin = {float(cfg.adx_level_confirmation_min)}",
+        f"adxRisingMin = {float(cfg.adx_rising_min_delta_1)}",
+        f"emaJointSlopeMin = {float(cfg.ema_joint_slope_min_atr)}",
+        f"bandExpandMin = {float(cfg.band_expand_min_change_atr)}",
+    ]
+
+
+def build_clean_regime_pine_script(
+    *,
+    cfg: CleanRegimeConfig | None = None,
+    fixed_variant: str | None = None,
+    title: str | None = None,
+) -> str:
+    """Generate Pine v6 indicator implementing the same causal clean state machine."""
+    if fixed_variant is not None:
+        cfg = CleanRegimeConfig.for_variant(fixed_variant)
+    elif cfg is None:
+        cfg = CleanRegimeConfig.for_variant("medium")
+
+    spec = build_rule_spec(cfg)
+    cfg_h = config_hash(cfg)
+    rule_h = rule_spec_hash(spec)
+    pine_h = pine_rule_hash(cfg)
+    assert pine_h == rule_h
+
+    script_title = title or f"C3.3B Clean Regime ({cfg.variant})"
+    lines = [
+        *build_pine_header(script_title),
+        "// =============================================================================",
+        "// RESEARCH ONLY — clean_regime_state == bot interface state",
+        "// Background depends ONLY on clean_regime_state (not raw components).",
+        "// Generated from central CleanRegimeConfig / rule_spec.",
+        f"// variant={cfg.variant}",
+        f"// config_hash={cfg_h}",
+        f"// rule_spec_hash={rule_h}",
+        f"// pine_rule_hash={pine_h}",
+        "// Non-repainting: state uses only current+past closed bars + prior clean state.",
+        "// No request.security lookahead. No RETRO outcomes in clean state.",
+        "// =============================================================================",
+        "",
+    ]
+
+    if fixed_variant is None:
+        lines.extend(
+            [
+                'variantName = input.string("medium", "Smoothing Variant", options=["light", "medium", "strong"])',
+                'buildingConf = variantName == "light" ? 2 : variantName == "strong" ? 3 : 2',
+                'confirmedConf = variantName == "light" ? 2 : 3',
+                'neutralConf = variantName == "light" ? 2 : 3',
+                'oppositeConf = variantName == "strong" ? 4 : 3',
+                'minBuildingHold = variantName == "light" ? 2 : 3',
+                'minConfirmedHold = variantName == "light" ? 3 : variantName == "strong" ? 5 : 4',
+                'cooldownBars = variantName == "light" ? 1 : 2',
+                f"minBullComp = {int(cfg.min_bull_components_building)}",
+                f"minBearComp = {int(cfg.min_bear_components_building)}",
+                f"holdNetFloor = {int(cfg.hold_net_score_floor)}",
+                f"diSpreadExpandMin = {float(cfg.di_spread_expand_min)}",
+                f"adxConfirmMin = {float(cfg.adx_level_confirmation_min)}",
+                f"adxRisingMin = {float(cfg.adx_rising_min_delta_1)}",
+                f"emaJointSlopeMin = {float(cfg.ema_joint_slope_min_atr)}",
+                f"bandExpandMin = {float(cfg.band_expand_min_change_atr)}",
+            ]
+        )
+    else:
+        lines.extend(_timing_consts(cfg))
+        lines.append(f'variantName = "{cfg.variant}"')
+
+    lines.extend(
+        [
+            "",
+            'showRawMarkers = input.bool(false, "Show Raw Markers")',
+            'showTransitionMarkers = input.bool(true, "Show Transition Markers")',
+            'showCandidateCounter = input.bool(false, "Show Candidate Counter")',
+            'showEmaLines = input.bool(true, "Show EMA Lines")',
+            'showStateTable = input.bool(true, "Show State Table")',
+            'showComponentTable = input.bool(false, "Show Component Table")',
+            'showDebugCode = input.bool(true, "Show clean state code (Data Window)")',
+            "",
+            "// ---- As-of components (same periods/thresholds as C3.3B) ----",
+            "emaFast = ta.ema(close, 9)",
+            "emaSlow = ta.ema(close, 20)",
+            "ema59 = ta.ema(close, 59)",
+            "ema200 = ta.ema(close, 200)",
+            "atr14 = ta.atr(14)",
+            "[plusDI, minusDI, adx14] = ta.dmi(14, 14)",
+            "diSpread = plusDI - minusDI",
+            "diAbs = math.abs(diSpread)",
+            "diAbsChange1 = diAbs - diAbs[1]",
+            "diBull = plusDI > minusDI",
+            "diBear = plusDI < minusDI",
+            "diCrossBull = ta.crossover(plusDI, minusDI)",
+            "diCrossBear = ta.crossunder(plusDI, minusDI)",
+            "diExpanding = diAbsChange1 >= diSpreadExpandMin",
+            "diShrinking = diAbsChange1 <= -diSpreadExpandMin",
+            "adxDelta1 = adx14 - adx14[1]",
+            "adxSlope3 = (adx14 - adx14[3]) / 3.0",
+            "adxSlope5 = (adx14 - adx14[5]) / 5.0",
+            "adxRising = adxDelta1 >= adxRisingMin",
+            "adxFalling = adxDelta1 <= -adxRisingMin",
+            "adxConfirm = (adx14 >= adxConfirmMin) or adxRising",
+            "emaBullOrder = emaFast > emaSlow",
+            "emaBearOrder = emaFast < emaSlow",
+            "bandAbsAtr = math.abs(emaFast - emaSlow) / atr14",
+            "bandChange3 = bandAbsAtr - bandAbsAtr[3]",
+            "bandExpand = bandChange3 >= bandExpandMin",
+            "bandCompress = bandChange3 <= -bandExpandMin",
+            "slopeFast = (emaFast - emaFast[3]) / atr14",
+            "slopeSlow = (emaSlow - emaSlow[3]) / atr14",
+            "jointSlope = (slopeFast + slopeSlow) / 2.0",
+            "jointRising = jointSlope >= emaJointSlopeMin",
+            "jointFalling = jointSlope <= -emaJointSlopeMin",
+            "moveRelevant = bandAbsAtr >= bandExpandMin",
+            "",
+            "bullScore = (diBull ? 1 : 0) + (diSpread > 0 ? 1 : 0) + (adxRising ? 1 : 0) + ((adx14 >= adxConfirmMin) ? 1 : 0) + (slopeFast > 0 ? 1 : 0) + (slopeSlow > 0 ? 1 : 0) + (emaBullOrder ? 1 : 0) + (bandExpand ? 1 : 0) + (close > ema59 ? 1 : 0) + (close > ema200 ? 1 : 0) + (moveRelevant ? 1 : 0)",
+            "bearScore = (diBear ? 1 : 0) + (diSpread < 0 ? 1 : 0) + (adxRising ? 1 : 0) + ((adx14 >= adxConfirmMin) ? 1 : 0) + (slopeFast < 0 ? 1 : 0) + (slopeSlow < 0 ? 1 : 0) + (emaBearOrder ? 1 : 0) + (bandExpand ? 1 : 0) + (close < ema59 ? 1 : 0) + (close < ema200 ? 1 : 0) + (moveRelevant ? 1 : 0)",
+            "netScore = bullScore - bearScore",
+            "",
+            "// Raw research state (diagnostic only; never drives bgcolor).",
+            "confirmedBullRaw = emaBullOrder and slopeFast > 0 and slopeSlow > 0 and bandExpand and diBull and adxConfirm and moveRelevant",
+            "confirmedBearRaw = emaBearOrder and slopeFast < 0 and slopeSlow < 0 and bandExpand and diBear and adxConfirm and moveRelevant",
+            "developingBullRaw = diBull and (adxRising or adxSlope3 > 0) and jointRising and (bandExpand or diExpanding) and not confirmedBullRaw",
+            "developingBearRaw = diBear and (adxRising or adxSlope3 > 0) and jointFalling and (bandExpand or diExpanding) and not confirmedBearRaw",
+            "earlyBullRaw = diCrossBull or (diBull and diExpanding and not emaBullOrder)",
+            "earlyBearRaw = diCrossBear or (diBear and diExpanding and not emaBearOrder)",
+            'var string rawState = "neutral"',
+            "prevRaw = rawState[1]",
+            'failedBullRaw = (prevRaw == "early_bullish" or prevRaw == "developing_bullish") and (diCrossBear or (diBear and not emaBullOrder))',
+            'failedBearRaw = (prevRaw == "early_bearish" or prevRaw == "developing_bearish") and (diCrossBull or (diBull and not emaBearOrder))',
+            'weakeningBullRaw = emaBullOrder and (prevRaw == "confirmed_bullish" or prevRaw == "weakening_bullish" or prevRaw == "developing_bullish") and adxFalling and (diShrinking or bandCompress)',
+            'weakeningBearRaw = emaBearOrder and (prevRaw == "confirmed_bearish" or prevRaw == "weakening_bearish" or prevRaw == "developing_bearish") and adxFalling and (diShrinking or bandCompress)',
+            "if failedBullRaw",
+            '    rawState := "failed_bullish"',
+            "else if failedBearRaw",
+            '    rawState := "failed_bearish"',
+            "else if confirmedBullRaw",
+            '    rawState := "confirmed_bullish"',
+            "else if confirmedBearRaw",
+            '    rawState := "confirmed_bearish"',
+            "else if weakeningBullRaw",
+            '    rawState := "weakening_bullish"',
+            "else if weakeningBearRaw",
+            '    rawState := "weakening_bearish"',
+            "else if developingBullRaw",
+            '    rawState := "developing_bullish"',
+            "else if developingBearRaw",
+            '    rawState := "developing_bearish"',
+            "else if earlyBullRaw",
+            '    rawState := "early_bullish"',
+            "else if earlyBearRaw",
+            '    rawState := "early_bearish"',
+            "else",
+            '    rawState := "neutral"',
+            "",
+            "// ---- Clean candidate features (identical semantics to Python prepare_bar_features) ----",
+            'buildingBull = rawState == "early_bullish" or rawState == "developing_bullish" or (diBull and netScore > 0 and bullScore >= minBullComp)',
+            'buildingBear = rawState == "early_bearish" or rawState == "developing_bearish" or (diBear and netScore < 0 and bearScore >= minBearComp)',
+            'confirmedBull = rawState == "confirmed_bullish" or (emaBullOrder and diBull and adxConfirm and bandExpand and jointRising and moveRelevant)',
+            'confirmedBear = rawState == "confirmed_bearish" or (emaBearOrder and diBear and adxConfirm and bandExpand and jointFalling and moveRelevant)',
+            "holdBull = (emaBullOrder or diBull) and bearScore < bullScore and netScore >= holdNetFloor",
+            "holdBear = (emaBearOrder or diBear) and bullScore < bearScore and netScore <= -holdNetFloor",
+            'weakenBull = rawState == "weakening_bullish" or (adxFalling and (bandCompress or diShrinking) and emaBullOrder)',
+            'weakenBear = rawState == "weakening_bearish" or (adxFalling and (bandCompress or diShrinking) and emaBearOrder)',
+            'loseBull = rawState == "failed_bullish" or rawState == "early_bearish" or rawState == "developing_bearish" or rawState == "confirmed_bearish" or (not diBull and not emaBullOrder)',
+            'loseBear = rawState == "failed_bearish" or rawState == "early_bullish" or rawState == "developing_bullish" or rawState == "confirmed_bullish" or (not diBear and not emaBearOrder)',
+            "",
+            "// ---- Causal clean state machine (bot reality) ----",
+            'var string cleanState = "neutral"',
+            'var string prevClean = "neutral"',
+            'var string candidateState = ""',
+            "var int candidateCount = 0",
+            "var int oppositeCount = 0",
+            "var int stateAge = 0",
+            "var int barsSinceTransition = 0",
+            "var int cooldownLeft = 0",
+            'var string transitionReason = "init"',
+            "var bool suppressedFlip = false",
+            "",
+            "prevClean := cleanState",
+            "stateAge := stateAge + 1",
+            "barsSinceTransition := barsSinceTransition + 1",
+            "cooldownLeft := math.max(0, cooldownLeft - 1)",
+            "suppressedFlip := false",
+            'string desired = ""',
+            "bool exitActive = false",
+            "bool holdActive = false",
+            "int needed = 0",
+            "",
+            'if prevClean == "neutral"',
+            "    if buildingBull and not buildingBear",
+            '        desired := "bullish_building"',
+            "    else if buildingBear and not buildingBull",
+            '        desired := "bearish_building"',
+            'else if prevClean == "bullish_building"',
+            "    holdActive := buildingBull or confirmedBull or holdBull",
+            "    if confirmedBull",
+            '        desired := "bullish_confirmed"',
+            "    else if loseBull or buildingBear",
+            "        exitActive := true",
+            '        desired := "neutral"',
+            'else if prevClean == "bullish_confirmed"',
+            "    holdActive := holdBull or confirmedBull",
+            "    if holdActive and not loseBull",
+            '        desired := ""',
+            "    else if weakenBull or (not holdActive and not confirmedBull) or loseBull or buildingBear or confirmedBear",
+            "        exitActive := true",
+            '        desired := "bullish_building"',
+            'else if prevClean == "bearish_building"',
+            "    holdActive := buildingBear or confirmedBear or holdBear",
+            "    if confirmedBear",
+            '        desired := "bearish_confirmed"',
+            "    else if loseBear or buildingBull",
+            "        exitActive := true",
+            '        desired := "neutral"',
+            'else if prevClean == "bearish_confirmed"',
+            "    holdActive := holdBear or confirmedBear",
+            "    if holdActive and not loseBear",
+            '        desired := ""',
+            "    else if weakenBear or (not holdActive and not confirmedBear) or loseBear or buildingBull or confirmedBull",
+            "        exitActive := true",
+            '        desired := "bearish_building"',
+            "",
+            'if desired == ""',
+            '    candidateState := ""',
+            "    candidateCount := 0",
+            "    oppositeCount := 0",
+            "else",
+            "    if candidateState == desired",
+            "        candidateCount := candidateCount + 1",
+            "    else",
+            "        candidateState := desired",
+            "        candidateCount := 1",
+            "    oppositeCount := exitActive ? oppositeCount + 1 : 0",
+            "",
+            'if desired == "bullish_building" or desired == "bearish_building"',
+            '    needed := prevClean == "neutral" ? buildingConf : (exitActive ? oppositeConf : buildingConf)',
+            'else if desired == "bullish_confirmed" or desired == "bearish_confirmed"',
+            "    needed := confirmedConf",
+            'else if desired == "neutral"',
+            "    needed := exitActive ? math.max(neutralConf, oppositeConf) : neutralConf",
+            "",
+            "bool minHoldOk = true",
+            'if prevClean == "bullish_confirmed" or prevClean == "bearish_confirmed"',
+            "    minHoldOk := stateAge >= minConfirmedHold",
+            'else if prevClean == "bullish_building" or prevClean == "bearish_building"',
+            "    minHoldOk := stateAge >= minBuildingHold",
+            "",
+            "// Forbidden direct flips (same matrix as Python).",
+            "bool forbidden = false",
+            'if prevClean == "bullish_confirmed" and (desired == "bearish_confirmed" or desired == "bearish_building")',
+            "    forbidden := true",
+            'if prevClean == "bearish_confirmed" and (desired == "bullish_confirmed" or desired == "bullish_building")',
+            "    forbidden := true",
+            'if prevClean == "bullish_building" and (desired == "bearish_confirmed" or desired == "bearish_building")',
+            "    forbidden := true",
+            'if prevClean == "bearish_building" and (desired == "bullish_confirmed" or desired == "bullish_building")',
+            "    forbidden := true",
+            'if prevClean == "neutral" and (desired == "bullish_confirmed" or desired == "bearish_confirmed")',
+            "    forbidden := true",
+            "",
+            "bool changed = false",
+            'if desired == "" or desired == prevClean',
+            '    transitionReason := "hold"',
+            "else if cooldownLeft > 0",
+            '    transitionReason := "suppressed_cooldown"',
+            "    suppressedFlip := true",
+            "else if not minHoldOk",
+            '    transitionReason := "suppressed_min_hold"',
+            "    suppressedFlip := true",
+            "else if forbidden",
+            '    transitionReason := "suppressed_forbidden_transition"',
+            "    suppressedFlip := true",
+            '    candidateState := ""',
+            "    candidateCount := 0",
+            "else if candidateState == desired and candidateCount >= needed",
+            "    cleanState := desired",
+            '    transitionReason := "transition_to_" + desired',
+            "    changed := true",
+            "else",
+            '    transitionReason := "awaiting_confirmation"',
+            "",
+            "if changed",
+            "    stateAge := 1",
+            "    barsSinceTransition := 0",
+            "    cooldownLeft := cooldownBars",
+            '    candidateState := ""',
+            "    candidateCount := 0",
+            "    oppositeCount := 0",
+            "",
+            "// Numeric bot/debug codes.",
+            'cleanCode = cleanState == "bullish_confirmed" ? 2 : cleanState == "bullish_building" ? 1 : cleanState == "bearish_confirmed" ? -2 : cleanState == "bearish_building" ? -1 : 0',
+            'dirCode = cleanState == "bullish_building" or cleanState == "bullish_confirmed" ? 1 : cleanState == "bearish_building" or cleanState == "bearish_confirmed" ? -1 : 0',
+            'strCode = cleanState == "bullish_confirmed" or cleanState == "bearish_confirmed" ? 2 : cleanState == "bullish_building" or cleanState == "bearish_building" ? 1 : 0',
+            "",
+            "// Background ONLY from clean_regime_state.",
+            'bgcolor(cleanState == "bullish_building" ? color.new(color.green, 92) : na, title="bullish_building")',
+            'bgcolor(cleanState == "bullish_confirmed" ? color.new(color.teal, 82) : na, title="bullish_confirmed")',
+            'bgcolor(cleanState == "bearish_building" ? color.new(color.maroon, 92) : na, title="bearish_building")',
+            'bgcolor(cleanState == "bearish_confirmed" ? color.new(color.red, 82) : na, title="bearish_confirmed")',
+            "",
+            'plot(showEmaLines ? emaFast : na, "EMA Fast 9", color=color.new(color.teal, 0), linewidth=2)',
+            'plot(showEmaLines ? emaSlow : na, "EMA Slow 20", color=color.new(color.orange, 0), linewidth=2)',
+            'plot(showDebugCode ? cleanCode : na, "clean_regime_state_code", display=display.data_window)',
+            'plot(showDebugCode ? dirCode : na, "clean_regime_direction", display=display.data_window)',
+            'plot(showDebugCode ? strCode : na, "clean_regime_strength", display=display.data_window)',
+            'plot(showCandidateCounter ? candidateCount : na, "candidate_count", display=display.data_window)',
+            "",
+            'plotshape(showRawMarkers and rawState == "early_bullish", title="Raw Early Bull", style=shape.triangleup, location=location.belowbar, color=color.new(color.lime, 30), size=size.tiny)',
+            'plotshape(showRawMarkers and rawState == "early_bearish", title="Raw Early Bear", style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 30), size=size.tiny)',
+            'plotshape(showRawMarkers and (rawState == "developing_bullish" or rawState == "developing_bearish"), title="Raw Developing", style=shape.circle, location=location.belowbar, color=color.new(color.yellow, 40), size=size.tiny)',
+            'plotshape(showRawMarkers and (rawState == "confirmed_bullish" or rawState == "confirmed_bearish"), title="Raw Confirmed", style=shape.flag, location=location.belowbar, color=color.new(color.aqua, 20), size=size.tiny)',
+            'plotshape(showRawMarkers and (rawState == "weakening_bullish" or rawState == "weakening_bearish"), title="Raw Weakening", style=shape.square, location=location.abovebar, color=color.new(color.olive, 20), size=size.tiny)',
+            'plotshape(showRawMarkers and (rawState == "failed_bullish" or rawState == "failed_bearish"), title="Raw Failed", style=shape.xcross, location=location.abovebar, color=color.new(color.black, 0), size=size.tiny)',
+            'plotshape(showTransitionMarkers and changed, title="Clean State Change", style=shape.diamond, location=location.belowbar, color=color.new(color.blue, 0), size=size.tiny)',
+            'plotshape(showTransitionMarkers and suppressedFlip, title="Suppressed Flip", style=shape.xcross, location=location.abovebar, color=color.new(color.gray, 0), size=size.tiny)',
+            "",
+            f'shortCfgHash = "{cfg_h[:12]}"',
+            f'shortRuleHash = "{rule_h[:12]}"',
+            "var table diag = table.new(position.top_right, 2, 24, border_width=1)",
+            "if showStateTable and barstate.islast",
+            '    table.cell(diag, 0, 0, "raw_research_state")',
+            "    table.cell(diag, 1, 0, rawState)",
+            '    table.cell(diag, 0, 1, "clean_regime_state")',
+            "    table.cell(diag, 1, 1, cleanState)",
+            '    table.cell(diag, 0, 2, "previous_clean")',
+            "    table.cell(diag, 1, 2, prevClean)",
+            '    table.cell(diag, 0, 3, "direction")',
+            "    table.cell(diag, 1, 3, str.tostring(dirCode))",
+            '    table.cell(diag, 0, 4, "strength")',
+            "    table.cell(diag, 1, 4, str.tostring(strCode))",
+            '    table.cell(diag, 0, 5, "state_age")',
+            "    table.cell(diag, 1, 5, str.tostring(stateAge))",
+            '    table.cell(diag, 0, 6, "candidate")',
+            '    table.cell(diag, 1, 6, candidateState == "" ? "-" : candidateState)',
+            '    table.cell(diag, 0, 7, "candidate_count")',
+            "    table.cell(diag, 1, 7, str.tostring(candidateCount))",
+            '    table.cell(diag, 0, 8, "opposite_count")',
+            "    table.cell(diag, 1, 8, str.tostring(oppositeCount))",
+            '    table.cell(diag, 0, 9, "bars_since_transition")',
+            "    table.cell(diag, 1, 9, str.tostring(barsSinceTransition))",
+            '    table.cell(diag, 0, 10, "bull_comps")',
+            "    table.cell(diag, 1, 10, str.tostring(bullScore))",
+            '    table.cell(diag, 0, 11, "bear_comps")',
+            "    table.cell(diag, 1, 11, str.tostring(bearScore))",
+            '    table.cell(diag, 0, 12, "net_score")',
+            "    table.cell(diag, 1, 12, str.tostring(netScore))",
+            '    table.cell(diag, 0, 13, "+DI")',
+            "    table.cell(diag, 1, 13, str.tostring(plusDI, \"#.##\"))",
+            '    table.cell(diag, 0, 14, "-DI")',
+            "    table.cell(diag, 1, 14, str.tostring(minusDI, \"#.##\"))",
+            '    table.cell(diag, 0, 15, "ADX")',
+            "    table.cell(diag, 1, 15, str.tostring(adx14, \"#.##\"))",
+            '    table.cell(diag, 0, 16, "ADX slope3")',
+            "    table.cell(diag, 1, 16, str.tostring(adxSlope3, \"#.###\"))",
+            '    table.cell(diag, 0, 17, "ADX slope5")',
+            "    table.cell(diag, 1, 17, str.tostring(adxSlope5, \"#.###\"))",
+            '    table.cell(diag, 0, 18, "transition")',
+            "    table.cell(diag, 1, 18, transitionReason)",
+            '    table.cell(diag, 0, 19, "variant")',
+            "    table.cell(diag, 1, 19, variantName)",
+            '    table.cell(diag, 0, 20, "config_hash")',
+            "    table.cell(diag, 1, 20, shortCfgHash)",
+            '    table.cell(diag, 0, 21, "rule_hash")',
+            "    table.cell(diag, 1, 21, shortRuleHash)",
+            "",
+            "// EOF",
+        ]
+    )
+    text = "\n".join(lines) + "\n"
+    validate_pine_script(text)
+    if re.search(r"(?m)^strategy\(", text):
+        raise ValueError("clean regime pine must not contain strategy(")
+    return text
+
+
+def write_clean_regime_pines(output_dir: Path, *, default_variant: str = "medium") -> dict[str, Any]:
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths: dict[str, str] = {}
+    hashes: dict[str, str] = {}
+
+    default_cfg = CleanRegimeConfig.for_variant(default_variant)
+    main_text = build_clean_regime_pine_script(cfg=default_cfg, fixed_variant=None)
+    main_path = output_dir / CLEAN_PINE_NAME
+    main_path.write_text(main_text, encoding="utf-8")
+    paths["main"] = str(main_path)
+    hashes["main"] = hashlib.sha256(main_text.encode("utf-8")).hexdigest()
+
+    for variant, name in VARIANT_PINE_NAMES.items():
+        cfg = CleanRegimeConfig.for_variant(variant)
+        text = build_clean_regime_pine_script(cfg=cfg, fixed_variant=variant)
+        path = output_dir / name
+        path.write_text(text, encoding="utf-8")
+        paths[variant] = str(path)
+        hashes[variant] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    return {
+        "paths": paths,
+        "content_hashes": hashes,
+        "config_hash": config_hash(default_cfg),
+        "rule_spec_hash": rule_spec_hash(cfg=default_cfg),
+        "pine_rule_hash": pine_rule_hash(default_cfg),
+        "python_rule_hash": pine_rule_hash(default_cfg),
+        "state_codes": dict(CLEAN_STATE_CODE),
+    }
