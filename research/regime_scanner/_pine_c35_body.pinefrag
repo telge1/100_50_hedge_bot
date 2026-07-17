@@ -51,6 +51,17 @@ var string reason = "init"
 var int stateAge = 0
 var bool newMicroHigh = false
 var bool newMicroLow = false
+var bool extUp = false
+var bool extDown = false
+var bool intUp = false
+var bool intDown = false
+var bool zoneActive = false
+var bool wickUp = false
+var bool wickDown = false
+var bool closeUp = false
+var bool closeDown = false
+var float extLevel = na
+var float distExt = na
 
 // Event-state commit gate: with confirmOnBarClose, mutate only on barstate.isconfirmed.
 // EMA/ATR/ADX above remain live; historical bars are always confirmed.
@@ -143,19 +154,19 @@ if canCommit
             candLow := na
             candLeg := "none"
 
-    extLevel = majorDir < 0 ? protectedHigh : majorDir > 0 ? protectedLow : na
-    distExt = na(extLevel) ? na : majorDir < 0 ? (extLevel - close) / safeAtr : (close - extLevel) / safeAtr
-    wickUp = not na(protectedHigh) and high > protectedHigh
-    wickDown = not na(protectedLow) and low < protectedLow
-    closeUp = not na(protectedHigh) and close > protectedHigh + minBeyond * safeAtr
-    closeDown = not na(protectedLow) and close < protectedLow - minBeyond * safeAtr
+    extLevel := majorDir < 0 ? protectedHigh : majorDir > 0 ? protectedLow : na
+    distExt := na(extLevel) ? na : majorDir < 0 ? (extLevel - close) / safeAtr : (close - extLevel) / safeAtr
+    wickUp := not na(protectedHigh) and high > protectedHigh
+    wickDown := not na(protectedLow) and low < protectedLow
+    closeUp := not na(protectedHigh) and close > protectedHigh + minBeyond * safeAtr
+    closeDown := not na(protectedLow) and close < protectedLow - minBeyond * safeAtr
     upStreak := closeUp ? upStreak + 1 : 0
     downStreak := closeDown ? downStreak + 1 : 0
-    extUp = majorDir < 0 and upStreak >= reqCloses
-    extDown = majorDir > 0 and downStreak >= reqCloses
-    intUp = not na(lastMicroHigh) and close > lastMicroHigh and (na(protectedHigh) or close <= protectedHigh)
-    intDown = not na(lastMicroLow) and close < lastMicroLow and (na(protectedLow) or close >= protectedLow)
-    zoneActive = not na(distExt) and distExt >= 0 and distExt <= zoneAtr and not extUp and not extDown
+    extUp := majorDir < 0 and upStreak >= reqCloses
+    extDown := majorDir > 0 and downStreak >= reqCloses
+    intUp := not na(lastMicroHigh) and close > lastMicroHigh and (na(protectedHigh) or close <= protectedHigh)
+    intDown := not na(lastMicroLow) and close < lastMicroLow and (na(protectedLow) or close >= protectedLow)
+    zoneActive := not na(distExt) and distExt >= 0 and distExt <= zoneAtr and not extUp and not extDown
 
     prevStruct := structState
     stateAge := stateAge + 1

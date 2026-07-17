@@ -497,6 +497,28 @@ def test_diagnostics_pine_terminal_labels() -> None:
     assert "lookahead_on" not in text
 
 
+def test_pine_structure_flags_global_var_scope() -> None:
+    text = build_pullback_entry_pine()
+    for name in (
+        "extUp",
+        "extDown",
+        "intUp",
+        "intDown",
+        "zoneActive",
+        "wickUp",
+        "wickDown",
+        "closeUp",
+        "closeDown",
+    ):
+        assert f"var bool {name} = false" in text
+    assert "var float extLevel = na" in text
+    assert "var float distExt = na" in text
+    assert "extDown :=" in text
+    assert "armExtBear = extDown and not extDown[1]" in text
+    # Must not introduce undeclared local-only `=` first assign used outside canCommit
+    assert "var bool extDown = false" in text.split("if canCommit", 1)[0]
+
+
 def test_pine_confirm_on_bar_close_gates_mutations() -> None:
     text = build_pullback_entry_pine()
     assert 'confirmOnBarClose = input.bool(true, "Confirm all events on bar close")' in text
