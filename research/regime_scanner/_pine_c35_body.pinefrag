@@ -336,6 +336,20 @@ var float priorSwingHigh = na
 var float priorSwingLow = na
 var float breakoutLevel = na
 var int setupAge = 0
+var int readyAge = 0
+var int rejectionBar = na
+var int setupIdCounter = 0
+var int activeSetupId = na
+var bool oppositeArmSeen = false
+var int oppositeArmBar = na
+var string oppositeArmType = "-"
+var string lastTermOutcome = "-"
+var string lastTermReason = "-"
+var int lastTermBar = na
+var string lastTermDir = "-"
+var string lastTermState = "-"
+var bool terminalEdge = false
+var string terminalTag = "-"
 var int armBarIndex = na
 var string lastInvReason = "-"
 var string lastEntryReason = "-"
@@ -371,6 +385,7 @@ longReadyEdge := false
 shortInvEdge := false
 longInvEdge := false
 atrRejectEdge := false
+terminalEdge := false
 rejectReason := "-"
 
 zoneShort = high >= emaLo
@@ -436,15 +451,60 @@ if fillLongNow
 
 if entryState != "IDLE"
     setupAge := setupAge + 1
+if entryState == "SHORT_READY" or entryState == "LONG_READY"
+    readyAge := readyAge + 1
+
+// Opposite arm (any opposite structure edge) while setup live
+oppArmNow = entrySide < 0 ? (armExtBull or armIntBull or armChochBull or armMajorBull or armStructProtBull) : entrySide > 0 ? (armExtBear or armIntBear or armChochBear or armMajorBear or armStructProtBear) : false
+if entryState != "IDLE" and oppArmNow and not oppositeArmSeen
+    oppositeArmSeen := true
+    oppositeArmBar := bar_index
+    oppositeArmType := armExtBull or armExtBear ? "external_bos" : armIntBull or armIntBear ? "internal_bos" : armChochBull or armChochBear ? "choch" : armMajorBull or armMajorBear ? "major_dir_change" : "structure_plus_protected"
+
+// Ready expiry (R1+); R0 has useReadyExpiry=false
+if useReadyExpiry and (entryState == "SHORT_READY" or entryState == "LONG_READY") and readyAge > maxReadyAgeBars
+    lastTermOutcome := "ready_expired"
+    lastTermReason := "ready_expired"
+    lastTermBar := bar_index
+    lastTermDir := entrySide < 0 ? "short" : "long"
+    lastTermState := entryState
+    terminalTag := "READY_OLD"
+    terminalEdge := true
+    breakoutLevel := na
+    entryState := "IDLE"
+    entrySide := 0
+    armedPrice := na
+    pullbackHigh := na
+    pullbackLow := na
+    priorSwingHigh := na
+    priorSwingLow := na
+    setupAge := 0
+    readyAge := 0
+    armBarIndex := na
+    armTypeUsed := "-"
+    lhConfirmed := false
+    activeSetupId := na
+    oppositeArmSeen := false
+    oppositeArmBar := na
+    oppositeArmType := "-"
+
+oppVeto = oppositeVetoMode == "none" or not oppositeArmSeen or na(oppositeArmBar) ? false : oppositeVetoMode == "trigger_bar" ? oppositeArmBar == bar_index : oppositeVetoMode == "since_ready" ? (not na(rejectionBar) and oppositeArmBar >= rejectionBar and oppositeArmBar <= bar_index) : oppositeVetoMode == "lookback_1" ? bar_index - oppositeArmBar <= 1 : oppositeVetoMode == "lookback_2" ? bar_index - oppositeArmBar <= 2 : oppositeVetoMode == "lookback_3" ? bar_index - oppositeArmBar <= 3 : false
 
 if entryState == "IDLE"
     if armShort
         entryState := "SHORT_ARMED"
         entrySide := -1
+        setupIdCounter := setupIdCounter + 1
+        activeSetupId := setupIdCounter
         armedPrice := close
         setupAge := 0
+        readyAge := 0
+        rejectionBar := na
         armBarIndex := bar_index
         armTypeUsed := armingMode
+        oppositeArmSeen := false
+        oppositeArmBar := na
+        oppositeArmType := "-"
         priorSwingHigh := not na(lastMicroHigh) ? lastMicroHigh : high
         priorSwingLow := lastMicroLow
         shortArmEdge := true
@@ -474,10 +534,17 @@ if entryState == "IDLE"
     else if armLong
         entryState := "LONG_ARMED"
         entrySide := 1
+        setupIdCounter := setupIdCounter + 1
+        activeSetupId := setupIdCounter
         armedPrice := close
         setupAge := 0
+        readyAge := 0
+        rejectionBar := na
         armBarIndex := bar_index
         armTypeUsed := armingMode
+        oppositeArmSeen := false
+        oppositeArmBar := na
+        oppositeArmType := "-"
         priorSwingLow := not na(lastMicroLow) ? lastMicroLow : low
         priorSwingHigh := lastMicroHigh
         longArmEdge := true
@@ -509,6 +576,13 @@ else if entryState == "SHORT_ARMED"
     if invShort
         lastInvReason := invShortReason
         shortInvEdge := true
+        terminalEdge := true
+        lastTermDir := "short"
+        lastTermBar := bar_index
+        lastTermReason := invShortReason
+        lastTermState := entryState
+        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -531,6 +605,13 @@ else if entryState == "SHORT_PULLBACK"
     if invShort
         lastInvReason := invShortReason
         shortInvEdge := true
+        terminalEdge := true
+        lastTermDir := "short"
+        lastTermBar := bar_index
+        lastTermReason := invShortReason
+        lastTermState := entryState
+        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -549,6 +630,8 @@ else if entryState == "SHORT_PULLBACK"
         if rejShort
             entryState := "SHORT_READY"
             breakoutLevel := pullbackLow
+            rejectionBar := bar_index
+            readyAge := 0
             lhConfirmed := lhOk
             shortReadyEdge := true
 
@@ -556,6 +639,13 @@ else if entryState == "SHORT_READY"
     if invShort
         lastInvReason := invShortReason
         shortInvEdge := true
+        terminalEdge := true
+        lastTermDir := "short"
+        lastTermBar := bar_index
+        lastTermReason := invShortReason
+        lastTermState := entryState
+        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -580,6 +670,33 @@ else if entryState == "SHORT_READY"
                 atrRejectEdge := true
             else if not mtfOkShort
                 rejectReason := mtfFailShort
+            else if oppVeto
+                lastTermOutcome := "superseded_by_opposite"
+                lastTermReason := "opposite_veto:" + oppositeVetoMode
+                lastTermBar := bar_index
+                lastTermDir := "short"
+                lastTermState := "SHORT_READY"
+                terminalTag := "OPP"
+                terminalEdge := true
+                lastInvReason := lastTermReason
+                shortInvEdge := true
+                entryState := "IDLE"
+                entrySide := 0
+                armedPrice := na
+                pullbackHigh := na
+                pullbackLow := na
+                priorSwingHigh := na
+                priorSwingLow := na
+                breakoutLevel := na
+                setupAge := 0
+                readyAge := 0
+                armBarIndex := na
+                armTypeUsed := "-"
+                lhConfirmed := false
+                activeSetupId := na
+                oppositeArmSeen := false
+                oppositeArmBar := na
+                oppositeArmType := "-"
             else
                 entryState := "SHORT_ENTERED"
                 lastEntryReason := not na(breakoutLevel) and close < breakoutLevel ? "break_pullback_low" : "bearish_bos_after_rejection"
@@ -595,6 +712,13 @@ else if entryState == "LONG_ARMED"
     if invLong
         lastInvReason := invLongReason
         longInvEdge := true
+        terminalEdge := true
+        lastTermDir := "long"
+        lastTermBar := bar_index
+        lastTermReason := invLongReason
+        lastTermState := entryState
+        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -617,6 +741,13 @@ else if entryState == "LONG_PULLBACK"
     if invLong
         lastInvReason := invLongReason
         longInvEdge := true
+        terminalEdge := true
+        lastTermDir := "long"
+        lastTermBar := bar_index
+        lastTermReason := invLongReason
+        lastTermState := entryState
+        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -635,6 +766,8 @@ else if entryState == "LONG_PULLBACK"
         if rejLong
             entryState := "LONG_READY"
             breakoutLevel := pullbackHigh
+            rejectionBar := bar_index
+            readyAge := 0
             lhConfirmed := hlOk
             longReadyEdge := true
 
@@ -642,6 +775,13 @@ else if entryState == "LONG_READY"
     if invLong
         lastInvReason := invLongReason
         longInvEdge := true
+        terminalEdge := true
+        lastTermDir := "long"
+        lastTermBar := bar_index
+        lastTermReason := invLongReason
+        lastTermState := entryState
+        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
         entryState := "IDLE"
         entrySide := 0
         armedPrice := na
@@ -666,6 +806,33 @@ else if entryState == "LONG_READY"
                 atrRejectEdge := true
             else if not mtfOkLong
                 rejectReason := mtfFailLong
+            else if oppVeto
+                lastTermOutcome := "superseded_by_opposite"
+                lastTermReason := "opposite_veto:" + oppositeVetoMode
+                lastTermBar := bar_index
+                lastTermDir := "long"
+                lastTermState := "LONG_READY"
+                terminalTag := "OPP"
+                terminalEdge := true
+                lastInvReason := lastTermReason
+                longInvEdge := true
+                entryState := "IDLE"
+                entrySide := 0
+                armedPrice := na
+                pullbackHigh := na
+                pullbackLow := na
+                priorSwingHigh := na
+                priorSwingLow := na
+                breakoutLevel := na
+                setupAge := 0
+                readyAge := 0
+                armBarIndex := na
+                armTypeUsed := "-"
+                lhConfirmed := false
+                activeSetupId := na
+                oppositeArmSeen := false
+                oppositeArmBar := na
+                oppositeArmType := "-"
             else
                 entryState := "LONG_ENTERED"
                 lastEntryReason := not na(breakoutLevel) and close > breakoutLevel ? "break_pullback_high" : "bullish_bos_after_rejection"
@@ -794,5 +961,31 @@ if showTable and barstate.islast
     table.cell(diag, 1, 22, lastInvReason)
     table.cell(diag, 0, 23, "Last entry reason")
     table.cell(diag, 1, 23, lastEntryReason)
+
+
+// Setup span bgcolor (optional, focus-gated)
+bgcolor(inFocus and showSpan and (entryState == "SHORT_ARMED" or entryState == "LONG_ARMED") ? color.new(color.yellow, 92) : inFocus and showSpan and (entryState == "SHORT_PULLBACK" or entryState == "LONG_PULLBACK") ? color.new(color.orange, 92) : inFocus and showSpan and (entryState == "SHORT_READY" or entryState == "LONG_READY") ? color.new(color.purple, 92) : na)
+
+idSuffix = showSetupId and not na(activeSetupId) ? " #" + str.tostring(activeSetupId) : ""
+fullSuffix = showFullReasonLabels ? " " + lastTermReason : ""
+if inFocus and showTerminalLabels and terminalEdge and lastTermDir == "short"
+    label.new(bar_index, high, "S X " + terminalTag + idSuffix + fullSuffix, style=label.style_label_down, color=color.new(color.gray, 15), textcolor=color.white, size=size.tiny)
+if inFocus and showTerminalLabels and terminalEdge and lastTermDir == "long"
+    label.new(bar_index, low, "L X " + terminalTag + idSuffix + fullSuffix, style=label.style_label_up, color=color.new(color.gray, 15), textcolor=color.white, size=size.tiny)
+
+var table term = table.new(position.bottom_right, 2, 6, border_width=1)
+if showTable and barstate.islast
+    table.cell(term, 0, 0, "Last setup id")
+    table.cell(term, 1, 0, na(activeSetupId) ? "-" : str.tostring(activeSetupId))
+    table.cell(term, 0, 1, "Last direction")
+    table.cell(term, 1, 1, lastTermDir)
+    table.cell(term, 0, 2, "Last terminal outcome")
+    table.cell(term, 1, 2, lastTermOutcome)
+    table.cell(term, 0, 3, "Last terminal reason")
+    table.cell(term, 1, 3, lastTermReason)
+    table.cell(term, 0, 4, "Last terminal bar")
+    table.cell(term, 1, 4, na(lastTermBar) ? "-" : str.tostring(lastTermBar))
+    table.cell(term, 0, 5, "Last state before term")
+    table.cell(term, 1, 5, lastTermState)
 
 // EOF

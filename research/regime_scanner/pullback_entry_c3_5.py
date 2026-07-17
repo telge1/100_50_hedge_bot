@@ -99,6 +99,9 @@ class PullbackEntryConfig:
     require_candle_rejection: bool = False
     direct_entry: bool = False  # A0 reference
     fee_bps_per_side: float = FEE_BPS
+    # Research diagnostics (O0/R0 defaults preserve baseline):
+    max_ready_age_bars: int | None = None  # None = unlimited (R0)
+    opposite_veto_mode: str = "none"  # none|trigger_bar|since_ready|lookback_1|lookback_2|lookback_3
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -193,10 +196,34 @@ RESEARCH_VARIANTS: tuple[PullbackEntryConfig, ...] = (
 ABLATION_BASE = "A6"
 
 
+TERMINAL_OUTCOMES: tuple[str, ...] = (
+    "entered",
+    "invalidated",
+    "timed_out",
+    "rejected",
+    "superseded_by_opposite",
+    "ready_expired",
+    "never_reached_pullback",
+    "never_reached_ready",
+    "no_breakout",
+    "filtered",
+)
+
+OPPOSITE_VETO_MODES: tuple[str, ...] = (
+    "none",
+    "trigger_bar",
+    "since_ready",
+    "lookback_1",
+    "lookback_2",
+    "lookback_3",
+)
+
+
 @dataclass
 class SetupRuntime:
     state: str = "IDLE"
     side: int = 0  # -1 short, +1 long, 0 none
+    setup_id: int | None = None
     start_bar: int | None = None
     start_timestamp: Any = None
     armed_price: float | None = None
@@ -210,6 +237,7 @@ class SetupRuntime:
     rejection_timestamp: Any = None
     breakout_level: float | None = None
     setup_age: int = 0
+    ready_age: int = 0
     invalidation_reason: str | None = None
     entry_reason: str | None = None
     entry_bar: int | None = None
@@ -218,6 +246,21 @@ class SetupRuntime:
     closes_beyond: int = 0
     arming_type: str | None = None
     last_event: str | None = None
+    opposite_arm_seen: bool = False
+    opposite_arm_bar: int | None = None
+    opposite_arm_type: str | None = None
+    last_reject_reason: str | None = None
+    terminal_outcome: str | None = None
+    terminal_reason: str | None = None
+    terminal_state: str | None = None
+    terminal_bar: int | None = None
+    terminal_setup_id: int | None = None
+    terminal_setup_age: int | None = None
+    terminal_ready_age: int | None = None
+    terminal_opposite_arm_seen: bool = False
+    terminal_opposite_arm_bar: int | None = None
+    terminal_opposite_arm_type: str | None = None
+    terminal_direction: str | None = None
 
 
 def config_hash(cfg: PullbackEntryConfig) -> str:
@@ -804,6 +847,7 @@ def _invalidate_long(rt: SetupRuntime, row: Mapping[str, Any], cfg: PullbackEntr
 def _reset(rt: SetupRuntime) -> None:
     rt.state = "IDLE"
     rt.side = 0
+    rt.setup_id = None
     rt.start_bar = None
     rt.start_timestamp = None
     rt.armed_price = None
@@ -817,6 +861,7 @@ def _reset(rt: SetupRuntime) -> None:
     rt.rejection_timestamp = None
     rt.breakout_level = None
     rt.setup_age = 0
+    rt.ready_age = 0
     rt.invalidation_reason = None
     rt.entry_reason = None
     rt.entry_bar = None
@@ -825,6 +870,154 @@ def _reset(rt: SetupRuntime) -> None:
     rt.closes_beyond = 0
     rt.arming_type = None
     rt.last_event = None
+    rt.opposite_arm_seen = False
+    rt.opposite_arm_bar = None
+    rt.opposite_arm_type = None
+    rt.last_reject_reason = None
+    # terminal_* intentionally retained until next arm overwrites / cleared on arm
+
+
+def _clear_terminal(rt: SetupRuntime) -> None:
+    rt.terminal_outcome = None
+    rt.terminal_reason = None
+    rt.terminal_state = None
+    rt.terminal_bar = None
+    rt.terminal_setup_id = None
+    rt.terminal_setup_age = None
+    rt.terminal_ready_age = None
+    rt.terminal_opposite_arm_seen = False
+    rt.terminal_opposite_arm_bar = None
+    rt.terminal_opposite_arm_type = None
+    rt.terminal_direction = None
+
+
+def classify_terminal_outcome(state_before: str, reason: str | None, *, entered: bool = False) -> str:
+    """Map end-of-setup reason to a stable terminal_outcome."""
+    if entered:
+        return "entered"
+    r = str(reason or "unknown")
+    if r == "ready_expired":
+        return "ready_expired"
+    if r.startswith("opposite_veto") or r == "superseded_by_opposite":
+        return "superseded_by_opposite"
+    if r.startswith("direct_reject") or r.endswith("filter_reject") or r == "direct_entry_filter_reject":
+        return "filtered"
+    if r.startswith("break_rejected") or r in {
+        "entry_too_far_from_ema",
+        "move_since_arm_too_large",
+        "breakout_candle_too_large",
+        "ema_filter",
+        "adx_filter",
+    }:
+        return "rejected"
+    if r == "max_age":
+        if state_before in {"SHORT_ARMED", "LONG_ARMED"}:
+            return "never_reached_pullback"
+        if state_before in {"SHORT_PULLBACK", "LONG_PULLBACK"}:
+            return "never_reached_ready"
+        if state_before in {"SHORT_READY", "LONG_READY"}:
+            return "no_breakout"
+        return "timed_out"
+    if r in {"end_of_data", "forced_close"}:
+        if state_before in {"SHORT_ARMED", "LONG_ARMED"}:
+            return "never_reached_pullback"
+        if state_before in {"SHORT_PULLBACK", "LONG_PULLBACK"}:
+            return "never_reached_ready"
+        if state_before in {"SHORT_READY", "LONG_READY"}:
+            return "no_breakout"
+        return "timed_out"
+    return "invalidated"
+
+
+def _note_opposite_arm(rt: SetupRuntime, row: Mapping[str, Any], cfg: PullbackEntryConfig, *, bar_i: int) -> None:
+    """Record first opposite-direction structure arm while setup is live.
+
+    Uses *all* ARMING_TYPES (not only cfg.arming_type) so soft opposite signals
+    that do not themselves invalidate can still be audited / vetoed.
+    """
+    if rt.state == "IDLE" or rt.side == 0:
+        return
+    opp = -1 if rt.side > 0 else 1
+    for atype in ARMING_TYPES:
+        if _arm_signal(row, side=opp, arming_type=atype):
+            if not rt.opposite_arm_seen:
+                rt.opposite_arm_seen = True
+                rt.opposite_arm_bar = bar_i
+                rt.opposite_arm_type = atype
+            break
+
+
+def _opposite_veto_blocks(rt: SetupRuntime, *, bar_i: int, cfg: PullbackEntryConfig) -> bool:
+    mode = cfg.opposite_veto_mode or "none"
+    if mode in {"none", ""} or not rt.opposite_arm_seen or rt.opposite_arm_bar is None:
+        return False
+    opp = int(rt.opposite_arm_bar)
+    if mode == "trigger_bar":
+        return opp == bar_i
+    if mode == "since_ready":
+        ready_bar = rt.rejection_bar
+        if ready_bar is None:
+            return False
+        return ready_bar <= opp <= bar_i
+    if mode == "lookback_1":
+        return bar_i - opp <= 1
+    if mode == "lookback_2":
+        return bar_i - opp <= 2
+    if mode == "lookback_3":
+        return bar_i - opp <= 3
+    return False
+
+
+
+def _mark_entered(
+    rt: SetupRuntime,
+    *,
+    bar_i: int,
+    reason: str,
+    events: list[str] | None = None,
+) -> None:
+    """Record entered terminal metadata but keep *_ENTERED until next bar reset."""
+    rt.terminal_outcome = "entered"
+    rt.terminal_reason = reason
+    rt.terminal_state = rt.state
+    rt.terminal_bar = bar_i
+    rt.terminal_setup_id = rt.setup_id
+    rt.terminal_setup_age = rt.setup_age
+    rt.terminal_ready_age = rt.ready_age
+    rt.terminal_opposite_arm_seen = rt.opposite_arm_seen
+    rt.terminal_opposite_arm_bar = rt.opposite_arm_bar
+    rt.terminal_opposite_arm_type = rt.opposite_arm_type
+    rt.terminal_direction = "short" if rt.side < 0 else ("long" if rt.side > 0 else None)
+    if events is not None:
+        events.append(f"terminal:entered:{reason}")
+
+
+def _terminate(
+    rt: SetupRuntime,
+    *,
+    bar_i: int,
+    reason: str,
+    entered: bool = False,
+    events: list[str] | None = None,
+) -> None:
+    state_before = rt.state
+    outcome = classify_terminal_outcome(state_before, reason, entered=entered)
+    rt.terminal_outcome = outcome
+    rt.terminal_reason = reason
+    rt.terminal_state = state_before
+    rt.terminal_bar = bar_i
+    rt.terminal_setup_id = rt.setup_id
+    rt.terminal_setup_age = rt.setup_age
+    rt.terminal_ready_age = rt.ready_age
+    rt.terminal_opposite_arm_seen = rt.opposite_arm_seen
+    rt.terminal_opposite_arm_bar = rt.opposite_arm_bar
+    rt.terminal_opposite_arm_type = rt.opposite_arm_type
+    rt.terminal_direction = "short" if rt.side < 0 else ("long" if rt.side > 0 else None)
+    if events is not None:
+        events.append(f"terminal:{outcome}:{reason}")
+    if not entered:
+        rt.invalidation_reason = reason
+    _reset(rt)
 
 
 # ---------------------------------------------------------------------------
@@ -838,67 +1031,109 @@ def step_pullback_entry(
     *,
     cfg: PullbackEntryConfig,
     next_open: float | None = None,
+    setup_id_factory: Any | None = None,
 ) -> tuple[SetupRuntime, dict[str, Any]]:
     """One closed-bar step. Entry fills at next_open when entry_price_mode=next_open."""
     bar_i = int(row.get("bar_index", 0))
     ts = row.get("timestamp")
     events: list[str] = []
     entry_now = False
-    pending_entry_price: float | None = None
-
     allow_short = cfg.side_mode in {"both", "short"}
     allow_long = cfg.side_mode in {"both", "long"}
 
+    def _alloc_id() -> int:
+        if setup_id_factory is None:
+            return int(bar_i) + 1
+        return int(setup_id_factory())
+
+    def _fill_price() -> float:
+        if cfg.entry_price_mode == "next_open" and next_open is not None:
+            return _finite(next_open)
+        return _finite(row.get("close"))
+
     if rt.state != "IDLE":
         rt.setup_age += 1
+    if rt.state in {"SHORT_READY", "LONG_READY"}:
+        rt.ready_age += 1
+
+    _note_opposite_arm(rt, row, cfg, bar_i=bar_i)
+
+    # Ready-age expiry (research R1–R5); R0 keeps max_ready_age_bars=None.
+    if (
+        rt.state in {"SHORT_READY", "LONG_READY"}
+        and cfg.max_ready_age_bars is not None
+        and rt.ready_age > int(cfg.max_ready_age_bars)
+    ):
+        _terminate(rt, bar_i=bar_i, reason="ready_expired", events=events)
 
     # --- IDLE: arm ---
     if rt.state == "IDLE":
         if allow_short and _arm_signal(row, side=-1, arming_type=cfg.arming_type):
+            _clear_terminal(rt)
             rt.state = "SHORT_ARMED"
             rt.side = -1
+            rt.setup_id = _alloc_id()
             rt.start_bar = bar_i
             rt.start_timestamp = ts
             rt.armed_price = _finite(row.get("close"))
             rt.setup_age = 0
+            rt.ready_age = 0
             rt.arming_type = cfg.arming_type
-            rt.prior_swing_high = _finite(row.get("micro_swing_high")) if row.get("micro_swing_high") is not None else _finite(row.get("high"))
-            rt.prior_swing_low = _finite(row.get("micro_swing_low")) if row.get("micro_swing_low") is not None else None
+            rt.prior_swing_high = (
+                _finite(row.get("micro_swing_high"))
+                if row.get("micro_swing_high") is not None
+                else _finite(row.get("high"))
+            )
+            rt.prior_swing_low = (
+                _finite(row.get("micro_swing_low")) if row.get("micro_swing_low") is not None else None
+            )
             rt.last_event = "short_armed"
             events.append("short_armed")
             if cfg.direct_entry:
-                # A0: immediate entry reference (no pullback path).
                 ok_ema = _ema_filters_ok(row, cfg, side=-1)
                 ok_adx = _adx_filters_ok(row, cfg, side=-1)
                 ok_atr, atr_reason = _atr_anti_chase_ok(rt, row, cfg, side=-1)
                 ok_mtf, mtf_reason = _mtf_ok(row, cfg, side=-1)
                 if ok_ema and ok_adx and ok_atr and ok_mtf:
-                    rt.state = "SHORT_ENTERED"
-                    rt.entry_bar = bar_i
-                    rt.entry_timestamp = ts
-                    rt.entry_reason = "direct_structure_entry"
-                    pending_entry_price = (
-                        _finite(next_open)
-                        if cfg.entry_price_mode == "next_open" and next_open is not None
-                        else _finite(row.get("close"))
-                    )
-                    rt.entry_price = pending_entry_price
-                    entry_now = True
-                    events.append("short_entered_direct")
+                    if _opposite_veto_blocks(rt, bar_i=bar_i, cfg=cfg):
+                        _terminate(
+                            rt,
+                            bar_i=bar_i,
+                            reason=f"opposite_veto:{cfg.opposite_veto_mode}",
+                            events=events,
+                        )
+                    else:
+                        rt.state = "SHORT_ENTERED"
+                        rt.entry_bar = bar_i
+                        rt.entry_timestamp = ts
+                        rt.entry_reason = "direct_structure_entry"
+                        rt.entry_price = _fill_price()
+                        entry_now = True
+                        events.append("short_entered_direct")
+                        _mark_entered(rt, bar_i=bar_i, reason="direct_structure_entry", events=events)
                 else:
-                    rt.invalidation_reason = atr_reason or mtf_reason or "direct_entry_filter_reject"
-                    events.append(f"direct_reject:{rt.invalidation_reason}")
-                    _reset(rt)
+                    reason = atr_reason or mtf_reason or "direct_entry_filter_reject"
+                    events.append(f"direct_reject:{reason}")
+                    _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         elif allow_long and _arm_signal(row, side=1, arming_type=cfg.arming_type):
+            _clear_terminal(rt)
             rt.state = "LONG_ARMED"
             rt.side = 1
+            rt.setup_id = _alloc_id()
             rt.start_bar = bar_i
             rt.start_timestamp = ts
             rt.armed_price = _finite(row.get("close"))
             rt.setup_age = 0
+            rt.ready_age = 0
             rt.arming_type = cfg.arming_type
-            rt.prior_swing_low = _finite(row.get("micro_swing_low")) if row.get("micro_swing_low") is not None else _finite(row.get("low"))
-            rt.prior_swing_high = _finite(row.get("micro_swing_high")) if row.get("micro_swing_high") is not None else None
+            rt.prior_swing_low = (
+                _finite(row.get("micro_swing_low"))
+                if row.get("micro_swing_low") is not None
+                else _finite(row.get("low"))
+            )
+            rt.prior_swing_high = (
+                _finite(row.get("micro_swing_high")) if row.get("micro_swing_high") is not None else None
+            )
             rt.last_event = "long_armed"
             events.append("long_armed")
             if cfg.direct_entry:
@@ -907,30 +1142,33 @@ def step_pullback_entry(
                 ok_atr, atr_reason = _atr_anti_chase_ok(rt, row, cfg, side=1)
                 ok_mtf, mtf_reason = _mtf_ok(row, cfg, side=1)
                 if ok_ema and ok_adx and ok_atr and ok_mtf:
-                    rt.state = "LONG_ENTERED"
-                    rt.entry_bar = bar_i
-                    rt.entry_timestamp = ts
-                    rt.entry_reason = "direct_structure_entry"
-                    pending_entry_price = (
-                        _finite(next_open)
-                        if cfg.entry_price_mode == "next_open" and next_open is not None
-                        else _finite(row.get("close"))
-                    )
-                    rt.entry_price = pending_entry_price
-                    entry_now = True
-                    events.append("long_entered_direct")
+                    if _opposite_veto_blocks(rt, bar_i=bar_i, cfg=cfg):
+                        _terminate(
+                            rt,
+                            bar_i=bar_i,
+                            reason=f"opposite_veto:{cfg.opposite_veto_mode}",
+                            events=events,
+                        )
+                    else:
+                        rt.state = "LONG_ENTERED"
+                        rt.entry_bar = bar_i
+                        rt.entry_timestamp = ts
+                        rt.entry_reason = "direct_structure_entry"
+                        rt.entry_price = _fill_price()
+                        entry_now = True
+                        events.append("long_entered_direct")
+                        _mark_entered(rt, bar_i=bar_i, reason="direct_structure_entry", events=events)
                 else:
-                    rt.invalidation_reason = atr_reason or mtf_reason or "direct_entry_filter_reject"
-                    events.append(f"direct_reject:{rt.invalidation_reason}")
-                    _reset(rt)
+                    reason = atr_reason or mtf_reason or "direct_entry_filter_reject"
+                    events.append(f"direct_reject:{reason}")
+                    _terminate(rt, bar_i=bar_i, reason=reason, events=events)
 
     # --- SHORT path ---
     elif rt.state == "SHORT_ARMED":
         reason = _invalidate_short(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         elif _zone_reached_short(row, cfg):
             rt.state = "SHORT_PULLBACK"
             rt.pullback_start_bar = bar_i
@@ -943,9 +1181,8 @@ def step_pullback_entry(
     elif rt.state == "SHORT_PULLBACK":
         reason = _invalidate_short(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         else:
             rt.pullback_high = max(rt.pullback_high or -1e18, _finite(row.get("high")))
             rt.pullback_low = min(rt.pullback_low or 1e18, _finite(row.get("low")))
@@ -954,56 +1191,60 @@ def step_pullback_entry(
                 rt.rejection_bar = bar_i
                 rt.rejection_timestamp = ts
                 rt.breakout_level = rt.pullback_low
+                rt.ready_age = 0
                 rt.last_event = "short_ready"
                 events.append("short_ready")
 
     elif rt.state == "SHORT_READY":
         reason = _invalidate_short(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         else:
-            # Breakout uses the frozen level from READY; do not lower the trigger on this bar.
             ok, level, br = _breakout_short(rt, row, cfg)
             if ok:
                 if not _ema_filters_ok(row, cfg, side=-1):
+                    rt.last_reject_reason = "ema_filter"
                     events.append("break_rejected:ema_filter")
                 elif not _adx_filters_ok(row, cfg, side=-1):
+                    rt.last_reject_reason = "adx_filter"
                     events.append("break_rejected:adx_filter")
                 else:
                     atr_ok, atr_reason = _atr_anti_chase_ok(rt, row, cfg, side=-1)
                     mtf_ok, mtf_reason = _mtf_ok(row, cfg, side=-1)
                     if not atr_ok:
+                        rt.last_reject_reason = atr_reason
                         events.append(f"break_rejected:{atr_reason}")
                     elif not mtf_ok:
+                        rt.last_reject_reason = mtf_reason
                         events.append(f"break_rejected:{mtf_reason}")
+                    elif _opposite_veto_blocks(rt, bar_i=bar_i, cfg=cfg):
+                        _terminate(
+                            rt,
+                            bar_i=bar_i,
+                            reason=f"opposite_veto:{cfg.opposite_veto_mode}",
+                            events=events,
+                        )
                     else:
                         rt.state = "SHORT_ENTERED"
                         rt.breakout_level = level
                         rt.entry_bar = bar_i
                         rt.entry_timestamp = ts
                         rt.entry_reason = br or "short_breakout"
-                        pending_entry_price = (
-                            _finite(next_open)
-                            if cfg.entry_price_mode == "next_open" and next_open is not None
-                            else _finite(row.get("close"))
-                        )
-                        rt.entry_price = pending_entry_price
+                        rt.entry_price = _fill_price()
                         entry_now = True
                         events.append("short_entered")
+                        _mark_entered(rt, bar_i=bar_i, reason=rt.entry_reason, events=events)
             else:
                 rt.pullback_high = max(rt.pullback_high or -1e18, _finite(row.get("high")))
-                # Keep tracking pullback low for diagnostics but never raise the frozen breakout trigger.
                 rt.pullback_low = min(rt.pullback_low or 1e18, _finite(row.get("low")))
 
     # --- LONG path ---
     elif rt.state == "LONG_ARMED":
         reason = _invalidate_long(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         elif _zone_reached_long(row, cfg):
             rt.state = "LONG_PULLBACK"
             rt.pullback_start_bar = bar_i
@@ -1016,9 +1257,8 @@ def step_pullback_entry(
     elif rt.state == "LONG_PULLBACK":
         reason = _invalidate_long(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         else:
             rt.pullback_high = max(rt.pullback_high or -1e18, _finite(row.get("high")))
             rt.pullback_low = min(rt.pullback_low or 1e18, _finite(row.get("low")))
@@ -1027,56 +1267,65 @@ def step_pullback_entry(
                 rt.rejection_bar = bar_i
                 rt.rejection_timestamp = ts
                 rt.breakout_level = rt.pullback_high
+                rt.ready_age = 0
                 rt.last_event = "long_ready"
                 events.append("long_ready")
 
     elif rt.state == "LONG_READY":
         reason = _invalidate_long(rt, row, cfg)
         if reason:
-            rt.invalidation_reason = reason
             events.append(f"invalidated:{reason}")
-            _reset(rt)
+            _terminate(rt, bar_i=bar_i, reason=reason, events=events)
         else:
             ok, level, br = _breakout_long(rt, row, cfg)
             if ok:
                 if not _ema_filters_ok(row, cfg, side=1):
+                    rt.last_reject_reason = "ema_filter"
                     events.append("break_rejected:ema_filter")
                 elif not _adx_filters_ok(row, cfg, side=1):
+                    rt.last_reject_reason = "adx_filter"
                     events.append("break_rejected:adx_filter")
                 else:
                     atr_ok, atr_reason = _atr_anti_chase_ok(rt, row, cfg, side=1)
                     mtf_ok, mtf_reason = _mtf_ok(row, cfg, side=1)
                     if not atr_ok:
+                        rt.last_reject_reason = atr_reason
                         events.append(f"break_rejected:{atr_reason}")
                     elif not mtf_ok:
+                        rt.last_reject_reason = mtf_reason
                         events.append(f"break_rejected:{mtf_reason}")
+                    elif _opposite_veto_blocks(rt, bar_i=bar_i, cfg=cfg):
+                        _terminate(
+                            rt,
+                            bar_i=bar_i,
+                            reason=f"opposite_veto:{cfg.opposite_veto_mode}",
+                            events=events,
+                        )
                     else:
                         rt.state = "LONG_ENTERED"
                         rt.breakout_level = level
                         rt.entry_bar = bar_i
                         rt.entry_timestamp = ts
                         rt.entry_reason = br or "long_breakout"
-                        pending_entry_price = (
-                            _finite(next_open)
-                            if cfg.entry_price_mode == "next_open" and next_open is not None
-                            else _finite(row.get("close"))
-                        )
-                        rt.entry_price = pending_entry_price
+                        rt.entry_price = _fill_price()
                         entry_now = True
                         events.append("long_entered")
+                        _mark_entered(rt, bar_i=bar_i, reason=rt.entry_reason, events=events)
             else:
                 rt.pullback_low = min(rt.pullback_low or 1e18, _finite(row.get("low")))
                 rt.pullback_high = max(rt.pullback_high or -1e18, _finite(row.get("high")))
 
     elif rt.state in {"SHORT_ENTERED", "LONG_ENTERED"}:
-        # Research SM resets after recording entry (one-shot setups).
+        # One-shot: reset after the signal bar (fill occurs at next open externally).
         events.append("reset_after_entry")
         _reset(rt)
 
     diag = {
         "entry_state": rt.state,
         "entry_side": rt.side,
+        "setup_id": rt.setup_id,
         "setup_age": rt.setup_age,
+        "ready_age": rt.ready_age,
         "armed_price": rt.armed_price,
         "pullback_high": rt.pullback_high,
         "pullback_low": rt.pullback_low,
@@ -1090,12 +1339,33 @@ def step_pullback_entry(
         "events": "|".join(events) if events else None,
         "arming_type": rt.arming_type,
         "variant": cfg.name,
+        "opposite_arm_seen": rt.opposite_arm_seen,
+        "opposite_arm_bar": rt.opposite_arm_bar,
+        "opposite_arm_type": rt.opposite_arm_type,
+        "last_reject_reason": rt.last_reject_reason,
+        "terminal_outcome": rt.terminal_outcome,
+        "terminal_reason": rt.terminal_reason,
+        "terminal_state": rt.terminal_state,
+        "terminal_bar": rt.terminal_bar,
+        "terminal_setup_id": rt.terminal_setup_id,
+        "terminal_setup_age": rt.terminal_setup_age,
+        "terminal_ready_age": rt.terminal_ready_age,
+        "terminal_opposite_arm_seen": rt.terminal_opposite_arm_seen,
+        "terminal_opposite_arm_bar": rt.terminal_opposite_arm_bar,
+        "terminal_opposite_arm_type": rt.terminal_opposite_arm_type,
+        "terminal_direction": rt.terminal_direction,
     }
     return rt, diag
 
 
-def apply_pullback_entry(frame: pd.DataFrame, cfg: PullbackEntryConfig) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
-    """Replay SM over prepared frame. Returns (timeline_df, entries)."""
+
+def apply_pullback_entry(
+    frame: pd.DataFrame,
+    cfg: PullbackEntryConfig,
+    *,
+    return_lifecycles: bool = False,
+) -> tuple[pd.DataFrame, list[dict[str, Any]]] | tuple[pd.DataFrame, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Replay SM over prepared frame. Returns (timeline_df, entries[, lifecycles])."""
     df = frame.reset_index(drop=True).copy()
     if "bar_index" not in df.columns:
         df["bar_index"] = np.arange(len(df))
@@ -1103,20 +1373,117 @@ def apply_pullback_entry(frame: pd.DataFrame, cfg: PullbackEntryConfig) -> tuple
     rt = SetupRuntime()
     rows: list[dict[str, Any]] = []
     entries: list[dict[str, Any]] = []
+    lifecycles: dict[int, dict[str, Any]] = {}
+    next_id = 1
+
+    def _alloc() -> int:
+        nonlocal next_id
+        sid = next_id
+        next_id += 1
+        return sid
+
+    def _ensure_life(sid: int, *, direction: str, arm_bar: int, arm_ts: Any, arm_px: float | None) -> dict[str, Any]:
+        if sid not in lifecycles:
+            lifecycles[sid] = {
+                "setup_id": sid,
+                "direction": direction,
+                "variant": cfg.name,
+                "arming_type": cfg.arming_type,
+                "armed_bar": arm_bar,
+                "armed_timestamp": arm_ts,
+                "armed_price": arm_px,
+                "pullback_bar": None,
+                "ready_bar": None,
+                "trigger_bar": None,
+                "fill_bar": None,
+                "terminal_bar": None,
+                "terminal_state": None,
+                "terminal_outcome": None,
+                "terminal_reason": None,
+                "setup_age_total": None,
+                "ready_age_at_terminal": None,
+                "opposite_arm_seen": False,
+                "opposite_arm_bar": None,
+                "opposite_arm_type": None,
+                "entry_created": False,
+                "last_reject_reason": None,
+            }
+        return lifecycles[sid]
+
     for i in range(len(df)):
         row = df.iloc[i].to_dict()
         next_open = opens[i + 1] if i + 1 < len(opens) else None
-        # For next_open entry mode without future bar, skip fill (no lookahead invent).
-        rt, diag = step_pullback_entry(rt, row, cfg=cfg, next_open=next_open)
+        prev_side = rt.side
+        prev_id = rt.setup_id
+        prev_state = rt.state
+        rt, diag = step_pullback_entry(
+            rt, row, cfg=cfg, next_open=next_open, setup_id_factory=_alloc
+        )
         out = {
             "bar_index": int(row.get("bar_index", i)),
             "timestamp": row.get("timestamp"),
             **diag,
         }
         rows.append(out)
+        ev = str(diag.get("events") or "")
+        bi = int(out["bar_index"])
+
+        # Arm edge → open lifecycle
+        if "short_armed" in ev or "long_armed" in ev:
+            sid = int(diag["setup_id"] or prev_id or 0)
+            if diag.get("entry_signal") and diag.get("setup_id") is not None:
+                sid = int(diag["setup_id"])
+            direction = "short" if "short_armed" in ev else "long"
+            # For direct entry, setup_id comes from entry_snap
+            if diag.get("setup_id") is not None:
+                sid = int(diag["setup_id"])
+            life = _ensure_life(
+                sid,
+                direction=direction,
+                arm_bar=bi,
+                arm_ts=row.get("timestamp"),
+                arm_px=diag.get("armed_price"),
+            )
+            life["arming_type"] = diag.get("arming_type") or cfg.arming_type
+
+        active_id = diag.get("setup_id")
+        if active_id is None and prev_id is not None and prev_state != "IDLE" and "terminal:" not in ev:
+            active_id = prev_id
+        if active_id is not None and int(active_id) in lifecycles:
+            life = lifecycles[int(active_id)]
+            if "short_pullback" in ev or "long_pullback" in ev:
+                life["pullback_bar"] = bi
+            if "short_ready" in ev or "long_ready" in ev:
+                life["ready_bar"] = bi
+            if diag.get("opposite_arm_seen"):
+                life["opposite_arm_seen"] = True
+                life["opposite_arm_bar"] = diag.get("opposite_arm_bar")
+                life["opposite_arm_type"] = diag.get("opposite_arm_type")
+            if diag.get("last_reject_reason"):
+                life["last_reject_reason"] = diag.get("last_reject_reason")
+
         if diag.get("entry_signal"):
+            sid = int(diag.get("setup_id") or 0)
+            if sid not in lifecycles and sid:
+                _ensure_life(
+                    sid,
+                    direction="short" if int(diag.get("entry_side") or 0) < 0 else "long",
+                    arm_bar=bi,
+                    arm_ts=row.get("timestamp"),
+                    arm_px=diag.get("armed_price"),
+                )
+            if sid in lifecycles:
+                life = lifecycles[sid]
+                life["trigger_bar"] = bi
+                life["fill_bar"] = bi + 1 if next_open is not None else None
+                life["entry_created"] = True
+                life["ready_age_at_terminal"] = diag.get("ready_age")
+                life["setup_age_total"] = diag.get("setup_age")
+                life["opposite_arm_seen"] = bool(diag.get("opposite_arm_seen"))
+                life["opposite_arm_bar"] = diag.get("opposite_arm_bar")
+                life["opposite_arm_type"] = diag.get("opposite_arm_type")
             if cfg.entry_price_mode == "next_open" and next_open is None:
-                continue  # cannot fill without lookahead
+                continue
             entries.append(
                 {
                     **out,
@@ -1133,11 +1500,60 @@ def apply_pullback_entry(frame: pd.DataFrame, cfg: PullbackEntryConfig) -> tuple
                     "pullback_high": diag.get("pullback_high"),
                     "pullback_low": diag.get("pullback_low"),
                     "setup_age_at_entry": diag.get("setup_age"),
+                    "ready_age_at_entry": diag.get("ready_age"),
                     "m15_major_direction": row.get("m15_major_direction"),
                     "m30_major_direction": row.get("m30_major_direction"),
+                    "opposite_arm_seen": diag.get("opposite_arm_seen"),
+                    "opposite_arm_bar": diag.get("opposite_arm_bar"),
+                    "opposite_arm_type": diag.get("opposite_arm_type"),
                 }
             )
-    return pd.DataFrame(rows), entries
+
+        if diag.get("terminal_outcome") and "terminal:" in ev:
+            sid = diag.get("terminal_setup_id") or diag.get("setup_id") or prev_id
+            if sid is not None and int(sid) in lifecycles:
+                life = lifecycles[int(sid)]
+                life["terminal_bar"] = diag.get("terminal_bar")
+                life["terminal_state"] = diag.get("terminal_state")
+                life["terminal_outcome"] = diag.get("terminal_outcome")
+                life["terminal_reason"] = diag.get("terminal_reason")
+                life["setup_age_total"] = diag.get("terminal_setup_age")
+                life["ready_age_at_terminal"] = diag.get("terminal_ready_age")
+                if diag.get("terminal_opposite_arm_seen"):
+                    life["opposite_arm_seen"] = True
+                    life["opposite_arm_bar"] = diag.get("terminal_opposite_arm_bar")
+                    life["opposite_arm_type"] = diag.get("terminal_opposite_arm_type")
+                if diag.get("entry_signal") or life.get("terminal_outcome") == "entered":
+                    life["entry_created"] = bool(diag.get("entry_signal") or life.get("entry_created"))
+
+    # Force-close any open setup at end of data
+    if rt.state != "IDLE" and rt.setup_id is not None:
+        last_i = int(df.iloc[-1].get("bar_index", len(df) - 1))
+        sid = int(rt.setup_id)
+        state_before = rt.state
+        reason = "end_of_data"
+        outcome = classify_terminal_outcome(state_before, reason)
+        if sid in lifecycles and lifecycles[sid].get("terminal_outcome") is None:
+            lifecycles[sid].update(
+                {
+                    "terminal_bar": last_i,
+                    "terminal_state": state_before,
+                    "terminal_outcome": outcome,
+                    "terminal_reason": reason,
+                    "setup_age_total": rt.setup_age,
+                    "ready_age_at_terminal": rt.ready_age,
+                    "opposite_arm_seen": rt.opposite_arm_seen,
+                    "opposite_arm_bar": rt.opposite_arm_bar,
+                    "opposite_arm_type": rt.opposite_arm_type,
+                }
+            )
+        _terminate(rt, bar_i=last_i, reason=reason)
+
+    timeline = pd.DataFrame(rows)
+    life_list = [lifecycles[k] for k in sorted(lifecycles.keys())]
+    if return_lifecycles:
+        return timeline, entries, life_list
+    return timeline, entries
 
 
 # ---------------------------------------------------------------------------

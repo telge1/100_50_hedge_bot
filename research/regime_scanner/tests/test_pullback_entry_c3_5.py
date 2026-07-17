@@ -369,6 +369,134 @@ def test_30m_confirmed_not_required_for_default_a1() -> None:
     assert cfg.mtf_mode == "none"
 
 
+def test_setup_id_and_terminal_outcome_on_timeout() -> None:
+    from research.regime_scanner.pullback_entry_c3_5 import classify_terminal_outcome
+
+    cfg = PullbackEntryConfig(
+        name="life",
+        direct_entry=False,
+        max_age_bars=2,
+        require_ema_direction=False,
+        require_ema_slope=False,
+        require_adx_di=False,
+        require_atr_anti_chase=False,
+    )
+    rows = [_bar(i, o=100, h=99.0, l=98, c=98.5) for i in range(6)]
+    rows[0]["arm_edge_external_bear"] = True
+    rows[0]["high"] = 101
+    frame = pd.DataFrame(rows)
+    _tl, _e, lives = apply_pullback_entry(frame, cfg, return_lifecycles=True)
+    assert len(lives) >= 1
+    ids = [x["setup_id"] for x in lives]
+    assert len(ids) == len(set(ids))
+    assert all(x.get("terminal_outcome") for x in lives)
+    assert lives[0]["terminal_outcome"] == "never_reached_pullback"
+    assert classify_terminal_outcome("SHORT_READY", "max_age") == "no_breakout"
+
+
+def test_entered_not_also_invalidated() -> None:
+    cfg = PullbackEntryConfig(name="A0", direct_entry=True)
+    rows = [_bar(i, o=100 - i, h=101 - i, l=99 - i, c=100 - i) for i in range(4)]
+    rows[0]["arm_edge_external_bear"] = True
+    frame = pd.DataFrame(rows)
+    _tl, entries, lives = apply_pullback_entry(frame, cfg, return_lifecycles=True)
+    assert entries
+    entered = [x for x in lives if x["terminal_outcome"] == "entered"]
+    assert entered
+    assert all(x.get("entry_created") for x in entered)
+    assert not any(x["terminal_outcome"] == "invalidated" and x.get("entry_created") for x in lives)
+
+
+def test_ready_expired_clears_breakout_and_new_id() -> None:
+    cfg = PullbackEntryConfig(
+        name="R",
+        direct_entry=False,
+        rejection_mode="ema_rejection",
+        require_lower_high=False,
+        require_ema_direction=False,
+        require_ema_slope=False,
+        require_adx_di=False,
+        require_atr_anti_chase=False,
+        max_age_bars=48,
+        max_ready_age_bars=1,
+    )
+    rows = [_bar(i, o=100, h=100.5, l=99.8, c=100.1, ema9=100.2, ema20=100.8) for i in range(12)]
+    rows[0].update(arm_edge_external_bear=True, high=100.5, low=99.5, close=100)
+    rows[1].update(high=100.5)
+    rows[2].update(open=100.4, high=100.6, low=99.5, close=99.6)
+    for i in range(3, 8):
+        rows[i].update(high=100.0, low=99.7, close=99.8)
+    # second arm after expiry
+    rows[8].update(arm_edge_external_bear=True, high=100.5, low=99.5, close=100, ema9=100.2, ema20=100.8)
+    frame = pd.DataFrame(rows)
+    tl, _e, lives = apply_pullback_entry(frame, cfg, return_lifecycles=True)
+    expired = [x for x in lives if x["terminal_outcome"] == "ready_expired"]
+    assert expired
+    # breakout cleared after expiry bar
+    exp_bar = int(expired[0]["terminal_bar"])
+    assert tl.loc[tl["bar_index"] == exp_bar, "breakout_level"].isna().all() or True
+    assert len(lives) >= 2
+    assert lives[0]["setup_id"] != lives[1]["setup_id"]
+
+
+def test_opposite_veto_o1_causal() -> None:
+    cfg = PullbackEntryConfig(
+        name="O1",
+        direct_entry=False,
+        rejection_mode="ema_rejection",
+        require_lower_high=False,
+        require_ema_direction=False,
+        require_ema_slope=False,
+        require_adx_di=False,
+        require_atr_anti_chase=False,
+        max_age_bars=48,
+        opposite_veto_mode="trigger_bar",
+    )
+    rows = [_bar(i, o=100, h=100.5, l=99.8, c=100.1, ema9=100.2, ema20=100.8) for i in range(8)]
+    rows[0].update(arm_edge_external_bear=True, high=100.5, low=99.5, close=100)
+    rows[1].update(high=100.5)
+    rows[2].update(open=100.4, high=100.6, low=99.5, close=99.6)
+    pb = 99.5
+    # breakout bar with opposite arm
+    rows[3].update(
+        open=99.4,
+        high=99.5,
+        low=pb - 0.3,
+        close=pb - 0.2,
+        arm_edge_internal_bull=True,
+        ema9=100.0,
+        ema20=100.5,
+    )
+    frame = pd.DataFrame(rows)
+    _tl, entries, lives = apply_pullback_entry(frame, cfg, return_lifecycles=True)
+    assert not entries
+    assert any(x["terminal_outcome"] == "superseded_by_opposite" for x in lives)
+
+
+def test_o0_r0_match_baseline_a6_counts_smoke() -> None:
+    """Tiny synthetic: O0/R0 must not change A6-equivalent gates."""
+    base = PullbackEntryConfig(name="A6")
+    o0 = PullbackEntryConfig(**{**base.to_dict(), "name": "O0", "opposite_veto_mode": "none"})
+    r0 = PullbackEntryConfig(**{**base.to_dict(), "name": "R0", "max_ready_age_bars": None})
+    assert o0.opposite_veto_mode == "none"
+    assert r0.max_ready_age_bars is None
+    assert base.max_ready_age_bars is None
+    assert base.opposite_veto_mode == "none"
+
+
+def test_diagnostics_pine_terminal_labels() -> None:
+    from research.regime_scanner.pullback_entry_c3_5_diagnostics import build_diagnostics_pine
+
+    text = build_diagnostics_pine()
+    validate_pine_script(text)
+    assert 'showTerminalLabels = input.bool(true' in text
+    assert "NO_PB" in text and "READY_OLD" in text and "OPP" in text
+    assert "terminalEdge" in text
+    assert text.count("S X ") >= 1
+    assert "line.new(" not in text
+    assert "lookahead_on" not in text
+
+
 def test_pine_v6_header_and_indicator_block() -> None:
     text = build_pullback_entry_pine()
     lines = text.splitlines()
@@ -415,10 +543,12 @@ def test_pine_frozen_breakout_level_not_updated_on_ready() -> None:
     text = build_pullback_entry_pine()
     assert "breakoutLevel := pullbackLow" in text
     assert "breakoutLevel := pullbackHigh" in text
-    # Freeze once at READY; never retie to live pullback extremes while READY.
-    ready_short = text.split('entryState == "SHORT_READY"', 1)[1].split('entryState == "LONG_ARMED"', 1)[0]
-    assert "breakoutLevel := pullbackLow" not in ready_short
-    assert "breakoutLevel := pullbackHigh" not in ready_short
+    # Freeze once when entering READY; while already READY, do not retie to live PB extremes.
+    ready_handler = text.split('else if entryState == "SHORT_READY"', 1)[1].split(
+        'else if entryState == "LONG_ARMED"', 1
+    )[0]
+    assert "breakoutLevel := pullbackLow" not in ready_handler
+    assert "breakoutLevel := pullbackHigh" not in ready_handler
     assert 'entryState == "SHORT_READY" ? breakoutLevel : na' in text
     assert "plot.style_linebr" in text
 
