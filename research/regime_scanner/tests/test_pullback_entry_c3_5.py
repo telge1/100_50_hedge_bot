@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-import numpy as np
+import re
+from pathlib import Path
+
 import pandas as pd
 
 from research.regime_scanner.pullback_entry_c3_5 import (
@@ -17,6 +19,12 @@ from research.regime_scanner.pullback_entry_c3_5 import (
     _zone_reached_short,
     _zone_reached_long,
 )
+from research.regime_scanner.pullback_entry_c3_5_pine import (
+    MAIN_PINE,
+    build_pullback_entry_pine,
+    write_pullback_entry_pine,
+)
+from research.regime_scanner.trend_pine_export import AUDIT_ANCHOR_PLOT, validate_pine_script
 
 
 def _bar(
@@ -359,3 +367,139 @@ def test_arm_signal_types() -> None:
 def test_30m_confirmed_not_required_for_default_a1() -> None:
     cfg = PullbackEntryConfig(name="A1", mtf_mode="none")
     assert cfg.mtf_mode == "none"
+
+
+def test_pine_v6_header_and_indicator_block() -> None:
+    text = build_pullback_entry_pine()
+    lines = text.splitlines()
+    assert lines[0] == "//@version=6"
+    assert lines[1] == "indicator("
+    assert lines[6] == ")"
+    assert lines[8] == AUDIT_ANCHOR_PLOT
+    validate_pine_script(text)
+    assert text.count(AUDIT_ANCHOR_PLOT) == 1
+
+
+def test_pine_audit_anchor_immediately_after_indicator() -> None:
+    text = build_pullback_entry_pine()
+    end = text.index(")\n", text.index("indicator("))
+    after = text[end + 2 :].lstrip("\n")
+    assert after.startswith(AUDIT_ANCHOR_PLOT)
+
+
+def test_pine_labels_only_on_state_edges() -> None:
+    text = build_pullback_entry_pine()
+    assert "shortArmEdge" in text and "longArmEdge" in text
+    assert "shortPbEdge" in text and "shortReadyEdge" in text
+    assert "label.new" in text
+    # Must not label every active READY/ARMED bar
+    assert "entryState == \"SHORT_ARMED\"" in text or 'entryState == "SHORT_ARMED"' in text
+    assert not re.search(r'label\.new\([^\n]*entryState == "SHORT_READY"[^\n]*\)', text)
+    assert "SHORT TRIGGER" in text and "SHORT ENTRY" in text
+    assert "LONG TRIGGER" in text and "LONG ENTRY" in text
+    assert "S ARM" in text and "L ARM" in text
+    assert "S PB" in text and "L READY" in text
+    assert "S X" in text and "L X" in text
+
+
+def test_pine_trigger_and_fill_bars_separated() -> None:
+    text = build_pullback_entry_pine()
+    assert "pendingFillShort" in text and "pendingFillLong" in text
+    assert "fillShortNow = pendingFillShort" in text
+    assert "SHORT TRIGGER" in text
+    assert "SHORT ENTRY" in text
+    assert text.index("SHORT TRIGGER") != text.index("SHORT ENTRY")
+
+
+def test_pine_frozen_breakout_level_not_updated_on_ready() -> None:
+    text = build_pullback_entry_pine()
+    assert "breakoutLevel := pullbackLow" in text
+    assert "breakoutLevel := pullbackHigh" in text
+    # Freeze once at READY; never retie to live pullback extremes while READY.
+    ready_short = text.split('entryState == "SHORT_READY"', 1)[1].split('entryState == "LONG_ARMED"', 1)[0]
+    assert "breakoutLevel := pullbackLow" not in ready_short
+    assert "breakoutLevel := pullbackHigh" not in ready_short
+    assert 'entryState == "SHORT_READY" ? breakoutLevel : na' in text
+    assert "plot.style_linebr" in text
+
+
+def test_pine_ema_optional_and_debug_data_window() -> None:
+    text = build_pullback_entry_pine()
+    assert 'showEmaZone = input.bool(true' in text
+    assert 'showEma50 = input.bool(false' in text
+    assert "display.data_window" in text
+    assert "plot(showDebug ? setupAge" in text
+    # No visible age/bar_index chart plots
+    assert 'plot(setupAge' not in text.replace("plot(showDebug ? setupAge", "")
+    assert "plot(bar_index" not in text
+
+
+def test_pine_no_line_new_no_lookahead() -> None:
+    text = build_pullback_entry_pine()
+    assert "line.new(" not in text
+    assert "lookahead_on" not in text
+    assert "lookahead=barmerge.lookahead_off" in text
+    assert "ta.ema(close, 9)[1]" in text
+    assert "ta.ema(close, 20)[1]" in text
+
+
+def test_pine_variants_and_arming_selectable() -> None:
+    text = build_pullback_entry_pine()
+    assert 'options=["A0", "A1", "A6", "A9"]' in text
+    assert "external_bos" in text and "internal_bos" in text and "choch" in text
+    assert "structure_plus_protected" in text
+    assert "isA0" in text and "requireAtrAntiChase" in text and "useMtfGates" in text
+
+
+def test_pine_long_short_mirrored_and_invalidation_reason() -> None:
+    text = build_pullback_entry_pine()
+    for s, l in [
+        ("SHORT_ARMED", "LONG_ARMED"),
+        ("SHORT_PULLBACK", "LONG_PULLBACK"),
+        ("SHORT_READY", "LONG_READY"),
+        ("shortInvEdge", "longInvEdge"),
+    ]:
+        assert s in text and l in text
+    assert "lastInvReason" in text
+    assert 'showInvalidationLabels = input.bool(false' in text
+    assert "setup_timeout" in text
+    assert "structure_flipped" in text
+
+
+def test_pine_default_readable_and_export_deterministic(tmp_path: Path) -> None:
+    t1 = build_pullback_entry_pine()
+    t2 = build_pullback_entry_pine()
+    assert t1 == t2
+    meta = write_pullback_entry_pine(tmp_path)
+    path = Path(meta["path"])
+    assert path.name == MAIN_PINE
+    assert path.read_text(encoding="utf-8") == t1
+    assert 'variant = input.string("A6"' in t1
+    assert 'showInvalidationLabels = input.bool(false' in t1
+
+
+def test_pine_expected_labels_fill_is_next_bar() -> None:
+    cfg = PullbackEntryConfig(name="A0", direct_entry=True)
+    rows = [_bar(i, o=100 - i, h=101 - i, l=99 - i, c=100 - i) for i in range(5)]
+    rows[0]["arm_edge_external_bear"] = True
+    frame = pd.DataFrame(rows)
+    timeline, entries = apply_pullback_entry(frame, cfg)
+    assert entries
+    bi = int(entries[0]["bar_index"])
+    assert bool(timeline.iloc[bi]["entry_signal"]) is True
+    assert abs(float(entries[0]["entry_price"]) - float(frame.iloc[bi + 1]["open"])) < 1e-9
+    from research.regime_scanner.pullback_entry_c3_5_pine import export_pine_expected_event_labels
+
+    fill_i = bi + 1
+    assert fill_i < len(frame)
+    assert float(frame.iloc[fill_i]["open"]) == float(entries[0]["entry_price"])
+    assert callable(export_pine_expected_event_labels)
+
+
+def test_pine_mtf_closed_bars_only() -> None:
+    text = build_pullback_entry_pine()
+    secs = [ln for ln in text.splitlines() if ln.strip().startswith("m15Ema") or ln.strip().startswith("m30Ema") or ("request.security(" in ln and not ln.strip().startswith("//"))]
+    assert len(secs) >= 4
+    for ln in secs:
+        assert "lookahead=barmerge.lookahead_off" in ln
+        assert "[1]" in ln
