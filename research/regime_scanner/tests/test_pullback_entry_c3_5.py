@@ -497,6 +497,75 @@ def test_diagnostics_pine_terminal_labels() -> None:
     assert "lookahead_on" not in text
 
 
+def test_pine_confirm_on_bar_close_gates_mutations() -> None:
+    text = build_pullback_entry_pine()
+    assert 'confirmOnBarClose = input.bool(true, "Confirm all events on bar close")' in text
+    assert "canCommit = not confirmOnBarClose or barstate.isconfirmed" in text
+    assert text.count("if canCommit") >= 2
+    # Event labels require canCommit; fill labels must remain open-bar capable
+    assert "inFocus and canCommit and showArmingLabels and shortArmEdge" in text
+    assert "inFocus and canCommit and showEntryLabels and shortTriggerNow" in text
+    assert "inFocus and showEntryLabels and fillShortNow" in text
+    assert "inFocus and canCommit and showEntryLabels and fillShortNow" not in text
+    # Default mode must not emit provisional labels
+    assert "showRealtimeDebug" in text
+    assert "provBrokeShort" in text
+    assert "showRealtimeDebug and not canCommit" in text
+
+
+def test_pine_a9_timeframe_guard() -> None:
+    text = build_pullback_entry_pine()
+    assert "a9Unsupported" in text
+    assert "mtfSupported" in text
+    assert "useMtfGates = mtfSupported" in text
+    assert "UNSUPPORTED on this TF" in text
+    assert "A9 unsupported on this chart TF" in text
+    assert "lookahead_on" not in text
+    assert "lookahead=barmerge.lookahead_off" in text
+
+
+def test_breakout_reject_keeps_ready_documented() -> None:
+    """Filter reject rejects the attempt only; READY stays open (no semantic change)."""
+    cfg = PullbackEntryConfig(
+        name="rej",
+        direct_entry=False,
+        rejection_mode="ema_rejection",
+        require_lower_high=False,
+        require_ema_direction=True,
+        require_ema_slope=False,
+        require_adx_di=False,
+        require_atr_anti_chase=False,
+        max_age_bars=48,
+    )
+    rows = [_bar(i, o=100, h=100.5, l=99.8, c=100.1, ema9=100.2, ema20=100.8) for i in range(6)]
+    rows[0].update(arm_edge_external_bear=True, high=100.5, low=99.5, close=100)
+    rows[1].update(high=100.5)
+    rows[2].update(open=100.4, high=100.6, low=99.5, close=99.6)
+    pb = 99.5
+    # Breakout close below PB low but EMA direction fails (ema9 above ema20 / close above ema20)
+    rows[3].update(
+        open=99.4,
+        high=99.5,
+        low=pb - 0.3,
+        close=pb - 0.2,
+        ema9=101.0,
+        ema20=100.0,
+        ema9_below_ema20=False,
+        ema9_above_ema20=True,
+    )
+    frame = pd.DataFrame(rows)
+    rt = SetupRuntime()
+    for i, row in frame.iterrows():
+        rt, d = step_pullback_entry(rt, row.to_dict(), cfg=cfg, next_open=98.0)
+        if i == 2:
+            assert rt.state == "SHORT_READY"
+        if i == 3:
+            assert rt.state == "SHORT_READY"
+            assert d["entry_signal"] is False
+            assert "break_rejected" in str(d.get("events"))
+            assert rt.breakout_level is not None
+
+
 def test_pine_v6_header_and_indicator_block() -> None:
     text = build_pullback_entry_pine()
     lines = text.splitlines()

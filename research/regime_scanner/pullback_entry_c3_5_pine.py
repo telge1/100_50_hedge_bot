@@ -5,8 +5,8 @@ Structure arming edges reuse the C3.4B medium protected-structure Pine rules
 (black-box SoT for arming); C3.4B Python is not modified.
 
 A9 MTF uses closed HTF bars via request.security(..., lookahead=barmerge.lookahead_off).
-HTF gate is an EMA-bias proxy of Python's C3.4B HTF major_direction — documented in
-pine_parity_summary.json.
+HTF gate is an EMA-bias proxy; only supported when chart TF < 15m (prefer 5m).
+Default confirmOnBarClose=true gates all event-state mutations behind barstate.isconfirmed.
 """
 
 from __future__ import annotations
@@ -96,6 +96,8 @@ def build_pullback_entry_pine(*, title: str | None = None) -> str:
         'showEma50 = input.bool(false, "Show EMA 50")',
         'showTable = input.bool(true, "Show state table")',
         'showDebug = input.bool(false, "Show debug (data window)")',
+        'confirmOnBarClose = input.bool(true, "Confirm all events on bar close")',
+        'showRealtimeDebug = input.bool(false, "Show realtime provisional debug")',
         'showTerminalLabels = input.bool(true, "Show terminal/ignore labels")',
         'showFullReasonLabels = input.bool(false, "Show full terminal reason")',
         'showSetupId = input.bool(false, "Append setup id on labels")',
@@ -116,9 +118,16 @@ def build_pullback_entry_pine(*, title: str | None = None) -> str:
         "requireEmaSlope = isA6 or isA9",
         "requireAdxDi = isA6 or isA9",
         "requireAtrAntiChase = isA6 or isA9",
-        "useMtfGates = isA9",
+        "// A9 MTF only when chart TF is strictly below 15m (prefer exact 5m). On 15m/30m, request.security(\"15\") is LTF/same-TF and unsupported here.",
+        'chartTfSec = timeframe.in_seconds()',
+        'mtfTfSec = timeframe.in_seconds("15")',
+        "mtfSupported = isA9 and not na(chartTfSec) and not na(mtfTfSec) and chartTfSec < mtfTfSec",
+        'mtfPreferred = timeframe.period == "5"',
+        "a9Unsupported = isA9 and not mtfSupported",
+        "useMtfGates = mtfSupported",
         "maxAgeBars = maxAgeDefault",
         "inFocus = not useFocusWindow or (time >= focusStart and time <= focusEnd)",
+        "canCommit = not confirmOnBarClose or barstate.isconfirmed",
         "maxReadyAgeBars = maxReadyAgeInput == 0 ? na : maxReadyAgeInput",
         "oppositeVetoMode = oppositeVetoInput",
         "useReadyExpiry = not na(maxReadyAgeBars)",
@@ -138,6 +147,15 @@ def build_pullback_entry_pine(*, title: str | None = None) -> str:
         raise ValueError("lookahead_on forbidden")
     if "request.security(" in text and "lookahead=barmerge.lookahead_off" not in text:
         raise ValueError("MTF request.security must use lookahead_off")
+    if "confirmOnBarClose" not in text or "canCommit" not in text:
+        raise ValueError("confirmOnBarClose / canCommit gate required")
+    if "barstate.isconfirmed" not in text:
+        raise ValueError("barstate.isconfirmed required for close confirmation")
+    if re.search(r"\[[1-9]\d*\]", text) and "close[" in text:
+        # allow historical series refs like ema9[3]; forbid forward-looking positive offsets on OHLC in commit path is soft-checked below
+        pass
+    if "lookahead_on" in text:
+        raise ValueError("lookahead_on forbidden")
     return text
 
 

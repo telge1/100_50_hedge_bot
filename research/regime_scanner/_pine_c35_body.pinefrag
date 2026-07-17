@@ -52,246 +52,250 @@ var int stateAge = 0
 var bool newMicroHigh = false
 var bool newMicroLow = false
 
-newMicroHigh := false
-newMicroLow := false
+// Event-state commit gate: with confirmOnBarClose, mutate only on barstate.isconfirmed.
+// EMA/ATR/ADX above remain live; historical bars are always confirmed.
+if canCommit
+    newMicroHigh := false
+    newMicroLow := false
 
-if not na(ph) and validHighSource
-    alreadyH = not na(lastConfHighSrc) and extHighBar == lastConfHighSrc
-    if not alreadyH
-        if na(pendingHigh) or extHighBar != pendingHighBar or ph >= pendingHigh
-            pendingHigh := ph
-            pendingHighBar := extHighBar
-if not na(pl) and validLowSource
-    alreadyL = not na(lastConfLowSrc) and extLowBar == lastConfLowSrc
-    if not alreadyL
-        if na(pendingLow) or extLowBar != pendingLowBar or pl <= pendingLow
-            pendingLow := pl
-            pendingLowBar := extLowBar
+    if not na(ph) and validHighSource
+        alreadyH = not na(lastConfHighSrc) and extHighBar == lastConfHighSrc
+        if not alreadyH
+            if na(pendingHigh) or extHighBar != pendingHighBar or ph >= pendingHigh
+                pendingHigh := ph
+                pendingHighBar := extHighBar
+    if not na(pl) and validLowSource
+        alreadyL = not na(lastConfLowSrc) and extLowBar == lastConfLowSrc
+        if not alreadyL
+            if na(pendingLow) or extLowBar != pendingLowBar or pl <= pendingLow
+                pendingLow := pl
+                pendingLowBar := extLowBar
 
-if not na(pendingHigh) and not na(pendingHighBar)
-    delayH = bar_index - pendingHighBar
-    revH = (pendingHigh - close) / safeAtr
-    if delayH >= confirmBars and revH >= minRevAtr
-        if not na(lastConfHighSrc) and pendingHighBar == lastConfHighSrc
-            pendingHigh := na
-            pendingHighBar := na
-        else if not na(lastMicroHighConfBar) and bar_index - lastMicroHighConfBar < microMinBars
-            pendingHigh := na
-            pendingHighBar := na
-        else
-            lastMicroHigh := pendingHigh
-            lastMicroHighConfBar := bar_index
-            lastConfHighSrc := pendingHighBar
-            newMicroHigh := true
-            if na(protectedHigh) and majorDir <= 0
-                protectedHigh := pendingHigh
-                lastExtHigh := pendingHigh
-            else if majorDir < 0
-                if candLeg != "high" or na(candHigh) or pendingHigh > candHigh
-                    candHigh := pendingHigh
-                    candLeg := "high"
-            pendingHigh := na
-            pendingHighBar := na
+    if not na(pendingHigh) and not na(pendingHighBar)
+        delayH = bar_index - pendingHighBar
+        revH = (pendingHigh - close) / safeAtr
+        if delayH >= confirmBars and revH >= minRevAtr
+            if not na(lastConfHighSrc) and pendingHighBar == lastConfHighSrc
+                pendingHigh := na
+                pendingHighBar := na
+            else if not na(lastMicroHighConfBar) and bar_index - lastMicroHighConfBar < microMinBars
+                pendingHigh := na
+                pendingHighBar := na
+            else
+                lastMicroHigh := pendingHigh
+                lastMicroHighConfBar := bar_index
+                lastConfHighSrc := pendingHighBar
+                newMicroHigh := true
+                if na(protectedHigh) and majorDir <= 0
+                    protectedHigh := pendingHigh
+                    lastExtHigh := pendingHigh
+                else if majorDir < 0
+                    if candLeg != "high" or na(candHigh) or pendingHigh > candHigh
+                        candHigh := pendingHigh
+                        candLeg := "high"
+                pendingHigh := na
+                pendingHighBar := na
 
-if not na(pendingLow) and not na(pendingLowBar)
-    delayL = bar_index - pendingLowBar
-    revL = (close - pendingLow) / safeAtr
-    if delayL >= confirmBars and revL >= minRevAtr
-        if not na(lastConfLowSrc) and pendingLowBar == lastConfLowSrc
-            pendingLow := na
-            pendingLowBar := na
-        else if not na(lastMicroLowConfBar) and bar_index - lastMicroLowConfBar < microMinBars
-            pendingLow := na
-            pendingLowBar := na
-        else
-            lastMicroLow := pendingLow
-            lastMicroLowConfBar := bar_index
-            lastConfLowSrc := pendingLowBar
-            newMicroLow := true
-            if na(protectedLow) and majorDir >= 0
-                protectedLow := pendingLow
-                lastExtLow := pendingLow
-            else if majorDir > 0
-                if candLeg != "low" or na(candLow) or pendingLow < candLow
-                    candLow := pendingLow
-                    candLeg := "low"
-            pendingLow := na
-            pendingLowBar := na
+    if not na(pendingLow) and not na(pendingLowBar)
+        delayL = bar_index - pendingLowBar
+        revL = (close - pendingLow) / safeAtr
+        if delayL >= confirmBars and revL >= minRevAtr
+            if not na(lastConfLowSrc) and pendingLowBar == lastConfLowSrc
+                pendingLow := na
+                pendingLowBar := na
+            else if not na(lastMicroLowConfBar) and bar_index - lastMicroLowConfBar < microMinBars
+                pendingLow := na
+                pendingLowBar := na
+            else
+                lastMicroLow := pendingLow
+                lastMicroLowConfBar := bar_index
+                lastConfLowSrc := pendingLowBar
+                newMicroLow := true
+                if na(protectedLow) and majorDir >= 0
+                    protectedLow := pendingLow
+                    lastExtLow := pendingLow
+                else if majorDir > 0
+                    if candLeg != "low" or na(candLow) or pendingLow < candLow
+                        candLow := pendingLow
+                        candLeg := "low"
+                pendingLow := na
+                pendingLowBar := na
 
-if majorDir >= 0 and candLeg == "high"
-    candHigh := na
-    candLeg := "none"
-if majorDir <= 0 and candLeg == "low"
-    candLow := na
-    candLeg := "none"
-
-if majorDir < 0 and newMicroLow and not na(candHigh)
-    isLL = na(lastExtLow) or lastMicroLow < lastExtLow
-    if isLL
-        protectedHigh := candHigh
-        lastExtLow := lastMicroLow
+    if majorDir >= 0 and candLeg == "high"
         candHigh := na
         candLeg := "none"
-if majorDir > 0 and newMicroHigh and not na(candLow)
-    isHH = na(lastExtHigh) or lastMicroHigh > lastExtHigh
-    if isHH
-        protectedLow := candLow
-        lastExtHigh := lastMicroHigh
+    if majorDir <= 0 and candLeg == "low"
         candLow := na
         candLeg := "none"
 
-extLevel = majorDir < 0 ? protectedHigh : majorDir > 0 ? protectedLow : na
-distExt = na(extLevel) ? na : majorDir < 0 ? (extLevel - close) / safeAtr : (close - extLevel) / safeAtr
-wickUp = not na(protectedHigh) and high > protectedHigh
-wickDown = not na(protectedLow) and low < protectedLow
-closeUp = not na(protectedHigh) and close > protectedHigh + minBeyond * safeAtr
-closeDown = not na(protectedLow) and close < protectedLow - minBeyond * safeAtr
-upStreak := closeUp ? upStreak + 1 : 0
-downStreak := closeDown ? downStreak + 1 : 0
-extUp = majorDir < 0 and upStreak >= reqCloses
-extDown = majorDir > 0 and downStreak >= reqCloses
-intUp = not na(lastMicroHigh) and close > lastMicroHigh and (na(protectedHigh) or close <= protectedHigh)
-intDown = not na(lastMicroLow) and close < lastMicroLow and (na(protectedLow) or close >= protectedLow)
-zoneActive = not na(distExt) and distExt >= 0 and distExt <= zoneAtr and not extUp and not extDown
+    if majorDir < 0 and newMicroLow and not na(candHigh)
+        isLL = na(lastExtLow) or lastMicroLow < lastExtLow
+        if isLL
+            protectedHigh := candHigh
+            lastExtLow := lastMicroLow
+            candHigh := na
+            candLeg := "none"
+    if majorDir > 0 and newMicroHigh and not na(candLow)
+        isHH = na(lastExtHigh) or lastMicroHigh > lastExtHigh
+        if isHH
+            protectedLow := candLow
+            lastExtHigh := lastMicroHigh
+            candLow := na
+            candLeg := "none"
 
-prevStruct := structState
-stateAge := stateAge + 1
+    extLevel = majorDir < 0 ? protectedHigh : majorDir > 0 ? protectedLow : na
+    distExt = na(extLevel) ? na : majorDir < 0 ? (extLevel - close) / safeAtr : (close - extLevel) / safeAtr
+    wickUp = not na(protectedHigh) and high > protectedHigh
+    wickDown = not na(protectedLow) and low < protectedLow
+    closeUp = not na(protectedHigh) and close > protectedHigh + minBeyond * safeAtr
+    closeDown = not na(protectedLow) and close < protectedLow - minBeyond * safeAtr
+    upStreak := closeUp ? upStreak + 1 : 0
+    downStreak := closeDown ? downStreak + 1 : 0
+    extUp = majorDir < 0 and upStreak >= reqCloses
+    extDown = majorDir > 0 and downStreak >= reqCloses
+    intUp = not na(lastMicroHigh) and close > lastMicroHigh and (na(protectedHigh) or close <= protectedHigh)
+    intDown = not na(lastMicroLow) and close < lastMicroLow and (na(protectedLow) or close >= protectedLow)
+    zoneActive = not na(distExt) and distExt >= 0 and distExt <= zoneAtr and not extUp and not extDown
 
-if prevStruct == "bullish_choch" or prevStruct == "bullish_structure_candidate"
-    held = not na(protectedHigh) and close >= protectedHigh - retestTol * safeAtr
-    failed = not na(protectedHigh) and close < protectedHigh - retestTol * safeAtr and not closeUp
-    if failed and wickUp and not closeUp
-        structState := "bullish_break_failed"
-        majorDir := -1
-        reason := "bullish_choch_failed"
-        chochHold := 0
-    else if chochMode == "immediate"
-        structState := "bullish_structure"
-        majorDir := 1
-        reason := "choch_immediate"
-    else if chochMode == "hold"
-        if held
-            chochHold := chochHold + 1
-            if chochHold >= chochHoldBars
-                structState := "bullish_structure"
-                majorDir := 1
-                reason := "choch_hold_confirm"
-                chochHold := 0
-            else
-                structState := "bullish_structure_candidate"
-                reason := "choch_holding"
-        else
-            structState := "bullish_choch"
-            chochHold := 0
-    else
-        structState := "bullish_structure_candidate"
-        reason := "choch_await_confirm"
-else if prevStruct == "bearish_choch" or prevStruct == "bearish_structure_candidate"
-    held = not na(protectedLow) and close <= protectedLow + retestTol * safeAtr
-    failed = not na(protectedLow) and close > protectedLow + retestTol * safeAtr and not closeDown
-    if failed and wickDown and not closeDown
-        structState := "bearish_break_failed"
-        majorDir := 1
-        reason := "bearish_choch_failed"
-        chochHold := 0
-    else if chochMode == "immediate"
-        structState := "bearish_structure"
-        majorDir := -1
-        reason := "choch_immediate"
-    else if chochMode == "hold"
-        if held
-            chochHold := chochHold + 1
-            if chochHold >= chochHoldBars
-                structState := "bearish_structure"
-                majorDir := -1
-                reason := "choch_hold_confirm"
-                chochHold := 0
-            else
-                structState := "bearish_structure_candidate"
-                reason := "choch_holding"
-        else
-            structState := "bearish_choch"
-            chochHold := 0
-    else
-        structState := "bearish_structure_candidate"
-        reason := "choch_await_confirm"
-else if majorDir == 0
-    if na(protectedHigh) and na(protectedLow)
-        structState := "structure_unknown"
-        reason := "awaiting_levels"
-    else
-        structState := "range_unclear"
-        reason := "unclear"
-    if not na(lastExtHigh) and not na(lastExtLow) and not na(lastMicroHigh) and not na(lastMicroLow)
-        if lastMicroHigh < lastExtHigh and lastMicroLow < lastExtLow
+    prevStruct := structState
+    stateAge := stateAge + 1
+
+    if prevStruct == "bullish_choch" or prevStruct == "bullish_structure_candidate"
+        held = not na(protectedHigh) and close >= protectedHigh - retestTol * safeAtr
+        failed = not na(protectedHigh) and close < protectedHigh - retestTol * safeAtr and not closeUp
+        if failed and wickUp and not closeUp
+            structState := "bullish_break_failed"
             majorDir := -1
-        if lastMicroHigh > lastExtHigh and lastMicroLow > lastExtLow
-            majorDir := 1
-else if majorDir < 0
-    if extUp
-        if chochMode == "immediate"
+            reason := "bullish_choch_failed"
+            chochHold := 0
+        else if chochMode == "immediate"
             structState := "bullish_structure"
             majorDir := 1
-            reason := "external_bos_immediate"
+            reason := "choch_immediate"
+        else if chochMode == "hold"
+            if held
+                chochHold := chochHold + 1
+                if chochHold >= chochHoldBars
+                    structState := "bullish_structure"
+                    majorDir := 1
+                    reason := "choch_hold_confirm"
+                    chochHold := 0
+                else
+                    structState := "bullish_structure_candidate"
+                    reason := "choch_holding"
+            else
+                structState := "bullish_choch"
+                chochHold := 0
         else
-            structState := "bullish_choch"
-            reason := "external_bos_up"
+            structState := "bullish_structure_candidate"
+            reason := "choch_await_confirm"
+    else if prevStruct == "bearish_choch" or prevStruct == "bearish_structure_candidate"
+        held = not na(protectedLow) and close <= protectedLow + retestTol * safeAtr
+        failed = not na(protectedLow) and close > protectedLow + retestTol * safeAtr and not closeDown
+        if failed and wickDown and not closeDown
+            structState := "bearish_break_failed"
+            majorDir := 1
+            reason := "bearish_choch_failed"
             chochHold := 0
-    else if zoneActive
-        structState := "transition_blocked"
-        reason := "near_protected_high"
-    else if intUp
-        structState := "bullish_internal_break"
-        reason := "internal_bos_up"
-    else
-        structState := "bearish_structure"
-        reason := "hold_bearish_protected"
-else
-    if extDown
-        if chochMode == "immediate"
+        else if chochMode == "immediate"
             structState := "bearish_structure"
             majorDir := -1
-            reason := "external_bos_immediate"
+            reason := "choch_immediate"
+        else if chochMode == "hold"
+            if held
+                chochHold := chochHold + 1
+                if chochHold >= chochHoldBars
+                    structState := "bearish_structure"
+                    majorDir := -1
+                    reason := "choch_hold_confirm"
+                    chochHold := 0
+                else
+                    structState := "bearish_structure_candidate"
+                    reason := "choch_holding"
+            else
+                structState := "bearish_choch"
+                chochHold := 0
         else
-            structState := "bearish_choch"
-            reason := "external_bos_down"
-            chochHold := 0
-    else if zoneActive
-        structState := "transition_blocked"
-        reason := "near_protected_low"
-    else if intDown
-        structState := "bearish_internal_break"
-        reason := "internal_bos_down"
+            structState := "bearish_structure_candidate"
+            reason := "choch_await_confirm"
+    else if majorDir == 0
+        if na(protectedHigh) and na(protectedLow)
+            structState := "structure_unknown"
+            reason := "awaiting_levels"
+        else
+            structState := "range_unclear"
+            reason := "unclear"
+        if not na(lastExtHigh) and not na(lastExtLow) and not na(lastMicroHigh) and not na(lastMicroLow)
+            if lastMicroHigh < lastExtHigh and lastMicroLow < lastExtLow
+                majorDir := -1
+            if lastMicroHigh > lastExtHigh and lastMicroLow > lastExtLow
+                majorDir := 1
+    else if majorDir < 0
+        if extUp
+            if chochMode == "immediate"
+                structState := "bullish_structure"
+                majorDir := 1
+                reason := "external_bos_immediate"
+            else
+                structState := "bullish_choch"
+                reason := "external_bos_up"
+                chochHold := 0
+        else if zoneActive
+            structState := "transition_blocked"
+            reason := "near_protected_high"
+        else if intUp
+            structState := "bullish_internal_break"
+            reason := "internal_bos_up"
+        else
+            structState := "bearish_structure"
+            reason := "hold_bearish_protected"
     else
-        structState := "bullish_structure"
-        reason := "hold_bullish_protected"
+        if extDown
+            if chochMode == "immediate"
+                structState := "bearish_structure"
+                majorDir := -1
+                reason := "external_bos_immediate"
+            else
+                structState := "bearish_choch"
+                reason := "external_bos_down"
+                chochHold := 0
+        else if zoneActive
+            structState := "transition_blocked"
+            reason := "near_protected_low"
+        else if intDown
+            structState := "bearish_internal_break"
+            reason := "internal_bos_down"
+        else
+            structState := "bullish_structure"
+            reason := "hold_bullish_protected"
 
-if structState != prevStruct
-    stateAge := 1
+    if structState != prevStruct
+        stateAge := 1
 
-if majorDir != prevMajorDir
-    if majorDir < 0
+    if majorDir != prevMajorDir
+        if majorDir < 0
+            protectedLow := na
+            candLow := na
+            if candLeg == "low"
+                candLeg := "none"
+            if na(protectedHigh) and not na(lastMicroHigh)
+                protectedHigh := lastMicroHigh
+                lastExtHigh := lastMicroHigh
+        if majorDir > 0
+            protectedHigh := na
+            candHigh := na
+            if candLeg == "high"
+                candLeg := "none"
+            if na(protectedLow) and not na(lastMicroLow)
+                protectedLow := lastMicroLow
+                lastExtLow := lastMicroLow
+        prevMajorDir := majorDir
+
+    if majorDir < 0 and not na(protectedHigh) and not na(protectedLow) and protectedHigh <= protectedLow
         protectedLow := na
-        candLow := na
-        if candLeg == "low"
-            candLeg := "none"
-        if na(protectedHigh) and not na(lastMicroHigh)
-            protectedHigh := lastMicroHigh
-            lastExtHigh := lastMicroHigh
-    if majorDir > 0
+    if majorDir > 0 and not na(protectedHigh) and not na(protectedLow) and protectedHigh <= protectedLow
         protectedHigh := na
-        candHigh := na
-        if candLeg == "high"
-            candLeg := "none"
-        if na(protectedLow) and not na(lastMicroLow)
-            protectedLow := lastMicroLow
-            lastExtLow := lastMicroLow
-    prevMajorDir := majorDir
 
-if majorDir < 0 and not na(protectedHigh) and not na(protectedLow) and protectedHigh <= protectedLow
-    protectedLow := na
-if majorDir > 0 and not na(protectedHigh) and not na(protectedLow) and protectedHigh <= protectedLow
-    protectedHigh := na
 
 // --- Arming edges (rising) mirroring Python attach_structure_edges ---
 armExtBear = extDown and not extDown[1]
@@ -437,6 +441,16 @@ hlOk = na(priorSwingLow) or na(pullbackLow) ? true : pullbackLow > priorSwingLow
 rejShort = lhOk and (emaRejShort or wickRejShort or newMicroHigh)
 rejLong = hlOk and (emaRejLong or wickRejLong or newMicroLow)
 
+// Provisional (non-mutating) realtime hints — never drawn as labels unless showRealtimeDebug.
+provZoneShort = zoneShort
+provZoneLong = zoneLong
+provBrokeShort = entryState == "SHORT_READY" and not na(breakoutLevel) and close < breakoutLevel
+provBrokeLong = entryState == "LONG_READY" and not na(breakoutLevel) and close > breakoutLevel
+provArmShort = armShort
+provArmLong = armLong
+provInvShort = invShort
+provInvLong = invLong
+
 // Pending fill from prior trigger bar (research fill = this bar open)
 fillShortNow = pendingFillShort
 fillLongNow = pendingFillLong
@@ -449,414 +463,418 @@ if fillLongNow
     simFillPrice := open
     pendingFillLong := false
 
-if entryState != "IDLE"
-    setupAge := setupAge + 1
-if entryState == "SHORT_READY" or entryState == "LONG_READY"
-    readyAge := readyAge + 1
+// Entry / invalidation / opposite / ready-expiry mutations only when canCommit.
+// Fill markers above intentionally run on the next bar (open) without waiting for that bar close.
+if canCommit
+    if entryState != "IDLE"
+        setupAge := setupAge + 1
+    if entryState == "SHORT_READY" or entryState == "LONG_READY"
+        readyAge := readyAge + 1
 
-// Opposite arm (any opposite structure edge) while setup live
-oppArmNow = entrySide < 0 ? (armExtBull or armIntBull or armChochBull or armMajorBull or armStructProtBull) : entrySide > 0 ? (armExtBear or armIntBear or armChochBear or armMajorBear or armStructProtBear) : false
-if entryState != "IDLE" and oppArmNow and not oppositeArmSeen
-    oppositeArmSeen := true
-    oppositeArmBar := bar_index
-    oppositeArmType := armExtBull or armExtBear ? "external_bos" : armIntBull or armIntBear ? "internal_bos" : armChochBull or armChochBear ? "choch" : armMajorBull or armMajorBear ? "major_dir_change" : "structure_plus_protected"
+    // Opposite arm (any opposite structure edge) while setup live
+    oppArmNow = entrySide < 0 ? (armExtBull or armIntBull or armChochBull or armMajorBull or armStructProtBull) : entrySide > 0 ? (armExtBear or armIntBear or armChochBear or armMajorBear or armStructProtBear) : false
+    if entryState != "IDLE" and oppArmNow and not oppositeArmSeen
+        oppositeArmSeen := true
+        oppositeArmBar := bar_index
+        oppositeArmType := armExtBull or armExtBear ? "external_bos" : armIntBull or armIntBear ? "internal_bos" : armChochBull or armChochBear ? "choch" : armMajorBull or armMajorBear ? "major_dir_change" : "structure_plus_protected"
 
-// Ready expiry (R1+); R0 has useReadyExpiry=false
-if useReadyExpiry and (entryState == "SHORT_READY" or entryState == "LONG_READY") and readyAge > maxReadyAgeBars
-    lastTermOutcome := "ready_expired"
-    lastTermReason := "ready_expired"
-    lastTermBar := bar_index
-    lastTermDir := entrySide < 0 ? "short" : "long"
-    lastTermState := entryState
-    terminalTag := "READY_OLD"
-    terminalEdge := true
-    breakoutLevel := na
-    entryState := "IDLE"
-    entrySide := 0
-    armedPrice := na
-    pullbackHigh := na
-    pullbackLow := na
-    priorSwingHigh := na
-    priorSwingLow := na
-    setupAge := 0
-    readyAge := 0
-    armBarIndex := na
-    armTypeUsed := "-"
-    lhConfirmed := false
-    activeSetupId := na
-    oppositeArmSeen := false
-    oppositeArmBar := na
-    oppositeArmType := "-"
-
-oppVeto = oppositeVetoMode == "none" or not oppositeArmSeen or na(oppositeArmBar) ? false : oppositeVetoMode == "trigger_bar" ? oppositeArmBar == bar_index : oppositeVetoMode == "since_ready" ? (not na(rejectionBar) and oppositeArmBar >= rejectionBar and oppositeArmBar <= bar_index) : oppositeVetoMode == "lookback_1" ? bar_index - oppositeArmBar <= 1 : oppositeVetoMode == "lookback_2" ? bar_index - oppositeArmBar <= 2 : oppositeVetoMode == "lookback_3" ? bar_index - oppositeArmBar <= 3 : false
-
-if entryState == "IDLE"
-    if armShort
-        entryState := "SHORT_ARMED"
-        entrySide := -1
-        setupIdCounter := setupIdCounter + 1
-        activeSetupId := setupIdCounter
-        armedPrice := close
+    // Ready expiry (R1+); R0 has useReadyExpiry=false
+    if useReadyExpiry and (entryState == "SHORT_READY" or entryState == "LONG_READY") and readyAge > maxReadyAgeBars
+        lastTermOutcome := "ready_expired"
+        lastTermReason := "ready_expired"
+        lastTermBar := bar_index
+        lastTermDir := entrySide < 0 ? "short" : "long"
+        lastTermState := entryState
+        terminalTag := "READY_OLD"
+        terminalEdge := true
+        breakoutLevel := na
+        entryState := "IDLE"
+        entrySide := 0
+        armedPrice := na
+        pullbackHigh := na
+        pullbackLow := na
+        priorSwingHigh := na
+        priorSwingLow := na
         setupAge := 0
         readyAge := 0
-        rejectionBar := na
-        armBarIndex := bar_index
-        armTypeUsed := armingMode
+        armBarIndex := na
+        armTypeUsed := "-"
+        lhConfirmed := false
+        activeSetupId := na
         oppositeArmSeen := false
         oppositeArmBar := na
         oppositeArmType := "-"
-        priorSwingHigh := not na(lastMicroHigh) ? lastMicroHigh : high
-        priorSwingLow := lastMicroLow
-        shortArmEdge := true
-        if isA0
-            if emaFiltersShort and adxFiltersShort and atrOk and mtfOkShort
-                entryState := "SHORT_ENTERED"
-                lastEntryReason := "direct_structure_entry"
-                shortTriggerNow := true
-                lastTriggerBar := bar_index
-                lastTriggerLevel := close
-                pendingFillShort := true
-            else
-                lastInvReason := atrFailReason != "-" ? atrFailReason : mtfFailShort != "-" ? mtfFailShort : "direct_entry_filter_reject"
-                shortInvEdge := true
-                entryState := "IDLE"
-                entrySide := 0
-                armedPrice := na
-                pullbackHigh := na
-                pullbackLow := na
-                priorSwingHigh := na
-                priorSwingLow := na
-                breakoutLevel := na
-                setupAge := 0
-                armBarIndex := na
-                armTypeUsed := "-"
-                lhConfirmed := false
-    else if armLong
-        entryState := "LONG_ARMED"
-        entrySide := 1
-        setupIdCounter := setupIdCounter + 1
-        activeSetupId := setupIdCounter
-        armedPrice := close
-        setupAge := 0
-        readyAge := 0
-        rejectionBar := na
-        armBarIndex := bar_index
-        armTypeUsed := armingMode
-        oppositeArmSeen := false
-        oppositeArmBar := na
-        oppositeArmType := "-"
-        priorSwingLow := not na(lastMicroLow) ? lastMicroLow : low
-        priorSwingHigh := lastMicroHigh
-        longArmEdge := true
-        if isA0
-            if emaFiltersLong and adxFiltersLong and atrOk and mtfOkLong
-                entryState := "LONG_ENTERED"
-                lastEntryReason := "direct_structure_entry"
-                longTriggerNow := true
-                lastTriggerBar := bar_index
-                lastTriggerLevel := close
-                pendingFillLong := true
-            else
-                lastInvReason := atrFailReason != "-" ? atrFailReason : mtfFailLong != "-" ? mtfFailLong : "direct_entry_filter_reject"
-                longInvEdge := true
-                entryState := "IDLE"
-                entrySide := 0
-                armedPrice := na
-                pullbackHigh := na
-                pullbackLow := na
-                priorSwingHigh := na
-                priorSwingLow := na
-                breakoutLevel := na
-                setupAge := 0
-                armBarIndex := na
-                armTypeUsed := "-"
-                lhConfirmed := false
 
-else if entryState == "SHORT_ARMED"
-    if invShort
-        lastInvReason := invShortReason
-        shortInvEdge := true
-        terminalEdge := true
-        lastTermDir := "short"
-        lastTermBar := bar_index
-        lastTermReason := invShortReason
-        lastTermState := entryState
-        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else if usePullbackPath and zoneShort
-        entryState := "SHORT_PULLBACK"
-        pullbackHigh := high
-        pullbackLow := low
-        shortPbEdge := true
+    oppVeto = oppositeVetoMode == "none" or not oppositeArmSeen or na(oppositeArmBar) ? false : oppositeVetoMode == "trigger_bar" ? oppositeArmBar == bar_index : oppositeVetoMode == "since_ready" ? (not na(rejectionBar) and oppositeArmBar >= rejectionBar and oppositeArmBar <= bar_index) : oppositeVetoMode == "lookback_1" ? bar_index - oppositeArmBar <= 1 : oppositeVetoMode == "lookback_2" ? bar_index - oppositeArmBar <= 2 : oppositeVetoMode == "lookback_3" ? bar_index - oppositeArmBar <= 3 : false
 
-else if entryState == "SHORT_PULLBACK"
-    if invShort
-        lastInvReason := invShortReason
-        shortInvEdge := true
-        terminalEdge := true
-        lastTermDir := "short"
-        lastTermBar := bar_index
-        lastTermReason := invShortReason
-        lastTermState := entryState
-        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else
-        pullbackHigh := math.max(nz(pullbackHigh, high), high)
-        pullbackLow := math.min(nz(pullbackLow, low), low)
-        if rejShort
-            entryState := "SHORT_READY"
-            breakoutLevel := pullbackLow
-            rejectionBar := bar_index
+    if entryState == "IDLE"
+        if armShort
+            entryState := "SHORT_ARMED"
+            entrySide := -1
+            setupIdCounter := setupIdCounter + 1
+            activeSetupId := setupIdCounter
+            armedPrice := close
+            setupAge := 0
             readyAge := 0
-            lhConfirmed := lhOk
-            shortReadyEdge := true
+            rejectionBar := na
+            armBarIndex := bar_index
+            armTypeUsed := armingMode
+            oppositeArmSeen := false
+            oppositeArmBar := na
+            oppositeArmType := "-"
+            priorSwingHigh := not na(lastMicroHigh) ? lastMicroHigh : high
+            priorSwingLow := lastMicroLow
+            shortArmEdge := true
+            if isA0
+                if emaFiltersShort and adxFiltersShort and atrOk and mtfOkShort
+                    entryState := "SHORT_ENTERED"
+                    lastEntryReason := "direct_structure_entry"
+                    shortTriggerNow := true
+                    lastTriggerBar := bar_index
+                    lastTriggerLevel := close
+                    pendingFillShort := true
+                else
+                    lastInvReason := atrFailReason != "-" ? atrFailReason : mtfFailShort != "-" ? mtfFailShort : "direct_entry_filter_reject"
+                    shortInvEdge := true
+                    entryState := "IDLE"
+                    entrySide := 0
+                    armedPrice := na
+                    pullbackHigh := na
+                    pullbackLow := na
+                    priorSwingHigh := na
+                    priorSwingLow := na
+                    breakoutLevel := na
+                    setupAge := 0
+                    armBarIndex := na
+                    armTypeUsed := "-"
+                    lhConfirmed := false
+        else if armLong
+            entryState := "LONG_ARMED"
+            entrySide := 1
+            setupIdCounter := setupIdCounter + 1
+            activeSetupId := setupIdCounter
+            armedPrice := close
+            setupAge := 0
+            readyAge := 0
+            rejectionBar := na
+            armBarIndex := bar_index
+            armTypeUsed := armingMode
+            oppositeArmSeen := false
+            oppositeArmBar := na
+            oppositeArmType := "-"
+            priorSwingLow := not na(lastMicroLow) ? lastMicroLow : low
+            priorSwingHigh := lastMicroHigh
+            longArmEdge := true
+            if isA0
+                if emaFiltersLong and adxFiltersLong and atrOk and mtfOkLong
+                    entryState := "LONG_ENTERED"
+                    lastEntryReason := "direct_structure_entry"
+                    longTriggerNow := true
+                    lastTriggerBar := bar_index
+                    lastTriggerLevel := close
+                    pendingFillLong := true
+                else
+                    lastInvReason := atrFailReason != "-" ? atrFailReason : mtfFailLong != "-" ? mtfFailLong : "direct_entry_filter_reject"
+                    longInvEdge := true
+                    entryState := "IDLE"
+                    entrySide := 0
+                    armedPrice := na
+                    pullbackHigh := na
+                    pullbackLow := na
+                    priorSwingHigh := na
+                    priorSwingLow := na
+                    breakoutLevel := na
+                    setupAge := 0
+                    armBarIndex := na
+                    armTypeUsed := "-"
+                    lhConfirmed := false
 
-else if entryState == "SHORT_READY"
-    if invShort
-        lastInvReason := invShortReason
-        shortInvEdge := true
-        terminalEdge := true
-        lastTermDir := "short"
-        lastTermBar := bar_index
-        lastTermReason := invShortReason
-        lastTermState := entryState
-        lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else
-        brokeShort = (not na(breakoutLevel) and close < breakoutLevel) or armExtBear or armIntBear
-        if brokeShort
-            if not emaFiltersShort
-                rejectReason := "ema_filter"
-            else if not adxFiltersShort
-                rejectReason := "adx_filter"
-            else if not atrOk
-                rejectReason := atrFailReason
-                atrRejectEdge := true
-            else if not mtfOkShort
-                rejectReason := mtfFailShort
-            else if oppVeto
-                lastTermOutcome := "superseded_by_opposite"
-                lastTermReason := "opposite_veto:" + oppositeVetoMode
-                lastTermBar := bar_index
-                lastTermDir := "short"
-                lastTermState := "SHORT_READY"
-                terminalTag := "OPP"
-                terminalEdge := true
-                lastInvReason := lastTermReason
-                shortInvEdge := true
-                entryState := "IDLE"
-                entrySide := 0
-                armedPrice := na
-                pullbackHigh := na
-                pullbackLow := na
-                priorSwingHigh := na
-                priorSwingLow := na
-                breakoutLevel := na
-                setupAge := 0
-                readyAge := 0
-                armBarIndex := na
-                armTypeUsed := "-"
-                lhConfirmed := false
-                activeSetupId := na
-                oppositeArmSeen := false
-                oppositeArmBar := na
-                oppositeArmType := "-"
-            else
-                entryState := "SHORT_ENTERED"
-                lastEntryReason := not na(breakoutLevel) and close < breakoutLevel ? "break_pullback_low" : "bearish_bos_after_rejection"
-                shortTriggerNow := true
-                lastTriggerBar := bar_index
-                lastTriggerLevel := breakoutLevel
-                pendingFillShort := true
+    else if entryState == "SHORT_ARMED"
+        if invShort
+            lastInvReason := invShortReason
+            shortInvEdge := true
+            terminalEdge := true
+            lastTermDir := "short"
+            lastTermBar := bar_index
+            lastTermReason := invShortReason
+            lastTermState := entryState
+            lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
+        else if usePullbackPath and zoneShort
+            entryState := "SHORT_PULLBACK"
+            pullbackHigh := high
+            pullbackLow := low
+            shortPbEdge := true
+
+    else if entryState == "SHORT_PULLBACK"
+        if invShort
+            lastInvReason := invShortReason
+            shortInvEdge := true
+            terminalEdge := true
+            lastTermDir := "short"
+            lastTermBar := bar_index
+            lastTermReason := invShortReason
+            lastTermState := entryState
+            lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
         else
             pullbackHigh := math.max(nz(pullbackHigh, high), high)
             pullbackLow := math.min(nz(pullbackLow, low), low)
-
-else if entryState == "LONG_ARMED"
-    if invLong
-        lastInvReason := invLongReason
-        longInvEdge := true
-        terminalEdge := true
-        lastTermDir := "long"
-        lastTermBar := bar_index
-        lastTermReason := invLongReason
-        lastTermState := entryState
-        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else if usePullbackPath and zoneLong
-        entryState := "LONG_PULLBACK"
-        pullbackHigh := high
-        pullbackLow := low
-        longPbEdge := true
-
-else if entryState == "LONG_PULLBACK"
-    if invLong
-        lastInvReason := invLongReason
-        longInvEdge := true
-        terminalEdge := true
-        lastTermDir := "long"
-        lastTermBar := bar_index
-        lastTermReason := invLongReason
-        lastTermState := entryState
-        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else
-        pullbackHigh := math.max(nz(pullbackHigh, high), high)
-        pullbackLow := math.min(nz(pullbackLow, low), low)
-        if rejLong
-            entryState := "LONG_READY"
-            breakoutLevel := pullbackHigh
-            rejectionBar := bar_index
-            readyAge := 0
-            lhConfirmed := hlOk
-            longReadyEdge := true
-
-else if entryState == "LONG_READY"
-    if invLong
-        lastInvReason := invLongReason
-        longInvEdge := true
-        terminalEdge := true
-        lastTermDir := "long"
-        lastTermBar := bar_index
-        lastTermReason := invLongReason
-        lastTermState := entryState
-        lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
-        terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
-        entryState := "IDLE"
-        entrySide := 0
-        armedPrice := na
-        pullbackHigh := na
-        pullbackLow := na
-        priorSwingHigh := na
-        priorSwingLow := na
-        breakoutLevel := na
-        setupAge := 0
-        armBarIndex := na
-        armTypeUsed := "-"
-        lhConfirmed := false
-    else
-        brokeLong = (not na(breakoutLevel) and close > breakoutLevel) or armExtBull or armIntBull
-        if brokeLong
-            if not emaFiltersLong
-                rejectReason := "ema_filter"
-            else if not adxFiltersLong
-                rejectReason := "adx_filter"
-            else if not atrOk
-                rejectReason := atrFailReason
-                atrRejectEdge := true
-            else if not mtfOkLong
-                rejectReason := mtfFailLong
-            else if oppVeto
-                lastTermOutcome := "superseded_by_opposite"
-                lastTermReason := "opposite_veto:" + oppositeVetoMode
-                lastTermBar := bar_index
-                lastTermDir := "long"
-                lastTermState := "LONG_READY"
-                terminalTag := "OPP"
-                terminalEdge := true
-                lastInvReason := lastTermReason
-                longInvEdge := true
-                entryState := "IDLE"
-                entrySide := 0
-                armedPrice := na
-                pullbackHigh := na
-                pullbackLow := na
-                priorSwingHigh := na
-                priorSwingLow := na
-                breakoutLevel := na
-                setupAge := 0
+            if rejShort
+                entryState := "SHORT_READY"
+                breakoutLevel := pullbackLow
+                rejectionBar := bar_index
                 readyAge := 0
-                armBarIndex := na
-                armTypeUsed := "-"
-                lhConfirmed := false
-                activeSetupId := na
-                oppositeArmSeen := false
-                oppositeArmBar := na
-                oppositeArmType := "-"
-            else
-                entryState := "LONG_ENTERED"
-                lastEntryReason := not na(breakoutLevel) and close > breakoutLevel ? "break_pullback_high" : "bullish_bos_after_rejection"
-                longTriggerNow := true
-                lastTriggerBar := bar_index
-                lastTriggerLevel := breakoutLevel
-                pendingFillLong := true
-        else
-            pullbackLow := math.min(nz(pullbackLow, low), low)
-            pullbackHigh := math.max(nz(pullbackHigh, high), high)
+                lhConfirmed := lhOk
+                shortReadyEdge := true
 
-else if entryState == "SHORT_ENTERED" or entryState == "LONG_ENTERED"
-    entryState := "IDLE"
-    entrySide := 0
-    armedPrice := na
-    pullbackHigh := na
-    pullbackLow := na
-    priorSwingHigh := na
-    priorSwingLow := na
-    breakoutLevel := na
-    setupAge := 0
-    armBarIndex := na
-    armTypeUsed := "-"
-    lhConfirmed := false
+    else if entryState == "SHORT_READY"
+        if invShort
+            lastInvReason := invShortReason
+            shortInvEdge := true
+            terminalEdge := true
+            lastTermDir := "short"
+            lastTermBar := bar_index
+            lastTermReason := invShortReason
+            lastTermState := entryState
+            lastTermOutcome := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "never_reached_pullback" : entryState == "SHORT_PULLBACK" ? "never_reached_ready" : entryState == "SHORT_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invShortReason == "setup_timeout" ? (entryState == "SHORT_ARMED" ? "NO_PB" : entryState == "SHORT_PULLBACK" ? "NO_READY" : "NO_BREAK") : invShortReason == "structure_flipped" ? "FLIP" : invShortReason == "swing_high_broken" ? "HIGH" : invShortReason == "ema_reclaim" ? "X" : str.contains(invShortReason, "15m") or str.contains(invShortReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
+        else
+            brokeShort = (not na(breakoutLevel) and close < breakoutLevel) or armExtBear or armIntBear
+            if brokeShort
+                if not emaFiltersShort
+                    rejectReason := "ema_filter"
+                else if not adxFiltersShort
+                    rejectReason := "adx_filter"
+                else if not atrOk
+                    rejectReason := atrFailReason
+                    atrRejectEdge := true
+                else if not mtfOkShort
+                    rejectReason := mtfFailShort
+                else if oppVeto
+                    lastTermOutcome := "superseded_by_opposite"
+                    lastTermReason := "opposite_veto:" + oppositeVetoMode
+                    lastTermBar := bar_index
+                    lastTermDir := "short"
+                    lastTermState := "SHORT_READY"
+                    terminalTag := "OPP"
+                    terminalEdge := true
+                    lastInvReason := lastTermReason
+                    shortInvEdge := true
+                    entryState := "IDLE"
+                    entrySide := 0
+                    armedPrice := na
+                    pullbackHigh := na
+                    pullbackLow := na
+                    priorSwingHigh := na
+                    priorSwingLow := na
+                    breakoutLevel := na
+                    setupAge := 0
+                    readyAge := 0
+                    armBarIndex := na
+                    armTypeUsed := "-"
+                    lhConfirmed := false
+                    activeSetupId := na
+                    oppositeArmSeen := false
+                    oppositeArmBar := na
+                    oppositeArmType := "-"
+                else
+                    entryState := "SHORT_ENTERED"
+                    lastEntryReason := not na(breakoutLevel) and close < breakoutLevel ? "break_pullback_low" : "bearish_bos_after_rejection"
+                    shortTriggerNow := true
+                    lastTriggerBar := bar_index
+                    lastTriggerLevel := breakoutLevel
+                    pendingFillShort := true
+            else
+                pullbackHigh := math.max(nz(pullbackHigh, high), high)
+                pullbackLow := math.min(nz(pullbackLow, low), low)
+
+    else if entryState == "LONG_ARMED"
+        if invLong
+            lastInvReason := invLongReason
+            longInvEdge := true
+            terminalEdge := true
+            lastTermDir := "long"
+            lastTermBar := bar_index
+            lastTermReason := invLongReason
+            lastTermState := entryState
+            lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
+        else if usePullbackPath and zoneLong
+            entryState := "LONG_PULLBACK"
+            pullbackHigh := high
+            pullbackLow := low
+            longPbEdge := true
+
+    else if entryState == "LONG_PULLBACK"
+        if invLong
+            lastInvReason := invLongReason
+            longInvEdge := true
+            terminalEdge := true
+            lastTermDir := "long"
+            lastTermBar := bar_index
+            lastTermReason := invLongReason
+            lastTermState := entryState
+            lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
+        else
+            pullbackHigh := math.max(nz(pullbackHigh, high), high)
+            pullbackLow := math.min(nz(pullbackLow, low), low)
+            if rejLong
+                entryState := "LONG_READY"
+                breakoutLevel := pullbackHigh
+                rejectionBar := bar_index
+                readyAge := 0
+                lhConfirmed := hlOk
+                longReadyEdge := true
+
+    else if entryState == "LONG_READY"
+        if invLong
+            lastInvReason := invLongReason
+            longInvEdge := true
+            terminalEdge := true
+            lastTermDir := "long"
+            lastTermBar := bar_index
+            lastTermReason := invLongReason
+            lastTermState := entryState
+            lastTermOutcome := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "never_reached_pullback" : entryState == "LONG_PULLBACK" ? "never_reached_ready" : entryState == "LONG_READY" ? "no_breakout" : "timed_out") : "invalidated"
+            terminalTag := invLongReason == "setup_timeout" ? (entryState == "LONG_ARMED" ? "NO_PB" : entryState == "LONG_PULLBACK" ? "NO_READY" : "NO_BREAK") : invLongReason == "structure_flipped" ? "FLIP" : invLongReason == "swing_low_broken" ? "LOW" : invLongReason == "ema_reclaim" ? "X" : str.contains(invLongReason, "15m") or str.contains(invLongReason, "30m") ? "MTF" : "X"
+            entryState := "IDLE"
+            entrySide := 0
+            armedPrice := na
+            pullbackHigh := na
+            pullbackLow := na
+            priorSwingHigh := na
+            priorSwingLow := na
+            breakoutLevel := na
+            setupAge := 0
+            armBarIndex := na
+            armTypeUsed := "-"
+            lhConfirmed := false
+        else
+            brokeLong = (not na(breakoutLevel) and close > breakoutLevel) or armExtBull or armIntBull
+            if brokeLong
+                if not emaFiltersLong
+                    rejectReason := "ema_filter"
+                else if not adxFiltersLong
+                    rejectReason := "adx_filter"
+                else if not atrOk
+                    rejectReason := atrFailReason
+                    atrRejectEdge := true
+                else if not mtfOkLong
+                    rejectReason := mtfFailLong
+                else if oppVeto
+                    lastTermOutcome := "superseded_by_opposite"
+                    lastTermReason := "opposite_veto:" + oppositeVetoMode
+                    lastTermBar := bar_index
+                    lastTermDir := "long"
+                    lastTermState := "LONG_READY"
+                    terminalTag := "OPP"
+                    terminalEdge := true
+                    lastInvReason := lastTermReason
+                    longInvEdge := true
+                    entryState := "IDLE"
+                    entrySide := 0
+                    armedPrice := na
+                    pullbackHigh := na
+                    pullbackLow := na
+                    priorSwingHigh := na
+                    priorSwingLow := na
+                    breakoutLevel := na
+                    setupAge := 0
+                    readyAge := 0
+                    armBarIndex := na
+                    armTypeUsed := "-"
+                    lhConfirmed := false
+                    activeSetupId := na
+                    oppositeArmSeen := false
+                    oppositeArmBar := na
+                    oppositeArmType := "-"
+                else
+                    entryState := "LONG_ENTERED"
+                    lastEntryReason := not na(breakoutLevel) and close > breakoutLevel ? "break_pullback_high" : "bullish_bos_after_rejection"
+                    longTriggerNow := true
+                    lastTriggerBar := bar_index
+                    lastTriggerLevel := breakoutLevel
+                    pendingFillLong := true
+            else
+                pullbackLow := math.min(nz(pullbackLow, low), low)
+                pullbackHigh := math.max(nz(pullbackHigh, high), high)
+
+    else if entryState == "SHORT_ENTERED" or entryState == "LONG_ENTERED"
+        entryState := "IDLE"
+        entrySide := 0
+        armedPrice := na
+        pullbackHigh := na
+        pullbackLow := na
+        priorSwingHigh := na
+        priorSwingLow := na
+        breakoutLevel := na
+        setupAge := 0
+        armBarIndex := na
+        armTypeUsed := "-"
+        lhConfirmed := false
+
 
 shortBreakoutPlot = showBreakoutLevel and entryState == "SHORT_READY" ? breakoutLevel : na
 longBreakoutPlot = showBreakoutLevel and entryState == "LONG_READY" ? breakoutLevel : na
@@ -869,35 +887,35 @@ pEma20 = plot(showEmaZone ? ema20 : na, "EMA20", color=color.new(color.orange, 3
 plot(showEma50 ? ema50 : na, "EMA50", color=color.new(color.gray, 40), linewidth=1)
 fill(pEma9, pEma20, color=showEmaZone ? color.new(color.blue, 92) : na, title="EMA 9/20 band")
 
-if inFocus and showArmingLabels and shortArmEdge
+if inFocus and canCommit and showArmingLabels and shortArmEdge
     label.new(bar_index, high, "S ARM " + armTag, style=label.style_label_down, color=color.new(color.maroon, 20), textcolor=color.white, size=size.small)
-if inFocus and showArmingLabels and longArmEdge
+if inFocus and canCommit and showArmingLabels and longArmEdge
     label.new(bar_index, low, "L ARM " + armTag, style=label.style_label_up, color=color.new(color.teal, 20), textcolor=color.white, size=size.small)
-if inFocus and showPullbackLabels and shortPbEdge
+if inFocus and canCommit and showPullbackLabels and shortPbEdge
     label.new(bar_index, high, "S PB", style=label.style_label_down, color=color.new(color.orange, 30), textcolor=color.white, size=size.tiny)
-if inFocus and showPullbackLabels and longPbEdge
+if inFocus and canCommit and showPullbackLabels and longPbEdge
     label.new(bar_index, low, "L PB", style=label.style_label_up, color=color.new(color.orange, 30), textcolor=color.white, size=size.tiny)
-if inFocus and showReadyLabels and shortReadyEdge
+if inFocus and canCommit and showReadyLabels and shortReadyEdge
     label.new(bar_index, high, "S READY", style=label.style_label_down, color=color.new(color.purple, 20), textcolor=color.white, size=size.small)
-if inFocus and showReadyLabels and longReadyEdge
+if inFocus and canCommit and showReadyLabels and longReadyEdge
     label.new(bar_index, low, "L READY", style=label.style_label_up, color=color.new(color.purple, 20), textcolor=color.white, size=size.small)
-if inFocus and showEntryLabels and shortTriggerNow
+if inFocus and canCommit and showEntryLabels and shortTriggerNow
     label.new(bar_index, high, "SHORT TRIGGER", style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white, size=size.normal)
-if inFocus and showEntryLabels and longTriggerNow
+if inFocus and canCommit and showEntryLabels and longTriggerNow
     label.new(bar_index, low, "LONG TRIGGER", style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.normal)
 if inFocus and showEntryLabels and fillShortNow
     label.new(bar_index, open, "SHORT ENTRY", style=label.style_label_down, color=color.new(color.red, 40), textcolor=color.white, size=size.normal)
 if inFocus and showEntryLabels and fillLongNow
     label.new(bar_index, open, "LONG ENTRY", style=label.style_label_up, color=color.new(color.green, 40), textcolor=color.white, size=size.normal)
-if inFocus and showInvalidationLabels and shortInvEdge
+if inFocus and canCommit and showInvalidationLabels and shortInvEdge
     label.new(bar_index, high, "S X " + lastInvReason, style=label.style_label_down, color=color.new(color.gray, 10), textcolor=color.white, size=size.tiny)
-if inFocus and showInvalidationLabels and longInvEdge
+if inFocus and canCommit and showInvalidationLabels and longInvEdge
     label.new(bar_index, low, "L X " + lastInvReason, style=label.style_label_up, color=color.new(color.gray, 10), textcolor=color.white, size=size.tiny)
-if inFocus and showInvalidationLabels and atrRejectEdge
+if inFocus and canCommit and showInvalidationLabels and atrRejectEdge
     label.new(bar_index, high, "ATR reject " + rejectReason, style=label.style_label_down, color=color.new(color.olive, 20), textcolor=color.white, size=size.tiny)
 
-plotshape(inFocus and showEntryLabels and shortTriggerNow, title="Short trigger shape", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
-plotshape(inFocus and showEntryLabels and longTriggerNow, title="Long trigger shape", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny)
+plotshape(inFocus and canCommit and showEntryLabels and shortTriggerNow, title="Short trigger shape", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+plotshape(inFocus and canCommit and showEntryLabels and longTriggerNow, title="Long trigger shape", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny)
 
 plot(showDebug ? setupAge : na, "setup_age", display=display.data_window)
 plot(showDebug ? entrySide : na, "entry_side", display=display.data_window)
@@ -911,7 +929,7 @@ barsArmedToEntry = na(armBarIndex) or na(lastTriggerBar) ? na : lastTriggerBar -
 dirTxt = entrySide < 0 ? "short" : entrySide > 0 ? "long" : "none"
 antiChasePass = requireAtrAntiChase ? (atrOk ? "pass" : atrFailReason) : "n/a"
 
-var table diag = table.new(position.top_right, 2, 24, border_width=1)
+var table diag = table.new(position.top_right, 2, 27, border_width=1)
 if showTable and barstate.islast
     table.cell(diag, 0, 0, "Variant")
     table.cell(diag, 1, 0, variant)
@@ -962,15 +980,22 @@ if showTable and barstate.islast
     table.cell(diag, 0, 23, "Last entry reason")
     table.cell(diag, 1, 23, lastEntryReason)
 
+    table.cell(diag, 0, 24, "confirmOnClose")
+    table.cell(diag, 1, 24, str.tostring(confirmOnBarClose))
+    table.cell(diag, 0, 25, "canCommit")
+    table.cell(diag, 1, 25, str.tostring(canCommit))
+    table.cell(diag, 0, 26, "A9 MTF")
+    table.cell(diag, 1, 26, a9Unsupported ? "UNSUPPORTED on this TF" : (isA9 ? (mtfPreferred ? "ok (5m)" : "ok (<15m)") : "n/a"))
+
 
 // Setup span bgcolor (optional, focus-gated)
 bgcolor(inFocus and showSpan and (entryState == "SHORT_ARMED" or entryState == "LONG_ARMED") ? color.new(color.yellow, 92) : inFocus and showSpan and (entryState == "SHORT_PULLBACK" or entryState == "LONG_PULLBACK") ? color.new(color.orange, 92) : inFocus and showSpan and (entryState == "SHORT_READY" or entryState == "LONG_READY") ? color.new(color.purple, 92) : na)
 
 idSuffix = showSetupId and not na(activeSetupId) ? " #" + str.tostring(activeSetupId) : ""
 fullSuffix = showFullReasonLabels ? " " + lastTermReason : ""
-if inFocus and showTerminalLabels and terminalEdge and lastTermDir == "short"
+if inFocus and canCommit and showTerminalLabels and terminalEdge and lastTermDir == "short"
     label.new(bar_index, high, "S X " + terminalTag + idSuffix + fullSuffix, style=label.style_label_down, color=color.new(color.gray, 15), textcolor=color.white, size=size.tiny)
-if inFocus and showTerminalLabels and terminalEdge and lastTermDir == "long"
+if inFocus and canCommit and showTerminalLabels and terminalEdge and lastTermDir == "long"
     label.new(bar_index, low, "L X " + terminalTag + idSuffix + fullSuffix, style=label.style_label_up, color=color.new(color.gray, 15), textcolor=color.white, size=size.tiny)
 
 var table term = table.new(position.bottom_right, 2, 6, border_width=1)
@@ -987,5 +1012,21 @@ if showTable and barstate.islast
     table.cell(term, 1, 4, na(lastTermBar) ? "-" : str.tostring(lastTermBar))
     table.cell(term, 0, 5, "Last state before term")
     table.cell(term, 1, 5, lastTermState)
+
+
+// Realtime debug: provisional only (no state mutation, default off).
+plotshape(showRealtimeDebug and not canCommit and provArmShort, title="prov ARM short", style=shape.circle, location=location.abovebar, color=color.new(color.maroon, 70), size=size.tiny)
+plotshape(showRealtimeDebug and not canCommit and provArmLong, title="prov ARM long", style=shape.circle, location=location.belowbar, color=color.new(color.teal, 70), size=size.tiny)
+plotshape(showRealtimeDebug and not canCommit and provZoneShort and entryState == "SHORT_ARMED", title="prov PB short", style=shape.circle, location=location.abovebar, color=color.new(color.orange, 70), size=size.tiny)
+plotshape(showRealtimeDebug and not canCommit and provZoneLong and entryState == "LONG_ARMED", title="prov PB long", style=shape.circle, location=location.belowbar, color=color.new(color.orange, 70), size=size.tiny)
+plotshape(showRealtimeDebug and not canCommit and provBrokeShort, title="prov TRIG short", style=shape.circle, location=location.abovebar, color=color.new(color.red, 70), size=size.tiny)
+plotshape(showRealtimeDebug and not canCommit and provBrokeLong, title="prov TRIG long", style=shape.circle, location=location.belowbar, color=color.new(color.green, 70), size=size.tiny)
+plot(showRealtimeDebug ? (canCommit ? 1 : 0) : na, "canCommit", display=display.data_window)
+plot(showRealtimeDebug ? (provBrokeShort ? 1 : 0) : na, "prov_broke_short", display=display.data_window)
+plot(showDebug ? (canCommit ? 1 : 0) : na, "confirm_gate", display=display.data_window)
+
+
+if a9Unsupported and barstate.islast
+    label.new(bar_index, high, "A9 unsupported on this chart TF (need <15m, prefer 5m)", style=label.style_label_down, color=color.new(color.orange, 0), textcolor=color.black, size=size.normal)
 
 // EOF
