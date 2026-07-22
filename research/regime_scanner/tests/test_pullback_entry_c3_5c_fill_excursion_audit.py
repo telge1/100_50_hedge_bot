@@ -15,8 +15,11 @@ from research.regime_scanner.pullback_entry_c3_5c_fill_excursion_audit import (
     HORIZON_BARS,
     SL_LEVELS_PCT,
     TP_LEVELS_PCT,
+    adverse_before_tp_detail,
     analyze_fill_core,
+    classify_fill_blocker,
     classify_path,
+    entry_reclaim_after_adverse,
     fav_adv_from_bar,
     first_touch_level,
     path_arrays,
@@ -39,7 +42,9 @@ def test_output_path_and_guardrails() -> None:
     assert "production_sm_unchanged" in src
     assert len(TP_LEVELS_PCT) == 11
     assert len(SL_LEVELS_PCT) == 11
-    assert HORIZON_BARS[-1] == 192
+    assert HORIZON_BARS[-1] == 672
+    assert 12 in HORIZON_BARS and 24 in HORIZON_BARS and 48 in HORIZON_BARS
+    assert 96 in HORIZON_BARS and 192 in HORIZON_BARS and 672 in HORIZON_BARS
 
 
 def test_sm_and_pine_untouched() -> None:
@@ -141,7 +146,7 @@ def test_same_bar_tp_sl_ambiguous_conservative_optimistic() -> None:
         "exit_a_closed": False,
         "is_terminal_open_fill": True,
     }
-    panel, _h, _lv, ft, _seq = analyze_fill_core(
+    panel, _h, _lv, ft, _seq, _tp_h = analyze_fill_core(
         fill=fill,
         recon_row=recon,
         fills=[fill],
@@ -154,6 +159,7 @@ def test_same_bar_tp_sl_ambiguous_conservative_optimistic() -> None:
     row = next(r for r in ft if r["tp_level_pct"] == 1.0 and r["sl_level_pct"] == -1.0)
     assert row["both_same_bar"] is True
     assert row["intrabar_ambiguous"] is True
+    assert row["same_bar_ambiguous"] is True
     assert row["result_if_conservative"] == "SL"
     assert row["result_if_optimistic"] == "TP"
     assert panel["intrabar_order_unknown"] is True
@@ -238,7 +244,7 @@ def test_full_levels_present_in_matrix() -> None:
         "fill_timestamp": timestamps[0],
         "entry_price": 100.0,
     }
-    _p, _h, levels, ft, _s = analyze_fill_core(
+    _p, _h, levels, ft, _s, tp_h = analyze_fill_core(
         fill=fill,
         recon_row={"next_opposite_fill_index": None},
         fills=[fill],
@@ -250,6 +256,208 @@ def test_full_levels_present_in_matrix() -> None:
     )
     assert len(levels) == len(TP_LEVELS_PCT) + len(SL_LEVELS_PCT)
     assert len(ft) == len(TP_LEVELS_PCT) * len(SL_LEVELS_PCT)
+    assert len(tp_h) == len(HORIZON_BARS) * len(TP_LEVELS_PCT)
+    assert any(r.get("never_hit") is False for r in levels if r["level_type"] == "TP")
+
+
+def test_adverse_before_tp_incl_excl_and_never_hit_long() -> None:
+    # bar0 adverse -1%, bar1 TP 0.5% with high 100.6, low still 99.0
+    highs = np.array([100.0, 100.6, 101.0])
+    lows = np.array([99.0, 99.0, 100.0])
+    closes = np.array([99.5, 100.4, 100.8])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 2)
+    d = adverse_before_tp_detail(p, 0.5)
+    assert d["never_hit"] is False
+    assert d["tp_bar_offset"] == 1
+    assert abs(d["adverse_incl_tp_bar_pct"] - (-1.0)) < 1e-12
+    assert abs(d["adverse_excl_tp_bar_pct"] - (-1.0)) < 1e-12
+    d_miss = adverse_before_tp_detail(p, 5.0)
+    assert d_miss["never_hit"] is True
+    assert d_miss["adverse_incl_tp_bar_pct"] == d_miss["adverse_excl_tp_bar_pct"]
+
+
+def test_adverse_before_tp_short_mirror() -> None:
+    # Short: favorable via lows, adverse via highs
+    highs = np.array([101.0, 100.5, 99.0])
+    lows = np.array([100.0, 99.4, 98.5])
+    closes = np.array([100.5, 99.8, 98.8])
+    p = path_arrays(-1, 100.0, highs, lows, closes, 0, 2)
+    d = adverse_before_tp_detail(p, 0.5)
+    assert d["never_hit"] is False
+    assert d["adverse_incl_tp_bar_pct"] < 0
+
+
+def test_tp_immediate_no_prior_adverse() -> None:
+    highs = np.array([100.5, 101.0])
+    lows = np.array([100.0, 100.2])
+    closes = np.array([100.3, 100.8])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 1)
+    d = adverse_before_tp_detail(p, 0.25)
+    assert d["never_hit"] is False
+    assert d["tp_bar_offset"] == 0
+    assert d["adverse_excl_tp_bar_pct"] is None
+    # inclusive MAE on TP bar: low == entry → 0
+    assert abs(d["adverse_incl_tp_bar_pct"] - 0.0) < 1e-12
+
+
+def test_entry_reclaim_after_adverse_long() -> None:
+    highs = np.array([99.8, 99.9, 100.2, 100.5])
+    lows = np.array([98.5, 98.8, 99.5, 100.0])
+    closes = np.array([99.0, 99.2, 100.1, 100.3])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 3)
+    r = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert r["had_adverse_excursion"] is True
+    assert r["reclaimed_after_adverse"] is True
+    assert r["reclaim_bar_offset"] == 2
+    assert r["worst_adverse_before_reclaim_pct"] < 0
+
+
+def test_entry_reclaim_never_adverse_not_counted() -> None:
+    highs = np.array([100.5, 101.0, 101.5])
+    lows = np.array([100.0, 100.2, 100.5])
+    closes = np.array([100.2, 100.8, 101.0])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 2)
+    r = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert r["never_adverse"] is True
+    assert r["reclaimed_after_adverse"] is False
+    assert r["had_adverse_excursion"] is False
+
+
+def test_entry_reclaim_no_reclaim_within_window() -> None:
+    highs = np.array([99.5, 99.6, 99.7])
+    lows = np.array([98.0, 98.2, 98.5])
+    closes = np.array([99.0, 99.1, 99.2])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 2)
+    r = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert r["had_adverse_excursion"] is True
+    assert r["reclaimed_after_adverse"] is False
+    assert r["never_reclaim_within_window"] is True
+
+
+def test_entry_reclaim_short_mirror() -> None:
+    # Short adverse = price up; reclaim = low/close back to entry
+    highs = np.array([101.5, 101.0, 100.2])
+    lows = np.array([100.5, 100.2, 99.5])
+    closes = np.array([101.0, 100.5, 99.8])
+    p = path_arrays(-1, 100.0, highs, lows, closes, 0, 2)
+    r = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert r["had_adverse_excursion"] is True
+    assert r["reclaimed_after_adverse"] is True
+
+
+def test_blocker_fast_and_delayed_winner() -> None:
+    # 14 bars: TP 0.25 at bar 15 would be delayed; build path with early TP
+    highs = np.array([100.3] + [100.1] * 14)
+    lows = np.array([100.0] + [99.9] * 14)
+    closes = np.array([100.2] + [100.0] * 14)
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 14)
+    tp = {"reached": True, "bar_offset": 0}
+    reclaim = entry_reclaim_after_adverse(p, fill_bar=0)
+    b = classify_fill_blocker(p, tp_0_25=tp, reclaim=reclaim, truncated=False)
+    assert b["blocker_class"] == "fast_winner"
+    assert b["flag_fast_winner"] is True
+
+    tp_d = {"reached": True, "bar_offset": 12}
+    b2 = classify_fill_blocker(p, tp_0_25=tp_d, reclaim=reclaim, truncated=False)
+    assert b2["blocker_class"] == "delayed_winner"
+
+
+def test_blocker_reclaim_only_and_never_profitable() -> None:
+    highs = np.array([99.8, 100.1, 100.05])
+    lows = np.array([98.5, 99.5, 99.8])
+    closes = np.array([99.0, 100.0, 99.9])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 2)
+    reclaim = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert reclaim["reclaimed_after_adverse"] is True
+    tp = {"reached": False, "bar_offset": None}
+    b = classify_fill_blocker(p, tp_0_25=tp, reclaim=reclaim, truncated=False)
+    assert b["blocker_class"] == "reclaimed_entry_only"
+
+    highs2 = np.array([99.9, 99.8])
+    lows2 = np.array([98.0, 97.0])
+    closes2 = np.array([99.0, 98.5])
+    p2 = path_arrays(1, 100.0, highs2, lows2, closes2, 0, 1)
+    r2 = entry_reclaim_after_adverse(p2, fill_bar=0)
+    b2 = classify_fill_blocker(p2, tp_0_25=tp, reclaim=r2, truncated=False)
+    assert b2["blocker_class"] == "never_profitable_within_horizon"
+    assert b2["flag_severe_adverse_excursion"] is True  # MAE -3%
+
+
+def test_blocker_open_at_horizon() -> None:
+    # Had MFE > 0 early (no adverse yet), then underwater, never reclaimed, no TP 0.25
+    highs = np.array([100.2, 99.8, 99.7])
+    lows = np.array([100.0, 98.5, 98.0])
+    closes = np.array([100.1, 99.0, 98.5])
+    p = path_arrays(1, 100.0, highs, lows, closes, 0, 2)
+    assert p["maximum_favorable_excursion_pct"] > 0
+    reclaim = entry_reclaim_after_adverse(p, fill_bar=0)
+    assert reclaim["reclaimed_after_adverse"] is False
+    b = classify_fill_blocker(
+        p, tp_0_25={"reached": False, "bar_offset": None}, reclaim=reclaim, truncated=False
+    )
+    assert b["blocker_class"] == "open_blocker_at_horizon"
+
+
+def test_horizon_does_not_use_future_bars() -> None:
+    highs = np.array([100.1, 100.2, 110.0])
+    lows = np.array([99.9, 99.8, 90.0])
+    closes = np.array([100.0, 100.0, 100.0])
+    timestamps = list(pd.date_range("2026-02-01", periods=3, freq="15min", tz="UTC"))
+    fill = {
+        "side": 1,
+        "side_name": "long",
+        "setup_id": 1,
+        "trigger_bar": 0,
+        "fill_bar": 0,
+        "fill_timestamp": timestamps[0],
+        "entry_price": 100.0,
+    }
+    _p, horizons, _lv, _ft, _s, tp_h = analyze_fill_core(
+        fill=fill,
+        recon_row={"next_opposite_fill_index": None},
+        fills=[fill],
+        highs=highs,
+        lows=lows,
+        closes=closes,
+        timestamps=timestamps,
+        n_bars=3,
+    )
+    h2 = next(r for r in horizons if r["horizon_bars"] == 2)
+    assert h2["maximum_favorable_excursion_pct"] < 1.0
+    assert h2["maximum_adverse_excursion_pct"] > -5.0
+    # future spike on bar 2 must not appear in horizon=2 (bars 0..1)
+    tp_rows = [r for r in tp_h if r["horizon_bars"] == 2 and r["level_pct"] == 10.0]
+    assert tp_rows and tp_rows[0]["never_hit"] is True
+
+
+def test_analyze_fill_core_horizon_672_present() -> None:
+    n = 20
+    highs = np.linspace(100, 101, n)
+    lows = np.linspace(99.5, 100.5, n)
+    closes = (highs + lows) / 2
+    timestamps = list(pd.date_range("2026-02-01", periods=n, freq="15min", tz="UTC"))
+    fill = {
+        "side": 1,
+        "side_name": "long",
+        "setup_id": 1,
+        "trigger_bar": 0,
+        "fill_bar": 0,
+        "fill_timestamp": timestamps[0],
+        "entry_price": 100.0,
+    }
+    _p, horizons, _lv, _ft, _s, _tp = analyze_fill_core(
+        fill=fill,
+        recon_row={"next_opposite_fill_index": None},
+        fills=[fill],
+        highs=highs,
+        lows=lows,
+        closes=closes,
+        timestamps=timestamps,
+        n_bars=n,
+    )
+    assert any(r["horizon_bars"] == 672 and r["truncated"] is True for r in horizons)
+    assert "blocker_class" in horizons[0]
+    assert "reclaimed_after_adverse" in horizons[0]
 
 
 @pytest.mark.skipif(
@@ -288,7 +496,10 @@ def test_live_audit_55_fills_29_closed_and_artifacts(tmp_path: Path) -> None:
         "first_touch_grid_summary.csv",
         "excursion_by_side.csv",
         "excursion_by_outcome.csv",
-        "excursion_by_archetype.csv",
+        "fill_excursion_by_archetype.csv",
+        "fill_tp_adverse_by_horizon.csv",
+        "blocker_summary_by_horizon.csv",
+        "tp_adverse_summary_by_horizon.csv",
         "report.md",
         "metadata.json",
     ]

@@ -1,7 +1,8 @@
 """C3.5c APT 15m fill excursion audit (research-only, descriptive).
 
 Analyzes ALL A6 fills (not only Exit-A closed trades): MFE/MAE, TP/SL reach,
-first-touch matrix, path class, and 55-vs-29 reconciliation.
+first-touch matrix, path class, 55-vs-29 reconciliation, pre-TP adverse,
+entry reclaim after adverse, and descriptive blocker classes by horizon.
 
 No SM / Pine / filter / stop-TP optimization changes. No commits.
 """
@@ -58,12 +59,18 @@ VARIANT = "A6"
 BAR_MINUTES = 15
 COST_ROUNDTRIP_PCT = 0.20
 
-HORIZON_BARS: tuple[int, ...] = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192)
+HORIZON_BARS: tuple[int, ...] = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192, 672)
 MAX_CALENDAR_DAYS = 7
 MAX_BARS_7D = MAX_CALENDAR_DAYS * 24 * 60 // BAR_MINUTES  # 672
 
 TP_LEVELS_PCT: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00, 4.00, 5.00, 7.50, 10.00)
 SL_LEVELS_PCT: tuple[float, ...] = tuple(-x for x in TP_LEVELS_PCT)
+
+# Blocker / reclaim diagnostics (descriptive only; not a strategy filter)
+TP_BLOCKER_LEVEL_PCT = 0.25
+FAST_WINNER_MAX_BARS = 12  # bar_offset < 12 ≡ touch within first 12 bars (offsets 0..11)
+SEVERE_MAE_THRESHOLD_PCT = -3.0
+CORE_TP_ADVERSE_LEVELS_PCT: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00)
 
 # Formulas (direction-normalized):
 # Long:  signed_ret(px) = (px/entry - 1)*100
@@ -393,16 +400,175 @@ def adverse_before_tp(
     path: Mapping[str, Any],
     tp_pct: float,
 ) -> float | None:
-    """Max adverse (most negative) before first time running MFE reaches tp."""
+    """Max adverse (most negative) through first TP bar (inclusive). Legacy wrapper."""
+    detail = adverse_before_tp_detail(path, tp_pct)
+    return detail.get("adverse_incl_tp_bar_pct")
+
+
+def adverse_before_tp_detail(
+    path: Mapping[str, Any],
+    tp_pct: float,
+) -> dict[str, Any]:
+    """Adverse excursion before first TP touch.
+
+    - adverse_incl_tp_bar_pct: min(adv) through TP bar inclusive (existing semantics)
+    - adverse_excl_tp_bar_pct: min(adv) strictly before TP bar (None if TP on bar 0)
+    - never_hit: True if TP not reached on this path window
+    When never_hit, both adverse values are the full-window MAE (excl is identical).
+    """
+    empty = {
+        "never_hit": True,
+        "tp_bar_offset": None,
+        "adverse_incl_tp_bar_pct": None,
+        "adverse_excl_tp_bar_pct": None,
+    }
     if path.get("empty"):
-        return None
+        return empty
     fav = path["fav"]
     adv = path["adv"]
+    if len(adv) == 0:
+        return empty
     hit = np.where(fav >= tp_pct - 1e-15)[0]
     if len(hit) == 0:
-        return float(np.min(adv)) if len(adv) else None  # never hit: full-path MAE
+        mae = float(np.min(adv))
+        return {
+            "never_hit": True,
+            "tp_bar_offset": None,
+            "adverse_incl_tp_bar_pct": mae,
+            "adverse_excl_tp_bar_pct": mae,
+        }
     k = int(hit[0])
-    return float(np.min(adv[: k + 1]))
+    incl = float(np.min(adv[: k + 1]))
+    excl = float(np.min(adv[:k])) if k > 0 else None
+    return {
+        "never_hit": False,
+        "tp_bar_offset": k,
+        "adverse_incl_tp_bar_pct": incl,
+        "adverse_excl_tp_bar_pct": excl,
+    }
+
+
+def entry_reclaim_after_adverse(
+    path: Mapping[str, Any],
+    *,
+    timestamps: Sequence[Any] | None = None,
+    fill_bar: int = 0,
+    eps: float = 1e-12,
+) -> dict[str, Any]:
+    """Entry reclaim after a genuine adverse excursion (High/Low + Close touch).
+
+    Long: high>=entry (fav>=0) or close>=entry.
+    Short: low<=entry (fav>=0) or close<=entry.
+    Fills that never went adverse are never classified as reclaimed_after_adverse.
+    """
+    out: dict[str, Any] = {
+        "had_adverse_excursion": False,
+        "reclaimed_after_adverse": False,
+        "reclaim_bar_offset": None,
+        "reclaim_bar_index": None,
+        "reclaim_timestamp": None,
+        "bars_to_reclaim": None,
+        "worst_adverse_before_reclaim_pct": None,
+        "never_reclaim_within_window": False,
+        "never_adverse": True,
+    }
+    if path.get("empty"):
+        out["never_reclaim_within_window"] = True
+        return out
+    fav = path["fav"]
+    adv = path["adv"]
+    close_s = path["close_s"]
+    first_adv = next((i for i, a in enumerate(adv) if float(a) < -eps), None)
+    if first_adv is None:
+        return out
+    out["had_adverse_excursion"] = True
+    out["never_adverse"] = False
+    reclaim_i = None
+    for i in range(first_adv, len(fav)):
+        if float(fav[i]) >= -1e-15 or float(close_s[i]) >= -1e-15:
+            reclaim_i = i
+            break
+    if reclaim_i is None:
+        out["never_reclaim_within_window"] = True
+        out["worst_adverse_before_reclaim_pct"] = float(np.min(adv))
+        return out
+    out["reclaimed_after_adverse"] = True
+    out["reclaim_bar_offset"] = int(reclaim_i)
+    out["bars_to_reclaim"] = int(reclaim_i)
+    out["reclaim_bar_index"] = int(fill_bar + reclaim_i)
+    if timestamps is not None and 0 <= fill_bar + reclaim_i < len(timestamps):
+        out["reclaim_timestamp"] = timestamps[fill_bar + reclaim_i]
+    out["worst_adverse_before_reclaim_pct"] = float(np.min(adv[: reclaim_i + 1]))
+    return out
+
+
+def classify_fill_blocker(
+    path: Mapping[str, Any],
+    *,
+    tp_0_25: Mapping[str, Any],
+    reclaim: Mapping[str, Any],
+    truncated: bool,
+    severe_mae_threshold_pct: float = SEVERE_MAE_THRESHOLD_PCT,
+    fast_winner_max_bars: int = FAST_WINNER_MAX_BARS,
+) -> dict[str, Any]:
+    """Deterministic blocker labels: one exclusive primary class + boolean flags.
+
+    Priority for blocker_class (first match wins):
+      1. fast_winner — TP 0.25% with bar_offset < fast_winner_max_bars
+      2. delayed_winner — TP 0.25% later but within window
+      3. reclaimed_entry_only — entry reclaimed after adverse, TP 0.25% not hit
+      4. never_profitable_within_horizon — MFE <= 0
+      5. open_blocker_at_horizon — close < 0 at window end and entry not reclaimed
+      6. severe_adverse_excursion — MAE <= threshold (fallback if nothing else)
+      7. other_path — residual
+
+    flag_severe_adverse_excursion is always set independently when MAE <= threshold.
+    No 'total loss' / liquidation class.
+    """
+    empty = path.get("empty", True)
+    mfe = float("nan") if empty else float(path["maximum_favorable_excursion_pct"])
+    mae = float("nan") if empty else float(path["maximum_adverse_excursion_pct"])
+    close_r = float("nan") if empty else float(path["close_return_pct"])
+    tp_hit = bool(tp_0_25.get("reached"))
+    tp_off = tp_0_25.get("bar_offset")
+    reclaimed = bool(reclaim.get("reclaimed_after_adverse"))
+
+    flag_fast = bool(tp_hit and tp_off is not None and int(tp_off) < int(fast_winner_max_bars))
+    flag_delayed = bool(tp_hit and tp_off is not None and int(tp_off) >= int(fast_winner_max_bars))
+    flag_reclaim_only = bool(reclaimed and not tp_hit)
+    flag_never_prof = bool(not empty and mfe <= 0.0)
+    flag_open_blocker = bool(
+        not empty and close_r < 0.0 and not reclaimed and not tp_hit
+    )
+    flag_severe = bool(not empty and mae <= severe_mae_threshold_pct + 1e-15)
+
+    if empty:
+        primary = "unresolved_at_data_end" if truncated else "other_path"
+    elif flag_fast:
+        primary = "fast_winner"
+    elif flag_delayed:
+        primary = "delayed_winner"
+    elif flag_reclaim_only:
+        primary = "reclaimed_entry_only"
+    elif flag_never_prof:
+        primary = "never_profitable_within_horizon"
+    elif flag_open_blocker:
+        primary = "open_blocker_at_horizon"
+    elif flag_severe:
+        primary = "severe_adverse_excursion"
+    else:
+        primary = "other_path"
+
+    return {
+        "blocker_class": primary,
+        "flag_fast_winner": flag_fast,
+        "flag_delayed_winner": flag_delayed,
+        "flag_reclaimed_entry_only": flag_reclaim_only,
+        "flag_open_blocker_at_horizon": flag_open_blocker,
+        "flag_never_profitable_within_horizon": flag_never_prof,
+        "flag_severe_adverse_excursion": flag_severe,
+        "truncated_horizon": bool(truncated),
+    }
 
 
 def favorable_before_sl(path: Mapping[str, Any], sl_pct: float) -> float | None:
@@ -467,7 +633,14 @@ def analyze_fill_core(
     closes: np.ndarray,
     timestamps: Sequence[Any],
     n_bars: int,
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[
+    dict[str, Any],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     side = int(fill["side"])
     entry = float(fill["entry_price"])
     fill_i = int(fill["fill_bar"])
@@ -483,8 +656,19 @@ def analyze_fill_core(
     path_primary = path_arrays(side, entry, highs, lows, closes, fill_i, end_primary)
     path_to_opp = path_arrays(side, entry, highs, lows, closes, fill_i, end_opp if opp_bar is not None else end_data)
 
-    # horizon rows
+    reclaim_primary = entry_reclaim_after_adverse(
+        path_primary, timestamps=timestamps, fill_bar=fill_i
+    )
+    tp025_primary = first_touch_level(
+        side, entry, highs, lows, fill_i, end_primary, TP_BLOCKER_LEVEL_PCT
+    )
+    blocker_primary = classify_fill_blocker(
+        path_primary, tp_0_25=tp025_primary, reclaim=reclaim_primary, truncated=truncated_primary
+    )
+
+    # horizon rows + long-form TP adverse by horizon
     horizon_rows = []
+    tp_horizon_rows: list[dict[str, Any]] = []
     for hb in HORIZON_BARS:
         # hb bars including fill bar: 1 = fill only, 2 = fill+next, …
         end_h = min(end_data, fill_i + hb - 1)
@@ -493,6 +677,11 @@ def analyze_fill_core(
         p = path_arrays(side, entry, highs, lows, closes, fill_i, end_h)
         if p.get("empty"):
             continue
+        reclaim_h = entry_reclaim_after_adverse(p, timestamps=timestamps, fill_bar=fill_i)
+        tp025_h = first_touch_level(side, entry, highs, lows, fill_i, end_h, TP_BLOCKER_LEVEL_PCT)
+        blocker_h = classify_fill_blocker(
+            p, tp_0_25=tp025_h, reclaim=reclaim_h, truncated=trunc
+        )
         horizon_rows.append(
             {
                 "horizon_bars": hb,
@@ -511,15 +700,65 @@ def analyze_fill_core(
                 "mfe_before_mae": p["mfe_before_mae"],
                 "first_excursion_direction": p["first_excursion_direction"],
                 "intrabar_order_unknown": p["intrabar_order_unknown"],
+                "tp_0_25_reached": bool(tp025_h["reached"]),
+                "tp_0_25_bar_offset": tp025_h["bar_offset"],
+                "tp_0_25_timestamp": None
+                if tp025_h["bar_index"] is None
+                else timestamps[int(tp025_h["bar_index"])],
+                "had_adverse_excursion": reclaim_h["had_adverse_excursion"],
+                "reclaimed_after_adverse": reclaim_h["reclaimed_after_adverse"],
+                "reclaim_bar_offset": reclaim_h["reclaim_bar_offset"],
+                "reclaim_timestamp": reclaim_h["reclaim_timestamp"],
+                "bars_to_reclaim": reclaim_h["bars_to_reclaim"],
+                "worst_adverse_before_reclaim_pct": reclaim_h["worst_adverse_before_reclaim_pct"],
+                "never_reclaim_within_horizon": reclaim_h["never_reclaim_within_window"],
+                "never_adverse": reclaim_h["never_adverse"],
+                "never_reclaim_to_data_end": bool(
+                    reclaim_h["never_reclaim_within_window"] and end_h >= end_data
+                ),
+                **blocker_h,
             }
         )
+        for lvl in TP_LEVELS_PCT:
+            touch = first_touch_level(side, entry, highs, lows, fill_i, end_h, lvl)
+            detail = adverse_before_tp_detail(p, lvl)
+            tp_horizon_rows.append(
+                {
+                    "horizon_bars": hb,
+                    "horizon_minutes": hb * BAR_MINUTES,
+                    "bars_available": avail,
+                    "truncated": trunc,
+                    "level_type": "TP",
+                    "level_pct": lvl,
+                    "level_reached": bool(touch["reached"]),
+                    "never_hit": bool(detail["never_hit"]),
+                    "first_touch_bar_offset": touch["bar_offset"],
+                    "first_touch_bar_index": touch["bar_index"],
+                    "bars_to_touch": touch["bar_offset"],
+                    "minutes_to_touch": None
+                    if touch["bar_offset"] is None
+                    else touch["bar_offset"] * BAR_MINUTES,
+                    "first_touch_time": None
+                    if touch["bar_index"] is None
+                    else timestamps[int(touch["bar_index"])],
+                    "adverse_excursion_before_tp": detail["adverse_incl_tp_bar_pct"],
+                    "adverse_excursion_before_tp_excl": detail["adverse_excl_tp_bar_pct"],
+                    "adverse_incl_tp_bar_pct": detail["adverse_incl_tp_bar_pct"],
+                    "adverse_excl_tp_bar_pct": detail["adverse_excl_tp_bar_pct"],
+                }
+            )
 
     # level touches on primary path
     level_rows = []
     path_seq = []
     for lvl in TP_LEVELS_PCT:
         touch = first_touch_level(side, entry, highs, lows, fill_i, end_primary, lvl)
-        adv_b = adverse_before_tp(path_primary, lvl) if path_primary.get("fav") is not None else None
+        detail = adverse_before_tp_detail(path_primary, lvl) if path_primary.get("fav") is not None else {
+            "never_hit": True,
+            "adverse_incl_tp_bar_pct": None,
+            "adverse_excl_tp_bar_pct": None,
+        }
+        adv_b = detail.get("adverse_incl_tp_bar_pct")
         close_at = None
         if touch["reached"] and touch["bar_index"] is not None:
             close_at = signed_return_pct(side, entry, float(closes[int(touch["bar_index"])]))
@@ -528,6 +767,7 @@ def analyze_fill_core(
                 "level_type": "TP",
                 "level_pct": lvl,
                 "level_reached": bool(touch["reached"]),
+                "never_hit": bool(detail.get("never_hit", not touch["reached"])),
                 "first_touch_bar_offset": touch["bar_offset"],
                 "first_touch_bar_index": touch["bar_index"],
                 "bars_to_touch": touch["bar_offset"],
@@ -536,6 +776,7 @@ def analyze_fill_core(
                 if touch["bar_index"] is None
                 else timestamps[int(touch["bar_index"])],
                 "adverse_excursion_before_tp": adv_b,
+                "adverse_excursion_before_tp_excl": detail.get("adverse_excl_tp_bar_pct"),
                 "favorable_excursion_before_sl": None,
                 "close_return_at_touch": close_at,
                 "reached_before_opposite_fill": bool(
@@ -564,6 +805,7 @@ def analyze_fill_core(
                 "level_type": "SL",
                 "level_pct": lvl,
                 "level_reached": bool(touch["reached"]),
+                "never_hit": bool(not touch["reached"]),
                 "first_touch_bar_offset": touch["bar_offset"],
                 "first_touch_bar_index": touch["bar_index"],
                 "bars_to_touch": touch["bar_offset"],
@@ -572,6 +814,7 @@ def analyze_fill_core(
                 if touch["bar_index"] is None
                 else timestamps[int(touch["bar_index"])],
                 "adverse_excursion_before_tp": None,
+                "adverse_excursion_before_tp_excl": None,
                 "favorable_excursion_before_sl": fav_b,
                 "close_return_at_touch": close_at,
                 "reached_before_opposite_fill": bool(
@@ -651,6 +894,7 @@ def analyze_fill_core(
                     "both_same_bar": both_same,
                     "neither": neither,
                     "intrabar_ambiguous": ambiguous,
+                    "same_bar_ambiguous": ambiguous,
                     "bars_to_resolution": bars_res,
                     "minutes_to_resolution": None if bars_res is None else bars_res * BAR_MINUTES,
                     "first_touch_time": None
@@ -696,6 +940,20 @@ def analyze_fill_core(
     close_path = path_primary.get("close_s")
     close_path_list = close_path.tolist() if close_path is not None else None
 
+    # core TP adverse wide columns (incl + excl + never_hit) for requested levels
+    tp_adverse_wide: dict[str, Any] = {}
+    for lvl in CORE_TP_ADVERSE_LEVELS_PCT:
+        detail = adverse_before_tp_detail(path_primary, lvl)
+        tag = str(lvl).replace(".", "_")
+        tp_adverse_wide[f"adverse_before_tp_{tag}"] = detail["adverse_incl_tp_bar_pct"]
+        tp_adverse_wide[f"adverse_before_tp_{tag}_excl"] = detail["adverse_excl_tp_bar_pct"]
+        tp_adverse_wide[f"tp_{tag}_never_hit"] = detail["never_hit"]
+        touch = first_touch_level(side, entry, highs, lows, fill_i, end_primary, lvl)
+        tp_adverse_wide[f"tp_{tag}_bars_to_touch"] = touch["bar_offset"]
+        tp_adverse_wide[f"tp_{tag}_first_touch_time"] = (
+            None if touch["bar_index"] is None else timestamps[int(touch["bar_index"])]
+        )
+
     panel = {
         "maximum_favorable_excursion_pct": path_primary.get("maximum_favorable_excursion_pct"),
         "maximum_adverse_excursion_pct": path_primary.get("maximum_adverse_excursion_pct"),
@@ -736,6 +994,7 @@ def analyze_fill_core(
         "truncated_primary": truncated_primary,
         "path_to_opp_mfe": path_to_opp.get("maximum_favorable_excursion_pct"),
         "path_to_opp_mae": path_to_opp.get("maximum_adverse_excursion_pct"),
+        # legacy wide adverse-before-TP aliases (incl TP bar)
         "adverse_before_tp_0_5": adverse_before_tp(path_primary, 0.5),
         "adverse_before_tp_1": adverse_before_tp(path_primary, 1.0),
         "adverse_before_tp_2": adverse_before_tp(path_primary, 2.0),
@@ -746,11 +1005,24 @@ def analyze_fill_core(
         "favorable_before_sl_2": favorable_before_sl(path_primary, -2.0),
         "favorable_before_sl_3": favorable_before_sl(path_primary, -3.0),
         "favorable_before_sl_5": favorable_before_sl(path_primary, -5.0),
+        **tp_adverse_wide,
+        "had_adverse_excursion": reclaim_primary["had_adverse_excursion"],
+        "reclaimed_after_adverse": reclaim_primary["reclaimed_after_adverse"],
+        "reclaim_bar_offset": reclaim_primary["reclaim_bar_offset"],
+        "reclaim_timestamp": reclaim_primary["reclaim_timestamp"],
+        "bars_to_reclaim": reclaim_primary["bars_to_reclaim"],
+        "worst_adverse_before_reclaim_pct": reclaim_primary["worst_adverse_before_reclaim_pct"],
+        "never_reclaim_within_primary": reclaim_primary["never_reclaim_within_window"],
+        "never_adverse": reclaim_primary["never_adverse"],
+        "never_reclaim_to_data_end": bool(
+            reclaim_primary["never_reclaim_within_window"] and end_primary >= end_data
+        ),
+        **blocker_primary,
         **tp_flags,
         **sl_flags,
         "close_s_path": close_path_list,
     }
-    return panel, horizon_rows, level_rows, ft_rows, path_seq
+    return panel, horizon_rows, level_rows, ft_rows, path_seq, tp_horizon_rows
 
 
 # ---------------------------------------------------------------------------
@@ -957,6 +1229,66 @@ def summarize_first_touch_grid(ft: pd.DataFrame) -> pd.DataFrame:
                     else None,
                 }
             )
+    return pd.DataFrame(rows)
+
+
+def summarize_blocker_by_horizon(by_h: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    if by_h.empty or "blocker_class" not in by_h.columns:
+        return pd.DataFrame()
+    for (hb, side), g in list(by_h.groupby(["horizon_bars", "side"])) + [
+        ((hb, "both"), g) for hb, g in by_h.groupby("horizon_bars")
+    ]:
+        row: dict[str, Any] = {
+            "horizon_bars": hb,
+            "side": side,
+            "n": len(g),
+            "share_reclaimed_after_adverse": float(g["reclaimed_after_adverse"].mean()),
+            "share_never_adverse": float(g["never_adverse"].mean()),
+            "share_tp_0_25_reached": float(g["tp_0_25_reached"].mean()),
+            "share_truncated": float(g["truncated"].mean()),
+        }
+        for cls in (
+            "fast_winner",
+            "delayed_winner",
+            "reclaimed_entry_only",
+            "open_blocker_at_horizon",
+            "never_profitable_within_horizon",
+            "severe_adverse_excursion",
+            "other_path",
+            "unresolved_at_data_end",
+        ):
+            row[f"share_{cls}"] = float((g["blocker_class"] == cls).mean())
+        row["share_flag_severe_adverse"] = float(g["flag_severe_adverse_excursion"].mean())
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def summarize_tp_adverse_by_horizon(tp_by_h: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    if tp_by_h.empty:
+        return pd.DataFrame()
+    for (hb, lvl, side), g in list(tp_by_h.groupby(["horizon_bars", "level_pct", "side"])) + [
+        ((hb, lvl, "both"), g)
+        for (hb, lvl), g in tp_by_h.groupby(["horizon_bars", "level_pct"])
+    ]:
+        reached = g[g["level_reached"] == True]  # noqa: E712
+        rows.append(
+            {
+                "horizon_bars": hb,
+                "level_pct": lvl,
+                "side": side,
+                "n": len(g),
+                "reach_rate": float(g["level_reached"].mean()),
+                "never_hit_rate": float(g["never_hit"].mean()),
+                "median_bars_to_touch": float(reached["bars_to_touch"].median()) if len(reached) else None,
+                "median_adverse_incl_tp": float(reached["adverse_incl_tp_bar_pct"].median()) if len(reached) else None,
+                "median_adverse_excl_tp": float(reached["adverse_excl_tp_bar_pct"].dropna().median())
+                if len(reached) and reached["adverse_excl_tp_bar_pct"].notna().any()
+                else None,
+                "p90_adverse_incl_tp": float(reached["adverse_incl_tp_bar_pct"].quantile(0.90)) if len(reached) else None,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -1198,13 +1530,16 @@ def write_report(out_dir: Path, meta: Mapping[str, Any], panel: pd.DataFrame, re
         "- Vollständiges Gitter in `first_touch_grid_summary.csv` / Heatmaps.",
         "- Same-bar TP+SL: **ambiguous**; konservativ=SL zuerst, optimistisch=TP zuerst — beide nur diagnostisch.",
         "",
-        "## 10–11. Gegenlauf vor TP / früher Gewinn vor Verlust",
+        "## 10–11. Gegenlauf vor TP / Entry-Reclaim / Blocker",
         "",
         f"- med adverse before TP1%=`{float(panel['adverse_before_tp_1'].median()):.3f}%`",
         f"- med adverse before TP2%=`{float(panel['adverse_before_tp_2'].median()):.3f}%`",
         f"- med adverse before TP3%=`{float(panel['adverse_before_tp_3'].median()):.3f}%`",
         f"- med adverse before TP5%=`{float(panel['adverse_before_tp_5'].median()):.3f}%`",
         f"- med favorable before SL1%=`{float(panel['favorable_before_sl_1'].median()):.3f}%`",
+        f"- share reclaimed_after_adverse (primary)=`{float(panel['reclaimed_after_adverse'].mean()):.3f}`",
+        f"- blocker_class distribution (primary): see panel / `blocker_summary_by_horizon.csv`",
+        f"- long-form pre-TP adverse by horizon: `fill_tp_adverse_by_horizon.csv`",
         "",
         "## 12. Long vs Short",
         "",
@@ -1340,11 +1675,12 @@ def run_fill_excursion_audit(
     level_rows = []
     ft_rows = []
     seq_rows = []
+    tp_horizon_rows = []
 
     for _, rr in recon.iterrows():
         idx = int(rr["fill_index"])
         fill = filled[idx]
-        core, horizons, levels, fts, seq = analyze_fill_core(
+        core, horizons, levels, fts, seq, tp_h = analyze_fill_core(
             fill=fill,
             recon_row=rr.to_dict(),
             fills=filled,
@@ -1374,6 +1710,8 @@ def run_fill_excursion_audit(
             ft_rows.append({"fill_id": fill_id, "side": rr["side"], **ft_r})
         for s in seq:
             seq_rows.append({"fill_id": fill_id, "side": rr["side"], **s})
+        for th in tp_h:
+            tp_horizon_rows.append({"fill_id": fill_id, "side": rr["side"], "split": split, **th})
 
     panel = pd.DataFrame(panel_rows)
     panel = attach_context_features(panel, pattern_dir, case_dir)
@@ -1381,6 +1719,7 @@ def run_fill_excursion_audit(
     levels = pd.DataFrame(level_rows)
     ft = pd.DataFrame(ft_rows)
     seq = pd.DataFrame(seq_rows)
+    tp_by_h = pd.DataFrame(tp_horizon_rows)
 
     # verify closed identity vs shared Exit-A helper
     n_closed_check = int(((recon["included_in_realized_exit_a"]) & (recon["exit_a_closed"])).sum())
@@ -1392,6 +1731,8 @@ def run_fill_excursion_audit(
     hor_sum = summarize_horizons(by_h)
     tp_sum, sl_sum = summarize_level_touches(levels, panel)
     ft_grid = summarize_first_touch_grid(ft)
+    blocker_sum = summarize_blocker_by_horizon(by_h)
+    tp_adv_sum = summarize_tp_adverse_by_horizon(tp_by_h)
 
     # by side / outcome / archetype
     side_rows = []
@@ -1503,6 +1844,9 @@ def run_fill_excursion_audit(
     outcome_df.to_csv(output_dir / "excursion_by_outcome.csv", index=False)
     arch_sum.to_csv(output_dir / "excursion_by_archetype.csv", index=False)
     closed.to_csv(output_dir / "exit_a_trades_reference.csv", index=False)
+    tp_by_h.to_csv(output_dir / "fill_tp_adverse_by_horizon.csv", index=False)
+    blocker_sum.to_csv(output_dir / "blocker_summary_by_horizon.csv", index=False)
+    tp_adv_sum.to_csv(output_dir / "tp_adverse_summary_by_horizon.csv", index=False)
 
     plots = maybe_plots(output_dir, panel, hor_sum, tp_sum, sl_sum, ft_grid) if write_plots else []
 
@@ -1530,6 +1874,26 @@ def run_fill_excursion_audit(
         "tp_levels": list(TP_LEVELS_PCT),
         "sl_levels": list(SL_LEVELS_PCT),
         "max_calendar_days": MAX_CALENDAR_DAYS,
+        "blocker_definitions": {
+            "fast_winner": "TP 0.25% with bar_offset < 12 (within first 12 bars)",
+            "delayed_winner": "TP 0.25% with bar_offset >= 12 within window",
+            "reclaimed_entry_only": "entry reclaimed after adverse; TP 0.25% not reached",
+            "open_blocker_at_horizon": "close < 0 at window end; entry not reclaimed; TP 0.25% not hit",
+            "never_profitable_within_horizon": "MFE <= 0 within window",
+            "severe_adverse_excursion": f"MAE <= {SEVERE_MAE_THRESHOLD_PCT}% (also always as flag)",
+            "priority": [
+                "fast_winner",
+                "delayed_winner",
+                "reclaimed_entry_only",
+                "never_profitable_within_horizon",
+                "open_blocker_at_horizon",
+                "severe_adverse_excursion",
+                "other_path",
+            ],
+            "reclaim_touch": "long: high|close >= entry; short: low|close <= entry; requires prior adverse",
+            "adverse_before_tp_incl": "min(adv) through first TP bar inclusive",
+            "adverse_before_tp_excl": "min(adv) strictly before first TP bar",
+        },
         "no_stop_tp_optimization": True,
         "no_filter_promotion": True,
         "production_sm_unchanged": True,
