@@ -91,6 +91,26 @@ class FinalExitEconomics:
     sufficient: bool
 
 
+@dataclass(frozen=True)
+class BasketExitCoverageDecision:
+    """Read-only wrapper around FinalExitEconomics for staging basket guards.
+
+    ``coverage_ok`` is exactly ``FinalExitEconomics.sufficient`` — no parallel formula.
+    """
+
+    required_net_usdt: float
+    realized_net_usdt: float
+    expected_basket_net_usdt: float
+    remaining_required_usdt: float
+    coverage_after_exit_usdt: float
+    coverage_ok: bool
+    tolerance_usdt: float
+    reason_code: str
+    staging_incomplete: bool
+    pending_cycle_loss_usdt: float
+    economics: FinalExitEconomics
+
+
 def _is_per_bot_config(path_obj: Path) -> bool:
     try:
         relative = path_obj.relative_to(PER_BOT_CONFIG_ROOT)
@@ -12252,6 +12272,39 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             runtime_state=runtime_state,
             projection=tp_projection,
         )
+        coverage_decision = self.evaluate_basket_exit_coverage(
+            snapshot=snapshot,
+            runtime_state=runtime_state,
+            long_tp_price=long_tp_price,
+            short_sl_price=short_sl_price,
+            projection=tp_projection,
+        )
+        # Staging residual path: block placement when FinalExitEconomics insufficient.
+        # Legacy / non-staged: coverage_ok is True (skipped) — existing sufficient check remains.
+        if coverage_decision.staging_incomplete and not coverage_decision.coverage_ok:
+            self._defer_final_exit_insufficient_coverage(
+                runtime_state,
+                context,
+                economics=final_exit_economics,
+                tp_price=effective_tp_price,
+                long_tp_price=long_tp_price,
+                short_sl_price=short_sl_price,
+                snapshot=snapshot,
+            )
+            _log_event(
+                "fixed_cycle_exit_intent_build_skipped",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "reason": "staged_basket_coverage_blocked",
+                    "coverage_reason_code": coverage_decision.reason_code,
+                    "target_delta_usdt": final_exit_economics.target_delta_usdt,
+                    "expected_total_net_after_exit": (
+                        final_exit_economics.expected_total_net_after_exit
+                    ),
+                    "min_required_total_usdt": final_exit_economics.min_required_total_usdt,
+                },
+            )
+            return []
         if not final_exit_economics.sufficient:
             self._defer_final_exit_insufficient_coverage(
                 runtime_state,
@@ -13262,6 +13315,291 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             min_profit_target_usdt=projection.min_profit_target_usdt,
             min_required_total_usdt=min_required_total_usdt,
             sufficient=target_delta_usdt >= -coverage_tolerance,
+        )
+
+    def evaluate_basket_exit_coverage(
+        self,
+        *,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        long_tp_price: float,
+        short_sl_price: float,
+        projection: TpProjection | None = None,
+    ) -> BasketExitCoverageDecision:
+        """Canonical basket coverage decision (FinalExitEconomics.sufficient)."""
+        break_even, _ = self._calculate_break_even(snapshot, runtime_state)
+        proj = projection or self._calculate_tp_projection(
+            break_even, snapshot, runtime_state
+        )
+        economics = self._evaluate_final_exit_economics(
+            long_tp_price=float(long_tp_price),
+            short_sl_price=float(short_sl_price),
+            snapshot=snapshot,
+            runtime_state=runtime_state,
+            projection=proj,
+        )
+        tolerance = self._final_exit_coverage_tolerance_usdt(proj)
+        expected_basket_net = (
+            float(economics.expected_total_net_after_exit) - float(proj.realized_cycle_net)
+        )
+        remaining_required = max(
+            float(economics.min_required_total_usdt) - float(proj.realized_cycle_net),
+            0.0,
+        )
+        staging_incomplete = self._has_incomplete_staged_second_leg_residuals(
+            snapshot, runtime_state
+        )
+        if not staging_incomplete:
+            reason = "coverage_skipped_not_staged"
+            coverage_ok = True
+        elif economics.sufficient:
+            complete, _ = self._any_staged_cycle_complete(runtime_state)
+            reason = (
+                "coverage_ok_complete_stages"
+                if complete
+                else "coverage_ok_basket_compensates_partial_stages"
+            )
+            coverage_ok = True
+        else:
+            reason = "coverage_blocked_insufficient_basket"
+            coverage_ok = False
+        decision = BasketExitCoverageDecision(
+            required_net_usdt=float(economics.min_required_total_usdt),
+            realized_net_usdt=float(proj.realized_cycle_net),
+            expected_basket_net_usdt=float(expected_basket_net),
+            remaining_required_usdt=float(remaining_required),
+            coverage_after_exit_usdt=float(economics.expected_total_net_after_exit),
+            coverage_ok=bool(coverage_ok),
+            tolerance_usdt=float(tolerance),
+            reason_code=reason,
+            staging_incomplete=bool(staging_incomplete),
+            pending_cycle_loss_usdt=float(proj.pending_cycle_loss_usdt),
+            economics=economics,
+        )
+        both_flat = (
+            float(snapshot.long_qty or 0.0) <= 1e-12
+            and float(snapshot.short_qty or 0.0) <= 1e-12
+        )
+        prior = runtime_state.strategy_state.get("last_basket_exit_coverage_decision")
+        if both_flat:
+            # After flatten, zero-qty economics are meaningless. Preserve a prior
+            # inventory-open decision for audit, and stop protecting residuals.
+            if not (isinstance(prior, dict) and prior.get("coverage_ok") is True):
+                runtime_state.strategy_state["last_basket_exit_coverage_decision"] = {
+                    "coverage_ok": decision.coverage_ok,
+                    "reason_code": decision.reason_code,
+                    "staging_incomplete": decision.staging_incomplete,
+                    "expected_total_net_after_exit": decision.coverage_after_exit_usdt,
+                    "min_required_total_usdt": decision.required_net_usdt,
+                    "tolerance_usdt": decision.tolerance_usdt,
+                    "target_delta_usdt": economics.target_delta_usdt,
+                    "sufficient": economics.sufficient,
+                }
+            return BasketExitCoverageDecision(
+                required_net_usdt=float(
+                    (prior or {}).get("min_required_total_usdt", decision.required_net_usdt)
+                    if isinstance(prior, dict)
+                    else decision.required_net_usdt
+                ),
+                realized_net_usdt=decision.realized_net_usdt,
+                expected_basket_net_usdt=decision.expected_basket_net_usdt,
+                remaining_required_usdt=decision.remaining_required_usdt,
+                coverage_after_exit_usdt=float(
+                    (prior or {}).get(
+                        "expected_total_net_after_exit", decision.coverage_after_exit_usdt
+                    )
+                    if isinstance(prior, dict)
+                    else decision.coverage_after_exit_usdt
+                ),
+                coverage_ok=True,
+                tolerance_usdt=decision.tolerance_usdt,
+                reason_code=(
+                    str((prior or {}).get("reason_code") or "coverage_ok_basket_compensates_partial_stages")
+                    if isinstance(prior, dict) and prior.get("coverage_ok") is True
+                    else "coverage_skipped_not_staged"
+                ),
+                staging_incomplete=False,
+                pending_cycle_loss_usdt=decision.pending_cycle_loss_usdt,
+                economics=decision.economics,
+            )
+        runtime_state.strategy_state["last_basket_exit_coverage_decision"] = {
+            "coverage_ok": decision.coverage_ok,
+            "reason_code": decision.reason_code,
+            "staging_incomplete": decision.staging_incomplete,
+            "expected_total_net_after_exit": decision.coverage_after_exit_usdt,
+            "min_required_total_usdt": decision.required_net_usdt,
+            "tolerance_usdt": decision.tolerance_usdt,
+            "target_delta_usdt": economics.target_delta_usdt,
+            "sufficient": economics.sufficient,
+        }
+        return decision
+
+    def _any_staged_cycle_complete(self, runtime_state: RuntimeState) -> tuple[bool, dict[str, Any]]:
+        state = runtime_state.strategy_state
+        required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        for cycle_key in list(required_map.keys()):
+            try:
+                cycle_index = int(cycle_key)
+            except (TypeError, ValueError):
+                continue
+            complete, diag = self._is_staged_second_leg_cycle_complete(state, cycle_index)
+            if complete:
+                return True, diag
+        return False, {}
+
+    def _iter_active_orders(
+        self, snapshot: HedgeSnapshot | None, runtime_state: RuntimeState | None
+    ) -> list[Any]:
+        orders: list[Any] = []
+        if runtime_state is not None:
+            orders.extend(list(runtime_state.active_orders.values()))
+        if snapshot is not None:
+            orders.extend(list(snapshot.active_orders or []))
+        return orders
+
+    def _order_is_open_residual_staged_second_leg(self, order: Any) -> bool:
+        if self._is_terminal_order_status(getattr(order, "status", None)):
+            return False
+        purpose = str(getattr(order, "purpose", "") or "")
+        if "SHORT_REDUCE" not in purpose.upper() and "LONG_REDUCE" not in purpose.upper():
+            return False
+        meta = getattr(order, "metadata", None) or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        if meta.get("research_price_staging") or meta.get("is_staged_second_leg_tp"):
+            stage_count = int(meta.get("stage_count") or 0)
+            stage_index = meta.get("stage_index")
+            if stage_count >= 2 and stage_index is not None:
+                return True
+        return False
+
+    def _has_incomplete_staged_second_leg_residuals(
+        self,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState | None,
+    ) -> bool:
+        if runtime_state is None:
+            return False
+        state = runtime_state.strategy_state
+        # Open residual staged orders on the book.
+        for order in self._iter_active_orders(snapshot, runtime_state):
+            if self._order_is_open_residual_staged_second_leg(order):
+                complete, _ = self._any_staged_cycle_complete(runtime_state)
+                if not complete:
+                    return True
+        # Or staging maps show incomplete cycle even if order metadata thin.
+        required_map = state.get("staged_second_leg_tp_required_net_total") or {}
+        stage_count_map = state.get("staged_second_leg_tp_stage_count") or {}
+        filled_map = state.get("staged_second_leg_tp_filled_stages") or {}
+        for cycle_key, stage_count in stage_count_map.items():
+            try:
+                n = int(stage_count or 0)
+            except (TypeError, ValueError):
+                continue
+            if n < 2:
+                continue
+            filled = list(filled_map.get(cycle_key) or [])
+            if len(filled) >= n:
+                continue
+            if cycle_key not in required_map:
+                continue
+            try:
+                cycle_index = int(cycle_key)
+            except (TypeError, ValueError):
+                continue
+            purpose = self._get_second_leg_purpose(cycle_index)
+            for order in self._iter_active_orders(snapshot, runtime_state):
+                if str(getattr(order, "purpose", "") or "") != purpose:
+                    continue
+                if self._is_terminal_order_status(getattr(order, "status", None)):
+                    continue
+                return True
+        return False
+
+    def allow_cancel_residual_staged_second_leg_orders(
+        self,
+        snapshot: HedgeSnapshot | None,
+        runtime_state: RuntimeState,
+        *,
+        long_tp_price: float | None = None,
+        short_sl_price: float | None = None,
+    ) -> BasketExitCoverageDecision:
+        """Flat-cancel of residual staged reduces is allowed only when coverage_ok."""
+        if not self._has_incomplete_staged_second_leg_residuals(snapshot, runtime_state):
+            # No protection needed.
+            dummy_econ = FinalExitEconomics(
+                expected_total_net_after_exit=0.0,
+                target_delta_usdt=0.0,
+                required_profit_to_cover_loss=0.0,
+                min_profit_target_usdt=0.0,
+                min_required_total_usdt=0.0,
+                sufficient=True,
+            )
+            return BasketExitCoverageDecision(
+                required_net_usdt=0.0,
+                realized_net_usdt=0.0,
+                expected_basket_net_usdt=0.0,
+                remaining_required_usdt=0.0,
+                coverage_after_exit_usdt=0.0,
+                coverage_ok=True,
+                tolerance_usdt=0.0,
+                reason_code="coverage_skipped_not_staged",
+                staging_incomplete=False,
+                pending_cycle_loss_usdt=float(
+                    runtime_state.strategy_state.get("pending_cycle_loss_usdt") or 0.0
+                ),
+                economics=dummy_econ,
+            )
+        snap = snapshot or runtime_state.last_snapshot
+        if snap is None:
+            # Conservative: protect residuals.
+            dummy_econ = FinalExitEconomics(
+                expected_total_net_after_exit=0.0,
+                target_delta_usdt=-1.0,
+                required_profit_to_cover_loss=0.0,
+                min_profit_target_usdt=0.0,
+                min_required_total_usdt=0.0,
+                sufficient=False,
+            )
+            return BasketExitCoverageDecision(
+                required_net_usdt=0.0,
+                realized_net_usdt=0.0,
+                expected_basket_net_usdt=0.0,
+                remaining_required_usdt=0.0,
+                coverage_after_exit_usdt=0.0,
+                coverage_ok=False,
+                tolerance_usdt=0.0,
+                reason_code="coverage_blocked_missing_prices",
+                staging_incomplete=True,
+                pending_cycle_loss_usdt=float(
+                    runtime_state.strategy_state.get("pending_cycle_loss_usdt") or 0.0
+                ),
+                economics=dummy_econ,
+            )
+        break_even, _ = self._calculate_break_even(snap, runtime_state)
+        projection = self._calculate_tp_projection(break_even, snap, runtime_state)
+        tp = float(long_tp_price) if long_tp_price and long_tp_price > 0 else float(projection.tp_price)
+        # Short SL typically tracks TP for long-primary basket (same trigger band).
+        sl = float(short_sl_price) if short_sl_price and short_sl_price > 0 else tp
+        # Prefer live exit order prices when present.
+        for order in self._iter_active_orders(snap, runtime_state):
+            purpose = str(getattr(order, "purpose", "") or "")
+            px = float(getattr(order, "trigger_price", None) or getattr(order, "price", None) or 0.0)
+            if px <= 0:
+                continue
+            if purpose in self._get_final_exit_purposes() or purpose == self.LONG_TP_EXIT_PURPOSE:
+                if "LONG" in purpose.upper() and "EXIT" in purpose.upper():
+                    tp = px
+            if purpose == self.SHORT_SL_EXIT_PURPOSE or (
+                "SHORT" in purpose.upper() and "EXIT" in purpose.upper() and "SL" in purpose.upper()
+            ):
+                sl = px
+        return self.evaluate_basket_exit_coverage(
+            snapshot=snap,
+            runtime_state=runtime_state,
+            long_tp_price=tp,
+            short_sl_price=sl,
+            projection=projection,
         )
 
     def _defer_final_exit_insufficient_coverage(

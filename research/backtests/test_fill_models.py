@@ -333,6 +333,8 @@ def test_simulator_process_candle_uses_fill_model() -> None:
     sim = HedgeBotOriginalSimulator(signal="long", symbol="BTCUSDT", candle_close=100.0)
     try:
         sim.run_entry_smoke()
+        # Entry-created exits are causally eligible from the next candle index.
+        sim.candle_index = 1
         candle = _touchable_candle(high=102.0, low=98.0)
         result = sim.process_candle(
             candle,

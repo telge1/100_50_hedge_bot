@@ -76,6 +76,9 @@ class VirtualOrder:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     created_index: int = 0
     created_candle_index: int | None = None
+    # Earliest candle index at which this order may be filled against OHLC range
+    # (or as a deferred market fill). Orders created/replaced in candle X use X+1.
+    eligible_from_candle_index: int | None = None
     filled_qty: float = 0.0
     remaining_qty: float = 0.0
 

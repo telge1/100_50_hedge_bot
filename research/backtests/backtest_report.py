@@ -58,6 +58,8 @@ SUMMARY_CSV_FIELDS = (
     "config_load_warning",
     "price_tick_size",
     "tp_profit_target_pct",
+    "tp_buffer_pct",
+    "target_profit_usdt",
     "long_fill_distance_pct",
     "short_fill_distance_pct",
     "base_notional_usdt",
@@ -259,6 +261,8 @@ class BacktestResult:
     loaded_bot_config: dict[str, Any] = field(default_factory=dict)
     price_tick_size: float | None = None
     tp_profit_target_pct: float | None = None
+    tp_buffer_pct: float | None = None
+    target_profit_usdt: float | None = None
     long_fill_distance_pct: float | None = None
     short_fill_distance_pct: float | None = None
     base_notional_usdt: float | None = None

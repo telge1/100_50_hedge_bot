@@ -30,6 +30,12 @@ from .cycle_short_tp_relief_shim import install_cycle_short_tp_relief
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
 from .dynamic_cycle_order_scaling_shim import install_dynamic_cycle_order_scaling
 from .exit_pnl_audit_shim import install_exit_pnl_audit_shim
+from .exit_rebuild_policy import ExitRebuildPolicyConfig
+from .exit_rebuild_policy_shim import install_exit_rebuild_policy
+from .inventory_mtm_freeze import InventoryMtmFreezeConfig
+from .inventory_mtm_freeze_shim import install_inventory_mtm_freeze
+from .second_leg_price_staging import SecondLegPriceStagingConfig
+from .second_leg_price_staging_shim import install_second_leg_price_staging
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .stuck_recovery_reload_shim import attach_stuck_recovery_reload_tracker
 from .fill_models import FillModelConfig, resolve_fill_model_config
@@ -38,10 +44,13 @@ from .purpose_utils import preserve_bot_purpose
 from .simulated_execution import (
     fill_entry_intents_at_candle_close,
     fill_order_at_candle_close,
+    is_deferred_cycle_second_leg_market_order,
     is_immediate_market_fill,
     is_immediate_refill_market_fill,
+    order_is_fill_eligible_on_candle,
     process_candle_fills,
     resolve_simulated_fee_rate,
+    stamp_order_causal_eligibility,
 )
 from .simulated_order_book import SimulatedOrderBook, SyntheticCandle
 from .backtest_audit_recorder import BacktestAuditRecorder
@@ -187,6 +196,9 @@ class HedgeBotOriginalSimulator:
         dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
         stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
         cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
+        exit_rebuild_policy_config: ExitRebuildPolicyConfig | None = None,
+        inventory_mtm_freeze_config: InventoryMtmFreezeConfig | None = None,
+        second_leg_price_staging_config: SecondLegPriceStagingConfig | None = None,
         audit_recorder: BacktestAuditRecorder | None = None,
     ) -> None:
         self.signal = signal
@@ -222,10 +234,14 @@ class HedgeBotOriginalSimulator:
         self.strategy = build_strategy(signal, self.config)
         install_cycle_fill_reference_repair(self.strategy)
         install_exit_pnl_audit_shim(self.strategy)
+        install_exit_rebuild_policy(self.strategy, exit_rebuild_policy_config)
         install_dynamic_cycle_order_scaling(self.strategy, dynamic_cycle_scaling_config)
         install_cycle_short_tp_relief(self.strategy, cycle_short_tp_relief_config)
+        install_second_leg_price_staging(self.strategy, second_leg_price_staging_config)
+        self.second_leg_price_staging_config = second_leg_price_staging_config
         self.dynamic_cycle_scaling_config = dynamic_cycle_scaling_config
         self.cycle_short_tp_relief_config = cycle_short_tp_relief_config
+        self.exit_rebuild_policy_config = exit_rebuild_policy_config
         self.stuck_recovery_reload_tracker = attach_stuck_recovery_reload_tracker(
             self,
             stuck_recovery_reload_config,
@@ -261,6 +277,10 @@ class HedgeBotOriginalSimulator:
         self.book.current_candle_index = self.candle_index
         self._wire_order_book_callbacks()
         self._configure_isolated_paths()
+        self.inventory_mtm_freeze_config = inventory_mtm_freeze_config
+        # Must run last: wraps process_candle/run_entry_smoke/intent_filter and
+        # needs self.book/self.intent_filter already initialized above.
+        install_inventory_mtm_freeze(self, inventory_mtm_freeze_config)
 
     def _wire_order_book_callbacks(self) -> None:
         def _cancel_open_orders_by_purpose(purposes: list[str]) -> None:
@@ -356,7 +376,7 @@ class HedgeBotOriginalSimulator:
         }:
             return None
         order, replaced_ids = self.book.submit_intent(intent, replace=replace)
-        order.created_candle_index = self.candle_index
+        stamp_order_causal_eligibility(order, created_candle_index=self.candle_index)
         intent_mapping = build_intent_to_order_mapping(
             intent,
             order,
@@ -430,6 +450,9 @@ class HedgeBotOriginalSimulator:
         leg. Otherwise stale cycle orders can fill later with zero quantity/PnL,
         e.g. LONG_TP_EXIT closes the long side and an old CYCLE_*_LONG_ADD
         still fills after long_qty is already zero.
+
+        Staging residual SHORT_REDUCE orders are protected while basket coverage
+        is insufficient (Variant C flat-cancel guard).
         """
         long_flat = float(self.book.long_qty or 0.0) <= 1e-12
         short_flat = float(self.book.short_qty or 0.0) <= 1e-12
@@ -437,8 +460,41 @@ class HedgeBotOriginalSimulator:
         if not long_flat and not short_flat:
             return []
 
+        # Protect residual staged second-leg orders only while inventory is still
+        # open and basket coverage is insufficient. Once both legs are flat the
+        # basket already closed (or the book is otherwise flat) — never leave
+        # orphan stage orders that can fill later into a zero position.
+        protect_residual_staged = False
+        if not (long_flat and short_flat):
+            allow_fn = getattr(
+                self.strategy, "allow_cancel_residual_staged_second_leg_orders", None
+            )
+            if callable(allow_fn):
+                try:
+                    decision = allow_fn(self.snapshot, self.runtime_state)
+                    protect_residual_staged = bool(
+                        getattr(decision, "staging_incomplete", False)
+                        and not bool(getattr(decision, "coverage_ok", True))
+                    )
+                except Exception:
+                    protect_residual_staged = False
+
         def should_cancel(order) -> bool:
             purpose = str(getattr(order, "purpose", "") or "").upper()
+            meta = getattr(order, "metadata", None) or {}
+            if not isinstance(meta, dict):
+                meta = {}
+            is_residual_staged_sr = (
+                purpose.startswith("CYCLE_")
+                and purpose.endswith("_SHORT_REDUCE")
+                and bool(
+                    meta.get("research_price_staging")
+                    or meta.get("is_staged_second_leg_tp")
+                )
+                and int(meta.get("stage_count") or 0) >= 2
+            )
+            if protect_residual_staged and is_residual_staged_sr:
+                return False
 
             if long_flat and short_flat:
                 return True
@@ -479,6 +535,59 @@ class HedgeBotOriginalSimulator:
             self._refresh_snapshot_from_book(source=source)
         return cancelled
 
+    def _is_final_basket_exit_purpose(self, purpose: str) -> bool:
+        p = str(purpose or "").upper()
+        return p in {
+            "LONG_TP_EXIT",
+            "SHORT_SL_EXIT",
+            "LONG_TP_EXIT_RECOVERY",
+            "SHORT_SL_EXIT_RECOVERY",
+            "LONG_SL_EXIT",
+        }
+
+    def _should_block_basket_exit_fill(self, purpose: str) -> bool:
+        if not self._is_final_basket_exit_purpose(purpose):
+            return False
+        allow_fn = getattr(self.strategy, "allow_cancel_residual_staged_second_leg_orders", None)
+        if not callable(allow_fn):
+            return False
+        try:
+            decision = allow_fn(self.snapshot, self.runtime_state)
+        except Exception:
+            return False
+        return bool(
+            getattr(decision, "staging_incomplete", False)
+            and not bool(getattr(decision, "coverage_ok", True))
+        )
+
+    def _defer_blocked_basket_exits(self) -> None:
+        allow_fn = getattr(self.strategy, "allow_cancel_residual_staged_second_leg_orders", None)
+        defer = getattr(self.strategy, "_defer_final_exit_insufficient_coverage", None)
+        if not callable(allow_fn) or not callable(defer):
+            return
+        try:
+            decision = allow_fn(self.snapshot, self.runtime_state)
+            if not getattr(decision, "staging_incomplete", False):
+                return
+            if bool(getattr(decision, "coverage_ok", True)):
+                return
+            break_even, _ = self.strategy._calculate_break_even(
+                self.snapshot, self.runtime_state
+            )
+            projection = self.strategy._calculate_tp_projection(
+                break_even, self.snapshot, self.runtime_state
+            )
+            defer(
+                self.runtime_state,
+                self.context,
+                economics=decision.economics,
+                tp_price=float(projection.tp_price),
+                long_tp_price=float(projection.tp_price),
+                short_sl_price=float(projection.tp_price),
+                snapshot=self.snapshot,
+            )
+        except Exception:
+            return
 
     def _mark_refill_registry_submitted(self, intent: StrategyIntent, order: VirtualOrder) -> None:
         purpose = preserve_bot_purpose(intent.purpose)
@@ -613,37 +722,114 @@ class HedgeBotOriginalSimulator:
             else [self._resolve_intent_log_index(intent) for intent in intents]
         )
         resting: list[VirtualOrder] = []
-        submitted_pairs: list[tuple[StrategyIntent, VirtualOrder]] = []
+        submitted_count = 0
+        staged_purposes_seen: set[str] = set()
         for intent, intent_log_index in zip(intents, intent_indices):
             if self.intent_filter is not None and not self.intent_filter(intent):
                 continue
+            meta = dict(getattr(intent, "metadata", None) or {})
+            # Only research / distinct-price staged TPs may share a purpose.
+            # Same-price normal_cycle_second_leg_split keeps legacy replace semantics.
+            is_multi_price_stage = bool(
+                meta.get("research_price_staging")
+                or (
+                    meta.get("is_staged_second_leg_tp")
+                    and meta.get("stage_trigger_price") is not None
+                )
+            )
+            intent_replace = replace
+            if is_multi_price_stage:
+                purpose_key = str(preserve_bot_purpose(intent.purpose) or "")
+                # First stage may replace a prior single second-leg; later stages must coexist.
+                if purpose_key in staged_purposes_seen:
+                    intent_replace = False
+                else:
+                    staged_purposes_seen.add(purpose_key)
             if log_orders:
                 order = self._submit_intent_with_logging(
                     intent,
-                    replace=replace,
+                    replace=intent_replace,
                     intent_log_index=intent_log_index,
                 )
             else:
-                order, _ = self.book.submit_intent(intent, replace=replace)
+                order, _ = self.book.submit_intent(intent, replace=intent_replace)
                 if order is not None:
-                    order.created_candle_index = self.candle_index
+                    stamp_order_causal_eligibility(
+                        order, created_candle_index=self.candle_index
+                    )
             if order is None:
                 continue
-            submitted_pairs.append((intent, order))
-        self.book.sync_runtime_state(self.runtime_state)
-        self.orders_submitted += len(submitted_pairs)
-        self._refresh_snapshot_from_book(source="after_submit_intents")
-        for intent, order in submitted_pairs:
+            submitted_count += 1
+            self.book.sync_runtime_state(self.runtime_state)
+            self._refresh_snapshot_from_book(source="after_submit_intents")
+            # Fill immediate market intents before submitting the rest of the
+            # batch. Otherwise a prior immediate fill can run flat-cancel and
+            # cancel a later REFILL_* that is still waiting in the batch.
             if is_immediate_market_fill(intent):
+                live = self.book.get_order(order.order_id)
+                if live is None or str(live.status).upper() == "CANCELED":
+                    continue
                 self._fill_immediate_refill_market_intent(
                     intent,
-                    order,
+                    live,
                     event_source=event_source,
                     source_fill_purpose=source_fill_purpose,
                 )
                 continue
             resting.append(order)
+        self.orders_submitted += submitted_count
         return resting
+
+    def _fill_eligible_deferred_market_orders(
+        self,
+        *,
+        event_source: str = "deferred_market_next_candle",
+    ) -> tuple[list[FillEvent], list[StrategyIntent]]:
+        """Fill deferred cycle second-leg MARKET orders once causally eligible.
+
+        These are created without price/trigger after a prior fill and must not
+        consume the creation candle's OHLC range. On the first eligible candle
+        they fill at the modeled candle close (sim market), then ``on_fill`` runs.
+        """
+        fill_events: list[FillEvent] = []
+        follow_up_intents: list[StrategyIntent] = []
+        for order in list(self.book.active_orders()):
+            if not is_deferred_cycle_second_leg_market_order(order):
+                continue
+            if not order_is_fill_eligible_on_candle(order, self.candle_index):
+                continue
+            fill_event = fill_order_at_candle_close(
+                book=self.book,
+                runtime_state=self.runtime_state,
+                order_id=order.order_id,
+                candle=self.candle,
+            )
+            filled_order = self.book.get_order(fill_event.client_order_id)
+            if filled_order is not None:
+                self._record_order_event(
+                    filled_order,
+                    event_type="filled",
+                    status="FILLED",
+                )
+                for row in reversed(self.order_log):
+                    if row.get("order_id") != filled_order.order_id:
+                        continue
+                    if str(row.get("event_type") or "") != "filled":
+                        continue
+                    fill_price = float(fill_event.exec_price)
+                    if row.get("price") in (None, ""):
+                        row["price"] = fill_price
+                    row.setdefault("fill_price", fill_price)
+                    break
+            fill_events.append(fill_event)
+            follow_up_intents.extend(
+                self._dispatch_fill_to_strategy(
+                    fill_event,
+                    event_source=event_source,
+                    source_fill_purpose=fill_event.purpose,
+                )
+            )
+        return fill_events, follow_up_intents
 
     def process_candle(
         self,
@@ -656,13 +842,31 @@ class HedgeBotOriginalSimulator:
         self.candle = candle
         # Keep book's candle index in sync for audit sequencing.
         self.book.current_candle_index = self.candle_index
+        # Research diagnostics (FULL_DYNAMIC replan events).
+        self.runtime_state.strategy_state["_backtest_candle_index"] = int(self.candle_index)
         self._refresh_snapshot_from_book(source="before_process_candle", price=candle.close)
 
         fill_config = resolve_fill_model_config(
             fill_model=fill_model,
             max_fills_per_candle=max_fills_per_candle,
         )
-        eligible_orders = list(self.book.active_orders())
+        deferred_fills, deferred_follow_ups = self._fill_eligible_deferred_market_orders()
+        # Candle-start snapshot for OHLC-range fills: only orders already causally
+        # eligible. Orders created/replaced later in this candle wait until X+1.
+        eligible_orders = [
+            order
+            for order in self.book.active_orders()
+            if order_is_fill_eligible_on_candle(order, self.candle_index)
+            and not is_deferred_cycle_second_leg_market_order(order)
+        ]
+        # Variant C: do not let basket exits fill while staged residuals need coverage.
+        eligible_orders = [
+            order
+            for order in eligible_orders
+            if not self._should_block_basket_exit_fill(str(getattr(order, "purpose", "") or ""))
+        ]
+        if self._should_block_basket_exit_fill("LONG_TP_EXIT"):
+            self._defer_blocked_basket_exits()
         candle_fills, fill_stats = process_candle_fills(
             book=self.book,
             runtime_state=self.runtime_state,
@@ -671,10 +875,12 @@ class HedgeBotOriginalSimulator:
             fill_model=fill_config.fill_model,
             max_fills_per_candle=fill_config.max_fills_per_candle,
             conservative_fill_order=conservative_fill_order,
+            candle_index=self.candle_index,
         )
-        on_fill_intents: list[StrategyIntent] = []
+        on_fill_intents: list[StrategyIntent] = list(deferred_follow_ups)
+        candle_fills = list(deferred_fills) + list(candle_fills)
 
-        for fill_event in candle_fills:
+        for fill_event in candle_fills[len(deferred_fills) :]:
             self._refresh_snapshot_from_book(source="after_candle_fill", price=candle.close)
             filled_order = self.book.get_order(fill_event.client_order_id)
             if filled_order is not None:
@@ -695,6 +901,10 @@ class HedgeBotOriginalSimulator:
                 event_source="after_fill",
                 source_fill_purpose=fill_event.purpose,
             )
+            # After a staged second-leg fill, re-check basket coverage and defer exits
+            # if FinalExitEconomics is insufficient while residuals remain.
+            if self._should_block_basket_exit_fill("LONG_TP_EXIT"):
+                self._defer_blocked_basket_exits()
             self._cancel_active_orders_when_flat(source="after_fill_flat_cleanup")
 
         self._refresh_snapshot_from_book(source="before_on_tick", price=candle.close)
@@ -713,7 +923,7 @@ class HedgeBotOriginalSimulator:
             tick_intents=list(tick_intents),
             snapshot=self.snapshot,
             strategy_state=dict(self.runtime_state.strategy_state),
-            same_candle_fill_count=int(fill_stats.get("same_candle_fill_count", len(candle_fills))),
+            same_candle_fill_count=len(candle_fills),
             paired_exit_fills_count=int(fill_stats.get("paired_exit_fills_count", 0)),
         )
 

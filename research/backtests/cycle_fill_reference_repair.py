@@ -97,6 +97,9 @@ def _ensure_second_leg_sequence_commit(
     can build ``CYCLE_(N+1)_LONG_ADD``. Backtests can see the fill in the
     simulated order book while the sequence entry remains incomplete after
     commit/advance/repair edge cases, especially around immediate refills.
+
+    Also re-commits when a previously confirmed second-leg price disagrees with
+    the actual fill (e.g. a first-leg price wrongly written into the field).
     """
     purpose = str(fill_event.purpose or "").upper()
     status = str(getattr(fill_event, "status", "") or "").upper()
@@ -107,8 +110,14 @@ def _ensure_second_leg_sequence_commit(
         cycle_index <= 0
         or (status and status != "FILLED")
         or exec_price <= 0
-        or "SHORT_REDUCE" not in purpose
     ):
+        return
+
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    if purpose != second_leg_purpose:
         return
 
     entry = strategy._get_cycle_sequence_entry(runtime_state, cycle_index)
@@ -118,7 +127,9 @@ def _ensure_second_leg_sequence_commit(
     existing_price = float(entry.get(fill_price_field) or 0.0)
     existing_confirmed = bool(entry.get(fill_confirmed_field))
     if existing_confirmed and existing_price > 0:
-        return
+        relative_delta = abs(existing_price - exec_price) / exec_price
+        if relative_delta <= 0.005:
+            return
 
     strategy._commit_short_reduce_terminal_fill(
         runtime_state,
@@ -322,21 +333,53 @@ def repair_cycle_fill_maps_after_advance(
     )
 
     cycle_state = strategy._ensure_cycle_state(runtime_state)
+    second_leg_purpose = strategy._normalize_cycle_purpose(
+        strategy._get_second_leg_purpose(cycle_index),
+        {"cycle_index": cycle_index, "cycle_role": strategy._get_second_leg_cycle_role()},
+    )
+    exec_price = float(getattr(fill_event, "exec_price", 0.0) or 0.0)
+    is_second_leg_fill = purpose == second_leg_purpose
 
     if "_SHORT_" in purpose and ("SHORT_REDUCE" in purpose or "SHORT_TP" in purpose):
         fills = cycle_state.setdefault("short_fills", {})
         key = str(cycle_index)
         repaired = _repair_vwap_fill_entry(dict(fills.get(key) or {}))
         if repaired:
+            # Prefer the actual fill price when the map still carries a stale
+            # first-leg reference after deferred second-leg fills.
+            if is_second_leg_fill and exec_price > 0:
+                map_avg = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+                if map_avg <= 0 or abs(map_avg - exec_price) / exec_price > 0.005:
+                    repaired["avg_price"] = exec_price
+                    repaired["price"] = exec_price
+                    if float(repaired.get("total_qty") or 0.0) <= 0:
+                        repaired["total_qty"] = float(
+                            getattr(fill_event, "exec_qty", 0.0) or 0.0
+                        )
+                    repaired["weighted_price_sum"] = exec_price * float(
+                        repaired.get("total_qty")
+                        or getattr(fill_event, "exec_qty", 0.0)
+                        or 0.0
+                    )
             fills[key] = repaired
-            avg_price = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+            if is_second_leg_fill:
+                avg_price = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+                _sync_cycle_sequence_fill_price(
+                    strategy,
+                    runtime_state,
+                    cycle_index=cycle_index,
+                    fill_price_field=strategy._second_leg_fill_price_field(),
+                    fill_confirmed_field=strategy._second_leg_fill_confirmed_field(),
+                    fill_price=avg_price if avg_price > 0 else exec_price,
+                )
+        elif is_second_leg_fill and exec_price > 0:
             _sync_cycle_sequence_fill_price(
                 strategy,
                 runtime_state,
                 cycle_index=cycle_index,
                 fill_price_field=strategy._second_leg_fill_price_field(),
                 fill_confirmed_field=strategy._second_leg_fill_confirmed_field(),
-                fill_price=avg_price,
+                fill_price=exec_price,
             )
         return
 
@@ -345,15 +388,42 @@ def repair_cycle_fill_maps_after_advance(
         key = str(cycle_index)
         repaired = _repair_vwap_fill_entry(dict(fills.get(key) or {}))
         if repaired:
+            if is_second_leg_fill and exec_price > 0:
+                map_avg = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+                if map_avg <= 0 or abs(map_avg - exec_price) / exec_price > 0.005:
+                    repaired["avg_price"] = exec_price
+                    repaired["price"] = exec_price
+                    if float(repaired.get("total_qty") or 0.0) <= 0:
+                        repaired["total_qty"] = float(
+                            getattr(fill_event, "exec_qty", 0.0) or 0.0
+                        )
+                    repaired["weighted_price_sum"] = exec_price * float(
+                        repaired.get("total_qty")
+                        or getattr(fill_event, "exec_qty", 0.0)
+                        or 0.0
+                    )
             fills[key] = repaired
-            avg_price = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+            # Only second-leg fills (e.g. LONG_REDUCE on short signal) may sync
+            # into short_reduce_fill_price / long_reduce_fill_price. First-leg
+            # LONG_ADD must not overwrite the second-leg reference.
+            if is_second_leg_fill:
+                avg_price = float(repaired.get("avg_price") or repaired.get("price") or 0.0)
+                _sync_cycle_sequence_fill_price(
+                    strategy,
+                    runtime_state,
+                    cycle_index=cycle_index,
+                    fill_price_field=strategy._second_leg_fill_price_field(),
+                    fill_confirmed_field=strategy._second_leg_fill_confirmed_field(),
+                    fill_price=avg_price if avg_price > 0 else exec_price,
+                )
+        elif is_second_leg_fill and exec_price > 0:
             _sync_cycle_sequence_fill_price(
                 strategy,
                 runtime_state,
                 cycle_index=cycle_index,
                 fill_price_field=strategy._second_leg_fill_price_field(),
                 fill_confirmed_field=strategy._second_leg_fill_confirmed_field(),
-                fill_price=avg_price,
+                fill_price=exec_price,
             )
 
 
@@ -447,6 +517,17 @@ def install_cycle_fill_reference_repair(strategy: Any) -> None:
         runtime_state: RuntimeState,
         context: Any | None = None,
     ) -> None:
+        # Correct a stale/wrong second-leg reference *before* strategy advance
+        # builds the next-cycle trigger (deferred causal fills expose this).
+        purpose = str(getattr(fill_event, "purpose", "") or "").upper()
+        cycle_index = _cycle_index_from_purpose(purpose)
+        if cycle_index > 0:
+            _ensure_second_leg_sequence_commit(
+                strategy,
+                runtime_state,
+                fill_event,
+                cycle_index=cycle_index,
+            )
         original_advance(fill_event, runtime_state, context)
         repair_cycle_fill_maps_after_advance(strategy, runtime_state, fill_event)
 

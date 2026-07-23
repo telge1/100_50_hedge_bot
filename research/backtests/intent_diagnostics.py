@@ -80,6 +80,12 @@ INTENT_METADATA_EXCERPT_KEYS = (
 
     # Split disable diagnostics
     "normal_cycle_second_leg_split_disabled",
+    "normal_cycle_second_leg_split",
+    "is_staged_second_leg_tp",
+    "split_stage_index",
+    "split_stage_count",
+    "split_stage_qtys",
+    "split_total_qty",
 
     # Dynamic cycle order scaling (backtest-only)
     "dynamic_cycle_order_scaling_enabled",

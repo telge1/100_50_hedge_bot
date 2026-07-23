@@ -81,7 +81,13 @@ def is_immediate_cycle_second_leg_market_fill(intent: StrategyIntent) -> bool:
 
 
 def is_immediate_market_fill(intent: StrategyIntent) -> bool:
-    """Initial hedge entries and immediate market cycle/refill/reload orders."""
+    """True for fills that may execute immediately at the modeled candle price.
+
+    Includes initial entries, REFILL_* market adds, and stuck-recovery reload
+    entries. Cycle second-leg MARKET fallbacks are intentionally excluded: when
+    they are created as a follow-up of a same-candle fill they must wait until
+    the next candle (see ``eligible_from_candle_index`` / deferred market path).
+    """
     purpose = str(intent.purpose or "").strip().upper()
     if purpose in INITIAL_ENTRY_PURPOSES:
         return True
@@ -89,7 +95,42 @@ def is_immediate_market_fill(intent: StrategyIntent) -> bool:
         return True
     if is_immediate_refill_market_fill(intent):
         return True
-    return is_immediate_cycle_second_leg_market_fill(intent)
+    return False
+
+
+def is_deferred_cycle_second_leg_market_order(order: VirtualOrder) -> bool:
+    """Resting cycle second-leg MARKET reduce with no price/trigger (deferred fill)."""
+    order_type = str(order.order_type or "Market").strip().upper()
+    if order_type != "MARKET":
+        return False
+    if order.price is not None or order.trigger_price is not None:
+        return False
+    if not bool(getattr(order, "reduce_only", False)):
+        return False
+    return _is_cycle_second_leg_reduce_purpose(str(order.purpose or ""))
+
+
+def order_is_fill_eligible_on_candle(order: VirtualOrder, candle_index: int) -> bool:
+    """Return True when ``candle_index`` is at/after the order's causal eligibility."""
+    eligible_from = getattr(order, "eligible_from_candle_index", None)
+    if eligible_from is None:
+        return True
+    return int(candle_index) >= int(eligible_from)
+
+
+def stamp_order_causal_eligibility(
+    order: VirtualOrder,
+    *,
+    created_candle_index: int,
+    eligible_from_candle_index: int | None = None,
+) -> VirtualOrder:
+    """Stamp creation candle and earliest fill candle (default: next candle)."""
+    order.created_candle_index = int(created_candle_index)
+    if eligible_from_candle_index is None:
+        order.eligible_from_candle_index = int(created_candle_index) + 1
+    else:
+        order.eligible_from_candle_index = int(eligible_from_candle_index)
+    return order
 
 
 def order_trigger_side(order: VirtualOrder) -> str:
@@ -530,21 +571,42 @@ def process_candle_fills(
     fill_model: str = "conservative",
     max_fills_per_candle: int | None = None,
     conservative_fill_order: bool = True,
+    candle_index: int | None = None,
 ) -> tuple[list[FillEvent], dict[str, int]]:
     """Check eligible resting orders against candle high/low and emit FillEvents.
 
     Phase 7: only orders in ``eligible_orders`` (candle-start snapshot) may fill.
     New orders submitted during ``on_fill`` in the same candle are not eligible.
+    Additionally, orders with ``eligible_from_candle_index`` later than
+    ``candle_index`` are skipped (causal OHLC rule for conservative fills).
     Pass ``eligible_orders=None`` and ``max_fills_per_candle=None`` for legacy
     unlimited fills from all active orders (smoke tests).
     """
     stats = {"same_candle_fill_count": 0, "paired_exit_fills_count": 0}
+
+    resolved_candle_index = (
+        int(candle_index)
+        if candle_index is not None
+        else (
+            int(book.current_candle_index)
+            if getattr(book, "current_candle_index", None) is not None
+            else None
+        )
+    )
 
     if eligible_orders is None:
         order_pool = list(book.active_orders())
     else:
         active_ids = {order.order_id for order in book.active_orders()}
         order_pool = [order for order in eligible_orders if order.order_id in active_ids]
+
+    if resolved_candle_index is not None:
+        order_pool = [
+            order
+            for order in order_pool
+            if order_is_fill_eligible_on_candle(order, resolved_candle_index)
+            and not is_deferred_cycle_second_leg_market_order(order)
+        ]
 
     if max_fills_per_candle is None:
         candidates = [order for order in order_pool if should_fill_order_on_candle(order, candle)]

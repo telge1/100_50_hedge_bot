@@ -3325,6 +3325,47 @@ class GenericHedgeRuntime:
                         short_qty=short_qty,
                     )
                     continue
+            # Variant C: do not cancel residual staged second-leg reduces while
+            # basket coverage is insufficient and inventory is still open.
+            if long_qty > 0.0 or short_qty > 0.0:
+                order_is_residual = False
+                checker = getattr(
+                    self.strategy, "_order_is_open_residual_staged_second_leg", None
+                )
+                if callable(checker):
+                    try:
+                        order_is_residual = bool(checker(order))
+                    except Exception:
+                        order_is_residual = False
+                if order_is_residual:
+                    allow_fn = getattr(
+                        self.strategy,
+                        "allow_cancel_residual_staged_second_leg_orders",
+                        None,
+                    )
+                    protect = False
+                    if callable(allow_fn):
+                        try:
+                            decision = allow_fn(
+                                snapshot, self.runtime_state
+                            )
+                            protect = bool(
+                                getattr(decision, "staging_incomplete", False)
+                                and not bool(getattr(decision, "coverage_ok", True))
+                            )
+                        except Exception:
+                            protect = False
+                    if protect:
+                        self.audit.log_event(
+                            "cancel_blocked_protect_residual_staged_second_leg",
+                            strategy=self.strategy.name,
+                            client_order_id=client_id,
+                            purpose=order.purpose,
+                            reason="insufficient_basket_coverage",
+                            long_qty=long_qty,
+                            short_qty=short_qty,
+                        )
+                        continue
             canceled = False
             if order.exchange_order_id:
                 self._register_expected_exit_cancel(client_id, order, replace_context)

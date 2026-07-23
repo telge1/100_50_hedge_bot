@@ -22,7 +22,14 @@ from .pnl_coverage_audit import apply_trade_exit_quality
 from .multi_start_backtest import compact_result_dict, resolve_directions
 from .trade_block_export import ensure_backtest_trade_block_ids, stamp_trade_block_id
 from .addon_short_recovery import AddonShortRecoveryConfig
+from .exit_rebuild_policy import ExitRebuildPolicyConfig
+from .inventory_mtm_freeze import InventoryMtmFreezeConfig
 from .recovery_bot_config import RecoveryBotConfig, recovery_bot_config_dict
+from .recovery_reentry_policy import (
+    RecoveryReentryConfig,
+    RecoveryReentryRuntimeState,
+    apply_recovery_policy_after_trade,
+)
 
 CONTINUOUS_SUMMARY_CSV_FIELDS = (
     "symbol",
@@ -484,8 +491,15 @@ def run_continuous_reentry_for_direction(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
+    base_notional_usdt: float | None = None,
+    initial_notional_usdt: float | None = None,
+    exit_rebuild_policy_config: ExitRebuildPolicyConfig | None = None,
+    inventory_mtm_freeze_config: InventoryMtmFreezeConfig | None = None,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
     recovery_bot_config: RecoveryBotConfig | None = None,
+    recovery_reentry_config: RecoveryReentryConfig | None = None,
     input_slice_start_index: int = 0,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
@@ -505,6 +519,9 @@ def run_continuous_reentry_for_direction(
 
     results: list[BacktestResult] = []
     trade_number = 0
+    recovery_state = (
+        RecoveryReentryRuntimeState() if recovery_reentry_config is not None else None
+    )
 
     while start_index < len(candle_list):
         if continuous_max_trades is not None and trade_number >= int(continuous_max_trades):
@@ -528,6 +545,16 @@ def run_continuous_reentry_for_direction(
             short_config_path=short_config_path,
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
+            long_fill_distance_pct=long_fill_distance_pct,
+            target_profit_usdt=target_profit_usdt,
+            base_notional_usdt=base_notional_usdt,
+            initial_notional_usdt=(
+                float(initial_notional_usdt)
+                if initial_notional_usdt is not None
+                else (float(base_notional_usdt) if base_notional_usdt is not None else 100.0)
+            ),
+            exit_rebuild_policy_config=exit_rebuild_policy_config,
+            inventory_mtm_freeze_config=inventory_mtm_freeze_config,
             addon_short_recovery_config=addon_short_recovery_config,
             recovery_bot_config=recovery_bot_config,
             absolute_trade_start_index=start_index,
@@ -541,12 +568,29 @@ def run_continuous_reentry_for_direction(
         ensure_backtest_trade_block_ids(result)
         # Optional Cycle-3 snapshot for long-gap-reduction audits.
         result.cycle3_snapshot = _compute_cycle3_snapshot_from_fill_log(result)
+
+        default_next_start = int(result.end_index) + 1
+        recovery_should_break = False
+        if recovery_reentry_config is not None and recovery_state is not None:
+            outcome = apply_recovery_policy_after_trade(
+                result=result,
+                config=recovery_reentry_config,
+                state=recovery_state,
+                candle_list=candle_list,
+                default_next_start_index=default_next_start,
+            )
+            recovery_should_break = outcome.should_break
+            if not outcome.should_break and outcome.next_start_index is not None:
+                default_next_start = outcome.next_start_index
+
         results.append(result)
 
         if result.exit_reason not in CONTINUOUS_SUCCESSFUL_EXIT_REASONS:
             break
+        if recovery_should_break:
+            break
 
-        next_start = int(result.end_index) + 1
+        next_start = default_next_start
         if next_start >= len(candle_list):
             break
         start_index = next_start
@@ -569,8 +613,15 @@ def run_continuous_reentry_backtests(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
+    base_notional_usdt: float | None = None,
+    initial_notional_usdt: float | None = None,
+    exit_rebuild_policy_config: ExitRebuildPolicyConfig | None = None,
+    inventory_mtm_freeze_config: InventoryMtmFreezeConfig | None = None,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
     recovery_bot_config: RecoveryBotConfig | None = None,
+    recovery_reentry_config: RecoveryReentryConfig | None = None,
     input_slice_start_index: int = 0,
     candle_source_total_count: int | None = None,
     input_slice_first_timestamp: str | None = None,
@@ -608,8 +659,15 @@ def run_continuous_reentry_backtests(
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
                 tp_profit_target_pct=tp_profit_target_pct,
+                long_fill_distance_pct=long_fill_distance_pct,
+                target_profit_usdt=target_profit_usdt,
+                base_notional_usdt=base_notional_usdt,
+                initial_notional_usdt=initial_notional_usdt,
+                exit_rebuild_policy_config=exit_rebuild_policy_config,
+                inventory_mtm_freeze_config=inventory_mtm_freeze_config,
                 addon_short_recovery_config=addon_short_recovery_config,
                 recovery_bot_config=recovery_bot_config,
+                recovery_reentry_config=recovery_reentry_config,
                 input_slice_start_index=input_slice_start_index,
             )
         )

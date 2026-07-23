@@ -33,6 +33,9 @@ from .backtest_report import BacktestResult, build_fill_log_entry
 from .debug_report import finalize_backtest_debug
 from .cycle_short_tp_relief import CycleShortTpReliefConfig
 from .dynamic_cycle_order_scaling import DynamicCycleOrderScalingConfig
+from .exit_rebuild_policy import ExitRebuildPolicyConfig
+from .inventory_mtm_freeze import InventoryMtmFreezeConfig, freeze_state_summary
+from .second_leg_price_staging import SecondLegPriceStagingConfig
 from .stuck_recovery_reload import StuckRecoveryReloadConfig
 from .stuck_recovery_reload_shim import maybe_execute_stuck_recovery_reload
 from .trade_block_export import ensure_backtest_trade_block_ids
@@ -113,15 +116,21 @@ def run_historical_backtest(
     max_fills_per_candle: int | None = None,
     conservative_fill_order: bool = True,
     initial_notional_usdt: float = 100.0,
+    base_notional_usdt: float | None = None,
     config_source: ConfigSource = "test",
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
     use_live_short_tp_relief: bool = False,
+    exit_rebuild_policy_config: ExitRebuildPolicyConfig | None = None,
+    inventory_mtm_freeze_config: InventoryMtmFreezeConfig | None = None,
+    second_leg_price_staging_config: SecondLegPriceStagingConfig | None = None,
     addon_short_recovery_config: AddonShortRecoveryConfig | None = None,
     audit_recorder: BacktestAuditRecorder | None = None,
     recovery_bot_config: RecoveryBotConfig | None = None,
@@ -159,6 +168,13 @@ def run_historical_backtest(
     )
     if tp_profit_target_pct is not None:
         config_load.config.tp_profit_target_pct = float(tp_profit_target_pct)
+    if long_fill_distance_pct is not None:
+        config_load.config.long_fill_distance_pct = float(long_fill_distance_pct)
+    if target_profit_usdt is not None:
+        config_load.config.target_profit_usdt = float(target_profit_usdt)
+    if base_notional_usdt is not None:
+        config_load.config.base_notional_usdt = float(base_notional_usdt)
+        initial_notional_usdt = float(base_notional_usdt)
 
     if use_live_short_tp_relief:
         # Aktiviert das Live-Short-TP-Relief-Feature auf Config-Ebene, ohne den
@@ -175,6 +191,9 @@ def run_historical_backtest(
         dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
         stuck_recovery_reload_config=stuck_recovery_reload_config,
         cycle_short_tp_relief_config=None if use_live_short_tp_relief else cycle_short_tp_relief_config,
+        exit_rebuild_policy_config=exit_rebuild_policy_config,
+        inventory_mtm_freeze_config=inventory_mtm_freeze_config,
+        second_leg_price_staging_config=second_leg_price_staging_config,
         audit_recorder=audit_recorder,
     )
     sim.candle = first_candle
@@ -428,6 +447,72 @@ def run_historical_backtest(
         except Exception:
             pass
     finally:
+        decisions = list(getattr(sim.strategy, "_backtest_exit_policy_decisions", []) or [])
+        excerpt = dict(result.final_strategy_state_excerpt or {})
+        excerpt["exit_rebuild_policy"] = getattr(
+            sim.strategy, "_backtest_exit_rebuild_policy", "current"
+        )
+        excerpt["exit_policy_decisions"] = decisions
+
+        freeze_state = getattr(sim.strategy, "_backtest_inventory_mtm_freeze_state", None)
+        excerpt["inventory_mtm_freeze_variant"] = getattr(
+            sim.strategy, "_backtest_inventory_mtm_freeze_variant", "A0"
+        )
+        excerpt["inventory_mtm_trigger_event"] = getattr(
+            sim.strategy, "_backtest_inventory_mtm_trigger_event", None
+        )
+        excerpt["inventory_mtm_policy_actions"] = list(
+            getattr(sim.strategy, "_backtest_inventory_mtm_policy_actions", []) or []
+        )
+        excerpt["inventory_mtm_freeze_state"] = (
+            freeze_state_summary(freeze_state) if freeze_state is not None else None
+        )
+        try:
+            excerpt["last_basket_exit_coverage_decision"] = dict(
+                (sim.runtime_state.strategy_state or {}).get(
+                    "last_basket_exit_coverage_decision"
+                )
+                or {}
+            )
+        except Exception:
+            excerpt["last_basket_exit_coverage_decision"] = {}
+        try:
+            excerpt["research_second_leg_price_staging_plan"] = dict(
+                (sim.runtime_state.strategy_state or {}).get(
+                    "research_second_leg_price_staging_plan"
+                )
+                or {}
+            )
+        except Exception:
+            excerpt["research_second_leg_price_staging_plan"] = {}
+        excerpt["research_second_leg_price_staging_plans"] = list(
+            getattr(sim.strategy, "_backtest_slps_plans", []) or []
+        )
+        # FULL_DYNAMIC diagnostics (research-only).
+        try:
+            st = sim.runtime_state.strategy_state or {}
+            excerpt["research_fd_replan_events"] = list(st.get("research_fd_replan_events") or [])
+            excerpt["research_fd_plan_revision"] = dict(st.get("research_fd_plan_revision") or {})
+            excerpt["research_fd_required_net_total"] = dict(
+                st.get("research_fd_required_net_total") or {}
+            )
+            excerpt["research_fd_initial_pending"] = dict(
+                st.get("research_fd_initial_pending") or {}
+            )
+            excerpt["research_fd_cycle_covered"] = dict(st.get("research_fd_cycle_covered") or {})
+            excerpt["research_fd_stale_generation_fills"] = int(
+                st.get("research_fd_stale_generation_fills") or 0
+            )
+            excerpt["staged_second_leg_tp_realized_net"] = dict(
+                st.get("staged_second_leg_tp_realized_net") or {}
+            )
+            excerpt["staged_second_leg_tp_required_net_total"] = dict(
+                st.get("staged_second_leg_tp_required_net_total") or {}
+            )
+            excerpt["pending_cycle_loss_usdt"] = float(st.get("pending_cycle_loss_usdt") or 0.0)
+        except Exception:
+            excerpt.setdefault("research_fd_replan_events", [])
+        result.final_strategy_state_excerpt = excerpt
         sim.close()
 
     if result.end_time is None:

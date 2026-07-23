@@ -156,14 +156,23 @@ def generate_start_indices(
     start_step_candles: int,
     window_candles: int,
     max_starts: int,
+    require_full_window: bool = False,
 ) -> list[int]:
-    """Return start indices spaced by step, up to max_starts."""
+    """Return start indices spaced by step, up to max_starts.
+
+    When ``require_full_window`` is True, only indices with
+    ``index + window_candles <= candle_count`` are included.
+    """
     if candle_count < 1 or max_starts < 1 or start_step_candles < 1 or window_candles < 1:
+        return []
+
+    last_valid = candle_count - window_candles if require_full_window else candle_count - 1
+    if last_valid < 0:
         return []
 
     indices: list[int] = []
     index = 0
-    while len(indices) < max_starts and index < candle_count:
+    while len(indices) < max_starts and index <= last_valid:
         indices.append(index)
         index += start_step_candles
     return indices
@@ -449,10 +458,14 @@ def run_multi_start_backtest(
     start_step_candles: int = 100,
     window_candles: int = 1000,
     max_starts: int = 20,
+    start_indices: list[int] | None = None,
+    require_full_window: bool = False,
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
     dynamic_cycle_scaling_config: DynamicCycleOrderScalingConfig | None = None,
     stuck_recovery_reload_config: StuckRecoveryReloadConfig | None = None,
     cycle_short_tp_relief_config: CycleShortTpReliefConfig | None = None,
@@ -465,12 +478,16 @@ def run_multi_start_backtest(
         fill_model=fill_model,
         max_fills_per_candle=max_fills_per_candle,
     )
-    start_indices = generate_start_indices(
-        len(candles),
-        start_step_candles=start_step_candles,
-        window_candles=window_candles,
-        max_starts=max_starts,
-    )
+    if start_indices is None:
+        start_indices = generate_start_indices(
+            len(candles),
+            start_step_candles=start_step_candles,
+            window_candles=window_candles,
+            max_starts=max_starts,
+            require_full_window=require_full_window,
+        )
+    else:
+        start_indices = [int(index) for index in start_indices]
 
     results: list[BacktestResult] = []
     effective_cycle_short_tp_relief_config: CycleShortTpReliefConfig | None
@@ -484,6 +501,8 @@ def run_multi_start_backtest(
         window = candles[start_index : start_index + window_candles]
         if not window:
             continue
+        if require_full_window and len(window) < window_candles:
+            continue
         result = run_historical_backtest(
             symbol_upper,
             signal,
@@ -496,6 +515,8 @@ def run_multi_start_backtest(
             short_config_path=short_config_path,
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
+            long_fill_distance_pct=long_fill_distance_pct,
+            target_profit_usdt=target_profit_usdt,
             dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
             stuck_recovery_reload_config=stuck_recovery_reload_config,
             cycle_short_tp_relief_config=effective_cycle_short_tp_relief_config,
@@ -530,10 +551,14 @@ def run_multi_start_backtests(
     start_step_candles: int = 100,
     window_candles: int = 1000,
     max_starts: int = 20,
+    start_indices: list[int] | None = None,
+    require_full_window: bool = False,
     long_config_path: str | Path = DEFAULT_LONG_CONFIG_PATH,
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
     output_dir: str | Path = "research/backtests/results",
     write_json: bool = True,
     write_csv: bool = True,
@@ -565,10 +590,14 @@ def run_multi_start_backtests(
                     start_step_candles=start_step_candles,
                     window_candles=window_candles,
                     max_starts=max_starts,
+                    start_indices=start_indices,
+                    require_full_window=require_full_window,
                     long_config_path=long_config_path,
                     short_config_path=short_config_path,
                     file_config_path=file_config_path,
                     tp_profit_target_pct=tp_profit_target_pct,
+                    long_fill_distance_pct=long_fill_distance_pct,
+                    target_profit_usdt=target_profit_usdt,
                     dynamic_cycle_scaling_config=dynamic_cycle_scaling_config,
                     stuck_recovery_reload_config=stuck_recovery_reload_config,
                     cycle_short_tp_relief_config=cycle_short_tp_relief_config,

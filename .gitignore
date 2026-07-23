@@ -138,3 +138,7 @@ research/liquidation_level/results/**/safe_batch_nohup.out
 # Regime scanner generated research outputs
 research/regime_scanner/results/
 research/regime_scanner/results_*/
+
+# Generated backtest and forecast outputs
+research/backtests/results/
+research/trend_forecast_validation/results/

@@ -158,6 +158,56 @@ def test_submit_refill_market_intent_fills_immediately(purpose: str) -> None:
         sim.close()
 
 
+def test_refill_short_survives_batch_with_flat_short_leg() -> None:
+    """REFILL_SHORT must fill even when short qty is already flat at submit time.
+
+    Flat-cancel runs after each immediate fill. If both refills are submitted
+    before either fills, REFILL_LONG's fill can cancel REFILL_SHORT while it is
+    still waiting in the batch. Immediate fills must therefore run inline.
+    """
+    sim = HedgeBotOriginalSimulator(signal="long", symbol="BTCUSDT", candle_close=100.0)
+    sim.candle = _candle("BTCUSDT", close=100.0)
+    try:
+        sim.book.long_qty = 50.0
+        sim.book.long_avg = 100.0
+        sim.book.short_qty = 0.0
+        sim.book.short_avg = 0.0
+
+        resting = sim.submit_intents_to_book(
+            [
+                StrategyIntent(
+                    side="long",
+                    qty=2.0,
+                    purpose="REFILL_LONG",
+                    order_type="Market",
+                ),
+                StrategyIntent(
+                    side="short",
+                    qty=1.0,
+                    purpose="REFILL_SHORT",
+                    order_type="Market",
+                ),
+            ],
+            event_source="test_refill_flat_short_batch",
+        )
+        assert resting == []
+        assert float(sim.book.long_qty) == pytest.approx(52.0)
+        assert float(sim.book.short_qty) == pytest.approx(1.0)
+        assert not any(
+            str(o.purpose) == "REFILL_SHORT" and str(o.status).upper() == "CANCELED"
+            for o in sim.book._orders.values()
+        )
+        short_fills = [
+            o
+            for o in sim.book._orders.values()
+            if str(o.purpose) == "REFILL_SHORT"
+        ]
+        assert short_fills
+        assert str(short_fills[-1].status).upper() == "FILLED"
+    finally:
+        sim.close()
+
+
 def test_strategy_on_fill_called_for_both_refill_legs() -> None:
     sim = HedgeBotOriginalSimulator(signal="long", symbol="BTCUSDT", candle_close=100.0)
     sim.candle = _candle("BTCUSDT", close=100.0)

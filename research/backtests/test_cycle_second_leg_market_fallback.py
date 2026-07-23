@@ -1,4 +1,4 @@
-"""Immediate MARKET fallback fills for cycle second-leg reduces."""
+"""Deferred MARKET fallback fills for cycle second-leg reduces (next candle)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from fixed_cycle_hedge_bot.models import RuntimeState, StrategyIntent
+from fixed_cycle_hedge_bot.models import StrategyIntent
 
 from research.backtests.hedge_bot_original_simulator import HedgeBotOriginalSimulator
 from research.backtests.simulated_execution import (
@@ -16,14 +16,14 @@ from research.backtests.simulated_execution import (
 from research.backtests.simulated_order_book import SyntheticCandle
 
 
-def _candle(symbol: str, *, close: float) -> SyntheticCandle:
+def _candle(symbol: str, *, close: float, ts: datetime | None = None) -> SyntheticCandle:
     return SyntheticCandle(
         symbol=symbol,
         open=close,
         high=close,
         low=close,
         close=close,
-        timestamp=datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc),
+        timestamp=ts or datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc),
     )
 
 
@@ -34,7 +34,9 @@ def _candle(symbol: str, *, close: float) -> SyntheticCandle:
         "CYCLE_3_LONG_REDUCE",
     ],
 )
-def test_cycle_second_leg_market_reduce_without_price_is_immediate_fill(purpose: str) -> None:
+def test_cycle_second_leg_market_reduce_without_price_is_detected_but_not_immediate(
+    purpose: str,
+) -> None:
     intent = StrategyIntent(
         side="short" if "SHORT" in purpose else "long",
         qty=1.0,
@@ -43,7 +45,8 @@ def test_cycle_second_leg_market_reduce_without_price_is_immediate_fill(purpose:
         reduce_only=True,
     )
     assert is_immediate_cycle_second_leg_market_fill(intent) is True
-    assert is_immediate_market_fill(intent) is True
+    # Causal rule: not filled in the creation candle via immediate path.
+    assert is_immediate_market_fill(intent) is False
 
 
 @pytest.mark.parametrize(
@@ -54,7 +57,6 @@ def test_cycle_second_leg_market_reduce_without_price_is_immediate_fill(purpose:
     ],
 )
 def test_cycle_second_leg_with_price_or_not_reduce_only_is_not_immediate(purpose: str) -> None:
-    # Mit Limit-/Triggerpreis oder ohne reduce_only darf der Helper nicht greifen.
     base = StrategyIntent(
         side="short" if "SHORT" in purpose else "long",
         qty=1.0,
@@ -80,35 +82,19 @@ def test_cycle_long_add_market_not_treated_as_immediate() -> None:
         reduce_only=False,
     )
     assert is_immediate_cycle_second_leg_market_fill(intent) is False
-    # is_immediate_market_fill kann für andere Pfade noch True sein; hier erwarten wir False.
     assert is_immediate_market_fill(intent) is False
 
 
-def test_e2e_cycle_second_leg_market_fallback_fills_immediately() -> None:
-    """E2E: Market-Fallback für CYCLE_3_SHORT_REDUCE wird im Simulator sofort gefüllt."""
+def test_e2e_cycle_second_leg_market_fallback_fills_next_candle() -> None:
+    """E2E: Market-Fallback rests on creation candle and fills on the next candle."""
     sim = HedgeBotOriginalSimulator(signal="long", symbol="BTCUSDT", candle_close=100.0)
     sim.candle = _candle("BTCUSDT", close=100.0)
     try:
-        # Ausgangsposition
         sim.book.long_qty = 100.0
         sim.book.long_avg = 100.0
         sim.book.short_qty = 50.0
         sim.book.short_avg = 100.0
-
-        runtime_state: RuntimeState = sim.runtime_state
-        state = runtime_state.strategy_state
-        state.update(
-            {
-                "trade_block_id": "tb-cycle-3",
-                "cycle_waiting_for_short_tp": True,
-                "short_tp_pending_cycle": 3,
-                "pending_short_cycle_index": 3,
-                "current_long_cycle_index": 3,
-                "current_short_cycle_index": 0,
-                "processed_cycle_purposes": ["CYCLE_3_LONG_ADD"],
-                "initial_entry_confirmed": True,
-            }
-        )
+        sim.candle_index = 3
 
         intent = StrategyIntent(
             side="short",
@@ -120,33 +106,31 @@ def test_e2e_cycle_second_leg_market_fallback_fills_immediately() -> None:
         )
 
         qty_before_short = sim.book.short_qty
-
         resting = sim.submit_intents_to_book(
             [intent],
-            event_source="test_cycle_second_leg_market_fallback",
+            event_source="after_fill",
         )
 
-        # Intent darf nicht als NEW im Orderbuch liegen bleiben.
-        assert resting == []
+        assert len(resting) == 1
+        assert resting[0].eligible_from_candle_index == 4
+        assert sim.book.active_orders_by_purpose("CYCLE_3_SHORT_REDUCE")
+        assert sim.book.short_qty == pytest.approx(qty_before_short)
+
+        # Creation candle must not fill it via process_candle.
+        result_same = sim.process_candle(sim.candle, fill_model="conservative")
+        assert not any(f.purpose == "CYCLE_3_SHORT_REDUCE" for f in result_same.candle_fills)
+        assert sim.book.short_qty == pytest.approx(qty_before_short)
+
+        # Next candle fills deferred market at close.
+        sim.candle_index = 4
+        next_candle = _candle(
+            "BTCUSDT",
+            close=99.0,
+            ts=datetime(2026, 6, 24, 12, 5, tzinfo=timezone.utc),
+        )
+        result_next = sim.process_candle(next_candle, fill_model="conservative")
+        assert any(f.purpose == "CYCLE_3_SHORT_REDUCE" for f in result_next.candle_fills)
+        assert sim.book.short_qty == pytest.approx(qty_before_short - 5.0)
         assert sim.book.active_orders_by_purpose("CYCLE_3_SHORT_REDUCE") == []
-
-        # Short-Position muss reduziert worden sein.
-        qty_after_short = sim.book.short_qty
-        assert qty_after_short == pytest.approx(qty_before_short - 5.0)
-
-        # Es muss ein entsprechender Fill im order_log erscheinen.
-        fills = [
-            entry
-            for entry in sim.order_log
-            if entry.get("purpose") == "CYCLE_3_SHORT_REDUCE" and entry.get("event_type") == "filled"
-        ]
-        assert len(fills) == 1
-        filled = fills[0]
-        assert filled.get("status") == "FILLED"
-        assert filled.get("price") == pytest.approx(100.0)
-        assert filled.get("fill_price") == pytest.approx(100.0)
-        # Keine doppelte Ausführung im gleichen Candle-Lauf.
-        assert filled.get("same_candle_fill_count", 1) == 1
     finally:
         sim.close()
-

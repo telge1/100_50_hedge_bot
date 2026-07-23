@@ -24,6 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HIGHLIGHT_BOT_CONFIG_KEYS = (
     "price_tick_size",
     "tp_profit_target_pct",
+    "tp_buffer_pct",
+    "target_profit_usdt",
     "long_fill_distance_pct",
     "short_fill_distance_pct",
     "base_notional_usdt",

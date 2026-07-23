@@ -184,6 +184,8 @@ def run_original_hedge_backtests(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
     write_json: bool = True,
     write_csv: bool = True,
     candles: list[dict[str, Any]] | None = None,
@@ -216,6 +218,8 @@ def run_original_hedge_backtests(
             short_config_path=short_config_path,
             file_config_path=file_config_path,
             tp_profit_target_pct=tp_profit_target_pct,
+            long_fill_distance_pct=long_fill_distance_pct,
+            target_profit_usdt=target_profit_usdt,
             use_live_short_tp_relief=use_live_short_tp_relief,
             addon_short_recovery_config=addon_short_recovery_config,
         )
@@ -275,6 +279,8 @@ def run_fill_model_comparison(
     short_config_path: str | Path = DEFAULT_SHORT_CONFIG_PATH,
     file_config_path: str | Path | None = None,
     tp_profit_target_pct: float | None = None,
+    long_fill_distance_pct: float | None = None,
+    target_profit_usdt: float | None = None,
 ) -> dict[str, Any]:
     symbol_upper = symbol.upper()
     directions = resolve_directions(direction)
@@ -300,6 +306,9 @@ def run_fill_model_comparison(
                 long_config_path=long_config_path,
                 short_config_path=short_config_path,
                 file_config_path=file_config_path,
+                tp_profit_target_pct=tp_profit_target_pct,
+                long_fill_distance_pct=long_fill_distance_pct,
+                target_profit_usdt=target_profit_usdt,
             )
 
     json_path, csv_path = comparison_output_paths(output_dir, symbol_upper)
@@ -461,6 +470,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Backtest-only: override config.tp_profit_target_pct. Example: 0.50 means 0.50%%",
+    )
+    parser.add_argument(
+        "--long-fill-distance-pct",
+        type=float,
+        default=None,
+        help=(
+            "Backtest-only: override config.long_fill_distance_pct for LONG_ADD trigger distance. "
+            "Example: 0.8 means 0.8%% (code divides by 100)."
+        ),
+    )
+    parser.add_argument(
+        "--target-profit-usdt",
+        type=float,
+        default=None,
+        help=(
+            "Backtest-only: override config.target_profit_usdt cycle coverage buffer in USDT. "
+            "Example: 0.015. Used in required_net = loss_to_cover + target_profit_usdt."
+        ),
     )
     parser.add_argument(
         "--multi-start",
@@ -724,6 +751,8 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                long_fill_distance_pct=args.long_fill_distance_pct,
+                target_profit_usdt=args.target_profit_usdt,
                 addon_short_recovery_config=resolve_addon_short_recovery_config(args),
                 recovery_bot_config=resolve_recovery_bot_config(args),
                 input_slice_start_index=slice_info.input_slice_start_index,
@@ -762,6 +791,8 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                long_fill_distance_pct=args.long_fill_distance_pct,
+                target_profit_usdt=args.target_profit_usdt,
                 output_dir=args.output_dir,
                 write_json=write_json,
                 write_csv=write_csv,
@@ -807,6 +838,8 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                long_fill_distance_pct=args.long_fill_distance_pct,
+                target_profit_usdt=args.target_profit_usdt,
             )
         else:
             payload = run_original_hedge_backtests(
@@ -825,6 +858,8 @@ def main(argv: list[str] | None = None) -> int:
                 short_config_path=args.short_config_path,
                 file_config_path=args.config_path,
                 tp_profit_target_pct=args.tp_profit_target_pct,
+                long_fill_distance_pct=args.long_fill_distance_pct,
+                target_profit_usdt=args.target_profit_usdt,
                 addon_short_recovery_config=resolve_addon_short_recovery_config(args),
                 use_live_short_tp_relief=getattr(args, "use_live_short_tp_relief", False),
             )
