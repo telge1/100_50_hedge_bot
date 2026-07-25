@@ -1,0 +1,10 @@
+{
+  "core_unchanged_until_full_exit_or_still_frozen": true,
+  "start_qty_neutral": true,
+  "no_negative_qty": true,
+  "locked_spread_loss": 28.309310161323403,
+  "fill_count": 26,
+  "recovery_rounds": 8,
+  "final_state": "RECOVERED",
+  "exit_reason": "recovered_profit"
+}

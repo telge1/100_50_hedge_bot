@@ -1,0 +1,98 @@
+{
+  "variants": {
+    "shared_be": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 26,
+      "recovery_rounds": 8,
+      "final_state": "RECOVERED",
+      "exit_reason": "recovered_profit",
+      "overlay_exit_policy": "shared_be",
+      "safety_violation_count": 0
+    },
+    "individual_tp_0p50": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 42,
+      "recovery_rounds": 14,
+      "final_state": "DATA_END_OPEN",
+      "exit_reason": "data_end_open",
+      "overlay_exit_policy": "individual_tp",
+      "safety_violation_count": 0
+    },
+    "individual_tp_0p75": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 48,
+      "recovery_rounds": 13,
+      "final_state": "DATA_END_OPEN",
+      "exit_reason": "data_end_open",
+      "overlay_exit_policy": "individual_tp",
+      "safety_violation_count": 0
+    },
+    "individual_tp_1p00": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 37,
+      "recovery_rounds": 10,
+      "final_state": "RECOVERED",
+      "exit_reason": "recovered_profit",
+      "overlay_exit_policy": "individual_tp",
+      "safety_violation_count": 0
+    },
+    "individual_tp_1p50": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 22,
+      "recovery_rounds": 4,
+      "final_state": "RECOVERED",
+      "exit_reason": "recovered_profit",
+      "overlay_exit_policy": "individual_tp",
+      "safety_violation_count": 0
+    },
+    "individual_tp_2p00": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 16,
+      "recovery_rounds": 1,
+      "final_state": "RECOVERED",
+      "exit_reason": "recovered_profit",
+      "overlay_exit_policy": "individual_tp",
+      "safety_violation_count": 0
+    },
+    "individual_tp_scaled_1_2_3": {
+      "core_unchanged_until_full_exit_or_still_frozen": true,
+      "start_qty_neutral": true,
+      "no_negative_qty": true,
+      "tranche_ledger_qty_sync": true,
+      "locked_spread_loss": 28.309310161323403,
+      "fill_count": 32,
+      "recovery_rounds": 1,
+      "final_state": "RECOVERED",
+      "exit_reason": "recovered_profit",
+      "overlay_exit_policy": "individual_tp_scaled",
+      "safety_violation_count": 0
+    }
+  },
+  "shared_be_final_status": "RECOVERED",
+  "shared_be_final_econ": 30.596847805021635,
+  "n_variants": 7
+}

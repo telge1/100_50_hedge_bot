@@ -1,0 +1,8 @@
+{
+  "generated_at_utc": "2026-07-25T13:45:17.261266+00:00",
+  "start_index": 4102,
+  "bars_processed": 5141,
+  "final_state": "RECOVERED",
+  "exit_reason": "recovered_profit",
+  "recovery_reference_price_final": 1.0531000000000001
+}
