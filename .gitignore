@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Runtime data
+data/raw/*
+data/checkpoints/*
+logs/*
+results/*
+
+# Platzhalter behalten
+!data/raw/.gitkeep
+!data/checkpoints/.gitkeep
+!logs/.gitkeep
+!results/.gitkeep
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

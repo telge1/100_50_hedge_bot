@@ -1,0 +1,9 @@
+websockets
+httpx
+clickhouse-connect
+python-dotenv
+orjson
+zstandard
+pandas
+pyarrow
+pytest
