@@ -228,6 +228,44 @@ def test_liquidation_rows() -> None:
     assert rows[1][3] == "Buy"
 
 
+def test_liquidation_missing_side_not_coerced_to_buy(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    msg = {
+        "topic": "allLiquidation.APTUSDT",
+        "type": "snapshot",
+        "ts": 1,
+        "data": [
+            {"T": 10, "s": "APTUSDT", "v": "200", "p": "5.00"},  # missing S
+            {"T": 11, "s": "APTUSDT", "S": "Sell", "v": "50", "p": "5.20"},
+        ],
+    }
+    with caplog.at_level(logging.WARNING):
+        rows = parse_liquidation_rows(msg, received_ts=RECEIVED)
+    assert len(rows) == 1
+    assert rows[0][3] == "Sell"
+    assert any("Invalid liquidation side" in r.message for r in caplog.records)
+
+
+def test_liquidation_invalid_side_dropped_and_logged(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    msg = {
+        "topic": "allLiquidation.APTUSDT",
+        "type": "snapshot",
+        "ts": 1,
+        "data": [
+            {"T": 10, "s": "APTUSDT", "S": "Long", "v": "200", "p": "5.00"},
+            {"T": 11, "s": "APTUSDT", "S": "Buy", "v": "50", "p": "5.20"},
+        ],
+    }
+    with caplog.at_level(logging.WARNING):
+        rows = parse_liquidation_rows(msg, received_ts=RECEIVED)
+    assert len(rows) == 1
+    assert rows[0][3] == "Buy"
+    assert any("Invalid liquidation side" in r.message for r in caplog.records)
+
+
 def test_redact_settings_hides_password() -> None:
     settings = Settings(
         bybit_ws_url="wss://example",

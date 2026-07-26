@@ -303,17 +303,25 @@ def parse_public_trade_rows(
 def parse_liquidation_rows(
     msg: dict[str, Any], *, received_ts: datetime
 ) -> list[SequenceRow]:
+    """Parse Bybit allLiquidation payload into ClickHouse liquidations rows.
+
+    ``S`` is the position side (Buy = long liquidated, Sell = short liquidated).
+    ``p`` is the bankruptcy price. Invalid/missing ``S`` is dropped (never coerced
+    to Buy) because the ClickHouse enum only allows Buy/Sell.
+    """
     data = msg.get("data")
     items = data if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
     rows: list[SequenceRow] = []
     for item in items:
         if not isinstance(item, dict):
             continue
+        raw_side = item.get("S")
+        if raw_side not in ("Buy", "Sell"):
+            logger.warning("Invalid liquidation side: %r", raw_side)
+            continue
+        side = raw_side
         price = to_decimal_required(item.get("p"))
         qty = to_decimal_required(item.get("v"))
-        side = item.get("S") or "Buy"
-        if side not in ("Buy", "Sell"):
-            side = "Buy"
         liq_ts = ms_to_dt(item.get("T")) or ms_to_dt(msg.get("ts")) or received_ts
         rows.append(
             (
