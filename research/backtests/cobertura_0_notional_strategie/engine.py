@@ -25,6 +25,9 @@ from .economics import (
     adverse_short_exit_price,
     compute_total_exit_economics,
     distance_pct,
+    gap_aware_long_close_fill_price,
+    gap_aware_short_close_fill_price,
+    gap_aware_short_open_fill_price,
     long_open_fill_price,
     overlay_open_profit_usdt,
     overlay_short_be_trigger_price,
@@ -35,6 +38,7 @@ from .equalization import (
     locked_spread_pct,
 )
 from .ledger import CoberturaLedger, round_price, round_qty
+from .start_distance import resolve_post_add_qty
 from .tranches import TrancheBook
 
 State = Literal[
@@ -91,6 +95,8 @@ class EngineResult:
     tranches_final: list[dict[str, Any]] = field(default_factory=list)
     equalization_events: list[dict[str, Any]] = field(default_factory=list)
     first_net_be_touch: dict[str, Any] | None = None
+    post_add_guard_events: list[dict[str, Any]] = field(default_factory=list)
+    gap_fill_events: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def fills_events(self) -> list[dict[str, Any]]:
@@ -131,6 +137,9 @@ class CoberturaEngine:
         self._eq_add_qty_pending: float | None = None
         self._short_add_count_total = 0
         self._first_net_be_touch: dict[str, Any] | None = None
+        self.post_add_guard_events: list[dict[str, Any]] = []
+        self._bar_open: float | None = None
+        self.gap_fill_events: list[dict[str, Any]] = []
 
         self.per_bar_trace: list[dict[str, Any]] = []
         self.order_events: list[dict[str, Any]] = []
@@ -197,6 +206,10 @@ class CoberturaEngine:
                 return False
             self._execute_full_exit(ref_price=ref_price, ts=ts, reason="recovered_net_be")
             return True
+        # Legacy / research next-bar exit: defer only when same-bar adds created
+        # the newly satisfied gate; prior-bar entitlement still exits immediately.
+        if bool(self.cfg.defer_full_exit_after_same_bar_adds) and bool(added_this_bar):
+            return False
         label = (
             "recovered_profit"
             if econ.total_exit_economics > float(self.cfg.pnl_tolerance_usdt)
@@ -539,15 +552,73 @@ class CoberturaEngine:
             )
 
     def _fill_short_add(self, *, level: int, trigger: float, ts: str) -> bool:
-        qty = self._add_qty()
+        configured_qty = self._add_qty()
+        candle_open = float(self._bar_open if self._bar_open is not None else trigger)
+        fill_raw, gap_ref, gap_adj = gap_aware_short_open_fill_price(
+            trigger=trigger,
+            candle_open=candle_open,
+            slippage_bps_open=self.cfg.slippage_bps_open,
+            enabled=bool(self.cfg.gap_through_trigger_fills),
+        )
+        fill_px = round_price(fill_raw, self.cfg.tick_size)
+        if gap_adj:
+            self.gap_fill_events.append(
+                {
+                    "timestamp": ts,
+                    "kind": "overlay_short_add",
+                    "side": "short",
+                    "trigger": trigger,
+                    "candle_open": candle_open,
+                    "raw_reference": gap_ref,
+                    "fill_price": fill_px,
+                    "gap_adjusted": True,
+                }
+            )
+        cur_short_qty = float(self.ledger.total_short_qty())
+        cur_short_avg = float(self.ledger.total_short_avg()) if cur_short_qty > 0 else 0.0
+        decision = resolve_post_add_qty(
+            configured_candidate_add_qty=configured_qty,
+            current_total_short_qty=cur_short_qty,
+            current_total_short_avg=cur_short_avg if cur_short_qty > 0 else fill_px,
+            current_overlay_qty=float(
+                self.ledger.overlay_short.qty + self.ledger.overlay_long.qty
+            ),
+            core_qty=float(self.cfg.core_qty()),
+            candidate_fill_price=fill_px,
+            current_price=float(trigger),
+            minimum_post_add_distance_pct=self.cfg.minimum_post_add_distance_pct,
+            post_add_distance_policy=self.cfg.post_add_distance_policy,
+            max_overlay_qty_multiple=self.cfg.max_overlay_qty_multiple,
+            qty_step=float(self.cfg.qty_step),
+            min_notional=float(self.cfg.min_notional),
+        )
+        guard_row = {
+            "timestamp": ts,
+            "level": level,
+            "trigger": trigger,
+            "fill_price": fill_px,
+            **decision,
+        }
+        self.post_add_guard_events.append(guard_row)
+
+        if decision["action"] == "skip" or float(decision["actual_add_qty"]) <= 0.0:
+            self.order_events.append(
+                {
+                    "timestamp": ts,
+                    "event": "overlay_short_add_skipped",
+                    "level": level,
+                    "trigger": trigger,
+                    "reason": decision.get("reason"),
+                    "configured_qty": configured_qty,
+                }
+            )
+            return False
+
+        qty = float(decision["actual_add_qty"])
         block = self._exposure_blocks_add(qty, trigger)
         if block is not None:
             self._note_safety(block, ts, level=level)
             return False
-        fill_px = round_price(
-            short_open_fill_price(trigger, self.cfg.slippage_bps_open),
-            self.cfg.tick_size,
-        )
         meta = self.ledger.open_overlay_short(
             qty=qty,
             fill_price=fill_px,
@@ -565,6 +636,8 @@ class CoberturaEngine:
                 "level": level,
                 "trigger": trigger,
                 "qty": qty,
+                "configured_qty": configured_qty,
+                "post_add_action": decision.get("action"),
             }
         )
         self.fills.append(
@@ -575,9 +648,15 @@ class CoberturaEngine:
                 "trigger": trigger,
                 "fill_price": fill_px,
                 "qty": qty,
+                "configured_qty": configured_qty,
                 "fee": meta["fee"],
                 "slippage_cost": meta["slippage_cost"],
                 "side": "short",
+                "projected_post_add_distance_pct": decision.get(
+                    "projected_post_add_distance_pct"
+                ),
+                "projected_total_short_avg": decision.get("projected_total_short_avg"),
+                "post_add_action": decision.get("action"),
             }
         )
         # Always record tranche for audit; TP only for individual policies.
@@ -612,10 +691,27 @@ class CoberturaEngine:
 
     def _close_overlay_short_be(self, *, trigger: float, ts: str) -> None:
         core_before = self.ledger.core_snapshot()
-        fill_px = round_price(
-            adverse_short_exit_price(trigger, self.cfg.slippage_bps_close),
-            self.cfg.tick_size,
+        candle_open = float(self._bar_open if self._bar_open is not None else trigger)
+        fill_raw, gap_ref, gap_adj = gap_aware_short_close_fill_price(
+            trigger=trigger,
+            candle_open=candle_open,
+            slippage_bps_close=self.cfg.slippage_bps_close,
+            enabled=bool(self.cfg.gap_through_trigger_fills),
         )
+        fill_px = round_price(fill_raw, self.cfg.tick_size)
+        if gap_adj:
+            self.gap_fill_events.append(
+                {
+                    "timestamp": ts,
+                    "kind": "overlay_be_close",
+                    "side": "buy",
+                    "trigger": trigger,
+                    "candle_open": candle_open,
+                    "raw_reference": gap_ref,
+                    "fill_price": fill_px,
+                    "gap_adjusted": True,
+                }
+            )
         meta = self.ledger.close_all_overlay_short(
             fill_price=fill_px,
             reference_price=trigger,
@@ -747,11 +843,44 @@ class CoberturaEngine:
         econ = compute_total_exit_economics(
             self.ledger, self.cfg, reference_exit_price=ref_price
         )
+        candle_open = float(self._bar_open if self._bar_open is not None else ref_price)
+        long_px = float(econ.long_exit_price)
+        short_px = float(econ.short_exit_price)
+        if bool(self.cfg.gap_through_trigger_fills):
+            long_raw, long_ref, long_adj = gap_aware_long_close_fill_price(
+                trigger=ref_price,
+                candle_open=candle_open,
+                slippage_bps_close=self.cfg.slippage_bps_close,
+                enabled=True,
+            )
+            short_raw, short_ref, short_adj = gap_aware_short_close_fill_price(
+                trigger=ref_price,
+                candle_open=candle_open,
+                slippage_bps_close=self.cfg.slippage_bps_close,
+                enabled=True,
+            )
+            long_px = round_price(long_raw, self.cfg.tick_size)
+            short_px = round_price(short_raw, self.cfg.tick_size)
+            if long_adj or short_adj:
+                self.gap_fill_events.append(
+                    {
+                        "timestamp": ts,
+                        "kind": "full_exit",
+                        "side": "both",
+                        "trigger": ref_price,
+                        "candle_open": candle_open,
+                        "raw_reference_long": long_ref,
+                        "raw_reference_short": short_ref,
+                        "fill_price_long": long_px,
+                        "fill_price_short": short_px,
+                        "gap_adjusted": True,
+                    }
+                )
         for pos, side, px, is_overlay in (
-            (self.ledger.overlay_long, "long", econ.long_exit_price, True),
-            (self.ledger.overlay_short, "short", econ.short_exit_price, True),
-            (self.ledger.core_long, "long", econ.long_exit_price, False),
-            (self.ledger.core_short, "short", econ.short_exit_price, False),
+            (self.ledger.overlay_long, "long", long_px, True),
+            (self.ledger.overlay_short, "short", short_px, True),
+            (self.ledger.core_long, "long", long_px, False),
+            (self.ledger.core_short, "short", short_px, False),
         ):
             qty = pos.qty
             if qty <= 0.0:
@@ -779,7 +908,7 @@ class CoberturaEngine:
             )
         self.tranche_book.close_all_for_full_exit(
             timestamp=ts,
-            fill_price=econ.short_exit_price,
+            fill_price=short_px,
             close_fee_by_qty=0.0,
             realized_by_qty=0.0,
         )
@@ -811,6 +940,7 @@ class CoberturaEngine:
         h = float(candle["high"])
         low = float(candle["low"])
         c = float(candle["close"])
+        self._bar_open = o
         self.bars_since_start += 1
         added_this_bar = False
 
@@ -946,10 +1076,14 @@ class CoberturaEngine:
                     self._append_econ(ts, econ)
 
             # net_be: full-exit before adds so a same-candle add cannot create the BE.
-            if self._uses_net_be() and self.state not in (
+            # next_bar_exit (legacy): also evaluate prior entitlement before adds.
+            if self.state not in (
                 "RECOVERED",
                 "RECOVERED_BE",
                 "STOPPED",
+            ) and (
+                self._uses_net_be()
+                or bool(self.cfg.defer_full_exit_after_same_bar_adds)
             ):
                 econ = compute_total_exit_economics(
                     self.ledger, self.cfg, reference_exit_price=c
@@ -984,15 +1118,21 @@ class CoberturaEngine:
             if added_this_bar and self._uses_shared_be():
                 self._be_active = None
 
-        # 5) Full-exit gate (legacy after adds; net_be already handled pre-add)
+        # 5) Full-exit gate (legacy after adds; net_be / next_bar already handled pre-add)
         if self.state not in ("RECOVERED", "RECOVERED_BE", "STOPPED"):
             econ = compute_total_exit_economics(
                 self.ledger, self.cfg, reference_exit_price=c
             )
             self._append_econ(ts, econ)
-            if self._uses_net_be():
-                # Already evaluated pre-add; do not allow post-add BE on this bar.
-                exited = False
+            if self._uses_net_be() or bool(self.cfg.defer_full_exit_after_same_bar_adds):
+                # Pre-add gate already evaluated; do not allow post-add same-bar exit
+                # when adds occurred. If no adds, still allow exit here.
+                if added_this_bar:
+                    exited = False
+                else:
+                    exited = self._maybe_full_exit(
+                        ref_price=c, ts=ts, econ=econ, added_this_bar=False
+                    )
             else:
                 exited = self._maybe_full_exit(
                     ref_price=c, ts=ts, econ=econ, added_this_bar=added_this_bar
@@ -1183,4 +1323,6 @@ class CoberturaEngine:
             tranches_final=[t.to_dict() for t in self.tranche_book.tranches],
             equalization_events=list(self.equalization_events),
             first_net_be_touch=self._first_net_be_touch,
+            post_add_guard_events=self.post_add_guard_events,
+            gap_fill_events=self.gap_fill_events,
         )

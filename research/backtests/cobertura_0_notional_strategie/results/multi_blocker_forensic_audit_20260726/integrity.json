@@ -1,0 +1,12 @@
+{
+  "decision": "MULTI_BLOCKER_FORENSIC_AUDIT_PASS_WITH_WARNINGS",
+  "warnings": [
+    "baseline_same_candle_add_full_exit",
+    "unresolved_cases_present"
+  ],
+  "n_selected": 25,
+  "n_unresolved": 2,
+  "n_results": 100,
+  "apt_regression": "APT_REGRESSION_PASS",
+  "multi_blocker_release_allowed": true
+}

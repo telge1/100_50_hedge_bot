@@ -1,0 +1,12 @@
+{
+  "candles_multi_add": 5,
+  "candles_add_and_be": 0,
+  "candles_add_and_full_exit": 0,
+  "candles_gt3_fills": 2,
+  "max_adds_on_one_candle": 4,
+  "exit_candle_pnl_share": null,
+  "exit_candle_timestamp": null,
+  "economics_before_final_candle_adds": null,
+  "first_full_exit_gate_after_add_index": null,
+  "would_exit_without_final_candle_adds": null
+}

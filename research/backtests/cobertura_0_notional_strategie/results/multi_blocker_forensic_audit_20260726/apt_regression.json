@@ -1,0 +1,75 @@
+{
+  "pass": true,
+  "decision": "APT_REGRESSION_PASS",
+  "checks": [
+    {
+      "check": "fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00"
+    },
+    {
+      "check": "fill_price",
+      "ok": true,
+      "got": 1.6447,
+      "expected": 1.6447
+    },
+    {
+      "check": "neut_qty",
+      "ok": true,
+      "got": 98.76800000000003,
+      "expected": 98.768
+    },
+    {
+      "check": "core_qty",
+      "ok": true,
+      "got": [
+        296.365,
+        296.365
+      ],
+      "expected": 296.365
+    },
+    {
+      "check": "core_short_avg",
+      "ok": true,
+      "got": 1.791289264225859,
+      "expected": 1.791289264225859
+    },
+    {
+      "check": "overlay_adds",
+      "ok": true,
+      "got": 16,
+      "expected": 16
+    },
+    {
+      "check": "overlay_be",
+      "ok": true,
+      "got": 7,
+      "expected": 7
+    },
+    {
+      "check": "exit_ts",
+      "ok": true,
+      "got": "2026-02-06T00:15:00+00:00",
+      "expected": "2026-02-06T00:15:00"
+    },
+    {
+      "check": "overlay_pnl",
+      "ok": true,
+      "got": 46.149957799999854,
+      "expected": 46.149957799999854
+    },
+    {
+      "check": "engine_econ",
+      "ok": true,
+      "got": 21.858019294808667,
+      "expected": 21.858019294808667
+    },
+    {
+      "check": "combined_like_forensic",
+      "ok": true,
+      "got": 9.957886192741164,
+      "expected": 9.957886192741164
+    }
+  ]
+}

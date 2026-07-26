@@ -1,0 +1,41 @@
+{
+  "policy": "shared_be_t1_6pct",
+  "start_distance_pct": 0.06,
+  "timing_mode": "T1",
+  "variants": [
+    "baseline",
+    "next_bar_exit",
+    "gap_open",
+    "next_bar_exit_gap_open"
+  ],
+  "horizon_days": 120,
+  "strategy": {
+    "symbol": "APTUSDT",
+    "timeframe": "5m",
+    "direction_mode": "short_only",
+    "activation_move_pct": 0.05,
+    "first_add_move_pct": 0.06,
+    "add_step_pct": 0.01,
+    "add_size_pct": 0.4,
+    "max_add_count": 8,
+    "max_adds_per_candle": 4,
+    "reset_reference_after_overlay_be": true,
+    "max_overlay_qty_multiple": 4.0,
+    "fee_rate_open": 0.00055,
+    "fee_rate_close": 0.00055,
+    "slippage_bps_open": 0.0,
+    "slippage_bps_close": 0.0,
+    "fee_buffer_usdt": 0.0,
+    "overlay_exit_policy": "shared_be",
+    "overlay_be_target_usdt": 0.0,
+    "full_exit_target_mode": "legacy",
+    "full_exit_target_usdt": 0.0,
+    "target_total_pnl_usdt": 0.0,
+    "target_profit_buffer_usdt": 0.0,
+    "pnl_tolerance_usdt": 0.01,
+    "candle_limit": 50000,
+    "start_price_source": "config_start_price",
+    "end_timestamp": null
+  },
+  "generated_at_utc": "2026-07-26T12:21:01.355023+00:00"
+}

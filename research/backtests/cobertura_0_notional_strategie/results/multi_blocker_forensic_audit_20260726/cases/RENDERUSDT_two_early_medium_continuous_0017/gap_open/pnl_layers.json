@@ -1,0 +1,18 @@
+{
+  "A_realized_overlay_gross": -34.06544699999974,
+  "A_overlay_entry_fees": 2.1225568306800007,
+  "A_overlay_close_fees": 2.1412928265300004,
+  "A_realized_overlay_net": -38.329296657209746,
+  "B_engine_total_exit_economics": -64.67216496511952,
+  "B_neutralization_fee": 0.1494488387700001,
+  "B_cobertura_total_including_neut_fee": -64.82161380388952,
+  "C_prior_tem_realized": -25.215444320084483,
+  "C_prior_tem_open_mtm_at_start": -26.54588400430969,
+  "C_prior_tem_fees": null,
+  "C_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+  "D_combined": -90.037058123974,
+  "combined_before_unresolved_fees": -90.037058123974,
+  "combined_after_known_fees": -90.037058123974,
+  "unresolved_fee_amount": null,
+  "combined_quality": "PASS_WITH_UNRESOLVED_PRIOR_FEES"
+}

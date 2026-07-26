@@ -17,6 +17,7 @@ OverlayExitPolicy = Literal[
     "individual_tp_scaled",
     "dynamic_long_equalization",
 ]
+PostAddDistancePolicy = Literal["disabled", "skip", "scale_down"]
 
 
 @dataclass
@@ -59,6 +60,18 @@ class CoberturaConfig:
     max_net_notional: float | None = None
     minimum_total_short_avg_distance_pct: float | None = None
     minimum_overlay_avg_distance_pct: float | None = None
+    # Research / safety distance guards (None / disabled = fingerprint-stable)
+    minimum_start_distance_pct: float | None = None
+    minimum_post_add_distance_pct: float | None = None
+    post_add_distance_policy: PostAddDistancePolicy = "disabled"
+
+    # Research fill / exit variants (defaults preserve fingerprint-stable baseline)
+    # When True (legacy mode): full-exit entitlement from prior bars may fire
+    # before adds; full exit that only becomes valid after same-bar adds is
+    # deferred to the next candle (V1 / V3).
+    defer_full_exit_after_same_bar_adds: bool = False
+    # When True: gap-through adverse fill vs candle open before slippage (V2 / V3).
+    gap_through_trigger_fills: bool = False
 
     # Fees / slippage
     fee_rate_open: float = 0.00055
@@ -177,6 +190,16 @@ class CoberturaConfig:
             )
         if self.full_exit_safety_buffer_usdt < 0.0:
             raise ValueError("full_exit_safety_buffer_usdt must be >= 0")
+        if self.post_add_distance_policy not in ("disabled", "skip", "scale_down"):
+            raise ValueError(
+                f"unsupported post_add_distance_policy: {self.post_add_distance_policy}"
+            )
+        if self.minimum_post_add_distance_pct is not None:
+            if not (0.0 <= float(self.minimum_post_add_distance_pct) < 1.0):
+                raise ValueError("minimum_post_add_distance_pct must be in [0, 1)")
+        if self.minimum_start_distance_pct is not None:
+            if not (0.0 <= float(self.minimum_start_distance_pct) < 1.0):
+                raise ValueError("minimum_start_distance_pct must be in [0, 1)")
         # Alias USDT gross cap onto existing exposure field when set.
         if self.max_total_gross_notional_usdt is not None:
             if self.max_total_gross_notional is None:

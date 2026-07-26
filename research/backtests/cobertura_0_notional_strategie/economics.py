@@ -63,6 +63,57 @@ def long_open_fill_price(trigger: float, slippage_bps_open: float) -> float:
     )
 
 
+def gap_aware_short_open_fill_price(
+    *,
+    trigger: float,
+    candle_open: float,
+    slippage_bps_open: float,
+    enabled: bool,
+) -> tuple[float, float, bool]:
+    """Short open: never fill better (higher) than candle open on a down-gap.
+
+    Returns (fill_price, raw_reference, gap_adjusted).
+    """
+    raw = float(trigger)
+    adjusted = False
+    if enabled and float(candle_open) + 1e-12 < float(trigger):
+        raw = float(candle_open)
+        adjusted = True
+    return short_open_fill_price(raw, slippage_bps_open), raw, adjusted
+
+
+def gap_aware_short_close_fill_price(
+    *,
+    trigger: float,
+    candle_open: float,
+    slippage_bps_close: float,
+    enabled: bool,
+) -> tuple[float, float, bool]:
+    """Buy to close short: never fill better (lower) than candle open on an up-gap."""
+    raw = float(trigger)
+    adjusted = False
+    if enabled and float(candle_open) - 1e-12 > float(trigger):
+        raw = float(candle_open)
+        adjusted = True
+    return adverse_short_exit_price(raw, slippage_bps_close), raw, adjusted
+
+
+def gap_aware_long_close_fill_price(
+    *,
+    trigger: float,
+    candle_open: float,
+    slippage_bps_close: float,
+    enabled: bool,
+) -> tuple[float, float, bool]:
+    """Sell long: never fill better (higher) than candle open on a down-gap."""
+    raw = float(trigger)
+    adjusted = False
+    if enabled and float(candle_open) + 1e-12 < float(trigger):
+        raw = float(candle_open)
+        adjusted = True
+    return adverse_long_exit_price(raw, slippage_bps_close), raw, adjusted
+
+
 def locked_spread_loss(ledger: CoberturaLedger) -> float:
     """Frozen core loss for long_avg > short_avg at qty-neutral hedge."""
     q = min(ledger.core_long.qty, ledger.core_short.qty)
