@@ -28,3 +28,19 @@ results/*
 .idea/
 .vscode/
 .DS_Store
+
+# ClickHouse runtime data
+/data/clickhouse/
+/logs/clickhouse/
+
+# Local runtime output
+/data/raw/*
+/data/checkpoints/*
+/logs/*
+/results/*
+
+# Platzhalter behalten
+!/data/raw/.gitkeep
+!/data/checkpoints/.gitkeep
+!/logs/.gitkeep
+!/results/.gitkeep
