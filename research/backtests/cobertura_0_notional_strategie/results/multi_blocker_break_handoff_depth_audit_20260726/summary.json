@@ -1,0 +1,24 @@
+{
+  "decision": "BREAK_HANDOFF_DEPTH_AUDIT_PASS_WITH_WARNINGS",
+  "selected_cases": 25,
+  "unresolved_break_cases": 2,
+  "parity_pass": true,
+  "variants": [
+    "BREAK_D0",
+    "BREAK_D1",
+    "BREAK_D2",
+    "BREAK_D3",
+    "BREAK_D4",
+    "BREAK_D5",
+    "BREAK_D6",
+    "BREAK_D8",
+    "BREAK_D10",
+    "BREAK_D12",
+    "BREAK_D15",
+    "BREAK_D20",
+    "NO_COBERTURA_AFTER_BREAK",
+    "LEGACY_B0_REFERENCE"
+  ],
+  "output_dir": "research/backtests/cobertura_0_notional_strategie/results/multi_blocker_break_handoff_depth_audit_20260726",
+  "handoff_order_policy": "CANCEL_ALL_OPEN_TEM_ORDERS_ON_HANDOFF: reconcile book from fills strictly before activation_ts; cancel remaining open TEM intents; Cobertura derives new orders from handed-off inventory only."
+}

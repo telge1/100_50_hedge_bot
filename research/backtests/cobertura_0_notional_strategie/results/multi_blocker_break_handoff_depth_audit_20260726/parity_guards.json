@@ -1,0 +1,1106 @@
+{
+  "pass": true,
+  "decision": "BREAK_HANDOFF_DEPTH_AUDIT_PASS",
+  "checks": [
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T20:00:00+00:00",
+      "signal_break": "2026-01-15T20:00:00+00:00",
+      "level_row": 171.55,
+      "level_break": 171.55
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:pre_break_state:long_qty",
+      "ok": true,
+      "got": 4.202,
+      "expected": "4.202"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:pre_break_state:short_qty",
+      "ok": true,
+      "got": 2.8000000000000003,
+      "expected": "2.8000000000000003"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:pre_break_state:long_avg",
+      "ok": true,
+      "got": 175.1893073902178,
+      "expected": "175.1893073902178"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:pre_break_state:short_avg",
+      "ok": true,
+      "got": 175.19623571428573,
+      "expected": "175.19623571428573"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -6.830518771350393,
+      "expected": "-6.830518771350393"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-16T16:00:00+00:00",
+      "signal_break": "2026-01-16T16:00:00+00:00",
+      "level_row": 0.3862,
+      "level_break": 0.3862
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:pre_break_state:long_qty",
+      "ok": true,
+      "got": 1339.6059999999998,
+      "expected": "1339.6059999999998"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:pre_break_state:short_qty",
+      "ok": true,
+      "got": 895.2560000000001,
+      "expected": "895.2560000000001"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.41268126082554873,
+      "expected": "0.41268126082554873"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.4127293197867915,
+      "expected": "0.4127293197867915"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -12.199126906811227,
+      "expected": "-12.199126906811227"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-19T00:00:00+00:00",
+      "signal_break": "2026-01-19T00:00:00+00:00",
+      "level_row": 1.7639,
+      "level_break": 1.7639
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:pre_break_state:long_qty",
+      "ok": true,
+      "got": 296.365,
+      "expected": "296.365"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:pre_break_state:short_qty",
+      "ok": true,
+      "got": 197.59699999999998,
+      "expected": "197.59699999999998"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:pre_break_state:long_avg",
+      "ok": true,
+      "got": 1.864531340748192,
+      "expected": "1.864531340748192"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:pre_break_state:short_avg",
+      "ok": true,
+      "got": 1.864561269615919,
+      "expected": "1.864561269615919"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -11.900133102067503,
+      "expected": "-11.900133102067503"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T04:00:00+00:00",
+      "signal_break": "2026-01-15T04:00:00+00:00",
+      "level_row": 0.2134,
+      "level_break": 0.2134
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:pre_break_state:long_qty",
+      "ok": true,
+      "got": 3357.2069999999994,
+      "expected": "3357.2069999999994"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:pre_break_state:short_qty",
+      "ok": true,
+      "got": 2238.137,
+      "expected": "2238.137"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.21959375255094915,
+      "expected": "0.21959375255094915"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.21963120255819907,
+      "expected": "0.21963120255819907"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -7.279588954284407,
+      "expected": "-7.279588954284407"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T04:00:00+00:00",
+      "signal_break": "2026-01-15T04:00:00+00:00",
+      "level_row": 2.579,
+      "level_break": 2.579
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:pre_break_state:long_qty",
+      "ok": true,
+      "got": 278.914,
+      "expected": "278.914"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:pre_break_state:short_qty",
+      "ok": true,
+      "got": 185.94100000000003,
+      "expected": "185.94100000000003"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:pre_break_state:long_avg",
+      "ok": true,
+      "got": 2.642625195961117,
+      "expected": "2.642625195961117"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:pre_break_state:short_avg",
+      "ok": true,
+      "got": 2.642677553632604,
+      "expected": "2.642677553632604"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -7.155926387007529,
+      "expected": "-7.155926387007529"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-08T08:00:00+00:00",
+      "signal_break": "2026-01-08T08:00:00+00:00",
+      "level_row": 13.895,
+      "level_break": 13.895
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:pre_break_state:long_qty",
+      "ok": true,
+      "got": 51.038,
+      "expected": "51.038"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:pre_break_state:short_qty",
+      "ok": true,
+      "got": 34.024,
+      "expected": "34.024"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:pre_break_state:long_avg",
+      "ok": true,
+      "got": 14.473194019103602,
+      "expected": "14.473194019103602"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:pre_break_state:short_avg",
+      "ok": true,
+      "got": 14.47323965436163,
+      "expected": "14.47323965436163"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -7.690123768639641,
+      "expected": "-7.690123768639641"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-19T04:00:00+00:00",
+      "signal_break": "2026-01-19T04:00:00+00:00",
+      "level_row": 93034.6,
+      "level_break": 93034.6
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:pre_break_state:long_qty",
+      "ok": true,
+      "got": 0.008,
+      "expected": "0.008"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:pre_break_state:short_qty",
+      "ok": true,
+      "got": 0.005,
+      "expected": "0.005"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:pre_break_state:long_avg",
+      "ok": true,
+      "got": 95567.64,
+      "expected": "95567.64"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:pre_break_state:short_avg",
+      "ok": true,
+      "got": 95567.64,
+      "expected": "95567.64"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -5.394451515104987,
+      "expected": "-5.394451515104987"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-06T20:00:00+00:00",
+      "signal_break": "2026-01-06T20:00:00+00:00",
+      "level_row": 0.14613,
+      "level_break": 0.14613
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:pre_break_state:long_qty",
+      "ok": true,
+      "got": 4928.697,
+      "expected": "4928.697"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:pre_break_state:short_qty",
+      "ok": true,
+      "got": 3285.797,
+      "expected": "3285.797"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.15013125088639045,
+      "expected": "0.15013125088639045"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.15013977379917262,
+      "expected": "0.15013977379917262"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -8.338409448457512,
+      "expected": "-8.338409448457512"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-06T20:00:00+00:00",
+      "signal_break": "2026-01-06T20:00:00+00:00",
+      "level_row": 2.1934,
+      "level_break": 2.1934
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:pre_break_state:long_qty",
+      "ok": true,
+      "got": 332.60800000000006,
+      "expected": "332.60800000000006"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:pre_break_state:short_qty",
+      "ok": true,
+      "got": 221.73899999999998,
+      "expected": "221.73899999999998"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:pre_break_state:long_avg",
+      "ok": true,
+      "got": 2.214256498758673,
+      "expected": "2.214256498758673"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:pre_break_state:short_avg",
+      "ok": true,
+      "got": 2.214269997158822,
+      "expected": "2.214269997158822"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -6.961307364738843,
+      "expected": "-6.961307364738843"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T16:00:00+00:00",
+      "signal_break": "2026-01-15T16:00:00+00:00",
+      "level_row": 12.904,
+      "level_break": 12.904
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:pre_break_state:long_qty",
+      "ok": true,
+      "got": 55.857,
+      "expected": "55.857"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:pre_break_state:short_qty",
+      "ok": true,
+      "got": 37.237,
+      "expected": "37.237"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:pre_break_state:long_avg",
+      "ok": true,
+      "got": 13.179814396584135,
+      "expected": "13.179814396584135"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:pre_break_state:short_avg",
+      "ok": true,
+      "got": 13.179876037274752,
+      "expected": "13.179876037274752"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -6.855641072707526,
+      "expected": "-6.855641072707526"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-20T08:00:00+00:00",
+      "signal_break": "2026-01-20T08:00:00+00:00",
+      "level_row": 3169.64,
+      "level_break": 3169.64
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:pre_break_state:long_qty",
+      "ok": true,
+      "got": 0.22299999999999998,
+      "expected": "0.22299999999999998"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:pre_break_state:short_qty",
+      "ok": true,
+      "got": 0.14700000000000002,
+      "expected": "0.14700000000000002"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:pre_break_state:long_avg",
+      "ok": true,
+      "got": 3314.8111111111107,
+      "expected": "3314.8111111111107"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:pre_break_state:short_avg",
+      "ok": true,
+      "got": 3316.0878231292513,
+      "expected": "3316.0878231292513"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -8.444814438354433,
+      "expected": "-8.444814438354433"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T20:00:00+00:00",
+      "signal_break": "2026-01-15T20:00:00+00:00",
+      "level_row": 1.5235,
+      "level_break": 1.5235
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:pre_break_state:long_qty",
+      "ok": true,
+      "got": 601.431,
+      "expected": "601.431"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:pre_break_state:short_qty",
+      "ok": true,
+      "got": 300.714,
+      "expected": "300.714"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:pre_break_state:long_avg",
+      "ok": true,
+      "got": 1.568886662656748,
+      "expected": "1.568886662656748"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:pre_break_state:short_avg",
+      "ok": true,
+      "got": 1.5912496968543042,
+      "expected": "1.5912496968543042"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -10.677786204882976,
+      "expected": "-10.677786204882976"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-06-04T08:00:00+00:00",
+      "signal_break": "2026-06-04T08:00:00+00:00",
+      "level_row": 6.289,
+      "level_break": 6.289
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:pre_break_state:long_qty",
+      "ok": true,
+      "got": 102.58500000000001,
+      "expected": "102.58500000000001"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:pre_break_state:short_qty",
+      "ok": true,
+      "got": 58.66600000000001,
+      "expected": "58.66600000000001"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:pre_break_state:long_avg",
+      "ok": true,
+      "got": 6.896799035299354,
+      "expected": "6.896799035299354"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:pre_break_state:short_avg",
+      "ok": true,
+      "got": 6.99112284379285,
+      "expected": "6.99112284379285"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -26.885043898737443,
+      "expected": "-26.885043898737443"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-16T16:00:00+00:00",
+      "signal_break": "2026-01-16T16:00:00+00:00",
+      "level_row": 13.529,
+      "level_break": 13.529
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:pre_break_state:long_qty",
+      "ok": true,
+      "got": 52.19900000000001,
+      "expected": "52.19900000000001"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:pre_break_state:short_qty",
+      "ok": true,
+      "got": 34.799,
+      "expected": "34.799"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:pre_break_state:long_avg",
+      "ok": true,
+      "got": 14.106822150061783,
+      "expected": "14.106822150061783"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:pre_break_state:short_avg",
+      "ok": true,
+      "got": 14.10687361705796,
+      "expected": "14.10687361705796"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -6.918289641778873,
+      "expected": "-6.918289641778873"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-07T16:00:00+00:00",
+      "signal_break": "2026-01-07T16:00:00+00:00",
+      "level_row": 81.56,
+      "level_break": 81.56
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:pre_break_state:long_qty",
+      "ok": true,
+      "got": 6.708,
+      "expected": "6.708"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:pre_break_state:short_qty",
+      "ok": true,
+      "got": 4.471,
+      "expected": "4.471"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:pre_break_state:long_avg",
+      "ok": true,
+      "got": 83.86,
+      "expected": "83.86"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:pre_break_state:short_avg",
+      "ok": true,
+      "got": 83.86,
+      "expected": "83.86"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -3.626596865319986,
+      "expected": "-3.626596865319986"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-06-04T08:00:00+00:00",
+      "signal_break": "2026-06-04T08:00:00+00:00",
+      "level_row": 2.4545,
+      "level_break": 2.4545
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:pre_break_state:long_qty",
+      "ok": true,
+      "got": 245.84500000000003,
+      "expected": "245.84500000000003"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:pre_break_state:short_qty",
+      "ok": true,
+      "got": 140.59,
+      "expected": "140.59"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:pre_break_state:long_avg",
+      "ok": true,
+      "got": 2.875440703232929,
+      "expected": "2.875440703232929"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:pre_break_state:short_avg",
+      "ok": true,
+      "got": 2.9165094285332818,
+      "expected": "2.9165094285332818"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -27.46659597688062,
+      "expected": "-27.46659597688062"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-19T04:00:00+00:00",
+      "signal_break": "2026-01-19T04:00:00+00:00",
+      "level_row": 0.3126,
+      "level_break": 0.3126
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:pre_break_state:long_qty",
+      "ok": true,
+      "got": 2012.8829999999998,
+      "expected": "2012.8829999999998"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:pre_break_state:short_qty",
+      "ok": true,
+      "got": 1150.7790000000002,
+      "expected": "1150.7790000000002"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.3517148638861246,
+      "expected": "0.3517148638861246"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.356467239002009,
+      "expected": "0.356467239002009"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -27.238029259111357,
+      "expected": "-27.238029259111357"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T00:00:00+00:00",
+      "signal_break": "2026-01-15T00:00:00+00:00",
+      "level_row": 2.2651,
+      "level_break": 2.2651
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:pre_break_state:long_qty",
+      "ok": true,
+      "got": 280.605,
+      "expected": "280.605"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:pre_break_state:short_qty",
+      "ok": true,
+      "got": 160.46299999999994,
+      "expected": "160.46299999999994"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:pre_break_state:long_avg",
+      "ok": true,
+      "got": 2.520337364762961,
+      "expected": "2.520337364762961"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:pre_break_state:short_avg",
+      "ok": true,
+      "got": 2.553493067155675,
+      "expected": "2.553493067155675"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -25.215444320084483,
+      "expected": "-25.215444320084483"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-15T08:00:00+00:00",
+      "signal_break": "2026-01-15T08:00:00+00:00",
+      "level_row": 0.1234,
+      "level_break": 0.1234
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:pre_break_state:long_qty",
+      "ok": true,
+      "got": 5862.122,
+      "expected": "5862.122"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:pre_break_state:short_qty",
+      "ok": true,
+      "got": 3908.0800000000004,
+      "expected": "3908.0800000000004"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.1258837511274715,
+      "expected": "0.1258837511274715"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.12590545518515486,
+      "expected": "0.12590545518515486"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -7.43481862246964,
+      "expected": "-7.43481862246964"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-16T16:00:00+00:00",
+      "signal_break": "2026-01-16T16:00:00+00:00",
+      "level_row": 140.89,
+      "level_break": 140.89
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:pre_break_state:long_qty",
+      "ok": true,
+      "got": 5.088,
+      "expected": "5.088"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:pre_break_state:short_qty",
+      "ok": true,
+      "got": 3.392,
+      "expected": "3.392"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:pre_break_state:long_avg",
+      "ok": true,
+      "got": 145.01999999999998,
+      "expected": "145.01999999999998"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:pre_break_state:short_avg",
+      "ok": true,
+      "got": 145.02320754716982,
+      "expected": "145.02320754716982"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -7.4318290687499475,
+      "expected": "-7.4318290687499475"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-16T16:00:00+00:00",
+      "signal_break": "2026-01-16T16:00:00+00:00",
+      "level_row": 1.7513,
+      "level_break": 1.7513
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:pre_break_state:long_qty",
+      "ok": true,
+      "got": 294.50299999999993,
+      "expected": "294.50299999999993"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:pre_break_state:short_qty",
+      "ok": true,
+      "got": 196.351,
+      "expected": "196.351"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:pre_break_state:long_avg",
+      "ok": true,
+      "got": 1.876837572389029,
+      "expected": "1.876837572389029"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:pre_break_state:short_avg",
+      "ok": true,
+      "got": 1.8769070842198954,
+      "expected": "1.8769070842198954"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -11.94481640649325,
+      "expected": "-11.94481640649325"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-19T00:00:00+00:00",
+      "signal_break": "2026-01-19T00:00:00+00:00",
+      "level_row": 0.5366,
+      "level_break": 0.5366
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:pre_break_state:long_qty",
+      "ok": true,
+      "got": 955.8209999999999,
+      "expected": "955.8209999999999"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:pre_break_state:short_qty",
+      "ok": true,
+      "got": 637.273,
+      "expected": "637.273"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.5780437684605131,
+      "expected": "0.5780437684605131"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.5781390678388026,
+      "expected": "0.5781390678388026"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -11.826044743045262,
+      "expected": "-11.826044743045262"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-07T20:00:00+00:00",
+      "signal_break": "2026-01-07T20:00:00+00:00",
+      "level_row": 5.713,
+      "level_break": 5.713
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:pre_break_state:long_qty",
+      "ok": true,
+      "got": 88.93299999999996,
+      "expected": "88.93299999999996"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:pre_break_state:short_qty",
+      "ok": true,
+      "got": 59.29299999999999,
+      "expected": "59.29299999999999"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:pre_break_state:long_avg",
+      "ok": true,
+      "got": 6.221750932942026,
+      "expected": "6.221750932942026"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:pre_break_state:short_avg",
+      "ok": true,
+      "got": 6.221862885984997,
+      "expected": "6.221862885984997"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -12.363203165215513,
+      "expected": "-12.363203165215513"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-06-18T16:00:00+00:00",
+      "signal_break": "2026-06-18T16:00:00+00:00",
+      "level_row": 0.6218,
+      "level_break": 0.6218
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:pre_break_state:long_qty",
+      "ok": true,
+      "got": 1069.29,
+      "expected": "1069.29"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:pre_break_state:short_qty",
+      "ok": true,
+      "got": 534.6819999999999,
+      "expected": "534.6819999999999"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:pre_break_state:long_avg",
+      "ok": true,
+      "got": 0.6824125323433299,
+      "expected": "0.6824125323433299"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:pre_break_state:short_avg",
+      "ok": true,
+      "got": 0.6824158979545746,
+      "expected": "0.6824158979545746"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": 1.1881025549892517,
+      "expected": "1.1881025549892517"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:structure_break_parity",
+      "ok": true,
+      "signal_row": "2026-01-09T20:00:00+00:00",
+      "signal_break": "2026-01-09T20:00:00+00:00",
+      "level_row": 2.0865,
+      "level_break": 2.0865
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:pre_break_state:long_qty",
+      "ok": true,
+      "got": 419.234,
+      "expected": "419.234"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:pre_break_state:short_qty",
+      "ok": true,
+      "got": 209.617,
+      "expected": "209.617"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:pre_break_state:long_avg",
+      "ok": true,
+      "got": 2.250367349002203,
+      "expected": "2.250367349002203"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:pre_break_state:short_avg",
+      "ok": true,
+      "got": 2.2800990253060434,
+      "expected": "2.2800990253060434"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:pre_break_state:realized_pnl",
+      "ok": true,
+      "got": -9.648444414518906,
+      "expected": "-9.648444414518906"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T20:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-16T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-19T00:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T04:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T04:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-08T08:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-19T04:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-06T20:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-06T20:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-20T08:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T20:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-06-04T08:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-16T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-07T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-06-04T08:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-19T04:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T00:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-15T08:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-16T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-16T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-19T00:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-07T20:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-06-18T16:00:00+00:00",
+      "fills_between": 0
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:break_d0_starts_at_break_state",
+      "ok": true,
+      "activation_time": "2026-01-09T20:00:00+00:00",
+      "fills_between": 0
+    }
+  ]
+}
