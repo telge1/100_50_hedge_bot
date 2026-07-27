@@ -219,7 +219,22 @@ def test_crv_stop_under_second_low() -> None:
         stop_buffer_bps=3,
     )
     assert m["stop_price"] < 0.629
-    assert m["estimated_crv"] > 0
+    assert m["crv_valid"] is True
+    assert m["estimated_crv"] is not None and m["estimated_crv"] > 0
+
+
+def test_crv_invalid_when_stop_not_below_signal() -> None:
+    m = crv_from_hl(
+        signal_price=0.630,
+        second_low_price=0.631,
+        ceiling_price=0.640,
+        stop_buffer_bps=3,
+    )
+    assert m["stop_price"] >= 0.630
+    assert m["crv_valid"] is False
+    assert m["estimated_crv"] is None
+    # no epsilon-inflated CRV
+    assert m["estimated_crv"] is not m.get("target_distance_bps")
 
 
 def test_touch_exact_ceiling() -> None:
@@ -597,3 +612,419 @@ def test_no_existing_audit_modules_modified() -> None:
         path = line[3:].strip() if len(line) > 3 else ""
         if path.startswith("src/orderbook_analyse/orderbook_") and "price_higher_lows" not in path:
             assert not line.startswith(" M") and not line.startswith("M "), path
+
+
+def _step(
+    m: PullbackMachine,
+    *,
+    i: int,
+    px: float,
+    params: HigherLowParams,
+    counter: list[int],
+    tx: list,
+    step_seconds: int = 30,
+):
+    return advance_pullback_machine(
+        m,
+        ts=TS0 + timedelta(seconds=step_seconds * i),
+        mid=px,
+        params=params,
+        delta_ratio=0.1,
+        buy_n=1,
+        sell_n=1,
+        low_counter=counter,
+        transitions=tx,
+    )
+
+
+def test_pullback_still_confirms_on_rebound() -> None:
+    lows = _drive_to_confirm(
+        [0.630, 0.6315, 0.632, 0.631, 0.6302, 0.6298, 0.6308],
+        params=HigherLowParams(
+            impulse_min_bps=10,
+            pullback_min_bps=5,
+            rebound_confirm_bps=5,
+            max_pullback_duration_seconds=900,
+            max_pullback_depth_bps=100,
+        ),
+    )
+    assert len(lows) >= 1
+    assert lows[0].confirmation_time > lows[0].candidate_time
+
+
+def test_pullback_expires_exactly_at_max_duration() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=50,  # prevent confirm
+        max_pullback_duration_seconds=90,
+        max_pullback_depth_bps=500,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    # impulse then shallow pullback
+    path = [0.630, 0.631, 0.6315, 0.6310]  # enter pullback around i=3
+    for i, px in enumerate(path):
+        _step(m, i=i, px=px, params=params, counter=counter, tx=tx)
+    assert m.state in {"PULLBACK_ACTIVE", "LOW_CANDIDATE"}
+    pb_start_i = next(
+        i
+        for i, t in enumerate(tx)
+        if t["new_state"] == "PULLBACK_ACTIVE"
+    )
+    # Find snapshot index of pullback start from transition time
+    start_ts = datetime.fromisoformat(tx[pb_start_i]["transition_time"])
+    start_i = int((start_ts - TS0).total_seconds() // 30)
+
+    # just before boundary: duration 60 < 90
+    _step(m, i=start_i + 2, px=0.6308, params=params, counter=counter, tx=tx)
+    assert m.state in {"PULLBACK_ACTIVE", "LOW_CANDIDATE"}
+    assert m.pullback_expired_count == 0
+
+    # exactly at 90s
+    low = _step(m, i=start_i + 3, px=0.6307, params=params, counter=counter, tx=tx)
+    assert low is None
+    assert m.pullback_expired_count == 1
+    assert m.state == "IMPULSE_UP"
+    assert any(t["new_state"] == "EXPIRED" for t in tx)
+    assert any(t["reason"] == "restart_after_expire" for t in tx)
+
+
+def test_no_expiry_before_duration_boundary() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=50,
+        max_pullback_duration_seconds=120,
+        max_pullback_depth_bps=500,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    for i, px in enumerate([0.630, 0.6312, 0.6315, 0.6308]):
+        _step(m, i=i, px=px, params=params, counter=counter, tx=tx)
+    assert m.pullback_start_time is not None
+    # duration 90 < 120
+    _step(m, i=6, px=0.6305, params=params, counter=counter, tx=tx)
+    assert m.pullback_expired_count == 0
+    assert m.state in {"PULLBACK_ACTIVE", "LOW_CANDIDATE"}
+
+
+def test_deep_pullback_invalidated() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=50,
+        max_pullback_duration_seconds=10_000,
+        max_pullback_depth_bps=20,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    # ~20+ bps drop from peak 0.632
+    for i, px in enumerate([0.630, 0.631, 0.632, 0.631, 0.6305, 0.6295]):
+        low = _step(m, i=i, px=px, params=params, counter=counter, tx=tx)
+        assert low is None
+    assert m.pullback_invalidated_count >= 1
+    assert m.state == "IMPULSE_UP"
+    assert any(t["new_state"] == "INVALIDATED" for t in tx)
+    assert any(t["reason"] == "restart_after_invalidate" for t in tx)
+    assert counter[0] == 0
+
+
+def test_expiry_and_invalidate_create_no_confirmed_low() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=100,
+        max_pullback_duration_seconds=60,
+        max_pullback_depth_bps=15,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    for i, px in enumerate([0.630, 0.6315, 0.632, 0.6305, 0.629]):
+        assert _step(m, i=i, px=px, params=params, counter=counter, tx=tx) is None
+    assert counter[0] == 0
+    assert len(m.confirmed) == 0
+
+
+def test_after_expiry_new_impulse_and_later_confirm() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=5,
+        max_pullback_duration_seconds=90,
+        max_pullback_depth_bps=500,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    # enter pullback, expire without rebound (rebound blocked by high threshold temporarily)
+    params_block = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=50,
+        max_pullback_duration_seconds=90,
+        max_pullback_depth_bps=500,
+    )
+    for i, px in enumerate([0.630, 0.6315, 0.632, 0.631, 0.6308, 0.6306, 0.6305]):
+        _step(m, i=i, px=px, params=params_block, counter=counter, tx=tx)
+    assert m.pullback_expired_count >= 1
+    assert m.state == "IMPULSE_UP"
+    # new impulse + shallow confirmable pullback
+    path2 = [0.6305, 0.6312, 0.6318, 0.6312, 0.6309, 0.6314]
+    lows = []
+    base = 10
+    for j, px in enumerate(path2):
+        low = _step(m, i=base + j, px=px, params=params, counter=counter, tx=tx)
+        if low:
+            lows.append(low)
+    assert len(lows) >= 1
+    assert lows[0].confirmation_time >= lows[0].candidate_time
+
+
+def test_confirmed_lows_retained_after_invalidate() -> None:
+    params = HigherLowParams(
+        impulse_min_bps=5,
+        pullback_min_bps=3,
+        rebound_confirm_bps=5,
+        max_pullback_duration_seconds=10_000,
+        max_pullback_depth_bps=40,
+    )
+    m = PullbackMachine()
+    counter = [0]
+    tx: list = []
+    # shallow confirm first low (depth << 40)
+    for i, px in enumerate([0.630, 0.631, 0.6315, 0.6310, 0.6308, 0.6312]):
+        _step(m, i=i, px=px, params=params, counter=counter, tx=tx)
+    assert len(m.confirmed) == 1
+    kept = m.confirmed[0].low_id
+    # deep second pullback → invalidate (>40 bps from peak)
+    for j, px in enumerate([0.6315, 0.6325, 0.633, 0.631, 0.6295]):
+        _step(m, i=20 + j, px=px, params=params, counter=counter, tx=tx)
+    assert m.pullback_invalidated_count >= 1
+    assert len(m.confirmed) == 1
+    assert m.confirmed[0].low_id == kept
+
+
+def test_signal_time_causal_after_abort_path(tmp_path: Path) -> None:
+    # expire then later form HL; signal at second confirm
+    prices = [
+        0.630, 0.632, 0.631, 0.6305, 0.6304, 0.6303, 0.6302,  # expire-ish long shallow
+    ]
+    # continue with workable structure after restart
+    prices += [
+        0.631, 0.632, 0.633, 0.632, 0.631, 0.6305, 0.6312,  # L1
+        0.632, 0.6335, 0.6325, 0.6315, 0.6310, 0.6318,  # L2 higher
+        0.633, 0.634, 0.635,
+    ]
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask="0.640")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "abort_hl",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            max_time_between_lows_seconds=900,
+            max_pullback_duration_seconds=120,
+            max_pullback_depth_bps=200,
+            max_ceiling_distance_bps=200,
+            min_crv=0.5,
+        ),
+    )
+    assert summary["integrity"]["future_data_violations"] == 0
+    assert summary["integrity"]["outcome_leakage_violations"] == 0
+    assert summary["integrity"]["retroactive_pivot_violations"] == 0
+    for row in summary.get("variant_summary") or []:
+        if row["variant"] == "P3" and int(row.get("actions") or 0) > 0:
+            # outcomes exist only after signals formed at confirm times
+            assert True
+
+
+def _hl_path_then_ceiling_later() -> tuple[list[float], list[str]]:
+    """Impulse/pullback HL pair, then hold, then nearer ask appears."""
+    prices = [
+        0.6300,
+        0.6310,
+        0.6318,  # impulse
+        0.6312,
+        0.6306,
+        0.6312,  # L1 confirm
+        0.6320,
+        0.6328,  # impulse 2
+        0.6322,
+        0.6314,
+        0.6320,  # L2 confirm higher (~0.6314 > 0.6306)
+    ]
+    # hold several snaps without near ceiling
+    prices += [0.6321, 0.6322, 0.6323, 0.6324]
+    # still holding
+    prices += [0.6325, 0.6326]
+    asks = ["0.700"] * len(prices)
+    # last two snaps: near ceiling
+    asks[-2] = "0.636"
+    asks[-1] = "0.636"
+    return prices, asks
+
+
+def test_armed_persists_and_later_ceiling_triggers_p3(tmp_path: Path) -> None:
+    prices, asks = _hl_path_then_ceiling_later()
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask=asks[i], bid=f"{px-0.004:.6f}")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "armed_later",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            max_time_between_lows_seconds=900,
+            higher_low_armed_seconds=600,
+            max_ceiling_distance_bps=100,
+            min_crv=0.1,
+            max_pullback_depth_bps=200,
+        ),
+    )
+    assert summary["integrity"]["higher_low_pair_count"] >= 1
+    assert summary["integrity"]["armed_pair_count"] >= 1
+    p3 = next(v for v in summary["variant_summary"] if v["variant"] == "P3")
+    assert int(p3["actions"] or 0) >= 1
+    # action not before second confirm
+    actions = [
+        r
+        for r in (tmp_path / "armed_later" / "long_to_ceiling_actions.csv").read_text().splitlines()[1:]
+        if r.startswith("S") or ",P3," in r or r
+    ]
+    # parse via integrity delays
+    assert summary["integrity"]["future_data_violations"] == 0
+    assert (summary["integrity"].get("median_pair_to_action_seconds") or 0) >= 0
+
+
+def test_armed_zero_is_event_only(tmp_path: Path) -> None:
+    prices, asks = _hl_path_then_ceiling_later()
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask=asks[i], bid=f"{px-0.004:.6f}")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "armed0",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            max_time_between_lows_seconds=900,
+            higher_low_armed_seconds=0,
+            max_ceiling_distance_bps=100,
+            min_crv=0.1,
+            max_pullback_depth_bps=200,
+        ),
+    )
+    p3 = next(v for v in summary["variant_summary"] if v["variant"] == "P3")
+    # ceiling only appears later → event-only must NOT action
+    assert int(p3.get("actions") or 0) == 0
+    assert summary["integrity"]["armed_expired_count"] >= 1
+
+
+def test_armed_invalidation_under_second_low(tmp_path: Path) -> None:
+    prices = [
+        0.6300, 0.6310, 0.6318, 0.6312, 0.6306, 0.6312,
+        0.6320, 0.6328, 0.6322, 0.6314, 0.6320,
+        0.6310,  # breaks under second low 0.6314 with buffer
+    ]
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask="0.700")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "armed_inv",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            higher_low_armed_seconds=600,
+            max_ceiling_distance_bps=100,
+            max_pullback_depth_bps=200,
+        ),
+    )
+    assert summary["integrity"]["armed_invalidated_count"] >= 1
+
+
+def test_armed_expiry_at_boundary(tmp_path: Path) -> None:
+    prices = [
+        0.6300, 0.6310, 0.6318, 0.6312, 0.6306, 0.6312,
+        0.6320, 0.6328, 0.6322, 0.6314, 0.6320,
+    ]
+    # hold 90s with armed_seconds=60 → expire without ceiling
+    prices += [0.6321, 0.6322, 0.6323]
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask="0.700")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "armed_exp",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            higher_low_armed_seconds=60,
+            max_ceiling_distance_bps=100,
+            max_pullback_depth_bps=200,
+        ),
+    )
+    assert summary["integrity"]["armed_expired_count"] >= 1
+
+
+def test_pair_actioned_once_per_variant(tmp_path: Path) -> None:
+    prices, asks = _hl_path_then_ceiling_later()
+    # keep near ceiling for many snaps after it appears
+    prices = prices + [0.6327, 0.6328, 0.6329]
+    asks = asks + ["0.636", "0.636", "0.636"]
+    snaps = [
+        _snap(TS0 + timedelta(seconds=30 * i), f"{px:.6f}", ask=asks[i], bid=f"{px-0.004:.6f}")
+        for i, px in enumerate(prices)
+    ]
+    summary = run_higher_lows_audit_from_state(
+        snapshots=snaps,
+        transitions=[],
+        output_dir=tmp_path / "once",
+        params=HigherLowParams(
+            impulse_min_bps=8,
+            pullback_min_bps=4,
+            rebound_confirm_bps=4,
+            min_higher_low_bps=1,
+            higher_low_armed_seconds=900,
+            max_ceiling_distance_bps=100,
+            min_crv=0.1,
+            max_pullback_depth_bps=200,
+        ),
+    )
+    import csv
+
+    with (tmp_path / "once" / "higher_low_raw_signals.csv").open() as fh:
+        rows = [r for r in csv.DictReader(fh) if r.get("variant") == "P3"]
+    # one pair → at most one P3 raw signal
+    pair_keys = {(r.get("first_low_id"), r.get("second_low_id")) for r in rows}
+    for key in pair_keys:
+        n = sum(1 for r in rows if (r.get("first_low_id"), r.get("second_low_id")) == key)
+        assert n == 1

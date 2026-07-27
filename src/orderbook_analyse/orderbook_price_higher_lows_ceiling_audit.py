@@ -66,14 +66,20 @@ LOW_CANDIDATE = "LOW_CANDIDATE"
 LOW_CONFIRMED = "LOW_CONFIRMED"
 REBOUND_ACTIVE = "REBOUND_ACTIVE"
 HIGHER_LOW_CONFIRMED = "HIGHER_LOW_CONFIRMED"
+HIGHER_LOW_ARMED = "HIGHER_LOW_ARMED"
+HIGHER_LOW_ACTIONED = "HIGHER_LOW_ACTIONED"
+HIGHER_LOW_INVALIDATED = "HIGHER_LOW_INVALIDATED"
+HIGHER_LOW_EXPIRED = "HIGHER_LOW_EXPIRED"
 LONG_SIGNAL = "LONG_SIGNAL"
 INVALIDATED = "INVALIDATED"
 EXPIRED = "EXPIRED"
 
 P_VARIANTS = tuple(f"P{i}" for i in range(12))
+P_HL_VARIANTS = tuple(f"P{i}" for i in range(3, 12))
 B_VARIANTS = ("B0", "B1", "B2", "B3", "B4", "B5", "B6")
 CONTROLS = tuple(f"C{i}" for i in range(9))
 HORIZONS = (30, 60, 120, 300, 600, 900, 1800, 3600)
+ARMED_SECONDS_ABLATIONS = (0, 300, 600, 900, 1800)
 
 OUTPUT_FILES = (
     "REPORT.md",
@@ -101,6 +107,7 @@ OUTPUT_FILES = (
     "time_between_lows_ablation.csv",
     "crv_ablation.csv",
     "breakout_confirmation_ablation.csv",
+    "higher_low_armed_ablation.csv",
     "a2_g5_diagnostics.csv",
     "pattern_examples.csv",
     "pattern_reference_point_audit.csv",
@@ -240,6 +247,15 @@ EMPTY_CSV_HEADERS: dict[str, tuple[str, ...]] = {
         "failed_breakout_rate",
         "hit_rate_0_25",
     ),
+    "higher_low_armed_ablation.csv": (
+        "higher_low_armed_seconds",
+        "armed_pair_count",
+        "armed_action_count",
+        "P3_actions",
+        "P3_touch_rate",
+        "median_pair_to_action_seconds",
+        "note",
+    ),
     "variant_summary.csv": ("variant", "actions", "ceiling_touch_rate"),
     "control_summary.csv": (
         "variant",
@@ -298,7 +314,11 @@ class HigherLowParams:
     rebound_confirm_bps: float = 5.0
     min_higher_low_bps: float = 2.0
     max_time_between_lows_seconds: int = 600
+    max_pullback_duration_seconds: int = 900
+    max_pullback_depth_bps: float = 100.0
+    higher_low_armed_seconds: int = 600
     stop_buffer_bps: float = 3.0
+    invalidate_armed_on_first_low_break: bool = True
     min_crv: float = 1.5
     breakout_min_extension_bps: float = 3.0
     failed_break_confirm_snapshots: int = 2
@@ -337,6 +357,12 @@ class PullbackMachine:
     low_candidate_time: datetime | None = None
     low_candidate_price: float | None = None
     confirmed: list[ConfirmedLow] = field(default_factory=list)
+    pullback_expired_count: int = 0
+    pullback_invalidated_count: int = 0
+    longest_pullback_seconds: float = 0.0
+    last_pullback_duration_seconds: float | None = None
+    last_pullback_depth_bps: float | None = None
+    pullback_start_count: int = 0
 
 
 def structure_quality(
@@ -367,22 +393,47 @@ def structure_quality(
     return "INSUFFICIENT"
 
 
+@dataclass
+class ArmedHigherLow:
+    armed_pair_id: str
+    first_low_id: str
+    second_low_id: str
+    first_low_price: float
+    second_low_price: float
+    armed_time: datetime
+    expiry_time: datetime | None
+    pair_info: dict[str, Any]
+    actioned_variants: set[str] = field(default_factory=set)
+
+    def age_seconds(self, ts: datetime) -> float:
+        return (ensure_utc(ts) - ensure_utc(self.armed_time)).total_seconds()
+
+
 def crv_from_hl(
     *,
     signal_price: float,
     second_low_price: float,
     ceiling_price: float,
     stop_buffer_bps: float,
-) -> dict[str, float]:
-    target_bps = (ceiling_price - signal_price) / signal_price * 10_000.0
+) -> dict[str, Any]:
+    """CRV for long-to-ceiling. Invalid when stop is not strictly below signal."""
+    target_bps = (ceiling_price - signal_price) / signal_price * 10_000.0 if signal_price else 0.0
     stop_price = second_low_price * (1.0 - stop_buffer_bps / 10_000.0)
-    stop_bps = (signal_price - stop_price) / signal_price * 10_000.0
-    return {
+    stop_bps = (
+        (signal_price - stop_price) / signal_price * 10_000.0 if signal_price else 0.0
+    )
+    out: dict[str, Any] = {
         "target_distance_bps": target_bps,
         "stop_price": stop_price,
         "stop_distance_bps": stop_bps,
-        "estimated_crv": target_bps / max(stop_bps, EPSILON),
+        "estimated_crv": None,
+        "crv_valid": False,
     }
+    if signal_price <= 0 or stop_price >= signal_price or stop_bps <= 0:
+        return out
+    out["estimated_crv"] = target_bps / stop_bps
+    out["crv_valid"] = True
+    return out
 
 
 def p_variant_ok(
@@ -433,6 +484,35 @@ def p_variant_ok(
     return False
 
 
+def _restart_impulse_from_current(
+    m: PullbackMachine,
+    *,
+    ts: datetime,
+    mid: float,
+    set_state,
+    exit_state: str,
+    exit_reason: str,
+    restart_reason: str,
+) -> None:
+    """Abort active pullback (keep confirmed lows) and restart impulse tracking."""
+    set_state(
+        exit_state,
+        exit_reason,
+        extra={
+            "pullback_duration_seconds": m.last_pullback_duration_seconds,
+            "pullback_depth_bps": m.last_pullback_depth_bps,
+        },
+    )
+    m.impulse_start_time = ts
+    m.impulse_start_price = mid
+    m.impulse_peak_time = ts
+    m.impulse_peak_price = mid
+    m.pullback_start_time = None
+    m.low_candidate_time = None
+    m.low_candidate_price = None
+    set_state(IMPULSE_UP, restart_reason)
+
+
 def advance_pullback_machine(
     m: PullbackMachine,
     *,
@@ -445,18 +525,26 @@ def advance_pullback_machine(
     low_counter: list[int],
     transitions: list[dict[str, Any]],
 ) -> ConfirmedLow | None:
-    """Advance causal pullback SM; return newly confirmed low or None."""
+    """Advance causal pullback SM; return newly confirmed low or None.
 
-    def set_state(new: str, reason: str) -> None:
-        transitions.append(
-            {
-                "previous_state": m.state,
-                "new_state": new,
-                "transition_time": ts.isoformat(),
-                "reason": reason,
-                "mid": mid,
-            }
-        )
+    Pullback exits:
+      - rebound confirm → ConfirmedLow (unchanged semantics)
+      - duration >= max_pullback_duration_seconds → EXPIRED, restart IMPULSE_UP
+      - depth >= max_pullback_depth_bps → INVALIDATED, restart IMPULSE_UP
+    Confirmed lows are never cleared on expiry/invalidation.
+    """
+
+    def set_state(new: str, reason: str, extra: Mapping[str, Any] | None = None) -> None:
+        row: dict[str, Any] = {
+            "previous_state": m.state,
+            "new_state": new,
+            "transition_time": ts.isoformat(),
+            "reason": reason,
+            "mid": mid,
+        }
+        if extra:
+            row.update(dict(extra))
+        transitions.append(row)
         m.state = new
 
     confirmed: ConfirmedLow | None = None
@@ -482,17 +570,59 @@ def advance_pullback_machine(
                 m.pullback_start_time = ts
                 m.low_candidate_time = ts
                 m.low_candidate_price = mid
+                m.pullback_start_count += 1
+                m.last_pullback_duration_seconds = 0.0
+                m.last_pullback_depth_bps = drop
                 set_state(PULLBACK_ACTIVE, "pullback_after_impulse")
         return None
 
     if m.state in {PULLBACK_ACTIVE, LOW_CANDIDATE}:
         assert m.impulse_peak_price is not None
+        assert m.pullback_start_time is not None
         drop = bps_signed(m.impulse_peak_price, mid)
         if m.low_candidate_price is None or mid <= m.low_candidate_price:
             m.low_candidate_price = mid
             m.low_candidate_time = ts
             if m.state == PULLBACK_ACTIVE and drop >= params.pullback_min_bps:
                 set_state(LOW_CANDIDATE, "low_candidate")
+
+        depth = bps_signed(
+            m.impulse_peak_price,
+            m.low_candidate_price if m.low_candidate_price is not None else mid,
+        )
+        duration = (ts - m.pullback_start_time).total_seconds()
+        m.last_pullback_duration_seconds = duration
+        m.last_pullback_depth_bps = depth
+        m.longest_pullback_seconds = max(m.longest_pullback_seconds, duration)
+
+        # Depth abort before duration / rebound (no confirmed low).
+        if depth >= params.max_pullback_depth_bps:
+            m.pullback_invalidated_count += 1
+            _restart_impulse_from_current(
+                m,
+                ts=ts,
+                mid=mid,
+                set_state=set_state,
+                exit_state=INVALIDATED,
+                exit_reason="pullback_depth_exceeded",
+                restart_reason="restart_after_invalidate",
+            )
+            return None
+
+        # Duration abort at/after max (no confirmed low); not before boundary.
+        if duration >= params.max_pullback_duration_seconds:
+            m.pullback_expired_count += 1
+            _restart_impulse_from_current(
+                m,
+                ts=ts,
+                mid=mid,
+                set_state=set_state,
+                exit_state=EXPIRED,
+                exit_reason="pullback_duration_exceeded",
+                restart_reason="restart_after_expire",
+            )
+            return None
+
         # rebound confirmation
         if (
             m.low_candidate_price is not None
@@ -524,7 +654,14 @@ def advance_pullback_machine(
                 ),
             )
             m.confirmed.append(confirmed)
-            set_state(LOW_CONFIRMED, "low_confirmed_on_rebound")
+            set_state(
+                LOW_CONFIRMED,
+                "low_confirmed_on_rebound",
+                extra={
+                    "pullback_duration_seconds": duration,
+                    "pullback_depth_bps": depth,
+                },
+            )
             # reset for next impulse from confirmation
             m.impulse_start_time = ts
             m.impulse_start_price = mid
@@ -743,6 +880,14 @@ def run_higher_lows_audit_from_state(
     ceiling_persistence: dict[float, int] = {}
     invalid_pairs = 0
     sig_n = 0
+    armed: ArmedHigherLow | None = None
+    armed_n = 0
+    armed_pair_count = 0
+    armed_action_count = 0
+    armed_expired_count = 0
+    armed_invalidated_count = 0
+    invalid_crv_count = 0
+    pair_to_action_delays: list[float] = []
 
     prev_mid: float | None = None
     for i, snap in enumerate(snapshots):
@@ -820,16 +965,14 @@ def run_higher_lows_audit_from_state(
                 }
             )
 
-        # form higher-low pairs from last two confirmed lows
-        higher_low = False
-        pair_info: dict[str, Any] | None = None
+        # form higher-low pairs from last two confirmed lows (event at confirm only)
+        pair_formed_now = False
+        pair_info_event: dict[str, Any] | None = None
         if len(all_confirmed) >= 2:
             first, second = all_confirmed[-2], all_confirmed[-1]
-            # only evaluate at second confirmation snapshot
             if second.confirmation_time == ts:
                 dt = (second.confirmation_time - first.confirmation_time).total_seconds()
                 hl_bps = bps_signed(second.candidate_price, first.candidate_price)
-                # invalidating low: any mid between confirms below first low
                 invalidated = False
                 for t2, px in mids:
                     if first.confirmation_time < t2 < second.confirmation_time:
@@ -842,8 +985,8 @@ def run_higher_lows_audit_from_state(
                     and hl_bps >= params.min_higher_low_bps
                     and second.candidate_price > first.candidate_price
                 ):
-                    higher_low = True
-                    pair_info = {
+                    pair_formed_now = True
+                    pair_info_event = {
                         "first_low_id": first.low_id,
                         "second_low_id": second.low_id,
                         "first_low_time": first.candidate_time.isoformat(),
@@ -866,7 +1009,7 @@ def run_higher_lows_audit_from_state(
                         "buy_increasing": second.buy_notional_at_confirm
                         > first.buy_notional_at_confirm,
                     }
-                    pairs.append(pair_info)
+                    pairs.append(pair_info_event)
                     state_tx.append(
                         {
                             "previous_state": LOW_CONFIRMED,
@@ -874,34 +1017,153 @@ def run_higher_lows_audit_from_state(
                             "transition_time": ts.isoformat(),
                             "reason": "higher_low_pair",
                             "higher_low_distance_bps": hl_bps,
+                            "first_low_id": first.low_id,
+                            "second_low_id": second.low_id,
                         }
                     )
-                elif second.confirmation_time == ts:
+                else:
                     invalid_pairs += 1
+
+        # Arm newly confirmed pair (supersedes prior armed pair if any)
+        if pair_formed_now and pair_info_event is not None:
+            if armed is not None:
+                state_tx.append(
+                    {
+                        "previous_state": HIGHER_LOW_ARMED,
+                        "new_state": HIGHER_LOW_EXPIRED,
+                        "transition_time": ts.isoformat(),
+                        "reason": "superseded_by_new_pair",
+                        "armed_pair_id": armed.armed_pair_id,
+                        "mid": mid,
+                    }
+                )
+                armed_expired_count += 1
+            armed_n += 1
+            expiry = (
+                None
+                if params.higher_low_armed_seconds <= 0
+                else ts + timedelta(seconds=params.higher_low_armed_seconds)
+            )
+            armed = ArmedHigherLow(
+                armed_pair_id=f"AP{armed_n:04d}",
+                first_low_id=str(pair_info_event["first_low_id"]),
+                second_low_id=str(pair_info_event["second_low_id"]),
+                first_low_price=float(pair_info_event["first_low_price"]),
+                second_low_price=float(pair_info_event["second_low_price"]),
+                armed_time=ts,
+                expiry_time=expiry,
+                pair_info=dict(pair_info_event),
+            )
+            armed_pair_count += 1
+            state_tx.append(
+                {
+                    "previous_state": HIGHER_LOW_CONFIRMED,
+                    "new_state": HIGHER_LOW_ARMED,
+                    "transition_time": ts.isoformat(),
+                    "reason": "higher_low_armed",
+                    "armed_pair_id": armed.armed_pair_id,
+                    "expiry_time": None if expiry is None else expiry.isoformat(),
+                    "higher_low_armed_seconds": params.higher_low_armed_seconds,
+                    "mid": mid,
+                }
+            )
+
+        # Maintain armed lifecycle: invalidate / expire before action
+        higher_low_active = False
+        active_pair: dict[str, Any] | None = None
+        armed_age: float | None = None
+        event_only_expire = False
+        if armed is not None:
+            armed_age = armed.age_seconds(ts)
+            stop_line = armed.second_low_price * (1.0 - params.stop_buffer_bps / 10_000.0)
+            inv = mid < stop_line
+            if params.invalidate_armed_on_first_low_break and mid < armed.first_low_price:
+                inv = True
+            if inv:
+                state_tx.append(
+                    {
+                        "previous_state": HIGHER_LOW_ARMED,
+                        "new_state": HIGHER_LOW_INVALIDATED,
+                        "transition_time": ts.isoformat(),
+                        "reason": "armed_low_broken",
+                        "armed_pair_id": armed.armed_pair_id,
+                        "armed_age_seconds": armed_age,
+                        "mid": mid,
+                        "second_low_price": armed.second_low_price,
+                        "stop_line": stop_line,
+                    }
+                )
+                armed_invalidated_count += 1
+                armed = None
+            elif params.higher_low_armed_seconds <= 0 and ts > armed.armed_time:
+                state_tx.append(
+                    {
+                        "previous_state": HIGHER_LOW_ARMED,
+                        "new_state": HIGHER_LOW_EXPIRED,
+                        "transition_time": ts.isoformat(),
+                        "reason": "armed_event_only_expired",
+                        "armed_pair_id": armed.armed_pair_id,
+                        "armed_age_seconds": armed_age,
+                        "mid": mid,
+                    }
+                )
+                armed_expired_count += 1
+                armed = None
+            elif (
+                params.higher_low_armed_seconds > 0
+                and armed.expiry_time is not None
+                and ts >= armed.expiry_time
+            ):
+                state_tx.append(
+                    {
+                        "previous_state": HIGHER_LOW_ARMED,
+                        "new_state": HIGHER_LOW_EXPIRED,
+                        "transition_time": ts.isoformat(),
+                        "reason": "armed_timeout",
+                        "armed_pair_id": armed.armed_pair_id,
+                        "armed_age_seconds": armed_age,
+                        "expiry_time": armed.expiry_time.isoformat(),
+                        "mid": mid,
+                    }
+                )
+                armed_expired_count += 1
+                armed = None
+            else:
+                higher_low_active = True
+                active_pair = armed.pair_info
+                if params.higher_low_armed_seconds <= 0:
+                    event_only_expire = True
 
         one_low = len(all_confirmed) >= 1
         two_lows = len(all_confirmed) >= 2
         has_ceiling = ce is not None and ce_persist >= params.min_ceiling_persistence
         delta_pos = delta_ratio > 0.05
-        delta_improving = bool(pair_info and pair_info.get("delta_improving"))
-        sell_declining = bool(pair_info and pair_info.get("sell_declining"))
+        delta_improving = bool(active_pair and active_pair.get("delta_improving"))
+        sell_declining = bool(active_pair and active_pair.get("sell_declining"))
         quality = "INSUFFICIENT"
-        crv = None
-        if higher_low and pair_info and ce is not None:
+        crv: dict[str, Any] | None = None
+        if higher_low_active and active_pair is not None and ce is not None:
             quality = structure_quality(
-                rebound_bps=float(pair_info["rebound_after_second_low_bps"]),
-                pullback_depth_bps=float(pair_info["second_pullback_depth_bps"]),
+                rebound_bps=float(active_pair["rebound_after_second_low_bps"]),
+                pullback_depth_bps=float(active_pair["second_pullback_depth_bps"]),
                 gap_flag=gap,
                 ceiling_persistence=ce_persist,
-                higher_low_bps=float(pair_info["higher_low_distance_bps"]),
+                higher_low_bps=float(active_pair["higher_low_distance_bps"]),
             )
             crv = crv_from_hl(
                 signal_price=mid,
-                second_low_price=float(pair_info["second_low_price"]),
+                second_low_price=float(active_pair["second_low_price"]),
                 ceiling_price=ce["ceiling_price"],
                 stop_buffer_bps=params.stop_buffer_bps,
             )
-        crv_ok = bool(crv and crv["estimated_crv"] >= params.min_crv)
+            if not crv.get("crv_valid"):
+                invalid_crv_count += 1
+        crv_ok = bool(
+            crv
+            and crv.get("crv_valid")
+            and crv.get("estimated_crv") is not None
+            and float(crv["estimated_crv"]) >= params.min_crv
+        )
         quality_ok = quality in {"HIGH", "MEDIUM"}
         no_a2 = not a2_active
 
@@ -917,75 +1179,113 @@ def run_higher_lows_audit_from_state(
             "buy_notional": buy,
             "sell_notional": sell,
             "confirmed_low_count": len(all_confirmed),
-            "higher_low": higher_low,
+            "higher_low": higher_low_active,
+            "higher_low_pair_event": pair_formed_now,
+            "armed_pair_id": None if armed is None else armed.armed_pair_id,
+            "armed_time": None if armed is None else armed.armed_time.isoformat(),
+            "armed_expiry_time": None
+            if armed is None or armed.expiry_time is None
+            else armed.expiry_time.isoformat(),
+            "armed_age_seconds": armed_age if armed is not None else None,
             "structure_quality": quality,
             "a2_active": a2_active,
             "snapshot_gap": gap,
-            "estimated_crv": None if crv is None else crv["estimated_crv"],
+            "estimated_crv": None if crv is None else crv.get("estimated_crv"),
+            "crv_valid": None if crv is None else crv.get("crv_valid"),
+            "pullback_duration_seconds": machine.last_pullback_duration_seconds,
+            "pullback_depth_bps": machine.last_pullback_depth_bps,
+            "pullback_expired_count": machine.pullback_expired_count,
+            "pullback_invalidated_count": machine.pullback_invalidated_count,
+            "longest_pullback_seconds": machine.longest_pullback_seconds,
         }
         feat_rows.append(feat)
 
-        # emit signals only at second-low confirmation with higher low
-        if higher_low and pair_info and ce is not None:
-            # signal time must be confirm time
-            if ts < datetime.fromisoformat(pair_info["second_low_confirmation_time"]):
+        # P3–P11 from active armed state; action_time = current causal snapshot
+        if higher_low_active and armed is not None and active_pair is not None and ce is not None:
+            slc = datetime.fromisoformat(str(active_pair["second_low_confirmation_time"]))
+            if ts < slc:
                 future_violations += 1
-                continue
-            for variant in P_VARIANTS:
-                if not p_variant_ok(
-                    variant,
-                    has_ceiling=has_ceiling,
-                    one_low=one_low,
-                    two_lows=two_lows,
-                    higher_low=higher_low,
-                    delta_pos=delta_pos,
-                    delta_improving=delta_improving,
-                    sell_declining=sell_declining,
-                    crv_ok=crv_ok,
-                    quality_ok=quality_ok,
-                    no_a2=no_a2,
-                ):
-                    continue
-                # P0/P1/P2 can also fire without HL — handled below for baseline
-                if variant in {"P0", "P1", "P2"}:
-                    continue  # emitted separately for fair baseline cadence
-                sig_n += 1
-                sid = f"S{sig_n:05d}"
-                sig = {
-                    "signal_id": sid,
-                    "variant": variant,
-                    "goal": "T",
-                    "signal_time": ts.isoformat(),
-                    "signal_price": mid,
-                    "target_price": ce["ceiling_price"],
-                    "ceiling_price": ce["ceiling_price"],
-                    "ceiling_distance_bps": ce["ceiling_distance_bps"],
-                    "structure_quality": quality,
-                    "a2_active_at_signal": a2_active,
-                    "delta_positive": delta_pos,
-                    "delta_improving": delta_improving,
-                    "sell_declining": sell_declining,
-                    **pair_info,
-                    **(crv or {}),
-                }
-                raw_signals.append(sig)
-                state_tx.append(
-                    {
-                        "previous_state": HIGHER_LOW_CONFIRMED,
-                        "new_state": LONG_SIGNAL,
-                        "transition_time": ts.isoformat(),
-                        "reason": f"variant_{variant}",
+            else:
+                for variant in P_HL_VARIANTS:
+                    if variant in armed.actioned_variants:
+                        continue
+                    if not p_variant_ok(
+                        variant,
+                        has_ceiling=has_ceiling,
+                        one_low=one_low,
+                        two_lows=two_lows,
+                        higher_low=True,
+                        delta_pos=delta_pos,
+                        delta_improving=delta_improving,
+                        sell_declining=sell_declining,
+                        crv_ok=crv_ok,
+                        quality_ok=quality_ok,
+                        no_a2=no_a2,
+                    ):
+                        continue
+                    sig_n += 1
+                    sid = f"S{sig_n:05d}"
+                    pair_to_action = (ts - slc).total_seconds()
+                    pair_to_action_delays.append(pair_to_action)
+                    sig = {
                         "signal_id": sid,
+                        "variant": variant,
+                        "goal": "T",
+                        "signal_time": ts.isoformat(),
+                        "action_time": ts.isoformat(),
+                        "signal_price": mid,
+                        "target_price": ce["ceiling_price"],
+                        "ceiling_price": ce["ceiling_price"],
+                        "ceiling_distance_bps": ce["ceiling_distance_bps"],
+                        "structure_quality": quality,
+                        "a2_active_at_signal": a2_active,
+                        "delta_positive": delta_pos,
+                        "delta_improving": delta_improving,
+                        "sell_declining": sell_declining,
+                        "armed_pair_id": armed.armed_pair_id,
+                        "armed_time": armed.armed_time.isoformat(),
+                        "armed_age_seconds": armed.age_seconds(ts),
+                        "pair_to_action_seconds": pair_to_action,
+                        "crv_valid": None if crv is None else crv.get("crv_valid"),
+                        **active_pair,
+                        **{k: v for k, v in (crv or {}).items()},
                     }
-                )
+                    raw_signals.append(sig)
+                    armed.actioned_variants.add(variant)
+                    armed_action_count += 1
+                    state_tx.append(
+                        {
+                            "previous_state": HIGHER_LOW_ARMED,
+                            "new_state": HIGHER_LOW_ACTIONED,
+                            "transition_time": ts.isoformat(),
+                            "reason": f"variant_{variant}",
+                            "signal_id": sid,
+                            "armed_pair_id": armed.armed_pair_id,
+                            "armed_age_seconds": armed.age_seconds(ts),
+                            "mid": mid,
+                        }
+                    )
+
+        if event_only_expire and armed is not None:
+            state_tx.append(
+                {
+                    "previous_state": HIGHER_LOW_ARMED,
+                    "new_state": HIGHER_LOW_EXPIRED,
+                    "transition_time": ts.isoformat(),
+                    "reason": "armed_event_only_end_of_snapshot",
+                    "armed_pair_id": armed.armed_pair_id,
+                    "armed_age_seconds": 0.0,
+                    "mid": mid,
+                }
+            )
+            armed_expired_count += 1
+            armed = None
 
         # P0/P1/P2 baseline emissions (throttled via later dedupe)
         if has_ceiling and ce is not None:
             for variant, need in (("P0", True), ("P1", one_low), ("P2", two_lows)):
                 if not need:
                     continue
-                # emit sparsely: every time we have ceiling and optional lows, but only
-                # on confirmation events or every Nth for P0 — use confirmation or first snap with ceiling
                 emit = False
                 if variant == "P0" and (i % 6 == 0):
                     emit = True
@@ -995,8 +1295,7 @@ def run_higher_lows_audit_from_state(
                     emit = True
                 if not emit:
                     continue
-                # avoid double P3+ style; P2 is two lows not necessarily higher
-                if variant == "P2" and higher_low:
+                if variant == "P2" and higher_low_active:
                     continue
                 sig_n += 1
                 low1 = all_confirmed[-1] if all_confirmed else None
@@ -1007,12 +1306,15 @@ def run_higher_lows_audit_from_state(
                     ceiling_price=ce["ceiling_price"],
                     stop_buffer_bps=params.stop_buffer_bps,
                 )
+                if not crv0.get("crv_valid"):
+                    invalid_crv_count += 1
                 raw_signals.append(
                     {
                         "signal_id": f"S{sig_n:05d}",
                         "variant": variant,
                         "goal": "T",
                         "signal_time": ts.isoformat(),
+                        "action_time": ts.isoformat(),
                         "signal_price": mid,
                         "target_price": ce["ceiling_price"],
                         "ceiling_price": ce["ceiling_price"],
@@ -1084,12 +1386,17 @@ def run_higher_lows_audit_from_state(
         ):
             retroactive_pivot_violations += 1
             continue
-        action = {**first, "episode_id": ep["episode_id"], "action_time": first["signal_time"]}
+        action = {
+            **first,
+            "episode_id": ep["episode_id"],
+            "action_time": first.get("action_time") or first["signal_time"],
+        }
         long_actions.append(action)
         second_low = float(first.get("second_low_price") or first["signal_price"] * 0.99)
         first_low = float(first.get("first_low_price") or second_low)
+        action_ts = datetime.fromisoformat(str(action["action_time"]))
         oc = long_to_ceiling_outcomes(
-            signal_time=datetime.fromisoformat(first["signal_time"]),
+            signal_time=action_ts,
             signal_price=float(first["signal_price"]),
             ceiling_price=float(first["ceiling_price"]),
             second_low_price=second_low,
@@ -1105,7 +1412,7 @@ def run_higher_lows_audit_from_state(
                 "signal_id": first["signal_id"],
             }
         )
-        st = datetime.fromisoformat(first["signal_time"])
+        st = action_ts
         g5w = next((g for g in g5_warning_times if g > st), None)
         g5a = next((g for g in g5_action_times if g > st), None)
         touch_before_g5 = bool(
@@ -1505,6 +1812,17 @@ def run_higher_lows_audit_from_state(
             for v in variant_summary
             if str(v["variant"]).startswith("B")
         ],
+        "higher_low_armed_ablation": [
+            {
+                "higher_low_armed_seconds": params.higher_low_armed_seconds,
+                "armed_pair_count": armed_pair_count,
+                "armed_action_count": armed_action_count,
+                "P3_actions": p3.get("actions"),
+                "P3_touch_rate": p3.get("ceiling_touch_rate"),
+                "median_pair_to_action_seconds": _median(pair_to_action_delays),
+                "note": "primary_run_slice_full_grid_via_cli_list",
+            }
+        ],
     }
 
     ref_rows = []
@@ -1551,6 +1869,18 @@ def run_higher_lows_audit_from_state(
         "invalid_higher_low_pair_count": invalid_pairs,
         "missing_snapshot_intervals": 0,
         "required_outputs_complete": True,
+        "pullback_start_count": machine.pullback_start_count,
+        "pullback_expired_count": machine.pullback_expired_count,
+        "pullback_invalidated_count": machine.pullback_invalidated_count,
+        "longest_pullback_seconds": machine.longest_pullback_seconds,
+        "armed_pair_count": armed_pair_count,
+        "armed_action_count": armed_action_count,
+        "armed_expired_count": armed_expired_count,
+        "armed_invalidated_count": armed_invalidated_count,
+        "invalid_crv_count": invalid_crv_count,
+        "median_pair_to_action_seconds": _median(pair_to_action_delays),
+        "higher_low_armed_seconds": params.higher_low_armed_seconds,
+        "state_distribution": dict(Counter(r["state"] for r in feat_rows)),
         "warnings": warnings,
         "errors": errors,
         "decision": verdict,
@@ -1559,7 +1889,25 @@ def run_higher_lows_audit_from_state(
         "params": asdict(params),
         "price_basis": "snapshot_mid",
         "low_confirm_rule": "rebound_confirm_bps_after_pullback_min",
-        "signal_time_rule": "second_low_confirmation_time",
+        "pullback_abort_rules": {
+            "expired_when_duration_seconds_ge": params.max_pullback_duration_seconds,
+            "invalidated_when_depth_bps_ge": params.max_pullback_depth_bps,
+            "restart_state_after_abort": IMPULSE_UP,
+            "confirmed_lows_retained_on_abort": True,
+        },
+        "higher_low_armed_rules": {
+            "armed_seconds": params.higher_low_armed_seconds,
+            "armed_seconds_0_means_event_only": True,
+            "action_time": "snapshot_when_ceiling_and_variant_ok",
+            "max_one_action_per_variant_per_pair": True,
+            "invalidate_on_second_low_break": True,
+            "invalidate_on_first_low_break": params.invalidate_armed_on_first_low_break,
+        },
+        "crv_rules": {
+            "invalid_when_stop_price_ge_signal_price": True,
+            "no_epsilon_rescue_for_nonpositive_stop": True,
+        },
+        "signal_time_rule": "causal_action_snapshot_not_before_second_low_confirm",
         "no_retroactive_pivots": True,
         "reference_times_post_hoc_only": list(REFERENCE_TIMES),
         "a2_g5_diagnostic_only": True,
@@ -1927,6 +2275,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--rebound-confirm-bps", type=float, default=5.0)
     p.add_argument("--min-higher-low-bps", type=float, default=2.0)
     p.add_argument("--max-time-between-lows-seconds", type=int, default=600)
+    p.add_argument("--max-pullback-duration-seconds", type=int, default=900)
+    p.add_argument("--max-pullback-depth-bps", type=float, default=100.0)
+    p.add_argument(
+        "--higher-low-armed-seconds",
+        default="600",
+        help="Armed window seconds after HL pair; 0=event-only. Comma-list runs ablation.",
+    )
     p.add_argument("--stop-buffer-bps", type=float, default=3.0)
     p.add_argument("--min-crv", type=float, default=1.5)
     p.add_argument("--episode-gap-seconds", type=int, default=180)
@@ -1941,49 +2296,151 @@ def main(argv: list[str] | None = None) -> int:
         level=getattr(logging, str(args.log_level).upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(message)s",
     )
-    params = HigherLowParams(
-        snapshot_seconds=int(args.snapshot_seconds),
-        max_ceiling_distance_bps=float(args.max_ceiling_distance_bps),
-        impulse_min_bps=float(args.impulse_min_bps),
-        pullback_min_bps=float(args.pullback_min_bps),
-        rebound_confirm_bps=float(args.rebound_confirm_bps),
-        min_higher_low_bps=float(args.min_higher_low_bps),
-        max_time_between_lows_seconds=int(args.max_time_between_lows_seconds),
-        stop_buffer_bps=float(args.stop_buffer_bps),
-        min_crv=float(args.min_crv),
-        episode_gap_seconds=int(args.episode_gap_seconds),
-        episode_level_bps=float(args.episode_level_bps),
-        symbol=str(args.symbol),
-        start=str(args.start),
-        end=str(args.end),
-    )
-    out = (
+    armed_values = [
+        int(x.strip())
+        for x in str(args.higher_low_armed_seconds).split(",")
+        if str(x).strip() != ""
+    ]
+    if not armed_values:
+        armed_values = [600]
+    out_root = (
         Path(args.output_dir)
         if args.output_dir
         else PROJECT_ROOT
         / "results"
         / f"orderbook_price_higher_lows_ceiling_{args.symbol}_{utc_now().strftime('%Y%m%dT%H%M%SZ')}"
     )
-    summary = run_higher_lows_audit(
-        symbol=str(args.symbol),
-        start=parse_utc(args.start),
-        end=parse_utc(args.end),
-        output_dir=out,
-        params=params,
-        absorption_dir=Path(args.absorption_dir),
-        g5_dir=Path(args.g5_dir),
-    )
-    sys.stdout.buffer.write(
-        orjson.dumps(
-            {
-                "decision": summary.get("decision"),
-                "best_long": summary.get("best_long"),
-                "c1_control": summary.get("c1_control"),
-                "output_dir": summary.get("output_dir"),
-            },
-            option=orjson.OPT_INDENT_2,
+
+    def _params(armed_s: int) -> HigherLowParams:
+        return HigherLowParams(
+            snapshot_seconds=int(args.snapshot_seconds),
+            max_ceiling_distance_bps=float(args.max_ceiling_distance_bps),
+            impulse_min_bps=float(args.impulse_min_bps),
+            pullback_min_bps=float(args.pullback_min_bps),
+            rebound_confirm_bps=float(args.rebound_confirm_bps),
+            min_higher_low_bps=float(args.min_higher_low_bps),
+            max_time_between_lows_seconds=int(args.max_time_between_lows_seconds),
+            max_pullback_duration_seconds=int(args.max_pullback_duration_seconds),
+            max_pullback_depth_bps=float(args.max_pullback_depth_bps),
+            higher_low_armed_seconds=int(armed_s),
+            stop_buffer_bps=float(args.stop_buffer_bps),
+            min_crv=float(args.min_crv),
+            episode_gap_seconds=int(args.episode_gap_seconds),
+            episode_level_bps=float(args.episode_level_bps),
+            symbol=str(args.symbol),
+            start=str(args.start),
+            end=str(args.end),
         )
-    )
+
+    if len(armed_values) == 1:
+        summary = run_higher_lows_audit(
+            symbol=str(args.symbol),
+            start=parse_utc(args.start),
+            end=parse_utc(args.end),
+            output_dir=out_root,
+            params=_params(armed_values[0]),
+            absorption_dir=Path(args.absorption_dir),
+            g5_dir=Path(args.g5_dir),
+        )
+        payload = {
+            "decision": summary.get("decision"),
+            "best_long": summary.get("best_long"),
+            "c1_control": summary.get("c1_control"),
+            "output_dir": summary.get("output_dir"),
+            "integrity": {
+                k: summary.get("integrity", {}).get(k)
+                for k in (
+                    "armed_pair_count",
+                    "armed_action_count",
+                    "armed_expired_count",
+                    "armed_invalidated_count",
+                    "invalid_crv_count",
+                    "median_pair_to_action_seconds",
+                    "higher_low_pair_count",
+                    "confirmed_low_count",
+                )
+            },
+        }
+    else:
+        # Load state once; run armed-seconds ablations into subdirs.
+        db = connect_readonly()
+        try:
+            state = prepare_tracker_state(
+                db=db,
+                symbol=str(args.symbol),
+                start=parse_utc(args.start),
+                end=parse_utc(args.end),
+                params=AuditParams(sample_seconds=int(args.snapshot_seconds)),
+            )
+            a2: list[datetime] = []
+            g5w: list[datetime] = []
+            g5a: list[datetime] = []
+            abs_map: dict[str, dict[str, Any]] = {}
+            abs_dir = Path(args.absorption_dir)
+            g5_dir = Path(args.g5_dir)
+            if abs_dir.exists():
+                a2 = load_a2_times(abs_dir)
+                abs_map = load_absorption_by_ts(abs_dir)
+            if g5_dir.exists():
+                g5w, g5a = load_g5_times(g5_dir)
+            comparison: list[dict[str, Any]] = []
+            last_summary: dict[str, Any] | None = None
+            out_root.mkdir(parents=True, exist_ok=True)
+            for armed_s in armed_values:
+                sub = out_root / f"armed_{armed_s}s"
+                summary = run_higher_lows_audit_from_state(
+                    snapshots=state["snapshots"],
+                    transitions=state["transitions"],
+                    output_dir=sub,
+                    params=_params(armed_s),
+                    a2_times=a2,
+                    g5_warning_times=g5w,
+                    g5_action_times=g5a,
+                    absorption_by_ts=abs_map,
+                )
+                last_summary = summary
+                integ = summary.get("integrity") or {}
+                vs = {v["variant"]: v for v in summary.get("variant_summary") or []}
+                c1 = summary.get("c1_control") or {}
+                row = {
+                    "higher_low_armed_seconds": armed_s,
+                    "confirmed_low_count": integ.get("confirmed_low_count"),
+                    "higher_low_pair_count": integ.get("higher_low_pair_count"),
+                    "armed_pair_count": integ.get("armed_pair_count"),
+                    "armed_action_count": integ.get("armed_action_count"),
+                    "armed_expired_count": integ.get("armed_expired_count"),
+                    "armed_invalidated_count": integ.get("armed_invalidated_count"),
+                    "invalid_crv_count": integ.get("invalid_crv_count"),
+                    "median_pair_to_action_seconds": integ.get(
+                        "median_pair_to_action_seconds"
+                    ),
+                    "decision": summary.get("decision"),
+                    "c1_touch_rate": c1.get("ceiling_touch_rate"),
+                    "c1_median_mae_bps": c1.get("median_mae_before_touch_bps"),
+                }
+                for pv in P_HL_VARIANTS:
+                    v = vs.get(pv) or {}
+                    row[f"{pv}_actions"] = v.get("actions")
+                    row[f"{pv}_touch_rate"] = v.get("ceiling_touch_rate")
+                    row[f"{pv}_median_mae"] = v.get("median_mae_before_touch_bps")
+                    row[f"{pv}_second_low_inv_rate"] = v.get(
+                        "second_low_invalidation_rate"
+                    )
+                comparison.append(row)
+            write_csv_headered(out_root / "higher_low_armed_ablation_compare.csv", comparison)
+            (out_root / "armed_ablation_compare.json").write_bytes(
+                orjson.dumps(comparison, option=orjson.OPT_INDENT_2)
+            )
+            payload = {
+                "output_dir": str(out_root),
+                "armed_seconds": armed_values,
+                "comparison": comparison,
+                "primary": None if last_summary is None else last_summary.get("decision"),
+            }
+        finally:
+            db.close()
+
+    sys.stdout.buffer.write(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
     sys.stdout.write("\n")
     return 0
 
