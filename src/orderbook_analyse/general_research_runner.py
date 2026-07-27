@@ -1,7 +1,8 @@
 """Central research-only general runner for orderbook_analyse.
 
-Orchestrates full-history Phase 0–5 plus Higher-Lows audits per replayable
-segment. No live-trading hooks, no DB writes, no forward outcomes.
+Orchestrates full-history Phase 0–5, Higher-Lows audits per replayable
+segment, and Phase 6 causal pattern forward outcomes. No live-trading hooks,
+no DB writes.
 """
 
 from __future__ import annotations
@@ -25,6 +26,14 @@ from orderbook_analyse.orderbook_price_higher_lows_ceiling_audit import (
     run_higher_lows_audit_from_state,
 )
 from orderbook_analyse.orderbook_trade_candidate_audit import AuditParams, prepare_tracker_state
+from orderbook_analyse.pattern_outcome_evaluation import (
+    OutcomeParams,
+    PatternOutcomeError,
+    parse_float_list,
+    parse_int_list,
+    run_pattern_outcome_evaluation,
+    validate_outcome_params,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +101,15 @@ class GeneralResearchParams:
     max_pullback_depth_bps: float = 100.0
     log_level: str = "INFO"
     skip_higher_lows: bool = False
+    run_pattern_outcomes: bool = True
+    skip_pattern_outcomes: bool = False
+    outcome_horizons_seconds: tuple[int, ...] = (60, 300, 900, 1800, 3600, 7200)
+    outcome_targets_bps: tuple[float, ...] = (10.0, 25.0, 50.0, 100.0)
+    outcome_stop_bps: tuple[float, ...] = (25.0, 50.0, 100.0)
+    outcome_price_source: str = "mid"
+    outcome_min_samples: int = 30
+    outcome_bootstrap_iterations: int = 1000
+    outcome_random_seed: int = 42
     continue_on_phase_error: bool = False
     overwrite: bool = False
     snapshot_seconds: int = 30
@@ -450,6 +468,13 @@ def render_general_report(
         f"{summary.get('higher_low_pair_count_total')} / "
         f"{summary.get('armed_pair_count_total')} / "
         f"{summary.get('armed_action_count_total')}",
+        f"- Phase 6 outcomes requested/ok: "
+        f"{summary.get('pattern_outcomes_requested')} / {summary.get('pattern_outcomes_ok')}",
+        f"- Phase 6 decision: `{summary.get('pattern_outcome_decision')}`",
+        f"- Outcome events complete/incomplete: "
+        f"{summary.get('pattern_outcome_complete_count')} / "
+        f"{summary.get('pattern_outcome_incomplete_count')}",
+        f"- Promising_for_oos groups: {summary.get('pattern_promising_for_oos_count')}",
         "",
         "## Phase status",
         "",
@@ -889,18 +914,162 @@ def run_general_research(
         )
     )
 
+    # --- Phase 6: pattern forward outcomes ---
+    po_dir = out_dir / "pattern_outcomes"
+    po_requested = bool(params.run_pattern_outcomes) and not bool(params.skip_pattern_outcomes)
+    po_summary: dict[str, Any] = {
+        "pattern_outcomes_requested": po_requested,
+        "pattern_outcomes_ok": False,
+        "pattern_outcome_event_count": 0,
+        "pattern_outcome_complete_count": 0,
+        "pattern_outcome_incomplete_count": 0,
+        "pattern_cluster_count": 0,
+        "pattern_directional_event_count": 0,
+        "pattern_neutral_event_count": 0,
+        "pattern_unknown_event_count": 0,
+        "pattern_groups_tested": 0,
+        "pattern_groups_sufficient": 0,
+        "pattern_promising_for_oos_count": 0,
+        "pattern_outcome_integrity_error_count": 0,
+        "pattern_outcome_decision": None,
+    }
+    if not po_requested:
+        phase_status.append(
+            _phase_row(
+                phase="pattern_outcomes",
+                requested=False,
+                status="NOT_REQUESTED",
+                output_path=str(po_dir),
+            )
+        )
+        limitations.append("Phase 6 skipped (--skip-pattern-outcomes).")
+    else:
+        t_po = time.perf_counter()
+        try:
+            oparams = validate_outcome_params(
+                OutcomeParams(
+                    horizons_seconds=params.outcome_horizons_seconds,
+                    targets_bps=params.outcome_targets_bps,
+                    stops_bps=params.outcome_stop_bps,
+                    price_source=params.outcome_price_source,
+                    min_samples=int(params.outcome_min_samples),
+                    bootstrap_iterations=int(params.outcome_bootstrap_iterations),
+                    random_seed=int(params.outcome_random_seed),
+                )
+            )
+            po_result = run_pattern_outcome_evaluation(
+                general_output_dir=out_dir,
+                full_history_dir=fh_dir,
+                eval_input_path=out_dir / "general_pattern_evaluation_input.csv",
+                output_dir=po_dir,
+                params=oparams,
+            )
+            po_summary.update(
+                {
+                    "pattern_outcomes_ok": bool(po_result.ok),
+                    "pattern_outcome_event_count": int(po_result.summary.get("pattern_outcome_event_count") or 0),
+                    "pattern_outcome_complete_count": int(po_result.summary.get("pattern_outcome_complete_count") or 0),
+                    "pattern_outcome_incomplete_count": int(po_result.summary.get("pattern_outcome_incomplete_count") or 0),
+                    "pattern_cluster_count": int(po_result.summary.get("pattern_cluster_count") or 0),
+                    "pattern_directional_event_count": int(po_result.summary.get("pattern_directional_event_count") or 0),
+                    "pattern_neutral_event_count": int(po_result.summary.get("pattern_neutral_event_count") or 0),
+                    "pattern_unknown_event_count": int(po_result.summary.get("pattern_unknown_event_count") or 0),
+                    "pattern_groups_tested": int(po_result.summary.get("pattern_groups_tested") or 0),
+                    "pattern_groups_sufficient": int(po_result.summary.get("pattern_groups_sufficient") or 0),
+                    "pattern_promising_for_oos_count": int(po_result.summary.get("pattern_promising_for_oos_count") or 0),
+                    "pattern_outcome_integrity_error_count": int(
+                        po_result.summary.get("pattern_outcome_integrity_error_count") or 0
+                    ),
+                    "pattern_outcome_decision": po_result.decision,
+                }
+            )
+            st = "OK"
+            if not po_result.ok:
+                st = "FAILED"
+                soft_warnings = True
+                if not params.continue_on_phase_error:
+                    # hard failure handled below via summary flags
+                    pass
+            elif "WITH_WARNINGS" in str(po_result.decision):
+                st = "OK_WITH_GAPS"
+                soft_warnings = True
+            elif "WITH_GAPS" in str(po_result.decision):
+                st = "OK_WITH_GAPS"
+            elif "INSUFFICIENT" in str(po_result.decision):
+                # Technical completeness without usable forward samples — not a soft failure
+                st = "OK_WITH_GAPS"
+                limitations.append(
+                    "Phase 6: PATTERN_OUTCOMES_DATA_INSUFFICIENT "
+                    "(no complete forward outcomes)."
+                )
+            phase_status.append(
+                _phase_row(
+                    phase="pattern_outcomes",
+                    requested=True,
+                    status=st,
+                    runtime_sec=time.perf_counter() - t_po,
+                    input_rows=len(eval_out),
+                    output_rows=int(po_result.summary.get("pattern_outcome_row_count") or 0),
+                    output_path=str(po_dir),
+                    error_message=None if po_result.ok else "; ".join((po_result.integrity or {}).get("errors") or [])[:500],
+                )
+            )
+            if not po_result.ok and not params.continue_on_phase_error:
+                errors.append(
+                    {
+                        "phase": "pattern_outcomes",
+                        "segment_id": "",
+                        "error_type": "PHASE6_FAILED",
+                        "error_message": po_result.decision,
+                        "details": "",
+                    }
+                )
+        except (PatternOutcomeError, Exception) as exc:  # noqa: BLE001
+            soft_warnings = True
+            logger.exception("phase 6 pattern outcomes failed")
+            errors.append(
+                {
+                    "phase": "pattern_outcomes",
+                    "segment_id": "",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "details": "",
+                }
+            )
+            phase_status.append(
+                _phase_row(
+                    phase="pattern_outcomes",
+                    requested=True,
+                    status="FAILED",
+                    runtime_sec=time.perf_counter() - t_po,
+                    output_path=str(po_dir),
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+            )
+            po_summary["pattern_outcomes_ok"] = False
+            po_summary["pattern_outcome_decision"] = "PATTERN_OUTCOMES_FAILED"
+            if not params.continue_on_phase_error:
+                # will flip hard_failure below
+                fh_summary = dict(fh_summary)
+                fh_summary["pattern_outcomes_hard_fail"] = True
+
     hard_failure = bool(fh_error) or (
         hl_requested
         and hl_fail > 0
         and not params.continue_on_phase_error
     )
-    # Also fail if pattern/wall explicitly failed without continue
+    # Also fail if pattern/wall/phase6 explicitly failed without continue
     if not params.continue_on_phase_error:
         if fh_summary.get("pattern_candidates_ok") is False:
             hard_failure = True
         if fh_summary.get("wall_history_ok") is False:
             hard_failure = True
         if fh_summary.get("market_context_ok") is False:
+            hard_failure = True
+        if fh_summary.get("pattern_outcomes_hard_fail"):
+            hard_failure = True
+        if po_requested and po_summary.get("pattern_outcomes_ok") is False:
             hard_failure = True
 
     summary: dict[str, Any] = {
@@ -933,6 +1102,7 @@ def run_general_research(
         "higher_low_pair_count_total": pairs_total,
         "armed_pair_count_total": armed_pairs_total,
         "armed_action_count_total": armed_actions_total,
+        **po_summary,
         "general_integrity_ok": False,
         "decision": None,
         "runtime_sec_total": time.perf_counter() - t_all,
@@ -1069,6 +1239,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--max-pullback-depth-bps", type=float, default=100.0)
     p.add_argument("--log-level", default="INFO")
     p.add_argument("--skip-higher-lows", action="store_true")
+    p.add_argument(
+        "--run-pattern-outcomes",
+        action="store_true",
+        default=True,
+        help="Run Phase 6 pattern forward outcomes (default: on)",
+    )
+    p.add_argument(
+        "--skip-pattern-outcomes",
+        action="store_true",
+        help="Skip Phase 6 pattern forward outcomes",
+    )
+    p.add_argument(
+        "--outcome-horizons-seconds",
+        default="60,300,900,1800,3600,7200",
+    )
+    p.add_argument("--outcome-targets-bps", default="10,25,50,100")
+    p.add_argument("--outcome-stop-bps", default="25,50,100")
+    p.add_argument(
+        "--outcome-price-source",
+        default="mid",
+        choices=["mid", "close", "high_low"],
+    )
+    p.add_argument("--outcome-min-samples", type=int, default=30)
+    p.add_argument("--outcome-bootstrap-iterations", type=int, default=1000)
+    p.add_argument("--outcome-random-seed", type=int, default=42)
     p.add_argument("--continue-on-phase-error", action="store_true")
     p.add_argument(
         "--overwrite",
@@ -1095,6 +1290,17 @@ def params_from_args(args: argparse.Namespace) -> GeneralResearchParams:
         max_pullback_depth_bps=float(args.max_pullback_depth_bps),
         log_level=str(args.log_level),
         skip_higher_lows=bool(args.skip_higher_lows),
+        run_pattern_outcomes=bool(args.run_pattern_outcomes) and not bool(args.skip_pattern_outcomes),
+        skip_pattern_outcomes=bool(args.skip_pattern_outcomes),
+        outcome_horizons_seconds=parse_int_list(
+            args.outcome_horizons_seconds, default=(60, 300, 900, 1800, 3600, 7200)
+        ),
+        outcome_targets_bps=parse_float_list(args.outcome_targets_bps, default=(10, 25, 50, 100)),
+        outcome_stop_bps=parse_float_list(args.outcome_stop_bps, default=(25, 50, 100)),
+        outcome_price_source=str(args.outcome_price_source),
+        outcome_min_samples=int(args.outcome_min_samples),
+        outcome_bootstrap_iterations=int(args.outcome_bootstrap_iterations),
+        outcome_random_seed=int(args.outcome_random_seed),
         continue_on_phase_error=bool(args.continue_on_phase_error),
         overwrite=bool(args.overwrite),
     )

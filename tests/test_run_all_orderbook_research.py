@@ -120,6 +120,30 @@ def _fake_full_history(*, params, segments=None, patterns=None, gaps=0):
     # empty companion files
     for name in ("replay_gaps.csv", "data_inventory.csv"):
         write_csv_headered(out / name, [], ["x"])
+    # mid samples for Phase 6 causal forwards (replayable segment only)
+    samples = []
+    for s in segs:
+        if s["is_replayable"] not in (True, "True", "true"):
+            continue
+        t0 = datetime.fromisoformat(str(s["segment_start_ts"]).replace("Z", "+00:00"))
+        t1 = datetime.fromisoformat(str(s["segment_end_ts"]).replace("Z", "+00:00"))
+        t = t0
+        px = 1.0
+        while t <= t1:
+            samples.append(
+                {
+                    "segment_id": s["segment_id"],
+                    "sample_ts": t.isoformat(),
+                    "mid_price": f"{px:.6f}",
+                }
+            )
+            px += 0.0001
+            t += timedelta(seconds=15)
+    write_csv_headered(
+        out / "segment_replay_samples.csv",
+        samples,
+        ["segment_id", "sample_ts", "mid_price"],
+    )
     return {
         "decision": "FULL_HISTORY_ANALYSIS_COMPLETE_WITH_GAPS" if gaps else "FULL_HISTORY_ANALYSIS_COMPLETE",
         "output_dir": str(out),
@@ -227,6 +251,13 @@ def test_parse_args_defaults() -> None:
     assert args.skip_higher_lows is False
     assert args.continue_on_phase_error is False
     assert args.overwrite is False
+    assert args.run_pattern_outcomes is True
+    assert args.skip_pattern_outcomes is False
+    assert args.outcome_horizons_seconds == "60,300,900,1800,3600,7200"
+    assert args.outcome_price_source == "mid"
+    assert args.outcome_min_samples == 30
+    assert args.outcome_bootstrap_iterations == 1000
+    assert args.outcome_random_seed == 42
     assert parse_armed_seconds(args.higher_low_armed_seconds) == (0, 300, 600, 900, 1800)
 
 
