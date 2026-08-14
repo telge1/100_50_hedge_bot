@@ -156,7 +156,7 @@ def test_research_api_contracts():
     meta = client.get("/api/research/meta").json()
     assert meta["layouts"] == list(SUPPORTED_LAYOUTS)
     assert meta["source"] == "clickhouse_candles_1m"
-    assert meta["realtime_mode"] == "closed_1m_poll"
+    assert meta["realtime_mode"] == "forming_1m_poll"
 
     inds = client.get(
         "/api/research/indicators",

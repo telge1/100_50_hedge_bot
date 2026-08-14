@@ -205,7 +205,14 @@ def test_htf_refresh_rolling_window():
     assert all(c["time"] % 900 == 0 for c in nxt["candles"])
 
 
-def test_live_status_http_and_auth():
+def test_live_status_http_and_auth(monkeypatch):
+    import research_charts.collector_control as cc
+
+    monkeypatch.setattr(
+        cc,
+        "fetch_collector_status",
+        lambda **_kwargs: cc.unavailable_status(detail="test_collector_unavailable"),
+    )
     client = _mini()
     body = client.get("/api/research/live-status", params={"symbol": "APTUSDT"}).json()
     assert body["symbol"] == "APTUSDT"
