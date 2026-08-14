@@ -172,11 +172,15 @@ def test_drawing_tools_compose_and_persistence(tmp_path, monkeypatch):
     ts_b = datetime(2026, 2, 1, 12, 15, tzinfo=timezone.utc)
     ws.set_drawing_tool("hline")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.5)
+    assert ws.snapshot()["tool"] == "select"
     ws.set_drawing_tool("vline")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.5)
     ws.set_drawing_tool("trend")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.4)
+    assert ws.snapshot()["pending"] is True
+    assert ws.snapshot()["tool"] == "trend"
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_b, price=1.6)
+    assert ws.snapshot()["tool"] == "select"
     ws.set_drawing_tool("rectangle")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.3)
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_b, price=1.7)
@@ -300,7 +304,10 @@ def test_zone_rendering_contract_in_trp_js():
 
 def test_collector_strings_regression():
     host = HOST_JS.read_text(encoding="utf-8")
-    assert "ensure=false" in host or "ensure=false" in host
+    assert "ensure=false" in host
+    assert "ensure=true" in host
+    html = (DASHBOARD_ROOT / "templates" / "research_charts.html").read_text()
+    assert "research_charts.js?v=forming-2" in html
     assert "/api/research/live-status" in host
     assert "/api/research/candles" in host
     py = (DASHBOARD_ROOT / "research_charts" / "clickhouse_source.py").read_text()

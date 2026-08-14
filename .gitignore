@@ -127,6 +127,9 @@ live_bots/100_50_hedge_bot/*/state/
 __pycache__/
 *.py[cod]
 
+# Research Charts browser persistence (TRP drawings/settings adapter)
+dashboard/research_charts/user_data/
+
 # Research runtime files
 research/liquidation_level/results/**/cache/
 research/liquidation_level/results/**/nohup.out

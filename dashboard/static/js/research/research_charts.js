@@ -14,6 +14,7 @@
   const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
   const SYMBOL_KEY = "research.symbol";
   const POLL_MS = 5000;
+  const FORMING_MS = 250;
   const TOOLS = [
     ["select", "Auswählen"],
     ["trend", "Trendlinie"],
@@ -35,6 +36,7 @@
     panes: {},
     pollGen: 0,
     pollTimer: null,
+    formingTimer: null,
     loadGen: 0,
     loadAbort: null,
     initialLoadDone: false,
@@ -254,7 +256,7 @@
         if (pane.pendingLower) chart.setLowerPane(pane.pendingLower);
         if (pane.pendingLldEma) chart.setLldEma(pane.pendingLldEma);
         if (pane.pendingOverlays) syncOverlays(pane, pane.pendingOverlays);
-        chart.setInteractionMode(pane.pendingMode || toolMode());
+        chart.setInteractionMode(toolMode());
         pane.phase = "INTERACTION_READY";
         chart.resize();
         if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
@@ -264,6 +266,7 @@
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
       on_visible_range: function () {},
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
+      on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
     };
   }
@@ -271,6 +274,27 @@
   function toolMode() {
     const tool = (state.workspace && state.workspace.tool) || "select";
     return tool === "select" ? "select" : tool;
+  }
+
+  function deactivateToolsLocal() {
+    if (!state.workspace) state.workspace = {};
+    state.workspace.tool = "select";
+    state.workspace.pending = false;
+    state.workspace.preview_anchor = null;
+    document.querySelectorAll(".trp-tool-btn[data-tool]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.dataset.tool === "select");
+    });
+    PANE_IDS.forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      pane.pendingMode = "select";
+      const chart = api(pane);
+      if (chart) {
+        chart.setInteractionMode("select");
+        if (chart.clearPreview) chart.clearPreview();
+      }
+    });
+    refreshStatusLine();
   }
 
   function syncOverlays(pane, payloads) {
@@ -365,7 +389,7 @@
       iframe.addEventListener("load", function () {
         attachBridge(pane);
       });
-      iframe.src = "/static/research_trp/pane.html?v=price-scale-1";
+      iframe.src = "/static/research_trp/pane.html?v=forming-2";
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
         loadPane(pid, { force: true, sourceAction: "tf-change" });
@@ -491,6 +515,8 @@
     }
     applyWorkspace(await sendJson("/api/research/drawings/event", "POST", data));
     if (data.type !== "point" || (state.workspace && !state.workspace.pending)) {
+      deactivateToolsLocal();
+      await pushInteractionMode();
       await refreshOverlaysVisible();
     } else {
       visibleIds().forEach(function (pid) {
@@ -577,10 +603,11 @@
         chart.setData(payload);
         pane.phase = "DATA_READY";
       }
+      if (chart.resize) chart.resize();
       chart.setEmaOverlays(pane.pendingEma);
       chart.setLowerPane(pane.pendingLower);
       chart.setLldEma(pane.pendingLldEma);
-      chart.setInteractionMode(pane.pendingMode || toolMode());
+      chart.setInteractionMode(toolMode());
       pane.phase = "INTERACTION_READY";
     }
     syncOverlays(pane, pane.pendingOverlays);
@@ -695,6 +722,10 @@
       clearInterval(state.pollTimer);
       state.pollTimer = null;
     }
+    if (state.formingTimer) {
+      clearInterval(state.formingTimer);
+      state.formingTimer = null;
+    }
   }
 
   function startPoll() {
@@ -704,7 +735,65 @@
     state.pollTimer = setInterval(function () {
       if (gen !== state.pollGen || !state.initialLoadDone) return;
       pollIncremental(gen);
+      refreshLiveBar(false);
     }, POLL_MS);
+    state.formingTimer = setInterval(function () {
+      if (gen !== state.pollGen || !state.initialLoadDone) return;
+      pollForming(gen);
+    }, FORMING_MS);
+  }
+
+  function formingBarForTf(forming, tfSec, lastCandle) {
+    const t1 = Number(forming && forming.time);
+    const px = Number(forming && forming.close);
+    if (!Number.isFinite(t1) || !Number.isFinite(px) || !tfSec) return null;
+    const bucket = Math.floor(t1 / tfSec) * tfSec;
+    if (!lastCandle || Number(lastCandle.time) < bucket) {
+      const o = lastCandle ? Number(lastCandle.close) : Number(forming.open);
+      return {
+        time: bucket,
+        open: o,
+        high: Math.max(o, px, Number(forming.high) || px),
+        low: Math.min(o, px, Number(forming.low) || px),
+        close: px,
+      };
+    }
+    if (Number(lastCandle.time) === bucket) {
+      return {
+        time: bucket,
+        open: Number(lastCandle.open),
+        high: Math.max(Number(lastCandle.high), Number(forming.high) || px, px),
+        low: Math.min(Number(lastCandle.low), Number(forming.low) || px, px),
+        close: px,
+      };
+    }
+    return null;
+  }
+
+  async function pollForming(gen) {
+    if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    const body = await getJson(
+      "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol)
+    ).catch(function () { return null; });
+    if (gen !== state.pollGen) return;
+    const forming = body && body.forming;
+    if (!forming) return;
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane || !pane.pendingData || !(pane.pendingData.candles || []).length) return;
+      const candles = pane.pendingData.candles;
+      const last = candles[candles.length - 1];
+      const bar = formingBarForTf(forming, TF_SEC[pane.tf] || 60, last);
+      if (!bar) return;
+      if (Number(bar.time) < Number(last.time)) return;
+      if (Number(candles[candles.length - 1].time) === bar.time) {
+        candles[candles.length - 1] = Object.assign({}, candles[candles.length - 1], bar);
+      } else {
+        candles.push(bar);
+      }
+      const chart = api(pane);
+      if (chart && chart.updateFormingBar) chart.updateFormingBar(bar);
+    });
   }
 
   async function pollIncremental(gen) {
@@ -755,10 +844,11 @@
     });
   }
 
-  async function refreshLiveBar() {
+  async function refreshLiveBar(ensure) {
     if (!state.symbol) return;
+    const q = ensure ? "&ensure=true" : "&ensure=false";
     const body = await getJson(
-      "/api/research/live-status?symbol=" + encodeURIComponent(state.symbol) + "&ensure=false"
+      "/api/research/live-status?symbol=" + encodeURIComponent(state.symbol) + q
     );
     state.liveStatus = body;
     const ui = body.ui_status || body.status || "HISTORICAL";
@@ -811,7 +901,7 @@
       return loadPane(pid, { force: true, gen: gen, sourceAction: "symbol-switch" });
     });
     if (gen !== state.loadGen) return;
-    await refreshLiveBar();
+    await refreshLiveBar(true);
     if (gen !== state.loadGen) return;
     state.initialLoadDone = true;
     state.phase = "INTERACTION_READY";

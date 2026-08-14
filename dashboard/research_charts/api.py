@@ -16,7 +16,7 @@ from .boundary import (
     TRP_ROOT,
 )
 from .clickhouse_source import SOURCE_NAME
-from .collector_control import POLL_INTERVAL_MS, live_status_for_symbol
+from .collector_control import POLL_INTERVAL_MS, fetch_forming_candle, live_status_for_symbol
 from .service import (
     DEFAULT_PANE_TIMEFRAMES,
     candle_objects,
@@ -31,8 +31,8 @@ from .service import (
 from .workspace_session import get_workspace
 
 FEED_MESSAGE = (
-    "ClickHouse signal_generator.candles_1m · TRP aggregate/indicators · "
-    "existing Live1mCollector (closed 1m only, poll 5s). No Research Bybit WS."
+    "ClickHouse signal_generator.candles_1m · Live1mCollector "
+    "(History + Live-Kerze + Forming-Preis)."
 )
 
 
@@ -145,7 +145,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         meta = symbol_meta(symbol)
         history = bool(meta)
         last_closed = int(meta["last_time"]) if meta else None
-        payload = live_status_for_symbol(
+        payload = await asyncio.to_thread(
+            live_status_for_symbol,
             symbol,
             history_available=history,
             last_closed_time=last_closed,
@@ -155,6 +156,18 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         payload["feed_ready"] = True
         payload["source"] = candle_source_name()
         return payload
+
+    @router.get("/api/research/forming-bar")
+    async def api_research_forming_bar(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+    ):
+        bar = await asyncio.to_thread(fetch_forming_candle, symbol)
+        return {
+            "success": True,
+            "symbol": str(symbol or "").strip().upper(),
+            "forming": bar,
+        }
 
     @router.get("/api/research/indicators")
     async def api_research_indicators_get(
@@ -255,8 +268,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "source": candle_source_name(),
             "canonical_source": SOURCE_NAME,
             "realtime": True,
-            "realtime_mode": "closed_1m_poll",
+            "realtime_mode": "forming_1m_poll",
             "poll_interval_ms": POLL_INTERVAL_MS,
+            "forming_poll_ms": 250,
         }
 
     @router.get("/api/research/workspace")

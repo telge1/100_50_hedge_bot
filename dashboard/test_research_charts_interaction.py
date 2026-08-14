@@ -151,7 +151,7 @@ def test_host_iframe_ready_handshake():
     assert "DATA_READY" in host
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
-    assert "iframe.src = \"/static/research_trp/pane.html?v=price-scale-1\"" in host
+    assert "iframe.src = \"/static/research_trp/pane.html?v=forming-2\"" in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -226,8 +226,19 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=price-scale-1" in pane
+    assert "chart.js?v=forming-2" in pane
     assert 'window.addEventListener("pointerdown", onShiftMeasureDown, true)' in js
+    assert "onPointerDown, true" in js
+    assert "function cursorForDragMode" in js
+    assert "resize-tp" in js
+    assert "resize-sl" in js
+    assert "resize-left" in js
+    assert "function finishToolToSelect" in js
+    assert "function deactivateToolsLocal" in host
+    assert "on_tool_idle" in host
+    assert "function pollForming" in host
+    assert "updateFormingBar" in host
+    assert "function updateFormingBar" in js
 
 
 def test_price_scale_precision_from_candles():
@@ -356,6 +367,36 @@ def test_drawing_tools_hline_vline_trend_rectangle_measure_positions(tmp_path, m
     ws.set_drawing_tool("long_position")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.4)
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_b, price=1.2)
+    assert ws.snapshot()["tool"] == "select"
+    long_d = next(d for d in ws.drawings.get_drawings("APTUSDT") if d.drawing_type == "long_position")
+    ws.on_drag(
+        long_d.drawing_id + ":position",
+        None,
+        None,
+        {
+            "mode": "resize-tp",
+            "start_timestamp": ts_a.timestamp(),
+            "end_timestamp": ts_b.timestamp(),
+            "entry_price": long_d.entry_price,
+            "stop_price": long_d.stop_price,
+            "target_price": 1.55,
+        },
+    )
+    assert abs(float(ws.drawings.get_drawing(long_d.drawing_id).target_price) - 1.55) < 1e-9
+    ws.on_drag(
+        long_d.drawing_id + ":position",
+        None,
+        None,
+        {
+            "mode": "resize-right",
+            "start_timestamp": ts_a.timestamp(),
+            "end_timestamp": ts_b.timestamp() + 900,
+            "entry_price": ws.drawings.get_drawing(long_d.drawing_id).entry_price,
+            "stop_price": ws.drawings.get_drawing(long_d.drawing_id).stop_price,
+            "target_price": ws.drawings.get_drawing(long_d.drawing_id).target_price,
+        },
+    )
+    assert abs(ws.drawings.get_drawing(long_d.drawing_id).end_timestamp.timestamp() - (ts_b.timestamp() + 900)) < 1
     ws.set_drawing_tool("short_position")
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_a, price=1.6)
     ws.on_point(pane_id="pane-0", timeframe="5m", symbol="APTUSDT", ts=ts_b, price=1.8)

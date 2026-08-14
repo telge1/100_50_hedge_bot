@@ -61,6 +61,20 @@ def unavailable_status(*, detail: str = "collector_api_unreachable") -> dict[str
     }
 
 
+def fetch_forming_candle(symbol: str, *, timeout: float = 2.0) -> dict[str, Any] | None:
+    url = f"{_base()}/api/collector/forming"
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(url, params={"symbol": str(symbol).strip().upper()})
+        payload = resp.json()
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    bar = payload.get("forming")
+    return bar if isinstance(bar, dict) else None
+
+
 def fetch_collector_status(*, timeout: float = 5.0) -> dict[str, Any]:
     """GET existing control API. Never starts a process."""
     url = f"{_base()}/api/collector/status"
@@ -108,6 +122,21 @@ def set_desired_state(desired: str, *, timeout: float = 5.0) -> dict[str, Any]:
     return payload
 
 
+def ensure_symbol_on_collector(symbol: str, *, timeout: float = 8.0) -> dict[str, Any]:
+    """Ask the existing collector to recover+live only this symbol."""
+    url = f"{_base()}/api/collector/ensure_symbol"
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.post(url, json={"symbol": str(symbol).strip().upper()})
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {"error": "invalid_json_from_collector"}
+    if not isinstance(payload, dict):
+        payload = {"error": "invalid_ensure_payload"}
+    payload["http_status"] = resp.status_code
+    return payload
+
+
 def _symbol_row(status: dict[str, Any], symbol: str) -> dict[str, Any]:
     sym = symbol.upper()
     for row in status.get("symbols") or []:
@@ -149,15 +178,15 @@ def map_research_ui_status(
 
 
 def ensure_live_collector(symbol: str) -> dict[str, Any]:
-    """Ensure the existing universe collector is desired RUNNING.
+    """Start/switch the existing collector to this symbol (demand singleton).
 
-    Never starts a second process. Never starts a per-symbol collector.
-    RUNNING applies to the whole live_universe.
+    Never starts a second process. BTCUSDT is rejected. Other symbols do not
+    need to be in live_universe.json — demand replaces the active set.
     """
     sym = str(symbol or "").strip().upper()
     universe = load_live_universe_symbols()
     btc = is_btc_rejected(sym)
-    live_configured = is_live_configured(sym, universe)
+    live_configured = (not btc) and bool(sym)
     status = fetch_collector_status()
     available = bool(status.get("collector_available"))
     collector_state = str(status.get("collector_state") or "UNAVAILABLE").upper()
@@ -185,31 +214,36 @@ def ensure_live_collector(symbol: str) -> dict[str, Any]:
     if btc:
         result["reason"] = "btc_rejected"
         return result
-    if not live_configured:
-        result["reason"] = "not_in_live_universe"
-        return result
     if not available:
         result["reason"] = "collector_unavailable"
         return result
 
-    if collector_state in ALREADY_ACTIVE_STATES or desired == "RUNNING":
+    live_syms = [
+        str(s).upper()
+        for s in (status.get("configured_symbols") or status.get("live_symbols") or [])
+    ]
+    if (
+        collector_state in ALREADY_ACTIVE_STATES
+        and desired == "RUNNING"
+        and live_syms == [sym]
+    ):
         result["ensured"] = True
         result["action"] = "already_running"
-        result["reason"] = "collector_active"
+        result["reason"] = "already_on_symbol"
         return result
 
     try:
-        posted = set_desired_state("RUNNING")
+        posted = ensure_symbol_on_collector(sym)
     except Exception as exc:  # noqa: BLE001
-        result["reason"] = f"set_desired_failed:{exc}"
+        result["reason"] = f"ensure_symbol_failed:{exc}"
         return result
     if int(posted.get("http_status") or 500) >= 400:
-        result["reason"] = posted.get("error") or "set_desired_rejected"
+        result["reason"] = posted.get("error") or "ensure_symbol_rejected"
         result["post_response"] = posted
         return result
     result["ensured"] = True
-    result["action"] = "set_desired_running"
-    result["reason"] = "desired_was_stopped"
+    result["action"] = "ensure_symbol"
+    result["reason"] = "demand_singleton"
     result["post_response"] = posted
     result["desired_state"] = "RUNNING"
     return result
@@ -225,7 +259,7 @@ def live_status_for_symbol(
     sym = str(symbol or "").strip().upper()
     universe = load_live_universe_symbols()
     btc = is_btc_rejected(sym)
-    live_configured = is_live_configured(sym, universe)
+    live_configured = (not btc) and bool(sym)
     capability = classify_live_capability(
         history_available=history_available, live_configured=live_configured
     )

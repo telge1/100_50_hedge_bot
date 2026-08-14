@@ -201,10 +201,10 @@ body {
 
 .ov-handle {
   position: absolute;
-  width: 7px;
-  height: 7px;
-  margin-left: -3px;
-  margin-top: -3px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5px;
+  margin-top: -5px;
   background: #d4dce8;
   border: 1px solid #0f1218;
   border-radius: 1px;

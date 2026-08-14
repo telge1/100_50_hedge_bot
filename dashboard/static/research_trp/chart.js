@@ -37,6 +37,17 @@
   let lastAppliedSize = { w: 0, h: 0 };
   const overlayRegistry = new Map();
   let interactionMode = "select";
+  let toolClickCount = 0;
+  const ONE_POINT_TOOLS = { hline: true, vline: true };
+  const TWO_POINT_TOOLS = {
+    trend: true,
+    rectangle: true,
+    circle: true,
+    arrow: true,
+    measure: true,
+    long_position: true,
+    short_position: true,
+  };
   let previewAnchor = null;
   let dragState = null;
   let suppressNextClick = false;
@@ -83,12 +94,14 @@
   function toOhlc(candles) {
     return candles.map(function (c) {
       return {
-        time: c.time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
+        time: Number(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
       };
+    }).filter(function (c) {
+      return Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.close);
     });
   }
 
@@ -306,7 +319,12 @@
       if (!window.bridge) return;
       const pt = pointFromParam(param);
       if (interactionMode && interactionMode !== "select") {
+        const mode = interactionMode;
         emitDrawing({ type: "point", time: pt.time, price: pt.price });
+        toolClickCount += 1;
+        if (ONE_POINT_TOOLS[mode] || (TWO_POINT_TOOLS[mode] && toolClickCount >= 2)) {
+          finishToolToSelect();
+        }
         return;
       }
       const hit = pt.x != null && pt.y != null ? hitTestXY(pt.x, pt.y) : null;
@@ -348,7 +366,7 @@
     const pricePane = $("price-pane");
     if (pricePane) pricePane.addEventListener("contextmenu", onChartContextMenu);
     el.addEventListener("pointerdown", onScalePointerDown, true);
-    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointerdown", onPointerDown, true);
     el.addEventListener("wheel", onScaleWheel, { passive: true });
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onScalePointerUp, true);
@@ -476,6 +494,41 @@
     }
   }
 
+  function updateFormingBar(bar) {
+    if (!candleSeries || !bar || bar.time == null) return false;
+    const point = {
+      time: Number(bar.time),
+      open: Number(bar.open),
+      high: Number(bar.high),
+      low: Number(bar.low),
+      close: Number(bar.close),
+    };
+    if (!Number.isFinite(point.time) || !Number.isFinite(point.close)) return false;
+    if (!Number.isFinite(point.high) || point.high < point.close) point.high = Math.max(point.open, point.close);
+    if (!Number.isFinite(point.low) || point.low > point.close) point.low = Math.min(point.open, point.close);
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (candles.length) {
+      const lastT = Number(candles[candles.length - 1].time);
+      if (Number.isFinite(lastT) && point.time < lastT) return false;
+    } else {
+      return false;
+    }
+    try {
+      candleSeries.update(point);
+    } catch (err) {
+      return false;
+    }
+    if (Number(candles[candles.length - 1].time) === point.time) {
+      candles[candles.length - 1] = Object.assign({}, candles[candles.length - 1], point);
+    } else {
+      candles.push(Object.assign({}, point));
+    }
+    lastPayload.candles = candles;
+    candleByTime.set(point.time, candles[candles.length - 1]);
+    updateLegend(null);
+    return true;
+  }
+
   function setData(payload) {
     clearShiftMeasure();
     lastPayload = payload || { candles: [] };
@@ -509,6 +562,7 @@
     applySeriesData(lastPayload);
     updateOscTimeBase();
     applyDefaultView();
+    resize();
     if (lastSelectedUnix != null) {
       applySelectedMarker(lastSelectedUnix);
     }
@@ -1772,7 +1826,16 @@
         const yE = yOf(p.entry_price);
         const yT = yOf(p.target_price);
         const yS = yOf(p.stop_price);
-        if (x1 != null && x2 != null && yE != null && yT != null && yS != null) {
+          const pts = positionHandlePoints(p);
+          if (pts) {
+            for (let hi = 0; hi < pts.length; hi++) {
+              if (Math.hypot(x - pts[hi].x, y - pts[hi].y) <= 14) {
+                hit = true;
+                break;
+              }
+            }
+          }
+          if (!hit && x1 != null && x2 != null && yE != null && yT != null && yS != null) {
           const left = Math.min(x1, x2);
           const right = Math.max(x1, x2);
           const top = Math.min(yE, yT, yS);
@@ -1808,9 +1871,19 @@
   function setInteractionMode(mode) {
     interactionMode = mode || "select";
     if (interactionMode === "select") {
+      toolClickCount = 0;
       setPanEnabled(!dragState);
     } else {
+      toolClickCount = 0;
       setPanEnabled(false);
+    }
+  }
+
+  function finishToolToSelect() {
+    setInteractionMode("select");
+    clearPreview();
+    if (window.bridge && window.bridge.on_tool_idle) {
+      window.bridge.on_tool_idle();
     }
   }
 
@@ -1969,7 +2042,7 @@
   }
 
   function detectDragMode(p, xy) {
-    const HANDLE = 8;
+    const HANDLE = 14;
     if (p.type === "position") {
       const pts = positionHandlePoints(p);
       if (pts) {
@@ -2633,7 +2706,29 @@
     }
   }
 
+  function cursorForDragMode(mode) {
+    if (mode === "resize-tp" || mode === "resize-sl" || mode === "resize-entry") return "ns-resize";
+    if (mode === "resize-left" || mode === "resize-right") return "ew-resize";
+    if (mode === "resize-start" || mode === "resize-end") return "nwse-resize";
+    if (mode && String(mode).indexOf("resize-") === 0) return "nwse-resize";
+    return "move";
+  }
+
+  function setChartCursor(kind) {
+    const el = $("chart");
+    const pane = $("price-pane");
+    const value = kind || "crosshair";
+    if (el) el.style.cursor = value;
+    if (pane) pane.style.cursor = value;
+    if (el) {
+      const canvases = el.querySelectorAll("canvas");
+      for (let i = 0; i < canvases.length; i++) canvases[i].style.cursor = value;
+    }
+  }
+
   function onPointerDown(ev) {
+    if (ev.button != null && ev.button !== 0) return;
+    if (shiftMeasure && shiftMeasure.dragging) return;
     if (interactionMode !== "select" || !chart) return;
     const xy = xyFromEvent(ev);
     if (!xy) return;
@@ -2649,15 +2744,28 @@
       (p.type === "zone" && p.shape === "ellipse") ||
       p.type === "position";
     if (!movable) return;
+    if (ev.preventDefault) ev.preventDefault();
+    if (ev.stopPropagation) ev.stopPropagation();
+    if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    const mode = detectDragMode(p, xy);
     dragState = {
       overlayId: hit,
       kind: kind || p.shape || p.type,
-      mode: detectDragMode(p, xy),
+      mode: mode,
       moved: false,
       grab: marketPointFromXY(xy),
       orig: snapshotGeometry(p),
     };
     setPanEnabled(false);
+    setChartCursor(cursorForDragMode(mode));
+    const el = $("chart");
+    if (el && ev.pointerId != null && el.setPointerCapture) {
+      try {
+        el.setPointerCapture(ev.pointerId);
+      } catch (err) {
+        /* ignore */
+      }
+    }
   }
 
   function onPointerMove(ev) {
@@ -2759,6 +2867,7 @@
     const overlayId = dragState.overlayId;
     dragState = null;
     setPanEnabled(interactionMode === "select");
+    setChartCursor("crosshair");
     if (moved && payload) {
       suppressNextClick = true;
       const event = {
@@ -3309,6 +3418,7 @@
 
   window.chartApi = {
     setData: setData,
+    updateFormingBar: updateFormingBar,
     setIndicatorVisible: setIndicatorVisible,
     clear: clear,
     resize: resize,

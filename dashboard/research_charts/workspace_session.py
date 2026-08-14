@@ -288,6 +288,9 @@ class ResearchWorkspace:
     def _commit(self, drawing) -> None:
         self.drawings.add_drawing(drawing)
         self._selected_drawing_id = drawing.drawing_id
+        self._drawing_tool = "select"
+        self._pending_draw = None
+        self._preview_anchor = None
         self.persist_drawings()
 
     def on_point(self, *, pane_id: str, timeframe: str, symbol: str, ts, price) -> dict[str, Any]:

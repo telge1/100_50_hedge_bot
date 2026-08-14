@@ -120,11 +120,14 @@ def test_ensure_live_collector_running(monkeypatch):
             "collector_available": True,
             "collector_state": "LIVE",
             "desired_state": "RUNNING",
+            "configured_symbols": ["APTUSDT"],
+            "live_symbols": ["APTUSDT"],
             "symbols": [{"symbol": "APTUSDT", "state": "LIVE"}],
         },
     )
     posts = []
     monkeypatch.setattr(cc, "set_desired_state", lambda *a, **k: posts.append(a) or {"http_status": 200})
+    monkeypatch.setattr(cc, "ensure_symbol_on_collector", lambda *a, **k: posts.append(a) or {"http_status": 200})
     out = ensure_live_collector("APTUSDT")
     assert out["ensured"] is True
     assert out["action"] == "already_running"
@@ -150,11 +153,11 @@ def test_ensure_live_collector_stopped(monkeypatch):
         posts.append(desired)
         return {"http_status": 200, "desired_state": desired}
 
-    monkeypatch.setattr(cc, "set_desired_state", _post)
+    monkeypatch.setattr(cc, "ensure_symbol_on_collector", _post)
     out = ensure_live_collector("APTUSDT")
     assert out["ensured"] is True
-    assert out["action"] == "set_desired_running"
-    assert posts == ["RUNNING"]
+    assert out["action"] == "ensure_symbol"
+    assert posts == ["APTUSDT"]
 
 
 def test_ensure_collector_unavailable_and_not_configured(monkeypatch):
@@ -171,12 +174,12 @@ def test_ensure_collector_unavailable_and_not_configured(monkeypatch):
     )
     posts = []
     monkeypatch.setattr(cc, "set_desired_state", lambda *a, **k: posts.append(1) or {})
+    monkeypatch.setattr(cc, "ensure_symbol_on_collector", lambda *a, **k: posts.append(1) or {})
     down = ensure_live_collector("APTUSDT")
     assert down["reason"] == "collector_unavailable"
     assert posts == []
     skip = ensure_live_collector("ETHUSDT")
-    assert skip["reason"] == "not_in_live_universe"
-    assert skip["live_configured"] is False
+    assert skip["reason"] == "collector_unavailable"
     btc = ensure_live_collector("BTCUSDT")
     assert btc["reason"] == "btc_rejected"
     assert posts == []
@@ -215,8 +218,8 @@ def test_live_status_http_and_auth():
     assert btc["btc_rejected"] is True
     assert btc["research_ui_status"] == "LIVE_NOT_AVAILABLE"
     eth = client.get("/api/research/live-status", params={"symbol": "ETHUSDT"}).json()
-    assert eth["live_configured"] is False
-    assert eth["research_ui_status"] in {"HISTORICAL", "LIVE_NOT_AVAILABLE"} or eth["history_available"] in {True, False}
+    assert eth["live_configured"] is True
+    assert eth["btc_rejected"] is False
 
     mod = sys.modules.get("app")
     if mod is not None and not hasattr(mod, "sessions"):
