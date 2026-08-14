@@ -1,3 +1,4 @@
+# Master/Sub API keys (lokal setzen, nicht committen)
 master:
   api_key: "YOUR_BYBIT_API_KEY"
   secret_key: "YOUR_BYBIT_SECRET_KEY"
@@ -23,3 +24,6 @@ profiles:
     short_account: sub
   short_bot_2:
     short_account: bot_2_sub
+
+notifications:
+  ntfy_topic: "prices_alert"

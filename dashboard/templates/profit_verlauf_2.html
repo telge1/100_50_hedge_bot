@@ -280,12 +280,9 @@
                 <a href="/logout" class="btn-logout">🚪 Logout</a>
             </div>
         </div>
-        <div class="dashboard-navigation">
-            <a href="/dashboard" class="nav-link">Dashboard</a>
-            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link active">Profit-Verlauf</a>
-            <a href="/live-charts" class="nav-link">Live Charts</a>
-            <a href="/price-alert" class="nav-link">Price Alert</a>
-        </div>
+        {% set nav_active = 'profit-verlauf' %}
+        {% include "partials/nav.html" %}
+
         <div class="dashboard-content">
             <div class="profit-summary-grid">
                 <div class="profit-summary-card">

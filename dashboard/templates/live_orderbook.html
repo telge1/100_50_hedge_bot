@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Orderbook - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=lob-grid-20260807b">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'live-orderbook' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="position-calculator-container live-orderbook-page">
+                <div class="calculator-header">
+                    <h1>📡 Live Orderbook Watch</h1>
+                    <p class="calculator-description">
+                        Support, Resistance, Walls, Flow und Liquidationen — research-only.
+                        Zonen/State: 5s-Samples · Money Flow / Wall Bias / Liq: Report-Fenster.
+                        Start/Stop steuert nur eine Session: temporärer Datenfeed + Watch; kein Dauer-Recorder.
+                    </p>
+                </div>
+
+                <div class="cobertura-setup lob-controls-card">
+                    <div class="setup-section">
+                        <h3>Runner steuern</h3>
+                        <div class="setup-fields lob-control-fields">
+                            <div class="setup-field">
+                                <label for="lobSymbol">Symbol</label>
+                                <input type="text" id="lobSymbol" class="setup-input" maxlength="20" value="APTUSDT" autocomplete="off" spellcheck="false">
+                            </div>
+                            <div class="setup-field">
+                                <label for="lobWindow">Fenster</label>
+                                <select id="lobWindow" class="setup-input setup-select">
+                                    <option value="60" selected>1 Minute</option>
+                                    <option value="120">2 Minuten</option>
+                                    <option value="300">5 Minuten</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="service-status-actions lob-action-row">
+                        <button id="lobStart" class="btn-start" type="button">▶ STARTEN</button>
+                        <button id="lobStop" class="btn-stop" type="button" disabled>■ STOPPEN</button>
+                        <button id="lobRestart" class="btn-restart lob-btn-warning" type="button" disabled>↻ NEU STARTEN</button>
+                    </div>
+                </div>
+
+                <div class="calculator-summary lob-status-bar">
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Status</div>
+                        <div class="summary-value lob-metric-value">
+                            <span id="lobStatusDot" class="lob-status-dot lob-status-dot-stopped"></span>
+                            <span id="lobStatusText">STOPPED</span>
+                        </div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Symbol</div>
+                        <div class="summary-value lob-metric-value" id="lobWatchSymbol">—</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Fenster</div>
+                        <div class="summary-value lob-metric-value" id="lobWindowLabel">1m</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">State</div>
+                        <div class="summary-value lob-metric-value" id="lobState">NO_ACTIVE_ZONE</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Decision</div>
+                        <div class="summary-value lob-metric-value" id="lobDecision">NO_TRADE</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Mid</div>
+                        <div class="summary-value lob-metric-value" id="lobMid">—</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Datenalter</div>
+                        <div class="summary-value lob-metric-value" id="lobDataAge">—</div>
+                    </div>
+                    <div class="summary-card lob-status-card">
+                        <div class="summary-label">Lage</div>
+                        <div class="summary-value lob-metric-value" id="lobLevelSource">5s</div>
+                    </div>
+                </div>
+
+                <div class="lob-zone-block">
+                    <div class="lob-zone-grid">
+                        <section class="lob-level-card" data-card="resistance" id="lobResistanceCard">
+                            <div class="lob-level-header">
+                                <h3 class="lob-level-title">RESISTANCE</h3>
+                                <div class="lob-level-distance" data-field="resistance-distance">ABSTAND —</div>
+                            </div>
+                            <div class="lob-level-movement">
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Vorher</span>
+                                    <strong data-field="resistance-previous">NOCH KEIN VERGLEICH</strong>
+                                </div>
+                                <span class="lob-level-arrow" data-field="resistance-arrow-1">→</span>
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Aktuell</span>
+                                    <strong data-field="resistance-current">NICHT ERKANNT</strong>
+                                </div>
+                                <span class="lob-level-arrow" data-field="resistance-arrow-2">→</span>
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Bewegung</span>
+                                    <strong data-field="resistance-movement">NOCH KEIN VERGLEICH</strong>
+                                </div>
+                            </div>
+                            <div class="lob-level-reading lob-tone-neutral" data-field="resistance-reading">WIDERSTAND NICHT MEHR SICHTBAR</div>
+                            <div class="lob-level-metrics">
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Stärke</div>
+                                    <div class="lob-mini-metric-value" data-field="resistance-strength">—</div>
+                                </div>
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Ask-Volumen</div>
+                                    <div class="lob-mini-metric-value" data-field="resistance-notional">—</div>
+                                </div>
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Änderung</div>
+                                    <div class="lob-mini-metric-value" data-field="resistance-change">SAMMELT DATEN</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="lob-level-card" data-card="support" id="lobSupportCard">
+                            <div class="lob-level-header">
+                                <h3 class="lob-level-title">SUPPORT</h3>
+                                <div class="lob-level-distance" data-field="support-distance">ABSTAND —</div>
+                            </div>
+                            <div class="lob-level-movement">
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Vorher</span>
+                                    <strong data-field="support-previous">NOCH KEIN VERGLEICH</strong>
+                                </div>
+                                <span class="lob-level-arrow" data-field="support-arrow-1">→</span>
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Aktuell</span>
+                                    <strong data-field="support-current">NICHT ERKANNT</strong>
+                                </div>
+                                <span class="lob-level-arrow" data-field="support-arrow-2">→</span>
+                                <div class="lob-level-point">
+                                    <span class="lob-level-label">Bewegung</span>
+                                    <strong data-field="support-movement">NOCH KEIN VERGLEICH</strong>
+                                </div>
+                            </div>
+                            <div class="lob-level-reading lob-tone-neutral" data-field="support-reading">UNTERSTÜTZUNG NICHT MEHR SICHTBAR</div>
+                            <div class="lob-level-metrics">
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Stärke</div>
+                                    <div class="lob-mini-metric-value" data-field="support-strength">—</div>
+                                </div>
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Bid-Volumen</div>
+                                    <div class="lob-mini-metric-value" data-field="support-notional">—</div>
+                                </div>
+                                <div class="lob-mini-metric">
+                                    <div class="lob-mini-metric-label">Änderung</div>
+                                    <div class="lob-mini-metric-value" data-field="support-change">SAMMELT DATEN</div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="lob-level-card" data-card="support2" id="lobSupport2Card" hidden>
+                        <div class="lob-level-header">
+                            <h3 class="lob-level-title">SUPPORT 2</h3>
+                            <div class="lob-level-distance" data-field="support2-distance">ABSTAND —</div>
+                        </div>
+                        <div class="lob-level-movement">
+                            <div class="lob-level-point">
+                                <span class="lob-level-label">Vorher</span>
+                                <strong data-field="support2-previous">NOCH KEIN VERGLEICH</strong>
+                            </div>
+                            <span class="lob-level-arrow" data-field="support2-arrow-1">→</span>
+                            <div class="lob-level-point">
+                                <span class="lob-level-label">Aktuell</span>
+                                <strong data-field="support2-current">NICHT ERKANNT</strong>
+                            </div>
+                            <span class="lob-level-arrow" data-field="support2-arrow-2">→</span>
+                            <div class="lob-level-point">
+                                <span class="lob-level-label">Bewegung</span>
+                                <strong data-field="support2-movement">NOCH KEIN VERGLEICH</strong>
+                            </div>
+                        </div>
+                        <div class="lob-level-reading lob-tone-neutral" data-field="support2-reading">UNTERSTÜTZUNG NICHT MEHR SICHTBAR</div>
+                        <div class="lob-level-metrics">
+                            <div class="lob-mini-metric">
+                                <div class="lob-mini-metric-label">Stärke</div>
+                                <div class="lob-mini-metric-value" data-field="support2-strength">—</div>
+                            </div>
+                            <div class="lob-mini-metric">
+                                <div class="lob-mini-metric-label">Bid-Volumen</div>
+                                <div class="lob-mini-metric-value" data-field="support2-notional">—</div>
+                            </div>
+                            <div class="lob-mini-metric">
+                                <div class="lob-mini-metric-label">Änderung</div>
+                                <div class="lob-mini-metric-value" data-field="support2-change">SAMMELT DATEN</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="lob-support2-fallback" id="lobSupport2Fallback">
+                        <div class="lob-support2-fallback-title">SUPPORT 2</div>
+                        <div class="lob-support2-fallback-status">NICHT ERKANNT</div>
+                    </div>
+                </div>
+
+                <div class="lob-flow-grid">
+                    <section class="cobertura-setup lob-context-card" data-card="money_flow">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Money Flow</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Neue Positionen</div><div class="summary-value lob-metric-value" data-metric="0">—</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Stärke</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Delta</div><div class="summary-value lob-metric-value" data-metric="2">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">OI</div><div class="summary-value lob-metric-value" data-metric="3">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Preisbewegung</div><div class="summary-value lob-metric-value" data-metric="4">N/A</div></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="cobertura-setup lob-context-card" data-card="wall_bias">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Wall Bias</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Ask Resistance</div><div class="summary-value lob-metric-value" data-metric="0">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Bid Support</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">technischer Bias</div><div class="summary-value lob-metric-value" data-metric="2">N/A</div></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="calculator-summary lob-context-grid">
+                    <section class="cobertura-setup lob-context-card" data-card="absorption">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Absorption</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Stärke</div><div class="summary-value lob-metric-value" data-metric="0">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Reaktion</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Zone</div><div class="summary-value lob-metric-value" data-metric="2">N/A</div></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="cobertura-setup lob-context-card" data-card="near_price">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Orderbook nahe am Preis</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">0–10 bps</div><div class="summary-value lob-metric-value" data-metric="0">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">10–25 bps</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="cobertura-setup lob-context-card" data-card="level_quality">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Level-Qualität</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Tests</div><div class="summary-value lob-metric-value" data-metric="0">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Besteht seit</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Ermüdung</div><div class="summary-value lob-metric-value" data-metric="2">N/A</div></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="cobertura-setup lob-context-card" data-card="liquidations">
+                        <div class="setup-section">
+                            <h3 class="lob-card-title" data-role="title">Liquidationen</h3>
+                            <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                            <div class="lob-tech" data-role="tech"></div>
+                            <div class="calculator-summary lob-metric-grid">
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Longs</div><div class="summary-value lob-metric-value" data-metric="0">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Shorts</div><div class="summary-value lob-metric-value" data-metric="1">N/A</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Mehr betroffen</div><div class="summary-value lob-metric-value" data-metric="2">—</div></div>
+                                <div class="summary-card lob-metric-card"><div class="summary-label">Steigt</div><div class="summary-value lob-metric-value" data-metric="3">—</div></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <section class="cobertura-setup lob-ob-grid-card" data-card="ob-grid">
+                    <div class="setup-section">
+                        <h3 class="lob-card-title">ORDERBOOK GRID LEVELS</h3>
+                        <p class="lob-ob-grid-sub">
+                            Grid-Band 100–300 bps · zusätzlich STRONGEST_RELEVANT + Near-Mid-Walls (&lt;100 bps) · Anzeige nur · keine Trading-Signale
+                        </p>
+                        <div class="lob-ob-grid-meta" data-role="ob-grid-meta">
+                            <span data-field="grid-status">—</span>
+                            · <span data-field="grid-snapshot">—</span>
+                            · Tiefe Bid <span data-field="grid-depth-bid">—</span> /
+                            Ask <span data-field="grid-depth-ask">—</span> bps
+                            · Roh <span data-field="grid-raw">—</span>
+                            · Zonen <span data-field="grid-zones">—</span>
+                        </div>
+                        <div class="lob-ob-grid-layout">
+                            <div class="lob-ob-grid-col lob-ob-grid-ask">
+                                <div class="lob-ob-grid-side-label">ASK LEVELS <span class="lob-ob-grid-side-hint">Widerstand</span></div>
+                                <div class="lob-ob-grid-levels" data-role="ask-levels"></div>
+                            </div>
+                            <div class="lob-ob-grid-mid-wrap">
+                                <div class="lob-ob-near-mid lob-ob-near-mid-ask" data-role="near-mid-ask" hidden></div>
+                                <div class="lob-ob-grid-mid-rule"></div>
+                                <div class="lob-ob-grid-mid">
+                                    <div class="lob-ob-grid-mid-label">CURRENT MID</div>
+                                    <div class="lob-ob-grid-mid-price" data-role="grid-mid">—</div>
+                                </div>
+                                <div class="lob-ob-grid-mid-rule"></div>
+                                <div class="lob-ob-near-mid lob-ob-near-mid-bid" data-role="near-mid-bid" hidden></div>
+                            </div>
+                            <div class="lob-ob-grid-col lob-ob-grid-bid">
+                                <div class="lob-ob-grid-side-label">BID LEVELS <span class="lob-ob-grid-side-hint">Unterstützung</span></div>
+                                <div class="lob-ob-grid-levels" data-role="bid-levels"></div>
+                            </div>
+                        </div>
+                        <details class="lob-ob-grid-more">
+                            <summary>Mehr anzeigen / Preisleiter</summary>
+                            <div class="lob-ob-grid-ladder" data-role="grid-ladder"></div>
+                            <div class="lob-ob-grid-extra" data-role="grid-extra"></div>
+                        </details>
+                        <div class="lob-ob-grid-empty" data-role="grid-empty" hidden></div>
+                    </div>
+                </section>
+
+                <section class="cobertura-setup lob-overall-card" data-card="overall">
+                    <div class="setup-section">
+                        <h3 class="lob-card-title" data-role="title">Gesamtbild</h3>
+                        <div class="lob-headline lob-tone-neutral" data-role="headline">—</div>
+                        <div class="lob-overall-block">
+                            <div class="lob-overall-label">Dafür spricht</div>
+                            <ul class="lob-reason-list">
+                                <li data-reason="for-0">—</li>
+                                <li data-reason="for-1" hidden>—</li>
+                                <li data-reason="for-2" hidden>—</li>
+                            </ul>
+                        </div>
+                        <div class="lob-overall-block">
+                            <div class="lob-overall-label">Dagegen spricht</div>
+                            <ul class="lob-reason-list">
+                                <li data-reason="against-0">—</li>
+                                <li data-reason="against-1" hidden>—</li>
+                            </ul>
+                        </div>
+                        <div class="lob-decision-box">
+                            <div class="lob-overall-label">Entscheidung</div>
+                            <div class="lob-decision-value lob-tone-mixed" data-role="decision">ABWARTEN</div>
+                        </div>
+                        <div class="lob-tech" data-role="tech"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/live_orderbook.js?v=lob-grid-20260807b"></script>
+</body>
+</html>

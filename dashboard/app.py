@@ -3,7 +3,7 @@
 Dashboard Web Application
 """
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, Body, Query, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -43,6 +43,11 @@ os.environ.setdefault("BURN_REENTRY_PROJECT_ROOT", str(project_root))
 from fixed_cycle_hedge_bot.confirmed_pnl_path_logic import (
     confirmed_row_dedupe_key as _shared_confirmed_row_dedupe_key,
     validate_confirmed_pnl_row_for_path,
+)
+from live_orderbook_manager import (
+    live_orderbook_manager,
+    validate_report_interval,
+    validate_symbol,
 )
 
 CONFIRMED_ORDER_PNL_HISTORY_FILE = project_root / "logs" / "confirmed_order_pnl_history.jsonl"
@@ -570,8 +575,23 @@ CONFIG_ENDPOINTS = frozenset({
 MAX_CONCURRENT_CONFIG = 16
 
 
+def _is_circuit_breaker_exempt(path: str) -> bool:
+    """Status polls must keep working when an upstream is down (collector on :8787)."""
+    if path == "/api/system/status":
+        return True
+    if path.startswith("/api/collector/"):
+        return True
+    if path.startswith("/api/research/live-status"):
+        return True
+    if path.startswith("/api/research/forming-bar"):
+        return True
+    return False
+
+
 def _is_rate_limit_exempt(path: str) -> bool:
     """User-Klicks (Laden/Update/Config/Stop/Start/Restart): kein Rate-Limit, damit sie sofort durchkommen."""
+    if path.startswith("/api/research/forming-bar"):
+        return True
     if path.startswith("/api/bots/") and (
         "/config" in path or path.endswith("/stop") or path.endswith("/start") or "/restart" in path
     ):
@@ -2512,7 +2532,7 @@ async def timeout_and_error_handler(request: Request, call_next):
     
     try:
         # Prüfe Circuit Breaker (außer für /api/system/status - dieser Endpunkt sollte nie blockiert werden)
-        if endpoint != "GET /api/system/status" and endpoint in circuit_breaker:
+        if not _is_circuit_breaker_exempt(request.url.path) and endpoint in circuit_breaker:
             cb = circuit_breaker[endpoint]
             if cb['state'] == 'open':
                 # Circuit ist offen - prüfe ob Reset-Zeit abgelaufen ist
@@ -2577,6 +2597,8 @@ async def timeout_and_error_handler(request: Request, call_next):
                 if endpoint in circuit_breaker:
                     circuit_breaker[endpoint] = {'failures': 0, 'last_failure': 0, 'state': 'closed'}
             elif response.status_code >= 500:
+                if _is_circuit_breaker_exempt(request.url.path):
+                    return response
                 # Nur Server-Fehler (5xx) zählen für Circuit Breaker.
                 # 4xx (z.B. 401/403 bei abgelaufener Session) sind Client/Auth-Fehler
                 # und dürfen den Endpoint nicht "OPEN" schalten.
@@ -3169,36 +3191,13 @@ async def dashboard(request: Request, user: dict = Depends(require_auth)):
 @app.get("/position-calculator", response_class=HTMLResponse)
 async def position_calculator(request: Request, user: dict = Depends(require_auth)):
     """Position Calculator page"""
-    # Load config values from first available bot or use defaults
-    default_config = get_default_config()
-    short_reentry_step_percentage = default_config.get('short_reentry_step_percentage', 0.3)
-    target_long_notional = default_config.get('initial_long_usdt', 500)
-    
-    # Try to get config from first available bot
-    all_bots = get_all_bots()
-    if all_bots and len(all_bots) > 0:
-        first_bot = all_bots[0]
-        first_bot_type = first_bot.get("bot_type", "long")
-        first_bot_config = load_config(bot_type=first_bot_type)
-        if first_bot_config and 'short_reentry_step_percentage' in first_bot_config:
-            short_reentry_step_percentage = first_bot_config.get('short_reentry_step_percentage', 0.3)
-        if first_bot_config and 'initial_long_usdt' in first_bot_config:
-            target_long_notional = first_bot_config.get('initial_long_usdt', 500)
-    
-    # Get all available bots for symbol selection
-    all_bots_list = get_all_bots()
-    
     return HTMLResponse(render_template(
         "position_calculator.html",
         {
             "request": request,
             "user": user,
-            "short_reentry_step_percentage": short_reentry_step_percentage,
-            "target_long_notional": target_long_notional,
-            "all_bots": all_bots_list
         }
     ))
-
 
 @app.get("/dual-account-hedge")
 async def redirect_dual_account_hedge(request: Request, user: dict = Depends(require_auth)):
@@ -3275,6 +3274,741 @@ async def price_alert_page(request: Request, user: dict = Depends(require_auth))
         "price_alert.html",
         {"request": request, "user": user}
     ))
+
+
+@app.get("/stoch-signale", response_class=HTMLResponse)
+async def stoch_signale_page(request: Request, user: dict = Depends(require_auth)):
+    """Stoch / Wave-Fade Signale – source switchable (frozen vs research 1m timing)."""
+    try:
+        from stoch_signal_source import (
+            SOURCE_RESEARCH_1M_TIMING,
+            VARIANT_LABELS,
+            get_dashboard_signal_source,
+            get_default_research_display_variant,
+        )
+    except ImportError:
+        _dash = Path(__file__).resolve().parent
+        if str(_dash) not in sys.path:
+            sys.path.insert(0, str(_dash))
+        from stoch_signal_source import (
+            SOURCE_RESEARCH_1M_TIMING,
+            VARIANT_LABELS,
+            get_dashboard_signal_source,
+            get_default_research_display_variant,
+        )
+    src = get_dashboard_signal_source()
+    return HTMLResponse(render_template(
+        "stoch_signale.html",
+        {
+            "request": request,
+            "user": user,
+            "dashboard_signal_source": src,
+            "research_mode": src == SOURCE_RESEARCH_1M_TIMING,
+            "default_research_variant": get_default_research_display_variant(),
+            "research_variant_labels": VARIANT_LABELS,
+        },
+    ))
+
+
+@app.get("/stoch-profite", response_class=HTMLResponse)
+async def stoch_profite_page(request: Request, user: dict = Depends(require_auth)):
+    """Stoch / Wave-Fade Profite – Template-Scaffolding bis der Live-Feed angebunden ist."""
+    return HTMLResponse(render_template(
+        "stoch_profite.html",
+        {"request": request, "user": user}
+    ))
+
+
+# ---------------------------------------------------------------------------
+# Stoch / Wave-Fade signal feed (real signals via collector control API)
+# Transport: ClickHouse → Signal API (:8787) → Dashboard same-origin proxy
+# ---------------------------------------------------------------------------
+
+_STOCH_COLLECTOR_API_BASE = os.environ.get(
+    "STOCH_COLLECTOR_API_BASE", "http://127.0.0.1:8787"
+).rstrip("/")
+_STOCH_FEED_HOURS = int(os.environ.get("STOCH_SIGNAL_FEED_HOURS", "48"))
+_STOCH_FEED_PAGE_SIZE = int(os.environ.get("STOCH_SIGNAL_FEED_LIMIT", "300"))
+
+# Reversible display-only switch (production strategy unchanged).
+# DASHBOARD_SIGNAL_SOURCE=FROZEN_BASELINE | RESEARCH_1M_TIMING
+_dash_dir_for_stoch = Path(__file__).resolve().parent
+if str(_dash_dir_for_stoch) not in sys.path:
+    sys.path.insert(0, str(_dash_dir_for_stoch))
+from stoch_signal_source import (  # noqa: E402
+    SOURCE_FROZEN_BASELINE,
+    SOURCE_RESEARCH_1M_TIMING,
+    assert_sources_do_not_mix,
+    frozen_upstream_path,
+    get_dashboard_signal_source,
+    get_default_research_display_variant,
+    normalize_research_display_variant,
+    research_upstream_path,
+)
+
+
+def _stoch_demo_profits() -> list[dict]:
+    """Placeholder rows for /stoch-profite until trade feed is wired."""
+    now = int(time.time())
+    apt_long = _stoch_demo_levels("APTUSDT", "LONG", 1.80, 1.10)
+    doge_short = _stoch_demo_levels("DOGEUSDT", "SHORT", 1.20, 0.90)
+    apt_short = _stoch_demo_levels("APTUSDT", "SHORT", 1.50, 1.00)
+    apt_close = apt_long["entry"] * 1.0148
+    doge_close = doge_short["entry"] * (1.0 + 0.0092)
+    return [
+        {
+            "id": "demo-tr-apt-1",
+            "symbol": "APTUSDT",
+            "pnl": 14.8200,
+            "pnl_percent": 1.48,
+            "open_time": now - 90000,
+            "close_time": now - 85000,
+            "open_price": apt_long["entry"],
+            "close_price": apt_close,
+            "trade_state": "COMPLETED",
+            "batch_id": "fade-demo-batch-0",
+            "trade_direction": "LONG",
+            "expected_open_price": apt_long["entry"],
+            "expected_tp": apt_long["tp"],
+            "expected_sl": apt_long["sl"],
+            "strategy": "wave_fade",
+            "is_demo": True,
+        },
+        {
+            "id": "demo-tr-doge-1",
+            "symbol": "DOGEUSDT",
+            "pnl": -6.4100,
+            "pnl_percent": -0.92,
+            "open_time": now - 50000,
+            "close_time": now - 47000,
+            "open_price": doge_short["entry"],
+            "close_price": doge_close,
+            "trade_state": "COMPLETED",
+            "batch_id": "fade-demo-batch-0",
+            "trade_direction": "SHORT",
+            "expected_open_price": doge_short["entry"],
+            "expected_tp": doge_short["tp"],
+            "expected_sl": doge_short["sl"],
+            "strategy": "wave_fade",
+            "is_demo": True,
+        },
+        {
+            "id": "demo-tr-apt-open",
+            "symbol": "APTUSDT",
+            "pnl": 2.1500,
+            "pnl_percent": 0.35,
+            "open_time": now - 7200,
+            "close_time": None,
+            "open_price": apt_short["entry"],
+            "close_price": None,
+            "trade_state": "TP_SL_PENDING",
+            "batch_id": "fade-demo-batch-1",
+            "trade_direction": "SHORT",
+            "expected_open_price": apt_short["entry"],
+            "expected_tp": apt_short["tp"],
+            "expected_sl": apt_short["sl"],
+            "strategy": "wave_fade",
+            "is_demo": True,
+        },
+    ]
+
+
+def _stoch_demo_levels(symbol: str, direction: str, tp_pct: float, sl_pct: float) -> dict:
+    """Build Entry/TP/SL around live Bybit price (profits demo / chart helpers)."""
+    px = _fetch_bybit_ticker_price(symbol)
+    if px is None or px <= 0:
+        px = 0.07 if "DOGE" in symbol.upper() else 5.0
+    d = str(direction or "").upper()
+    if d == "SHORT":
+        tp = px * (1.0 - tp_pct / 100.0)
+        sl = px * (1.0 + sl_pct / 100.0)
+    else:
+        tp = px * (1.0 + tp_pct / 100.0)
+        sl = px * (1.0 - sl_pct / 100.0)
+    return {
+        "entry": float(px),
+        "tp": float(tp),
+        "sl": float(sl),
+    }
+
+
+def _map_upstream_signal(row: dict) -> dict:
+    """Map Signal API row → dashboard table row (frozen entry/TP/SL only)."""
+    direction = str(row.get("direction") or "").upper()
+    tier_a = bool(row.get("tier_a"))
+    selected = bool(row.get("selected"))
+    if selected:
+        signal_state = "SELECTED"
+    elif tier_a:
+        signal_state = "SIGNAL"
+    else:
+        signal_state = "CANDIDATE"
+
+    close_iso = row.get("candle_close_time")
+    gen_iso = row.get("generated_at")
+
+    def _f(v):
+        if v is None or v == "":
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    entry = _f(row.get("entry_price"))
+    if entry is None or entry <= 0:
+        entry = _f(row.get("signal_price"))
+        if entry is not None and entry <= 0:
+            entry = None
+    tp = _f(row.get("tp_price"))
+    sl = _f(row.get("sl_price"))
+    entry_valid = row.get("entry_valid")
+    if entry_valid is None:
+        entry_valid = entry is not None and entry > 0
+
+    sid = str(row.get("signal_id") or "")
+    return {
+        "id": sid,
+        "signal_id": sid,
+        "symbol": row.get("symbol"),
+        "timeframe": row.get("timeframe"),
+        "trade_direction": direction,
+        "direction": direction,
+        "signal_state": signal_state,
+        "tier_a": tier_a,
+        "selected": selected,
+        "signal_type": row.get("signal_type"),
+        "signal_price": entry,
+        "entry_price": entry,
+        "entry_time": row.get("entry_time"),
+        "entry_valid": bool(entry_valid),
+        "tp_pct": _f(row.get("tp_pct")),
+        "sl_pct": _f(row.get("sl_pct")),
+        "tp_price": tp,
+        "sl_price": sl,
+        "be_trigger_price": _f(row.get("be_trigger_price")),
+        "break_even_price": _f(row.get("break_even_price")),
+        "expected_open_price": entry,
+        "expected_tp": tp,
+        "expected_sl": sl,
+        "stoch_k": row.get("stoch_k"),
+        "stoch_d": row.get("stoch_d"),
+        "wave_state": row.get("wave_state"),
+        "rank_score": row.get("rank_score"),
+        "candle_open_time": row.get("candle_open_time"),
+        "candle_close_time": close_iso,
+        "generated_at": gen_iso,
+        "signal_time": close_iso,
+        "created_on": close_iso,
+        "expected_open_time": close_iso,
+        "trend_15m": row.get("trend_15m"),
+        "trend_30m": row.get("trend_30m"),
+        "trend_1h": row.get("trend_1h"),
+        "trend_4h": row.get("trend_4h"),
+        "strategy_version": row.get("strategy_version"),
+        "generator_version": row.get("generator_version"),
+        "traded": bool(row.get("traded")),
+        "selection_reason": row.get("selection_reason") or "",
+        "tier_a_context": row.get("tier_a_context") or "",
+        "is_demo": False,
+        "price_incomplete": not bool(entry_valid),
+        # Frozen BE50 trade outcome (default OPEN if missing)
+        "result": str(
+            row.get("display_result") or row.get("result") or "OPEN"
+        ).upper(),
+        "frozen_result": str(row.get("frozen_result") or row.get("result") or "OPEN").upper(),
+        "display_result": str(
+            row.get("display_result") or row.get("result") or "OPEN"
+        ).upper(),
+        "pnl_pct": _f(row.get("pnl_pct")),
+        "pnl_basis": row.get("pnl_basis") or "gross",
+        "duration_seconds": int(row["duration_seconds"])
+        if row.get("duration_seconds") is not None
+        else None,
+        "exit_time": row.get("exit_time"),
+        "exit_price": _f(row.get("exit_price")),
+        "exit_reason": row.get("exit_reason"),
+        "be50_activated": bool(row.get("be50_activated")),
+        "be50_activated_at": row.get("be50_activated_at"),
+        "counterfactual_no_be_result": row.get("counterfactual_no_be_result"),
+        "counterfactual_no_be_exit_time": row.get("counterfactual_no_be_exit_time"),
+        "counterfactual_no_be_exit_price": _f(row.get("counterfactual_no_be_exit_price")),
+        "counterfactual_no_be_pnl_pct": _f(row.get("counterfactual_no_be_pnl_pct")),
+        "counterfactual_no_be_duration_seconds": int(row["counterfactual_no_be_duration_seconds"])
+        if row.get("counterfactual_no_be_duration_seconds") is not None
+        else None,
+        "counterfactual_no_be_exit_reason": row.get("counterfactual_no_be_exit_reason"),
+        # Research 1m timing fields (ignored / empty in frozen mode)
+        "research_mode": bool(row.get("research_mode")),
+        "feed_source": row.get("feed_source"),
+        "timing_variant": row.get("timing_variant"),
+        "one_m_trigger_state": row.get("one_m_trigger_state")
+        or row.get("1m_trigger_state")
+        or row.get("trigger_state"),
+        "1m_trigger_state": row.get("1m_trigger_state")
+        or row.get("one_m_trigger_state")
+        or row.get("trigger_state"),
+        "original_tier_a_signal_ts": row.get("original_tier_a_signal_ts"),
+        "oversold_overbought_reached_at": row.get("oversold_overbought_reached_at"),
+        "turn_confirmed_at": row.get("turn_confirmed_at"),
+        "wait_minutes": _f(row.get("wait_minutes")),
+        "mae_pct": _f(row.get("mae_pct") if row.get("mae_pct") is not None else row.get("MAE")),
+        "mfe_pct": _f(row.get("mfe_pct") if row.get("mfe_pct") is not None else row.get("MFE")),
+        "original_baseline_entry_ts": row.get("original_baseline_entry_ts"),
+        "original_baseline_entry_price": _f(row.get("original_baseline_entry_price")),
+        "baseline_comparison_only": bool(row.get("baseline_comparison_only")),
+        "production_strategy_unchanged": bool(row.get("production_strategy_unchanged")),
+        "source_signal_id": row.get("source_signal_id"),
+    }
+
+
+async def _fetch_upstream_signals(
+    *,
+    hours: int = _STOCH_FEED_HOURS,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    direction: str | None = None,
+    tier_a: str | None = None,
+    selected: str | None = None,
+    strategy_version: str | None = None,
+    limit: int = _STOCH_FEED_PAGE_SIZE,
+    offset: int = 0,
+    upstream_path: str | None = None,
+    timing_variant: str | None = None,
+) -> tuple[dict | None, int, str | None]:
+    """Returns (payload, http_status, error_message)."""
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(hours=max(1, hours))
+    params = {
+        "start": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "end": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "time_field": "candle_close_time",
+        "limit": str(limit),
+        "offset": str(offset),
+    }
+    if symbol:
+        params["symbol"] = symbol.upper()
+    if timeframe:
+        params["timeframe"] = timeframe
+    if direction:
+        params["direction"] = direction.upper()
+    if tier_a is not None and str(tier_a) != "":
+        params["tier_a"] = tier_a
+    if selected is not None and str(selected) != "":
+        params["selected"] = selected
+    if strategy_version:
+        params["strategy_version"] = strategy_version
+    if timing_variant:
+        params["timing_variant"] = timing_variant
+
+    from urllib.parse import urlencode
+
+    qs = urlencode(params)
+    path = upstream_path or frozen_upstream_path()
+    url = f"{_STOCH_COLLECTOR_API_BASE}{path}?{qs}"
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.get(url)
+        try:
+            payload = resp.json()
+        except Exception:
+            return None, resp.status_code, "invalid_json_from_signal_api"
+        if resp.status_code >= 400:
+            err = None
+            if isinstance(payload, dict):
+                err = str(payload.get("error") or payload.get("detail") or payload)
+            return payload if isinstance(payload, dict) else None, resp.status_code, err or "upstream_error"
+        return payload if isinstance(payload, dict) else None, resp.status_code, None
+    except httpx.ConnectError:
+        return None, 503, "signal_api_unreachable"
+    except httpx.TimeoutException:
+        return None, 504, "signal_api_timeout"
+    except Exception as exc:
+        return None, 502, str(exc)
+
+
+def _fetch_bybit_klines(symbol: str, interval: str = "5", limit: int = 300) -> list[dict]:
+    """Public Bybit linear klines for Stoch chart modal (no auth)."""
+    try:
+        sym = str(symbol or "").strip().upper()
+        if not sym:
+            return []
+        lim = max(10, min(int(limit or 300), 1000))
+        url = (
+            "https://api.bybit.com/v5/market/kline"
+            f"?category=linear&symbol={sym}&interval={interval}&limit={lim}"
+        )
+        r = requests.get(url, timeout=8)
+        if r.status_code != 200:
+            return []
+        payload = r.json() or {}
+        rows = ((payload.get("result") or {}).get("list") or [])
+        candles = []
+        for row in rows:
+            try:
+                candles.append(
+                    {
+                        "time": int(int(row[0]) / 1000),
+                        "open": float(row[1]),
+                        "high": float(row[2]),
+                        "low": float(row[3]),
+                        "close": float(row[4]),
+                        "volume": float(row[5]) if len(row) > 5 else 0.0,
+                    }
+                )
+            except (TypeError, ValueError, IndexError):
+                continue
+        candles.sort(key=lambda c: c["time"])
+        return candles
+    except Exception:
+        return []
+
+
+@app.get("/api/stoch/signals")
+async def api_stoch_signals(
+    symbol: str | None = Query(None),
+    timeframe: str | None = Query(None),
+    direction: str | None = Query(None),
+    tier_a: str | None = Query(
+        "true",
+        description="Default true = real Tier-A signals only. Use 'all' for candidates too.",
+    ),
+    selected: str | None = Query(None),
+    strategy_version: str | None = Query(
+        "wave_fade_no_be50_v1",
+        description="Exit policy. Default NO_BE50. Use wave_fade_frozen_f16ae32 for BE50.",
+    ),
+    timing_variant: str | None = Query(
+        None,
+        description="Research 1m timing variant (only when DASHBOARD_SIGNAL_SOURCE=RESEARCH_1M_TIMING).",
+    ),
+    hours: int = Query(None, ge=1, le=720),
+    limit: int = Query(None, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
+    user: dict = Depends(require_auth),
+):
+    """Stoch signal feed — source controlled by DASHBOARD_SIGNAL_SOURCE (display-only)."""
+    hrs = hours if hours is not None else _STOCH_FEED_HOURS
+    lim = limit if limit is not None else _STOCH_FEED_PAGE_SIZE
+    dash_source = get_dashboard_signal_source()
+
+    if dash_source == SOURCE_RESEARCH_1M_TIMING:
+        try:
+            variant = normalize_research_display_variant(
+                timing_variant or get_default_research_display_variant()
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                {"success": False, "error": str(exc), "signals": [], "items": []},
+                status_code=400,
+            )
+        payload, status, err = await _fetch_upstream_signals(
+            hours=hrs,
+            symbol=symbol,
+            timeframe=timeframe,
+            direction=direction,
+            tier_a="true",
+            selected=None,
+            strategy_version=None,
+            limit=lim,
+            offset=offset,
+            upstream_path=research_upstream_path(),
+            timing_variant=variant,
+        )
+        if err or payload is None:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "feed_ready": False,
+                    "dashboard_signal_source": dash_source,
+                    "message": f"Research 1m timing feed nicht erreichbar: {err or 'unknown'}",
+                    "error": err or "research_feed_unavailable",
+                    "signals": [],
+                    "items": [],
+                    "summary": None,
+                    "total": 0,
+                    "page": 1,
+                    "page_size": lim,
+                    "research_mode": True,
+                    "production_strategy_unchanged": True,
+                },
+                status_code=status if status >= 400 else 503,
+            )
+        raw = payload.get("signals") or payload.get("items") or []
+        mapped = [_map_upstream_signal(r) for r in raw if isinstance(r, dict)]
+        try:
+            assert_sources_do_not_mix(dash_source, mapped)
+        except AssertionError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": str(exc),
+                    "dashboard_signal_source": dash_source,
+                    "signals": [],
+                    "items": [],
+                },
+                status_code=500,
+            )
+        total = int(payload.get("total") if payload.get("total") is not None else len(mapped))
+        return {
+            "success": True,
+            "feed_ready": True,
+            "message": None,
+            "signals": mapped,
+            "items": mapped,
+            "summary": payload.get("summary"),
+            "strategy_version": "research_1m_timing",
+            "timing_variant": variant,
+            "variant_choices": payload.get("variant_choices"),
+            "dashboard_signal_source": dash_source,
+            "research_mode": True,
+            "production_strategy_unchanged": True,
+            "outcome_horizon": "RESEARCH_1M_TIMING",
+            "total": total,
+            "count": len(mapped),
+            "page": int(payload.get("page") or 1),
+            "page_size": int(payload.get("page_size") or lim),
+            "hours": hrs,
+            "pnl_basis": "gross",
+            "source": "RESEARCH_1M_TIMING",
+            "sort": "original_tier_a_signal_ts DESC",
+        }
+
+    # --- FROZEN_BASELINE (production display) ---
+    t_raw = (tier_a if tier_a is not None else "true").strip().lower()
+    if t_raw in ("all", "*"):
+        tier_param: str | None = None
+    elif t_raw in ("",):
+        tier_param = "true"
+    else:
+        tier_param = t_raw
+
+    sv = (strategy_version or "wave_fade_no_be50_v1").strip()
+
+    payload, status, err = await _fetch_upstream_signals(
+        hours=hrs,
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        tier_a=tier_param,
+        selected=selected,
+        strategy_version=sv,
+        limit=lim,
+        offset=offset,
+        upstream_path=frozen_upstream_path(),
+    )
+    if err or payload is None:
+        return JSONResponse(
+            {
+                "success": False,
+                "feed_ready": False,
+                "dashboard_signal_source": SOURCE_FROZEN_BASELINE,
+                "message": f"Signal-Feed nicht erreichbar: {err or 'unknown'}",
+                "error": err or "signal_feed_unavailable",
+                "signals": [],
+                "items": [],
+                "summary": None,
+                "total": 0,
+                "page": 1,
+                "page_size": lim,
+            },
+            status_code=status if status >= 400 else 503,
+        )
+
+    raw = payload.get("signals") or payload.get("items") or []
+    mapped = [_map_upstream_signal(r) for r in raw if isinstance(r, dict)]
+    try:
+        assert_sources_do_not_mix(SOURCE_FROZEN_BASELINE, mapped)
+    except AssertionError as exc:
+        return JSONResponse(
+            {
+                "success": False,
+                "error": str(exc),
+                "dashboard_signal_source": SOURCE_FROZEN_BASELINE,
+                "signals": [],
+                "items": [],
+            },
+            status_code=500,
+        )
+    seen = set()
+    unique_rows = []
+    for r in mapped:
+        sid = r.get("signal_id")
+        if sid in seen:
+            continue
+        seen.add(sid)
+        unique_rows.append(r)
+
+    total = int(payload.get("total") if payload.get("total") is not None else len(unique_rows))
+    return {
+        "success": True,
+        "feed_ready": True,
+        "message": None,
+        "signals": unique_rows,
+        "items": unique_rows,
+        "summary": payload.get("summary"),
+        "strategy_version": payload.get("strategy_version") or sv,
+        "outcome_horizon": payload.get("outcome_horizon"),
+        "dashboard_signal_source": SOURCE_FROZEN_BASELINE,
+        "research_mode": False,
+        "total": total,
+        "count": len(unique_rows),
+        "page": int(payload.get("page") or 1),
+        "page_size": int(payload.get("page_size") or lim),
+        "hours": hrs,
+        "pnl_basis": "gross",
+        "source": "signal_generator.signals",
+        "sort": "candle_close_time DESC",
+    }
+
+
+@app.get("/api/stoch/profits")
+async def api_stoch_profits(user: dict = Depends(require_auth)):
+    """Stoch / Wave-Fade closed/open trades. Still demo until trade feed is ready."""
+    return {
+        "success": True,
+        "feed_ready": False,
+        "message": (
+            "Stoch-Profite / Trade-Feed ist noch nicht angebunden. "
+            "Angezeigte Zeilen sind <strong>Demo-Schema</strong>."
+        ),
+        "records": _stoch_demo_profits(),
+    }
+
+
+@app.get("/api/stoch/klines")
+async def api_stoch_klines(
+    symbol: str = Query(..., description="Trading symbol, e.g. APTUSDT"),
+    interval: str = Query("5", description="Bybit kline interval"),
+    limit: int = Query(300, ge=10, le=1000),
+    user: dict = Depends(require_auth),
+):
+    """Candles for Stoch chart modal (Entry/TP/SL overlay)."""
+    candles = await asyncio.to_thread(_fetch_bybit_klines, symbol, interval, limit)
+    return {
+        "success": True,
+        "symbol": str(symbol or "").strip().upper(),
+        "interval": interval,
+        "candles": candles,
+        "source": "bybit_public" if candles else "empty",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Stoch collector control proxy (localhost collector API → same-origin for UI)
+# Browser must never call 127.0.0.1 directly (client machine != server).
+# ---------------------------------------------------------------------------
+
+
+async def _proxy_collector_api(
+    method: str,
+    path: str,
+    *,
+    json_body: dict | None = None,
+) -> JSONResponse:
+    url = f"{_STOCH_COLLECTOR_API_BASE}{path}"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            if method.upper() == "GET":
+                resp = await client.get(url)
+            elif method.upper() == "POST":
+                resp = await client.post(url, json=json_body or {})
+            else:
+                return JSONResponse({"error": f"unsupported method {method}"}, status_code=405)
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = {"error": "invalid_json_from_collector", "raw": resp.text[:500]}
+        if resp.status_code >= 400 and isinstance(payload, dict) and "error" not in payload:
+            payload = {"error": payload.get("detail") or payload, "upstream_status": resp.status_code}
+        return JSONResponse(payload, status_code=resp.status_code)
+    except httpx.ConnectError:
+        return JSONResponse(
+            {
+                "success": True,
+                "collector_available": False,
+                "error": "collector_api_unreachable",
+                "detail": f"Cannot connect to {_STOCH_COLLECTOR_API_BASE}",
+                "desired_state": None,
+                "collector_state": "UNAVAILABLE",
+                "websocket_connected": False,
+                "configured_symbols": [],
+                "subscribed_symbols": [],
+                "live_symbols": [],
+                "stale_symbols": [],
+                "recovering_symbols": [],
+                "symbols": [],
+            },
+            status_code=200,
+        )
+    except httpx.TimeoutException:
+        return JSONResponse(
+            {"error": "collector_api_timeout", "detail": f"Timeout talking to {url}"},
+            status_code=504,
+        )
+    except Exception as exc:
+        return JSONResponse(
+            {"error": "collector_proxy_error", "detail": str(exc)},
+            status_code=502,
+        )
+
+
+@app.get("/api/collector/status")
+async def api_collector_status(user: dict = Depends(require_auth)):
+    """Proxy to signal_generator live collector status (localhost)."""
+    return await _proxy_collector_api("GET", "/api/collector/status")
+
+
+@app.get("/api/collector/desired_state")
+async def api_collector_desired_state_get(user: dict = Depends(require_auth)):
+    return await _proxy_collector_api("GET", "/api/collector/desired_state")
+
+
+@app.post("/api/collector/desired_state")
+async def api_collector_desired_state_post(
+    request: Request,
+    user: dict = Depends(require_auth),
+):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid_json_body"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "body must be object"}, status_code=400)
+    desired = str(body.get("desired_state") or "").upper()
+    if desired not in ("RUNNING", "STOPPED"):
+        return JSONResponse(
+            {"error": "desired_state must be RUNNING or STOPPED"},
+            status_code=400,
+        )
+    return await _proxy_collector_api(
+        "POST",
+        "/api/collector/desired_state",
+        json_body={"desired_state": desired},
+    )
+
+
+@app.post("/api/collector/ensure_symbol")
+async def api_collector_ensure_symbol(
+    request: Request,
+    user: dict = Depends(require_auth),
+):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid_json_body"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "body must be object"}, status_code=400)
+    symbol = str(body.get("symbol") or "").strip().upper()
+    if not symbol:
+        return JSONResponse({"error": "symbol required"}, status_code=400)
+    if symbol == "BTCUSDT":
+        return JSONResponse({"error": "btc_rejected"}, status_code=400)
+    return await _proxy_collector_api(
+        "POST",
+        "/api/collector/ensure_symbol",
+        json_body={"symbol": symbol},
+    )
 
 
 _PRICE_ALERT_STATE_FILE = project_root / "data" / "state" / "price_alert.json"
@@ -3372,12 +4106,15 @@ async def api_price_alert_start(
     if alert_key in state:
         return {"success": False, "error": f"Alert für {symbol} {trigger} {target_price} bereits aktiv."}
     try:
+        env = {**os.environ, "PYTHONPATH": str(project_root)}
+        if "XDG_RUNTIME_DIR" not in env:
+            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
         proc = subprocess.Popen(
             [sys.executable, str(script_path), "--symbol", symbol, "--target-price", str(target_price), "--trigger", trigger],
             cwd=str(project_root),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env={**os.environ, "PYTHONPATH": str(project_root)},
+            env=env,
         )
         state[alert_key] = {
             "symbol": symbol,
@@ -3448,6 +4185,106 @@ async def api_price_alert_stop(
     except Exception as e:
         logger.warning(f"State-Datei nach Stop nicht geschrieben: {e}")
     return {"success": True, "message": f"Alert für {symbol} beendet."}
+
+
+@app.get("/live-orderbook", response_class=HTMLResponse)
+async def live_orderbook_page(request: Request, user: dict = Depends(require_auth)):
+    """Read-only Live Orderbook Watch page (research-only)."""
+    return HTMLResponse(
+        render_template(
+            "live_orderbook.html",
+            {"request": request, "user": user},
+        )
+    )
+
+
+@app.post("/api/live-orderbook/start")
+async def api_live_orderbook_start(
+    payload: dict = Body(...),
+    user: dict = Depends(require_auth),
+):
+    """Start live level watch runner for one symbol."""
+    try:
+        symbol = validate_symbol(str(payload.get("symbol") or ""))
+        interval = validate_report_interval(payload.get("report_interval_seconds") or 60)
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    result = await asyncio.to_thread(
+        live_orderbook_manager.start_runner,
+        symbol=symbol,
+        report_interval_seconds=interval,
+    )
+    code = 200 if result.get("success") else 400
+    return JSONResponse(result, status_code=code)
+
+
+@app.post("/api/live-orderbook/stop")
+async def api_live_orderbook_stop(user: dict = Depends(require_auth)):
+    result = await asyncio.to_thread(live_orderbook_manager.stop_runner)
+    code = 200 if result.get("success") else 400
+    return JSONResponse(result, status_code=code)
+
+
+@app.post("/api/live-orderbook/restart")
+async def api_live_orderbook_restart(
+    payload: dict = Body(default={}),
+    user: dict = Depends(require_auth),
+):
+    symbol = payload.get("symbol")
+    interval = payload.get("report_interval_seconds")
+    try:
+        if symbol is not None and str(symbol).strip():
+            symbol = validate_symbol(str(symbol))
+        else:
+            symbol = None
+        if interval is not None and interval != "":
+            interval = validate_report_interval(interval)
+        else:
+            interval = None
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    result = await asyncio.to_thread(
+        live_orderbook_manager.restart_runner,
+        symbol=symbol,
+        report_interval_seconds=interval,
+    )
+    code = 200 if result.get("success") else 400
+    return JSONResponse(result, status_code=code)
+
+
+@app.get("/api/live-orderbook/status")
+async def api_live_orderbook_status(user: dict = Depends(require_auth)):
+    return JSONResponse(live_orderbook_manager.get_status())
+
+
+@app.get("/api/live-orderbook/snapshot")
+async def api_live_orderbook_snapshot(user: dict = Depends(require_auth)):
+    return JSONResponse(live_orderbook_manager.get_latest_snapshot())
+
+
+@app.get("/api/live-orderbook/logs")
+async def api_live_orderbook_logs(
+    user: dict = Depends(require_auth),
+    limit: int = Query(150, ge=1, le=500),
+):
+    lines = live_orderbook_manager.read_recent_logs(limit=limit)
+    return JSONResponse({"success": True, "lines": lines})
+
+
+@app.get("/api/live-orderbook/stream")
+async def api_live_orderbook_stream(request: Request, user: dict = Depends(require_auth)):
+    """SSE stream of status/snapshot heartbeats (fallback-friendly)."""
+
+    async def event_gen():
+        while True:
+            if await request.is_disconnected():
+                break
+            payload = live_orderbook_manager.get_latest_snapshot()
+            data = json.dumps(payload, default=str)
+            yield f"event: snapshot\ndata: {data}\n\n"
+            await asyncio.sleep(3)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
 @app.post("/api/multi-zyklus/upload")
@@ -3895,6 +4732,16 @@ async def api_live_order_levels(
 
 
 @app.get("/live-charts", response_class=HTMLResponse)
+async def live_charts_redirect(request: Request, user: dict = Depends(require_auth)):
+    """Compat: /live-charts → /live-charts/hedge (query string preserved)."""
+    target = "/live-charts/hedge"
+    qs = request.url.query
+    if qs:
+        target = f"{target}?{qs}"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/live-charts/hedge", response_class=HTMLResponse)
 async def live_charts(
     request: Request,
     user: dict = Depends(require_auth),
@@ -12764,18 +13611,38 @@ async def api_service_start(service_key: str, user: dict = Depends(require_auth)
 async def api_test_alert(user: dict = Depends(require_auth)):
     """Test alert"""
     try:
+        from utils.notifications import play_alert_sound
+        sound_ok = await asyncio.to_thread(play_alert_sound, 1)
         success = send_ntfy_alert(
             "🔔 Test-Nachricht vom Dashboard - Handy sollte klingeln!",
             title="Test Alert",
             priority="urgent",
             tags=["test_tube", "bell"]
         )
-        if success:
-            return {"success": True, "message": "Test-Alert gesendet"}
+        if success or sound_ok:
+            parts = []
+            if success:
+                parts.append("ntfy gesendet")
+            if sound_ok:
+                parts.append("Laptop-Ton gespielt")
+            return {"success": True, "message": "Test-Alert: " + ", ".join(parts)}
         else:
-            return {"success": False, "message": "Alert konnte nicht gesendet werden (ntfy_topic nicht konfiguriert?)"}
+            return {"success": False, "message": "Alert konnte nicht gesendet werden (ntfy_topic / Sound?)"}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@app.post("/api/price-alert/test-sound")
+async def api_price_alert_test_sound(user: dict = Depends(require_auth)):
+    """Spielt den lokalen Price-Alert-Ton auf dem Laptop."""
+    try:
+        from utils.notifications import play_alert_sound
+        ok = await asyncio.to_thread(play_alert_sound, 1)
+        if ok:
+            return {"success": True, "message": "Laptop-Ton gespielt"}
+        return {"success": False, "error": "Ton konnte nicht abgespielt werden"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/api/services/{service_key}/stop")

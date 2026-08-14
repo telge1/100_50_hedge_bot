@@ -75,11 +75,6 @@ function calculateAverages() {
     // Update summary
     const finalAverage = totalSize > 0 ? totalValue / totalSize : 0;
     updateSummary(totalSize, finalAverage, totalValue);
-    
-    // Update hedgebotpositions automatically
-    if (typeof updateHedgebotpositionsFromCalculator === 'function') {
-        updateHedgebotpositionsFromCalculator(totalSize, finalAverage);
-    }
 }
 
 function updateAveragePriceDisplay(index, averagePrice) {
@@ -112,33 +107,6 @@ function updateSummary(totalSize, averagePrice, totalValue) {
     
     if (totalValueEl) {
         totalValueEl.textContent = totalValue.toFixed(2);
-    }
-    
-    // Update hedgebotpositions Long values
-    updateHedgebotpositionsFromCalculator(totalSize, averagePrice);
-}
-
-function updateHedgebotpositionsFromCalculator(totalSize, averagePrice) {
-    const hedgeLongSizeEl = document.getElementById('hedgeLongSize');
-    const hedgeLongAvgEl = document.getElementById('hedgeLongAvg');
-    
-    if (hedgeLongSizeEl && totalSize > 0) {
-        hedgeLongSizeEl.value = totalSize.toFixed(2);
-    }
-    
-    if (hedgeLongAvgEl && averagePrice > 0) {
-        hedgeLongAvgEl.value = averagePrice.toFixed(5);
-    }
-    
-    // Update short size (50% of long)
-    const hedgeShortSizeEl = document.getElementById('hedgeShortSize');
-    if (hedgeShortSizeEl && totalSize > 0) {
-        hedgeShortSizeEl.value = (totalSize * 0.5).toFixed(2);
-    }
-    
-    // Trigger recalculation
-    if (typeof calculateHedgebotpositions === 'function') {
-        calculateHedgebotpositions();
     }
 }
 
@@ -193,11 +161,6 @@ function renderTable() {
     
     // Recalculate after rendering
     calculateAverages();
-    
-    // Update hedgebotpositions if values change
-    if (typeof calculateHedgebotpositions === 'function') {
-        calculateHedgebotpositions();
-    }
 }
 
 // Test Alert function

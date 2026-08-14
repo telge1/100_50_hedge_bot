@@ -1,12 +1,20 @@
 """
-Notification utilities using ntfy.sh
+Notification utilities using ntfy.sh and local laptop sound.
 """
+import os
+import subprocess
 import requests
 import yaml
 from pathlib import Path
 
 # Project root
 project_dir = Path(__file__).parent.parent.parent
+
+_ALERT_SOUND_CANDIDATES = (
+    Path("/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"),
+    Path("/usr/share/sounds/freedesktop/stereo/complete.oga"),
+    Path("/usr/share/sounds/freedesktop/stereo/bell.oga"),
+)
 
 
 def load_notification_config():
@@ -18,6 +26,48 @@ def load_notification_config():
             return config.get('notifications', {})
     except Exception:
         return {}
+
+
+def play_alert_sound(repeats: int = 2) -> bool:
+    """
+    Spielt einen lokalen Alarmton auf dem Laptop (PulseAudio/paplay).
+    Unabhängig von ntfy — damit Alerts auch hörbar sind, wenn die Browser-Seite zu ist.
+    """
+    sound = next((p for p in _ALERT_SOUND_CANDIDATES if p.exists()), None)
+    if sound is None:
+        print("Error playing alert sound: keine Sound-Datei gefunden")
+        return False
+
+    env = os.environ.copy()
+    runtime_dir = env.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    env["XDG_RUNTIME_DIR"] = runtime_dir
+    pulse_socket = Path(runtime_dir) / "pulse" / "native"
+    if pulse_socket.exists():
+        env["PULSE_SERVER"] = f"unix:{pulse_socket}"
+
+    ok = False
+    for _ in range(max(1, int(repeats))):
+        try:
+            result = subprocess.run(
+                ["paplay", str(sound)],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=30,
+                check=False,
+            )
+            if result.returncode == 0:
+                ok = True
+            else:
+                err = (result.stderr or b"").decode("utf-8", errors="ignore").strip()
+                print(f"Error playing alert sound: paplay exit {result.returncode} {err}")
+        except FileNotFoundError:
+            print("Error playing alert sound: paplay nicht gefunden")
+            return False
+        except Exception as e:
+            print(f"Error playing alert sound: {e}")
+            return False
+    return ok
 
 
 def send_ntfy_alert(message: str, title: str = "Hedge Bot Alert", priority: str = "default", tags: list = None):
@@ -37,7 +87,7 @@ def send_ntfy_alert(message: str, title: str = "Hedge Bot Alert", priority: str 
     topic = config.get('ntfy_topic')
     
     if not topic:
-        # No topic configured, skip
+        print("Error sending ntfy alert: ntfy_topic nicht in config/config.yaml konfiguriert")
         return False
     
     try:
@@ -103,4 +153,3 @@ def send_bot_alert(symbol: str, event: str, details: str = ""):
         message += f"{details}"
     
     return send_ntfy_alert(message, title=title, priority=priority, tags=tags)
-

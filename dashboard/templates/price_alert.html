@@ -27,6 +27,20 @@
             font-size: 14px;
             color: #9ca3af;
         }
+        .btn-test-sound {
+            margin-top: 14px;
+            background: #374151;
+            color: #e5e7eb;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-test-sound:hover {
+            background: #4b5563;
+        }
         .price-alert-form {
             display: flex;
             flex-wrap: wrap;
@@ -180,19 +194,16 @@
             </div>
         </div>
 
-        <div class="dashboard-navigation">
-            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
-            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
-            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
-            <a href="/live-charts" class="nav-link">📈 Live Charts</a>
-            <a href="/price-alert" class="nav-link active">🔔 Price Alert</a>
-        </div>
+        {% set nav_active = 'price-alert' %}
+        {% include "partials/nav.html" %}
 
         <div class="dashboard-content">
             <div class="price-alert-container">
                 <div class="price-alert-header">
                     <h1>🔔 Price Alert</h1>
-                    <p>Benachrichtigung per ntfy, wenn ein Coin einen Zielpreis erreicht (Above oder Below).</p>
+                    <p>Benachrichtigung per ntfy und Laptop-Ton im Browser, wenn ein Coin den Zielpreis erreicht. Für den Ton die Price-Alert-Seite offen lassen.</p>
+                    <button type="button" class="btn-test-sound" id="btnTestSound">🔊 Ton testen</button>
+                    <audio id="alertAudio" src="/static/sounds/price_alert.wav" preload="auto"></audio>
                 </div>
 
                 <div class="current-price-box" id="currentPriceBox">
@@ -229,16 +240,55 @@
         const activeAlertsList = document.getElementById('activeAlertsList');
         const alertRowsContainer = document.getElementById('alertRowsContainer');
         const btnAddAlert = document.getElementById('btnAddAlert');
+        const btnTestSound = document.getElementById('btnTestSound');
+        const alertAudio = document.getElementById('alertAudio');
 
         const PRICE_REFRESH_INTERVAL_MS = 5000;
-        const ALERTS_REFRESH_INTERVAL_MS = 10000;
+        const ALERTS_REFRESH_INTERVAL_MS = 5000;
+        const ALERT_SOUND_URL = '/static/sounds/price_alert.wav';
         let priceRefreshSymbol = '';
+        let knownAlertKeys = null; // null = erster Load, noch keinen Ton abspielen
+        const manuallyStoppedKeys = new Set();
 
         function showStatus(msg, isError) {
             statusMsg.textContent = msg;
             statusMsg.className = 'status-msg ' + (isError ? 'error' : 'success');
             statusMsg.style.display = msg ? 'block' : 'none';
             if (msg) setTimeout(() => { statusMsg.textContent = ''; statusMsg.style.display = 'none'; }, 5000);
+        }
+
+        function alertKey(symbol, targetPrice, trigger) {
+            const tp = Number(targetPrice);
+            return `${String(symbol).toUpperCase()}_${tp.toFixed(6)}_${trigger}`;
+        }
+
+        async function playLaptopAlertSound(times = 2) {
+            for (let i = 0; i < times; i++) {
+                await new Promise((resolve, reject) => {
+                    const audio = new Audio(ALERT_SOUND_URL + '?v=1&t=' + Date.now() + '-' + i);
+                    audio.volume = 1.0;
+                    audio.onended = () => resolve();
+                    audio.onerror = () => reject(new Error('Audio-Datei konnte nicht geladen werden'));
+                    const p = audio.play();
+                    if (p && typeof p.then === 'function') {
+                        p.catch(reject);
+                    }
+                });
+            }
+        }
+
+        if (btnTestSound) {
+            btnTestSound.addEventListener('click', async () => {
+                btnTestSound.disabled = true;
+                try {
+                    // Browser-Ton auf dem Laptop (nicht auf dem Server)
+                    await playLaptopAlertSound(2);
+                    showStatus('Laptop-Ton abgespielt.', false);
+                } catch (e) {
+                    showStatus('Ton fehlgeschlagen: ' + e.message + ' (Lautstärke / Autoplay prüfen)', true);
+                }
+                btnTestSound.disabled = false;
+            });
         }
 
         async function fetchCurrentPrice(symbol) {
@@ -366,12 +416,30 @@
             try {
                 const r = await fetch('/api/price-alert/status');
                 const j = await r.json();
-                if (!j.success || !j.alerts || Object.keys(j.alerts).length === 0) {
+                const alerts = (j.success && j.alerts) ? j.alerts : {};
+                const currentKeys = new Set(Object.keys(alerts));
+
+                if (knownAlertKeys !== null) {
+                    for (const key of knownAlertKeys) {
+                        if (!currentKeys.has(key) && !manuallyStoppedKeys.has(key)) {
+                            // Alert ist ausgelöst worden (nicht manuell gestoppt)
+                            playLaptopAlertSound(3).catch(() => {});
+                            showStatus('Price Alert ausgelöst — Laptop-Ton.', false);
+                            break;
+                        }
+                    }
+                }
+                knownAlertKeys = currentKeys;
+                for (const key of [...manuallyStoppedKeys]) {
+                    if (!currentKeys.has(key)) manuallyStoppedKeys.delete(key);
+                }
+
+                if (!currentKeys.size) {
                     activeAlertsList.innerHTML = '<p style="color:#9ca3af;font-size:14px;">Keine aktiven Alerts.</p>';
                     return;
                 }
                 let html = '';
-                for (const [, info] of Object.entries(j.alerts)) {
+                for (const [key, info] of Object.entries(alerts)) {
                     const sym = info.symbol || '';
                     const tp = info.target_price;
                     const tr = info.trigger || 'above';
@@ -387,6 +455,7 @@
         }
 
         async function stopAlert(symbol, targetPrice, trigger) {
+            manuallyStoppedKeys.add(alertKey(symbol, targetPrice, trigger));
             try {
                 const r = await fetch('/api/price-alert/stop', {
                     method: 'POST',
@@ -414,7 +483,8 @@
                 });
                 const j = await r.json();
                 if (j.success) {
-                    showStatus('✅ Test-Alert gesendet! Prüfe dein Handy.', false);
+                    try { await playLaptopAlertSound(1); } catch (_) {}
+                    showStatus('✅ Test-Alert gesendet (ntfy + Laptop-Ton).', false);
                 } else {
                     showStatus('❌ ' + (j.message || 'Fehler'), true);
                 }

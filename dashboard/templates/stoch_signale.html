@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stoch-Signale - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/stoch.css?v=6">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'stoch-signale' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="stoch-page-header">
+                <div>
+                    {% if research_mode %}
+                    <div class="stoch-research-banner" id="stochResearchBanner">
+                        <div class="stoch-research-banner-title">RESEARCH MODE — 1M STOCH ENTRY TIMING</div>
+                        <div class="stoch-research-banner-sub">Frozen Tier-A setup + 1m timing trigger</div>
+                        <div class="stoch-research-banner-flag">PRODUCTION STRATEGY UNCHANGED</div>
+                    </div>
+                    <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-warn">RESEARCH</span></h1>
+                    <p>Anzeige: <strong>1m timing entries / pending states</strong> (nicht die produktive Frozen-Baseline-Entry-Liste). Quelle: <code>DASHBOARD_SIGNAL_SOURCE=RESEARCH_1M_TIMING</code>.</p>
+                    {% else %}
+                    <div class="stoch-baseline-banner" id="stochBaselineBanner">
+                        <div class="stoch-baseline-banner-title">FROZEN BASELINE — 15M TIER-A</div>
+                        <div class="stoch-baseline-banner-sub">BASELINE_IMMEDIATE · SL_FIRST · NO_BE50</div>
+                        <div class="stoch-baseline-banner-flag">GLOBAL_FROZEN_TIER_A · wave_fade_no_be50_v1</div>
+                    </div>
+                    <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-live">FROZEN</span></h1>
+                    <p>Aktive Anzeige: <strong>FROZEN_BASELINE</strong> (<code>DASHBOARD_SIGNAL_SOURCE=FROZEN_BASELINE</code>). Exit-Policy <strong>NO_BE50</strong>. Keine Research-1m-Entries. PnL = gross.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="stoch-perf" id="stochPerfSummary" aria-live="polite">
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Signals</div><div class="stoch-perf-value" id="perfSignals">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Wins</div><div class="stoch-perf-value stoch-perf-win" id="perfWins">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Losses</div><div class="stoch-perf-value stoch-perf-loss" id="perfLosses">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Open</div><div class="stoch-perf-value" id="perfOpen">–</div></div>
+                </div>
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Win Rate</div><div class="stoch-perf-value" id="perfWinRate">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Profit</div><div class="stoch-perf-value stoch-perf-win" id="perfProfit">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Loss</div><div class="stoch-perf-value stoch-perf-loss" id="perfLoss">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Total PnL</div><div class="stoch-perf-value" id="perfTotal">–</div></div>
+                </div>
+                <div class="stoch-perf-meta" id="perfMeta">PnL basis: gross · Filter = Tabelle</div>
+            </div>
+
+            <details class="stoch-card" id="collectorControlCard" open>
+                <summary class="stoch-card-summary">Collector Steuerung</summary>
+                <div class="stoch-card-body">
+                    <div class="stoch-collector-error" id="collectorControlError" style="display:none;"></div>
+                    <div class="stoch-collector-kv">
+                        <div><span class="stoch-kv-label">Collector</span> <span class="stoch-chip" id="collectorStateChip">–</span></div>
+                        <div><span class="stoch-kv-label">Desired State</span> <span class="stoch-chip" id="collectorDesiredChip">–</span></div>
+                        <div><span class="stoch-kv-label">Shadow Mode</span> <span class="stoch-chip" id="collectorShadowChip">–</span></div>
+                    </div>
+                    <div class="stoch-collector-actions">
+                        <button type="button" class="btn-service-start" id="collectorStartBtn">Collector starten</button>
+                        <button type="button" class="btn-service-stop" id="collectorStopBtn">Collector stoppen</button>
+                    </div>
+                </div>
+            </details>
+
+            <details class="stoch-card" id="collectorStatusCard" open>
+                <summary class="stoch-card-summary">Collector Status</summary>
+                <div class="stoch-card-body">
+                    <div class="stoch-collector-error" id="collectorStatusError" style="display:none;"></div>
+                    <div class="stoch-collector-summary" id="collectorStatusSummary">
+                        <span>WebSocket: –</span>
+                        <span>Subscribed: –</span>
+                        <span>Live: –</span>
+                        <span>Recovering: –</span>
+                        <span>Stale: –</span>
+                        <span>Reconnects: –</span>
+                    </div>
+                    <div class="stoch-collector-meta" id="collectorStatusMeta"></div>
+                    <div class="stoch-table-wrap stoch-collector-table-wrap">
+                        <table class="stoch-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>State</th>
+                                    <th>Subscribed</th>
+                                    <th>Last Candle</th>
+                                    <th>Lag</th>
+                                    <th>Signal Processor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="collectorSymbolsBody">
+                                <tr><td colspan="6" class="stoch-empty">Lade Collector-Status…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+
+            <div class="stoch-feed-banner" id="stochFeedBanner" style="display:none;"></div>
+
+            <div class="stoch-toolbar">
+                <label for="stochFilterSymbol">Symbol</label>
+                <select id="stochFilterSymbol"></select>
+                <label for="stochFilterDirection">Direction</label>
+                <select id="stochFilterDirection">
+                    <option value="">Alle</option>
+                    <option value="LONG">LONG</option>
+                    <option value="SHORT">SHORT</option>
+                </select>
+                <label for="stochFilterTimeframe">Timeframe</label>
+                <select id="stochFilterTimeframe">
+                    <option value="">Alle</option>
+                    <option value="15m">15m</option>
+                    <option value="30m">30m</option>
+                    <option value="1h">1h</option>
+                    <option value="4h">4h</option>
+                </select>
+                {% if research_mode %}
+                <label for="stochFilterTimingVariant">1m Timing</label>
+                <select id="stochFilterTimingVariant">
+                    <option value="WAIT_1M_EXTREME_TURN_CROSS" {% if default_research_variant == 'WAIT_1M_EXTREME_TURN_CROSS' %}selected{% endif %}>Turn Cross</option>
+                    <option value="WAIT_1M_EXTREME_TURN_SLOPE" {% if default_research_variant == 'WAIT_1M_EXTREME_TURN_SLOPE' %}selected{% endif %}>Turn Slope</option>
+                    <option value="WAIT_1M_EXTREME" {% if default_research_variant == 'WAIT_1M_EXTREME' %}selected{% endif %}>Extreme</option>
+                </select>
+                <input type="hidden" id="stochDashboardSource" value="RESEARCH_1M_TIMING" />
+                {% else %}
+                <label for="stochFilterTierA">Signal Scope</label>
+                <select id="stochFilterTierA">
+                    <option value="true" selected>Tier-A (real)</option>
+                    <option value="all">Alle inkl. Candidates</option>
+                    <option value="false">Candidates only</option>
+                </select>
+                <label for="stochFilterSelected">Selected</label>
+                <select id="stochFilterSelected">
+                    <option value="">Alle</option>
+                    <option value="true">Selected</option>
+                    <option value="false">Not Selected</option>
+                </select>
+                <label for="stochFilterStrategy">Strategy</label>
+                <select id="stochFilterStrategy">
+                    <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
+                    <option value="wave_fade_frozen_f16ae32">BE50 Frozen (Research)</option>
+                </select>
+                <input type="hidden" id="stochDashboardSource" value="FROZEN_BASELINE" />
+                {% endif %}
+                <label for="stochFilterHours">Zeitraum</label>
+                <select id="stochFilterHours">
+                    <option value="48" selected>48h</option>
+                    <option value="168">168h</option>
+                    <option value="24">24h</option>
+                </select>
+                <button type="button" class="stoch-btn" id="stochRefreshBtn">Refresh</button>
+                <span class="stoch-meta" id="stochMeta">–</span>
+            </div>
+
+            <div class="stoch-table-wrap">
+                <table class="stoch-table" id="stochSignalsTable">
+                    <thead>
+                        {% if research_mode %}
+                        <tr>
+                            <th></th>
+                            <th><button type="button" data-sort="symbol">Symbol</button></th>
+                            <th><button type="button" data-sort="timeframe">TF</button></th>
+                            <th><button type="button" data-sort="trade_direction">Direction</button></th>
+                            <th><button type="button" data-sort="one_m_trigger_state">1m State</button></th>
+                            <th><button type="button" data-sort="entry_price">Entry</button></th>
+                            <th>TP</th>
+                            <th>SL</th>
+                            <th><button type="button" data-sort="wait_minutes">Wait</button></th>
+                            <th><button type="button" data-sort="original_tier_a_signal_ts">Tier-A TS</button></th>
+                            <th><button type="button" data-sort="result">Result</button></th>
+                            <th><button type="button" data-sort="pnl_pct">PnL</button></th>
+                            <th>MAE</th>
+                            <th>MFE</th>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <th></th>
+                            <th><button type="button" data-sort="symbol">Symbol</button></th>
+                            <th><button type="button" data-sort="timeframe">TF</button></th>
+                            <th><button type="button" data-sort="trade_direction">Direction</button></th>
+                            <th><button type="button" data-sort="entry_price">Entry</button></th>
+                            <th>TP</th>
+                            <th>SL</th>
+                            <th>Stoch K</th>
+                            <th><button type="button" data-sort="candle_close_time">Signal Time</button></th>
+                            <th><button type="button" data-sort="result">Result</button></th>
+                            <th><button type="button" data-sort="pnl_pct">PnL</button></th>
+                            <th><button type="button" data-sort="duration_seconds">Duration</button></th>
+                        </tr>
+                        {% endif %}
+                    </thead>
+                    <tbody id="stochSignalsBody">
+                        <tr><td colspan="14" class="stoch-empty">Lade…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="stoch-pagination">
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochPrevBtn">Zurück</button>
+                <span id="stochPageLabel">Seite 1</span>
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochNextBtn">Weiter</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stoch-modal-backdrop" id="stochChartModal" role="dialog" aria-modal="true">
+        <div class="stoch-modal">
+            <div class="stoch-modal-header">
+                <div>
+                    <h2 id="stochChartTitle">Chart</h2>
+                    <p class="stoch-modal-sub" id="stochChartSub"></p>
+                </div>
+                <button type="button" class="stoch-modal-close" id="stochChartClose" aria-label="Schließen">×</button>
+            </div>
+            <div class="stoch-modal-body">
+                <div class="stoch-chart-host" id="stochChartHost"></div>
+                <div class="stoch-chart-legend">
+                    <span class="stoch-leg-entry">Entry (Signal Price)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="/static/js/stoch_chart_modal.js?v=5"></script>
+    <script src="/static/js/stoch_signale.js?v=9"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

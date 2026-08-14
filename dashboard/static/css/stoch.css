@@ -1,0 +1,554 @@
+/* Stoch-Signale / Stoch-Profite (Wave-Fade scaffolding) */
+
+.stoch-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.stoch-page-header h1 {
+    margin: 0 0 6px 0;
+    font-size: 1.35rem;
+    color: #e5e7eb;
+}
+
+.stoch-page-header p {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    max-width: 720px;
+}
+
+.stoch-research-banner {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.14), rgba(15, 23, 42, 0.4));
+    max-width: 760px;
+}
+.stoch-research-banner-title {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #fbbf24;
+    font-size: 0.95rem;
+}
+.stoch-research-banner-sub {
+    margin-top: 4px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+}
+.stoch-research-banner-flag {
+    margin-top: 6px;
+    color: #86efac;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.stoch-baseline-banner {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    background: linear-gradient(90deg, rgba(14, 165, 233, 0.14), rgba(15, 23, 42, 0.4));
+    max-width: 760px;
+}
+.stoch-baseline-banner-title {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #7dd3fc;
+    font-size: 0.95rem;
+}
+.stoch-baseline-banner-sub {
+    margin-top: 4px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+}
+.stoch-baseline-banner-flag {
+    margin-top: 6px;
+    color: #86efac;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.stoch-chip-tf {
+    background: rgba(96, 165, 250, 0.15);
+    color: #93c5fd;
+}
+
+.stoch-feed-banner-error {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+.stoch-feed-banner {    background: #1e293b;
+    border: 1px solid #334155;
+    border-left: 4px solid #f59e0b;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+}
+
+.stoch-feed-banner code {
+    background: #0f172a;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+}
+
+.stoch-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.stoch-toolbar label {
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.stoch-toolbar select,
+.stoch-toolbar input {
+    background: #020617;
+    border: 1px solid #1f2937;
+    color: #e5e7eb;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    min-width: 120px;
+}
+
+.stoch-btn {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.stoch-btn:hover {
+    background: #1d4ed8;
+}
+
+.stoch-btn-ghost {
+    background: #374151;
+}
+
+.stoch-btn-ghost:hover {
+    background: #4b5563;
+}
+
+.stoch-meta {
+    margin-left: auto;
+    color: #6b7280;
+    font-size: 0.8rem;
+}
+
+.stoch-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    background: #0b1220;
+}
+
+.stoch-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 960px;
+}
+
+.stoch-table th,
+.stoch-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1f2937;
+    text-align: left;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.stoch-table th {
+    background: #111827;
+    color: #d1d5db;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.stoch-table th button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+.stoch-table tbody tr:hover {
+    background: #111827;
+}
+
+.stoch-empty {
+    text-align: center;
+    color: #6b7280;
+    padding: 36px 12px !important;
+}
+
+.stoch-chip {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.stoch-chip-long,
+.stoch-chip-tp {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.stoch-chip-short,
+.stoch-chip-sl {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.stoch-chip-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.stoch-chip-done {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.stoch-chip-demo {
+    background: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+}
+
+.stoch-pnl-pos { color: #4ade80; font-weight: 600; }
+.stoch-pnl-neg { color: #f87171; font-weight: 600; }
+
+.stoch-chart-btn {
+    background: #2563eb;
+    border: none;
+    color: #fff;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stoch-chart-btn:hover {
+    background: #1d4ed8;
+}
+
+.stoch-chart-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.stoch-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+}
+
+.stoch-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.72);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.stoch-modal-backdrop.open {
+    display: flex;
+}
+
+.stoch-modal {
+    width: min(1100px, 96vw);
+    background: #0f172a;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.stoch-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #1f2937;
+}
+
+.stoch-modal-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #e5e7eb;
+}
+
+.stoch-modal-sub {
+    margin: 4px 0 0;
+    color: #9ca3af;
+    font-size: 0.8rem;
+}
+
+.stoch-modal-close {
+    background: #374151;
+    border: none;
+    color: #e5e7eb;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.stoch-modal-body {
+    padding: 12px 18px 18px;
+}
+
+.stoch-chart-host {
+    width: 100%;
+    height: 480px;
+    background: #020617;
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+}
+
+.stoch-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.stoch-chart-legend span::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 3px;
+    margin-right: 6px;
+    vertical-align: middle;
+    border-radius: 2px;
+}
+
+.stoch-leg-entry::before { background: #808080; }
+.stoch-leg-tp::before { background: #4caf50; }
+.stoch-leg-sl::before { background: #f44336; }
+.stoch-leg-close::before { background: #ffd700; }
+
+/* Collector control / status cards on Stoch-Signale */
+.stoch-card {
+    background: #0b1220;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+
+.stoch-card-summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #e5e7eb;
+    background: #111827;
+    user-select: none;
+}
+
+.stoch-card-summary::-webkit-details-marker {
+    display: none;
+}
+
+.stoch-card-summary::before {
+    content: "▼";
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 0.7rem;
+    color: #9ca3af;
+    transition: transform 0.15s ease;
+}
+
+.stoch-card:not([open]) > .stoch-card-summary::before {
+    transform: rotate(-90deg);
+}
+
+.stoch-card-body {
+    padding: 12px 14px 14px;
+}
+
+.stoch-collector-kv {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 22px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+
+.stoch-kv-label {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin-right: 6px;
+}
+
+.stoch-collector-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.stoch-collector-actions .btn-service-start,
+.stoch-collector-actions .btn-service-stop {
+    flex: 0 1 auto;
+    min-width: 160px;
+}
+
+.stoch-collector-error {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+}
+
+.stoch-collector-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    color: #e5e7eb;
+}
+
+.stoch-collector-summary span {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+.stoch-collector-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 12px;
+    font-size: 0.78rem;
+    color: #9ca3af;
+}
+
+.stoch-collector-table-wrap {
+    margin-top: 4px;
+}
+
+.stoch-collector-table-wrap .stoch-table {
+    min-width: 640px;
+}
+
+.stoch-chip-live,
+.stoch-chip-ok {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.stoch-chip-warn {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+/* BE / WIN: later winner cut by BE50 — not a plain WIN (frozen PnL stays 0) */
+.stoch-chip-be-win {
+    background: rgba(34, 197, 94, 0.12);
+    color: #fbbf24;
+    box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.45);
+}
+
+/* BE / LOSS: BE50 saved a later loss — break-even protection case */
+.stoch-chip-be-loss {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fbbf24;
+    box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.45);
+}
+
+.stoch-chip-err {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.stoch-chip-stopped {
+    background: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+}
+
+.stoch-perf {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.35);
+}
+.stoch-perf-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.stoch-perf-row:last-of-type { margin-bottom: 6px; }
+.stoch-perf-card {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.55);
+}
+.stoch-perf-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+.stoch-perf-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+.stoch-perf-win { color: #4ade80; }
+.stoch-perf-loss { color: #f87171; }
+.stoch-perf-meta {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+@media (max-width: 900px) {
+    .stoch-perf-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

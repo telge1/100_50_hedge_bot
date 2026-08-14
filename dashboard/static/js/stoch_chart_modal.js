@@ -1,0 +1,299 @@
+/**
+ * Shared UTC helpers + chart modal for Stoch-Profite / Stoch-Signale.
+ * All timestamps displayed in UTC. Entry marked with axis label + candle marker.
+ */
+(function (global) {
+  "use strict";
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function toUtcMs(ts) {
+    if (ts === null || ts === undefined || ts === "") return null;
+    if (typeof ts === "string" && ts.includes("-") && Number.isNaN(Number(ts))) {
+      const d = new Date(ts.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + "Z");
+      const ms = d.getTime();
+      return Number.isNaN(ms) ? null : ms;
+    }
+    const n = Number(ts);
+    if (!Number.isFinite(n)) return null;
+    return n > 1e12 ? n : n * 1000;
+  }
+
+  function fmtUtc(ts) {
+    const ms = toUtcMs(ts);
+    if (ms === null) return "–";
+    const d = new Date(ms);
+    return (
+      `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ` +
+      `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())} UTC`
+    );
+  }
+
+  function fmtUtcShort(unixSec) {
+    const d = new Date(Number(unixSec) * 1000);
+    if (Number.isNaN(d.getTime())) return "";
+    return (
+      `${pad2(d.getUTCDate())}.${pad2(d.getUTCMonth() + 1)} ` +
+      `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
+    );
+  }
+
+  function fmt(n, digits) {
+    if (n === null || n === undefined || Number.isNaN(Number(n))) return "–";
+    return Number(n).toFixed(digits);
+  }
+
+  function asNum(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  global.StochUtc = { fmtUtc: fmtUtc, toUtcMs: toUtcMs, fmtUtcShort: fmtUtcShort };
+
+  function ChartModal(opts) {
+    this.backdrop = document.getElementById(opts.backdropId || "stochChartModal");
+    this.titleEl = document.getElementById(opts.titleId || "stochChartTitle");
+    this.subEl = document.getElementById(opts.subId || "stochChartSub");
+    this.hostEl = document.getElementById(opts.hostId || "stochChartHost");
+    this.closeBtn = document.getElementById(opts.closeId || "stochChartClose");
+    this.chart = null;
+    this.series = null;
+    this.priceLines = [];
+
+    if (this.closeBtn) {
+      this.closeBtn.addEventListener("click", () => this.close());
+    }
+    if (this.backdrop) {
+      this.backdrop.addEventListener("click", (e) => {
+        if (e.target === this.backdrop) this.close();
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this.backdrop && this.backdrop.classList.contains("open")) {
+        this.close();
+      }
+    });
+  }
+
+  ChartModal.prototype._destroyChart = function () {
+    this.priceLines = [];
+    if (this.chart) {
+      try {
+        this.chart.remove();
+      } catch (_) {}
+    }
+    this.chart = null;
+    this.series = null;
+    if (this.hostEl) this.hostEl.innerHTML = "";
+  };
+
+  ChartModal.prototype.close = function () {
+    if (this.backdrop) this.backdrop.classList.remove("open");
+    this._destroyChart();
+  };
+
+  ChartModal.prototype.open = async function (trade) {
+    if (!this.backdrop || !this.hostEl || !global.LightweightCharts) {
+      console.warn("Stoch chart modal: missing DOM or LightweightCharts");
+      return;
+    }
+    this._destroyChart();
+    this.backdrop.classList.add("open");
+
+    const symbol = String(trade.symbol || "").toUpperCase();
+    const direction = String(trade.trade_direction || "").toUpperCase();
+    const mode = trade.close_price != null || trade.trade_state ? "Resultat" : "Signal";
+
+    if (this.titleEl) this.titleEl.textContent = `${symbol} · ${mode} · UTC`;
+    if (this.subEl) {
+      const bits = [
+        direction || "–",
+        trade.trade_state || trade.signal_state || "",
+        trade.is_demo ? "Demo" : "",
+      ].filter(Boolean);
+      this.subEl.textContent = bits.join(" · ");
+    }
+
+    const chart = LightweightCharts.createChart(this.hostEl, {
+      layout: {
+        background: { color: "#020617" },
+        textColor: "#e5e7eb",
+      },
+      grid: {
+        vertLines: { color: "#1f2937" },
+        horzLines: { color: "#1f2937" },
+      },
+      rightPriceScale: {
+        borderColor: "#374151",
+        autoScale: true,
+      },
+      localization: {
+        locale: "en-GB",
+        timeFormatter: (time) => {
+          const sec = typeof time === "object" ? null : Number(time);
+          if (sec == null || !Number.isFinite(sec)) return "";
+          return fmtUtc(sec);
+        },
+      },
+      timeScale: {
+        borderColor: "#374151",
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: (time) => fmtUtcShort(time),
+      },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    });
+
+    const series = chart.addSeries(LightweightCharts.CandlestickSeries, {
+      upColor: "#26a69a",
+      downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a",
+      wickDownColor: "#ef5350",
+      lastValueVisible: false,
+      priceLineVisible: false,
+      priceFormat: { type: "price", precision: 6, minMove: 0.000001 },
+    });
+
+    this.chart = chart;
+    this.series = series;
+
+    let candles = [];
+    try {
+      const url = `/api/stoch/klines?symbol=${encodeURIComponent(symbol)}&interval=5&limit=300`;
+      const res = await fetch(url, { credentials: "include" });
+      const data = await res.json();
+      candles = Array.isArray(data.candles) ? data.candles : [];
+    } catch (err) {
+      console.warn("Stoch klines fetch failed", err);
+    }
+
+    const candleData = candles.map((c) => ({
+      time: Number(c.time),
+      open: Number(c.open),
+      high: Number(c.high),
+      low: Number(c.low),
+      close: Number(c.close),
+    }));
+
+    if (!candleData.length) {
+      if (this.subEl) this.subEl.textContent += " · Keine Kerzen verfügbar";
+    } else {
+      series.setData(candleData);
+      chart.timeScale().fitContent();
+    }
+
+    const addLine = (price, color, title, dashed) => {
+      const p = asNum(price);
+      if (p === null || !series) return null;
+      const line = series.createPriceLine({
+        price: p,
+        color,
+        lineWidth: 2,
+        lineStyle: dashed ? LightweightCharts.LineStyle.Dashed : LightweightCharts.LineStyle.Solid,
+        axisLabelVisible: true,
+        title,
+      });
+      this.priceLines.push(line);
+      return p;
+    };
+
+    const entry = asNum(trade.open_price) ?? asNum(trade.expected_open_price);
+    const tp = asNum(trade.expected_tp);
+    const sl = asNum(trade.expected_sl);
+    const closePx = asNum(trade.close_price);
+
+    // Entry mit klarem Label auf der Preisachse; TP/SL/Close analog
+    addLine(entry, "#808080", entry !== null ? `Entry ${fmt(entry, 6)}` : "Entry", false);
+    addLine(tp, "#4caf50", "TP", true);
+    addLine(sl, "#f44336", "SL", true);
+    if (closePx !== null) addLine(closePx, "#ffd700", "Close", false);
+
+    // Candle-Marker am Entry (wie trade_dashboard Open Trade)
+    const markers = [];
+    const openMs = toUtcMs(trade.open_time) ?? toUtcMs(trade.expected_open_time);
+    const openSec = openMs !== null ? Math.floor(openMs / 1000) : null;
+    if (candleData.length && entry !== null) {
+      let openCandle = null;
+      if (openSec !== null) {
+        openCandle = candleData.find((c) => c.time >= openSec) || null;
+      }
+      if (!openCandle) {
+        // Fallback: Kerze deren Close dem Entry am nächsten ist
+        openCandle = candleData.reduce((best, c) => {
+          if (!best) return c;
+          return Math.abs(c.close - entry) < Math.abs(best.close - entry) ? c : best;
+        }, null);
+      }
+      if (openCandle) {
+        const isLong = direction === "LONG";
+        markers.push({
+          time: openCandle.time,
+          position: isLong ? "belowBar" : "aboveBar",
+          color: "#808080",
+          shape: isLong ? "arrowUp" : "arrowDown",
+          text: `Entry ${fmt(entry, 6)}`,
+        });
+      }
+    }
+
+    const closeMs = toUtcMs(trade.close_time);
+    if (candleData.length && closePx !== null && closeMs !== null) {
+      const closeSec = Math.floor(closeMs / 1000);
+      const closeCandle = candleData.find((c) => c.time >= closeSec);
+      if (closeCandle) {
+        markers.push({
+          time: closeCandle.time,
+          position: "aboveBar",
+          color: "#ffd700",
+          shape: "circle",
+          text: `Close ${fmt(closePx, 6)}`,
+        });
+      }
+    }
+
+    if (markers.length && typeof LightweightCharts.createSeriesMarkers === "function") {
+      try {
+        LightweightCharts.createSeriesMarkers(series, markers);
+      } catch (err) {
+        console.warn("Stoch markers failed", err);
+      }
+    }
+
+    if (candleData.length && entry !== null) {
+      const last = candleData[candleData.length - 1].close;
+      const levels = [entry, tp, sl, closePx].filter((v) => v !== null);
+      const lo = Math.min(...candleData.map((c) => c.low));
+      const hi = Math.max(...candleData.map((c) => c.high));
+      const span = Math.max(hi - lo, Math.abs(last) * 0.01, 1e-9);
+      const far = levels.some((p) => p < lo - 2 * span || p > hi + 2 * span);
+      if (far && this.subEl) {
+        this.subEl.textContent +=
+          " · Hinweis: Entry/TP/SL liegen weit vom aktuellen Kurs (Achsen-Labels rechts)";
+      }
+    }
+
+    if (this.subEl) {
+      const openLabel = openMs !== null ? ` · Open ${fmtUtc(openMs)}` : "";
+      this.subEl.textContent +=
+        openLabel +
+        ` · Entry ${fmt(entry, 6)} · TP ${fmt(tp, 6)} · SL ${fmt(sl, 6)}` +
+        (closePx !== null ? ` · Close ${fmt(closePx, 6)}` : "");
+    }
+
+    requestAnimationFrame(() => {
+      try {
+        chart.applyOptions({
+          width: this.hostEl.clientWidth,
+          height: this.hostEl.clientHeight,
+        });
+        if (candleData.length) chart.timeScale().fitContent();
+      } catch (_) {}
+    });
+  };
+
+  global.StochChartModal = ChartModal;
+})(window);

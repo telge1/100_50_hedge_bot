@@ -1274,14 +1274,9 @@
             </div>
         </div>
         
-        <div class="dashboard-navigation">
-            <a href="/dashboard" class="nav-link active">📊 Dashboard</a>
-            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
-            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
-            <a href="/live-charts" class="nav-link">📈 Live Charts</a>
-            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
-        </div>
-        
+        {% set nav_active = 'dashboard' %}
+        {% include "partials/nav.html" %}
+
         <div class="hedge-positions-container">
             <!-- Desktop: Anzeige-Filter (Long/Short/Both) -->
             <div id="desktopPositionFilter" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 4px 0 10px 0; flex-wrap: wrap;">
