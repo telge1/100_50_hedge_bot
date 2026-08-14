@@ -2936,6 +2936,15 @@ def require_auth(request: Request):
     return user
 
 
+_dashboard_dir = Path(__file__).resolve().parent
+if str(_dashboard_dir) not in sys.path:
+    sys.path.insert(0, str(_dashboard_dir))
+from research_charts.api import build_router as _build_research_router  # noqa: E402
+app.include_router(
+    _build_research_router(require_auth=require_auth, render_template=render_template)
+)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Redirect to login if not authenticated, else dashboard"""

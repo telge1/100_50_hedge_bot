@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Charts - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/research.css">
+</head>
+<body>
+    <div class="dashboard-container research-trp-page">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'live-charts-research' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content research-trp-shell">
+            <h1 class="visually-hidden">Research Charts</h1>
+            <div class="research-live-bar" id="researchLiveBar">
+                <span class="research-chip" id="researchUiStatusChip">–</span>
+                <span>Collector <span class="research-chip" id="researchCollectorChip">–</span></span>
+                <span>Symbol <span class="research-chip" id="researchSymbolStateChip">–</span></span>
+                <span id="researchLiveDetail">–</span>
+            </div>
+            <div class="research-banner historical" id="researchFeedBanner">{{ feed_message }}</div>
+
+            <div class="trp-chrome">
+                <div class="trp-toolbar" id="trpToolbar">
+                    <div class="trp-title-box">
+                        <div class="trp-app-title">Trading Research Platform</div>
+                        <div class="trp-app-sub">Browser research workspace · TRP chart.js</div>
+                    </div>
+                    <span class="trp-field-label">SYMBOL</span>
+                    <select id="researchSymbol" class="trp-select"></select>
+                    <span class="trp-field-label">LAYOUT</span>
+                    <div class="trp-layout-group" id="trpLayouts">
+                        <button type="button" class="trp-layout-btn" data-layout="1">1</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2H">2H</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2V">2V</button>
+                        <button type="button" class="trp-layout-btn active" data-layout="4">4</button>
+                    </div>
+                    <label class="trp-check"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair Sync</label>
+                    <label class="trp-check"><input type="checkbox" id="researchOverlayTest"> Overlay Test</label>
+                    <div class="trp-tools" id="trpTools"></div>
+                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
+                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
+                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                </div>
+                <div class="trp-footerbar">
+                    <span class="trp-field-label">EMA OVERLAYS</span>
+                    <button type="button" class="trp-text-btn" id="trpEmaSettings">Settings</button>
+                    <span class="trp-muted" id="trpEmaSummary">off</span>
+                    <span class="trp-field-label">INDICATORS</span>
+                    <label class="trp-check"><input type="checkbox" id="researchIndLld"> Liquidity Location</label>
+                    <button type="button" class="trp-text-btn" id="trpLldSettings">Settings</button>
+                    <div class="trp-lld-legend" id="trpLldLegend" hidden>
+                        <span class="trp-muted">Vol Str</span>
+                        <div class="trp-vol-rows">
+                            <div class="trp-vol-row" id="trpVolSupport"></div>
+                            <div class="trp-vol-row" id="trpVolResistance"></div>
+                        </div>
+                        <span class="trp-muted" id="trpClusterCounts"></span>
+                    </div>
+                    <label class="trp-check"><input type="checkbox" id="researchIndStoch"> Stochastic</label>
+                    <button type="button" class="trp-text-btn" id="trpStochSettings">Settings</button>
+                </div>
+            </div>
+
+            <div class="research-status" id="researchStatus"></div>
+            <div class="research-selected" id="researchSelected">hover —  ·  sel —</div>
+            <div class="trp-workspace layout-4" id="researchWorkspace"></div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalEma" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>EMA Overlays</h2>
+            <div id="emaRows" class="trp-ema-rows"></div>
+            <button type="button" class="trp-text-btn" id="emaAdd">+ EMA hinzufügen</button>
+            <p class="trp-error" id="emaError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="ema">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalEma">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="emaApply">Apply</button>
+            </div>
+        </div>
+    </div>
+    <div class="trp-modal" id="modalStoch" hidden>
+        <div class="trp-modal-card">
+            <h2>Stochastic</h2>
+            <fieldset><legend>GENERAL</legend>
+                <label>K Length <input type="number" id="stochKLen" min="1" max="500" value="14"></label>
+                <label>K Smoothing <input type="number" id="stochKSmooth" min="1" max="200" value="3"></label>
+                <label>D Smoothing <input type="number" id="stochDSmooth" min="1" max="200" value="3"></label>
+            </fieldset>
+            <fieldset><legend>LEVELS</legend>
+                <label>Overbought <input type="number" id="stochOb" min="0" max="100" step="1" value="80"></label>
+                <label>Oversold <input type="number" id="stochOs" min="0" max="100" step="1" value="20"></label>
+                <label class="trp-check"><input type="checkbox" id="stochShowLevels" checked> Show Levels</label>
+            </fieldset>
+            <fieldset><legend>STYLE</legend>
+                <label class="trp-check"><input type="checkbox" id="stochShowK" checked> Show K</label>
+                <label>K Color <input type="color" id="stochKColor" value="#5b8def"></label>
+                <label class="trp-check"><input type="checkbox" id="stochShowD" checked> Show D</label>
+                <label>D Color <input type="color" id="stochDColor" value="#ef9f27"></label>
+            </fieldset>
+            <p class="trp-error" id="stochError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="stoch">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalStoch">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="stochApply">Apply</button>
+            </div>
+        </div>
+    </div>
+    <div class="trp-modal" id="modalLld" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>Liquidity Location Detector</h2>
+            <p class="trp-muted" id="lldLicense"></p>
+            <fieldset><legend>GENERAL</legend>
+                <label>Amount <input type="number" id="lldAmount" min="1" max="10000" value="300"></label>
+            </fieldset>
+            <fieldset><legend>LIQUIDITY SETTINGS</legend>
+                <label>Highest Length <input type="number" id="lldHigh" min="1" max="100" value="2"></label>
+                <label>Lowest Length <input type="number" id="lldLow" min="1" max="100" value="2"></label>
+            </fieldset>
+            <fieldset><legend>POOL VISIBILITY</legend>
+                <label class="trp-check"><input type="checkbox" id="lldBorders" checked> Show Individual Pool Borders</label>
+                <label>Normal Border Width <input type="number" id="lldBorderW" min="1" max="4" value="1"></label>
+                <label>Strong Pool Border Width <input type="number" id="lldStrongW" min="1" max="5" value="2"></label>
+                <label>Border Transparency <input type="number" id="lldBorderT" min="0" max="100" value="10"></label>
+            </fieldset>
+            <fieldset><legend>POOL CLUSTERS</legend>
+                <label class="trp-check"><input type="checkbox" id="lldClusters" checked> Enable Clusters</label>
+                <label>Cluster Gap <input type="number" id="lldGap" min="0" max="5" step="0.05" value="0.10"></label>
+                <label>Minimum Pools <input type="number" id="lldMinPools" min="1" max="20" value="3"></label>
+                <label class="trp-check"><input type="checkbox" id="lldShowSingle" checked> Show Single Pools</label>
+                <label class="trp-check"><input type="checkbox" id="lldClusterLabels" checked> Show Cluster Labels</label>
+                <label>Cluster Fill Transparency <input type="number" id="lldClusterFill" min="0" max="100" value="88"></label>
+                <label>Cluster Border Width <input type="number" id="lldClusterBorder" min="1" max="5" value="2"></label>
+            </fieldset>
+            <fieldset><legend>COLOR</legend>
+                <label>Support / Up Color <input type="color" id="lldSupport" value="#228bab"></label>
+                <label>Resistance / Down Color <input type="color" id="lldResist" value="#ec4079"></label>
+                <label>Fill Transparency <input type="number" id="lldFillT" min="0" max="100" value="30"></label>
+                <label>Support Border <input type="color" id="lldSupBorder" value="#00dcff"></label>
+                <label>Resistance Border <input type="color" id="lldResBorder" value="#ff468c"></label>
+            </fieldset>
+            <fieldset><legend>EMA</legend>
+                <label class="trp-check"><input type="checkbox" id="lldEmaFast"> Fast</label>
+                <input type="number" id="lldEmaFastLen" min="1" max="500" value="20">
+                <input type="color" id="lldEmaFastColor" value="#00ffff">
+                <label class="trp-check"><input type="checkbox" id="lldEmaSlow"> Slow</label>
+                <input type="number" id="lldEmaSlowLen" min="1" max="500" value="35">
+                <input type="color" id="lldEmaSlowColor" value="#d40047">
+            </fieldset>
+            <p class="trp-error" id="lldError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="lld">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalLld">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="lldApply">Apply</button>
+            </div>
+        </div>
+    </div>
+    <div class="trp-modal" id="modalPos" hidden>
+        <div class="trp-modal-card">
+            <h2 id="posTitle">Position</h2>
+            <p class="trp-muted">Nur visuelle Planung. Keine Order, keine Börse.</p>
+            <label>Entry <input type="number" id="posEntry" step="0.000001"></label>
+            <label>Stop-Loss <input type="number" id="posStop" step="0.000001"></label>
+            <label>Take-Profit <input type="number" id="posTarget" step="0.000001"></label>
+            <label>Notional USDT <input type="number" id="posNotional" step="0.01"></label>
+            <label>Quantity <input type="number" id="posQty" step="0.000001"></label>
+            <label>Default R:R <input type="number" id="posRr" step="0.01"></label>
+            <label>Profit-Farbe <input type="color" id="posProfit" value="#3dcc91"></label>
+            <label>Verlust-Farbe <input type="color" id="posLoss" value="#f0616d"></label>
+            <label>Entry-Linie <input type="color" id="posEntryColor" value="#5b8def"></label>
+            <label>Linienstärke <input type="number" id="posWidth" min="1" max="5" value="2"></label>
+            <label>Füllung % <input type="number" id="posFill" min="4" max="60" value="18"></label>
+            <p class="trp-muted" id="posPreview"></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-close="modalPos">Abbrechen</button>
+                <button type="button" class="trp-text-btn trp-primary" id="posApply">Übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/research/research_charts.js?v=shift-copy-crosshair"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

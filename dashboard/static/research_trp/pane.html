@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research Chart Pane</title>
+  <link rel="stylesheet" href="/static/research_trp/style.css?v=chart-flex-fix" />
+</head>
+<body>
+  <div id="app">
+    <div id="price-pane">
+      <div id="overlay">
+        <div id="demo-badge">DEMO · synthetic data</div>
+        <div id="legend"></div>
+      </div>
+      <div id="empty">No candles to display</div>
+      <div id="overlay-layer"></div>
+      <div id="selected-line"></div>
+      <div id="chart"></div>
+    </div>
+    <div id="lower-split" title="Resize oscillator"></div>
+    <div id="lower-pane">
+      <div id="osc-legend"></div>
+      <div id="oscillator"></div>
+    </div>
+  </div>
+  <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
+  <script src="/static/research_trp/chart.js?v=price-scale-1"></script>
+</body>
+</html>
