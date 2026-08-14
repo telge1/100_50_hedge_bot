@@ -13,6 +13,8 @@
   const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h"];
   const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
   const SYMBOL_KEY = "research.symbol";
+  const STOCH_STRATEGY_KEY = "stoch.strategy_version";
+  const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const POLL_MS = 5000;
   const FORMING_MS = 250;
   const TOOLS = [
@@ -389,7 +391,7 @@
       iframe.addEventListener("load", function () {
         attachBridge(pane);
       });
-      iframe.src = "/static/research_trp/pane.html?v=forming-2";
+      iframe.src = "/static/research_trp/pane.html?v=signals-all-tf-1";
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
         loadPane(pid, { force: true, sourceAction: "tf-change" });
@@ -584,10 +586,13 @@
       candles: packed.candles || [],
     };
     const nextFp = candleFingerprint(packed.candles || []);
-    const skipCandles = !!(opts && opts.indicatorsOnly && pane.candleFp === nextFp && pane.pendingData);
-    pane.lastTimes = new Set((packed.candles || []).map(function (c) { return c.time; }));
-    pane.pendingData = payload;
-    pane.candleFp = nextFp;
+    const skipCandles = !!(opts && opts.indicatorsOnly && pane.pendingData);
+    const preserveView = !!(opts && (opts.preserveView || opts.indicatorsOnly));
+    if (!skipCandles) {
+      pane.lastTimes = new Set((packed.candles || []).map(function (c) { return c.time; }));
+      pane.pendingData = payload;
+      pane.candleFp = nextFp;
+    }
     pane.pendingEma = packed.ema || { series: [] };
     pane.pendingLower = packed.stochastic || { id: "stochastic", visible: false };
     pane.pendingLldEma = packed.lld_ema || (packed.liquidity && packed.liquidity.ema) || {
@@ -600,10 +605,10 @@
     const chart = api(pane);
     if (chart) {
       if (!skipCandles) {
-        chart.setData(payload);
+        chart.setData(payload, { preserveView: preserveView });
         pane.phase = "DATA_READY";
       }
-      if (chart.resize) chart.resize();
+      if (!preserveView && chart.resize) chart.resize();
       chart.setEmaOverlays(pane.pendingEma);
       chart.setLowerPane(pane.pendingLower);
       chart.setLldEma(pane.pendingLldEma);
@@ -647,7 +652,10 @@
     if (packed.timeframe && packed.timeframe !== pane.tf) return;
     await whenReady(pane, 8000);
     if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
-    applyPaneBundle(pane, packed, { indicatorsOnly: !!(opts && opts.indicatorsOnly) });
+    applyPaneBundle(pane, packed, {
+      indicatorsOnly: !!(opts && opts.indicatorsOnly),
+      preserveView: !!(opts && opts.preserveView),
+    });
     if (force) {
       const ready = api(pane);
       if (ready && ready.resetView) ready.resetView();
@@ -836,10 +844,11 @@
     pane.lastTimes = new Set(merged.map(function (c) { return c.time; }));
     pane.candleFp = nextFp;
     const chart = api(pane);
-    if (chart) chart.setData(pane.pendingData);
+    if (chart) chart.setData(pane.pendingData, { preserveView: true });
     await loadPane(paneId, {
       allowStale: false,
       indicatorsOnly: true,
+      preserveView: true,
       sourceAction: "poll-indicators",
     });
   }
@@ -929,10 +938,23 @@
     return list;
   }
 
+  function lastStochStrategy() {
+    try {
+      return localStorage.getItem(STOCH_STRATEGY_KEY) || "wave_fade_no_be50_v1";
+    } catch (e) {
+      return "wave_fade_no_be50_v1";
+    }
+  }
+
   function pickDefaultSymbol(names) {
     const list = (names || []).slice();
     let preferred = "";
-    try { preferred = localStorage.getItem(SYMBOL_KEY) || ""; } catch (e) {}
+    try {
+      if (lastStochStrategy() === "POOL_ORDER_PLAN_V1") {
+        preferred = localStorage.getItem(STOCH_SYMBOL_KEY) || "";
+      }
+      if (!preferred) preferred = localStorage.getItem(SYMBOL_KEY) || "";
+    } catch (e) {}
     preferred = String(preferred).trim().toUpperCase();
     if (preferred && list.indexOf(preferred) >= 0) return preferred;
     return list[0] || "";
@@ -1109,6 +1131,29 @@
         enabled: state.overlayTest, symbol: state.symbol,
       }));
       await refreshOverlaysVisible();
+    });
+    $("researchBacktesterBtn").addEventListener("click", async function () {
+      if (!state.symbol) return;
+      const strategy = lastStochStrategy();
+      setStatus("Backtester: lade " + strategy + " für " + state.symbol + " …");
+      try {
+        const snap = await sendJson("/api/research/backtester/load", "POST", {
+          symbol: state.symbol,
+          hours: 48,
+          strategy_version: strategy,
+        }, { sourceAction: "backtester" });
+        applyWorkspace(snap);
+        await refreshOverlaysVisible();
+        const bt = snap.backtester || {};
+        setStatus(
+          "Backtester " + state.symbol + " · " + (bt.strategy_version || strategy) + ": "
+            + (bt.loaded || 0) + " Long/Short (Entry/TP/SL)"
+            + (bt.skipped ? ", " + bt.skipped + " übersprungen" : "")
+            + (bt.message ? " — " + bt.message : "")
+        );
+      } catch (err) {
+        setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+      }
     });
     $("researchIndStoch").addEventListener("change", async function () {
       applyWorkspace(await sendJson("/api/research/indicator-enabled", "POST", {

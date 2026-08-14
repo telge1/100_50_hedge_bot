@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .boundary import PANE_COUNT, SUPPORTED_LAYOUTS, SUPPORTED_TIMEFRAMES
+from .stoch_backtester import BACKTESTER_SOURCE, signal_to_position_spec
 from .trp_import import load_trp
 
 PANE_IDS = ("pane-0", "pane-1", "pane-2", "pane-3")
@@ -237,6 +238,67 @@ class ResearchWorkspace:
         self._preview_anchor = None
         self.persist_drawings()
         return self.snapshot()
+
+    def import_stoch_backtester(self, symbol: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+        """Replace Stoch-Signale positions on this symbol with long/short tools."""
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        sym = str(symbol or "").strip().upper()
+        existing = [
+            d
+            for d in self.drawings.get_drawings(sym, include_hidden=True)
+            if (d.metadata or {}).get("origin") == BACKTESTER_SOURCE
+            or (d.metadata or {}).get("source") == BACKTESTER_SOURCE
+            or str(d.drawing_id).startswith("stoch-")
+        ]
+        for drawing in existing:
+            self.drawings.remove_drawing(drawing.drawing_id)
+        loaded = 0
+        skipped = 0
+        for row in rows or []:
+            spec = signal_to_position_spec(row)
+            if spec is None or spec["symbol"] != sym:
+                skipped += 1
+                continue
+            factory = (
+                trp["make_long_position"]
+                if spec["drawing_type"] == "long_position"
+                else trp["make_short_position"]
+            )
+            drawing = factory(
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=spec["entry"],
+                timestamp_b=spec["end"],
+                price_b=spec["target"],
+                created_on_timeframe=spec["timeframe"],
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"] or None,
+                entry_price=spec["entry"],
+                stop_price=spec["stop"],
+                target_price=spec["target"],
+            )
+            drawing = dc_replace(
+                drawing,
+                metadata={
+                    "origin": BACKTESTER_SOURCE,
+                    "signal_id": spec["signal_id"],
+                    "direction": spec["direction"],
+                },
+            )
+            if spec["drawing_id"] and spec["drawing_id"] in self.drawings:
+                self.drawings.remove_drawing(spec["drawing_id"])
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "symbol": sym,
+            "loaded": loaded,
+            "skipped": skipped,
+            "source": BACKTESTER_SOURCE,
+        }
+        return snap
 
     def apply_style(self, *, color: Optional[str] = None, width: Optional[float] = None) -> dict[str, Any]:
         trp = self._trp

@@ -316,6 +316,34 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             bool(body.get("enabled")), str(body.get("symbol") or "").upper()
         )
 
+    @router.post("/api/research/backtester/load")
+    async def api_research_backtester_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .stoch_backtester import fetch_stoch_signal_rows
+
+        symbol = str(body.get("symbol") or "").strip().upper()
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        hours = int(body.get("hours") or 48)
+        strategy_version = str(body.get("strategy_version") or "").strip() or None
+        rows, err = await asyncio.to_thread(
+            fetch_stoch_signal_rows,
+            symbol=symbol,
+            hours=hours,
+            strategy_version=strategy_version,
+        )
+        if err:
+            return _error(503, "signal_feed_unavailable", err)
+        snap = get_workspace().import_stoch_backtester(symbol, rows)
+        bt = dict(snap.get("backtester") or {})
+        bt["strategy_version"] = strategy_version or "wave_fade_no_be50_v1"
+        if strategy_version == "POOL_ORDER_PLAN_V1" and not rows:
+            bt["message"] = f"Pool-V1 hat keine Signale für {symbol}"
+        snap["backtester"] = bt
+        return snap
+
     @router.post("/api/research/drawings/tool")
     async def api_research_drawings_tool(
         user: dict = Depends(require_auth),

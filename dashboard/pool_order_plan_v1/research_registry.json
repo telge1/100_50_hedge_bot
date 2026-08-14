@@ -1,0 +1,32 @@
+{
+  "strategy_id": "POOL_ORDER_PLAN_V1",
+  "research_run_id": "aceusdt_48h_20260814T150343Z",
+  "research_only": true,
+  "live_trading": false,
+  "symbol": "ACEUSDT",
+  "window_start": "2026-08-12T15:03:43Z",
+  "window_end": "2026-08-14T15:03:43Z",
+  "snapshot_as_of": "2026-08-14T15:03:43Z",
+  "signal_count": 16,
+  "dedupe_rule": "(symbol, entry_time UTC) keep first by available_at, created_at, signal_id",
+  "clickhouse_source": {
+    "pool_candle_source": "clickhouse",
+    "database": "signal_generator",
+    "table": "candles_1m",
+    "exchange": "bybit",
+    "interval": "1m",
+    "final": true,
+    "is_closed": 1
+  },
+  "planner_version": "c6c960a82e9a0c538dbe24b03f481893e722072f",
+  "source_database": "signal_generator",
+  "source_table": "candles_1m",
+  "source_interval": "1m",
+  "aggregation": "strict_contiguous_1m_to_5m",
+  "pool_interval": "5m",
+  "pool_engine": "bigbeluga",
+  "pool_lookback": 8,
+  "pool_warmup_days": 14,
+  "replay": false,
+  "artifact_relpath": "results/pool_order_plan_v1_comparisons/aceusdt_48h_20260814T150343Z/pool_artifacts/20260814T150343Z-76587402"
+}

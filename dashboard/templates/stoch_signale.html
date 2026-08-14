@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stoch-Signale - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/stoch.css?v=6">
+    <link rel="stylesheet" href="/static/css/stoch.css?v=7">
 </head>
 <body>
     <div class="dashboard-container">
@@ -40,6 +40,13 @@
                     </div>
                     <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-live">FROZEN</span></h1>
                     <p>Aktive Anzeige: <strong>FROZEN_BASELINE</strong> (<code>DASHBOARD_SIGNAL_SOURCE=FROZEN_BASELINE</code>). Exit-Policy <strong>NO_BE50</strong>. Keine Research-1m-Entries. PnL = gross.</p>
+                    <div class="stoch-research-banner" id="stochPoolResearchBanner" style="display:none;" hidden>
+                        <div class="stoch-research-banner-title">RESEARCH / BACKTEST ONLY</div>
+                        <div class="stoch-research-banner-sub">Source: ClickHouse 1m</div>
+                        <div class="stoch-research-banner-sub">Pool calculation: closed 5m candles</div>
+                        <div class="stoch-research-banner-sub">Historische, am Entry eingefrorene Pool-Snapshots. Keine Live-Strategie und keine Orderausführung.</div>
+                        <div class="stoch-research-banner-flag" id="stochPoolResearchWindow">ACEUSDT<br>2026-08-12 15:03:43 UTC – 2026-08-14 15:03:43 UTC</div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -56,6 +63,19 @@
                     <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Profit</div><div class="stoch-perf-value stoch-perf-win" id="perfProfit">–</div></div>
                     <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Loss</div><div class="stoch-perf-value stoch-perf-loss" id="perfLoss">–</div></div>
                     <div class="stoch-perf-card"><div class="stoch-perf-label">Total PnL</div><div class="stoch-perf-value" id="perfTotal">–</div></div>
+                </div>
+                <div class="stoch-perf-row" id="stochPoolPerfExtra" style="display:none;">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">READY</div><div class="stoch-perf-value" id="perfReady">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">NO_PLAN</div><div class="stoch-perf-value" id="perfNoPlan">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross PnL</div><div class="stoch-perf-value" id="perfGrossPnl">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Fees</div><div class="stoch-perf-value" id="perfFees">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Net PnL</div><div class="stoch-perf-value" id="perfNet">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Profit Factor</div><div class="stoch-perf-value" id="perfPf">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Max Drawdown</div><div class="stoch-perf-value" id="perfMdd">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">SL TOO WIDE</div><div class="stoch-perf-value" id="perfSlWide">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Ein Ziel</div><div class="stoch-perf-value" id="perfOneTarget">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Zwei Ziele</div><div class="stoch-perf-value" id="perfTwoTargets">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Ignorierte Duplikate</div><div class="stoch-perf-value" id="perfIgnored">–</div></div>
                 </div>
                 <div class="stoch-perf-meta" id="perfMeta">PnL basis: gross · Filter = Tabelle</div>
             </div>
@@ -153,6 +173,7 @@
                 <select id="stochFilterStrategy">
                     <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
                     <option value="wave_fade_frozen_f16ae32">BE50 Frozen (Research)</option>
+                    <option value="POOL_ORDER_PLAN_V1">Pool Order Plan V1 · Research</option>
                 </select>
                 <input type="hidden" id="stochDashboardSource" value="FROZEN_BASELINE" />
                 {% endif %}
@@ -164,6 +185,28 @@
                 </select>
                 <button type="button" class="stoch-btn" id="stochRefreshBtn">Refresh</button>
                 <span class="stoch-meta" id="stochMeta">–</span>
+            </div>
+            <div class="stoch-toolbar" id="stochPoolFilters" style="display:none;">
+                <label for="stochFilterOutcome">Outcome</label>
+                <select id="stochFilterOutcome">
+                    <option value="">Alle</option>
+                    <option value="WIN">WIN</option>
+                    <option value="LOSS">LOSS</option>
+                    <option value="OPEN">OPEN</option>
+                    <option value="NO_PLAN">NO_PLAN</option>
+                </select>
+                <label for="stochFilterSlWide">SL TOO WIDE</label>
+                <select id="stochFilterSlWide">
+                    <option value="">Alle</option>
+                    <option value="true">Ja</option>
+                    <option value="false">Nein</option>
+                </select>
+                <label for="stochFilterTargets">Ziele</label>
+                <select id="stochFilterTargets">
+                    <option value="">Alle</option>
+                    <option value="one">Ein Ziel</option>
+                    <option value="two">Zwei Ziele</option>
+                </select>
             </div>
 
             <div class="stoch-table-wrap">
@@ -229,15 +272,18 @@
             <div class="stoch-modal-body">
                 <div class="stoch-chart-host" id="stochChartHost"></div>
                 <div class="stoch-chart-legend">
-                    <span class="stoch-leg-entry">Entry (Signal Price)</span>
+                    <span class="stoch-leg-entry">Entry</span>
+                    <span class="stoch-leg-tp">TP1 / TP2</span>
+                    <span class="stoch-leg-sl">SL</span>
+                    <span class="stoch-leg-exit">Exit</span>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="/static/js/stoch_chart_modal.js?v=5"></script>
-    <script src="/static/js/stoch_signale.js?v=9"></script>
+    <script src="/static/js/stoch_chart_modal.js?v=7"></script>
+    <script src="/static/js/stoch_signale.js?v=13"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

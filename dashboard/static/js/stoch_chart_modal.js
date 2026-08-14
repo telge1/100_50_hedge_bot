@@ -162,11 +162,19 @@
     this.series = series;
 
     let candles = [];
+    let candleSource = "";
     try {
-      const url = `/api/stoch/klines?symbol=${encodeURIComponent(symbol)}&interval=5&limit=300`;
+      const url = trade.pool_research
+        ? `/api/stoch/pool-research-klines?signal_id=${encodeURIComponent(trade.signal_id || "")}`
+        : `/api/stoch/klines?symbol=${encodeURIComponent(symbol)}&interval=5&limit=300`;
       const res = await fetch(url, { credentials: "include" });
       const data = await res.json();
       candles = Array.isArray(data.candles) ? data.candles : [];
+      candleSource = String(data.source || "");
+      if (trade.pool_research && candleSource.indexOf("bybit") >= 0) {
+        candles = [];
+        candleSource = "rejected_bybit";
+      }
     } catch (err) {
       console.warn("Stoch klines fetch failed", err);
     }
@@ -201,15 +209,52 @@
       return p;
     };
 
-    const entry = asNum(trade.open_price) ?? asNum(trade.expected_open_price);
-    const tp = asNum(trade.expected_tp);
-    const sl = asNum(trade.expected_sl);
+    const entry = asNum(trade.open_price) ?? asNum(trade.expected_open_price) ?? asNum(trade.entry_price);
+    const tp = trade.pool_research ? null : asNum(trade.expected_tp);
+    const sl = asNum(trade.expected_sl) ?? asNum(trade.sl_price);
     const closePx = asNum(trade.close_price);
+    const tp1 = asNum(trade.tp1_price);
+    const tp2 = asNum(trade.tp2_price);
 
-    // Entry mit klarem Label auf der Preisachse; TP/SL/Close analog
-    addLine(entry, "#808080", entry !== null ? `Entry ${fmt(entry, 6)}` : "Entry", false);
-    addLine(tp, "#4caf50", "TP", true);
-    addLine(sl, "#f44336", "SL", true);
+    addLine(entry, "#3b82f6", entry !== null ? `Entry ${fmt(entry, 6)}` : "Entry", false);
+    if (trade.pool_research) {
+      if (tp1 !== null) {
+        const sz = trade.tp1_size != null ? ` ${Math.round(Number(trade.tp1_size) * 100)}%` : "";
+        addLine(tp1, "#22c55e", `TP1${sz}`, true);
+      }
+      if (tp2 !== null) {
+        const sz = trade.tp2_size != null ? ` ${Math.round(Number(trade.tp2_size) * 100)}%` : "";
+        addLine(tp2, "#16a34a", `TP2${sz}`, true);
+      }
+      addLine(sl, "#ef4444", "SL", true);
+      const addZone = (cluster, color, title) => {
+        if (!cluster) return;
+        addLine(cluster.bottom, color, title + " lo", true);
+        addLine(cluster.top, color, title + " hi", true);
+      };
+      addZone(trade.sl_cluster, "rgba(239,68,68,0.35)", "SL zone");
+      addZone(trade.tp1_cluster, "rgba(34,197,94,0.35)", "TP1 zone");
+      addZone(trade.tp2_cluster, "rgba(22,163,74,0.35)", "TP2 zone");
+      if (trade.pool_research) {
+        const slCl = trade.sl_cluster || {};
+        const tp1Cl = trade.tp1_cluster || {};
+        const tp2Cl = trade.tp2_cluster || {};
+        const wide = trade.sl_too_wide ? " · SL TOO WIDE (>1.5%)" : "";
+        this.subEl.textContent +=
+          ` · Signal-TF ${trade.signal_timeframe || "–"} · Pool-TF 5m` +
+          ` · Snapshot ${trade.snapshot_as_of ? fmtUtc(trade.snapshot_as_of) : "–"}` +
+          ` · 5m ${fmtUtc(trade.last_5m_open)}–${fmtUtc(trade.last_5m_close)}` +
+          ` · Pools@entry ${trade.entry_pool_count ?? "–"}` +
+          ` · SL cluster #${slCl.cluster_id ?? "–"} ${slCl.side || ""} [${fmt(slCl.bottom, 6)}–${fmt(slCl.top, 6)}]` +
+          ` dist ${fmt(trade.sl_distance_pct, 2)}%${wide}` +
+          ` · TP1 cluster #${tp1Cl.cluster_id ?? "–"}` +
+          (trade.tp2_price != null ? ` · TP2 cluster #${tp2Cl.cluster_id ?? "–"}` : "") +
+          (trade.exit_time ? ` · Closed ${fmtUtc(trade.exit_time)}` : " · OPEN/no close");
+      }
+    } else {
+      addLine(tp, "#4caf50", "TP", true);
+      addLine(sl, "#f44336", "SL", true);
+    }
     if (closePx !== null) addLine(closePx, "#ffd700", "Close", false);
 
     // Candle-Marker am Entry (wie trade_dashboard Open Trade)
@@ -233,7 +278,7 @@
         markers.push({
           time: openCandle.time,
           position: isLong ? "belowBar" : "aboveBar",
-          color: "#808080",
+          color: trade.pool_research ? "#3b82f6" : "#808080",
           shape: isLong ? "arrowUp" : "arrowDown",
           text: `Entry ${fmt(entry, 6)}`,
         });
@@ -253,6 +298,26 @@
           text: `Close ${fmt(closePx, 6)}`,
         });
       }
+    }
+
+    if (trade.pool_research && Array.isArray(trade.legs)) {
+      trade.legs.forEach((leg) => {
+        const kind = String(leg.kind || "").toUpperCase();
+        const tMs = toUtcMs(leg.time);
+        if (tMs === null || !candleData.length) return;
+        const tSec = Math.floor(tMs / 1000);
+        const candle = candleData.find((c) => c.time >= tSec) || candleData[candleData.length - 1];
+        let color = "#e879f9";
+        if (kind === "TP1" || kind === "TP2") color = "#22c55e";
+        if (kind === "SL") color = "#ef4444";
+        markers.push({
+          time: candle.time,
+          position: kind === "SL" ? "aboveBar" : "belowBar",
+          color,
+          shape: kind === "SL" ? "arrowDown" : "circle",
+          text: kind,
+        });
+      });
     }
 
     if (markers.length && typeof LightweightCharts.createSeriesMarkers === "function") {
@@ -278,10 +343,16 @@
 
     if (this.subEl) {
       const openLabel = openMs !== null ? ` · Open ${fmtUtc(openMs)}` : "";
-      this.subEl.textContent +=
-        openLabel +
-        ` · Entry ${fmt(entry, 6)} · TP ${fmt(tp, 6)} · SL ${fmt(sl, 6)}` +
-        (closePx !== null ? ` · Close ${fmt(closePx, 6)}` : "");
+      if (trade.pool_research) {
+        this.subEl.textContent +=
+          openLabel +
+          ` · Entry ${fmt(entry, 6)} · TP1 ${fmt(tp1, 6)} · TP2 ${fmt(tp2, 6)} · SL ${fmt(sl, 6)}`;
+      } else {
+        this.subEl.textContent +=
+          openLabel +
+          ` · Entry ${fmt(entry, 6)} · TP ${fmt(tp, 6)} · SL ${fmt(sl, 6)}` +
+          (closePx !== null ? ` · Close ${fmt(closePx, 6)}` : "");
+      }
     }
 
     requestAnimationFrame(() => {

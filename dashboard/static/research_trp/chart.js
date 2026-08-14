@@ -529,7 +529,16 @@
     return true;
   }
 
-  function setData(payload) {
+  function setData(payload, opts) {
+    const preserveView = !!(opts && opts.preserveView);
+    let savedRange = null;
+    if (preserveView && chart) {
+      try {
+        savedRange = chart.timeScale().getVisibleLogicalRange();
+      } catch (err) {
+        savedRange = null;
+      }
+    }
     clearShiftMeasure();
     lastPayload = payload || { candles: [] };
     const candles = lastPayload.candles || [];
@@ -561,8 +570,17 @@
     }
     applySeriesData(lastPayload);
     updateOscTimeBase();
-    applyDefaultView();
-    resize();
+    if (!preserveView) {
+      applyDefaultView();
+      resize();
+    } else if (savedRange) {
+      try {
+        chart.timeScale().setVisibleLogicalRange(savedRange);
+      } catch (err) {
+        /* keep current view */
+      }
+      syncOscLogicalFromMain(savedRange);
+    }
     if (lastSelectedUnix != null) {
       applySelectedMarker(lastSelectedUnix);
     }
@@ -744,9 +762,34 @@
     return $("overlay-layer");
   }
 
+  function snapUnixToBar(unix) {
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return unix;
+    if (candleByTime.has(t)) return t;
+    const candles = lastPayload && lastPayload.candles;
+    if (!candles || !candles.length) return unix;
+    if (t <= candles[0].time) return candles[0].time;
+    const last = candles[candles.length - 1];
+    if (t >= last.time) return last.time;
+    let lo = 0;
+    let hi = candles.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const mt = Number(candles[mid].time);
+      if (mt === t) return t;
+      if (mt < t) lo = mid + 1;
+      else hi = mid - 1;
+    }
+    return candles[Math.max(0, hi)].time;
+  }
+
   function xOf(unix) {
     if (!chart || unix == null) return null;
-    return chart.timeScale().timeToCoordinate(unix);
+    let coord = chart.timeScale().timeToCoordinate(unix);
+    if (coord != null) return coord;
+    const snapped = snapUnixToBar(unix);
+    if (snapped == null || snapped === unix) return null;
+    return chart.timeScale().timeToCoordinate(snapped);
   }
 
   function yOf(price) {

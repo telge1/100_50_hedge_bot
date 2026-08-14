@@ -15,6 +15,7 @@
     loading: false,
     symbolOptions: [],
     researchMode: false,
+    poolResearch: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -74,7 +75,7 @@
     else if (v === "BE / WIN") cls = "stoch-chip-be-win";
     else if (v === "BE / LOSS") cls = "stoch-chip-be-loss";
     else if (v === "BE / OPEN" || v === "BE") cls = "stoch-chip-warn";
-    else if (v === "OPEN") cls = "stoch-chip-pending";
+    else if (v === "OPEN") cls = "stoch-chip-open";
     else if (v === "WAITING_FOR_1M_EXTREME") cls = "stoch-chip-warn";
     else if (v === "WAITING_FOR_1M_TURN") cls = "stoch-chip-warn";
     else if (v === "ENTRY_TRIGGERED") cls = "stoch-chip-live";
@@ -183,6 +184,94 @@
     return `${sign}${v.toFixed(1)}%`;
   }
 
+  function persistStochChartBridge() {
+    const sv = (($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1");
+    const filterSym = (($("stochFilterSymbol") || {}).value || "").trim().toUpperCase();
+    const rowSym = ((state.rows[0] || {}).symbol || "").toString().trim().toUpperCase();
+    try {
+      localStorage.setItem("stoch.strategy_version", sv);
+      if (filterSym || rowSym) localStorage.setItem("stoch.last_symbol", filterSym || rowSym);
+    } catch (_) {}
+  }
+
+  function isPoolStrategy() {
+    return (($("stochFilterStrategy") || {}).value || "") === "POOL_ORDER_PLAN_V1";
+  }
+
+  function setPoolResearchUi(on, banner) {
+    state.poolResearch = !!on;
+    const el = $("stochPoolResearchBanner");
+    if (el) {
+      el.style.display = on ? "block" : "none";
+      if (on) el.removeAttribute("hidden");
+      else el.setAttribute("hidden", "hidden");
+    }
+    const extra = $("stochPoolPerfExtra");
+    if (extra) extra.style.display = on ? "grid" : "none";
+    const poolFilters = $("stochPoolFilters");
+    if (poolFilters) poolFilters.style.display = on ? "flex" : "none";
+    const hours = $("stochFilterHours");
+    if (hours) hours.disabled = !!on;
+    const thead = document.querySelector("#stochSignalsTable thead tr");
+    if (thead && !state.researchMode) {
+      if (on) {
+        thead.innerHTML = `
+          <th></th>
+          <th><button type="button" data-sort="entry_time">Zeit</button></th>
+          <th><button type="button" data-sort="symbol">Symbol</button></th>
+          <th><button type="button" data-sort="trade_direction">LONG/SHORT</button></th>
+          <th><button type="button" data-sort="signal_timeframe">Signal-TF</button></th>
+          <th>Pool-TF</th>
+          <th>Entry</th>
+          <th>Pool-Modus</th>
+          <th><button type="button" data-sort="entry_pool_count">Pools</button></th>
+          <th>SL</th>
+          <th>SL-Abstand</th>
+          <th>TP1</th>
+          <th>TP1-Größe</th>
+          <th>TP2</th>
+          <th>TP2-Größe</th>
+          <th><button type="button" data-sort="outcome">Outcome</button></th>
+          <th>Gross</th>
+          <th>Fees</th>
+          <th>Net</th>
+          <th>Hold</th>
+          <th>5m Open</th>
+          <th>5m Close</th>`;
+      } else if (!thead.querySelector('[data-sort="candle_close_time"]')) {
+        thead.innerHTML = `
+          <th></th>
+          <th><button type="button" data-sort="symbol">Symbol</button></th>
+          <th><button type="button" data-sort="timeframe">TF</button></th>
+          <th><button type="button" data-sort="trade_direction">Direction</button></th>
+          <th><button type="button" data-sort="entry_price">Entry</button></th>
+          <th>TP</th>
+          <th>SL</th>
+          <th>Stoch K</th>
+          <th><button type="button" data-sort="candle_close_time">Signal Time</button></th>
+          <th><button type="button" data-sort="result">Result</button></th>
+          <th><button type="button" data-sort="pnl_pct">PnL</button></th>
+          <th><button type="button" data-sort="duration_seconds">Duration</button></th>`;
+      }
+      thead.querySelectorAll("[data-sort]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-sort");
+          if (state.sortBy === key) {
+            state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+          } else {
+            state.sortBy = key;
+            state.sortDir = key === "candle_close_time" || key === "entry_time" ? "desc" : "asc";
+          }
+          applyFilters();
+        });
+      });
+    }
+    if (on && banner && banner.window_label) {
+      const win = $("stochPoolResearchWindow");
+      if (win) win.innerHTML = String(banner.window_label).replace(/\n/g, "<br>");
+    }
+  }
+
   function renderSummary(summary) {
     const s = summary || {};
     const set = (id, val) => {
@@ -212,19 +301,62 @@
     const meta = $("perfMeta");
     if (meta) {
       const sv = s.strategy_version || (($("stochFilterStrategy") || {}).value || "");
-      meta.textContent = `PnL basis: gross · Strategy: ${sv} · Stats = alle Treffer der aktiven Filter (nicht nur Seite)`;
+      if (state.poolResearch || sv === "POOL_ORDER_PLAN_V1") {
+        meta.textContent = "Pool-V1 PnL: net after fees · Baseline PnL: gross";
+        set("perfReady", s.ready != null ? String(s.ready) : "–");
+        set("perfNoPlan", s.no_plan != null ? String(s.no_plan) : "–");
+        set("perfGrossPnl", fmtPctSigned(s.gross_pnl_pct));
+        set("perfFees", fmtPctSigned(s.fees_pct));
+        set("perfNet", fmtPctSigned(s.net_pnl_pct));
+        set(
+          "perfPf",
+          s.profit_factor == null || Number.isNaN(Number(s.profit_factor))
+            ? "–"
+            : Number(s.profit_factor).toFixed(2)
+        );
+        set("perfMdd", fmtPctSigned(s.max_drawdown_pct));
+        set("perfSlWide", s.sl_too_wide_count != null ? String(s.sl_too_wide_count) : "–");
+        set("perfOneTarget", s.one_target_count != null ? String(s.one_target_count) : "–");
+        set("perfTwoTargets", s.two_target_count != null ? String(s.two_target_count) : "–");
+        set("perfIgnored", s.ignored_duplicates != null ? String(s.ignored_duplicates) : "–");
+        const totalEl = $("perfTotal");
+        if (totalEl) totalEl.textContent = fmtPctSigned(s.net_pnl_pct);
+      } else {
+        meta.textContent = `PnL basis: gross · Strategy: ${sv} · Stats = alle Treffer der aktiven Filter (nicht nur Seite)`;
+      }
     }
   }
 
   function applyFilters() {
-    // Server already applied symbol/TF/direction/hours/strategy. Local sort + page only.
     let rows = state.rows.slice();
+    if (state.poolResearch) {
+      const outcome = (($("stochFilterOutcome") || {}).value || "").toUpperCase();
+      const slWide = (($("stochFilterSlWide") || {}).value || "");
+      const targets = (($("stochFilterTargets") || {}).value || "");
+      rows = rows.filter((r) => {
+        if (outcome) {
+          const got = String(r.display_result || r.outcome || r.result || "").toUpperCase();
+          if (got !== outcome) return false;
+        }
+        if (slWide === "true" && !r.sl_too_wide) return false;
+        if (slWide === "false" && r.sl_too_wide) return false;
+        if (targets === "one") {
+          const one = Number(r.tp1_size) === 1 && !(Number(r.tp2_size) > 0);
+          if (!one) return false;
+        }
+        if (targets === "two") {
+          const two = Number(r.tp1_size) === 0.5 && Number(r.tp2_size) === 0.5;
+          if (!two) return false;
+        }
+        return true;
+      });
+    }
     const key = state.sortBy;
     const dir = state.sortDir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       let av = a[key];
       let bv = b[key];
-      if (key === "candle_close_time" || key === "signal_time" || key === "entry_time") {
+      if (key === "candle_close_time" || key === "signal_time" || key === "entry_time" || key === "last_5m_open" || key === "last_5m_close") {
         av = tsMs(av);
         bv = tsMs(bv);
       } else if (typeof av === "string") {
@@ -278,6 +410,8 @@
       } catch (_) {
         data = {};
       }
+      const poolOn = isPoolStrategy();
+      setPoolResearchUi(poolOn, data.banner);
       if (!res.ok || data.success === false || data.feed_ready === false) {
         state.rows = [];
         state.filtered = [];
@@ -305,6 +439,7 @@
       } else if (!state.symbolOptions.length) {
         state.symbolOptions = unique(state.rows.map((r) => r.symbol));
       }
+      persistStochChartBridge();
       fillSelect($("stochFilterSymbol"), state.symbolOptions, "Alle Symbole");
       if (sym) {
         const sel = $("stochFilterSymbol");
@@ -346,6 +481,15 @@
         });
       }
     });
+    ["stochFilterOutcome", "stochFilterSlWide", "stochFilterTargets"].forEach((id) => {
+      const el = $(id);
+      if (el) {
+        el.addEventListener("change", () => {
+          state.page = 0;
+          applyFilters();
+        });
+      }
+    });
     const refresh = $("stochRefreshBtn");
     if (refresh) refresh.addEventListener("click", () => load({ preservePage: true }));
     const prev = $("stochPrevBtn");
@@ -379,6 +523,7 @@
         applyFilters();
       });
     });
+    persistStochChartBridge();
   }
 
   function renderTable() {
@@ -392,8 +537,10 @@
     if (!slice.length) {
       const emptyMsg = state.researchMode
         ? "Keine Research-1m-Timing-Signale (inkl. pending) im gewählten Zeitraum."
-        : "Keine echten Tier-A-Signale im gewählten Zeitraum/Filter.";
-      tbody.innerHTML = `<tr><td colspan="14" class="stoch-empty">${emptyMsg}</td></tr>`;
+        : state.poolResearch
+          ? "Pool-V1-Artefakt nicht verfügbar"
+          : "Keine echten Tier-A-Signale im gewählten Zeitraum/Filter.";
+      tbody.innerHTML = `<tr><td colspan="18" class="stoch-empty">${emptyMsg}</td></tr>`;
     } else if (state.researchMode) {
       tbody.innerHTML = slice
         .map((r, i) => {
@@ -422,6 +569,49 @@
           </tr>`;
         })
         .join("");
+    } else if (state.poolResearch) {
+      tbody.innerHTML = slice
+        .map((r, i) => {
+          const idx = start + i;
+          const noPlan = String(r.plan_status || "") === "NO_PLAN";
+          const open = String(r.outcome || r.display_result || "").toUpperCase() === "OPEN";
+          const slWide = r.sl_too_wide
+            ? '<span class="stoch-badge-sl-wide">SL TOO WIDE</span>'
+            : "";
+          const hold =
+            r.hold_minutes == null || Number.isNaN(Number(r.hold_minutes))
+              ? "–"
+              : `${Number(r.hold_minutes).toFixed(0)}m`;
+          const reason = noPlan ? r.no_plan_reason || "NO_PLAN" : r.initial_target_mode || "–";
+          const outcomeChip = open
+            ? '<span class="stoch-chip stoch-chip-open">OPEN</span>'
+            : chipResult(r.display_result || r.outcome || r.result, r);
+          return `<tr data-signal-id="${r.signal_id || ""}">
+            <td><button type="button" class="stoch-chart-btn" data-idx="${idx}" title="Signal Chart / Inspector">${chartIcon()}</button></td>
+            <td>${fmtTs(r.entry_time || r.candle_close_time)}</td>
+            <td>${r.symbol || "–"}</td>
+            <td>${chipDirection(r.trade_direction || r.direction)}</td>
+            <td>${chipTf(r.signal_timeframe || r.timeframe)}</td>
+            <td>${chipTf(r.pool_interval || r.pool_timeframe || "5m")}</td>
+            <td>${fmtPrice(r.entry_price)}</td>
+            <td>${reason}</td>
+            <td>${r.entry_pool_count == null ? "–" : String(r.entry_pool_count)}</td>
+            <td>${noPlan ? "–" : fmtPrice(r.sl_price)}${slWide}</td>
+            <td>${noPlan ? "–" : fmtNum(r.sl_distance_pct, 2)}</td>
+            <td>${noPlan ? "–" : fmtPrice(r.tp1_price)}</td>
+            <td>${noPlan || r.tp1_size == null ? "–" : Math.round(Number(r.tp1_size) * 100) + "%"}</td>
+            <td>${noPlan ? "–" : fmtPrice(r.tp2_price)}</td>
+            <td>${noPlan || r.tp2_size == null ? "–" : Math.round(Number(r.tp2_size) * 100) + "%"}</td>
+            <td>${outcomeChip}</td>
+            <td>${open || noPlan ? "–" : fmtPnl(r.gross_pnl_pct)}</td>
+            <td>${open || noPlan ? "–" : fmtPnl(r.fees_pct)}</td>
+            <td>${open || noPlan ? "–" : fmtPnl(r.net_pnl_pct)}</td>
+            <td>${hold}</td>
+            <td>${fmtTs(r.last_5m_open)}</td>
+            <td>${fmtTs(r.last_5m_close)}</td>
+          </tr>`;
+        })
+        .join("");
     } else {
       tbody.innerHTML = slice
         .map((r, i) => {
@@ -433,12 +623,12 @@
             <td>${chipTf(r.timeframe)}</td>
             <td>${chipDirection(r.trade_direction || r.direction)}</td>
             <td>${fmtPrice(entry)}</td>
-            <td>${fmtPrice(r.tp_price)}</td>
-            <td>${fmtPrice(r.sl_price)}</td>
+            <td>${r.plan_status ? (fmtPrice(r.tp1_price) + (r.tp1_size != null ? " (" + Math.round(Number(r.tp1_size) * 100) + "%)" : "") + (r.tp2_price != null ? " / " + fmtPrice(r.tp2_price) : "")) : fmtPrice(r.tp_price)}</td>
+            <td>${fmtPrice(r.sl_price)}${r.sl_too_wide ? " wide" : ""}</td>
             <td>${fmtNum(r.stoch_k, 2)}</td>
             <td>${fmtTs(r.candle_close_time || r.signal_time)}</td>
             <td>${chipResult(r.display_result || r.result, r)}</td>
-            <td>${fmtPnl(r.pnl_pct)}</td>
+            <td>${fmtPnl(r.net_pnl_pct != null ? r.net_pnl_pct : r.pnl_pct)}</td>
             <td>${fmtDuration(r.duration_seconds, r.display_result || r.result)}</td>
           </tr>`;
         })
@@ -447,6 +637,10 @@
 
     if (meta) {
       meta.textContent = `${state.filtered.length} Signale · Seite ${state.page + 1}/${Math.max(1, Math.ceil(state.filtered.length / state.pageSize) || 1)} · auto ${state.refreshMs / 1000}s`;
+      const sv = (($("stochFilterStrategy") || {}).value || "");
+      if (sv === "POOL_ORDER_PLAN_V1") {
+        meta.textContent += " · RESEARCH/BACKTEST Pool Order Plan";
+      }
     }
     const pageLabel = $("stochPageLabel");
     if (pageLabel) pageLabel.textContent = `Seite ${state.page + 1}`;
@@ -471,12 +665,12 @@
           entry_price: entry,
           tp_price: row.tp_price,
           sl_price: row.sl_price,
-          signal_time: row.candle_close_time || row.signal_time,
-          expected_open_time: row.candle_close_time || row.signal_time,
+          signal_time: row.candle_close_time || row.signal_time || row.entry_time,
+          expected_open_time: row.candle_close_time || row.signal_time || row.entry_time,
           expected_open_price: entry,
           open_price: entry,
-          expected_tp: row.tp_price,
-          expected_sl: row.sl_price,
+          expected_tp: row.plan_status === "NO_PLAN" ? null : row.tp1_price || row.tp_price,
+          expected_sl: row.plan_status === "NO_PLAN" ? null : row.sl_price,
           generated_at: row.generated_at,
           result: row.display_result || row.result,
           frozen_result: row.frozen_result || row.result,
@@ -491,6 +685,25 @@
           counterfactual_no_be_result: row.counterfactual_no_be_result,
           counterfactual_no_be_exit_time: row.counterfactual_no_be_exit_time,
           counterfactual_no_be_pnl_pct: row.counterfactual_no_be_pnl_pct,
+          pool_research: !!row.pool_research,
+          tp1_price: row.tp1_price,
+          tp1_size: row.tp1_size,
+          tp2_price: row.tp2_price,
+          tp2_size: row.tp2_size,
+          legs: row.legs || [],
+          sl_cluster: row.sl_cluster,
+          tp1_cluster: row.tp1_cluster,
+          tp2_cluster: row.tp2_cluster,
+          snapshot_as_of: row.snapshot_as_of,
+          last_5m_open: row.last_5m_open,
+          last_5m_close: row.last_5m_close,
+          signal_timeframe: row.signal_timeframe || row.timeframe,
+          pool_timeframe: row.pool_timeframe || row.pool_interval || "5m",
+          entry_pool_count: row.entry_pool_count,
+          sl_too_wide: row.sl_too_wide,
+          sl_distance_pct: row.sl_distance_pct,
+          plan_status: row.plan_status,
+          outcome: row.outcome,
         });
       });
     });
@@ -511,7 +724,10 @@
 
   function startAutoRefresh() {
     if (state.refreshTimer) clearInterval(state.refreshTimer);
-    state.refreshTimer = setInterval(() => load({ preservePage: true }), state.refreshMs);
+    state.refreshTimer = setInterval(() => {
+      if (isPoolStrategy()) return;
+      load({ preservePage: true });
+    }, state.refreshMs);
   }
 
   document.addEventListener("DOMContentLoaded", () => {

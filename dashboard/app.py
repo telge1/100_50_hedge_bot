@@ -3297,6 +3297,20 @@ async def stoch_signale_page(request: Request, user: dict = Depends(require_auth
             get_default_research_display_variant,
         )
     src = get_dashboard_signal_source()
+    pool_v1_enabled = True
+    pool_v1_ready = False
+    try:
+        from pool_order_plan_v1.config import enable_pool_order_plan_v1
+
+        pool_v1_enabled = enable_pool_order_plan_v1()
+    except Exception:
+        pool_v1_enabled = True
+    try:
+        from pool_order_plan_v1.research_feed import research_artifact_available
+
+        pool_v1_ready = bool(pool_v1_enabled and research_artifact_available())
+    except Exception:
+        pool_v1_ready = False
     return HTMLResponse(render_template(
         "stoch_signale.html",
         {
@@ -3306,6 +3320,8 @@ async def stoch_signale_page(request: Request, user: dict = Depends(require_auth
             "research_mode": src == SOURCE_RESEARCH_1M_TIMING,
             "default_research_variant": get_default_research_display_variant(),
             "research_variant_labels": VARIANT_LABELS,
+            "enable_pool_order_plan_v1": pool_v1_enabled,
+            "pool_order_plan_v1_ready": pool_v1_ready,
         },
     ))
 
@@ -3784,6 +3800,18 @@ async def api_stoch_signals(
         tier_param = t_raw
 
     sv = (strategy_version or "wave_fade_no_be50_v1").strip()
+    if sv == "POOL_ORDER_PLAN_V1":
+        from pool_order_plan_v1.config import enable_pool_order_plan_v1
+
+        if enable_pool_order_plan_v1():
+            from pool_order_plan_v1.research_feed import research_signals_response
+
+            return research_signals_response(
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=direction,
+            )
+        sv = "wave_fade_no_be50_v1"
 
     payload, status, err = await _fetch_upstream_signals(
         hours=hrs,
@@ -3839,6 +3867,7 @@ async def api_stoch_signals(
         seen.add(sid)
         unique_rows.append(r)
 
+    response_sv = payload.get("strategy_version") or sv
     total = int(payload.get("total") if payload.get("total") is not None else len(unique_rows))
     return {
         "success": True,
@@ -3847,7 +3876,7 @@ async def api_stoch_signals(
         "signals": unique_rows,
         "items": unique_rows,
         "summary": payload.get("summary"),
-        "strategy_version": payload.get("strategy_version") or sv,
+        "strategy_version": response_sv,
         "outcome_horizon": payload.get("outcome_horizon"),
         "dashboard_signal_source": SOURCE_FROZEN_BASELINE,
         "research_mode": False,
@@ -3874,6 +3903,24 @@ async def api_stoch_profits(user: dict = Depends(require_auth)):
         ),
         "records": _stoch_demo_profits(),
     }
+
+
+@app.get("/api/stoch/pool-research-klines")
+async def api_stoch_pool_research_klines(
+    signal_id: str = Query(..., min_length=1),
+    user: dict = Depends(require_auth),
+):
+    """Read-only ClickHouse candles for Pool V1 research charts. No Bybit fallback."""
+    from pool_order_plan_v1.config import enable_pool_order_plan_v1
+    from pool_order_plan_v1.research_feed import load_research_klines
+
+    if not enable_pool_order_plan_v1():
+        return JSONResponse(
+            {"success": True, "candles": [], "source": "disabled", "message": "Pool-V1-Artefakt nicht verfügbar"},
+            status_code=200,
+        )
+    payload = await asyncio.to_thread(load_research_klines, signal_id)
+    return payload
 
 
 @app.get("/api/stoch/klines")

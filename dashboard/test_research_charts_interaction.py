@@ -151,7 +151,7 @@ def test_host_iframe_ready_handshake():
     assert "DATA_READY" in host
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
-    assert "iframe.src = \"/static/research_trp/pane.html?v=forming-2\"" in host
+    assert "iframe.src = \"/static/research_trp/pane.html?v=signals-all-tf-1\"" in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -226,7 +226,10 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=forming-2" in pane
+    assert "chart.js?v=signals-all-tf-1" in pane
+    assert "function snapUnixToBar" in js
+    assert "preserveView" in js
+    assert "preserveView: true" in host
     assert 'window.addEventListener("pointerdown", onShiftMeasureDown, true)' in js
     assert "onPointerDown, true" in js
     assert "function cursorForDragMode" in js
@@ -619,6 +622,124 @@ def test_two_parallel_pane_posts_do_not_429():
 
     responses = asyncio.run(two())
     assert [res.status_code for res in responses] == [200, 200]
+
+
+def test_stoch_backtester_positions_from_signal_list(tmp_path, monkeypatch):
+    from research_charts.stoch_backtester import signal_to_position_spec
+
+    spec = signal_to_position_spec(
+        {
+            "signal_id": "sig-ace-1",
+            "symbol": "ACEUSDT",
+            "direction": "LONG",
+            "timeframe": "15m",
+            "entry_price": 0.20,
+            "tp_price": 0.22,
+            "sl_price": 0.19,
+            "candle_close_time": "2026-08-14T10:00:00Z",
+            "exit_time": "2026-08-14T12:00:00Z",
+        }
+    )
+    assert spec is not None
+    assert spec["drawing_type"] == "long_position"
+    assert spec["entry"] == 0.20
+    assert spec["target"] == 0.22
+    assert spec["stop"] == 0.19
+
+    ws = _ws(tmp_path, monkeypatch)
+    snap = ws.import_stoch_backtester(
+        "ACEUSDT",
+        [
+            {
+                "signal_id": "sig-ace-1",
+                "symbol": "ACEUSDT",
+                "direction": "LONG",
+                "timeframe": "15m",
+                "entry_price": 0.20,
+                "tp_price": 0.22,
+                "sl_price": 0.19,
+                "candle_close_time": "2026-08-14T10:00:00Z",
+                "duration_seconds": 3600,
+            },
+            {
+                "signal_id": "sig-ace-2",
+                "symbol": "ACEUSDT",
+                "direction": "SHORT",
+                "timeframe": "5m",
+                "entry_price": 0.21,
+                "tp_price": 0.18,
+                "sl_price": 0.23,
+                "candle_close_time": "2026-08-14T11:00:00Z",
+            },
+            {
+                "signal_id": "skip",
+                "symbol": "APTUSDT",
+                "direction": "LONG",
+                "entry_price": 1.5,
+                "tp_price": 1.6,
+                "sl_price": 1.4,
+                "candle_close_time": "2026-08-14T10:00:00Z",
+            },
+        ],
+    )
+    assert snap["backtester"]["loaded"] == 2
+    assert snap["backtester"]["skipped"] == 1
+    pos = [d for d in ws.drawings.get_drawings("ACEUSDT") if d.drawing_type in ("long_position", "short_position")]
+    assert len(pos) == 2
+    longs = [d for d in pos if d.drawing_type == "long_position"]
+    assert abs(float(longs[0].entry_price) - 0.20) < 1e-9
+    assert abs(float(longs[0].target_price) - 0.22) < 1e-9
+    assert abs(float(longs[0].stop_price) - 0.19) < 1e-9
+    assert all(d.timeframe_scope == "all" for d in pos)
+    for tf in ("1m", "5m", "15m", "1h"):
+        overlays = ws.composed_overlays("ACEUSDT", tf)
+        kinds = [o.get("type") for o in overlays]
+        assert kinds.count("position") == 2
+    again = ws.import_stoch_backtester("ACEUSDT", [])
+    assert again["backtester"]["loaded"] == 0
+    assert not [
+        d for d in ws.drawings.get_drawings("ACEUSDT") if str(d.drawing_id).startswith("stoch-")
+    ]
+
+
+def test_pool_v1_backtester_uses_artifact_not_collector(tmp_path, monkeypatch):
+    from research_charts.stoch_backtester import fetch_stoch_signal_rows, signal_to_position_spec
+
+    spec = signal_to_position_spec(
+        {
+            "signal_id": "pool-1",
+            "symbol": "ACEUSDT",
+            "direction": "SHORT",
+            "timeframe": "15m",
+            "entry_price": 0.11,
+            "tp1_price": 0.10,
+            "sl_price": 0.12,
+            "entry_time": "2026-08-12T15:16:00Z",
+        }
+    )
+    assert spec is not None
+    assert spec["target"] == 0.10
+    assert spec["stop"] == 0.12
+
+    called = {"collector": False}
+
+    def _boom(*_a, **_k):
+        called["collector"] = True
+        raise AssertionError("collector must not be called for POOL_ORDER_PLAN_V1")
+
+    monkeypatch.setattr("research_charts.stoch_backtester.httpx.Client", _boom)
+    rows, err = fetch_stoch_signal_rows(symbol="ACEUSDT", strategy_version="POOL_ORDER_PLAN_V1")
+    assert err is None
+    assert called["collector"] is False
+    assert len(rows) >= 1
+    assert all(r.get("symbol") == "ACEUSDT" for r in rows)
+    assert all(r.get("strategy_version") == "POOL_ORDER_PLAN_V1" for r in rows)
+    mapped = [signal_to_position_spec(r) for r in rows]
+    assert sum(1 for s in mapped if s is not None) >= 1
+
+    empty, err2 = fetch_stoch_signal_rows(symbol="HYPEUSDT", strategy_version="POOL_ORDER_PLAN_V1")
+    assert err2 is None
+    assert empty == []
 
 
 def test_playwright_unavailable_is_explicit():

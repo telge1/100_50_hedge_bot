@@ -87,6 +87,7 @@ def test_trp_chart_js_loaded_without_hard_qwebchannel():
     assert "function resetView" in js
     assert "priceToCoordinate" in js
     assert "timeToCoordinate" in js
+    assert "function snapUnixToBar" in js
     assert "scaleWatchRaf" in js
     assert "layoutOverlays" in js
     assert "setSelectedMarker" in js
@@ -307,7 +308,11 @@ def test_collector_strings_regression():
     assert "ensure=false" in host
     assert "ensure=true" in host
     html = (DASHBOARD_ROOT / "templates" / "research_charts.html").read_text()
-    assert "research_charts.js?v=forming-2" in html
+    assert "research_charts.js?v=signals-all-tf-1" in html
+    assert "researchBacktesterBtn" in html
+    assert "researchBacktesterBtn" in host
+    assert "/api/research/backtester/load" in host
+    assert "strategy_version" in host
     assert "/api/research/live-status" in host
     assert "/api/research/candles" in host
     py = (DASHBOARD_ROOT / "research_charts" / "clickhouse_source.py").read_text()
