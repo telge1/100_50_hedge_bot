@@ -173,7 +173,12 @@
                 <select id="stochFilterStrategy">
                     <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
                     <option value="wave_fade_frozen_f16ae32">BE50 Frozen (Research)</option>
+                    {% if enable_pool_order_plan_v1 %}
                     <option value="POOL_ORDER_PLAN_V1">Pool Order Plan V1 · Research</option>
+                    {% endif %}
+                    {% if enable_ema_pool_trend_flip_v1 %}
+                    <option value="EMA_POOL_TREND_FLIP_V1">EMA Pool Trend Flip V1 · Research</option>
+                    {% endif %}
                 </select>
                 <input type="hidden" id="stochDashboardSource" value="FROZEN_BASELINE" />
                 {% endif %}

@@ -118,6 +118,17 @@ def fetch_stoch_signal_rows(
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Same feed as /stoch-signale. Pool V1 uses the research artifact, not collector :8787."""
     sv = str(strategy_version or "").strip()
+    if sv == "EMA_POOL_TREND_FLIP_V1":
+        from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
+        from ema_pool_trend_flip_v1.research_feed import research_signals_response as ema_flip_response
+
+        if not enable_ema_pool_trend_flip_v1():
+            return [], "EMA-Pool-Trend-Flip-Artefakt nicht verfügbar"
+        payload = ema_flip_response(symbol=symbol)
+        if not payload.get("feed_ready"):
+            return [], str(payload.get("message") or "EMA-Pool-Trend-Flip-Artefakt nicht verfügbar")
+        raw = payload.get("signals") or payload.get("items") or []
+        return [r for r in raw if isinstance(r, dict)], None
     if sv == "POOL_ORDER_PLAN_V1":
         from pool_order_plan_v1.config import enable_pool_order_plan_v1
         from pool_order_plan_v1.research_feed import research_signals_response

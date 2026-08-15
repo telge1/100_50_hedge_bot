@@ -1,0 +1,82 @@
+# Unresolved Audit — `individual_tp_scaled__2026-03-16T000000p0000`
+
+## 1. Startzustand
+
+- start_timestamp: `2026-03-16T00:00:00+00:00`
+- start_price: `0.9343`
+- long/short qty: `695.99` / `695.99`
+- long/short avg: `1.0039951633607973` / `0.9633203027467185`
+- locked_loss: `28.309296238792683`
+- seeding_mode: `relative_notional_invariant`
+
+## 2–3. Chronologische Adds / TP-Fills
+
+1. `2026-03-31T14:50:00+00:00` **overlay_short_add** qty=278.396 px=0.8782000000000001 fee=0.13446805196000003 overlay_after=278.396 econ=-30.451625841752637
+2. `2026-04-02T01:30:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8684000000000001 fee=0.06648374876000002 overlay_after=417.59400000000005 econ=-28.942342991162725
+3. `2026-04-02T01:30:00+00:00` **overlay_short_add** qty=278.396 px=0.8689 fee=0.13304405642000003 overlay_after=417.59400000000005 econ=-28.942342991162725
+4. `2026-04-02T05:05:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8596 fee=0.03290501522000001 overlay_after=487.1930000000001 econ=-23.164046789852822
+5. `2026-04-02T05:05:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8592000000000001 fee=0.06577940688000002 overlay_after=487.1930000000001 econ=-23.164046789852822
+6. `2026-04-02T05:05:00+00:00` **overlay_short_add** qty=278.396 px=0.8596 fee=0.13162006088000003 overlay_after=487.1930000000001 econ=-23.164046789852822
+7. `2026-04-02T12:50:00+00:00` **overlay_tp_close** qty=69.599 px=0.8509 fee=0.032571984005000006 overlay_after=487.1930000000001 econ=-21.073880593407786
+8. `2026-04-02T12:50:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8505 fee=0.032556672225000007 overlay_after=487.1930000000001 econ=-21.073880593407786
+9. `2026-04-02T12:50:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8500000000000001 fee=0.06507506500000002 overlay_after=487.1930000000001 econ=-21.073880593407786
+10. `2026-04-02T12:50:00+00:00` **overlay_short_add** qty=278.396 px=0.8502000000000001 fee=0.13018075356000003 overlay_after=487.1930000000001 econ=-21.073880593407786
+11. `2026-04-03T18:25:00+00:00` **overlay_tp_close** qty=69.599 px=0.8418 fee=0.032223641010000005 overlay_after=626.3910000000001 econ=-15.883612075302699
+12. `2026-04-03T18:25:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8414 fee=0.032208329230000006 overlay_after=626.3910000000001 econ=-15.883612075302699
+13. `2026-04-03T18:25:00+00:00` **overlay_short_add** qty=278.396 px=0.8409000000000001 fee=0.12875675802000003 overlay_after=626.3910000000001 econ=-15.883612075302699
+14. `2026-04-04T02:20:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8407 fee=0.06436306723000002 overlay_after=487.1930000000001 econ=-14.32174648422267
+15. `2026-04-05T06:00:00+00:00` **overlay_tp_close** qty=69.599 px=0.8328 fee=0.031879125960000004 overlay_after=417.5940000000001 econ=-11.797202140932708
+16. `2026-04-05T06:10:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8322 fee=0.031856158290000006 overlay_after=487.1930000000001 econ=-10.028681111082664
+17. `2026-04-05T06:10:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8315 fee=0.06365872535 overlay_after=487.1930000000001 econ=-10.028681111082664
+18. `2026-04-05T06:10:00+00:00` **overlay_short_add** qty=278.396 px=0.8315 fee=0.1273174507 overlay_after=487.1930000000001 econ=-10.028681111082664
+19. `2026-04-07T12:05:00+00:00` **overlay_tp_close** qty=69.599 px=0.8237 fee=0.031530782965000004 overlay_after=487.1930000000001 econ=-6.932366367002648
+20. `2026-04-07T12:05:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8231 fee=0.031507815295000005 overlay_after=487.1930000000001 econ=-6.932366367002648
+21. `2026-04-07T12:05:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8222 fee=0.06294672758000001 overlay_after=487.1930000000001 econ=-6.932366367002648
+22. `2026-04-07T12:05:00+00:00` **overlay_short_add** qty=278.396 px=0.8222 fee=0.12589345516000003 overlay_after=487.1930000000001 econ=-6.932366367002648
+23. `2026-04-09T01:05:00+00:00` **overlay_tp_close** qty=69.599 px=0.8147000000000001 fee=0.031186267915000006 overlay_after=487.1930000000001 econ=-3.121647815492591
+24. `2026-04-09T01:05:00+00:00` **overlay_tp_partial** qty=69.599 px=0.8139000000000001 fee=0.031155644355000005 overlay_after=487.1930000000001 econ=-3.121647815492591
+25. `2026-04-09T01:05:00+00:00` **overlay_tp_partial** qty=139.198 px=0.8130000000000001 fee=0.062242385700000014 overlay_after=487.1930000000001 econ=-3.121647815492591
+26. `2026-04-09T01:05:00+00:00` **overlay_short_add** qty=278.396 px=0.8128000000000001 fee=0.12445414784000003 overlay_after=487.1930000000001 econ=-3.121647815492591
+27. `2026-04-12T22:30:00+00:00` **overlay_tp_close** qty=69.599 px=0.8056000000000001 fee=0.030837924920000006 overlay_after=417.5940000000001 econ=0.016623293757416335
+
+## 4–6. Extremwerte
+
+- max_overlay_qty: `626.3910000000001`
+- max_overlay_notional: `533.5598538`
+- best_economics: `0.051824727982384466` (2026-04-12T22:25:00+00:00)
+- worst/adverse economics: `-179.13958242584263`
+- max_drawdown: `179.19140715382503`
+
+## 7. Zustand nach 60 Tagen
+
+- status: `DATA_END_OPEN`
+- final_economics: `-102.2865932433226`
+- distance_to_be_end: `102.5365932433226`
+- overlay_qty: `417.5940000000001`
+- net_exposure: `-417.59400000000005`
+
+## 8. Offene Tranchen
+
+- `R1-T7` rem=139.198 entry=0.8222 tp_fills=139.198/0.0/0.0 status=partial
+- `R1-T8` rem=278.396 entry=0.8128000000000001 tp_fills=0.0/0.0/0.0 status=open
+
+## 9. Warum BE nicht erreicht
+
+- Ursachen: `TP_HARVEST_TOO_SLOW, OVERLAY_SATURATED, NEAR_BE_AT_HORIZON, LARGE_OPEN_OVERLAY, V_REVERSAL`
+- max_drop: `-0.1382853473188483`
+- max_rally_from_low: `0.5380698049931685`
+- overlay_grows_faster_than_tp: `True`
+
+## 10. Extended horizons
+
+- 90d: recovered=True status=RECOVERED_BE days=79.87152777777779 econ=0.393353632887421
+- 120d: recovered=True status=RECOVERED_BE days=79.87152777777779 econ=0.393353632887421
+- full_remaining: recovered=True status=RECOVERED_BE days=79.87152777777779 econ=0.393353632887421
+
+## 11. Replay-CLI
+
+```bash
+python -m research.backtests.cobertura_0_notional_strategie.run_scaled_unresolved_audit \
+  --run-id individual_tp_scaled__2026-03-16T000000p0000 \
+  --output-dir research/backtests/cobertura_0_notional_strategie/results/apt_scaled_unresolved_audit_20260725
+```

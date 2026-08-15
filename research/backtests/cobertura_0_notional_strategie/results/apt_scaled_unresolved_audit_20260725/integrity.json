@@ -1,0 +1,16 @@
+{
+  "n_cases": 22,
+  "expected_cases": 22,
+  "replay_mismatches": 0,
+  "invariant_fails": 0,
+  "decision": "UNRESOLVED_AUDIT_PASS_WITH_WARNINGS",
+  "recover_90d": 14,
+  "recover_120d": 22,
+  "recover_full": 22,
+  "never_recover_full": 0,
+  "near_be_1": 2,
+  "near_be_5": 6,
+  "near_be_10": 9,
+  "overlay_grows_faster_count": 18,
+  "top_primary_cause": "TP_HARVEST_TOO_SLOW"
+}

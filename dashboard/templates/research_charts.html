@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css">
+    <link rel="stylesheet" href="/static/css/research.css?v=time-clip-1">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -39,32 +39,14 @@
                     </div>
                     <span class="trp-field-label">SYMBOL</span>
                     <select id="researchSymbol" class="trp-select"></select>
-                    <span class="trp-field-label">LAYOUT</span>
-                    <div class="trp-layout-group" id="trpLayouts">
-                        <button type="button" class="trp-layout-btn" data-layout="1">1</button>
-                        <button type="button" class="trp-layout-btn" data-layout="2H">2H</button>
-                        <button type="button" class="trp-layout-btn" data-layout="2V">2V</button>
-                        <button type="button" class="trp-layout-btn active" data-layout="4">4</button>
-                    </div>
                     <label class="trp-check"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair Sync</label>
                     <label class="trp-check"><input type="checkbox" id="researchOverlayTest"> Overlay Test</label>
                     <button type="button" class="trp-text-btn trp-primary" id="researchBacktesterBtn" title="Stoch-Signale als Long/Short mit Entry/TP/SL laden">Backtester</button>
-                    <div class="trp-tools" id="trpTools"></div>
-                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
-                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
-                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-                    </select>
-                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
-                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
-                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
                 </div>
                 <div class="trp-footerbar">
                     <span class="trp-field-label">EMA OVERLAYS</span>
                     <button type="button" class="trp-text-btn" id="trpEmaSettings">Settings</button>
                     <span class="trp-muted" id="trpEmaSummary">off</span>
-                    <span class="trp-field-label">INDICATORS</span>
-                    <label class="trp-check"><input type="checkbox" id="researchIndLld"> Liquidity Location</label>
-                    <button type="button" class="trp-text-btn" id="trpLldSettings">Settings</button>
                     <div class="trp-lld-legend" id="trpLldLegend" hidden>
                         <span class="trp-muted">Vol Str</span>
                         <div class="trp-vol-rows">
@@ -73,14 +55,38 @@
                         </div>
                         <span class="trp-muted" id="trpClusterCounts"></span>
                     </div>
-                    <label class="trp-check"><input type="checkbox" id="researchIndStoch"> Stochastic</label>
-                    <button type="button" class="trp-text-btn" id="trpStochSettings">Settings</button>
                 </div>
             </div>
 
             <div class="research-status" id="researchStatus"></div>
             <div class="research-selected" id="researchSelected">hover —  ·  sel —</div>
-            <div class="trp-workspace layout-4" id="researchWorkspace"></div>
+            <div class="trp-chart-dock" id="researchChartDock">
+                <div class="trp-dock-bar" id="researchDockBar">
+                    <div class="trp-resize-n" id="researchHeightHandle" title="Leiste nach oben/unten ziehen"></div>
+                    <span class="trp-field-label">LAYOUT</span>
+                    <div class="trp-layout-group" id="trpLayouts">
+                        <button type="button" class="trp-layout-btn active" data-layout="1">1</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2H">2H</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2V">2V</button>
+                        <button type="button" class="trp-layout-btn" data-layout="4">4</button>
+                    </div>
+                    <div class="trp-tools" id="trpTools"></div>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndStoch"> Stochastic</label>
+                    <button type="button" class="trp-text-btn" id="trpStochSettings" title="Stochastic Settings">⚙</button>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Liquidity Location</label>
+                    <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
+                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
+                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
+                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                </div>
+                <div class="trp-workspace layout-1" id="researchWorkspace"></div>
+            </div>
         </div>
     </div>
 
@@ -196,7 +202,7 @@
         </div>
     </div>
 
-    <script src="/static/js/research/research_charts.js?v=signals-all-tf-1"></script>
+    <script src="/static/js/research/research_charts.js?v=time-clip-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

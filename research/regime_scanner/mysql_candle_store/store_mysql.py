@@ -8,7 +8,11 @@ from typing import Any
 import pandas as pd
 
 from research.regime_scanner.mysql_candle_store.config import RegimeDbConfig
-from research.regime_scanner.mysql_candle_store.schema import ALLOWED_SOURCES, SCHEMA_SQL
+from research.regime_scanner.mysql_candle_store.schema import (
+    ALLOWED_SOURCES,
+    ENSURE_TIMEFRAME_BIN_COLLATION_SQL,
+    SCHEMA_SQL,
+)
 from research.regime_scanner.mysql_candle_store.source_policy import resolve_candle_upsert
 from research.regime_scanner.mysql_candle_store.store_memory import UpsertStats
 from research.regime_scanner.timeframes import ensure_utc_timestamp
@@ -42,6 +46,21 @@ class MySQLCandleStore:
         with self._engine.begin() as conn:
             for stmt in statements:
                 conn.execute(self._text(stmt))
+        # Separate connection: MySQL DDL commits implicitly; keep ALTER reliable
+        # so ``1m`` (minute) and ``1M`` (month) remain distinct under UNIQUE.
+        with self._engine.begin() as conn:
+            coll = conn.execute(
+                self._text(
+                    """
+                    SELECT COLLATION_NAME FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'market_candles'
+                      AND COLUMN_NAME = 'timeframe'
+                    """
+                )
+            ).scalar()
+            if coll and str(coll).lower() != "utf8mb4_bin":
+                conn.execute(self._text(ENSURE_TIMEFRAME_BIN_COLLATION_SQL))
 
     def _fetch_one(
         self,

@@ -1,0 +1,28 @@
+{
+  "generated_at_utc": "2026-07-26T11:39:22.875881+00:00",
+  "timing_source": {
+    "preferred_mode": "T1",
+    "threshold": 0.06,
+    "provenance_refs": [
+      "research/backtests/cobertura_0_notional_strategie/results/apt_start_distance_execution_timing_audit_20260726 (T1_thr_0p060)",
+      "research/backtests/cobertura_0_notional_strategie/results/apt_start_post_add_distance_audit_20260726 (start_06pct open-path twin)"
+    ],
+    "notes": "T1: distance confirmed on completed 5m close, fill at next 5m open. On APT the T1@6% fill coincides with the open-path winner at 2026-01-19T00:05:00+00:00 @ 1.6447."
+  },
+  "handoff_dir": "research/backtests/cobertura_0_notional_strategie/results/apt_cobertura_bundle_handoff_20260726",
+  "winner": {
+    "timing_mode": "T1",
+    "minimum_start_distance_pct": 0.06,
+    "fill_timestamp": "2026-01-19T00:05:00+00:00",
+    "fill_price": 1.6447,
+    "final_state": "RECOVERED",
+    "exit_reason": "recovered_profit",
+    "recovery_rounds": 8,
+    "bars_processed": 5187,
+    "overlay_add_fills": 16,
+    "overlay_be_closes": 7,
+    "realized_overlay_pnl": 46.149957799999854,
+    "final_total_exit_economics": 21.858019294808667
+  },
+  "engine_event_model": "order_created/activated/repriced/replaced/cancelled are NOT first-class OMS events in CoberturaEngine; audit uses order_events + fills."
+}

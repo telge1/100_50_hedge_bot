@@ -131,8 +131,21 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     assert switch.index("state.initialLoadDone = true") < switch.index("startPoll()")
     assert "visibleIds()" in switch
     layout = host[host.index('document.querySelectorAll(".trp-layout-btn")') :]
-    assert "!pane.lastTimes.size" in layout
-    assert "sourceAction: \"layout-change\"" in host or "sourceAction: \"layout-change\"" in layout
+    assert "loadNewlyVisiblePanes" in host
+    assert "sourceAction: \"layout-change\"" in host
+    assert "poll-indicators" not in host
+    assert 'layout: "1"' in host
+    assert "researchFullscreenBtn" in host
+    assert "togglePaneFullscreen" in host
+    assert "researchHeightHandle" in host
+    assert "researchChartDock" in host
+    assert "resetWorkspaceHeight" in host
+    assert "expandWorkspaceUp" in host
+    assert "bindHeightDrag" in host
+    assert "research-browser-fs" in host
+    assert 'pane.tf !== "1m"' in host
+    assert "lastClosedBarTime" in host
+    assert "closedCandleFingerprint" in host
 
 
 def test_host_generation_guard():
@@ -151,7 +164,8 @@ def test_host_iframe_ready_handshake():
     assert "DATA_READY" in host
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
-    assert "iframe.src = \"/static/research_trp/pane.html?v=signals-all-tf-1\"" in host
+    assert 'pane.html?v=" + ASSET_V' in host
+    assert 'const ASSET_V = "time-clip-1"' in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -226,7 +240,7 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=signals-all-tf-1" in pane
+    assert "chart.js?v=time-clip-1" in pane
     assert "function snapUnixToBar" in js
     assert "preserveView" in js
     assert "preserveView: true" in host

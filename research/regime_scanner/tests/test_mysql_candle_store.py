@@ -96,6 +96,95 @@ def test_general_feather_import_all_timeframes(tmp_path: Path, tf: str, step: in
     assert all(frame["source_timeframe"] == tf)
 
 
+def test_htf_1d_import_and_close_time(tmp_path: Path) -> None:
+    from research.regime_scanner.mysql_candle_store.candle_timeframes import candle_close_time
+
+    store = InMemoryCandleStore()
+    store.init_schema()
+    path = tmp_path / "APT_1d.feather"
+    _make_ohlcv("2026-01-01T00:00:00+00:00", 5, step_minutes=1440).to_feather(path)
+    report = import_feather(
+        store, input_path=path, exchange="bybit", symbol="APTUSDT", timeframe="1d"
+    )
+    assert not report.errors
+    assert report.inserted == 5
+    frame = load_candles(store, "bybit", "APTUSDT", "1d")
+    assert list(frame["source_timeframe"].unique()) == ["1d"]
+    ot = pd.Timestamp(frame["open_time"].iloc[0])
+    if ot.tzinfo is None:
+        ot = ot.tz_localize("UTC")
+    ct = pd.Timestamp(frame["close_time"].iloc[0])
+    if ct.tzinfo is None:
+        ct = ct.tz_localize("UTC")
+    assert ct == candle_close_time(ot, "1d")
+    assert bool(frame["is_closed"].all())
+
+
+def test_htf_1M_normalize_and_close_time() -> None:
+    from research.regime_scanner.mysql_candle_store.candle_timeframes import (
+        candle_close_time,
+        normalize_timeframe,
+    )
+
+    assert normalize_timeframe("1M") == "1M"
+    assert normalize_timeframe("1m") == "1m"
+    ot = pd.Timestamp("2024-01-01T00:00:00+00:00")
+    assert candle_close_time(ot, "1M") == pd.Timestamp("2024-02-01T00:00:00+00:00")
+
+
+def test_htf_1w_alignment_monday() -> None:
+    from research.regime_scanner.mysql_candle_store.candle_timeframes import is_aligned_open
+
+    assert is_aligned_open("2026-03-02T00:00:00+00:00", "1w")  # Monday
+    assert not is_aligned_open("2026-03-01T00:00:00+00:00", "1w")  # Sunday
+
+
+def test_1m_import_allowlist(tmp_path: Path) -> None:
+    store = InMemoryCandleStore()
+    store.init_schema()
+    path = tmp_path / "APT_1m.feather"
+    _make_ohlcv("2026-03-01T00:00:00+00:00", 10, step_minutes=1).to_feather(path)
+    report = import_feather(
+        store, input_path=path, exchange="bybit", symbol="APTUSDT", timeframe="1m"
+    )
+    assert not report.errors
+    assert report.inserted == 10
+    assert store.count_candles(exchange="bybit", symbol="APTUSDT", timeframe="1m") == 10
+
+
+def test_full_stack_window_helper() -> None:
+    from research.regime_scanner.scripts.build_full_mtf_candle_database import compute_windows
+
+    rows = []
+    for tf, start, end in [
+        ("1m", "2025-12-27", "2026-08-01"),
+        ("5m", "2025-12-27", "2026-08-01"),
+        ("15m", "2025-12-27", "2026-08-01"),
+        ("30m", "2025-12-27", "2026-08-01"),
+        ("1h", "2025-12-27", "2026-08-01"),
+        ("4h", "2022-10-19", "2026-08-01"),
+        ("1d", "2022-10-19", "2026-08-01"),
+        ("1w", "2022-10-17", "2026-07-27"),
+        ("1M", "2022-10-01", "2026-07-01"),
+    ]:
+        rows.append(
+            {
+                "symbol": "APTUSDT",
+                "timeframe": tf,
+                "min_open": start,
+                "max_open": end,
+                "n": 1,
+                "closed_n": 1,
+            }
+        )
+    w = compute_windows(rows)["APTUSDT"]
+    assert w["FULL_STACK_WINDOW"]["ok"] is True
+    assert w["FULL_STACK_WINDOW"]["start"].startswith("2025-12-27")
+    assert w["FULL_STACK_WINDOW"]["end"].startswith("2026-07-01")
+    assert w["HTF_WINDOW"]["ok"] is True
+    assert w["LOWER_STACK_WINDOW"]["ok"] is True
+
+
 @pytest.mark.parametrize("tf", ["5m", "15m", "30m"])
 def test_timeframe_grid_alignment(tf: str) -> None:
     minutes = {"5m": 5, "15m": 15, "30m": 30}[tf]

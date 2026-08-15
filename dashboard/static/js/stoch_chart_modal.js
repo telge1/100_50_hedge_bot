@@ -164,14 +164,16 @@
     let candles = [];
     let candleSource = "";
     try {
-      const url = trade.pool_research
+      const url = trade.ema_flip_research
+        ? `/api/stoch/ema-flip-research-klines?signal_id=${encodeURIComponent(trade.signal_id || "")}`
+        : trade.pool_research
         ? `/api/stoch/pool-research-klines?signal_id=${encodeURIComponent(trade.signal_id || "")}`
         : `/api/stoch/klines?symbol=${encodeURIComponent(symbol)}&interval=5&limit=300`;
       const res = await fetch(url, { credentials: "include" });
       const data = await res.json();
       candles = Array.isArray(data.candles) ? data.candles : [];
       candleSource = String(data.source || "");
-      if (trade.pool_research && candleSource.indexOf("bybit") >= 0) {
+      if ((trade.pool_research || trade.ema_flip_research) && candleSource.indexOf("bybit") >= 0) {
         candles = [];
         candleSource = "rejected_bybit";
       }
@@ -217,7 +219,28 @@
     const tp2 = asNum(trade.tp2_price);
 
     addLine(entry, "#3b82f6", entry !== null ? `Entry ${fmt(entry, 6)}` : "Entry", false);
-    if (trade.pool_research) {
+    if (trade.ema_flip_research) {
+      addLine(trade.ema9, "#f59e0b", "EMA9", false);
+      addLine(trade.ema20, "#a855f7", "EMA20", false);
+      addLine(sl, "#ef4444", "SL", true);
+      const addZone = (cluster, color, title) => {
+        if (!cluster) return;
+        addLine(cluster.bottom, color, title + " lo", true);
+        addLine(cluster.top, color, title + " hi", true);
+      };
+      (trade.active_upper_pools || []).forEach((c, i) => addZone(c, "rgba(34,197,94,0.35)", "up" + i));
+      (trade.active_lower_pools || []).forEach((c, i) => addZone(c, "rgba(59,130,246,0.35)", "dn" + i));
+      addZone(trade.protection_pool || trade.sl_cluster, "rgba(239,68,68,0.45)", "protect");
+      (trade.ratchet_steps || []).forEach((st, i) => addLine(st.sl_price, "#fb7185", "R" + (i + 1), true));
+      const tag = trade.flipped || trade.decision === "FLIPPED" ? "FLIPPED" : trade.decision === "ALIGNED" ? "ALIGNED" : trade.decision;
+      this.subEl.textContent +=
+        ` · ${tag}` +
+        ` · orig ${trade.original_direction || "–"} → ${trade.executed_direction || "–"}` +
+        ` · EMA trend ${trade.ema_trend || "–"}` +
+        ` · last ${trade.last_confirmed_cross || "–"}` +
+        ` · Gross ${fmt(trade.gross_pnl_pct, 2)} Net ${fmt(trade.net_pnl_pct, 2)}` +
+        (trade.exit_reason ? ` · Exit ${trade.exit_reason}` : "");
+    } else if (trade.pool_research) {
       if (tp1 !== null) {
         const sz = trade.tp1_size != null ? ` ${Math.round(Number(trade.tp1_size) * 100)}%` : "";
         addLine(tp1, "#22c55e", `TP1${sz}`, true);

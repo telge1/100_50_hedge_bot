@@ -198,6 +198,72 @@
     return (($("stochFilterStrategy") || {}).value || "") === "POOL_ORDER_PLAN_V1";
   }
 
+  function isEmaFlipStrategy() {
+    return (($("stochFilterStrategy") || {}).value || "") === "EMA_POOL_TREND_FLIP_V1";
+  }
+
+  function setEmaFlipResearchUi(on, banner) {
+    state.emaFlipResearch = !!on;
+    const el = $("stochPoolResearchBanner");
+    if (el && on) {
+      el.style.display = "block";
+      el.removeAttribute("hidden");
+      const title = el.querySelector(".stoch-research-banner-title") || el;
+      if (banner && banner.title) {
+        el.innerHTML =
+          `<div class="stoch-research-banner-title">${banner.title}</div>` +
+          `<div class="stoch-research-banner-sub" id="stochPoolResearchWindow">${String(banner.body || "").replace(/\n/g, "<br>")}</div>`;
+      }
+    }
+    const extra = $("stochPoolPerfExtra");
+    if (extra) extra.style.display = on ? "grid" : extra.style.display;
+    const hours = $("stochFilterHours");
+    if (hours && on) hours.disabled = true;
+    const thead = document.querySelector("#stochSignalsTable thead tr");
+    if (thead && on && !state.researchMode) {
+      thead.innerHTML = `
+          <th></th>
+          <th><button type="button" data-sort="signal_time">Signalzeit</button></th>
+          <th><button type="button" data-sort="entry_time">Entry-Zeit</button></th>
+          <th><button type="button" data-sort="symbol">Symbol</button></th>
+          <th>Signal-TF</th>
+          <th>Orig.</th>
+          <th>Ausgeführt</th>
+          <th>Decision</th>
+          <th>Entry</th>
+          <th>EMA9</th>
+          <th>EMA20</th>
+          <th>Sep/ATR</th>
+          <th>EMA-Trend</th>
+          <th>Last Cross</th>
+          <th>Pool-TF</th>
+          <th>Bias up/dn</th>
+          <th>Schutzpool</th>
+          <th>SL</th>
+          <th>SL-Abstand</th>
+          <th>WIDE</th>
+          <th>Exit</th>
+          <th>Exit-Grund</th>
+          <th>Gross</th>
+          <th>Fees</th>
+          <th>Net</th>
+          <th>Hold</th>
+          <th>Variant</th>`;
+      thead.querySelectorAll("[data-sort]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-sort");
+          if (state.sortBy === key) {
+            state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+          } else {
+            state.sortBy = key;
+            state.sortDir = key === "candle_close_time" || key === "entry_time" ? "desc" : "asc";
+          }
+          applyFilters();
+        });
+      });
+    }
+  }
+
   function setPoolResearchUi(on, banner) {
     state.poolResearch = !!on;
     const el = $("stochPoolResearchBanner");
@@ -301,7 +367,22 @@
     const meta = $("perfMeta");
     if (meta) {
       const sv = s.strategy_version || (($("stochFilterStrategy") || {}).value || "");
-      if (state.poolResearch || sv === "POOL_ORDER_PLAN_V1") {
+      if (state.emaFlipResearch || sv === "EMA_POOL_TREND_FLIP_V1") {
+        meta.textContent = "EMA-Pool-Trend-Flip PnL: net after fees · RESEARCH / BACKTEST ONLY";
+        set("perfGrossPnl", fmtPctSigned(s.gross_pnl_pct));
+        set("perfFees", fmtPctSigned(s.fees_pct));
+        set("perfNet", fmtPctSigned(s.net_pnl_pct));
+        set(
+          "perfPf",
+          s.profit_factor == null || Number.isNaN(Number(s.profit_factor))
+            ? "–"
+            : Number(s.profit_factor).toFixed(2)
+        );
+        set("perfMdd", fmtPctSigned(s.max_drawdown_pct));
+        set("perfSlWide", s.sl_too_wide_count != null ? String(s.sl_too_wide_count) : "–");
+        const totalEl = $("perfTotal");
+        if (totalEl) totalEl.textContent = fmtPctSigned(s.net_pnl_pct);
+      } else if (state.poolResearch || sv === "POOL_ORDER_PLAN_V1") {
         meta.textContent = "Pool-V1 PnL: net after fees · Baseline PnL: gross";
         set("perfReady", s.ready != null ? String(s.ready) : "–");
         set("perfNoPlan", s.no_plan != null ? String(s.no_plan) : "–");
@@ -411,7 +492,9 @@
         data = {};
       }
       const poolOn = isPoolStrategy();
-      setPoolResearchUi(poolOn, data.banner);
+      const emaOn = isEmaFlipStrategy();
+      setPoolResearchUi(poolOn && !emaOn, data.banner);
+      setEmaFlipResearchUi(emaOn, data.banner);
       if (!res.ok || data.success === false || data.feed_ready === false) {
         state.rows = [];
         state.filtered = [];
@@ -537,7 +620,9 @@
     if (!slice.length) {
       const emptyMsg = state.researchMode
         ? "Keine Research-1m-Timing-Signale (inkl. pending) im gewählten Zeitraum."
-        : state.poolResearch
+        : state.emaFlipResearch
+          ? "EMA-Pool-Trend-Flip-Artefakt nicht verfügbar"
+          : state.poolResearch
           ? "Pool-V1-Artefakt nicht verfügbar"
           : "Keine echten Tier-A-Signale im gewählten Zeitraum/Filter.";
       tbody.innerHTML = `<tr><td colspan="18" class="stoch-empty">${emptyMsg}</td></tr>`;
@@ -566,6 +651,48 @@
             <td>${fmtPnl(r.pnl_pct)}</td>
             <td>${fmtNum(r.mae_pct, 2)}</td>
             <td>${fmtNum(r.mfe_pct, 2)}</td>
+          </tr>`;
+        })
+        .join("");
+    } else if (state.emaFlipResearch) {
+      tbody.innerHTML = slice
+        .map((r, i) => {
+          const idx = start + i;
+          const prot = r.protection_pool || r.sl_cluster || {};
+          const hold =
+            r.hold_minutes == null || Number.isNaN(Number(r.hold_minutes))
+              ? "–"
+              : `${Number(r.hold_minutes).toFixed(0)}m`;
+          const open = String(r.outcome || "").toUpperCase() === "OPEN";
+          const noT = r.decision === "NO_TRADE" || r.decision === "BLOCKED";
+          return `<tr data-signal-id="${r.signal_id || ""}">
+            <td><button type="button" class="stoch-chart-btn" data-idx="${idx}" title="Signal Chart / Inspector">${chartIcon()}</button></td>
+            <td>${fmtTs(r.signal_time)}</td>
+            <td>${fmtTs(r.entry_time)}</td>
+            <td>${r.symbol || "–"}</td>
+            <td>${chipTf(r.signal_timeframe || r.timeframe)}</td>
+            <td>${chipDirection(r.original_direction)}</td>
+            <td>${chipDirection(r.executed_direction || r.trade_direction)}</td>
+            <td>${r.decision || "–"}</td>
+            <td>${fmtPrice(r.entry_price)}</td>
+            <td>${fmtNum(r.ema9, 6)}</td>
+            <td>${fmtNum(r.ema20, 6)}</td>
+            <td>${fmtNum(r.ema_sep_atr, 3)}</td>
+            <td>${r.ema_trend || "–"}</td>
+            <td>${r.last_confirmed_cross || "–"}</td>
+            <td>5m</td>
+            <td>${fmtNum(r.upper_pool_bias_score, 2)} / ${fmtNum(r.lower_pool_bias_score, 2)}</td>
+            <td>${prot.cluster_id != null ? "#" + prot.cluster_id : "–"}</td>
+            <td>${noT ? "–" : fmtPrice(r.sl_price)}</td>
+            <td>${noT ? "–" : fmtNum(r.sl_distance_pct, 2)}</td>
+            <td>${r.sl_too_wide ? "true" : "false"}</td>
+            <td>${open || noT ? "–" : fmtTs(r.exit_time)}</td>
+            <td>${r.exit_reason || "–"}</td>
+            <td>${open || noT ? "–" : fmtPnl(r.gross_pnl_pct)}</td>
+            <td>${open || noT ? "–" : fmtPnl(r.fees_pct)}</td>
+            <td>${open || noT ? "–" : fmtPnl(r.net_pnl_pct)}</td>
+            <td>${hold}</td>
+            <td>${r.variant || "–"}</td>
           </tr>`;
         })
         .join("");
@@ -641,6 +768,9 @@
       if (sv === "POOL_ORDER_PLAN_V1") {
         meta.textContent += " · RESEARCH/BACKTEST Pool Order Plan";
       }
+      if (sv === "EMA_POOL_TREND_FLIP_V1") {
+        meta.textContent += " · RESEARCH/BACKTEST EMA Pool Trend Flip";
+      }
     }
     const pageLabel = $("stochPageLabel");
     if (pageLabel) pageLabel.textContent = `Seite ${state.page + 1}`;
@@ -686,6 +816,29 @@
           counterfactual_no_be_exit_time: row.counterfactual_no_be_exit_time,
           counterfactual_no_be_pnl_pct: row.counterfactual_no_be_pnl_pct,
           pool_research: !!row.pool_research,
+          ema_flip_research: !!row.ema_flip_research,
+          original_direction: row.original_direction,
+          executed_direction: row.executed_direction,
+          decision: row.decision,
+          ema9: row.ema9,
+          ema20: row.ema20,
+          ema_sep_atr: row.ema_sep_atr,
+          ema_trend: row.ema_trend,
+          last_confirmed_cross: row.last_confirmed_cross,
+          upper_pool_bias_score: row.upper_pool_bias_score,
+          lower_pool_bias_score: row.lower_pool_bias_score,
+          protection_pool: row.protection_pool,
+          ratchet_steps: row.ratchet_steps || [],
+          active_upper_pools: row.active_upper_pools || [],
+          active_lower_pools: row.active_lower_pools || [],
+          weak_cross_candidates: row.weak_cross_candidates || [],
+          confirmed_cross_events: row.confirmed_cross_events || [],
+          variant: row.variant,
+          flipped: row.flipped,
+          aligned: row.aligned,
+          gross_pnl_pct: row.gross_pnl_pct,
+          fees_pct: row.fees_pct,
+          net_pnl_pct: row.net_pnl_pct,
           tp1_price: row.tp1_price,
           tp1_size: row.tp1_size,
           tp2_price: row.tp2_price,
@@ -725,7 +878,7 @@
   function startAutoRefresh() {
     if (state.refreshTimer) clearInterval(state.refreshTimer);
     state.refreshTimer = setInterval(() => {
-      if (isPoolStrategy()) return;
+      if (isPoolStrategy() || isEmaFlipStrategy()) return;
       load({ preservePage: true });
     }, state.refreshMs);
   }

@@ -1,0 +1,12 @@
+{
+  "n_starts": 154,
+  "n_runs": 462,
+  "reference_included": true,
+  "same_starts_all_policies": true,
+  "decision": "APT_MULTISTART_PASS_WITH_WARNINGS",
+  "policies": [
+    "shared_be",
+    "individual_tp_2p00",
+    "individual_tp_scaled"
+  ]
+}

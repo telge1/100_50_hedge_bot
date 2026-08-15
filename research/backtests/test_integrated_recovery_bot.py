@@ -103,6 +103,9 @@ def test_runtime_four_steps_close_gap() -> None:
 def test_recovery_off_unchanged_exit_reason_set() -> None:
     assert "flat_no_active_orders" in CONTINUOUS_SUCCESSFUL_EXIT_REASONS
     assert "recovery_joint_exit" in CONTINUOUS_SUCCESSFUL_EXIT_REASONS
+    assert "recovery_timeout_close_all" in CONTINUOUS_SUCCESSFUL_EXIT_REASONS
+    assert "recovery_max_loss_close_all" in CONTINUOUS_SUCCESSFUL_EXIT_REASONS
+    assert "recovery_max_additional_loss_close_all" in CONTINUOUS_SUCCESSFUL_EXIT_REASONS
 
 
 def test_continuous_reentry_accepts_recovery_joint_exit_for_next_trade(tmp_path: Path) -> None:

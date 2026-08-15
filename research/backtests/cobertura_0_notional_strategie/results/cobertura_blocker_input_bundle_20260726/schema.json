@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "description": "Historical TEM blocker start facts for Cobertura research backtests. Neutralization quantities are NOT historical facts; they belong to scenarios.",
+  "join_key": [
+    "trade_id",
+    "trigger_mode"
+  ],
+  "timestamp_format": "ISO-8601 with timezone offset (e.g. 2026-01-19T00:00:00+00:00 or space variant)",
+  "percentage_semantics": {
+    "distance_break_to_market_pct": "Decimal fraction: market_price_at_signal / structure_break_level - 1. Example APT \u2248 -0.02358 \u2261 -2.358%."
+  },
+  "enums": {
+    "trigger_mode": [
+      "first_break",
+      "final_invalidation"
+    ],
+    "structure_break_direction": [
+      "bearish",
+      "bullish",
+      "unknown"
+    ],
+    "replay_match_status": [
+      "REPLAY_MATCH",
+      "REPLAY_MISMATCH",
+      "SKIPPED"
+    ],
+    "fee_quality": [
+      "FEES_COMPLETE",
+      "FEE_RECONSTRUCTION_UNRESOLVED",
+      "FEES_UNKNOWN"
+    ],
+    "source_quality": [
+      "EXACT_FILL_LEVEL_BEFORE_SIGNAL",
+      "BREAK_EVENT_UNRESOLVED",
+      "STATE_UNRESOLVED",
+      "NO_FILLS_BEFORE_SIGNAL"
+    ]
+  },
+  "required_fields_ready": [
+    "trade_id",
+    "coin",
+    "trigger.trigger_mode",
+    "trigger.signal_available_ts",
+    "trigger.structure_break_level",
+    "trigger.structure_break_kind",
+    "market.market_price_at_signal",
+    "market.neutralization_fill_price",
+    "pre_signal_position.long_qty",
+    "pre_signal_position.short_qty",
+    "quality.replay_match_status",
+    "quality.ready_for_cobertura"
+  ],
+  "optional_fields": [
+    "prior_economics.cumulative_fees",
+    "trigger.confirmation_ts",
+    "source_orders.orders"
+  ]
+}

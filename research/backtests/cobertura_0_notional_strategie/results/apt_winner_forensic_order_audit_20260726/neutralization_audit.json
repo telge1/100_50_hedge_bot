@@ -1,0 +1,57 @@
+{
+  "order_id": "research-neutralization-short-001",
+  "order_type": "market",
+  "purpose": "COBERTURA_HANDOFF_NEUTRALIZATION",
+  "side": "short",
+  "qty": 98.76800000000003,
+  "qty_step_rounded": 98.768,
+  "qty_step_ok": true,
+  "raw_market_price": 1.6447,
+  "fill_price": 1.6447,
+  "notional": 162.44372960000004,
+  "fee": 0.08934405128000003,
+  "timestamp": "2026-01-19T00:05:00+00:00",
+  "candle_ohlc": {
+    "open": 1.6447,
+    "high": 1.6522,
+    "low": 1.6208,
+    "close": 1.6327
+  },
+  "position_before": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 197.59699999999998,
+    "short_avg": 1.864561269615919,
+    "net_qty": 98.76800000000003
+  },
+  "position_after": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 296.365,
+    "short_avg": 1.791289264225859,
+    "net_qty": 0.0
+  },
+  "qty_neutral_after": true,
+  "min_notional_ok": true,
+  "single_neutralization": true,
+  "initial_entry_created": false,
+  "tem_orders_imported": false,
+  "fee_in_engine_ledger": false,
+  "fee_note": "Neutralization fee is a research handoff cost; CoberturaEngine is seeded with post-neutralization averages and does not book this fee into cumulative_entry_fees unless explicitly added.",
+  "compute_neutralization": {
+    "neutralization_status": "NEEDS_SHORT_FILL",
+    "neutralization_short_qty": 98.76800000000003,
+    "new_short_qty": 296.365,
+    "new_short_avg": 1.791289264225859,
+    "neutralization_notional": 162.44372960000004,
+    "neutralization_open_fee": 0.08934405128000003,
+    "post_neutralization_long_qty": 296.365,
+    "post_neutralization_short_qty": 296.365,
+    "post_neutralization_long_avg": 1.864531340748192,
+    "post_neutralization_short_avg": 1.791289264225859,
+    "post_neutralization_avg_spread_abs": 0.07324207652233294,
+    "post_neutralization_avg_spread_pct_from_long": 0.039281762082337884,
+    "post_neutralization_net_qty": 0.0,
+    "flags": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "n_rows": 27,
+  "n_replay_match": 25,
+  "n_exact_pre_signal": 25,
+  "n_ready_for_neutralization": 25,
+  "n_unresolved": 2,
+  "n_replay_mismatches": 0,
+  "n_fee_issues": 50,
+  "n_invariant_fails": 0,
+  "n_market_mismatches": 0,
+  "apt_status": "APT_FILL_REPLAY_WARNING",
+  "decision": "BLOCKER_FILL_REPLAY_PASS_WITH_WARNINGS"
+}

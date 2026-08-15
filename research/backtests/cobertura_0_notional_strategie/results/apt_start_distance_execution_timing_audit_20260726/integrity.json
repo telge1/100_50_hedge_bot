@@ -1,0 +1,17 @@
+{
+  "decision": "APT_START_DISTANCE_EXECUTION_ROBUST",
+  "generated_at_utc": "2026-07-26T10:53:13.237957+00:00",
+  "baseline_fingerprint_ok": true,
+  "baseline_fingerprint_failures": [],
+  "winner_t0_6_fingerprint_ok": true,
+  "winner_t0_6_fingerprint_failures": [],
+  "no_low_fills": true,
+  "tem_orders_imported": false,
+  "initial_entry_created": false,
+  "live_mode": "T0",
+  "conservative_modes": [
+    "T1",
+    "T2"
+  ],
+  "control_mode": "T3"
+}

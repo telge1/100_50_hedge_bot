@@ -1,0 +1,170 @@
+{
+  "decision": "APT_COBERTURA_BUNDLE_HANDOFF_PASS_WITH_WARNINGS",
+  "failures": [],
+  "checks": [
+    {
+      "check": "trade_id",
+      "ok": true,
+      "detail": "APTUSDT|two_early_medium|continuous|0006"
+    },
+    {
+      "check": "trigger_mode",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "ready_for_cobertura",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "replay_match",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "replay_diff_count",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "ledger_cutoff_violations",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "last_fill_before_signal",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "structure_break_level",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "market_price_at_signal",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "neutralization_fill_price",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "long_qty_before",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "short_qty_before",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "net_qty_before",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "open_order_count",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "source_orders_len",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "cancel_flag",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "active_source_order_count",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "tem_order_ids_active_empty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "no_tem_purposes_active",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "neutralization_side",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "neutralization_qty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "neutralization_fill_price_applied",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "post_long_qty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "post_short_qty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "post_net_qty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "post_long_avg_unchanged",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "post_short_avg",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "prior_realized_preserved",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "prior_not_in_spread_target",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "no_regular_initial_entry",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "engine_fills_empty",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "check": "cycle_not_inherited",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "pass": true,
+  "warnings": [
+    "FEE_RECONSTRUCTION_UNRESOLVED"
+  ]
+}

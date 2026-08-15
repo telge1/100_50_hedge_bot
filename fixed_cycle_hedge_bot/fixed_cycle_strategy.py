@@ -217,6 +217,11 @@ class FixedCycleHedgeConfig:
     qty_step: float = 0.001
     min_order_qty: float = 0.001
     min_notional_usdt: float = 5.0
+    # Multiplier applied to min_notional when projecting the next cycle second-leg order.
+    # 1.0 = exact exchange/config minimum (recommended first ship). Values >1.0 add headroom.
+    next_cycle_min_notional_safety_factor: float = 1.0
+    # When False, cycle-completion keeps only the regular pair-refill gate (B0 / audit baseline).
+    preventive_next_cycle_min_notional_refill_enabled: bool = True
     dynamic_symbol_hold_minutes: int = 10
     # Minutes after which a still-open trade becomes eligible for a time/distance-based
     # refill trigger. 0 or negative disables this trigger.
@@ -1606,6 +1611,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
 
         # Optional time-distance-refill-Trigger zusätzlich auf Tick-Ebene prüfen,
         # damit der Midpoint auch ohne aktiven Downside-Build erreicht werden kann.
+        self._maybe_clear_next_cycle_min_notional_block(snapshot, runtime_state)
+        if self._next_cycle_min_notional_block_active(state):
+            return []
         triggered_refill = self._maybe_trigger_time_distance_refill(snapshot, runtime_state, context)
         if triggered_refill or self._cycle_build_block_active(state):
             reason = "time_distance_refill_triggered_tick" if triggered_refill else "refill_required_tick"
@@ -4217,6 +4225,14 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "trigger_purpose": state.get("refill_trigger_purpose"),
             }
             _log_event("fixed_cycle_refill_qty_calculated", refill_payload)
+
+            if self._block_refill_after_illicit_cycle_flat(
+                snapshot,
+                runtime_state,
+                context,
+                refill_payload=refill_payload,
+            ):
+                return []
 
             if self._try_complete_refill_after_dust_residual(
                 snapshot,
@@ -7338,6 +7354,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         self._ensure_cycle_sequence_state(runtime_state)
         # Optional time/distance-based refill trigger using the existing refill mode.
         # This is a simple additional trigger that reuses the established refill lifecycle.
+        self._maybe_clear_next_cycle_min_notional_block(snapshot, runtime_state)
+        if self._next_cycle_min_notional_block_active(state):
+            _log_event(
+                "fixed_cycle_downside_cycle_intent_build_blocked",
+                {
+                    "symbol": snapshot.symbol or self.config.symbol,
+                    "reason": reason,
+                    "block_reason": "next_cycle_min_notional_blocked",
+                    "next_required_purpose": state.get("next_required_purpose"),
+                    "active_cycle_index": state.get("active_cycle_index"),
+                    "cycle_block_status": state.get("cycle_block_status"),
+                },
+            )
+            return []
         self._maybe_trigger_time_distance_refill(snapshot, runtime_state, context)
         gate_details = self._reconcile_refill_gate_state(snapshot, runtime_state)
         refill_required = self._cycle_build_block_active(state)
@@ -8702,7 +8732,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "processed_cycle_purposes": processed_cycle_purposes,
             },
         )
-        if self._cycle_build_block_active(state):
+        if self._cycle_build_block_active(state) or self._next_cycle_min_notional_block_active(state):
             _log_event(
                 "fixed_cycle_refill_block_cycle_build",
                 {
@@ -8717,7 +8747,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "refill_in_progress": bool(state.get("refill_in_progress")),
                     "bot_state": state.get("bot_state"),
                     "cycle_block_status": state.get("cycle_block_status"),
-                    "reason": "refill_required",
+                    "reason": (
+                        "next_cycle_min_notional_blocked"
+                        if self._next_cycle_min_notional_block_active(state)
+                        else "refill_required"
+                    ),
                 },
             )
             return []
@@ -10504,6 +10538,25 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     reduction_pct_per_fill=self.config.reduction_pct_per_fill,
                 )
                 return []
+            # Normal cycle LONG_REDUCE (short-bot second leg) must leave residual long.
+            _, long_rules, _ = self._resolve_instrument_rules(runtime_state)
+            long_qty_step = float(
+                long_rules["qty_step"]
+                if long_rules and long_rules.get("qty_step")
+                else float(self.config.qty_step or 0.0)
+            )
+            long_qty_eps = max(long_qty_step * 0.5, 1e-12)
+            if current_long_qty > long_qty_eps and long_qty + long_qty_eps >= current_long_qty:
+                _emit_short_tp_follow_up_skip(
+                    "long_reduce_full_close_forbidden",
+                    symbol=active_trade_symbol,
+                    long_reduce_qty=long_qty,
+                    current_long_qty=current_long_qty,
+                    reference_price=reference_price,
+                    action="skip",
+                    reason_detail="normal_cycle_reduce_must_leave_residual_long",
+                )
+                return []
             distance_pct_config = self.config.long_fill_distance_pct
             distance_pct = self._clamp_pct_fraction(self._pct(distance_pct_config))
             raw_trigger_price = reference_price * (1.0 + distance_pct)
@@ -10654,12 +10707,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if short_followup_qty is None or short_followup_qty <= 0:
             short_followup_qty = fresh_short_cycle_qty
             short_followup_qty_source = "configured_short_cycle_qty"
-        if short_followup_qty is None or short_followup_qty <= 0:
-            short_followup_qty = normalized_current_short_qty
-            short_followup_qty_source = "current_short_qty_normalized"
-        if (short_followup_qty is None or short_followup_qty <= 0) and long_reduce_qty > 0:
-            short_followup_qty = long_reduce_qty
-            short_followup_qty_source = "resolved_long_reduce_qty"
+        # Min-notional / zero cycle qty must Skip — never expand to full short inventory
+        # or long_reduce_qty (C8 full-close bug). Mirror long_reduce_qty_non_positive Skip.
+        strategy_target_qty_raw = current_short_qty * self._pct(effective_reduction_pct)
+        reference_price_for_notional = float(long_fill_price or snapshot.current_price or 0.0)
+        requested_notional = (
+            float(fresh_short_cycle_qty or strategy_target_qty_raw) * reference_price_for_notional
+            if reference_price_for_notional > 0
+            else 0.0
+        )
+        min_notional_usdt = float(self.config.min_notional_usdt or 0.0)
         _log_event(
             "fixed_cycle_short_followup_qty_resolved",
             {
@@ -10674,6 +10731,9 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "confirmed_closed_qty": confirmed_closed_qty,
                 "short_followup_qty": short_followup_qty,
                 "short_followup_qty_source": short_followup_qty_source,
+                "strategy_target_qty_raw": strategy_target_qty_raw,
+                "requested_notional": requested_notional,
+                "min_notional_usdt": min_notional_usdt,
             },
         )
         gate_decision = "allow"
@@ -10703,11 +10763,31 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
             return []
         if short_followup_qty is None or short_followup_qty <= 0:
+            skip_reason = "short_reduce_qty_below_min_notional"
+            if (
+                strategy_target_qty_raw > 0
+                and reference_price_for_notional > 0
+                and min_notional_usdt > 0
+                and strategy_target_qty_raw * reference_price_for_notional + 1e-12 < min_notional_usdt
+            ):
+                skip_reason = "short_reduce_qty_below_min_notional"
+            elif fresh_short_cycle_qty <= 0 and strategy_target_qty_raw <= 0:
+                skip_reason = "short_followup_invalid_short_qty"
             _emit_short_tp_follow_up_skip(
-                "short_followup_invalid_short_qty",
+                skip_reason,
                 symbol=active_trade_symbol,
                 short_followup_qty=short_followup_qty,
                 short_followup_qty_source=short_followup_qty_source,
+                strategy_qty=strategy_target_qty_raw,
+                normalized_qty=float(fresh_short_cycle_qty or 0.0),
+                current_short_qty=current_short_qty,
+                current_short_avg=float(snapshot.short_avg or state.get("short_avg") or 0.0),
+                reference_price=reference_price_for_notional,
+                requested_notional=requested_notional,
+                minimum_notional=min_notional_usdt,
+                next_required_purpose=str(state.get("next_required_purpose") or ""),
+                action="skip",
+                reason_detail="min_notional_or_zero_cycle_qty",
             )
             return []
         if long_reduce_qty <= 0:
@@ -10723,6 +10803,30 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 },
             )
         short_qty = float(short_followup_qty or 0.0)
+        # Normal cycle SHORT_REDUCE must never silently flatten the short inventory.
+        _, short_rules, _ = self._resolve_instrument_rules(runtime_state)
+        short_qty_step = float(
+            short_rules["qty_step"]
+            if short_rules and short_rules.get("qty_step")
+            else float(self.config.qty_step or 0.0)
+        )
+        short_qty_eps = max(short_qty_step * 0.5, 1e-12)
+        if (
+            current_short_qty > short_qty_eps
+            and short_qty + short_qty_eps >= current_short_qty
+        ):
+            _emit_short_tp_follow_up_skip(
+                "short_reduce_full_close_forbidden",
+                symbol=active_trade_symbol,
+                short_followup_qty=short_qty,
+                short_followup_qty_source=short_followup_qty_source,
+                current_short_qty=current_short_qty,
+                current_short_avg=float(snapshot.short_avg or state.get("short_avg") or 0.0),
+                next_required_purpose=str(state.get("next_required_purpose") or ""),
+                action="skip",
+                reason_detail="normal_cycle_reduce_must_leave_residual_short",
+            )
+            return []
         logger.info(
             "short_tp_build_proceed",
             extra={
@@ -10964,6 +11068,23 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         **short_reduce_cover_adjustment,
                     },
                 )
+            # Re-check after cover bump: still must leave residual short inventory.
+            if (
+                current_short_qty > short_qty_eps
+                and float(short_qty) + short_qty_eps >= current_short_qty
+            ):
+                _emit_short_tp_follow_up_skip(
+                    "short_reduce_full_close_forbidden",
+                    symbol=active_trade_symbol,
+                    short_followup_qty=float(short_qty),
+                    short_followup_qty_source="loss_cover_invariant_capped_or_rejected",
+                    current_short_qty=current_short_qty,
+                    current_short_avg=float(short_entry_price or 0.0),
+                    next_required_purpose=str(state.get("next_required_purpose") or ""),
+                    action="skip",
+                    reason_detail="cover_invariant_must_not_flatten_short",
+                )
+                return []
         state["last_expected_short_tp_net"] = required_net
         state["last_short_tp_trigger_price"] = trigger_price
         state["last_short_tp_qty"] = short_qty
@@ -11768,9 +11889,20 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
     ) -> list[StrategyIntent]:
         intents: list[StrategyIntent] = []
         state = runtime_state.strategy_state
+        if self._next_cycle_min_notional_block_active(state):
+            symbol = snapshot.symbol or self.config.symbol
+            _log_event(
+                "fixed_cycle_exit_intents_blocked_next_cycle_min_notional",
+                {
+                    "symbol": symbol,
+                    "cycle_block_status": state.get("cycle_block_status"),
+                    "cycle_block_reason": state.get("cycle_block_reason"),
+                },
+            )
+            return []
         if self._is_refill_mode_active(state):
             symbol = snapshot.symbol or self.config.symbol
-            self._log_event(
+            _log_event(
                 "fixed_cycle_exit_intents_blocked_refill_mode_active",
                 {
                     "symbol": symbol,
@@ -12773,7 +12905,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         desired_qty = min_order_qty
                     else:
                         desired_qty = adjusted_qty
-                desired_qty = min(desired_qty, available_short_qty)
+                # Never bump a normal cycle reduce to the full short inventory (C8 safety).
+                _, cap_rules, _ = self._resolve_instrument_rules(runtime_state)
+                qty_step = float(
+                    cap_rules["qty_step"]
+                    if cap_rules and cap_rules.get("qty_step")
+                    else float(self.config.qty_step or 0.0)
+                )
+                residual_eps = max(qty_step, 1e-12)
+                hard_cap = max(0.0, available_short_qty - residual_eps)
+                desired_qty = min(desired_qty, hard_cap)
 
                 if desired_qty > adjusted_qty + eps:
                     adjusted_qty = desired_qty
@@ -12902,7 +13043,16 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                         desired_qty = min_order_qty
                     else:
                         desired_qty = adjusted_qty
-                desired_qty = min(desired_qty, available_long_qty)
+                # Never bump a normal cycle reduce to the full long inventory.
+                _, cap_rules, _ = self._resolve_instrument_rules(runtime_state)
+                qty_step = float(
+                    cap_rules["qty_step"]
+                    if cap_rules and cap_rules.get("qty_step")
+                    else float(self.config.qty_step or 0.0)
+                )
+                residual_eps = max(qty_step, 1e-12)
+                hard_cap = max(0.0, available_long_qty - residual_eps)
+                desired_qty = min(desired_qty, hard_cap)
 
                 if desired_qty > adjusted_qty + eps:
                     adjusted_qty = desired_qty
@@ -14133,11 +14283,11 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         # processed_cycle_purposes auf den nächsten Cycle weiterschieben.
         self._recover_cycle_sequence_state(runtime_state, state)
         self._persist_cycle_sequence_state(runtime_state)
-        self._mark_refill_required_after_cycle_pair(
+        self._decide_refill_after_cycle_completion(
             runtime_state,
             cycle_index=cycle_index,
             trigger_purpose=trigger_purpose,
-            reason="short_reduce_completion",
+            default_reason="short_reduce_completion",
         )
         self._commit_short_reduce_terminal_fill(
             runtime_state,
@@ -14305,6 +14455,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         cycle_index: int,
         trigger_purpose: str | None = None,
         reason: str = "cycle_pair_limit_reached",
+        force: bool = False,
     ) -> None:
         state = runtime_state.strategy_state
         completed = int(state.get("cycle_completed_count") or 0)
@@ -14318,11 +14469,37 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "cycle_pair_count": pair_count,
                 "last_refill_completed_cycle_index": last_refill_completed,
                 "cycles_since_last_refill": cycles_since_last_refill,
+                "force": bool(force),
+                "reason": reason,
             },
         )
-        if cycles_since_last_refill < 2 and not bool(state.get("refill_pending")) and not bool(state.get("refill_required")):
+        already_refill_active = bool(
+            state.get("refill_pending") or state.get("refill_required") or self._is_refill_mode_active(state)
+        )
+        if (
+            not force
+            and cycles_since_last_refill < 2
+            and not already_refill_active
+        ):
             return
-        if completed < 2 and pair_count < 2 and cycle_index < 2:
+        if not force and completed < 2 and pair_count < 2 and cycle_index < 2:
+            return
+        if already_refill_active:
+            # Idempotent: merge reasons without re-entering refill mode / double cancel.
+            merged = self._merge_refill_trigger_reason(state.get("refill_trigger_reason"), reason)
+            state["refill_trigger_reason"] = merged
+            if trigger_purpose and not state.get("refill_trigger_purpose"):
+                state["refill_trigger_purpose"] = trigger_purpose
+            _log_event(
+                "fixed_cycle_refill_reason_merged_while_active",
+                {
+                    "cycle_index": cycle_index,
+                    "cycle_completed_count": completed,
+                    "merged_reason": merged,
+                    "trigger_purpose": state.get("refill_trigger_purpose"),
+                    "force": bool(force),
+                },
+            )
             return
         if state.get("skip_next_cycle_refill_after_time_distance"):
             state["skip_next_cycle_refill_after_time_distance"] = False
@@ -14406,6 +14583,7 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "bot_state": state.get("bot_state"),
                 "trigger_purpose": trigger_purpose,
                 "reason": reason,
+                "force": bool(force),
             },
         )
         _log_event(
@@ -14415,8 +14593,21 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                 "cycle_completed_count": completed,
                 "cycle_pair_count": pair_count,
                 "reason": reason,
+                "force": bool(force),
             },
         )
+        if "preventive_next_cycle_min_notional" in str(reason):
+            _log_event(
+                "fixed_cycle_preventive_refill_triggered",
+                {
+                    "symbol": self.config.symbol,
+                    "cycle_index": cycle_index,
+                    "cycle_completed_count": completed,
+                    "reason": "preventive_next_cycle_min_notional",
+                    "refill_trigger_reason": reason,
+                    "force": bool(force),
+                },
+            )
 
 
     def _complete_refill(
@@ -14587,6 +14778,84 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             )
         state["refill_long_filled"] = False
         state["refill_short_filled"] = False
+
+        # After reconcile: if this refill was (also) preventive min-notional, re-project before unlock.
+        # Regular pair refills keep existing rebuild behavior even if diagnostics are logged.
+        snapshot = runtime_state.last_snapshot
+        preventive_for = int(state.get("preventive_min_notional_refill_for_cycle") or 0)
+        was_preventive_refill = preventive_for > 0 and preventive_for == int(completed_cycle_index)
+        if (
+            was_preventive_refill
+            and snapshot is not None
+            and float(snapshot.long_qty or 0.0) > 0
+            and float(snapshot.short_qty or 0.0) > 0
+        ):
+            projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+            if not projection.get("valid"):
+                state["next_cycle_min_notional_blocked"] = True
+                state["cycle_block_status"] = "NEXT_CYCLE_MIN_NOTIONAL_BLOCKED"
+                state["cycle_block_reason"] = "preventive_refill_still_below_min_notional"
+                state["long_add_rebuild_allowed"] = False
+                state["force_exit_rebuild"] = False
+                state["exit_rebuild_allowed"] = False
+                state["exit_locked"] = True
+                state["post_refill_structure_rebuild_required"] = False
+                state["next_required_purpose"] = None
+                cycle_sequence_state = state.get("cycle_sequence_state") or {}
+                cycle_sequence_state["next_required_purpose"] = None
+                state["cycle_sequence_state"] = cycle_sequence_state
+                _log_event(
+                    "fixed_cycle_next_cycle_min_notional_blocked",
+                    {
+                        "symbol": self.config.symbol,
+                        "completion_reason": completion_reason,
+                        "completed_cycle_index": completed_cycle_index,
+                        "next_cycle_index": next_cycle_index,
+                        "projected_notional": projection.get("projected_notional"),
+                        "min_notional": projection.get("min_notional"),
+                        "reference_price": projection.get("reference_price"),
+                        "normalized_qty": projection.get("normalized_qty"),
+                        "preventive_refill_already_used": True,
+                    },
+                )
+                _log_event(
+                    "next_cycle_order_projection",
+                    {
+                        **projection,
+                        "preventive_refill_due": False,
+                        "action": "block_after_refill_still_invalid",
+                        "reason": projection.get("reason") or "still_below_min_notional",
+                    },
+                )
+            else:
+                state["next_cycle_min_notional_blocked"] = False
+                if state.get("cycle_block_status") == "NEXT_CYCLE_MIN_NOTIONAL_BLOCKED":
+                    state.pop("cycle_block_status", None)
+                    state.pop("cycle_block_reason", None)
+                _log_event(
+                    "next_cycle_order_projection",
+                    {
+                        **projection,
+                        "preventive_refill_due": False,
+                        "action": "continue_next_cycle",
+                        "reason": "post_refill_recheck_valid",
+                    },
+                )
+        elif (
+            snapshot is not None
+            and float(snapshot.long_qty or 0.0) > 0
+            and float(snapshot.short_qty or 0.0) > 0
+        ):
+            projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": False,
+                    "action": "continue_next_cycle",
+                    "reason": "post_regular_refill_diagnostic",
+                },
+            )
 
     def _maybe_complete_refill_after_reconcile(
         self,
@@ -16035,6 +16304,87 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
             "refill_short_qty": refill_short_qty,
         }
 
+    def _normal_cycle_reduce_purpose_caused_side_flat(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        side: str,
+    ) -> tuple[bool, str]:
+        """True when a normal CYCLE_* reduce likely flattened the given side (illicit full close)."""
+        state = runtime_state.strategy_state
+        purpose_candidates = [
+            str(state.get("last_confirmed_short_fill_purpose") or ""),
+            str(state.get("last_completed_purpose") or ""),
+            str(state.get("refill_trigger_purpose") or ""),
+        ]
+        side_u = str(side or "").lower()
+        for raw in purpose_candidates:
+            purpose = raw.upper()
+            if not purpose:
+                continue
+            if any(token in purpose for token in ("FINAL", "EMERGENCY", "BASKET", "EXIT")):
+                continue
+            if not purpose.startswith("CYCLE_"):
+                continue
+            if side_u == "short" and "SHORT_REDUCE" in purpose:
+                return True, purpose
+            if side_u == "long" and ("LONG_REDUCE" in purpose or "LONG_ADD" in purpose):
+                # LONG_ADD cycle purposes are reduce_only long on the long-bot.
+                return True, purpose
+        return False, ""
+
+    def _block_refill_after_illicit_cycle_flat(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+        context: StrategyContext,
+        *,
+        refill_payload: dict[str, Any],
+    ) -> bool:
+        """Secondary safety: do not auto-refill if a normal cycle reduce flattened inventory."""
+        state = runtime_state.strategy_state
+        current_long_qty = float(refill_payload.get("current_long_qty") or 0.0)
+        current_short_qty = float(refill_payload.get("current_short_qty") or 0.0)
+        initial_long_qty = float(refill_payload.get("initial_long_qty") or 0.0)
+        initial_short_qty = float(refill_payload.get("initial_short_qty") or 0.0)
+        blocked = False
+        reasons: list[str] = []
+        if current_short_qty <= 1e-12 and initial_short_qty > 0:
+            illicit, purpose = self._normal_cycle_reduce_purpose_caused_side_flat(
+                runtime_state, side="short"
+            )
+            if illicit:
+                blocked = True
+                reasons.append(f"short_flat_after_{purpose or 'cycle_short_reduce'}")
+        if current_long_qty <= 1e-12 and initial_long_qty > 0:
+            illicit, purpose = self._normal_cycle_reduce_purpose_caused_side_flat(
+                runtime_state, side="long"
+            )
+            if illicit:
+                blocked = True
+                reasons.append(f"long_flat_after_{purpose or 'cycle_long_reduce'}")
+        if not blocked:
+            return False
+        state["refill_blocked_illicit_cycle_flat"] = True
+        state["refill_blocked_illicit_cycle_flat_reasons"] = reasons
+        payload = {
+            **refill_payload,
+            "symbol": snapshot.symbol or self.config.symbol,
+            "reasons": reasons,
+            "action": "block_refill",
+            "pending_cycle_loss_usdt": float(state.get("pending_cycle_loss_usdt") or 0.0),
+            "next_required_purpose": state.get("next_required_purpose"),
+        }
+        _log_warning_event("fixed_cycle_refill_blocked_illicit_cycle_flat", payload)
+        context.audit.log_event(
+            "fixed_cycle_refill_blocked_illicit_cycle_flat",
+            strategy=self.name,
+            **payload,
+        )
+        # Refuse refill intents; leave refill gate flags so the bot does not treat
+        # an illicit flatten as a successful reload. Primary fix must prevent flat.
+        return True
+
     def _apply_refill_dust_residual_filter(
         self,
         residual: dict[str, float],
@@ -16185,6 +16535,396 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         if normalized * reference_price < self.config.min_notional_usdt:
             return 0.0
         return normalized
+
+    def _project_next_cycle_second_leg_min_notional(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> dict[str, Any]:
+        """Side-effect-free projection of the next cycle's second-leg 25% order vs min-notional.
+
+        Long-bot: projects short coverage qty. Short-bot: projects long coverage qty.
+        Uses snapshot.current_price (not a future coverage TP).
+        """
+        state = runtime_state.strategy_state
+        completed_cycle_index = int(state.get("cycle_completed_count") or 0)
+        next_cycle_index = completed_cycle_index + 1
+        reference_price = float(snapshot.current_price or 0.0)
+        reduction_pct = float(self.config.reduction_pct_per_fill or 0.0)
+        safety_factor = float(
+            getattr(self.config, "next_cycle_min_notional_safety_factor", 1.0) or 1.0
+        )
+        if safety_factor <= 0:
+            safety_factor = 1.0
+        min_notional = float(self.config.min_notional_usdt or 0.0)
+        notional_threshold = min_notional * safety_factor
+
+        symbol = str(snapshot.symbol or self.config.symbol or "").upper()
+        rules = None
+        if runtime_state is not None and symbol:
+            rules = (runtime_state.instrument_rules or {}).get(symbol)
+        min_order_qty = float(
+            rules["min_order_qty"]
+            if rules and rules.get("min_order_qty")
+            else float(self.config.min_order_qty or 0.0)
+        )
+
+        second_leg_role = str(self._get_second_leg_cycle_role() or "").lower()
+        projects_short = "short" in second_leg_role
+        if projects_short:
+            position_side = "short"
+            current_side_qty = float(snapshot.short_qty or 0.0)
+            initial_side_qty = float(state.get("initial_short_qty") or 0.0)
+            raw_qty = current_side_qty * self._pct(reduction_pct)
+            normalized_qty = self._normalize_qty(
+                min(raw_qty, current_side_qty) if current_side_qty > 0 else 0.0,
+                runtime_state,
+            )
+            gate_qty = self._fixed_short_cycle_qty(
+                initial_side_qty,
+                current_side_qty,
+                reference_price,
+                runtime_state=runtime_state,
+            )
+        else:
+            position_side = "long"
+            current_side_qty = float(snapshot.long_qty or 0.0)
+            initial_side_qty = float(state.get("initial_long_qty") or 0.0)
+            raw_qty = current_side_qty * self._pct(reduction_pct)
+            normalized_qty = self._normalize_qty(
+                min(raw_qty, current_side_qty) if current_side_qty > 0 else 0.0,
+                runtime_state,
+            )
+            gate_qty = self._fixed_long_cycle_qty(
+                initial_side_qty,
+                current_side_qty,
+                reference_price,
+                runtime_state=runtime_state,
+            )
+
+        projected_notional = (
+            float(normalized_qty) * reference_price if reference_price > 0 and normalized_qty > 0 else 0.0
+        )
+        qty_valid = bool(
+            normalized_qty > 0
+            and (min_order_qty <= 0 or normalized_qty + 1e-12 >= min_order_qty)
+        )
+        notional_valid = bool(
+            reference_price > 0
+            and notional_threshold > 0
+            and projected_notional + 1e-12 >= notional_threshold
+        )
+        # Align with production gate helpers at safety_factor==1.0; still apply threshold when factor>1.
+        valid = bool(qty_valid and notional_valid and gate_qty > 0)
+
+        last_refill_completed = int(state.get("last_refill_completed_cycle_index") or 0)
+        last_refill_pair = int(state.get("last_refill_completed_cycle_pair_count") or 0)
+        cycle_pair_count = int(state.get("cycle_pair_count") or 0)
+        cycles_since_last_refill = completed_cycle_index - last_refill_completed
+        pair_cycles_since_last_refill = cycle_pair_count - last_refill_pair
+        regular_refill_due = bool(
+            cycles_since_last_refill >= 2 or pair_cycles_since_last_refill >= 2
+        )
+
+        reason = "ok"
+        if reference_price <= 0:
+            reason = "missing_reference_price"
+        elif current_side_qty <= 0:
+            reason = "flat_coverage_side"
+        elif normalized_qty <= 0:
+            reason = "normalized_qty_non_positive"
+        elif not qty_valid:
+            reason = "below_min_order_qty"
+        elif not notional_valid:
+            reason = "below_min_notional"
+        elif gate_qty <= 0:
+            reason = "cycle_qty_gate_rejected"
+
+        return {
+            "completed_cycle_index": completed_cycle_index,
+            "next_cycle_index": next_cycle_index,
+            "bot_side": getattr(self.config, "strategy_side", None) or getattr(self.config, "side", None),
+            "position_side": position_side,
+            "projected_position_side": position_side,
+            "current_side_qty": current_side_qty,
+            "reduction_pct": reduction_pct,
+            "raw_qty": float(raw_qty),
+            "normalized_qty": float(normalized_qty),
+            "reference_price": reference_price,
+            "projected_notional": float(projected_notional),
+            "min_order_qty": float(min_order_qty),
+            "min_notional": float(min_notional),
+            "safety_factor": float(safety_factor),
+            "notional_threshold": float(notional_threshold),
+            "qty_valid": qty_valid,
+            "notional_valid": notional_valid,
+            "valid": valid,
+            "reason": reason,
+            "regular_refill_due": regular_refill_due,
+            "cycles_since_last_refill": cycles_since_last_refill,
+            "gate_qty": float(gate_qty),
+        }
+
+    def _merge_refill_trigger_reason(self, existing: str | None, new_reason: str) -> str:
+        parts: list[str] = []
+        for chunk in (str(existing or ""), str(new_reason or "")):
+            for token in chunk.split("|"):
+                token = token.strip()
+                if token and token not in parts:
+                    parts.append(token)
+        return "|".join(parts) if parts else str(new_reason or "")
+
+    def _next_cycle_min_notional_block_active(self, state: dict[str, Any]) -> bool:
+        return bool(
+            state.get("next_cycle_min_notional_blocked")
+            or state.get("cycle_block_status") == "NEXT_CYCLE_MIN_NOTIONAL_BLOCKED"
+        )
+
+    def _maybe_clear_next_cycle_min_notional_block(
+        self,
+        snapshot: HedgeSnapshot,
+        runtime_state: RuntimeState,
+    ) -> bool:
+        """Re-project while blocked; clear block if the next second-leg order is valid. Never refill-loop."""
+        state = runtime_state.strategy_state
+        if not self._next_cycle_min_notional_block_active(state):
+            return False
+        if self._is_refill_mode_active(state):
+            return False
+        if float(snapshot.long_qty or 0.0) <= 0 or float(snapshot.short_qty or 0.0) <= 0:
+            return False
+        projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+        if not projection.get("valid"):
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": False,
+                    "action": "blocked_waiting_price",
+                    "reason": projection.get("reason") or "still_below_min_notional",
+                },
+            )
+            return False
+        state["next_cycle_min_notional_blocked"] = False
+        if state.get("cycle_block_status") == "NEXT_CYCLE_MIN_NOTIONAL_BLOCKED":
+            state.pop("cycle_block_status", None)
+            state.pop("cycle_block_reason", None)
+        completed_cycle_index = int(state.get("cycle_completed_count") or 0)
+        next_cycle_index = completed_cycle_index + 1
+        next_purpose = self._get_first_leg_purpose(next_cycle_index)
+        state["active_cycle_index"] = next_cycle_index
+        state["cycle_step"] = STEP_WAITING_FOR_PAIR_FIRST_LEG
+        state["next_required_purpose"] = next_purpose
+        state["long_add_rebuild_allowed"] = True
+        state["force_exit_rebuild"] = True
+        state["exit_rebuild_allowed"] = True
+        state["exit_locked"] = False
+        state["post_refill_structure_rebuild_required"] = True
+        _log_event(
+            "fixed_cycle_next_cycle_min_notional_unblocked",
+            {
+                "symbol": snapshot.symbol or self.config.symbol,
+                "completed_cycle_index": completed_cycle_index,
+                "next_cycle_index": next_cycle_index,
+                "projected_notional": projection.get("projected_notional"),
+                "min_notional": projection.get("min_notional"),
+                "reference_price": projection.get("reference_price"),
+            },
+        )
+        _log_event(
+            "next_cycle_order_projection",
+            {
+                **projection,
+                "preventive_refill_due": False,
+                "action": "continue_next_cycle",
+                "reason": "unblocked_after_price_recovery",
+            },
+        )
+        return True
+
+    def _decide_refill_after_cycle_completion(
+        self,
+        runtime_state: RuntimeState,
+        *,
+        cycle_index: int,
+        trigger_purpose: str | None = None,
+        default_reason: str = "short_reduce_completion",
+    ) -> dict[str, Any] | None:
+        """After a covered cycle completes: project next second-leg min-notional and mark refill if needed."""
+        state = runtime_state.strategy_state
+        snapshot = runtime_state.last_snapshot
+
+        # If refill already active, keep existing lifecycle (merge reason only when projecting invalid).
+        if (
+            state.get("emergency_flat_required")
+            or state.get("full_exit_reset_in_progress")
+            or state.get("recovery_required")
+            or state.get("recovery_reload_required")
+        ):
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=default_reason,
+            )
+            return None
+
+        if snapshot is None or float(snapshot.long_qty or 0.0) <= 0 or float(snapshot.short_qty or 0.0) <= 0:
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=default_reason,
+            )
+            return None
+
+        if not bool(
+            getattr(self.config, "preventive_next_cycle_min_notional_refill_enabled", True)
+        ):
+            # B0 / audit baseline: keep regular pair refill only; still emit projection diagnostics.
+            if snapshot is not None:
+                projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+                regular_due = bool(projection.get("regular_refill_due"))
+                action = (
+                    "merge_with_regular_refill"
+                    if regular_due
+                    else ("continue_next_cycle" if projection.get("valid") else "baseline_skip_preventive")
+                )
+                _log_event(
+                    "next_cycle_order_projection",
+                    {
+                        **projection,
+                        "preventive_refill_due": False,
+                        "preventive_disabled": True,
+                        "action": action,
+                        "reason": "preventive_refill_disabled",
+                    },
+                )
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=default_reason,
+            )
+            return None
+
+        if self._next_cycle_min_notional_block_active(state):
+            # Already blocked after a prior preventive refill; never re-trigger refill for this boundary.
+            projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": False,
+                    "action": "block_after_refill_still_invalid",
+                    "reason": "already_blocked",
+                },
+            )
+            return projection
+
+        preventive_used_for = int(state.get("preventive_min_notional_refill_for_cycle") or 0)
+        projection = self._project_next_cycle_second_leg_min_notional(snapshot, runtime_state)
+        regular_due = bool(projection.get("regular_refill_due"))
+        valid = bool(projection.get("valid"))
+        preventive_due = (not valid) and preventive_used_for != int(cycle_index)
+
+        if regular_due and valid:
+            reason = default_reason
+            action = "merge_with_regular_refill"
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": False,
+                    "action": action,
+                    "reason": reason,
+                },
+            )
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=reason,
+            )
+            return projection
+
+        if regular_due and not valid:
+            reason = self._merge_refill_trigger_reason(
+                default_reason, "preventive_next_cycle_min_notional"
+            )
+            action = "merge_with_regular_refill"
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": True,
+                    "action": action,
+                    "reason": reason,
+                },
+            )
+            if preventive_due:
+                state["preventive_min_notional_refill_for_cycle"] = int(cycle_index)
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=reason,
+                force=True,
+            )
+            return projection
+
+        if preventive_due:
+            reason = "preventive_next_cycle_min_notional"
+            action = "trigger_preventive_refill"
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": True,
+                    "action": action,
+                    "reason": reason,
+                },
+            )
+            state["preventive_min_notional_refill_for_cycle"] = int(cycle_index)
+            self._mark_refill_required_after_cycle_pair(
+                runtime_state,
+                cycle_index=cycle_index,
+                trigger_purpose=trigger_purpose,
+                reason=reason,
+                force=True,
+            )
+            return projection
+
+        if not valid and preventive_used_for == int(cycle_index):
+            # Preventive already consumed for this boundary; do not loop.
+            _log_event(
+                "next_cycle_order_projection",
+                {
+                    **projection,
+                    "preventive_refill_due": False,
+                    "action": "block_after_refill_still_invalid",
+                    "reason": "preventive_refill_already_used",
+                },
+            )
+            return projection
+
+        _log_event(
+            "next_cycle_order_projection",
+            {
+                **projection,
+                "preventive_refill_due": False,
+                "action": "continue_next_cycle",
+                "reason": projection.get("reason") or "ok",
+            },
+        )
+        # Still allow regular pair mark (no-op when cycles_since < 2).
+        self._mark_refill_required_after_cycle_pair(
+            runtime_state,
+            cycle_index=cycle_index,
+            trigger_purpose=trigger_purpose,
+            reason=default_reason,
+        )
+        return projection
 
     def _price_to_qty(self, *, notional_usdt: float, price: float, runtime_state: RuntimeState | None) -> float:
         if notional_usdt <= 0 or price <= 0:
@@ -26913,16 +27653,12 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
         )
 
     def _is_refill_stale_cycle_reduce_purpose(self, purpose: str | None) -> bool:
-        """Return whether a cycle reduce order must be rebuilt after refill.
+        """Return whether a cycle order must be cancelled/rebuilt after refill.
 
-        Refill changes long_avg/short_avg and position sizes. Open cycle-reduce
-        orders are therefore stale because their coverage was calculated from
-        the pre-refill position state.
+        Refill changes long_avg/short_avg and position sizes. Any open cycle
+        first-/second-leg order (including LONG_ADD / staged reduces) is stale.
         """
-        if not purpose:
-            return False
-        normalized = str(purpose).upper()
-        return bool(re.fullmatch(r"CYCLE_\d+_(SHORT_REDUCE|LONG_REDUCE)", normalized))
+        return self._is_cycle_fill_purpose(purpose)
 
     def _is_staged_second_leg_cycle_complete(
         self,
@@ -27740,9 +28476,13 @@ class FixedCycleHedgeStrategy(HedgeStrategy):
                     "is_second_leg_purpose": is_second_leg_purpose,
                 },
             )
-        if self._cycle_build_block_active(state):
-            reason = "refill_required"
-            expected_next_action = "refill"
+        if self._cycle_build_block_active(state) or self._next_cycle_min_notional_block_active(state):
+            reason = (
+                "next_cycle_min_notional_blocked"
+                if self._next_cycle_min_notional_block_active(state)
+                else "refill_required"
+            )
+            expected_next_action = "blocked" if reason == "next_cycle_min_notional_blocked" else "refill"
             if is_first_leg_purpose:
                 _log_event(
                     "fixed_cycle_first_leg_gate_blocked",

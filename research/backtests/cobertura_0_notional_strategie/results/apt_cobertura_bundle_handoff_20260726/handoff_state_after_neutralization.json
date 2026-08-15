@@ -1,0 +1,45 @@
+{
+  "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+  "position": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 296.365,
+    "short_avg": 1.8171506068270433,
+    "net_qty": 0.0,
+    "cumulative_entry_fees": 0.09355946952000002
+  },
+  "economics": {
+    "prior_realized_pnl": -11.900133102067503,
+    "prior_realized_deficit": 11.900133102067503,
+    "spread_loss_before_neutralization": -14.041991208541187,
+    "spread_recovery_target": 14.041991208541187,
+    "neutralization_fee": 0.09355946952000002,
+    "include_prior_realized_pnl_in_recovery_target": false,
+    "include_neutralization_fee_in_spread_target": false,
+    "fee_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+    "cumulative_fees": null
+  },
+  "source_active_cycle": 4,
+  "cobertura_active_cycle": null,
+  "cobertura_cycle_inherited": false,
+  "regular_initial_entry_created": false,
+  "engine_seed_snapshot": {
+    "core_long_qty": 296.365,
+    "core_long_avg": 1.864531340748192,
+    "core_short_qty": 296.365,
+    "core_short_avg": 1.8171506068270433,
+    "fills_count": 0,
+    "order_events_count": 0,
+    "state": "WAITING_MOVE"
+  },
+  "cobertura_config_tags": {
+    "source_strategy": "TEM",
+    "source_trade_id": "APTUSDT|two_early_medium|continuous|0006",
+    "source_active_cycle": 4,
+    "cobertura_active_cycle": null,
+    "inherit_source_cycle_state": false,
+    "fresh_initial_entry_required": false,
+    "scenario_id": "full_qty_neutralization_spread_only_v1",
+    "handoff": true
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "decision": "START_DEPTH_AUDIT_PASS_WITH_WARNINGS",
+  "warnings": [
+    "unresolved_cases_present",
+    "baseline_same_candle_add_exit",
+    "structure_confirmed_not_implemented"
+  ],
+  "policy": "shared_be_t1_6pct",
+  "fill_model_deeper": "open_if_gapped_else_target_on_low_touch",
+  "structure_confirmed": "NOT_IMPLEMENTED",
+  "structure_confirmed_reason": "No causal post-baseline reclaim/start selector exists in-package; structure break already defines TEM signal before Cobertura T1 start.",
+  "n_selected": 25,
+  "n_unresolved": 2,
+  "horizon_days": 120,
+  "baseline_parity": "BASELINE_PARITY_PASS",
+  "class_counts": {
+    "DEEPER_START_IMPROVES_ONLY_DRAWDOWN": 22,
+    "START_LIKELY_TOO_EARLY": 3
+  }
+}

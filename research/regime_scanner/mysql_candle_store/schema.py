@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS market_candles (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   exchange VARCHAR(32) NOT NULL,
   symbol VARCHAR(32) NOT NULL,
-  timeframe VARCHAR(8) NOT NULL,
+  -- utf8mb4_bin: required so Freqtrade labels ``1m`` (minute) and ``1M`` (month)
+  -- remain distinct under UNIQUE (exchange, symbol, timeframe, open_time).
+  timeframe VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   open_time DATETIME(6) NOT NULL COMMENT 'UTC candle open',
   close_time DATETIME(6) NOT NULL COMMENT 'UTC candle close = open + timeframe',
   open DOUBLE NOT NULL,
@@ -22,7 +24,7 @@ CREATE TABLE IF NOT EXISTS market_candles (
   volume DOUBLE NOT NULL,
   is_closed TINYINT(1) NOT NULL,
   source VARCHAR(32) NOT NULL COMMENT 'freqtrade_direct | aggregated_from_5m',
-  source_timeframe VARCHAR(8) NULL COMMENT 'for direct: same as timeframe, for aggregated HTF: 5m',
+  source_timeframe VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL COMMENT 'for direct: same as timeframe, for aggregated HTF: 5m',
   source_hash CHAR(64) NULL COMMENT 'SHA256 of input feather or aggregation batch',
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
@@ -67,4 +69,16 @@ SOURCE_FREQTRADE_DIRECT = "freqtrade_direct"
 SOURCE_AGGREGATED_FROM_5M = "aggregated_from_5m"
 
 ALLOWED_SOURCES = frozenset({SOURCE_FREQTRADE_DIRECT, SOURCE_AGGREGATED_FROM_5M})
+# Scanner operational TFs (unchanged).
 OPERATIONAL_TIMEFRAMES = ("5m", "15m", "30m")
+# Direct import allowlist for full MTF candle database research.
+DIRECT_IMPORT_TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M")
+
+# Existing DBs created with table default unicode_ci cannot store both ``1m`` and ``1M``.
+# Idempotent ALTER: column types unchanged; only collation becomes case-sensitive.
+ENSURE_TIMEFRAME_BIN_COLLATION_SQL = """
+ALTER TABLE market_candles
+  MODIFY COLUMN timeframe VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  MODIFY COLUMN source_timeframe VARCHAR(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL
+  COMMENT 'for direct: same as timeframe, for aggregated HTF: 5m'
+"""

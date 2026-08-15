@@ -1,0 +1,16 @@
+{
+  "decision": "COBERTURA_BLOCKER_INPUT_BUNDLE_PASS_WITH_WARNINGS",
+  "schema_version": "1.0",
+  "source_blocker_count": 27,
+  "ready_blocker_count": 25,
+  "unresolved_blocker_count": 2,
+  "duplicate_join_keys": 0,
+  "missing_break_records": 0,
+  "missing_market_records": 0,
+  "missing_fill_replay_records": 0,
+  "replay_mismatch_count": 2,
+  "invariant_failure_count": 0,
+  "warning_count": 25,
+  "apt_status": "APT_BUNDLE_PASS_WITH_WARNINGS",
+  "trigger_mode": "first_break"
+}

@@ -1,0 +1,135 @@
+{
+  "decision": "APT_WINNER_FORENSIC_AUDIT_PASS_WITH_WARNINGS",
+  "checks": [
+    {
+      "check": "start_guard_causal_t1",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "start_6pct_not_met_at_0000_open",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "start_6pct_met_at_trigger_close",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "neutralization_once_qty_neutral",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "no_initial_entry",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "no_tem_orders",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "core_frozen_until_exit",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "no_negative_qty",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "tranche_sync",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "recovered",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "overlay_add_count_16",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "overlay_be_closes_7",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "recovery_rounds_8",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "flat_after_exit",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "fingerprint_overlay_pnl",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "same_candle_no_fail",
+      "ok": true,
+      "detail": 0,
+      "level": "hard"
+    },
+    {
+      "check": "full_exit_legacy_recovered_profit",
+      "ok": true,
+      "detail": "order_audit net_be gate N/A; legacy RECOVERED flat OK",
+      "level": "soft"
+    },
+    {
+      "check": "order_audit_invariants",
+      "ok": true,
+      "detail": 0,
+      "level": "hard"
+    },
+    {
+      "check": "prior_tem_not_in_cobertura_target",
+      "ok": true,
+      "detail": null,
+      "level": "hard"
+    },
+    {
+      "check": "fee_quality_flagged",
+      "ok": true,
+      "detail": null,
+      "level": "soft"
+    },
+    {
+      "check": "neut_fee_outside_engine",
+      "ok": true,
+      "detail": null,
+      "level": "soft"
+    }
+  ],
+  "hard_failures": [],
+  "soft_failures": [],
+  "order_audit_invariant_failures": [],
+  "multi_blocker_release_allowed": true
+}

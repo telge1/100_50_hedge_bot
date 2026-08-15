@@ -1,0 +1,72 @@
+{
+  "created_at_utc": "2026-07-26T08:24:57.231566+00:00",
+  "git": {
+    "branch": "research/trend-topping-bottoming-phase-c2",
+    "commit": "a1fd26085d9e03732bc9e2e5e4426798294f5066",
+    "dirty": true
+  },
+  "cli": {
+    "state_dir": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726",
+    "fill_replay_dir": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726",
+    "output_dir": "research/backtests/cobertura_0_notional_strategie/results/cobertura_blocker_input_bundle_20260726",
+    "trigger_mode": "first_break",
+    "taker_fee_rate": 0.00055
+  },
+  "sources": [
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726/blocker_break_events.csv",
+      "exists": true,
+      "size_bytes": 5979,
+      "sha256": "8d5200916f243f0ae1efbbb375e8a1e3d4f117a2c7de0f3768e192d054a87cea"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726/blocker_market_prices.csv",
+      "exists": true,
+      "size_bytes": 7080,
+      "sha256": "c44559d6ddbcd0db7b19247dc448a6c8c22cfefe65920356db3d48e5b39fa67a"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726/historical_blocker_states.csv",
+      "exists": true,
+      "size_bytes": 18533,
+      "sha256": "71030d0779bd24897ef8b5efb1ed566a61a837af933bdc093254dbc7b533df7c"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_pre_signal_states.csv",
+      "exists": true,
+      "size_bytes": 15355,
+      "sha256": "55e138c843a5f60b0c05d40e2489214427fe374b16503780b9a95bd8e728921d"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_fill_ledger.csv",
+      "exists": true,
+      "size_bytes": 124208,
+      "sha256": "e4277ad65cfee77eeac746cb90c10ea0d865f34004d210a8e2cb067d38b1f7f4"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_open_orders_at_signal.csv",
+      "exists": true,
+      "size_bytes": 15442,
+      "sha256": "15ceb71fbdad63c4259dd326d6b4230260c75bc48e09f116c72eb25164db221a"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/replay_comparison.csv",
+      "exists": true,
+      "size_bytes": 3718,
+      "sha256": "7d71a3a21d1758b1c34d7244954303f09413681ec19ce6be13f7bf69da3a29b8"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/fee_reconstruction_issues.csv",
+      "exists": true,
+      "size_bytes": 6044,
+      "sha256": "8c8c96367ca5ffc526dcfae39b2252963e536c5ae96a5e50a89cc5738354a41f"
+    },
+    {
+      "path": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/unresolved_replays.csv",
+      "exists": true,
+      "size_bytes": 204,
+      "sha256": "d5e0d7f39023db4f9e3311b32fe5f433730003e45b968f18b432de25d84a3abc"
+    }
+  ],
+  "other_trigger_modes_present": []
+}

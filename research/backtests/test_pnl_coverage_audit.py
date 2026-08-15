@@ -15,6 +15,7 @@ from research.backtests.pnl_coverage_audit import (
     PNL_COVERAGE_AUDIT_FIELDS,
     apply_trade_exit_quality,
     build_pnl_coverage_audit,
+    build_trade_coverage_summary,
     classify_trade_exit_quality,
     expected_cover_purpose,
     expected_cover_qty,
@@ -360,9 +361,16 @@ def test_cycle_loss_can_be_covered_by_final_exit_basket() -> None:
     assert row["cover_purpose"] == "LONG_SL_EXIT|SHORT_TP_EXIT"
     assert row["status"] == "overcovered_by_final_exit"
     assert row["missing_pnl"] == 0.0
-    assert row["cover_pnl"] == 0.2608208000000012
-    assert row["net_pnl"] == 0.13424930000000235
-    assert row["coverage_ratio"] > 2.0
+    assert row["coverage_source"] == "final_exit_pool"
+    # FIFO claims only what the loss needs; surplus stays in the pool.
+    assert row["cover_pnl"] == pytest.approx(0.12657149999999884)
+    assert row["final_exit_pool_net_pnl"] == pytest.approx(0.2608208000000012)
+    assert row["final_exit_claimed_pnl"] == pytest.approx(0.12657149999999884)
+    assert row["final_exit_pool_remaining_after"] == pytest.approx(
+        0.2608208000000012 - 0.12657149999999884
+    )
+    assert row["actual_cover_qty"] is None  # mixed long/short basket
+    assert row["net_pnl"] == pytest.approx(0.0, abs=1e-9)
 
 
 def test_classify_trade_exit_quality_undercovered_final_exit() -> None:
@@ -398,6 +406,8 @@ def test_classify_trade_exit_quality_undercovered_final_exit() -> None:
     quality = apply_trade_exit_quality(result)
     assert quality == "closed_undercovered_final_exit"
     assert result.final_status == "closed_undercovered_final_exit"
+    assert result.has_cycle_undercoverage is True
+    assert result.trade_level_undercovered is True
 
 
 def test_classify_trade_exit_quality_closed_ok() -> None:
@@ -407,6 +417,249 @@ def test_classify_trade_exit_quality_closed_ok() -> None:
     result.realized_pnl = 0.02
     quality = classify_trade_exit_quality(result)
     assert quality == "closed_ok"
+
+
+def test_fifo_final_exit_pool_two_losses_shared_basket() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        final_status="closed",
+        exit_reason="flat_no_active_orders",
+        realized_pnl=-0.2,
+        final_long_qty=0.0,
+        final_short_qty=0.0,
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "cycle_index": 1,
+                "cycle_role": "long_reduce",
+                "side": "long",
+                "qty": 10.0,
+                "closed_pnl": -0.152,
+            },
+            {
+                "timestamp": "2026-01-01T00:05:00+00:00",
+                "purpose": "CYCLE_2_LONG_ADD",
+                "cycle_index": 2,
+                "cycle_role": "long_reduce",
+                "side": "long",
+                "qty": 8.0,
+                "closed_pnl": -0.208,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "side": "long",
+                "qty": 40.0,
+                "closed_pnl": 0.846,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "SHORT_SL_EXIT",
+                "side": "short",
+                "qty": 30.0,
+                "closed_pnl": -0.668,
+            },
+        ],
+    )
+    rows = build_pnl_coverage_audit(result)
+    assert len(rows) == 2
+    row1, row2 = rows
+    assert row1["cycle_index"] == 1
+    assert row1["cover_pnl"] == pytest.approx(0.152)
+    # Pool surplus remains after exact claim => overcovered_by_final_exit.
+    assert row1["status"] == "overcovered_by_final_exit"
+    assert row1["missing_pnl"] == pytest.approx(0.0)
+    assert row1["final_exit_pool_available_before"] == pytest.approx(0.178)
+    assert row1["final_exit_pool_remaining_after"] == pytest.approx(0.026)
+
+    assert row2["cycle_index"] == 2
+    assert row2["cover_pnl"] == pytest.approx(0.026)
+    assert row2["status"] == "undercovered_by_final_exit"
+    assert row2["missing_pnl"] == pytest.approx(0.182)
+    assert row2["final_exit_pool_available_before"] == pytest.approx(0.026)
+    assert row2["final_exit_pool_remaining_after"] == pytest.approx(0.0)
+
+    claimed_total = row1["final_exit_claimed_pnl"] + row2["final_exit_claimed_pnl"]
+    assert claimed_total == pytest.approx(0.178)
+    assert claimed_total <= row1["final_exit_pool_net_pnl"] + 1e-9
+    assert row1["final_exit_pool_id"] == row2["final_exit_pool_id"]
+
+
+def test_single_loss_overcovered_by_larger_final_exit_pool() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "cycle_index": 1,
+                "side": "long",
+                "closed_pnl": -0.10,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "side": "long",
+                "qty": 5.0,
+                "closed_pnl": 0.25,
+            },
+        ],
+    )
+    rows = build_pnl_coverage_audit(result)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "overcovered_by_final_exit"
+    assert rows[0]["cover_pnl"] == pytest.approx(0.10)
+    assert rows[0]["final_exit_pool_net_pnl"] == pytest.approx(0.25)
+    assert rows[0]["missing_pnl"] == pytest.approx(0.0)
+
+
+def test_profitable_flat_trade_not_labeled_undercovered_final_exit() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        final_status="closed",
+        exit_reason="flat_no_active_orders",
+        realized_pnl=1.31,
+        final_long_qty=0.0,
+        final_short_qty=0.0,
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "cycle_index": 1,
+                "side": "long",
+                "closed_pnl": -0.152,
+            },
+            {
+                "timestamp": "2026-01-01T00:05:00+00:00",
+                "purpose": "CYCLE_2_LONG_ADD",
+                "cycle_index": 2,
+                "side": "long",
+                "closed_pnl": -0.208,
+            },
+            {
+                "timestamp": "2026-01-01T00:10:00+00:00",
+                "purpose": "CYCLE_3_LONG_ADD",
+                "cycle_index": 3,
+                "side": "long",
+                "closed_pnl": 1.67,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "side": "long",
+                "qty": 40.0,
+                "closed_pnl": 0.846,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "SHORT_SL_EXIT",
+                "side": "short",
+                "qty": 30.0,
+                "closed_pnl": -0.668,
+            },
+        ],
+    )
+    quality = apply_trade_exit_quality(result)
+    assert has_undercovered_final_exit(result)
+    assert quality == "closed_profitable_with_cycle_undercoverage"
+    assert result.final_status == "closed"
+    assert result.has_cycle_undercoverage is True
+    assert result.trade_level_undercovered is False
+    assert result.exit_quality_detail is not None
+    assert result.exit_quality_detail["trade_realized_pnl"] == pytest.approx(1.31)
+
+
+def test_negative_exit_leg_not_double_counted_as_loss() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "cycle_index": 1,
+                "side": "long",
+                "closed_pnl": -0.15,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "cycle_index": 8,
+                "side": "long",
+                "qty": 40.0,
+                "closed_pnl": 0.85,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "SHORT_SL_EXIT",
+                "cycle_index": 8,
+                "side": "short",
+                "qty": 30.0,
+                "closed_pnl": -0.60,
+            },
+        ],
+    )
+    rows = build_pnl_coverage_audit(result)
+    assert len(rows) == 1
+    assert rows[0]["loss_purpose"] == "CYCLE_1_LONG_ADD"
+    assert all(row["loss_purpose"] != "SHORT_SL_EXIT" for row in rows)
+    assert rows[0]["coverage_source"] == "final_exit_pool"
+    assert rows[0]["cover_pnl"] == pytest.approx(0.15)
+
+
+def test_final_exit_pool_claim_invariant() -> None:
+    result = BacktestResult(
+        symbol="APTUSDT",
+        direction="long",
+        fill_log=[
+            {
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "purpose": "CYCLE_1_LONG_ADD",
+                "cycle_index": 1,
+                "closed_pnl": -0.152,
+                "side": "long",
+            },
+            {
+                "timestamp": "2026-01-01T00:05:00+00:00",
+                "purpose": "CYCLE_2_LONG_ADD",
+                "cycle_index": 2,
+                "closed_pnl": -0.208,
+                "side": "long",
+            },
+            {
+                "timestamp": "2026-01-01T00:10:00+00:00",
+                "purpose": "CYCLE_3_LONG_ADD",
+                "cycle_index": 3,
+                "closed_pnl": -0.05,
+                "side": "long",
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "LONG_TP_EXIT",
+                "side": "long",
+                "closed_pnl": 0.8461,
+            },
+            {
+                "timestamp": "2026-01-01T01:00:00+00:00",
+                "purpose": "SHORT_SL_EXIT",
+                "side": "short",
+                "closed_pnl": -0.6685,
+            },
+        ],
+    )
+    rows = build_pnl_coverage_audit(result)
+    summary = build_trade_coverage_summary(result, rows)
+    for pool_id, net in summary["final_exit_pool_net_by_id"].items():
+        claimed = summary["final_exit_pool_claimed_by_id"].get(pool_id, 0.0)
+        assert claimed <= net + 1e-9
+    assert summary["final_exit_pool_claimed_total"] <= summary[
+        "final_exit_pool_available_total"
+    ] + 1e-9
+
 
 
 def _short_primary_cycle_result(

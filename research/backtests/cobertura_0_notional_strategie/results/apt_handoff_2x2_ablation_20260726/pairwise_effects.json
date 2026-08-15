@@ -1,0 +1,150 @@
+{
+  "start_time_on_historical_book_B_minus_A": {
+    "recovered": {
+      "a": false,
+      "b": true,
+      "flipped": true
+    },
+    "realized_overlay_pnl": {
+      "a": 3.8645995999999956,
+      "b": 46.76639699999999,
+      "delta_b_minus_a": 42.90179739999999
+    },
+    "final_total_exit_economics": {
+      "a": -14.057663582471257,
+      "b": 30.137720809588785,
+      "delta_b_minus_a": 44.19538439206004
+    },
+    "bars_processed": {
+      "a": 45945,
+      "b": 5141,
+      "delta_b_minus_a": -40804.0
+    },
+    "recovery_rounds": {
+      "a": 16,
+      "b": 8,
+      "delta_b_minus_a": -8.0
+    },
+    "max_overlay_qty": {
+      "a": 474.184,
+      "b": 474.184,
+      "delta_b_minus_a": 0.0
+    },
+    "average_adds_per_round": {
+      "a": 1.625,
+      "b": 1.1428571428571428,
+      "delta_b_minus_a": -0.4821428571428572
+    }
+  },
+  "start_time_on_phase_a_book_D_minus_C": {
+    "recovered": {
+      "a": false,
+      "b": true,
+      "flipped": true
+    },
+    "realized_overlay_pnl": {
+      "a": 5.15278859999989,
+      "b": 62.35506449999998,
+      "delta_b_minus_a": 57.202275900000096
+    },
+    "final_total_exit_economics": {
+      "a": -28.330206943903477,
+      "b": 30.596847805021635,
+      "delta_b_minus_a": 58.927054748925116
+    },
+    "bars_processed": {
+      "a": 45945,
+      "b": 5141,
+      "delta_b_minus_a": -40804.0
+    },
+    "recovery_rounds": {
+      "a": 16,
+      "b": 8,
+      "delta_b_minus_a": -8.0
+    },
+    "max_overlay_qty": {
+      "a": 632.244,
+      "b": 632.244,
+      "delta_b_minus_a": 0.0
+    },
+    "average_adds_per_round": {
+      "a": 1.625,
+      "b": 1.1428571428571428,
+      "delta_b_minus_a": -0.4821428571428572
+    }
+  },
+  "book_effect_at_0000_C_minus_A": {
+    "recovered": {
+      "a": false,
+      "b": false,
+      "flipped": false
+    },
+    "realized_overlay_pnl": {
+      "a": 3.8645995999999956,
+      "b": 5.15278859999989,
+      "delta_b_minus_a": 1.2881889999998943
+    },
+    "final_total_exit_economics": {
+      "a": -14.057663582471257,
+      "b": -28.330206943903477,
+      "delta_b_minus_a": -14.27254336143222
+    },
+    "bars_processed": {
+      "a": 45945,
+      "b": 45945,
+      "delta_b_minus_a": 0.0
+    },
+    "recovery_rounds": {
+      "a": 16,
+      "b": 16,
+      "delta_b_minus_a": 0.0
+    },
+    "max_overlay_qty": {
+      "a": 474.184,
+      "b": 632.244,
+      "delta_b_minus_a": 158.06
+    },
+    "average_adds_per_round": {
+      "a": 1.625,
+      "b": 1.625,
+      "delta_b_minus_a": 0.0
+    }
+  },
+  "book_effect_at_0355_D_minus_B": {
+    "recovered": {
+      "a": true,
+      "b": true,
+      "flipped": false
+    },
+    "realized_overlay_pnl": {
+      "a": 46.76639699999999,
+      "b": 62.35506449999998,
+      "delta_b_minus_a": 15.588667499999993
+    },
+    "final_total_exit_economics": {
+      "a": 30.137720809588785,
+      "b": 30.596847805021635,
+      "delta_b_minus_a": 0.4591269954328503
+    },
+    "bars_processed": {
+      "a": 5141,
+      "b": 5141,
+      "delta_b_minus_a": 0.0
+    },
+    "recovery_rounds": {
+      "a": 8,
+      "b": 8,
+      "delta_b_minus_a": 0.0
+    },
+    "max_overlay_qty": {
+      "a": 474.184,
+      "b": 632.244,
+      "delta_b_minus_a": 158.06
+    },
+    "average_adds_per_round": {
+      "a": 1.1428571428571428,
+      "b": 1.1428571428571428,
+      "delta_b_minus_a": 0.0
+    }
+  }
+}

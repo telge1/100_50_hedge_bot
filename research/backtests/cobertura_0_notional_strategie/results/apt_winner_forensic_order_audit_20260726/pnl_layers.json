@@ -1,0 +1,19 @@
+{
+  "A_cobertura_overlay_price_pnl": 46.149957799999854,
+  "B_cobertura_total_exit_economics": 21.858019294808667,
+  "C_prior_tem_realized_pnl": -11.900133102067503,
+  "D_combined_trade_economics": 9.957886192741164,
+  "neutralization_fee_not_in_engine": 0.08934405128000003,
+  "B_minus_neutralization_fee_informational": 21.768675243528666,
+  "include_prior_realized_in_cobertura_target": false,
+  "combined_trade_economics_quality": "PASS_WITH_UNRESOLVED_PRIOR_FEES",
+  "fee_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+  "components_in_B": [
+    "locked_core_spread_via_mtm_at_exit",
+    "realized_overlay_pnl",
+    "cumulative_entry_fees (overlay only)",
+    "cumulative_close_fees (overlay+core exits)",
+    "estimated remaining close fees at gate (pre-exit)"
+  ],
+  "components_not_double_counted": true
+}

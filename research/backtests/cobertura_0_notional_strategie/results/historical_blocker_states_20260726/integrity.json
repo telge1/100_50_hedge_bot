@@ -1,0 +1,15 @@
+{
+  "n_rows": 27,
+  "n_unique_trade_ids": 27,
+  "n_break_ok": 25,
+  "n_candle_ok": 25,
+  "n_exact_position": 1,
+  "n_fully_resolvable": 1,
+  "n_ready_for_cobertura": 1,
+  "n_short_larger_than_long": 0,
+  "n_fee_incomplete": 27,
+  "n_invariant_fails": 0,
+  "n_ambiguous": 0,
+  "apt_reference_status": "APT_REFERENCE_WARNING",
+  "decision": "BLOCKER_STATE_EXTRACTION_PASS_WITH_WARNINGS"
+}

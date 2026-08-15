@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0",
+  "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+  "trigger_mode": "first_break",
+  "scenario_id": "full_qty_neutralization_spread_only_v1",
+  "record": {
+    "coin": "APTUSDT",
+    "market": {
+      "distance_break_to_market_pct": -0.023584103407222723,
+      "market_price_at_signal": 1.7223,
+      "neutralization_fill_price": 1.7223,
+      "slippage_bps": 0.0,
+      "taker_fee_rate": 0.00055,
+      "tradeable_5m_open": 1.7223,
+      "tradeable_timestamp": "2026-01-19T00:00:00+00:00"
+    },
+    "pre_signal_position": {
+      "active_cycle": 4,
+      "fills_at_or_after_signal": 4,
+      "fills_before_signal": 9,
+      "last_fill_timestamp_before_signal": "2026-01-18T23:50:00+00:00",
+      "long_avg": 1.864531340748192,
+      "long_qty": 296.365,
+      "net_qty": 98.76800000000003,
+      "open_order_count": 4,
+      "short_avg": 1.864561269615919,
+      "short_qty": 197.59699999999998
+    },
+    "prior_economics": {
+      "cumulative_fees": null,
+      "fee_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+      "realized_pnl": -11.900133102067503,
+      "total_economics_at_signal": -25.94212431060869,
+      "unrealized_pnl_at_signal": -14.041991208541187
+    },
+    "profile": "two_early_medium",
+    "provenance": {
+      "break_source": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726/blocker_break_events.csv",
+      "fill_ledger_source": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_fill_ledger.csv",
+      "market_source": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726/blocker_market_prices.csv",
+      "open_orders_source": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_open_orders_at_signal.csv",
+      "position_source": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_fill_replay_20260726/blocker_pre_signal_states.csv"
+    },
+    "quality": {
+      "ledger_at_or_after_signal_count": 4,
+      "ledger_before_signal_count": 9,
+      "ledger_cutoff_violations": 0,
+      "ready_for_cobertura": true,
+      "ready_for_neutralization_source": true,
+      "replay_diff_count": 0,
+      "replay_match_status": "REPLAY_MATCH",
+      "source_quality": "EXACT_FILL_LEVEL_BEFORE_SIGNAL",
+      "warnings": [
+        "FEE_RECONSTRUCTION_UNRESOLVED"
+      ]
+    },
+    "run_mode": "continuous",
+    "schema_version": "1.0",
+    "source_orders": {
+      "cancel_on_cobertura_handoff": true,
+      "orders": [
+        {
+          "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+          "last_event_type": "submitted",
+          "order_id": "sim-fixed_cycle-cycle-4-short-reduce-30",
+          "price": null,
+          "purpose": "CYCLE_4_SHORT_REDUCE",
+          "qty": 34.574,
+          "side": "short",
+          "status": "NEW",
+          "trigger_price": 1.6955
+        },
+        {
+          "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+          "last_event_type": "submitted",
+          "order_id": "sim-fixed_cycle-cycle-4-short-reduce-31",
+          "price": null,
+          "purpose": "CYCLE_4_SHORT_REDUCE",
+          "qty": 64.211,
+          "side": "short",
+          "status": "NEW",
+          "trigger_price": 1.6205
+        },
+        {
+          "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+          "last_event_type": "submitted",
+          "order_id": "sim-fixed_cycle-long-tp-exit-28",
+          "price": null,
+          "purpose": "LONG_TP_EXIT",
+          "qty": 296.365,
+          "side": "long",
+          "status": "NEW",
+          "trigger_price": 2.0101
+        },
+        {
+          "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+          "last_event_type": "submitted",
+          "order_id": "sim-fixed_cycle-short-sl-exit-29",
+          "price": null,
+          "purpose": "SHORT_SL_EXIT",
+          "qty": 197.59699999999998,
+          "side": "short",
+          "status": "NEW",
+          "trigger_price": 2.0101
+        }
+      ]
+    },
+    "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+    "trigger": {
+      "break_cycle_id": 1,
+      "confirmation_ts": null,
+      "signal_available_ts": "2026-01-19T00:00:00+00:00",
+      "structure_break_direction": "bearish",
+      "structure_break_event_ts": "2026-01-18T23:55:00+00:00",
+      "structure_break_kind": "protected_low_4h_close_break",
+      "structure_break_level": 1.7639,
+      "structure_break_timeframe": "4h",
+      "trigger_mode": "first_break"
+    }
+  },
+  "scenario": {
+    "cancel_source_strategy_orders": true,
+    "fee_model": "TAKER_FEE_FROM_HISTORICAL_INPUT",
+    "fill_price_model": "SIGNAL_TRADEABLE_5M_OPEN",
+    "include_neutralization_fee_in_spread_target": false,
+    "include_prior_realized_pnl_in_recovery_target": false,
+    "inherit_source_cycle_state": false,
+    "neutralization_mode": "MATCH_SMALLER_SIDE_TO_LARGER_SIDE",
+    "scenario_id": "full_qty_neutralization_spread_only_v1",
+    "schema_version": "1.0",
+    "slippage_bps": 0.0
+  },
+  "causality": {
+    "source_cutoff_rule": "fill_timestamp < signal_available_ts",
+    "cobertura_start_timestamp": "2026-01-19T00:00:00+00:00",
+    "neutralization_fill_origin": "COBERTURA_HANDOFF",
+    "source_signal_bar_fills_imported": false
+  }
+}

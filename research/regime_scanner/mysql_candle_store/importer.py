@@ -1,4 +1,4 @@
-"""General feather importer into the candle store (5m/15m/30m direct)."""
+"""General feather importer into the candle store (direct TFs including HTF)."""
 
 from __future__ import annotations
 
@@ -8,14 +8,19 @@ from typing import Any
 
 import pandas as pd
 
+from research.regime_scanner.mysql_candle_store.candle_timeframes import (
+    candle_close_time,
+    is_importable_timeframe,
+    normalize_timeframe,
+)
 from research.regime_scanner.mysql_candle_store.hashing import sha256_file
 from research.regime_scanner.mysql_candle_store.schema import (
-    OPERATIONAL_TIMEFRAMES,
+    DIRECT_IMPORT_TIMEFRAMES,
     SOURCE_FREQTRADE_DIRECT,
 )
 from research.regime_scanner.mysql_candle_store.store_memory import CandleStore, UpsertStats
 from research.regime_scanner.mysql_candle_store.validation import ValidationReport, validate_ohlcv_frame
-from research.regime_scanner.timeframes import ensure_utc_timestamp, timeframe_timedelta
+from research.regime_scanner.timeframes import ensure_utc_timestamp
 
 
 @dataclass
@@ -59,11 +64,10 @@ def _frame_to_rows(
     source_hash: str,
     source_timeframe: str,
 ) -> list[dict[str, Any]]:
-    duration = timeframe_timedelta(timeframe)
     rows: list[dict[str, Any]] = []
     for _, row in frame.iterrows():
         open_time = ensure_utc_timestamp(row["date"])
-        close_time = open_time + duration
+        close_time = candle_close_time(open_time, timeframe)
         rows.append(
             {
                 "exchange": exchange,
@@ -96,13 +100,14 @@ def import_feather(
     batch_size: int = 2000,
     record_validation_metadata: bool = True,
 ) -> ImportReport:
-    """Import a Freqtrade OHLCV feather as operational ``freqtrade_direct`` candles.
+    """Import a Freqtrade OHLCV feather as ``freqtrade_direct`` candles.
 
-    Supports ``5m``, ``15m``, and ``30m``. Does not modify the input file.
+    Supports direct-import TFs including HTF ``4h`` / ``1d`` / ``1w`` / ``1M``.
+    Does not modify the input file. Only closed candles are persisted.
     """
-    tf = str(timeframe).strip().lower()
-    if tf not in OPERATIONAL_TIMEFRAMES:
-        raise ValueError(f"unsupported timeframe: {timeframe!r}; allowed={OPERATIONAL_TIMEFRAMES}")
+    tf = normalize_timeframe(timeframe)
+    if not is_importable_timeframe(tf):
+        raise ValueError(f"unsupported timeframe: {timeframe!r}; allowed={DIRECT_IMPORT_TIMEFRAMES}")
 
     path = Path(input_path)
     if not path.is_file():

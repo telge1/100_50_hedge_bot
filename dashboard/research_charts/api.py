@@ -341,6 +341,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         bt["strategy_version"] = strategy_version or "wave_fade_no_be50_v1"
         if strategy_version == "POOL_ORDER_PLAN_V1" and not rows:
             bt["message"] = f"Pool-V1 hat keine Signale für {symbol}"
+        if strategy_version == "EMA_POOL_TREND_FLIP_V1" and not rows:
+            bt["message"] = f"EMA Pool Trend Flip V1 hat keine Signale für {symbol}"
         snap["backtester"] = bt
         return snap
 

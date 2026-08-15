@@ -1,11 +1,13 @@
 """Isolated MySQL candle storage layer for the regime scanner research data path.
 
-Operational candles:
-- 5m from canonical Freqtrade feather (``freqtrade_direct``)
-- 15m / 30m only via ``timeframes.aggregate_candles`` (``aggregated_from_5m``)
+Scanner operational path (unchanged):
+- 5m / aggregated 15m / 30m via ``timeframes.aggregate_candles``
 
-Direct Freqtrade 15m/30m staging files are validation references only and must
-not be imported into ``market_candles``.
+Research HTF path (additive):
+- Direct Freqtrade feathers for ``4h`` / ``1d`` / ``1w`` / ``1M`` (and optionally
+  ``1h``) may be imported as ``freqtrade_direct`` with ``source_timeframe`` equal
+  to the candle timeframe. Existing rows are never deleted; upserts follow
+  ``source_policy``.
 """
 
 from __future__ import annotations

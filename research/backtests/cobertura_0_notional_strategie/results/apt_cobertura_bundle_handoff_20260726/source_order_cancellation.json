@@ -1,0 +1,67 @@
+{
+  "cancel_on_cobertura_handoff": true,
+  "source_orders_before": 4,
+  "source_orders_after": 0,
+  "active_source_order_count": 0,
+  "cancelled_orders": [
+    {
+      "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+      "last_event_type": "submitted",
+      "order_id": "sim-fixed_cycle-cycle-4-short-reduce-30",
+      "price": null,
+      "purpose": "CYCLE_4_SHORT_REDUCE",
+      "qty": 34.574,
+      "side": "short",
+      "status": "NEW",
+      "trigger_price": 1.6955,
+      "handoff_action": "CANCELLED_ON_COBERTURA_HANDOFF",
+      "cancelled_at": "2026-01-19T00:00:00+00:00",
+      "active_after_handoff": false
+    },
+    {
+      "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+      "last_event_type": "submitted",
+      "order_id": "sim-fixed_cycle-cycle-4-short-reduce-31",
+      "price": null,
+      "purpose": "CYCLE_4_SHORT_REDUCE",
+      "qty": 64.211,
+      "side": "short",
+      "status": "NEW",
+      "trigger_price": 1.6205,
+      "handoff_action": "CANCELLED_ON_COBERTURA_HANDOFF",
+      "cancelled_at": "2026-01-19T00:00:00+00:00",
+      "active_after_handoff": false
+    },
+    {
+      "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+      "last_event_type": "submitted",
+      "order_id": "sim-fixed_cycle-long-tp-exit-28",
+      "price": null,
+      "purpose": "LONG_TP_EXIT",
+      "qty": 296.365,
+      "side": "long",
+      "status": "NEW",
+      "trigger_price": 2.0101,
+      "handoff_action": "CANCELLED_ON_COBERTURA_HANDOFF",
+      "cancelled_at": "2026-01-19T00:00:00+00:00",
+      "active_after_handoff": false
+    },
+    {
+      "last_event_timestamp": "2026-01-18T23:50:00+00:00",
+      "last_event_type": "submitted",
+      "order_id": "sim-fixed_cycle-short-sl-exit-29",
+      "price": null,
+      "purpose": "SHORT_SL_EXIT",
+      "qty": 197.59699999999998,
+      "side": "short",
+      "status": "NEW",
+      "trigger_price": 2.0101,
+      "handoff_action": "CANCELLED_ON_COBERTURA_HANDOFF",
+      "cancelled_at": "2026-01-19T00:00:00+00:00",
+      "active_after_handoff": false
+    }
+  ],
+  "active_order_book": [],
+  "tem_order_ids_active": [],
+  "notes": "TEM source orders are retained for audit only and must not fill under Cobertura."
+}

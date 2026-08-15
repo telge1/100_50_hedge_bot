@@ -283,6 +283,10 @@ class BacktestResult:
     trade_number: int | None = None
     trade_block_id: str | None = None
     exit_quality: str = ""
+    exit_quality_detail: dict[str, Any] | None = None
+    has_cycle_undercoverage: bool | None = None
+    trade_level_undercovered: bool | None = None
+    trade_final_exit_net: float | None = None
     # Addon Short Recovery (backtest-only aggregates and flags)
     addon_short_recovery_enabled: bool | None = None
     addon_short_recovery_activation_order: str | None = None
@@ -329,6 +333,34 @@ class BacktestResult:
     recovery_duration_minutes: int | None = None
     recovery_diagnostic_events: list[dict[str, Any]] = field(default_factory=list)
     recovery_gap_reduction_events: list[dict[str, Any]] = field(default_factory=list)
+    recovery_timeout_action: str | None = None
+    recovery_timeout_min_loss_usdt: float | None = None
+    recovery_timeout_close_triggered: bool | None = None
+    recovery_timeout_close_index: int | None = None
+    recovery_timeout_close_net_pnl: float | None = None
+    recovery_timeout_close_fees: float | None = None
+    recovery_gap_reduction_skipped: bool | None = None
+    recovery_timeout_close_event: dict[str, Any] | None = None
+    # Explicit timeout diagnostics for continuous/result JSON consumers.
+    recovery_reference_fill_candle_index: int | None = None
+    recovery_timeout_target_candle_index: int | None = None
+    recovery_timeout_triggered: bool | None = None
+    recovery_timeout_trigger_candle_index: int | None = None
+    recovery_timeout_skip_reason: str | None = None
+    recovery_timeout_estimated_net_exit_pnl: float | None = None
+    # Continuous max-loss stop during recovery wait (backtest-only).
+    recovery_max_loss_usdt: float | None = None
+    recovery_max_loss_triggered: bool | None = None
+    recovery_max_loss_trigger_candle_index: int | None = None
+    recovery_max_loss_estimated_net_exit_pnl: float | None = None
+    recovery_max_additional_loss_usdt: float | None = None
+    recovery_reference_net_exit_pnl: float | None = None
+    recovery_current_net_exit_pnl: float | None = None
+    recovery_additional_loss_usdt: float | None = None
+    recovery_max_additional_loss_triggered: bool | None = None
+    recovery_max_additional_loss_trigger_candle_index: int | None = None
+    recovery_max_additional_loss_estimated_net_exit_pnl: float | None = None
+    recovery_close_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

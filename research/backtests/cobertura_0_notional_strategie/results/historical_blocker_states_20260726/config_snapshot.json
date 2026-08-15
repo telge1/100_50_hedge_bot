@@ -1,0 +1,22 @@
+{
+  "structure_dir": "research/backtests/results/tem_structure_break_27_blockers_v2_20260723",
+  "root_cause_dir": "research/backtests/results/tem_continuous_27_blocker_root_cause_20260722",
+  "trigger_mode": "first_break",
+  "modes": [
+    "first_break"
+  ],
+  "slippage_bps": 0.0,
+  "taker_fee_rate": 0.00055,
+  "frozen_rule_id": "tem_structure_break_v2_multi_episode_frozen_20260723",
+  "frozen_commit": "f828296a061354c8ddf867ff719f5bc37fdef0a8",
+  "candle_loader": "load_candles_for_symbol+normalize_candles+candles_to_frame (eval_common 5m path)",
+  "n_rows": 27,
+  "decision": "BLOCKER_STATE_EXTRACTION_PASS_WITH_WARNINGS",
+  "apt_reference": {
+    "status": "APT_REFERENCE_WARNING",
+    "details": [
+      "candidate cycle-4 end snapshot matches prior audit inventory, but cycle straddles signal_available_ts \u2192 not adopted as pre-signal state"
+    ]
+  },
+  "short_slippage_sign": "additional short fill_price = open * (1 - slippage_bps/10000); lower fill price is worse for short entry"
+}

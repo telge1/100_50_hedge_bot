@@ -13,6 +13,8 @@
   const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h"];
   const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
   const SYMBOL_KEY = "research.symbol";
+  const LAYOUT_KEY = "research.layout";
+  const ASSET_V = "time-clip-1";
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const POLL_MS = 5000;
@@ -32,7 +34,8 @@
 
   const state = {
     symbols: [],
-    layout: "4",
+    layout: "1",
+    paneFs: null,
     symbol: "",
     sync: true,
     panes: {},
@@ -127,6 +130,7 @@
   }
 
   function visibleIds() {
+    if (state.paneFs && PANE_IDS.indexOf(state.paneFs) >= 0) return [state.paneFs];
     return PANE_IDS.slice(0, PANE_COUNT[state.layout] || 1);
   }
 
@@ -362,6 +366,7 @@
         '<span class="trp-pane-symbol"></span><span class="trp-pane-sep">|</span>' +
         '<select class="trp-pane-tf"></select>' +
         '<button type="button" class="trp-reset" title="Chartansicht zurücksetzen" aria-label="Chartansicht zurücksetzen">⟲</button>' +
+        '<button type="button" class="trp-fs" title="Chart Vollbild" aria-label="Chart Vollbild">⛶</button>' +
         '<span class="trp-pane-status"></span></div>' +
         '<iframe class="trp-pane-frame" title="' + pid + '"></iframe>';
       const tfSel = wrap.querySelector(".trp-pane-tf");
@@ -391,7 +396,7 @@
       iframe.addEventListener("load", function () {
         attachBridge(pane);
       });
-      iframe.src = "/static/research_trp/pane.html?v=signals-all-tf-1";
+      iframe.src = "/static/research_trp/pane.html?v=" + ASSET_V;
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
         loadPane(pid, { force: true, sourceAction: "tf-change" });
@@ -400,9 +405,21 @@
         const chart = api(pane);
         if (chart && chart.resetView) chart.resetView();
       });
+      wrap.querySelector(".trp-fs").addEventListener("click", function () {
+        togglePaneFullscreen(pid);
+      });
+      let resizeTimer = null;
+      let lastBox = "0x0";
       new ResizeObserver(function () {
-        const chart = api(pane);
-        if (chart && !wrap.classList.contains("pooled-hidden")) chart.resize();
+        if (wrap.classList.contains("pooled-hidden")) return;
+        const box = wrap.clientWidth + "x" + wrap.clientHeight;
+        if (box === lastBox) return;
+        lastBox = box;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          const chart = api(pane);
+          if (chart && chart.resize) chart.resize();
+        }, 80);
       }).observe(wrap);
       root.appendChild(wrap);
     });
@@ -410,24 +427,203 @@
   }
 
   function applyLayout(layout, force) {
-    if (!force && layout === state.layout) return;
+    if (!PANE_COUNT[layout]) layout = "1";
+    if (!force && layout === state.layout && !state.paneFs) return;
     state.layout = layout;
+    try { localStorage.setItem(LAYOUT_KEY, layout); } catch (e) {}
     const root = $("researchWorkspace");
-    root.className = "trp-workspace layout-" + layout;
+    root.className = "trp-workspace layout-" + layout + (state.paneFs ? " pane-fs" : "");
     const vis = new Set(visibleIds());
     PANE_IDS.forEach(function (pid) {
       const pane = state.panes[pid];
       if (!pane) return;
       pane.el.classList.toggle("pooled-hidden", !vis.has(pid));
+      pane.el.classList.toggle("pane-fs-active", state.paneFs === pid);
+      const fsBtn = pane.el.querySelector(".trp-fs");
+      if (fsBtn) fsBtn.classList.toggle("active", state.paneFs === pid);
     });
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
       btn.classList.toggle("active", btn.dataset.layout === layout);
     });
     requestAnimationFrame(function () {
       visibleIds().forEach(function (pid) {
+        if (state.paneFs && pid !== state.paneFs) return;
         const chart = api(state.panes[pid]);
         if (chart) chart.resize();
       });
+    });
+  }
+
+  function waitPaneSize(pane, timeoutMs) {
+    return new Promise(function (resolve) {
+      const t0 = Date.now();
+      function tick() {
+        const frame = pane && pane.iframe;
+        if (frame && frame.clientWidth >= 16 && frame.clientHeight >= 16) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - t0 > (timeoutMs || 900)) {
+          resolve(false);
+          return;
+        }
+        requestAnimationFrame(tick);
+      }
+      tick();
+    });
+  }
+
+  async function loadNewlyVisiblePanes() {
+    const ids = visibleIds().filter(function (pid) {
+      const pane = state.panes[pid];
+      return pane && !(pane.lastTimes && pane.lastTimes.size);
+    });
+    if (!ids.length) return;
+    await Promise.all(ids.map(function (pid) { return waitPaneSize(state.panes[pid]); }));
+    await mapLimit(ids, PANE_HTTP_LIMIT, function (pid) {
+      return loadPane(pid, { sourceAction: "layout-change" });
+    });
+    requestAnimationFrame(function () {
+      ids.forEach(function (pid) {
+        const chart = api(state.panes[pid]);
+        if (chart && chart.resize) chart.resize();
+      });
+    });
+  }
+
+  function togglePaneFullscreen(paneId) {
+    const entering = state.paneFs !== paneId;
+    state.paneFs = entering ? paneId : null;
+    applyLayout(state.layout, true);
+    setBrowserFs(entering);
+    if (entering) loadNewlyVisiblePanes();
+  }
+
+  function isBrowserFs() {
+    return document.body.classList.contains("research-browser-fs");
+  }
+
+  function setBrowserFs(on) {
+    document.body.classList.toggle("research-browser-fs", !!on);
+    const btn = $("researchFullscreenBtn");
+    if (btn) btn.classList.toggle("active", !!on);
+    requestAnimationFrame(function () {
+      visibleIds().forEach(function (pid) {
+        const chart = api(state.panes[pid]);
+        if (chart && chart.resize) chart.resize();
+      });
+    });
+  }
+
+  function toggleWorkspaceFullscreen() {
+    expandWorkspaceUp();
+  }
+
+  function resizeVisibleCharts() {
+    requestAnimationFrame(function () {
+      visibleIds().forEach(function (pid) {
+        const chart = api(state.panes[pid]);
+        if (chart && chart.resize) chart.resize();
+      });
+    });
+  }
+
+  function applyWorkspaceHeight(height, marginTop) {
+    const dock = $("researchChartDock");
+    const root = $("researchWorkspace");
+    const handle = $("researchHeightHandle");
+    const bar = $("researchDockBar");
+    if (!dock || !root) return;
+    const handleH = (bar && bar.offsetHeight) || (handle && handle.offsetHeight) || 36;
+    const maxH = Math.max(240, window.innerHeight - handleH - 8);
+    const h = Math.min(maxH, Math.max(240, Math.round(height)));
+    let m = Math.round(marginTop);
+    dock.style.marginTop = m + "px";
+    const top = dock.getBoundingClientRect().top;
+    if (top < 0) {
+      m -= Math.round(top);
+      dock.style.marginTop = m + "px";
+    }
+    root.style.height = h + "px";
+    root.style.minHeight = h + "px";
+    root.style.marginTop = "0px";
+    const btn = $("researchFullscreenBtn");
+    const maxed = dock.getBoundingClientRect().top <= 4 && h >= maxH - 8;
+    dock.classList.toggle("is-max", maxed);
+    if (btn) {
+      btn.classList.toggle("active", maxed);
+      btn.title = maxed ? "Zurück" : "Aufziehen";
+    }
+    try {
+      localStorage.setItem("research.workspace_h", String(h));
+      localStorage.setItem("research.workspace_mt", String(m));
+    } catch (e) {}
+    resizeVisibleCharts();
+  }
+
+  function resetWorkspaceHeight() {
+    applyWorkspaceHeight(Math.min(640, Math.max(240, window.innerHeight - 280)), 0);
+  }
+
+  function expandWorkspaceUp() {
+    const dock = $("researchChartDock");
+    const handle = $("researchHeightHandle");
+    if (!dock) return;
+    if (dock.classList.contains("is-max")) {
+      resetWorkspaceHeight();
+      return;
+    }
+    const rect = dock.getBoundingClientRect();
+    const m = parseFloat(dock.style.marginTop) || 0;
+    const handleH = ($("researchDockBar") && $("researchDockBar").offsetHeight) || 36;
+    applyWorkspaceHeight(window.innerHeight - handleH - 8, m - Math.max(0, rect.top));
+  }
+
+  function restoreWorkspaceHeight() {
+    try {
+      const h = parseInt(localStorage.getItem("research.workspace_h") || "", 10);
+      const m = parseInt(localStorage.getItem("research.workspace_mt") || "", 10);
+      if (!Number.isFinite(h) || h < 240 || h > window.innerHeight + 40) {
+        resetWorkspaceHeight();
+        return;
+      }
+      applyWorkspaceHeight(h, Number.isFinite(m) ? m : 0);
+    } catch (e) {
+      resetWorkspaceHeight();
+    }
+  }
+
+  function bindHeightDrag() {
+    const handle = $("researchHeightHandle");
+    const dock = $("researchChartDock");
+    const root = $("researchWorkspace");
+    if (!handle || !dock || !root) return;
+    handle.addEventListener("dblclick", function () { expandWorkspaceUp(); });
+    handle.addEventListener("pointerdown", function (ev) {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      handle.classList.add("dragging");
+      handle.setPointerCapture(ev.pointerId);
+      const startY = ev.clientY;
+      const startH = root.getBoundingClientRect().height;
+      const startM = parseFloat(dock.style.marginTop) || 0;
+      const startTop = dock.getBoundingClientRect().top;
+      function onMove(e) {
+        const maxUp = Math.max(0, startTop);
+        const maxDown = startH - 240;
+        let up = startY - e.clientY;
+        up = Math.max(-maxDown, Math.min(maxUp, up));
+        applyWorkspaceHeight(startH + up, startM - up);
+      }
+      function onUp() {
+        handle.classList.remove("dragging");
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+      }
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
     });
   }
 
@@ -578,6 +774,26 @@
     return candles.length + ":" + first.time + ":" + last.time + ":" + last.close;
   }
 
+  function closedCandleFingerprint(candles, tf) {
+    const step = TF_SEC[tf] || 60;
+    const now = Math.floor(Date.now() / 1000);
+    const closed = (candles || []).filter(function (c) {
+      return Number(c.time) + step <= now;
+    });
+    return candleFingerprint(closed);
+  }
+
+  function lastClosedBarTime(pane) {
+    const step = TF_SEC[pane.tf] || 60;
+    const now = Math.floor(Date.now() / 1000);
+    const candles = (pane.pendingData && pane.pendingData.candles) || [];
+    for (let i = candles.length - 1; i >= 0; i--) {
+      const t = Number(candles[i].time);
+      if (t + step <= now) return t;
+    }
+    return null;
+  }
+
   function applyPaneBundle(pane, packed, opts) {
     const payload = {
       symbol: packed.symbol,
@@ -592,6 +808,7 @@
       pane.lastTimes = new Set((packed.candles || []).map(function (c) { return c.time; }));
       pane.pendingData = payload;
       pane.candleFp = nextFp;
+      pane.closedFp = closedCandleFingerprint(packed.candles || [], pane.tf);
     }
     pane.pendingEma = packed.ema || { series: [] };
     pane.pendingLower = packed.stochastic || { id: "stochastic", visible: false };
@@ -788,7 +1005,8 @@
     if (!forming) return;
     visibleIds().forEach(function (pid) {
       const pane = state.panes[pid];
-      if (!pane || !pane.pendingData || !(pane.pendingData.candles || []).length) return;
+      if (!pane || pane.tf !== "1m") return;
+      if (!pane.pendingData || !(pane.pendingData.candles || []).length) return;
       const candles = pane.pendingData.candles;
       const last = candles[candles.length - 1];
       const bar = formingBarForTf(forming, TF_SEC[pane.tf] || 60, last);
@@ -820,8 +1038,7 @@
     const pane = state.panes[paneId];
     if (!pane || !state.symbol) return;
     if (gen !== state.pollGen) return;
-    const times = Array.from(pane.lastTimes || []);
-    const last = times.length ? Math.max.apply(null, times) : null;
+    const last = lastClosedBarTime(pane);
     if (last == null || !pane.pendingData) return;
     let url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
       "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=50";
@@ -838,19 +1055,14 @@
     (pane.pendingData.candles || []).forEach(function (c) { byTime[c.time] = c; });
     incoming.forEach(function (c) { byTime[c.time] = c; });
     const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; }).map(function (t) { return byTime[t]; });
-    const nextFp = candleFingerprint(merged);
-    if (nextFp === pane.candleFp) return;
+    const nextClosed = closedCandleFingerprint(merged, pane.tf);
+    if (nextClosed === pane.closedFp) return;
     pane.pendingData = Object.assign({}, pane.pendingData, { candles: merged });
     pane.lastTimes = new Set(merged.map(function (c) { return c.time; }));
-    pane.candleFp = nextFp;
+    pane.candleFp = candleFingerprint(merged);
+    pane.closedFp = nextClosed;
     const chart = api(pane);
     if (chart) chart.setData(pane.pendingData, { preserveView: true });
-    await loadPane(paneId, {
-      allowStale: false,
-      indicatorsOnly: true,
-      preserveView: true,
-      sourceAction: "poll-indicators",
-    });
   }
 
   async function refreshLiveBar(ensure) {
@@ -1110,13 +1322,9 @@
   function bindUi() {
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
+        state.paneFs = null;
         applyLayout(btn.dataset.layout);
-        mapLimit(visibleIds().filter(function (pid) {
-          const pane = state.panes[pid];
-          return pane && !pane.lastTimes.size;
-        }), PANE_HTTP_LIMIT, function (pid) {
-          return loadPane(pid, { sourceAction: "layout-change" });
-        });
+        loadNewlyVisiblePanes();
       });
     });
     $("researchSymbol").addEventListener("change", function () { switchSymbol($("researchSymbol").value); });
@@ -1132,6 +1340,11 @@
       }));
       await refreshOverlaysVisible();
     });
+    const fsBtn = $("researchFullscreenBtn");
+    if (fsBtn) {
+      fsBtn.addEventListener("click", function () { expandWorkspaceUp(); });
+    }
+    bindHeightDrag();
     $("researchBacktesterBtn").addEventListener("click", async function () {
       if (!state.symbol) return;
       const strategy = lastStochStrategy();
@@ -1287,7 +1500,15 @@
     });
     window.addEventListener("keydown", function (ev) {
       if (ev.key === "Shift") syncHostShift(true);
-      if (ev.key === "Escape") handleChartKey("escape");
+      if (ev.key === "Escape") {
+        if (state.paneFs || isBrowserFs()) {
+          state.paneFs = null;
+          applyLayout(state.layout, true);
+          setBrowserFs(false);
+          return;
+        }
+        handleChartKey("escape");
+      }
       if (ev.key === "Delete" || ev.key === "Backspace") {
         const tag = (ev.target && ev.target.tagName) || "";
         if (tag !== "INPUT" && tag !== "SELECT" && tag !== "TEXTAREA") handleChartKey("delete");
@@ -1297,12 +1518,25 @@
       if (ev.key === "Shift") syncHostShift(false);
     });
     window.addEventListener("blur", function () { syncHostShift(false); });
+    document.addEventListener("fullscreenchange", function () {
+      requestAnimationFrame(function () {
+        visibleIds().forEach(function (pid) {
+          const chart = api(state.panes[pid]);
+          if (chart && chart.resize) chart.resize();
+        });
+      });
+    });
   }
 
   async function boot() {
+    try {
+      const saved = localStorage.getItem(LAYOUT_KEY);
+      if (saved && PANE_COUNT[saved]) state.layout = saved;
+    } catch (e) {}
     buildTools();
     buildPanes();
     bindUi();
+    restoreWorkspaceHeight();
     const symbols = await getJson("/api/research/symbols");
     state.symbols = symbols.symbols || [];
     const names = fillSymbolSelect(state.symbols);

@@ -1,0 +1,57 @@
+{
+  "decision": "APT_2X2_ABLATION_START_TIME_DOMINATES",
+  "generated_at_utc": "2026-07-26T09:41:19.091734+00:00",
+  "variant_count": 4,
+  "fingerprint_a_ok": true,
+  "fingerprint_d_ok": true,
+  "fingerprint_a_failures": [],
+  "fingerprint_d_failures": [],
+  "candle_open_0000": 1.7223,
+  "candle_open_0355": 1.6469,
+  "prescribed_start_price_0000": 1.7223,
+  "prescribed_start_price_0355": 1.6456,
+  "warnings": [
+    "03:55 candle open 1.6469 != prescribed start_price 1.6456 (Phase-A fingerprint uses config_start_price=1.6456)"
+  ],
+  "strategy_constants": {
+    "symbol": "APTUSDT",
+    "timeframe": "5m",
+    "direction_mode": "short_only",
+    "activation_move_pct": 0.05,
+    "first_add_move_pct": 0.06,
+    "add_step_pct": 0.01,
+    "add_size_pct": 0.4,
+    "max_add_count": 8,
+    "max_adds_per_candle": 4,
+    "reset_reference_after_overlay_be": true,
+    "max_overlay_qty_multiple": 4.0,
+    "fee_rate_open": 0.00055,
+    "fee_rate_close": 0.00055,
+    "slippage_bps_open": 0.0,
+    "slippage_bps_close": 0.0,
+    "overlay_exit_policy": "shared_be",
+    "overlay_be_target_usdt": 0.0,
+    "full_exit_target_mode": "legacy",
+    "full_exit_target_usdt": 0.0,
+    "target_total_pnl_usdt": 0.0,
+    "pnl_tolerance_usdt": 0.01,
+    "candle_limit": 50000,
+    "start_price_source": "config_start_price",
+    "end_timestamp": null
+  },
+  "historical_book": {
+    "core_long_qty": 296.365,
+    "core_long_avg": 1.864531340748192,
+    "core_short_qty": 296.365,
+    "core_short_avg": 1.8171506068270433
+  },
+  "phase_a_book": {
+    "core_long_qty": 395.153,
+    "core_long_avg": 1.768355389945979,
+    "core_short_qty": 395.153,
+    "core_short_avg": 1.696714
+  },
+  "handoff_dir": "research/backtests/cobertura_0_notional_strategie/results/apt_cobertura_bundle_handoff_20260726",
+  "tem_orders_imported": false,
+  "initial_entry_created": false
+}

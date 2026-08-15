@@ -731,6 +731,26 @@ def reconstruct_audit(
             + sum(ur_a.values())
         )
 
+        total_short_q_b = cs_q_b + os_q_b
+        total_short_a_b = (
+            weighted_avg(cs_q_b, cs_a_b, os_q_b, os_a_b) if total_short_q_b > 0 else 0.0
+        )
+        total_short_q_a = shadow.short_qty()
+        total_short_a_a = (
+            weighted_avg(
+                shadow.core_short.qty,
+                shadow.core_short.avg,
+                shadow.overlay_short.qty,
+                shadow.overlay_short.avg,
+            )
+            if total_short_q_a > 0
+            else 0.0
+        )
+        open_fee = recorded_fee if fee_type == "open" else 0.0
+        close_fee = recorded_fee if fee_type == "close" else 0.0
+        gross_realized = realized_delta
+        net_realized = realized_delta - close_fee if fee_type == "close" else 0.0
+
         bundle.position_timeline.append(
             {
                 "policy": policy,
@@ -740,12 +760,8 @@ def reconstruct_audit(
                 "order_id": order_id,
                 "long_qty_before": cl_q_b + ol_q_b,
                 "long_avg_before": long_a_b,
-                "short_qty_before": cs_q_b + os_q_b,
-                "short_avg_before": (
-                    weighted_avg(cs_q_b, cs_a_b, os_q_b, os_a_b)
-                    if (cs_q_b + os_q_b) > 0
-                    else 0.0
-                ),
+                "short_qty_before": total_short_q_b,
+                "short_avg_before": total_short_a_b,
                 "overlay_short_qty_before": os_q_b,
                 "long_qty_after": shadow.long_qty(),
                 "long_avg_after": (
@@ -758,17 +774,8 @@ def reconstruct_audit(
                     if shadow.long_qty() > 0
                     else 0.0
                 ),
-                "short_qty_after": shadow.short_qty(),
-                "short_avg_after": (
-                    weighted_avg(
-                        shadow.core_short.qty,
-                        shadow.core_short.avg,
-                        shadow.overlay_short.qty,
-                        shadow.overlay_short.avg,
-                    )
-                    if shadow.short_qty() > 0
-                    else 0.0
-                ),
+                "short_qty_after": total_short_q_a,
+                "short_avg_after": total_short_a_a,
                 "overlay_short_qty_after": shadow.overlay_short.qty,
                 "net_exposure_before": net_b,
                 "net_exposure_after": shadow.net(),
@@ -780,6 +787,49 @@ def reconstruct_audit(
                 "total_economics_after": econ_after,
                 "open_fees_total": shadow.open_fees,
                 "close_fees_total": shadow.close_fees,
+            }
+        )
+
+        bundle.fill_ledger.append(
+            {
+                "global_fill_index": len(bundle.fill_ledger),
+                "timestamp": ts,
+                "bar_index": bar.get("candle_index"),
+                "round": fill.get("level"),
+                "order_id": order_id,
+                "purpose": purpose,
+                "side": side or position_side,
+                "kind": kind,
+                "qty": qty,
+                "raw_price": trigger if trigger is not None else fill_px,
+                "filled_price": fill_px,
+                "notional": abs(fill_px * qty),
+                "open_fee": open_fee,
+                "close_fee": close_fee,
+                "allocated_entry_fee": open_fee,
+                "gross_realized_pnl": gross_realized,
+                "net_realized_pnl": net_realized,
+                "cumulative_realized_overlay_pnl": shadow.realized_overlay,
+                "cumulative_entry_fees": shadow.open_fees,
+                "cumulative_close_fees": shadow.close_fees,
+                "core_long_qty_before": cl_q_b,
+                "core_long_avg_before": cl_a_b,
+                "core_long_qty_after": shadow.core_long.qty,
+                "core_long_avg_after": shadow.core_long.avg,
+                "core_short_qty_before": cs_q_b,
+                "core_short_avg_before": cs_a_b,
+                "core_short_qty_after": shadow.core_short.qty,
+                "core_short_avg_after": shadow.core_short.avg,
+                "overlay_short_qty_before": os_q_b,
+                "overlay_short_avg_before": os_a_b,
+                "overlay_short_qty_after": shadow.overlay_short.qty,
+                "overlay_short_avg_after": shadow.overlay_short.avg,
+                "total_short_qty_before": total_short_q_b,
+                "total_short_avg_before": total_short_a_b,
+                "total_short_qty_after": total_short_q_a,
+                "total_short_avg_after": total_short_a_a,
+                "net_qty_before": net_b,
+                "net_qty_after": shadow.net(),
             }
         )
 

@@ -150,7 +150,8 @@ def test_no_future_right_bar_pivots_in_rule_spec() -> None:
     cfg = MarketStructureConfig.from_matrix_entry(RESEARCH_MATRIX[0])
     spec = build_rule_spec(cfg)
     assert spec["swing"]["method"] == "causal_extremum_then_reversal"
-    assert spec["swing"]["live_from"] == "confirmed_timestamp_only"
+    assert spec["swing"]["live_from"] == "confirmed_timestamp_for_level_activation"
+    assert spec["swing"]["extreme_timestamp_source"] == "pivot_candle_open_when_stamped"
 
 
 def test_no_retroactive_state_change() -> None:

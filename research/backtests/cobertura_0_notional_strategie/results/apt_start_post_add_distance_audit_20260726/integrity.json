@@ -1,0 +1,32 @@
+{
+  "decision": "APT_DISTANCE_GUARDS_RECOVERY_FOUND",
+  "generated_at_utc": "2026-07-26T10:22:41.976732+00:00",
+  "baseline_fingerprint_ok": true,
+  "baseline_fingerprint_failures": [],
+  "variant_count": 55,
+  "valid_candidate_count": 30,
+  "best_variant_id": "start_06__post_03",
+  "skip_control_variant_id": "skip_control__start_06__post_03",
+  "book": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 197.59699999999998,
+    "short_avg": 1.864561269615919,
+    "neutralization_qty": 98.76800000000003,
+    "structure_break_level": 1.7639,
+    "signal_available_ts": "2026-01-19T00:00:00+00:00"
+  },
+  "hypothesis_8_to_10_start": {
+    "first_recovering_start_distance_pct": 0.06,
+    "in_8_to_10_band": false,
+    "all_recovering_start_distances": [
+      0.06,
+      0.07,
+      0.08,
+      0.11,
+      0.12
+    ]
+  },
+  "tem_orders_imported": false,
+  "initial_entry_created": false
+}

@@ -1,0 +1,21 @@
+{
+  "state_dir": "research/backtests/cobertura_0_notional_strategie/results/historical_blocker_states_20260726",
+  "root_cause_dir": "research/backtests/results/tem_continuous_27_blocker_root_cause_20260722",
+  "trigger_mode": "first_break",
+  "strict_before_signal": true,
+  "include_signal_bar_fills": false,
+  "profile": "two_early_medium",
+  "taker_fee_rate": 0.00055,
+  "n_rows": 27,
+  "decision": "BLOCKER_FILL_REPLAY_PASS_WITH_WARNINGS",
+  "apt_fill_replay": {
+    "status": "APT_FILL_REPLAY_WARNING",
+    "details": [
+      "fills_before=9 fills_at_or_after=4",
+      "last_before=2026-01-18T23:50:00+00:00 CYCLE_4_LONG_ADD lq=296.365 sq=197.59699999999998",
+      "first_after=2026-01-19T00:00:00+00:00 CYCLE_4_SHORT_REDUCE lq=526.87 sq=263.43499999999995",
+      "pre-signal state DIFFERS from old cycle-4 candidate: got 296.365/197.59699999999998 vs candidate 526.87/199.22399999999993"
+    ]
+  },
+  "cutoff_rule": "fill_timestamp < signal_available_ts"
+}

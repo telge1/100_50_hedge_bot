@@ -221,12 +221,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser(
         "import-feather",
-        help="Import 5m/15m/30m direct feather into market_candles",
+        help="Import direct feather (5m/15m/30m/1h/4h/1d/1w/1M) into market_candles",
     )
     sp.add_argument("--input", required=True)
     sp.add_argument("--exchange", default="bybit")
     sp.add_argument("--symbol", default="APTUSDT")
-    sp.add_argument("--timeframe", required=True, choices=("5m", "15m", "30m"))
+    sp.add_argument(
+        "--timeframe",
+        required=True,
+        choices=("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"),
+    )
     sp.add_argument("--dry-run", action="store_true")
     sp.add_argument("--backend", choices=("mysql", "memory"), default="mysql")
     sp.add_argument("--batch-size", type=int, default=2000)

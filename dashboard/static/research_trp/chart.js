@@ -91,6 +91,64 @@
     };
   }
 
+  function priceAxisWidth() {
+    try {
+      if (chart && typeof chart.priceScale === "function") {
+        const ps = chart.priceScale("right");
+        if (ps && typeof ps.width === "function") {
+          const w = Number(ps.width());
+          if (w > 0) return w;
+        }
+      }
+    } catch (e) {}
+    const host = $("chart");
+    if (host) {
+      const cells = host.querySelectorAll("td");
+      if (cells.length) {
+        const last = cells[cells.length - 1];
+        const w = last.clientWidth;
+        if (w > 8 && w < host.clientWidth * 0.45) return w;
+      }
+    }
+    return 64;
+  }
+
+  function plotRightX() {
+    const size = chartSize();
+    try {
+      if (chart && chart.timeScale) {
+        const tw = Number(chart.timeScale().width());
+        if (tw > 16 && tw < size.w) return tw;
+      }
+    } catch (e) {}
+    return Math.max(0, size.w - priceAxisWidth());
+  }
+
+  function timeAxisHeight() {
+    try {
+      const host = $("chart");
+      if (host) {
+        const rows = host.querySelectorAll("table tr");
+        if (rows.length >= 2) {
+          const h = rows[rows.length - 1].clientHeight;
+          if (h > 4 && h < host.clientHeight * 0.45) return h;
+        }
+      }
+    } catch (e) {}
+    return 28;
+  }
+
+  function plotBottomY() {
+    return Math.max(0, chartSize().h - timeAxisHeight());
+  }
+
+  function clipOverlayLayerToPlot() {
+    const layer = overlayLayer();
+    if (!layer) return;
+    layer.style.right = Math.max(0, priceAxisWidth()) + "px";
+    layer.style.bottom = Math.max(0, timeAxisHeight()) + "px";
+  }
+
   function toOhlc(candles) {
     return candles.map(function (c) {
       return {
@@ -419,6 +477,7 @@
         setEmaOverlays(lastEmaOverlays);
       }
     }
+    clipOverlayLayerToPlot();
     layoutOverlays();
     updateSelectedLine();
     resizeOsc();
@@ -1138,18 +1197,18 @@
     const el = ensureDom(rec, "ov-zone");
     if (!el) return;
     const p = rec.payload;
-    const size = chartSize();
+    const plotRight = plotRightX();
     let x1 = xOf(p.start_timestamp);
     let x2 = p.end_timestamp != null ? xOf(p.end_timestamp) : null;
     if (p.extend_right) {
-      x2 = size.w;
+      x2 = plotRight;
     }
     if (x1 == null && x2 == null) {
       hideEl(el);
       return;
     }
     if (x1 == null) x1 = 0;
-    if (x2 == null) x2 = p.extend_right ? size.w : x1;
+    if (x2 == null) x2 = p.extend_right ? plotRight : x1;
     const yTop = yOf(p.top_price);
     const yBot = yOf(p.bottom_price);
     if (yTop == null || yBot == null) {
@@ -1157,10 +1216,19 @@
       return;
     }
     const left = Math.min(x1, x2);
+    const plotBottom = plotBottomY();
+    if (left >= plotRight) {
+      hideEl(el);
+      return;
+    }
     const minSize = p.shape === "ellipse" ? 4 : 1;
-    const width = Math.max(minSize, Math.abs(x2 - x1));
+    const width = Math.max(minSize, Math.min(Math.abs(x2 - x1), plotRight - left));
     const top = Math.min(yTop, yBot);
-    const height = Math.max(minSize, Math.abs(yBot - yTop));
+    if (top >= plotBottom) {
+      hideEl(el);
+      return;
+    }
+    const height = Math.max(minSize, Math.min(Math.abs(yBot - yTop), plotBottom - top));
     const color = p.style.color;
     el.style.display = "block";
     el.style.left = left + "px";
@@ -1682,6 +1750,7 @@
 
   function layoutOverlays() {
     overlayLayoutCount += 1;
+    clipOverlayLayerToPlot();
     overlayRegistry.forEach(function (rec) {
       renderOneOverlay(rec);
     });
@@ -2443,11 +2512,11 @@
       },
     };
     shiftMeasure.stats = computeShiftMeasure(shiftMeasure.start, shiftMeasure.end);
-    const el = $("chart");
-    if (el && ev && ev.pointerId != null && el.setPointerCapture) {
+    const captureEl = (ev && ev.target) || $("chart");
+    if (captureEl && ev && ev.pointerId != null && captureEl.setPointerCapture) {
       try {
-        el.setPointerCapture(ev.pointerId);
-        shiftMeasureCaptureEl = el;
+        captureEl.setPointerCapture(ev.pointerId);
+        shiftMeasureCaptureEl = captureEl;
       } catch (err) {
         shiftMeasureCaptureEl = null;
       }
@@ -2628,10 +2697,26 @@
     return true;
   }
 
+  function onShiftMeasureMoveCapture(ev) {
+    if (!shiftMeasure || !shiftMeasure.dragging) return;
+    if (ev.preventDefault) ev.preventDefault();
+    if (ev.stopPropagation) ev.stopPropagation();
+    scheduleShiftMeasureMove(ev);
+  }
+
+  function onShiftMeasureUpCapture(ev) {
+    if (!shiftMeasure || !shiftMeasure.dragging) return;
+    if (ev.pointerId != null && shiftMeasure.pointerId != null && ev.pointerId !== shiftMeasure.pointerId) {
+      return;
+    }
+    if (ev.preventDefault) ev.preventDefault();
+    if (ev.stopPropagation) ev.stopPropagation();
+    finishShiftMeasure(ev);
+  }
+
   function onLostPointerCapture(ev) {
     if (!shiftMeasure || !shiftMeasure.dragging) return;
-    if (ev && ev.buttons) return;
-    finishShiftMeasure(ev);
+    if (ev && (ev.buttons || ev.pressure > 0)) return;
   }
 
   function onWindowBlur() {
@@ -2652,7 +2737,9 @@
     const el = $("chart");
     shiftMeasureHandlersBound = true;
     window.addEventListener("pointerdown", onShiftMeasureDown, true);
-    window.addEventListener("mousedown", onShiftMeasureDown, true);
+    window.addEventListener("pointermove", onShiftMeasureMoveCapture, true);
+    window.addEventListener("pointerup", onShiftMeasureUpCapture, true);
+    window.addEventListener("pointercancel", onShiftMeasureUpCapture, true);
     if (el) el.addEventListener("lostpointercapture", onLostPointerCapture);
     window.addEventListener("blur", onWindowBlur);
     window.addEventListener("keydown", onShiftKey);
@@ -2664,7 +2751,9 @@
     if (!shiftMeasureHandlersBound) return;
     const el = $("chart");
     window.removeEventListener("pointerdown", onShiftMeasureDown, true);
-    window.removeEventListener("mousedown", onShiftMeasureDown, true);
+    window.removeEventListener("pointermove", onShiftMeasureMoveCapture, true);
+    window.removeEventListener("pointerup", onShiftMeasureUpCapture, true);
+    window.removeEventListener("pointercancel", onShiftMeasureUpCapture, true);
     if (el) el.removeEventListener("lostpointercapture", onLostPointerCapture);
     window.removeEventListener("blur", onWindowBlur);
     window.removeEventListener("keydown", onShiftKey);
@@ -2771,7 +2860,7 @@
 
   function onPointerDown(ev) {
     if (ev.button != null && ev.button !== 0) return;
-    if (shiftMeasure && shiftMeasure.dragging) return;
+    if (shiftHeld(ev) || (shiftMeasure && shiftMeasure.dragging)) return;
     if (interactionMode !== "select" || !chart) return;
     const xy = xyFromEvent(ev);
     if (!xy) return;

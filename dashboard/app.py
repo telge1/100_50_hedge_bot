@@ -3299,12 +3299,19 @@ async def stoch_signale_page(request: Request, user: dict = Depends(require_auth
     src = get_dashboard_signal_source()
     pool_v1_enabled = True
     pool_v1_ready = False
+    ema_flip_enabled = True
     try:
         from pool_order_plan_v1.config import enable_pool_order_plan_v1
 
         pool_v1_enabled = enable_pool_order_plan_v1()
     except Exception:
         pool_v1_enabled = True
+    try:
+        from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
+
+        ema_flip_enabled = enable_ema_pool_trend_flip_v1()
+    except Exception:
+        ema_flip_enabled = True
     try:
         from pool_order_plan_v1.research_feed import research_artifact_available
 
@@ -3322,6 +3329,7 @@ async def stoch_signale_page(request: Request, user: dict = Depends(require_auth
             "research_variant_labels": VARIANT_LABELS,
             "enable_pool_order_plan_v1": pool_v1_enabled,
             "pool_order_plan_v1_ready": pool_v1_ready,
+            "enable_ema_pool_trend_flip_v1": ema_flip_enabled,
         },
     ))
 
@@ -3800,6 +3808,19 @@ async def api_stoch_signals(
         tier_param = t_raw
 
     sv = (strategy_version or "wave_fade_no_be50_v1").strip()
+    if sv == "EMA_POOL_TREND_FLIP_V1":
+        from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
+        from ema_pool_trend_flip_v1.research_feed import research_signals_response as ema_flip_signals_response
+
+        if enable_ema_pool_trend_flip_v1():
+            return ema_flip_signals_response(
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=direction,
+            )
+        from ema_pool_trend_flip_v1.research_feed import missing_response as ema_flip_missing
+
+        return ema_flip_missing()
     if sv == "POOL_ORDER_PLAN_V1":
         from pool_order_plan_v1.config import enable_pool_order_plan_v1
 
@@ -3920,6 +3941,26 @@ async def api_stoch_pool_research_klines(
             status_code=200,
         )
     payload = await asyncio.to_thread(load_research_klines, signal_id)
+    return payload
+
+
+@app.get("/api/stoch/ema-flip-research-klines")
+async def api_stoch_ema_flip_research_klines(
+    signal_id: str = Query(..., min_length=1),
+    user: dict = Depends(require_auth),
+):
+    """Read-only ClickHouse 1m candles for EMA flip research charts. No Bybit. No pool recompute."""
+    from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
+    from ema_pool_trend_flip_v1.research_feed import load_research_klines as load_ema_flip_klines
+    from ema_pool_trend_flip_v1.research_feed import missing_response as ema_flip_missing
+
+    if not enable_ema_pool_trend_flip_v1():
+        miss = ema_flip_missing()
+        return JSONResponse(
+            {"success": True, "candles": [], "source": "disabled", "message": miss.get("message")},
+            status_code=200,
+        )
+    payload = await asyncio.to_thread(load_ema_flip_klines, signal_id)
     return payload
 
 

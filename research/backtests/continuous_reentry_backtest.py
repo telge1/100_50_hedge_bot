@@ -101,6 +101,9 @@ CONTINUOUS_SUCCESSFUL_EXIT_REASONS = frozenset(
     {
         "flat_no_active_orders",
         "recovery_joint_exit",
+        "recovery_timeout_close_all",
+        "recovery_max_loss_close_all",
+        "recovery_max_additional_loss_close_all",
     }
 )
 
@@ -155,7 +158,15 @@ def aggregate_continuous_results(results: Iterable[BacktestResult]) -> list[dict
         symbol, direction, fill_model, config_source = key
         runs = grouped[key]
         trade_count = len(runs)
-        successful_closed = [run for run in runs if run.exit_quality == "closed_ok"]
+        successful_closed = [
+            run
+            for run in runs
+            if run.exit_quality
+            in {
+                "closed_ok",
+                "closed_profitable_with_cycle_undercoverage",
+            }
+        ]
         undercovered_closed = [
             run for run in runs if run.exit_quality == "closed_undercovered_final_exit"
         ]
@@ -172,6 +183,7 @@ def aggregate_continuous_results(results: Iterable[BacktestResult]) -> list[dict
                 "closed_ok",
                 "closed_undercovered_final_exit",
                 "closed_negative_pnl",
+                "closed_profitable_with_cycle_undercoverage",
             }
         ]
 
@@ -191,7 +203,13 @@ def aggregate_continuous_results(results: Iterable[BacktestResult]) -> list[dict
         recovery_closed_runs = [
             run
             for run in runs
-            if str(run.exit_reason or "") == "recovery_joint_exit"
+            if str(run.exit_reason or "")
+            in {
+                "recovery_joint_exit",
+                "recovery_timeout_close_all",
+                "recovery_max_loss_close_all",
+                "recovery_max_additional_loss_close_all",
+            }
         ]
         normal_closed_runs = [
             run
@@ -501,6 +519,7 @@ def run_continuous_reentry_for_direction(
     recovery_bot_config: RecoveryBotConfig | None = None,
     recovery_reentry_config: RecoveryReentryConfig | None = None,
     input_slice_start_index: int = 0,
+    preventive_next_cycle_min_notional_refill_enabled: bool | None = None,
 ) -> list[BacktestResult]:
     """Run chained backtests until a trade stays open or candles are exhausted."""
     symbol_upper = symbol.upper()
@@ -559,6 +578,9 @@ def run_continuous_reentry_for_direction(
             recovery_bot_config=recovery_bot_config,
             absolute_trade_start_index=start_index,
             input_slice_start_index=input_slice_start_index,
+            preventive_next_cycle_min_notional_refill_enabled=(
+                preventive_next_cycle_min_notional_refill_enabled
+            ),
         )
         result.start_index = start_index
         result.input_slice_start_index = input_slice_start_index
@@ -630,6 +652,7 @@ def run_continuous_reentry_backtests(
     write_json: bool = True,
     write_csv: bool = True,
     include_logs: bool = False,
+    preventive_next_cycle_min_notional_refill_enabled: bool | None = None,
 ) -> dict[str, Any]:
     """Run continuous re-entry backtests for one or more directions."""
     symbol_upper = symbol.upper()
@@ -669,6 +692,9 @@ def run_continuous_reentry_backtests(
                 recovery_bot_config=recovery_bot_config,
                 recovery_reentry_config=recovery_reentry_config,
                 input_slice_start_index=input_slice_start_index,
+                preventive_next_cycle_min_notional_refill_enabled=(
+                    preventive_next_cycle_min_notional_refill_enabled
+                ),
             )
         )
 

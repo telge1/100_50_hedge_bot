@@ -7,7 +7,13 @@ from typing import Any
 
 import pandas as pd
 
-from research.regime_scanner.timeframes import TIMEFRAME_MINUTES, ensure_utc_timestamp
+from research.regime_scanner.mysql_candle_store.candle_timeframes import (
+    count_gaps,
+    is_aligned_open,
+    is_importable_timeframe,
+    normalize_timeframe,
+)
+from research.regime_scanner.timeframes import ensure_utc_timestamp
 
 REQUIRED_OHLCV = ("date", "open", "high", "low", "close", "volume")
 
@@ -28,6 +34,7 @@ class ValidationReport:
     sorted: bool = True
     start: str | None = None
     end: str | None = None
+    last_candle_closed: bool | None = None
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -61,10 +68,16 @@ def validate_ohlcv_frame(
     *,
     timeframe: str,
     max_samples: int = 20,
+    now: object | None = None,
 ) -> tuple[pd.DataFrame, ValidationReport]:
-    """Validate and return cleaned frame + report."""
-    key = str(timeframe).strip().lower()
-    if key not in TIMEFRAME_MINUTES:
+    """Validate and return cleaned frame + report.
+
+    Only **closed** candles are retained when ``now`` is provided (default: UTC now).
+    """
+    from research.regime_scanner.mysql_candle_store.candle_timeframes import candle_close_time
+
+    key = normalize_timeframe(timeframe)
+    if not is_importable_timeframe(key):
         raise ValueError(f"unsupported timeframe for validation: {timeframe!r}")
 
     report = ValidationReport()
@@ -95,12 +108,22 @@ def validate_ohlcv_frame(
             report.errors.append("duplicates remain after sort")
         report.sorted = True
 
-    minutes = int(TIMEFRAME_MINUTES[key])
-    misaligned_mask = []
-    for ts in frame["date"]:
-        t = ensure_utc_timestamp(ts)
-        bad = (int(t.minute) % minutes) != 0 or int(t.second) != 0 or int(t.microsecond) != 0
-        misaligned_mask.append(bad)
+    # Drop incomplete last candle(s) if still open.
+    now_ts = ensure_utc_timestamp(now) if now is not None else pd.Timestamp.now(tz="UTC")
+    close_times = frame["date"].map(lambda t: candle_close_time(t, key))
+    closed_mask = close_times <= now_ts
+    if len(frame) and not bool(closed_mask.iloc[-1]):
+        report.last_candle_closed = False
+        frame = frame.loc[closed_mask].reset_index(drop=True)
+        close_times = frame["date"].map(lambda t: candle_close_time(t, key))
+    else:
+        report.last_candle_closed = True if len(frame) else None
+
+    if frame.empty:
+        report.errors.append("no closed candles after filtering open last bar")
+        return frame, report
+
+    misaligned_mask = [not is_aligned_open(ts, key) for ts in frame["date"]]
     misaligned = frame.loc[pd.Series(misaligned_mask, index=frame.index)]
     report.misaligned_opens = int(len(misaligned))
     report.misaligned_samples = [
@@ -111,18 +134,9 @@ def validate_ohlcv_frame(
             f"misaligned open timestamps for {key}: {report.misaligned_opens}"
         )
 
-    expected = pd.Timedelta(minutes=minutes)
-    deltas = frame["date"].diff().iloc[1:]
-    bad = deltas[deltas != expected]
-    report.gap_count = int(len(bad))
-    for idx in list(bad.index)[:max_samples]:
-        report.gap_samples.append(
-            {
-                "previous": ensure_utc_timestamp(frame.loc[idx - 1, "date"]).isoformat(),
-                "current": ensure_utc_timestamp(frame.loc[idx, "date"]).isoformat(),
-                "delta": str(bad.loc[idx]),
-            }
-        )
+    gaps, gap_samples = count_gaps(frame["date"], key)
+    report.gap_count = gaps
+    report.gap_samples = gap_samples
 
     neg_vol = frame["volume"] < 0
     report.negative_volume_count = int(neg_vol.sum())

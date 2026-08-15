@@ -1,0 +1,940 @@
+{
+  "pass": true,
+  "decision": "BASELINE_PARITY_PASS",
+  "checks": [
+    {
+      "check": "n_cases_full_universe",
+      "ok": true,
+      "got": 25,
+      "expected": 25
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-20T08:35:00+00:00",
+      "expected": "2026-01-20T08:35:00+00:00"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:start_fill_price",
+      "ok": true,
+      "got": 159.52,
+      "expected": "159.52"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:engine_total_exit_economics",
+      "ok": true,
+      "got": -22.354694826300317,
+      "expected": "-22.354694826300317"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.97015889999982,
+      "expected": "2.97015889999982"
+    },
+    {
+      "check": "AAVEUSDT|two_early_medium|continuous|0006:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-18T23:55:00+00:00",
+      "expected": "2026-01-18T23:55:00+00:00"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:start_fill_price",
+      "ok": true,
+      "got": 0.3757,
+      "expected": "0.3757"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:engine_total_exit_economics",
+      "ok": true,
+      "got": -16.201643832056085,
+      "expected": "-16.201643832056085"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:realized_overlay_pnl",
+      "ok": true,
+      "got": 3.6973098000000832,
+      "expected": "3.6973098000000832"
+    },
+    {
+      "check": "ADAUSDT|two_early_medium|continuous|0006:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:status",
+      "ok": true,
+      "got": "RECOVERED_PROFIT",
+      "expected": "RECOVERED_PROFIT"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:start_fill_price",
+      "ok": true,
+      "got": 1.6447,
+      "expected": "1.6447"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:engine_total_exit_economics",
+      "ok": true,
+      "got": 21.858019294808667,
+      "expected": "21.858019294808667"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:realized_overlay_pnl",
+      "ok": true,
+      "got": 46.149957799999854,
+      "expected": "46.149957799999854"
+    },
+    {
+      "check": "APTUSDT|two_early_medium|continuous|0006:recovery_timestamp",
+      "ok": true,
+      "got": "2026-02-06T00:15:00+00:00",
+      "expected": "2026-02-06T00:15:00+00:00"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:start_fill_price",
+      "ok": true,
+      "got": 0.19804,
+      "expected": "0.19804"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:engine_total_exit_economics",
+      "ok": true,
+      "got": -23.33739916893026,
+      "expected": "-23.33739916893026"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:realized_overlay_pnl",
+      "ok": true,
+      "got": 4.968667100000143,
+      "expected": "4.968667100000143"
+    },
+    {
+      "check": "ARBUSDT|two_early_medium|continuous|0008:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:start_fill_price",
+      "ok": true,
+      "got": 2.347,
+      "expected": "2.347"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:engine_total_exit_economics",
+      "ok": true,
+      "got": -28.081522085858822,
+      "expected": "-28.081522085858822"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:realized_overlay_pnl",
+      "ok": true,
+      "got": 1.6958032000000607,
+      "expected": "1.6958032000000607"
+    },
+    {
+      "check": "ATOMUSDT|two_early_medium|continuous|0015:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-18T23:50:00+00:00",
+      "expected": "2026-01-18T23:50:00+00:00"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:start_fill_price",
+      "ok": true,
+      "got": 13.084,
+      "expected": "13.084"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:engine_total_exit_economics",
+      "ok": true,
+      "got": -24.141975695534413,
+      "expected": "-24.141975695534413"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.941801500000106,
+      "expected": "2.941801500000106"
+    },
+    {
+      "check": "AVAXUSDT|two_early_medium|continuous|0004:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-25T19:25:00+00:00",
+      "expected": "2026-01-25T19:25:00+00:00"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:start_fill_price",
+      "ok": true,
+      "got": 86700.1,
+      "expected": "86700.1"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:engine_total_exit_economics",
+      "ok": true,
+      "got": -27.284510661054988,
+      "expected": "-27.284510661054988"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:realized_overlay_pnl",
+      "ok": true,
+      "got": 1.4357859000000246,
+      "expected": "1.4357859000000246"
+    },
+    {
+      "check": "BTCUSDT|two_early_medium|continuous|0005:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-11T20:10:00+00:00",
+      "expected": "2026-01-11T20:10:00+00:00"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:start_fill_price",
+      "ok": true,
+      "got": 0.13658,
+      "expected": "0.13658"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:engine_total_exit_economics",
+      "ok": true,
+      "got": -20.554733541709208,
+      "expected": "-20.554733541709208"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:realized_overlay_pnl",
+      "ok": true,
+      "got": 6.308732799999743,
+      "expected": "6.308732799999743"
+    },
+    {
+      "check": "DOGEUSDT|two_early_medium|continuous|0003:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:start_fill_price",
+      "ok": true,
+      "got": 1.9748,
+      "expected": "1.9748"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:engine_total_exit_economics",
+      "ok": true,
+      "got": -26.91230126069956,
+      "expected": "-26.91230126069956"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.9668588999999685,
+      "expected": "2.9668588999999685"
+    },
+    {
+      "check": "DOTUSDT|two_early_medium|continuous|0004:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:start_fill_price",
+      "ok": true,
+      "got": 11.814,
+      "expected": "11.814"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:engine_total_exit_economics",
+      "ok": true,
+      "got": -25.972122527195037,
+      "expected": "-25.972122527195037"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.4018725000000183,
+      "expected": "2.4018725000000183"
+    },
+    {
+      "check": "ETCUSDT|two_early_medium|continuous|0007:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-20T15:10:00+00:00",
+      "expected": "2026-01-20T15:10:00+00:00"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:start_fill_price",
+      "ok": true,
+      "got": 2999.64,
+      "expected": "2999.64"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:engine_total_exit_economics",
+      "ok": true,
+      "got": -24.287454961972767,
+      "expected": "-24.287454961972767"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.802298499999978,
+      "expected": "2.802298499999978"
+    },
+    {
+      "check": "ETHUSDT|two_early_medium|continuous|0008:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:start_fill_price",
+      "ok": true,
+      "got": 1.3666,
+      "expected": "1.3666"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:engine_total_exit_economics",
+      "ok": true,
+      "got": -54.59547695409555,
+      "expected": "-54.59547695409555"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:realized_overlay_pnl",
+      "ok": true,
+      "got": 5.00389759999985,
+      "expected": "5.00389759999985"
+    },
+    {
+      "check": "FILUSDT|two_early_medium|continuous|0009:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-06-04T08:05:00+00:00",
+      "expected": "2026-06-04T08:05:00+00:00"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:start_fill_price",
+      "ok": true,
+      "got": 6.187,
+      "expected": "6.187"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:engine_total_exit_economics",
+      "ok": true,
+      "got": -26.17695931918288,
+      "expected": "-26.17695931918288"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:realized_overlay_pnl",
+      "ok": true,
+      "got": 1.5551885999999837,
+      "expected": "1.5551885999999837"
+    },
+    {
+      "check": "INJUSDT|two_early_medium|continuous|0028:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:15:00+00:00",
+      "expected": "2026-01-19T00:15:00+00:00"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:start_fill_price",
+      "ok": true,
+      "got": 12.804,
+      "expected": "12.804"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:engine_total_exit_economics",
+      "ok": true,
+      "got": -23.201684601975302,
+      "expected": "-23.201684601975302"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:realized_overlay_pnl",
+      "ok": true,
+      "got": 3.7625759999997435,
+      "expected": "3.7625759999997435"
+    },
+    {
+      "check": "LINKUSDT|two_early_medium|continuous|0006:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-12T13:00:00+00:00",
+      "expected": "2026-01-12T13:00:00+00:00"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:start_fill_price",
+      "ok": true,
+      "got": 76.33,
+      "expected": "76.33"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:engine_total_exit_economics",
+      "ok": true,
+      "got": -17.26900140947011,
+      "expected": "-17.26900140947011"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.796222599999946,
+      "expected": "2.796222599999946"
+    },
+    {
+      "check": "LTCUSDT|two_early_medium|continuous|0002:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-06-04T08:05:00+00:00",
+      "expected": "2026-06-04T08:05:00+00:00"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:start_fill_price",
+      "ok": true,
+      "got": 2.3969,
+      "expected": "2.3969"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:engine_total_exit_economics",
+      "ok": true,
+      "got": -45.054143836705315,
+      "expected": "-45.054143836705315"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:realized_overlay_pnl",
+      "ok": true,
+      "got": 1.3570644000000909,
+      "expected": "1.3570644000000909"
+    },
+    {
+      "check": "NEARUSDT|two_early_medium|continuous|0059:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T04:05:00+00:00",
+      "expected": "2026-01-19T04:05:00+00:00"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:start_fill_price",
+      "ok": true,
+      "got": 0.3117,
+      "expected": "0.3117"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:engine_total_exit_economics",
+      "ok": true,
+      "got": -27.841116456638456,
+      "expected": "-27.841116456638456"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:realized_overlay_pnl",
+      "ok": true,
+      "got": 5.716586299999806,
+      "expected": "5.716586299999806"
+    },
+    {
+      "check": "OPUSDT|two_early_medium|continuous|0009:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-15T00:05:00+00:00",
+      "expected": "2026-01-15T00:05:00+00:00"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:start_fill_price",
+      "ok": true,
+      "got": 2.2617,
+      "expected": "2.2617"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:engine_total_exit_economics",
+      "ok": true,
+      "got": -26.22875467255997,
+      "expected": "-26.22875467255997"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:realized_overlay_pnl",
+      "ok": true,
+      "got": 3.3335873999998076,
+      "expected": "3.3335873999998076"
+    },
+    {
+      "check": "RENDERUSDT|two_early_medium|continuous|0017:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-18T23:55:00+00:00",
+      "expected": "2026-01-18T23:55:00+00:00"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:start_fill_price",
+      "ok": true,
+      "got": 0.11474,
+      "expected": "0.11474"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:engine_total_exit_economics",
+      "ok": true,
+      "got": -20.133838158974534,
+      "expected": "-20.133838158974534"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:realized_overlay_pnl",
+      "ok": true,
+      "got": 5.86212249999994,
+      "expected": "5.86212249999994"
+    },
+    {
+      "check": "SEIUSDT|two_early_medium|continuous|0007:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-20T06:20:00+00:00",
+      "expected": "2026-01-20T06:20:00+00:00"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:start_fill_price",
+      "ok": true,
+      "got": 131.32,
+      "expected": "131.32"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:engine_total_exit_economics",
+      "ok": true,
+      "got": -23.6976510320748,
+      "expected": "-23.6976510320748"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.973338500000148,
+      "expected": "2.973338500000148"
+    },
+    {
+      "check": "SOLUSDT|two_early_medium|continuous|0008:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-18T23:50:00+00:00",
+      "expected": "2026-01-18T23:50:00+00:00"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:start_fill_price",
+      "ok": true,
+      "got": 1.7087,
+      "expected": "1.7087"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:engine_total_exit_economics",
+      "ok": true,
+      "got": -16.701640590105377,
+      "expected": "-16.701640590105377"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:realized_overlay_pnl",
+      "ok": true,
+      "got": 3.604710600000061,
+      "expected": "3.604710600000061"
+    },
+    {
+      "check": "SUIUSDT|two_early_medium|continuous|0011:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:status",
+      "ok": true,
+      "got": "RECOVERED_PROFIT",
+      "expected": "RECOVERED_PROFIT"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00",
+      "expected": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:start_fill_price",
+      "ok": true,
+      "got": 0.5067,
+      "expected": "0.5067"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:engine_total_exit_economics",
+      "ok": true,
+      "got": 28.078056838421208,
+      "expected": "28.078056838421208"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:realized_overlay_pnl",
+      "ok": true,
+      "got": 53.71708399999997,
+      "expected": "53.71708399999997"
+    },
+    {
+      "check": "TIAUSDT|two_early_medium|continuous|0007:recovery_timestamp",
+      "ok": true,
+      "got": "2026-02-06T00:15:00+00:00",
+      "expected": "2026-02-06T00:15:00+00:00"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-07T20:10:00+00:00",
+      "expected": "2026-01-07T20:10:00+00:00"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:start_fill_price",
+      "ok": true,
+      "got": 5.669,
+      "expected": "5.669"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:engine_total_exit_economics",
+      "ok": true,
+      "got": -16.680497856004596,
+      "expected": "-16.680497856004596"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:realized_overlay_pnl",
+      "ok": true,
+      "got": 2.9739028000001473,
+      "expected": "2.9739028000001473"
+    },
+    {
+      "check": "UNIUSDT|two_early_medium|continuous|0003:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-06-19T10:35:00+00:00",
+      "expected": "2026-06-19T10:35:00+00:00"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:start_fill_price",
+      "ok": true,
+      "got": 0.5972,
+      "expected": "0.5972"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:engine_total_exit_economics",
+      "ok": true,
+      "got": -45.99494764285141,
+      "expected": "-45.99494764285141"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:realized_overlay_pnl",
+      "ok": true,
+      "got": 1.0692899999999772,
+      "expected": "1.0692899999999772"
+    },
+    {
+      "check": "WLDUSDT|two_early_medium|continuous|0018:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:status",
+      "ok": true,
+      "got": "OPEN_AT_120D",
+      "expected": "OPEN_AT_120D"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:start_fill_timestamp",
+      "ok": true,
+      "got": "2026-01-18T23:30:00+00:00",
+      "expected": "2026-01-18T23:30:00+00:00"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:start_fill_price",
+      "ok": true,
+      "got": 2.0199,
+      "expected": "2.0199"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:engine_total_exit_economics",
+      "ok": true,
+      "got": -42.600965856552534,
+      "expected": "-42.600965856552534"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:realized_overlay_pnl",
+      "ok": true,
+      "got": 4.259427600000128,
+      "expected": "4.259427600000128"
+    },
+    {
+      "check": "XRPUSDT|two_early_medium|continuous|0005:recovery_timestamp",
+      "ok": true,
+      "got": null,
+      "expected": ""
+    },
+    {
+      "check": "apt_fill_ts",
+      "ok": true,
+      "got": "2026-01-19T00:05:00+00:00"
+    },
+    {
+      "check": "apt_fill_px",
+      "ok": true,
+      "got": 1.6447
+    },
+    {
+      "check": "apt_overlay",
+      "ok": true,
+      "got": 46.149957799999854
+    },
+    {
+      "check": "apt_engine",
+      "ok": true,
+      "got": 21.858019294808667
+    },
+    {
+      "check": "same_candle_exit_count",
+      "ok": true,
+      "got": 2,
+      "expected": 2
+    }
+  ],
+  "n_b0": 25,
+  "n_expected": 25
+}

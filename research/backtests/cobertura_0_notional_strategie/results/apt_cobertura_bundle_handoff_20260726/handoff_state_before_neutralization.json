@@ -1,0 +1,47 @@
+{
+  "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+  "position": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 197.59699999999998,
+    "short_avg": 1.864561269615919,
+    "net_qty": 98.76800000000003,
+    "active_cycle_source": 4,
+    "last_fill_timestamp_before_signal": "2026-01-18T23:50:00+00:00",
+    "fills_before_signal": 9,
+    "fills_at_or_after_signal": 4
+  },
+  "trigger": {
+    "break_cycle_id": 1,
+    "confirmation_ts": null,
+    "signal_available_ts": "2026-01-19T00:00:00+00:00",
+    "structure_break_direction": "bearish",
+    "structure_break_event_ts": "2026-01-18T23:55:00+00:00",
+    "structure_break_kind": "protected_low_4h_close_break",
+    "structure_break_level": 1.7639,
+    "structure_break_timeframe": "4h",
+    "trigger_mode": "first_break"
+  },
+  "market": {
+    "distance_break_to_market_pct": -0.023584103407222723,
+    "market_price_at_signal": 1.7223,
+    "neutralization_fill_price": 1.7223,
+    "slippage_bps": 0.0,
+    "taker_fee_rate": 0.00055,
+    "tradeable_5m_open": 1.7223,
+    "tradeable_timestamp": "2026-01-19T00:00:00+00:00"
+  },
+  "prior_economics": {
+    "cumulative_fees": null,
+    "fee_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+    "realized_pnl": -11.900133102067503,
+    "total_economics_at_signal": -25.94212431060869,
+    "unrealized_pnl_at_signal": -14.041991208541187
+  },
+  "source_strategy": "TEM",
+  "source_active_cycle": 4,
+  "cobertura_active_cycle": null,
+  "fresh_initial_entry_required": false,
+  "initial_entry_confirmed": true,
+  "initial_entry_submitted": true
+}

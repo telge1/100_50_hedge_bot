@@ -297,6 +297,11 @@ def test_zone_rendering_contract_in_trp_js():
     js = TRP_JS.read_text(encoding="utf-8")
     css = TRP_CSS.read_text(encoding="utf-8")
     assert "ov-zone" in js and "ov-zone" in css
+    assert "clipOverlayLayerToPlot" in js
+    assert "plotRightX" in js
+    assert "plotBottomY" in js
+    assert "timeAxisHeight" in js
+    assert "onShiftMeasureMoveCapture" in js
     assert "extend_right" in js or "extendRight" in js or "extend_right" in js
     assert "ov-position" in js and "ov-handle" in js
     assert "DEFAULT_VISIBLE_BARS" in js
@@ -308,8 +313,18 @@ def test_collector_strings_regression():
     assert "ensure=false" in host
     assert "ensure=true" in host
     html = (DASHBOARD_ROOT / "templates" / "research_charts.html").read_text()
-    assert "research_charts.js?v=signals-all-tf-1" in html
+    assert "research_charts.js?v=time-clip-1" in html
+    assert "researchHeightHandle" in html
+    assert "researchChartDock" in html
+    assert "researchDockBar" in html
+    assert "research.css?v=time-clip-1" in html
+    assert "researchIndStoch" in html
+    assert "researchIndLld" in html
+    dock = html[html.index("researchDockBar") : html.index("researchWorkspace")]
+    assert "researchIndStoch" in dock
+    assert "researchIndLld" in dock
     assert "researchBacktesterBtn" in html
+    assert "researchFullscreenBtn" in html
     assert "researchBacktesterBtn" in host
     assert "/api/research/backtester/load" in host
     assert "strategy_version" in host

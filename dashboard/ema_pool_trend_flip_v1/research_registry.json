@@ -1,0 +1,12 @@
+{
+  "strategy_id": "EMA_POOL_TREND_FLIP_V1",
+  "research_only": true,
+  "live_trading": false,
+  "research_run_id": "20260814T202505Z-e10f9ce9",
+  "artifact_relpath": "results/ema_pool_trend_flip_v1/20260814T202505Z-e10f9ce9",
+  "symbol": "ACEUSDT",
+  "window_start": "2026-08-12T15:03:43Z",
+  "window_end": "2026-08-14T15:03:43Z",
+  "planner_version": "c6c960a82e9a0c538dbe24b03f481893e722072f",
+  "pool_interval": "5m"
+}

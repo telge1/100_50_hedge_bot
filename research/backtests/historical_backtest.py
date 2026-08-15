@@ -136,6 +136,7 @@ def run_historical_backtest(
     recovery_bot_config: RecoveryBotConfig | None = None,
     absolute_trade_start_index: int = 0,
     input_slice_start_index: int = 0,
+    preventive_next_cycle_min_notional_refill_enabled: bool | None = None,
 ) -> BacktestResult:
     """Run a mini-backtest over a 5m candle series."""
     signal: Signal = "short" if str(direction).lower() == "short" else "long"
@@ -175,6 +176,10 @@ def run_historical_backtest(
     if base_notional_usdt is not None:
         config_load.config.base_notional_usdt = float(base_notional_usdt)
         initial_notional_usdt = float(base_notional_usdt)
+    if preventive_next_cycle_min_notional_refill_enabled is not None:
+        config_load.config.preventive_next_cycle_min_notional_refill_enabled = bool(
+            preventive_next_cycle_min_notional_refill_enabled
+        )
 
     if use_live_short_tp_relief:
         # Aktiviert das Live-Short-TP-Relief-Feature auf Config-Ebene, ohne den
@@ -275,7 +280,9 @@ def run_historical_backtest(
                 )
                 if recovery_closed:
                     result.final_status = "closed"
-                    result.exit_reason = "recovery_joint_exit"
+                    result.exit_reason = (
+                        recovery_tracker.state.exit_reason or "recovery_joint_exit"
+                    )
                     break
                 continue
 
@@ -368,7 +375,9 @@ def run_historical_backtest(
                 )
                 if recovery_closed:
                     result.final_status = "closed"
-                    result.exit_reason = "recovery_joint_exit"
+                    result.exit_reason = (
+                        recovery_tracker.state.exit_reason or "recovery_joint_exit"
+                    )
                     break
 
             if _is_trade_closed(sim):

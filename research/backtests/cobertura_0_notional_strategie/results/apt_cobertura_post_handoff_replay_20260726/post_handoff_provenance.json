@@ -1,0 +1,30 @@
+{
+  "generated_at_utc": "2026-07-26T09:05:25.921192+00:00",
+  "handoff_dir": "research/backtests/cobertura_0_notional_strategie/results/apt_cobertura_bundle_handoff_20260726",
+  "handoff_decision": "APT_COBERTURA_BUNDLE_HANDOFF_PASS_WITH_WARNINGS",
+  "start_timestamp": "2026-01-19T00:00:00+00:00",
+  "final_state": "DATA_END_OPEN",
+  "exit_reason": "data_end_open",
+  "bars_processed": 45945,
+  "recovery_rounds": 16,
+  "locked_spread_loss": 14.04199120854124,
+  "seed_position": {
+    "long_qty": 296.365,
+    "long_avg": 1.864531340748192,
+    "short_qty": 296.365,
+    "short_avg": 1.8171506068270433,
+    "net_qty": 0.0,
+    "cumulative_entry_fees": 0.09355946952000002
+  },
+  "prior_economics": {
+    "prior_realized_pnl": -11.900133102067503,
+    "prior_realized_deficit": 11.900133102067503,
+    "spread_loss_before_neutralization": -14.041991208541187,
+    "spread_recovery_target": 14.041991208541187,
+    "neutralization_fee": 0.09355946952000002,
+    "include_prior_realized_pnl_in_recovery_target": false,
+    "include_neutralization_fee_in_spread_target": false,
+    "fee_quality": "FEE_RECONSTRUCTION_UNRESOLVED",
+    "cumulative_fees": null
+  }
+}

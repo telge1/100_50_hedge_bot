@@ -214,7 +214,12 @@ def build_rule_spec(cfg: MarketStructureConfig) -> dict[str, Any]:
             "major_min_reversal_atr": cfg.major_min_reversal_atr,
             "major_min_bars_between": cfg.major_min_bars_between,
             "micro_min_bars_between": cfg.micro_min_bars_between,
-            "live_from": "confirmed_timestamp_only",
+            "live_from": "confirmed_timestamp_for_level_activation",
+            "extreme_timestamp_source": "pivot_candle_open_when_stamped",
+            "note": (
+                "Protected/swing level becomes live only at confirmed_timestamp; "
+                "extreme_timestamp records the pivot candle open when available."
+            ),
         },
         "break": {
             "mode": cfg.break_mode,
@@ -359,10 +364,17 @@ def _maybe_confirm_swings(
     cfg: MarketStructureConfig,
     highs_window: Sequence[float],
     lows_window: Sequence[float],
+    timestamps_window: Sequence[Any] | None = None,
 ) -> list[SwingPoint]:
     """Causal swing confirmation on the current bar only."""
     newly: list[SwingPoint] = []
     atr = max(atr, 1e-12)
+    ts_win = list(timestamps_window) if timestamps_window is not None else []
+
+    def _extreme_ts(extreme_bar: int) -> Any:
+        if 0 <= extreme_bar < len(ts_win):
+            return ts_win[extreme_bar]
+        return None
 
     # Candidate swing high: current lookback max at a past extreme still pending.
     if len(highs_window) >= cfg.lookback:
@@ -426,7 +438,7 @@ def _maybe_confirm_swings(
                     kind="high",
                     level=float(rt.pending_high_level),
                     extreme_bar=int(rt.pending_high_bar),
-                    extreme_timestamp=None,
+                    extreme_timestamp=_extreme_ts(int(rt.pending_high_bar)),
                     confirmed_bar=bar_i,
                     confirmed_timestamp=ts,
                     confirmation_delay_bars=delay,
@@ -462,7 +474,7 @@ def _maybe_confirm_swings(
                     kind="low",
                     level=float(rt.pending_low_level),
                     extreme_bar=int(rt.pending_low_bar),
-                    extreme_timestamp=None,
+                    extreme_timestamp=_extreme_ts(int(rt.pending_low_bar)),
                     confirmed_bar=bar_i,
                     confirmed_timestamp=ts,
                     confirmation_delay_bars=delay,
@@ -519,6 +531,7 @@ def step_market_structure_state(
     lows_window = prepared_bar.get("lows_window") or [low]
     clean_state = str(prepared_bar.get("indicator_clean_regime_state") or "neutral")
 
+    timestamps_window = prepared_bar.get("timestamps_window")
     newly = _maybe_confirm_swings(
         rt,
         bar_i=bar_i,
@@ -530,6 +543,7 @@ def step_market_structure_state(
         cfg=config,
         highs_window=list(highs_window),
         lows_window=list(lows_window),
+        timestamps_window=timestamps_window,
     )
 
     up_break, down_break = _active_break_levels(rt)
@@ -863,6 +877,10 @@ def apply_market_structure(
     prev = "structure_unknown"
     highs = df["high"].astype(float).tolist()
     lows = df["low"].astype(float).tolist()
+    timestamps = [
+        (src_ts if (src_ts := row.get("timestamp") or row.get("decision_time")) is not None else None)
+        for row in df.to_dict("records")
+    ]
 
     for i in range(len(df)):
         src = df.iloc[i].to_dict()
@@ -874,6 +892,7 @@ def apply_market_structure(
             "bar_index": int(src.get("bar_index", i)),
             "highs_window": highs[: i + 1],
             "lows_window": lows[: i + 1],
+            "timestamps_window": timestamps[: i + 1],
             "indicator_clean_regime_state": clean,
         }
         new_state, rt, diag = step_market_structure_state(prev, rt, prepared, cfg)
@@ -916,6 +935,7 @@ def advance_micro_swings(
     ts = prepared_bar.get("decision_time") or prepared_bar.get("timestamp")
     highs_window = list(prepared_bar.get("highs_window") or [high])
     lows_window = list(prepared_bar.get("lows_window") or [low])
+    timestamps_window = prepared_bar.get("timestamps_window")
     return _maybe_confirm_swings(
         runtime_state,
         bar_i=bar_i,
@@ -927,6 +947,7 @@ def advance_micro_swings(
         cfg=config,
         highs_window=highs_window,
         lows_window=lows_window,
+        timestamps_window=timestamps_window,
     )
 
 

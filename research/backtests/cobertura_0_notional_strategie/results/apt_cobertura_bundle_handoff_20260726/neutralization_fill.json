@@ -1,0 +1,33 @@
+{
+  "neutralization_side": "short",
+  "neutralization_qty": 98.76800000000003,
+  "neutralization_fill_price": 1.7223,
+  "neutralization_notional": 170.10812640000003,
+  "neutralization_fee": 0.09355946952000002,
+  "neutralization_fill_origin": "COBERTURA_HANDOFF",
+  "neutralization_status": "NEEDS_SHORT_FILL",
+  "post_long_qty": 296.365,
+  "post_long_avg": 1.864531340748192,
+  "post_short_qty": 296.365,
+  "post_short_avg": 1.8171506068270433,
+  "post_net_qty": 0.0,
+  "compute_neutralization": {
+    "neutralization_status": "NEEDS_SHORT_FILL",
+    "neutralization_short_qty": 98.76800000000003,
+    "new_short_qty": 296.365,
+    "new_short_avg": 1.8171506068270433,
+    "neutralization_notional": 170.10812640000003,
+    "neutralization_open_fee": 0.09355946952000002,
+    "post_neutralization_long_qty": 296.365,
+    "post_neutralization_short_qty": 296.365,
+    "post_neutralization_long_avg": 1.864531340748192,
+    "post_neutralization_short_avg": 1.8171506068270433,
+    "post_neutralization_avg_spread_abs": 0.04738073392114872,
+    "post_neutralization_avg_spread_pct_from_long": 0.025411604989238723,
+    "post_neutralization_net_qty": 0.0,
+    "flags": []
+  },
+  "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+  "scenario_id": "full_qty_neutralization_spread_only_v1",
+  "timestamp": "2026-01-19T00:00:00+00:00"
+}

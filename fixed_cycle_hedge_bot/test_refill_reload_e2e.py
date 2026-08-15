@@ -187,11 +187,18 @@ class RefillE2ELifecycleTests(unittest.TestCase):
         cancel_ok = strategy._cancel_refill_exit_orders(runtime_state, context, state)
         self.assertTrue(cancel_ok)
         self.assertFalse(state.get("refill_exit_orders_cancel_required"))
-        self.assertEqual(order_manager.cancel_order.call_count, 2)
+        self.assertEqual(order_manager.cancel_order.call_count, 3)
+        cancelled_exchange_ids = {
+            call.args[0] for call in order_manager.cancel_order.call_args_list
+        }
+        self.assertEqual(
+            cancelled_exchange_ids,
+            {"ex-long-tp", "ex-short-sl", "ex-cycle-add"},
+        )
         remaining_purposes = {order.purpose for order in runtime_state.active_orders.values()}
         self.assertNotIn("LONG_TP_EXIT", remaining_purposes)
         self.assertNotIn("SHORT_SL_EXIT", remaining_purposes)
-        self.assertIn("CYCLE_5_LONG_ADD", remaining_purposes)
+        self.assertNotIn("CYCLE_5_LONG_ADD", remaining_purposes)
 
         refill_intents = strategy._build_entry_intents(pre_refill_snapshot, runtime_state, context)
         purposes = {intent.purpose for intent in refill_intents}

@@ -205,7 +205,8 @@ def build_rule_spec(cfg: ProtectedStructureConfig) -> dict[str, Any]:
             "lookback": cfg.lookback,
             "confirm_bars": cfg.confirm_bars,
             "min_reversal_atr": cfg.min_reversal_atr,
-            "live_from": "confirmed_timestamp_only",
+            "live_from": "confirmed_timestamp_for_level_activation",
+            "extreme_timestamp_source": "pivot_candle_open_when_stamped",
         },
         "protected_levels": {
             "replace_only_after_continuation": True,
@@ -1210,6 +1211,7 @@ def apply_protected_structure(
     prev = "structure_unknown"
     highs = df["high"].astype(float).tolist()
     lows = df["low"].astype(float).tolist()
+    timestamps = [row.get("timestamp") or row.get("decision_time") for row in df.to_dict("records")]
 
     for i in range(len(df)):
         src = df.iloc[i].to_dict()
@@ -1221,6 +1223,7 @@ def apply_protected_structure(
             "bar_index": int(src.get("bar_index", i)),
             "highs_window": highs[: i + 1],
             "lows_window": lows[: i + 1],
+            "timestamps_window": timestamps[: i + 1],
             "indicator_clean_regime_state": clean,
         }
         new_state, rt, diag = step_protected_structure_state(

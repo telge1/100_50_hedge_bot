@@ -100,6 +100,17 @@ def resolve_cycle_short_tp_relief_config(args: argparse.Namespace) -> CycleShort
 
 
 def resolve_recovery_bot_config(args: argparse.Namespace) -> RecoveryBotConfig | None:
+    """Resolve backtest-only recovery config from CLI.
+
+    ``--recovery-bot`` enables the feature. In addition, passing an explicit
+    timeout alternative (``--recovery-timeout-action close_all``), a timeout
+    loss gate (``--recovery-timeout-min-loss-usdt``), a continuous max-loss
+    stop (``--recovery-max-loss-usdt``), or an additional-loss stop
+    (``--recovery-max-additional-loss-usdt``) also enables recovery, so those
+    flags cannot be silently ignored when ``--recovery-bot`` was omitted.
+    """
+    from .recovery_bot_config import normalize_recovery_timeout_action
+
     json_payload = getattr(args, "recovery_bot_config_json", None)
     if json_payload:
         cfg = recovery_bot_config_from_json_string(str(json_payload))
@@ -107,15 +118,37 @@ def resolve_recovery_bot_config(args: argparse.Namespace) -> RecoveryBotConfig |
         return cfg
     if bool(getattr(args, "no_recovery_bot", False)):
         return None
-    if bool(getattr(args, "recovery_bot", False)):
-        cfg = default_recovery_bot_config()
-        cfg.enabled = True
-        if getattr(args, "recovery_start_purpose", None):
-            cfg.recovery_start_purpose = str(args.recovery_start_purpose)
-        if getattr(args, "recovery_wait_candles", None) is not None:
-            cfg.recovery_wait_candles = max(0, int(args.recovery_wait_candles))
-        return cfg
-    return None
+
+    timeout_action = normalize_recovery_timeout_action(
+        getattr(args, "recovery_timeout_action", None)
+    )
+    min_loss = getattr(args, "recovery_timeout_min_loss_usdt", None)
+    max_loss = getattr(args, "recovery_max_loss_usdt", None)
+    max_additional_loss = getattr(args, "recovery_max_additional_loss_usdt", None)
+    explicit_enable = bool(getattr(args, "recovery_bot", False))
+    implied_enable = (
+        timeout_action == "close_all"
+        or min_loss is not None
+        or max_loss is not None
+        or max_additional_loss is not None
+    )
+    if not explicit_enable and not implied_enable:
+        return None
+
+    cfg = default_recovery_bot_config()
+    cfg.enabled = True
+    if getattr(args, "recovery_start_purpose", None):
+        cfg.recovery_start_purpose = str(args.recovery_start_purpose)
+    if getattr(args, "recovery_wait_candles", None) is not None:
+        cfg.recovery_wait_candles = max(0, int(args.recovery_wait_candles))
+    cfg.recovery_timeout_action = timeout_action
+    if min_loss is not None:
+        cfg.recovery_timeout_min_loss_usdt = float(min_loss)
+    if max_loss is not None:
+        cfg.recovery_max_loss_usdt = float(max_loss)
+    if max_additional_loss is not None:
+        cfg.recovery_max_additional_loss_usdt = float(max_additional_loss)
+    return cfg
 
 
 def resolve_addon_short_recovery_config(args: argparse.Namespace) -> AddonShortRecoveryConfig | None:
@@ -647,6 +680,53 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=144,
         help="5m candles to wait after reference fill before recovery activation (default: 144)",
+    )
+    parser.add_argument(
+        "--recovery-timeout-action",
+        choices=["gap_reduction", "close_all"],
+        default="gap_reduction",
+        help=(
+            "Backtest-only action at recovery wait end: "
+            "gap_reduction (default) or close_all "
+            "(fully close long+short instead of starting gap reduction). "
+            "Passing close_all enables the recovery bot even without --recovery-bot."
+        ),
+    )
+    parser.add_argument(
+        "--recovery-timeout-min-loss-usdt",
+        type=float,
+        default=None,
+        help=(
+            "Optional loss gate for close_all. Close only when estimated net exit PnL "
+            "<= -VALUE. Omit to always close at the timeout candle. Evaluated once."
+        ),
+    )
+    parser.add_argument(
+        "--recovery-max-loss-usdt",
+        type=float,
+        default=None,
+        help=(
+            "Optional continuous max-loss stop during the recovery wait phase. "
+            "On every candle after the reference fill, estimate full flat-close net PnL; "
+            "if <= -VALUE, close long+short immediately via close_all "
+            "(exit_reason=recovery_max_loss_close_all). "
+            "Timeout at reference+wait remains the latest close. "
+            "Enables the recovery bot even without --recovery-bot."
+        ),
+    )
+    parser.add_argument(
+        "--recovery-max-additional-loss-usdt",
+        type=float,
+        default=None,
+        help=(
+            "Optional additional-loss stop relative to the reference-fill baseline. "
+            "Stores estimated net exit PnL at the recovery reference fill, then on "
+            "every later candle closes via close_all when "
+            "(baseline - current) >= VALUE "
+            "(exit_reason=recovery_max_additional_loss_close_all). "
+            "Can run in parallel with --recovery-max-loss-usdt; first hit wins. "
+            "Enables the recovery bot even without --recovery-bot."
+        ),
     )
     parser.add_argument(
         "--recovery-bot-config-json",

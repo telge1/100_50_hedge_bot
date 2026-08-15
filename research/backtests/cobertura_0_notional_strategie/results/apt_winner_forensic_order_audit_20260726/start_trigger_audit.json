@@ -1,0 +1,68 @@
+{
+  "timing_mode": "T1",
+  "minimum_start_distance_pct": 0.06,
+  "signal_available_ts": "2026-01-19T00:00:00+00:00",
+  "signal_open": 1.7223,
+  "distance_at_signal_open": 0.052197438380005054,
+  "signal_open_meets_6pct": false,
+  "trigger_candle_timestamp": "2026-01-19T00:00:00+00:00",
+  "trigger_observation_kind": "close",
+  "trigger_close": 1.6447,
+  "trigger_ohlc": {
+    "open": 1.7223,
+    "high": 1.7223,
+    "low": 1.5101,
+    "close": 1.6447
+  },
+  "distance_at_trigger_close": 0.08183450163712698,
+  "trigger_close_meets_6pct": true,
+  "fill_timestamp": "2026-01-19T00:05:00+00:00",
+  "fill_price": 1.6447,
+  "fill_ohlc": {
+    "open": 1.6447,
+    "high": 1.6522,
+    "low": 1.6208,
+    "close": 1.6327
+  },
+  "projected_short_avg_at_fill": 1.791289264225859,
+  "projected_start_distance_pct_at_fill": 0.08183450163712698,
+  "causal_known_at_trigger_decision": [
+    "all candles strictly before trigger candle",
+    "completed OHLC of trigger candle (close decision)",
+    "pre-signal TEM book quantities/averages"
+  ],
+  "causal_unknown_at_trigger_decision": [
+    "next candle open/high/low/close at decision instant of close",
+    "future recovery outcome"
+  ],
+  "first_causal_trigger_only": true,
+  "same_bar_fill": false,
+  "used_low_as_fill": false,
+  "selection": {
+    "timing_mode": "T1",
+    "trigger_timestamp": "2026-01-19T00:00:00+00:00",
+    "trigger_observation_price": 1.6447,
+    "trigger_observation_kind": "close",
+    "fill_timestamp": "2026-01-19T00:05:00+00:00",
+    "fill_price": 1.6447,
+    "fill_candle_index": 4056,
+    "projected_short_avg_at_fill": 1.791289264225859,
+    "projected_distance_at_fill": 0.08183450163712698,
+    "delay_bars": 1,
+    "delay_minutes": 5,
+    "same_bar_fill": false,
+    "used_low_as_fill": false,
+    "scan": [
+      {
+        "candle_index": 4055,
+        "observation": "close",
+        "observation_price": 1.6447,
+        "timestamp": "2026-01-19T00:00:00+00:00",
+        "projected_short_avg": 1.791289264225859,
+        "projected_start_distance_pct": 0.08183450163712698,
+        "meets_threshold": true
+      }
+    ]
+  },
+  "fingerprint_match_expected_fill": true
+}

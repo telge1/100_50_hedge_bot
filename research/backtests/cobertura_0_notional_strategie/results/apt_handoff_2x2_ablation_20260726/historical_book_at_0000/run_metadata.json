@@ -1,0 +1,8 @@
+{
+  "generated_at_utc": "2026-07-26T09:41:17.096437+00:00",
+  "start_index": 4055,
+  "bars_processed": 45945,
+  "final_state": "DATA_END_OPEN",
+  "exit_reason": "data_end_open",
+  "recovery_reference_price_final": 0.5955
+}

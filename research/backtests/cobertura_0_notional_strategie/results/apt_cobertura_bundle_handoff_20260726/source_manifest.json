@@ -1,0 +1,29 @@
+{
+  "created_at": "2026-07-26T08:40:15.786572+00:00",
+  "schema_version": "1.0",
+  "cli_args": {
+    "bundle": "research/backtests/cobertura_0_notional_strategie/results/cobertura_blocker_input_bundle_20260726/blocker_historical_states.jsonl",
+    "scenarios": "research/backtests/cobertura_0_notional_strategie/results/cobertura_blocker_input_bundle_20260726/cobertura_start_scenarios.jsonl",
+    "trade_id": "APTUSDT|two_early_medium|continuous|0006",
+    "scenario_id": "full_qty_neutralization_spread_only_v1",
+    "trigger_mode": "first_break",
+    "output_dir": "research/backtests/cobertura_0_notional_strategie/results/apt_cobertura_bundle_handoff_20260726"
+  },
+  "git_branch": "research/trend-topping-bottoming-phase-c2",
+  "git_commit": "a1fd26085d9e03732bc9e2e5e4426798294f5066",
+  "git_dirty": true,
+  "sources": [
+    {
+      "role": "blocker_historical_states",
+      "path": "research/backtests/cobertura_0_notional_strategie/results/cobertura_blocker_input_bundle_20260726/blocker_historical_states.jsonl",
+      "sha256": "09ef54ce510b44067715fbd7db1c037c3131d9193b6be9c294e3d59a9609a0e1",
+      "size_bytes": 83427
+    },
+    {
+      "role": "cobertura_start_scenarios",
+      "path": "research/backtests/cobertura_0_notional_strategie/results/cobertura_blocker_input_bundle_20260726/cobertura_start_scenarios.jsonl",
+      "sha256": "f453d41ab3cf7a11aaead5393701d5176ae7477a1d0a5454d62912427933042b",
+      "size_bytes": 446
+    }
+  ]
+}
