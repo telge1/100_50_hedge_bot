@@ -888,6 +888,7 @@
     load();
     startAutoRefresh();
     wireCollector();
+    wireUniverse51();
   });
 
   /* ------------------------------------------------------------------ */
@@ -1122,5 +1123,394 @@
     loadCollectorStatus();
     if (collectorUi.timer) clearInterval(collectorUi.timer);
     collectorUi.timer = setInterval(loadCollectorStatus, collectorUi.pollMs);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Historisches 51-Coin-Universe (read-only coverage, no jobs)        */
+  /* ------------------------------------------------------------------ */
+
+  const universe51 = {
+    coins: [],
+    selected: {},
+    job: null,
+    pollTimer: null,
+    pollMs: 3000,
+    coverageReloadedForJob: null,
+  };
+
+  function universe51FreshnessChip(status) {
+    const v = String(status || "").toUpperCase();
+    if (v === "CURRENT") return "stoch-chip stoch-chip-ok";
+    if (v === "UPDATE_AVAILABLE") return "stoch-chip stoch-chip-update";
+    return "stoch-chip stoch-chip-nodata";
+  }
+
+  function universe51UpdateAvailableCount() {
+    return universe51.coins.filter(function (c) {
+      return c.freshness_status === "UPDATE_AVAILABLE";
+    }).length;
+  }
+
+  function universe51StatusChip(status) {
+    const v = String(status || "").toUpperCase();
+    if (v === "FULL") return "stoch-chip stoch-chip-ok";
+    if (v === "LISTING_LIMITED") return "stoch-chip stoch-chip-listing";
+    if (v === "INCOMPLETE") return "stoch-chip stoch-chip-incomplete";
+    return "stoch-chip stoch-chip-nodata";
+  }
+
+  function universe51SelectedSymbols() {
+    return universe51.coins
+      .filter(function (c) {
+        return c.testable && universe51.selected[c.symbol];
+      })
+      .map(function (c) {
+        return c.symbol;
+      });
+  }
+
+  function universe51SelectedCount() {
+    return universe51SelectedSymbols().length;
+  }
+
+  function universe51TestableCount() {
+    return universe51.coins.filter(function (c) {
+      return c.testable;
+    }).length;
+  }
+
+  function universe51JobActive() {
+    const state = universe51.job && universe51.job.state;
+    return state === "QUEUED" || state === "RUNNING";
+  }
+
+  function universe51CoinJobState(symbol) {
+    const coins = (universe51.job && universe51.job.coins) || [];
+    for (let i = 0; i < coins.length; i++) {
+      if (coins[i].symbol === symbol) return coins[i].state;
+    }
+    return "";
+  }
+
+  function syncUniverse51SelectAll() {
+    const master = $("universe51SelectAll");
+    if (!master) return;
+    const testable = universe51TestableCount();
+    const selected = universe51SelectedCount();
+    master.indeterminate = selected > 0 && selected < testable;
+    master.checked = testable > 0 && selected === testable;
+  }
+
+  function universe51ActionButton(c) {
+    const jobActive = universe51JobActive();
+    const coinState = universe51CoinJobState(c.symbol);
+    if (coinState === "UPDATING") {
+      return "<button type=\"button\" class=\"stoch-btn universe51-update-one\" data-symbol=\"" +
+        c.symbol +
+        "\" disabled>Aktualisieren</button>";
+    }
+    if (c.freshness_status === "CURRENT") {
+      return "<button type=\"button\" class=\"stoch-btn universe51-update-one\" data-symbol=\"" +
+        c.symbol +
+        "\" disabled>Aktuell</button>";
+    }
+    const disabled = jobActive ? "disabled" : "";
+    return "<button type=\"button\" class=\"stoch-btn universe51-update-one\" data-symbol=\"" +
+      c.symbol +
+      "\" " +
+      disabled +
+      ">Aktualisieren</button>";
+  }
+
+  function renderUniverse51Progress() {
+    const el = $("universe51Progress");
+    if (!el) return;
+    if (!universe51JobActive() && !(universe51.job && universe51.job.state)) {
+      el.style.display = "none";
+      el.textContent = "";
+      return;
+    }
+    const job = universe51.job || {};
+    if (!job.state) {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "block";
+    const n = job.completed_symbols == null ? 0 : job.completed_symbols;
+    const total = job.total_symbols == null ? 0 : job.total_symbols;
+    const current = job.current_symbol || "–";
+    const ok = job.success_count == null ? 0 : job.success_count;
+    const failed = job.failed_count == null ? 0 : job.failed_count;
+    el.textContent =
+      (universe51JobActive() ? "Datenaktualisierung läuft · " : "") +
+      "Coin " +
+      n +
+      " von " +
+      total +
+      " · " +
+      current +
+      " · " +
+      ok +
+      " erfolgreich · " +
+      failed +
+      " fehlgeschlagen";
+  }
+
+  function renderUniverse51Summary() {
+    const summary = $("universe51Summary");
+    if (summary) {
+      summary.textContent =
+        universe51.coins.length +
+        " Coins vorhanden · " +
+        universe51TestableCount() +
+        " testbar · " +
+        universe51SelectedCount() +
+        " ausgewählt · " +
+        universe51UpdateAvailableCount() +
+        " Update verfügbar";
+    }
+    syncUniverse51SelectAll();
+    const batch = $("universe51UpdateSelected");
+    if (batch) {
+      const n = universe51SelectedCount();
+      const all = universe51.coins.length === 51 && n === 51;
+      batch.textContent = all
+        ? "51 ausgewählte Coins aktualisieren"
+        : "Ausgewählte aktualisieren";
+      batch.disabled = n === 0 || universe51JobActive();
+    }
+    renderUniverse51Progress();
+  }
+
+  function renderUniverse51Table() {
+    const tbody = $("universe51Body");
+    if (!tbody) return;
+    if (!universe51.coins.length) {
+      tbody.innerHTML = '<tr><td colspan="13" class="stoch-empty">Keine Universe-Daten</td></tr>';
+      return;
+    }
+    tbody.innerHTML = universe51.coins
+      .map(function (c) {
+        const disabled = c.testable ? "" : "disabled";
+        const checked = c.testable && universe51.selected[c.symbol] ? "checked" : "";
+        const rowClass = c.testable ? "" : "universe51-row-disabled";
+        return (
+          "<tr class=\"" +
+          rowClass +
+          "\">" +
+          "<td><input type=\"checkbox\" class=\"universe51-coin\" data-symbol=\"" +
+          c.symbol +
+          "\" " +
+          disabled +
+          " " +
+          checked +
+          " /></td>" +
+          "<td>" +
+          c.symbol +
+          "</td>" +
+          "<td>" +
+          (c.data_from || "–") +
+          "</td>" +
+          "<td>" +
+          (c.data_to || "–") +
+          "</td>" +
+          "<td>" +
+          (c.days_available == null ? "–" : c.days_available) +
+          "</td>" +
+          "<td>" +
+          (c.candle_count == null ? "–" : c.candle_count) +
+          "</td>" +
+          "<td>" +
+          (c.expected_count == null ? "–" : c.expected_count) +
+          "</td>" +
+          "<td>" +
+          (c.missing_count == null ? "–" : c.missing_count) +
+          "</td>" +
+          "<td><span class=\"" +
+          universe51StatusChip(c.coverage_status) +
+          "\">" +
+          (c.coverage_status || "NO_DATA") +
+          "</span></td>" +
+          "<td><span class=\"" +
+          universe51FreshnessChip(c.freshness_status) +
+          "\">" +
+          (c.freshness_status || "NO_DATA") +
+          "</span></td>" +
+          "<td>" +
+          (c.lag_minutes == null ? "–" : c.lag_minutes) +
+          "</td>" +
+          "<td>" +
+          (c.update_from || "–") +
+          "</td>" +
+          "<td>" +
+          universe51ActionButton(c) +
+          "</td>" +
+          "</tr>"
+        );
+      })
+      .join("");
+    tbody.querySelectorAll(".universe51-coin").forEach(function (box) {
+      box.addEventListener("change", function () {
+        const sym = box.getAttribute("data-symbol");
+        universe51.selected[sym] = !!box.checked;
+        renderUniverse51Summary();
+      });
+    });
+    tbody.querySelectorAll(".universe51-update-one").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const sym = btn.getAttribute("data-symbol");
+        startUniverse51Update([sym], "1 ausgewählten Coin bis zur letzten geschlossenen Minute aktualisieren?");
+      });
+    });
+    renderUniverse51Summary();
+  }
+
+  function applyUniverse51SelectAll(on) {
+    universe51.coins.forEach(function (c) {
+      if (!c.testable) return;
+      universe51.selected[c.symbol] = !!on;
+    });
+    renderUniverse51Table();
+  }
+
+  function stopUniverse51JobPoll() {
+    if (universe51.pollTimer) {
+      clearInterval(universe51.pollTimer);
+      universe51.pollTimer = null;
+    }
+  }
+
+  function startUniverse51JobPoll() {
+    if (universe51.pollTimer) return;
+    universe51.pollTimer = setInterval(loadUniverse51JobStatus, universe51.pollMs);
+  }
+
+  async function loadUniverse51Coverage(preserveSelection) {
+    const errEl = "universe51Error";
+    setErr(errEl, "");
+    const prev = preserveSelection ? Object.assign({}, universe51.selected) : null;
+    try {
+      const res = await fetch("/api/stoch/universe-51-coverage", { credentials: "include" });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok || data.success === false) {
+        setErr(errEl, data.error || data.message || "Coverage nicht verfügbar");
+      }
+      universe51.coins = Array.isArray(data.coins) ? data.coins : [];
+      universe51.selected = {};
+      universe51.coins.forEach(function (c) {
+        if (c.testable) {
+          universe51.selected[c.symbol] = prev ? !!prev[c.symbol] : true;
+        }
+      });
+      const meta = $("universe51Meta");
+      if (meta) {
+        const ch = data.clickhouse || {};
+        meta.textContent =
+          "requested_from " +
+          (data.requested_from || "–") +
+          " · as_of " +
+          (data.as_of || "–") +
+          " · freshness_reference " +
+          (data.freshness_reference || "–") +
+          " · grace " +
+          (data.freshness_grace_minutes == null ? "10" : data.freshness_grace_minutes) +
+          " min" +
+          " · " +
+          (ch.database || "") +
+          "." +
+          (ch.table || "") +
+          " FINAL";
+      }
+      renderUniverse51Table();
+    } catch (err) {
+      setErr(errEl, "Coverage-API nicht erreichbar: " + err);
+    }
+  }
+
+  async function loadUniverse51JobStatus() {
+    try {
+      const res = await fetch("/api/stoch/universe-51-update/status", { credentials: "include" });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      universe51.job = data && data.job_id ? data : null;
+      const active = universe51JobActive();
+      if (active) {
+        startUniverse51JobPoll();
+      } else {
+        stopUniverse51JobPoll();
+        if (data && data.job_id && data.state && data.state !== "QUEUED" && data.state !== "RUNNING") {
+          if (universe51.coverageReloadedForJob !== data.job_id) {
+            universe51.coverageReloadedForJob = data.job_id;
+            loadUniverse51Coverage(true);
+          }
+        }
+      }
+      renderUniverse51Table();
+    } catch (_err) {
+      /* keep coverage table usable */
+    }
+  }
+
+  async function startUniverse51Update(symbols, confirmText) {
+    if (!symbols.length || universe51JobActive()) return;
+    const n = symbols.length;
+    let text = confirmText;
+    if (!text) {
+      if (n === 51) {
+        text = "51 ausgewählte Coins aktualisieren?\nDieser Vorgang kann einige Minuten dauern.";
+      } else {
+        text = n + " ausgewählte Coins bis zur letzten geschlossenen Minute aktualisieren?";
+      }
+    }
+    if (!window.confirm(text)) return;
+    const errEl = "universe51Error";
+    setErr(errEl, "");
+    try {
+      const res = await fetch("/api/stoch/universe-51-update", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbols: symbols }),
+      });
+      const data = await res.json().catch(function () {
+        return {};
+      });
+      if (res.status === 409) {
+        setErr(errEl, "Ein Update-Job läuft bereits.");
+        loadUniverse51JobStatus();
+        return;
+      }
+      if (!res.ok || data.success === false) {
+        setErr(errEl, data.error || "Update konnte nicht gestartet werden");
+        return;
+      }
+      universe51.job = data;
+      universe51.coverageReloadedForJob = null;
+      startUniverse51JobPoll();
+      loadUniverse51JobStatus();
+    } catch (err) {
+      setErr(errEl, "Update-API nicht erreichbar");
+    }
+  }
+
+  function wireUniverse51() {
+    const master = $("universe51SelectAll");
+    if (master) {
+      master.addEventListener("change", function () {
+        applyUniverse51SelectAll(master.checked);
+      });
+    }
+    const batch = $("universe51UpdateSelected");
+    if (batch) {
+      batch.addEventListener("click", function () {
+        const symbols = universe51SelectedSymbols();
+        startUniverse51Update(symbols);
+      });
+    }
+    loadUniverse51Coverage();
+    loadUniverse51JobStatus();
   }
 })();

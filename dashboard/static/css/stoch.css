@@ -566,6 +566,72 @@
     color: #fbbf24;
     border: 1px solid rgba(251, 191, 36, 0.45);
 }
+.stoch-universe51-note {
+    margin: 0 0 10px 0;
+    color: #9ca3af;
+    font-size: 0.82rem;
+    max-width: 920px;
+}
+.stoch-universe51-summary {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #e5e7eb;
+    font-weight: 600;
+}
+.stoch-universe51-meta {
+    margin-bottom: 10px;
+    font-size: 0.78rem;
+    color: #9ca3af;
+}
+.stoch-universe51-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.stoch-universe51-progress {
+    margin: 0 0 10px 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(56, 189, 248, 0.12);
+    color: #e5e7eb;
+    font-size: 0.85rem;
+}
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+}
+.stoch-universe51-table-wrap {
+    max-height: 360px;
+    overflow: auto;
+}
+.stoch-chip-update {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+}
+.stoch-universe51-table-wrap .stoch-table {
+    min-width: 980px;
+}
+.stoch-chip-listing {
+    background: rgba(56, 189, 248, 0.15);
+    color: #7dd3fc;
+}
+.stoch-chip-incomplete {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+.stoch-chip-nodata {
+    background: rgba(148, 163, 184, 0.15);
+    color: #cbd5e1;
+}
+.universe51-row-disabled td {
+    opacity: 0.65;
+}
+
 .stoch-leg-tp { color: #4caf50; margin-left: 10px; }
 .stoch-leg-sl { color: #f44336; margin-left: 10px; }
 .stoch-leg-exit { color: #e879f9; margin-left: 10px; }

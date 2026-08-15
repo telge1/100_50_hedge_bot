@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stoch-Signale - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/stoch.css?v=7">
+    <link rel="stylesheet" href="/static/css/stoch.css?v=10">
 </head>
 <body>
     <div class="dashboard-container">
@@ -123,6 +123,57 @@
                             </thead>
                             <tbody id="collectorSymbolsBody">
                                 <tr><td colspan="6" class="stoch-empty">Lade Collector-Status…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+
+            <details class="stoch-card" id="universe51CoverageCard" open>
+                <summary class="stoch-card-summary">Historisches 51-Coin-Universe (read-only)</summary>
+                <div class="stoch-card-body">
+                    <p class="stoch-universe51-note">
+                        Candle-Coverage aus ClickHouse <code>signal_generator.candles_1m</code> (FINAL, 1m, geschlossen, UTC).
+                        Inkrementelle Updates schreiben nur historische 1m-Candles. Kein Backtest, keine Signalgenerierung.
+                        Freshness gilt als aktuell bei Lag bis 10 Minuten.
+                        Collector-Steuerung bleibt unverändert.
+                    </p>
+                    <div class="stoch-collector-error" id="universe51Error" style="display:none;"></div>
+                    <div class="stoch-universe51-progress" id="universe51Progress" style="display:none;"></div>
+                    <div class="stoch-universe51-summary" id="universe51Summary">
+                        51 Coins vorhanden · – testbar · – ausgewählt
+                    </div>
+                    <div class="stoch-universe51-meta" id="universe51Meta"></div>
+                    <div class="stoch-universe51-actions">
+                        <label class="stoch-universe51-selectall">
+                            <input type="checkbox" id="universe51SelectAll" />
+                            Alle auswählen
+                        </label>
+                        <button type="button" class="stoch-btn" id="universe51UpdateSelected" disabled>
+                            Ausgewählte aktualisieren
+                        </button>
+                    </div>
+                    <div class="stoch-table-wrap stoch-universe51-table-wrap">
+                        <table class="stoch-table" id="universe51Table">
+                            <thead>
+                                <tr>
+                                    <th>Auswahl</th>
+                                    <th>Symbol</th>
+                                    <th>Daten von</th>
+                                    <th>Daten bis</th>
+                                    <th>Tage</th>
+                                    <th>Candles</th>
+                                    <th>Erwartet</th>
+                                    <th>Missing</th>
+                                    <th>Status</th>
+                                    <th>Aktualität</th>
+                                    <th>Lag (min)</th>
+                                    <th>Update ab</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="universe51Body">
+                                <tr><td colspan="13" class="stoch-empty">Lade Coverage…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -288,7 +339,7 @@
 
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
     <script src="/static/js/stoch_chart_modal.js?v=7"></script>
-    <script src="/static/js/stoch_signale.js?v=13"></script>
+    <script src="/static/js/stoch_signale.js?v=19"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

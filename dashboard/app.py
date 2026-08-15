@@ -3912,6 +3912,57 @@ async def api_stoch_signals(
     }
 
 
+@app.get("/api/stoch/universe-51-coverage")
+async def api_stoch_universe_51_coverage(user: dict = Depends(require_auth)):
+    """Read-only 51-coin candle coverage. No writes, no jobs, no signal table."""
+    from stoch_universe_51.coverage import coverage_http_status, coverage_report
+
+    payload = await asyncio.to_thread(coverage_report)
+    return JSONResponse(payload, status_code=coverage_http_status(payload))
+
+
+@app.post("/api/stoch/universe-51-update")
+async def api_stoch_universe_51_update(request: Request, user: dict = Depends(require_auth)):
+    """Start one incremental 1m candle update job. CSRF: Origin/Referer + JSON Content-Type."""
+    from stoch_universe_51.update_jobs import handle_update_post
+
+    content_type = request.headers.get("content-type")
+    try:
+        raw = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "JSON_CONTENT_TYPE_REQUIRED"}, status_code=400)
+    extra = {}
+    if not isinstance(raw, dict):
+        return JSONResponse({"success": False, "error": "UNKNOWN_FIELDS"}, status_code=400)
+    extra = {k: v for k, v in raw.items() if k != "symbols"}
+    payload, status = await asyncio.to_thread(
+        handle_update_post,
+        symbols=list(raw.get("symbols") or []),
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        content_type=content_type,
+        extra_fields=extra or None,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
+@app.get("/api/stoch/universe-51-update/status")
+async def api_stoch_universe_51_update_status(user: dict = Depends(require_auth)):
+    from stoch_universe_51.update_jobs import current_or_last_status
+
+    return await asyncio.to_thread(current_or_last_status)
+
+
+@app.get("/api/stoch/universe-51-update/{job_id}")
+async def api_stoch_universe_51_update_job(job_id: str, user: dict = Depends(require_auth)):
+    from stoch_universe_51.update_jobs import load_job_public
+
+    payload = await asyncio.to_thread(load_job_public, job_id)
+    if payload is None:
+        return JSONResponse({"success": False, "error": "JOB_NOT_FOUND"}, status_code=404)
+    return payload
+
+
 @app.get("/api/stoch/profits")
 async def api_stoch_profits(user: dict = Depends(require_auth)):
     """Stoch / Wave-Fade closed/open trades. Still demo until trade feed is ready."""
