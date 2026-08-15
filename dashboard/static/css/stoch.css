@@ -631,6 +631,37 @@
 .universe51-row-disabled td {
     opacity: 0.65;
 }
+.stoch-frozen-title {
+    margin: 0 0 8px 0;
+    font-size: 1.05rem;
+    color: #e5e7eb;
+}
+.stoch-frozen-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin: 10px 0;
+}
+.stoch-frozen-fields input[type="datetime-local"] {
+    background: #0f172a;
+    color: #e5e7eb;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+.stoch-frozen-bar-wrap {
+    height: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    margin: 8px 0 12px 0;
+    overflow: hidden;
+}
+.stoch-frozen-bar {
+    height: 100%;
+    width: 0;
+    background: #38bdf8;
+}
 
 .stoch-leg-tp { color: #4caf50; margin-left: 10px; }
 .stoch-leg-sl { color: #f44336; margin-left: 10px; }

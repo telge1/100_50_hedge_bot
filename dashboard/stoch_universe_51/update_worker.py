@@ -139,6 +139,12 @@ def run_job(job_dir: Path) -> int:
                 lock.unlink()
     except OSError:
         pass
+    try:
+        import stoch_heavy_job_gate as heavy_gate
+
+        heavy_gate.release(str(request.get("job_id") or ""))
+    except Exception:  # noqa: BLE001
+        pass
     return int(status.get("return_code") or 0)
 
 

@@ -3963,6 +3963,69 @@ async def api_stoch_universe_51_update_job(job_id: str, user: dict = Depends(req
     return payload
 
 
+@app.post("/api/stoch/frozen-fade-jobs")
+async def api_stoch_frozen_fade_jobs_create(request: Request, user: dict = Depends(require_auth)):
+    """Start sequential Frozen Wave-Fade signal research job. CSRF: Origin/Referer + JSON."""
+    from stoch_fade_research_jobs.jobs import handle_create_post
+
+    content_type = request.headers.get("content-type")
+    try:
+        raw = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "JSON_CONTENT_TYPE_REQUIRED"}, status_code=400)
+    if not isinstance(raw, dict):
+        return JSONResponse({"success": False, "error": "UNKNOWN_FIELDS"}, status_code=400)
+    payload, status = await asyncio.to_thread(
+        handle_create_post,
+        body=raw,
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        content_type=content_type,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
+@app.get("/api/stoch/frozen-fade-jobs/status")
+async def api_stoch_frozen_fade_jobs_status(user: dict = Depends(require_auth)):
+    from stoch_fade_research_jobs.jobs import current_or_last_status
+
+    return await asyncio.to_thread(current_or_last_status)
+
+
+@app.get("/api/stoch/frozen-fade-jobs/{job_id}")
+async def api_stoch_frozen_fade_jobs_get(job_id: str, user: dict = Depends(require_auth)):
+    from stoch_fade_research_jobs.jobs import load_job_public
+
+    payload = await asyncio.to_thread(load_job_public, job_id)
+    if payload is None:
+        return JSONResponse({"success": False, "error": "JOB_NOT_FOUND"}, status_code=404)
+    return payload
+
+
+@app.post("/api/stoch/frozen-fade-jobs/{job_id}/resume")
+async def api_stoch_frozen_fade_jobs_resume(job_id: str, request: Request, user: dict = Depends(require_auth)):
+    from stoch_fade_research_jobs.jobs import handle_resume_post
+
+    content_type = request.headers.get("content-type")
+    try:
+        raw = await request.json()
+    except Exception:
+        raw = {}
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        return JSONResponse({"success": False, "error": "UNKNOWN_FIELDS"}, status_code=400)
+    payload, status = await asyncio.to_thread(
+        handle_resume_post,
+        job_id=job_id,
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        content_type=content_type,
+        body=raw or None,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
 @app.get("/api/stoch/profits")
 async def api_stoch_profits(user: dict = Depends(require_auth)):
     """Stoch / Wave-Fade closed/open trades. Still demo until trade feed is ready."""

@@ -1202,7 +1202,7 @@
   }
 
   function universe51ActionButton(c) {
-    const jobActive = universe51JobActive();
+    const jobActive = universe51JobActive() || (typeof frozenFadeJobActive === "function" && frozenFadeJobActive());
     const coinState = universe51CoinJobState(c.symbol);
     if (coinState === "UPDATING") {
       return "<button type=\"button\" class=\"stoch-btn universe51-update-one\" data-symbol=\"" +
@@ -1277,9 +1277,12 @@
       batch.textContent = all
         ? "51 ausgewählte Coins aktualisieren"
         : "Ausgewählte aktualisieren";
-      batch.disabled = n === 0 || universe51JobActive();
+      batch.disabled = n === 0 || universe51JobActive() || (typeof frozenFadeJobActive === "function" && frozenFadeJobActive());
     }
     renderUniverse51Progress();
+    if (typeof frozenFadeSyncControls === "function") {
+      frozenFadeSyncControls();
+    }
   }
 
   function renderUniverse51Table() {
@@ -1455,7 +1458,7 @@
   }
 
   async function startUniverse51Update(symbols, confirmText) {
-    if (!symbols.length || universe51JobActive()) return;
+    if (!symbols.length || universe51JobActive() || (typeof frozenFadeJobActive === "function" && frozenFadeJobActive())) return;
     const n = symbols.length;
     let text = confirmText;
     if (!text) {
@@ -1512,5 +1515,273 @@
     }
     loadUniverse51Coverage();
     loadUniverse51JobStatus();
+    wireFrozenFade();
+  }
+
+  const frozenFade = {
+    job: null,
+    pollTimer: null,
+    pollMs: 3000,
+    windowLocked: false,
+    defaultsApplied: false,
+  };
+
+  function frozenFadeJobActive() {
+    const state = frozenFade.job && frozenFade.job.state;
+    return state === "QUEUED" || state === "RUNNING";
+  }
+
+  function toDatetimeLocalUtc(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+      "T" + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes());
+  }
+
+  function fromDatetimeLocalUtc(value) {
+    const v = String(value || "").trim();
+    if (!v) return "";
+    return v.length === 16 ? v + ":00Z" : v + "Z";
+  }
+
+  function frozenFadeWindowValid() {
+    const start = fromDatetimeLocalUtc(($("frozenFadeStart") || {}).value);
+    const end = fromDatetimeLocalUtc(($("frozenFadeEnd") || {}).value);
+    if (!start || !end) return false;
+    return Date.parse(start) < Date.parse(end);
+  }
+
+  function frozenFadeSyncControls() {
+    const n = universe51SelectedCount();
+    const summary = $("frozenFadeSelectionSummary");
+    if (summary) {
+      summary.textContent = n + " Coins ausgewählt · ~" + n + " min · ~" + (n * 20) + " MB";
+    }
+    const est = $("frozenFadeEstimates");
+    if (est && n === 51) {
+      est.textContent =
+        "Geschätzte Laufzeit: ungefähr 1 Minute pro Coin; 51 Coins ungefähr 45–60 Minuten. " +
+        "Geschätzter Artefaktspeicher: ungefähr 20 MB pro Coin; 51 Coins ungefähr 1 GB.";
+    }
+    const startBtn = $("frozenFadeStartBtn");
+    const updateBlocks = universe51JobActive();
+    const freezeBlocks = frozenFadeJobActive();
+    if (startBtn) {
+      startBtn.disabled = n < 1 || !frozenFadeWindowValid() || updateBlocks || freezeBlocks;
+    }
+    const start = $("frozenFadeStart");
+    const end = $("frozenFadeEnd");
+    if (start) start.disabled = freezeBlocks;
+    if (end) end.disabled = freezeBlocks;
+    const resume = $("frozenFadeResumeBtn");
+    if (resume) {
+      const allow = frozenFade.job && frozenFade.job.resumable && !freezeBlocks && !updateBlocks;
+      resume.style.display = allow ? "inline-block" : "none";
+      resume.disabled = !allow;
+    }
+  }
+
+  function frozenFadeTfCell(row, tf) {
+    const pt = (row.per_timeframe || {})[tf] || {};
+    return (pt.raw == null ? "–" : pt.raw) + "/" + (pt.tier_a == null ? "–" : pt.tier_a);
+  }
+
+  function frozenFadeWarmupCell(c) {
+    if (c.warmup_schema_error) return "Artefaktfehler";
+    const by = c.warmup_complete_by_tf || {};
+    const tfs = ["15m", "30m", "1h", "4h"];
+    const missing = tfs.filter(function (tf) { return typeof by[tf] !== "boolean"; });
+    if (missing.length) return "Artefaktfehler";
+    const ok = tfs.filter(function (tf) { return by[tf] === true; });
+    const bad = tfs.filter(function (tf) { return by[tf] === false; });
+    if (c.warmup_complete === true && bad.length === 0) return "vollständig";
+    if (ok.length && bad.length) return "teilweise (" + bad.join(", ") + ")";
+    if (c.warmup_complete === false || bad.length === 4) return "unvollständig";
+    return "unvollständig";
+  }
+
+  function renderFrozenFadeJob() {
+    const job = frozenFade.job || {};
+    const prog = $("frozenFadeProgress");
+    const barWrap = $("frozenFadeBarWrap");
+    const bar = $("frozenFadeBar");
+    const totals = $("frozenFadeTotals");
+    const wrap = $("frozenFadeResultWrap");
+    const body = $("frozenFadeResultBody");
+    const active = frozenFadeJobActive();
+    if (prog) {
+      if (!job.state) {
+        prog.style.display = "none";
+      } else {
+        prog.style.display = "block";
+        const idx = job.current_index == null ? 0 : job.current_index;
+        const total = job.total_coins == null ? 0 : job.total_coins;
+        prog.textContent =
+          (active ? "Job läuft · " : "") +
+          "Coin " + idx + " von " + total +
+          " · " + (job.current_symbol || "–") +
+          " · Raw " + (job.raw_total == null ? 0 : job.raw_total) +
+          " · Tier-A " + (job.tier_a_total == null ? 0 : job.tier_a_total) +
+          " · Fehler " + (job.failed_coins == null ? 0 : job.failed_coins) +
+          " · Job-ID " + (job.job_id || "–") +
+          " · " + (job.state || "");
+      }
+    }
+    if (barWrap && bar) {
+      barWrap.style.display = job.state ? "block" : "none";
+      bar.style.width = Math.max(0, Math.min(100, job.progress_percent || 0)) + "%";
+    }
+    const summary = job.combined_summary || {};
+    if (totals) {
+      totals.textContent =
+        "Ausgewertet " + (summary.coins_evaluated == null ? (job.total_coins || "–") : summary.coins_evaluated) +
+        " · erfolgreich " + (summary.successful_coins == null ? (job.successful_coins || 0) : summary.successful_coins) +
+        " · fehlgeschlagen " + (summary.failed_coins == null ? (job.failed_coins || 0) : summary.failed_coins) +
+        " · Raw " + (summary.raw_candidates == null ? (job.raw_total || 0) : summary.raw_candidates) +
+        " · Tier-A " + (summary.tier_a == null ? (job.tier_a_total || 0) : summary.tier_a) +
+        " · ohne Tier-A " + (summary.coins_without_tier_a == null ? "–" : summary.coins_without_tier_a) +
+        " · mit Signalen " + (summary.coins_with_signals == null ? "–" : summary.coins_with_signals) +
+        " · Warm-up-Warnungen " + (summary.warmup_warnings == null ? "–" : summary.warmup_warnings) +
+        " · Multi-TF " + (summary.multi_tf_collisions == null ? "–" : summary.multi_tf_collisions);
+    }
+    const done = job.state && job.state !== "QUEUED" && job.state !== "RUNNING";
+    if (wrap && body) {
+      if (done && Array.isArray(job.coins) && job.coins.length) {
+        wrap.style.display = "block";
+        body.innerHTML = job.coins.map(function (c) {
+          return "<tr><td>" + (c.symbol || "") + "</td><td>" + (c.state || "") +
+            "</td><td>" + (c.raw_total == null ? "–" : c.raw_total) +
+            "</td><td>" + (c.tier_a_total == null ? "–" : c.tier_a_total) +
+            "</td><td>" + frozenFadeTfCell(c, "15m") +
+            "</td><td>" + frozenFadeTfCell(c, "30m") +
+            "</td><td>" + frozenFadeTfCell(c, "1h") +
+            "</td><td>" + frozenFadeTfCell(c, "4h") +
+            "</td><td>" + frozenFadeWarmupCell(c) +
+            "</td><td>" + (c.multi_tf_collision_count == null ? "–" : c.multi_tf_collision_count) +
+            "</td><td>" + (c.duration_seconds == null ? "–" : c.duration_seconds) +
+            "</td></tr>";
+        }).join("");
+      } else if (!done) {
+        wrap.style.display = "none";
+      }
+    }
+    frozenFadeSyncControls();
+  }
+
+  function stopFrozenFadePoll() {
+    if (frozenFade.pollTimer) {
+      clearInterval(frozenFade.pollTimer);
+      frozenFade.pollTimer = null;
+    }
+  }
+
+  function startFrozenFadePoll() {
+    if (frozenFade.pollTimer) return;
+    frozenFade.pollTimer = setInterval(loadFrozenFadeStatus, frozenFade.pollMs);
+  }
+
+  async function loadFrozenFadeStatus() {
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-jobs/status", { credentials: "include" });
+      const data = await res.json().catch(function () { return {}; });
+      if (data.defaults && !frozenFade.defaultsApplied) {
+        const s = $("frozenFadeStart");
+        const e = $("frozenFadeEnd");
+        if (s && !s.value) s.value = toDatetimeLocalUtc(data.defaults.signal_start);
+        if (e && !e.value) e.value = toDatetimeLocalUtc(data.defaults.signal_end_exclusive);
+        frozenFade.defaultsApplied = true;
+      }
+      frozenFade.job = data && data.job_id ? data : frozenFade.job;
+      if (!data.job_id) {
+        if (!frozenFadeJobActive()) frozenFade.job = data && data.state ? data : frozenFade.job;
+      }
+      if (frozenFadeJobActive()) {
+        startFrozenFadePoll();
+      } else {
+        stopFrozenFadePoll();
+      }
+      renderFrozenFadeJob();
+      renderUniverse51Table();
+    } catch (_err) {
+      /* keep page usable */
+    }
+  }
+
+  async function startFrozenFadeJob() {
+    const symbols = universe51SelectedSymbols();
+    if (!symbols.length || frozenFadeJobActive() || universe51JobActive()) return;
+    const start = fromDatetimeLocalUtc(($("frozenFadeStart") || {}).value);
+    const end = fromDatetimeLocalUtc(($("frozenFadeEnd") || {}).value);
+    const text =
+      "Frozen-Signale für " + symbols.length + " Coin(s) berechnen?\n" +
+      "UTC " + start + " → " + end + " (Ende exklusiv)\n" +
+      "Nur Signalerzeugung – noch kein Profit-Backtest.";
+    if (!window.confirm(text)) return;
+    setErr("frozenFadeError", "");
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-jobs", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbols: symbols,
+          signal_start: start,
+          signal_end_exclusive: end,
+        }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (res.status === 409) {
+        setErr("frozenFadeError", data.error || "Ein Research-Job läuft bereits.");
+        loadFrozenFadeStatus();
+        return;
+      }
+      if (!res.ok || data.success === false) {
+        setErr("frozenFadeError", data.error || "Job konnte nicht gestartet werden");
+        return;
+      }
+      frozenFade.job = data;
+      startFrozenFadePoll();
+      loadFrozenFadeStatus();
+    } catch (_err) {
+      setErr("frozenFadeError", "Frozen-Job-API nicht erreichbar");
+    }
+  }
+
+  async function resumeFrozenFadeJob() {
+    const jobId = frozenFade.job && frozenFade.job.job_id;
+    if (!jobId || frozenFadeJobActive() || universe51JobActive()) return;
+    if (!window.confirm("Unterbrochenen Frozen-Job " + jobId + " fortsetzen?")) return;
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-jobs/" + encodeURIComponent(jobId) + "/resume", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || data.success === false) {
+        setErr("frozenFadeError", data.error || "Resume fehlgeschlagen");
+        return;
+      }
+      frozenFade.job = data;
+      startFrozenFadePoll();
+      loadFrozenFadeStatus();
+    } catch (_err) {
+      setErr("frozenFadeError", "Resume-API nicht erreichbar");
+    }
+  }
+
+  function wireFrozenFade() {
+    const startBtn = $("frozenFadeStartBtn");
+    if (startBtn) startBtn.addEventListener("click", startFrozenFadeJob);
+    const resumeBtn = $("frozenFadeResumeBtn");
+    if (resumeBtn) resumeBtn.addEventListener("click", resumeFrozenFadeJob);
+    ["frozenFadeStart", "frozenFadeEnd"].forEach(function (id) {
+      const el = $(id);
+      if (el) el.addEventListener("change", frozenFadeSyncControls);
+    });
+    loadFrozenFadeStatus();
   }
 })();

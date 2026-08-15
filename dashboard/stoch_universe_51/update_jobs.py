@@ -259,13 +259,6 @@ def start_update_job(
     if err or cleaned is None:
         code = 400
         return {"success": False, "error": err or "INVALID_SYMBOLS"}, code
-    active = active_job_id(environ)
-    if active:
-        return {
-            "success": False,
-            "error": "UPDATE_JOB_ALREADY_RUNNING",
-            "job_id": active,
-        }, 409
 
     payload = coverage_payload if coverage_payload is not None else coverage_report(
         use_cache=True, environ=environ, now=now
@@ -278,104 +271,139 @@ def start_update_job(
             return {"success": False, "error": "UNKNOWN_SYMBOL", "symbol": symbol}, 400
         plans.append(plan_symbol_update(coin, now=now))
 
-    job_id = uuid.uuid4().hex
-    created = now or _utcnow()
-    end_exclusive = last_closed_end_exclusive(created)
-    root = jobs_root(environ)
-    root.mkdir(parents=True, exist_ok=True)
-    directory = job_dir_for(job_id, environ)
-    directory.mkdir(parents=True, exist_ok=False)
-    universe_file = write_temp_universe(directory, cleaned, universe_path(environ))
+    from stoch_fade_research_jobs.cross_lock import frozen_research_active_id, start_gate
 
-    request = {
-        "job_id": job_id,
-        "created_at": iso_z(created),
-        "symbols": cleaned,
-        "requested_from": iso_z(REQUESTED_FROM),
-        "update_to": iso_z(end_exclusive),
-        "repair_missing": True,
-        "plans": plans,
-        "universe_file": universe_file.name,
-        "sg_root": str(signal_generator_root(environ)),
-        "sg_python": str(sg_python(environ)),
-        "backfill_script": str(backfill_script(environ)),
-        "jobs_root": str(jobs_root(environ)),
-    }
-    coins_progress = []
-    already = 0
-    for plan in plans:
-        state = "ALREADY_CURRENT" if plan["action"] == "ALREADY_CURRENT" else "QUEUED"
-        if state == "ALREADY_CURRENT":
-            already += 1
-        coins_progress.append(
-            {
-                "symbol": plan["symbol"],
-                "state": state,
-                "message": plan.get("message") or "",
-            }
+    with start_gate(environ):
+        active = active_job_id(environ)
+        if active:
+            return {
+                "success": False,
+                "error": "UPDATE_JOB_ALREADY_RUNNING",
+                "job_id": active,
+            }, 409
+        frozen = frozen_research_active_id(environ)
+        if frozen:
+            return {
+                "success": False,
+                "error": "FROZEN_JOB_BLOCKS_CANDLE_UPDATE",
+                "job_id": frozen,
+            }, 409
+
+        job_id = uuid.uuid4().hex
+        import stoch_heavy_job_gate as heavy_gate
+
+        acquired, gate_err, existing = heavy_gate.try_acquire(
+            heavy_gate.OWNER_CANDLE_UPDATE, job_id, environ=environ
         )
-    status = {
-        "job_id": job_id,
-        "state": "QUEUED",
-        "pid": None,
-        "started_at": None,
-        "finished_at": None,
-        "return_code": None,
-        "current_symbol": None,
-        "completed_symbols": already,
-        "total_symbols": len(cleaned),
-        "success_count": already,
-        "failed_count": 0,
-        "already_current_count": already,
-        "message": "queued",
-        "coins": coins_progress,
-    }
-    write_json_atomic(directory / "request.json", request)
-    write_json_atomic(directory / "status.json", status)
-    write_json_atomic(directory / "progress.json", {"coins": coins_progress})
-    (directory / "update.log").write_text("", encoding="utf-8")
-    last_job_path(environ).write_text(job_id, encoding="utf-8")
+        if not acquired:
+            return {
+                "success": False,
+                "error": gate_err or "HEAVY_JOB_RESOURCE_BUSY",
+                "job_id": (existing or {}).get("job_id"),
+            }, 409
+        created = now or _utcnow()
+        end_exclusive = last_closed_end_exclusive(created)
+        root = jobs_root(environ)
+        root.mkdir(parents=True, exist_ok=True)
+        directory = job_dir_for(job_id, environ)
+        directory.mkdir(parents=True, exist_ok=False)
+        universe_file = write_temp_universe(directory, cleaned, universe_path(environ))
 
-    worker = Path(__file__).resolve().parent / "update_worker.py"
-    dash_python = sys.executable
-    if environ and environ.get("STOCH_UNIVERSE_51_DASH_PYTHON"):
-        dash_python = str(environ["STOCH_UNIVERSE_51_DASH_PYTHON"])
-    argv = [dash_python, str(worker), job_id, str(directory)]
-    worker_cwd = DASHBOARD_ROOT
-    if environ and environ.get("STOCH_UNIVERSE_51_WORKER_CWD"):
-        worker_cwd = Path(str(environ["STOCH_UNIVERSE_51_WORKER_CWD"]))
-
-    write_json_atomic(
-        lock_path(environ),
-        {"job_id": job_id, "pid": None, "started_at": iso_z(created)},
-    )
-    spawn_fn = spawn or default_spawn_worker
-    try:
-        pid = spawn_fn(argv, worker_cwd, directory / "update.log")
-    except Exception as exc:  # noqa: BLE001
-        status["state"] = "FAILED"
-        status["finished_at"] = iso_z(_utcnow())
-        status["message"] = public_message(str(exc))
+        request = {
+            "job_id": job_id,
+            "created_at": iso_z(created),
+            "symbols": cleaned,
+            "requested_from": iso_z(REQUESTED_FROM),
+            "update_to": iso_z(end_exclusive),
+            "repair_missing": True,
+            "plans": plans,
+            "universe_file": universe_file.name,
+            "sg_root": str(signal_generator_root(environ)),
+            "sg_python": str(sg_python(environ)),
+            "backfill_script": str(backfill_script(environ)),
+            "jobs_root": str(jobs_root(environ)),
+        }
+        coins_progress = []
+        already = 0
+        for plan in plans:
+            state = "ALREADY_CURRENT" if plan["action"] == "ALREADY_CURRENT" else "QUEUED"
+            if state == "ALREADY_CURRENT":
+                already += 1
+            coins_progress.append(
+                {
+                    "symbol": plan["symbol"],
+                    "state": state,
+                    "message": plan.get("message") or "",
+                }
+            )
+        status = {
+            "job_id": job_id,
+            "state": "QUEUED",
+            "pid": None,
+            "started_at": None,
+            "finished_at": None,
+            "return_code": None,
+            "current_symbol": None,
+            "completed_symbols": already,
+            "total_symbols": len(cleaned),
+            "success_count": already,
+            "failed_count": 0,
+            "already_current_count": already,
+            "message": "queued",
+            "coins": coins_progress,
+        }
+        write_json_atomic(directory / "request.json", request)
         write_json_atomic(directory / "status.json", status)
-        clear_lock(environ)
-        bump_coverage_generation(environ)
-        return {"success": False, "error": "SPAWN_FAILED", "job_id": job_id}, 500
+        write_json_atomic(directory / "progress.json", {"coins": coins_progress})
+        (directory / "update.log").write_text("", encoding="utf-8")
+        last_job_path(environ).write_text(job_id, encoding="utf-8")
 
-    status["state"] = "RUNNING"
-    status["pid"] = pid
-    status["started_at"] = iso_z(_utcnow())
-    status["message"] = "Datenaktualisierung läuft"
-    write_json_atomic(directory / "status.json", status)
-    write_json_atomic(
-        lock_path(environ),
-        {"job_id": job_id, "pid": pid, "started_at": status["started_at"]},
-    )
-    return {
-        "success": True,
-        "job_id": job_id,
-        "state": "QUEUED",
-        "symbols": cleaned,
-    }, 200
+        worker = Path(__file__).resolve().parent / "update_worker.py"
+        dash_python = sys.executable
+        if environ and environ.get("STOCH_UNIVERSE_51_DASH_PYTHON"):
+            dash_python = str(environ["STOCH_UNIVERSE_51_DASH_PYTHON"])
+        argv = [dash_python, str(worker), job_id, str(directory)]
+        worker_cwd = DASHBOARD_ROOT
+        if environ and environ.get("STOCH_UNIVERSE_51_WORKER_CWD"):
+            worker_cwd = Path(str(environ["STOCH_UNIVERSE_51_WORKER_CWD"]))
+
+        write_json_atomic(
+            lock_path(environ),
+            {"job_id": job_id, "pid": None, "started_at": iso_z(created)},
+        )
+        spawn_fn = spawn or default_spawn_worker
+        try:
+            pid = spawn_fn(argv, worker_cwd, directory / "update.log")
+        except Exception as exc:  # noqa: BLE001
+            status["state"] = "FAILED"
+            status["finished_at"] = iso_z(_utcnow())
+            status["message"] = public_message(str(exc))
+            write_json_atomic(directory / "status.json", status)
+            clear_lock(environ)
+            import stoch_heavy_job_gate as heavy_gate
+
+            heavy_gate.release(job_id, environ=environ)
+            bump_coverage_generation(environ)
+            return {"success": False, "error": "SPAWN_FAILED", "job_id": job_id}, 500
+
+        status["state"] = "RUNNING"
+        status["pid"] = pid
+        status["started_at"] = iso_z(_utcnow())
+        status["message"] = "Datenaktualisierung läuft"
+        write_json_atomic(directory / "status.json", status)
+        write_json_atomic(
+            lock_path(environ),
+            {"job_id": job_id, "pid": pid, "started_at": status["started_at"]},
+        )
+        import stoch_heavy_job_gate as heavy_gate
+
+        heavy_gate.refresh_pid(job_id, pid, environ=environ)
+        return {
+            "success": True,
+            "job_id": job_id,
+            "state": "QUEUED",
+            "symbols": cleaned,
+        }, 200
 
 
 def handle_update_post(

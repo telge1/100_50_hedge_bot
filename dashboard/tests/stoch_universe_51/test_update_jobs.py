@@ -61,10 +61,16 @@ def _env(tmp_path, monkeypatch, symbols=None):
     monkeypatch.setenv("STOCH_UNIVERSE_51_JOBS_ROOT", str(jobs))
     monkeypatch.setenv("STOCH_UNIVERSE_51_CACHE_TTL", "60")
     monkeypatch.setenv("STOCH_UNIVERSE_51_BACKFILL_STUB", "1")
+    monkeypatch.setenv("STOCH_FADE_RESEARCH_JOBS_ROOT", str(tmp_path / "fade_jobs"))
+    monkeypatch.setenv("STOCH_DASHBOARD_START_GATE", str(tmp_path / "start.lock"))
+    monkeypatch.setenv("STOCH_HEAVY_JOB_GATE", str(tmp_path / "heavy.lock"))
     return {
         "STOCH_UNIVERSE_51_PATH": str(uni),
         "STOCH_UNIVERSE_51_JOBS_ROOT": str(jobs),
         "STOCH_UNIVERSE_51_CACHE_TTL": "60",
+        "STOCH_FADE_RESEARCH_JOBS_ROOT": str(tmp_path / "fade_jobs"),
+        "STOCH_DASHBOARD_START_GATE": str(tmp_path / "start.lock"),
+        "STOCH_HEAVY_JOB_GATE": str(tmp_path / "heavy.lock"),
     }
 
 
@@ -465,3 +471,43 @@ def test_frontend_buttons_and_strategy():
     assert "loadUniverse51Coverage(true)" in js
     assert "collectorControlCard" in html
     assert "Test starten" not in html
+    assert "frozenFadeJobActive()" in js
+    assert "FROZEN_JOB_BLOCKS_CANDLE_UPDATE" not in html
+
+
+def test_frozen_job_blocks_candle_update(tmp_path, monkeypatch):
+    env = _env(tmp_path, monkeypatch)
+    coins = [
+        _coin(
+            "ETHUSDT",
+            data_to=datetime(2026, 8, 10, 23, 59, tzinfo=timezone.utc),
+            freshness="UPDATE_AVAILABLE",
+        )
+    ]
+    monkeypatch.setattr(
+        "stoch_fade_research_jobs.jobs.worker_is_live",
+        lambda pid, job_id: True,
+    )
+    from stoch_fade_research_jobs.jobs import start_frozen_job
+
+    fade, code = start_frozen_job(
+        ["ETHUSDT"],
+        "2025-12-11T00:00:00Z",
+        "2026-08-15T07:56:00Z",
+        environ=env,
+        now=NOW,
+        spawn=lambda a, c, l: 4242,
+        coverage_payload={"coins": [{"symbol": "ETHUSDT", "coverage_status": "FULL", "testable": True}]},
+        disk_free=10 * 1024 * 1024 * 1024,
+    )
+    assert code == 200
+    payload, code = start_update_job(
+        ["ETHUSDT"],
+        environ=env,
+        now=NOW,
+        spawn=lambda a, c, l: 1,
+        coverage_payload=_coverage(coins),
+    )
+    assert code == 409
+    assert payload["error"] == "FROZEN_JOB_BLOCKS_CANDLE_UPDATE"
+    assert payload["job_id"] == fade["job_id"]
