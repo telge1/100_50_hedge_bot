@@ -19,6 +19,7 @@
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const STOCH_JOB_KEY = "stoch.research_job_id";
   const STOCH_SOURCE_KEY = "stoch.signal_source";
+  const STOCH_EVAL_KEY = "stoch.research_evaluation_id";
   const POLL_MS = 5000;
   const FORMING_MS = 250;
   const TOOLS = [
@@ -1164,7 +1165,20 @@
     try {
       const source = localStorage.getItem(STOCH_SOURCE_KEY) || "";
       const jobId = localStorage.getItem(STOCH_JOB_KEY) || "";
-      if (source === "FROZEN_RESEARCH_JOB" && /^[0-9a-f]{32}$/.test(jobId)) return jobId;
+      if (
+        (source === "FROZEN_RESEARCH_JOB" || source === "FROZEN_RESEARCH_EVALUATION") &&
+        /^[0-9a-f]{32}$/.test(jobId)
+      ) {
+        return jobId;
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  function lastStochEvaluation() {
+    try {
+      const evid = localStorage.getItem(STOCH_EVAL_KEY) || "";
+      if (/^[0-9a-f]{32}$/.test(evid)) return evid;
     } catch (e) {}
     return "";
   }
@@ -1173,12 +1187,20 @@
     const el = $("researchJobSourceNote");
     if (!el) return;
     const jobId = lastStochResearchJob();
+    const evalId = lastStochEvaluation();
     if (!jobId) {
       el.hidden = true;
       el.textContent = "";
       return;
     }
     el.hidden = false;
+    if (evalId) {
+      el.textContent =
+        "Frozen NO_BE50 Evaluation " + evalId +
+        " · Job " + jobId +
+        " · Signale wave_fade_frozen_f16ae32 · Exit NO_BE50 / SL_FIRST · WIN/LOSS/OPEN · PnL gross";
+      return;
+    }
     el.textContent =
       "Frozen Research Job " + jobId +
       " · wave_fade_frozen_f16ae32 · PLANNED_NO_OUTCOME · Job-Fenster aus Manifest · kein NO_BE50 · 4h nur visuelle Projektion";
@@ -1375,14 +1397,20 @@
       if (!state.symbol) return;
       const strategy = lastStochStrategy();
       const jobId = lastStochResearchJob();
-      const source = jobId ? "FROZEN_RESEARCH_JOB" : "";
+      const evalId = lastStochEvaluation();
+      const source = evalId ? "FROZEN_RESEARCH_EVALUATION" : (jobId ? "FROZEN_RESEARCH_JOB" : "");
       applyResearchJobSourceNote();
-      setStatus("Backtester: lade " + (jobId ? "Job " + jobId : strategy) + " für " + state.symbol + " …");
+      setStatus("Backtester: lade " + (evalId ? "Evaluation " + evalId : (jobId ? "Job " + jobId : strategy)) + " für " + state.symbol + " …");
       try {
         const body = { symbol: state.symbol };
         if (jobId) {
-          body.source = "FROZEN_RESEARCH_JOB";
           body.job_id = jobId;
+          if (evalId) {
+            body.source = "FROZEN_RESEARCH_EVALUATION";
+            body.evaluation_id = evalId;
+          } else {
+            body.source = "FROZEN_RESEARCH_JOB";
+          }
         } else {
           body.hours = 48;
           body.strategy_version = strategy;
@@ -1394,13 +1422,16 @@
         const windowLabel = (bt.signal_start && bt.signal_end_exclusive)
           ? (" · Fenster " + bt.signal_start + " – " + bt.signal_end_exclusive)
           : "";
+        const modeLabel = evalId
+          ? ("FROZEN_RESEARCH_EVALUATION " + (bt.display_mode || "FROZEN_NO_BE50_EVALUATED"))
+          : (jobId ? ("FROZEN_RESEARCH_JOB " + (bt.display_mode || "PLANNED_NO_OUTCOME")) : (bt.strategy_version || strategy));
         setStatus(
           "Backtester " + state.symbol + " · "
-            + (jobId ? ("FROZEN_RESEARCH_JOB " + (bt.display_mode || "PLANNED_NO_OUTCOME")) : (bt.strategy_version || strategy))
+            + modeLabel
             + windowLabel + ": "
             + (bt.loaded || 0) + " Long/Short (Entry/TP/SL)"
             + (bt.skipped ? ", " + bt.skipped + " übersprungen" : "")
-            + (jobId ? " — 4h-Planhorizont nur visuelle Projektion · keine Exit-/OPEN-/PnL-Marker" : "")
+            + (evalId ? " — echte Exit-Marker · NO_BE50 / SL_FIRST · keine BE-Exits" : (jobId ? " — 4h-Planhorizont nur visuelle Projektion · keine Exit-/OPEN-/PnL-Marker" : ""))
             + (bt.message ? " — " + bt.message : "")
         );
       } catch (err) {

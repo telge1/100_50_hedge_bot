@@ -242,6 +242,27 @@
                 </div>
             </div>
 
+            <div class="stoch-card" id="frozenEvalJobCard">
+                <div class="stoch-card-body">
+                    <h2 class="stoch-frozen-title">Frozen-NO_BE50-Outcomes berechnen</h2>
+                    <p class="stoch-universe51-note">
+                        Wählt zuerst einen Frozen-Research-Job. Signale: <code>wave_fade_frozen_f16ae32</code>.
+                        Exit-Policy: <code>NO_BE50</code> über <code>evaluate_signal_no_be50</code> / SL_FIRST.
+                        Nur Tier-A, unabhängig je Signal. Ergebnisse: WIN / LOSS / OPEN. PnL-Karten: gross.
+                    </p>
+                    <div class="stoch-collector-error" id="frozenEvalError" style="display:none;"></div>
+                    <div class="stoch-universe51-actions">
+                        <button type="button" class="stoch-btn" id="frozenEvalStartBtn" disabled>
+                            Frozen-NO_BE50-Outcomes berechnen
+                        </button>
+                        <button type="button" class="stoch-btn" id="frozenEvalResumeBtn" style="display:none;">
+                            Evaluation fortsetzen
+                        </button>
+                    </div>
+                    <div class="stoch-universe51-progress" id="frozenEvalProgress" style="display:none;"></div>
+                </div>
+            </div>
+
             <div class="stoch-feed-banner" id="stochFeedBanner" style="display:none;"></div>
 
             <div class="stoch-toolbar">
@@ -298,6 +319,12 @@
                 <select id="stochFilterResearchJob">
                     <option value="">Live-Baseline (Collector)</option>
                 </select>
+                <span id="stochEvalFilterWrap" hidden>
+                    <label for="stochFilterResearchEval">Frozen-NO_BE50-Evaluation</label>
+                    <select id="stochFilterResearchEval">
+                        <option value="">Keine Evaluation (nur Plan)</option>
+                    </select>
+                </span>
                 <input type="hidden" id="stochDashboardSource" value="FROZEN_BASELINE" />
                 {% endif %}
                 <label for="stochFilterHours" id="stochFilterHoursLabel">Zeitraum</label>
@@ -367,6 +394,9 @@
                             <th><button type="button" data-sort="result">Result</button></th>
                             <th><button type="button" data-sort="pnl_pct">PnL</button></th>
                             <th><button type="button" data-sort="duration_seconds">Duration</button></th>
+                            <th class="stoch-eval-col" hidden>Exit reason</th>
+                            <th class="stoch-eval-col" hidden>BE50</th>
+                            <th class="stoch-eval-col" hidden>Exit time</th>
                         </tr>
                         {% endif %}
                     </thead>
@@ -407,7 +437,7 @@
 
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
     <script src="/static/js/stoch_chart_modal.js?v=7"></script>
-    <script src="/static/js/stoch_signale.js?v=19"></script>
+    <script src="/static/js/stoch_signale.js?v=21"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

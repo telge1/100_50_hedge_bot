@@ -97,8 +97,16 @@ def signal_to_position_spec(row: dict[str, Any]) -> dict[str, Any] | None:
     tf = str(row.get("timeframe") or "5m").strip() or "5m"
     sid = str(row.get("signal_id") or row.get("id") or "").strip()
     drawing_type = "long_position" if direction == "LONG" else "short_position"
+    origin = str(row.get("source") or "")
+    evid = str(row.get("evaluation_id") or "")
+    drawing_id = None
+    if sid:
+        if evid:
+            drawing_id = f"stoch-{origin or 'eval'}-{evid}-{sid}"
+        else:
+            drawing_id = f"stoch-{sid}"
     return {
-        "drawing_id": f"stoch-{sid}" if sid else None,
+        "drawing_id": drawing_id,
         "drawing_type": drawing_type,
         "symbol": symbol,
         "timeframe": tf,
@@ -120,12 +128,14 @@ def fetch_stoch_signal_rows(
     strategy_version: str | None = None,
     source: str | None = None,
     job_id: str | None = None,
+    evaluation_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Same feed as /stoch-signale. Pool V1 uses the research artifact, not collector :8787."""
     sv = str(strategy_version or "").strip()
     job = str(job_id or "").strip()
     src = str(source or "").strip()
-    if job or src == "FROZEN_RESEARCH_JOB":
+    ev = str(evaluation_id or "").strip()
+    if job or src in ("FROZEN_RESEARCH_JOB", "FROZEN_RESEARCH_EVALUATION"):
         from stoch_fade_research_jobs.feed import load_job_signals
 
         payload, status = load_job_signals(
@@ -134,6 +144,7 @@ def fetch_stoch_signal_rows(
             offset=0,
             tier_a=True,
             symbol=symbol,
+            evaluation_id=ev or None,
         )
         if status != 200 or not payload or not payload.get("success"):
             return [], str((payload or {}).get("error") or "JOB_NOT_FOUND"), {}

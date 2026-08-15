@@ -15,6 +15,7 @@ from stoch_universe_51.jsonio import read_json
 from .complete import coin_run_is_complete
 from .config import STRATEGY_VERSION, jobs_root
 from .jobs import redact_public, safe_artifact_reference
+from stoch_fade_research_evaluations.config import EXIT_POLICY as EVAL_EXIT_POLICY
 
 SOURCE = "FROZEN_RESEARCH_JOB"
 JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -288,6 +289,7 @@ def load_job_signals(
     timeframe: str | None = None,
     direction: str | None = None,
     sort: str | None = None,
+    evaluation_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, int]:
     parsed = parse_job_id(job_id)
     if parsed is None:
@@ -372,6 +374,40 @@ def load_job_signals(
             )
 
     mapped.sort(key=_sort_ts, reverse=reverse)
+    eval_meta = None
+    if evaluation_id:
+        from stoch_fade_research_evaluations.feed import load_outcomes_index
+
+        ev_payload, ev_code = load_outcomes_index(evaluation_id, environ=environ)
+        if ev_code != 200 or not ev_payload:
+            return ev_payload, ev_code
+        if str(ev_payload.get("source_job_id") or "") != parsed:
+            return {"success": False, "error": "EVALUATION_JOB_MISMATCH", "source": SOURCE}, 409
+        by_sid = ev_payload.get("by_signal_id") or {}
+        joined: list[dict[str, Any]] = []
+        for row in mapped:
+            oc = by_sid.get(str(row.get("signal_id")))
+            if not oc:
+                joined.append(row)
+                continue
+            merged = dict(row)
+            merged["source"] = "FROZEN_RESEARCH_EVALUATION"
+            merged["outcomes_computed"] = True
+            merged["evaluation_id"] = evaluation_id
+            merged["result"] = oc.get("display_result") or oc.get("outcome")
+            merged["display_result"] = oc.get("display_result") or oc.get("outcome")
+            merged["pnl_pct"] = oc.get("pnl_pct_gross")
+            merged["duration_seconds"] = oc.get("duration_seconds")
+            merged["exit_time"] = oc.get("exit_time")
+            merged["exit_price"] = oc.get("exit_price")
+            merged["exit_reason"] = oc.get("exit_reason")
+            merged["be50_activated"] = oc.get("be_activated")
+            merged["be50_activated_at"] = oc.get("be_activation_time")
+            merged["be_trigger_price"] = oc.get("be_trigger_price")
+            merged["plan_status"] = None
+            joined.append(merged)
+        mapped = joined
+        eval_meta = ev_payload.get("summary")
     page = mapped[off : off + lim]
     summary = {
         "raw_total": int(status.get("raw_total") or raw_total),
@@ -382,9 +418,13 @@ def load_job_signals(
         "strategy_version": STRATEGY_VERSION,
         "outcomes_computed": False,
     }
+    if eval_meta:
+        summary.update({k: eval_meta.get(k) for k in eval_meta})
+        summary["outcomes_computed"] = True
+        summary["pnl_basis"] = "gross"
     payload = {
         "success": True,
-        "source": SOURCE,
+        "source": "FROZEN_RESEARCH_EVALUATION" if eval_meta else SOURCE,
         "job": {
             "job_id": parsed,
             "strategy_version": STRATEGY_VERSION,
@@ -393,9 +433,11 @@ def load_job_signals(
             "selected_symbols": selected,
             "state": state,
         },
-        "outcomes_computed": False,
+        "outcomes_computed": bool(eval_meta),
         "execution_dedup_applied": False,
         "be50_outcome_active": False,
+        "evaluation_id": parse_job_id(evaluation_id) if evaluation_id else None,
+        "exit_policy": EVAL_EXIT_POLICY if eval_meta else None,
         "rows": page,
         "signals": page,
         "items": page,

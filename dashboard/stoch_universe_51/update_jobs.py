@@ -271,7 +271,11 @@ def start_update_job(
             return {"success": False, "error": "UNKNOWN_SYMBOL", "symbol": symbol}, 400
         plans.append(plan_symbol_update(coin, now=now))
 
-    from stoch_fade_research_jobs.cross_lock import frozen_research_active_id, start_gate
+    from stoch_fade_research_jobs.cross_lock import (
+        frozen_research_active_id,
+        outcome_eval_active_id,
+        start_gate,
+    )
 
     with start_gate(environ):
         active = active_job_id(environ)
@@ -287,6 +291,13 @@ def start_update_job(
                 "success": False,
                 "error": "FROZEN_JOB_BLOCKS_CANDLE_UPDATE",
                 "job_id": frozen,
+            }, 409
+        ev = outcome_eval_active_id(environ)
+        if ev:
+            return {
+                "success": False,
+                "error": "OUTCOME_EVAL_BLOCKS_CANDLE_UPDATE",
+                "job_id": ev,
             }, 409
 
         job_id = uuid.uuid4().hex

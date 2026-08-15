@@ -46,3 +46,9 @@ def frozen_research_active_id(environ: dict | None = None) -> str | None:
     from stoch_fade_research_jobs.jobs import active_job_id as fade_active
 
     return fade_active(environ)
+
+
+def outcome_eval_active_id(environ: dict | None = None) -> str | None:
+    from stoch_fade_research_evaluations.jobs import active_evaluation_id
+
+    return active_evaluation_id(environ)

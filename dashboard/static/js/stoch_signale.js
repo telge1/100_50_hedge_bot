@@ -18,7 +18,15 @@
     poolResearch: false,
     frozenResearchJob: false,
     researchJobId: "",
+    researchEvaluation: false,
   };
+
+  const frozenEval = { job: null, pollTimer: null, pollMs: 4000 };
+
+  function frozenEvalJobActive() {
+    const st = frozenEval.job && frozenEval.job.state;
+    return st === "QUEUED" || st === "RUNNING";
+  }
 
   const $ = (id) => document.getElementById(id);
   state.researchMode =
@@ -70,7 +78,11 @@
   }
 
   function chipResult(r, row) {
-    if (row && (row.outcomes_computed === false || row.source === "FROZEN_RESEARCH_JOB")) {
+    if (
+      row &&
+      row.source === "FROZEN_RESEARCH_JOB" &&
+      row.outcomes_computed !== true
+    ) {
       return '<span class="stoch-chip stoch-chip-none">nicht berechnet</span>';
     }
     const v = String(r || "OPEN").toUpperCase();
@@ -193,11 +205,20 @@
     return (($("stochFilterResearchJob") || {}).value || "").trim();
   }
 
+  function selectedEvaluationId() {
+    return (($("stochFilterResearchEval") || {}).value || "").trim();
+  }
+
   function storedResearchJobId() {
     try {
       const source = localStorage.getItem("stoch.signal_source") || "";
       const jobId = localStorage.getItem("stoch.research_job_id") || "";
-      if (source === "FROZEN_RESEARCH_JOB" && /^[0-9a-f]{32}$/.test(jobId)) return jobId;
+      if (
+        (source === "FROZEN_RESEARCH_JOB" || source === "FROZEN_RESEARCH_EVALUATION") &&
+        /^[0-9a-f]{32}$/.test(jobId)
+      ) {
+        return jobId;
+      }
     } catch (_) {}
     return "";
   }
@@ -210,21 +231,32 @@
 
   function applyJobSourceUi(job) {
     const jobId = selectedResearchJobId();
+    const evalId = selectedEvaluationId();
     const on = !!jobId;
     state.frozenResearchJob = on;
     state.researchJobId = jobId;
+    state.researchEvaluation = !!evalId;
     const strat = $("stochFilterStrategy");
     const stratLabel = $("stochFilterStrategyLabel");
     const stratNote = $("stochStrategyJobNote");
     const hours = $("stochFilterHours");
     const hoursLabel = $("stochFilterHoursLabel");
     const win = $("stochJobWindowNote");
+    const evalWrap = $("stochEvalFilterWrap");
+    const evalBtn = $("frozenEvalStartBtn");
+    if (evalWrap) evalWrap.hidden = !on;
+    if (evalBtn) evalBtn.disabled = !on || frozenEvalJobActive();
     if (strat) {
       strat.disabled = on;
       strat.hidden = on;
     }
     if (stratLabel) stratLabel.hidden = on;
-    if (stratNote) stratNote.hidden = !on;
+    if (stratNote) {
+      stratNote.hidden = !on;
+      stratNote.textContent = evalId
+        ? "Frozen NO_BE50 · SL_FIRST · PnL basis gross · Execution-Dedup nicht angewendet"
+        : "Nicht anwendbar – Outcomes fehlen";
+    }
     if (hours) {
       hours.disabled = on;
       hours.hidden = on;
@@ -248,15 +280,23 @@
 
   function persistStochChartBridge() {
     const jobId = selectedResearchJobId();
+    const evalId = selectedEvaluationId();
     const filterSym = (($("stochFilterSymbol") || {}).value || "").trim().toUpperCase();
     const rowSym = ((state.rows[0] || {}).symbol || "").toString().trim().toUpperCase();
     try {
       if (jobId) {
-        localStorage.setItem("stoch.signal_source", "FROZEN_RESEARCH_JOB");
         localStorage.setItem("stoch.research_job_id", jobId);
+        if (evalId) {
+          localStorage.setItem("stoch.signal_source", "FROZEN_RESEARCH_EVALUATION");
+          localStorage.setItem("stoch.research_evaluation_id", evalId);
+        } else {
+          localStorage.setItem("stoch.signal_source", "FROZEN_RESEARCH_JOB");
+          localStorage.removeItem("stoch.research_evaluation_id");
+        }
       } else {
         localStorage.setItem("stoch.signal_source", "FROZEN_BASELINE");
         localStorage.removeItem("stoch.research_job_id");
+        localStorage.removeItem("stoch.research_evaluation_id");
         const sv = (($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1");
         localStorage.setItem("stoch.strategy_version", sv);
       }
@@ -472,6 +512,9 @@
         set("perfIgnored", s.ignored_duplicates != null ? String(s.ignored_duplicates) : "–");
         const totalEl = $("perfTotal");
         if (totalEl) totalEl.textContent = fmtPctSigned(s.net_pnl_pct);
+      } else if (state.researchEvaluation || s.outcomes_computed === true) {
+        meta.textContent =
+          "Frozen NO_BE50 · SL_FIRST · PnL basis: gross · OPEN excluded from win rate · Execution-Dedup nicht angewendet";
       } else if (state.frozenResearchJob || s.outcomes_computed === false) {
         meta.textContent =
           "Frozen Research Job · Outcomes nicht berechnet · keine Wins/Losses/Open/PnL";
@@ -534,11 +577,14 @@
     state.loading = true;
     try {
       const jobId = selectedResearchJobId();
+      const evalId = selectedEvaluationId();
       state.researchJobId = jobId;
       state.frozenResearchJob = !!jobId;
+      state.researchEvaluation = !!evalId;
       applyJobSourceUi();
       const qs = new URLSearchParams();
       qs.set("limit", state.researchMode ? "120" : "500");
+      if (evalId) qs.set("evaluation_id", evalId);
       if (!jobId) {
         const hours = ($("stochFilterHours") || {}).value || "48";
         qs.set("hours", hours);
@@ -608,13 +654,17 @@
         const job = data.job || {};
         const start = job.signal_start || "";
         const end = job.signal_end_exclusive || "";
+        const evaluated = !!(data.outcomes_computed || evalId);
         setBanner(
           "Frozen Research Job " +
             (job.strategy_version || "wave_fade_frozen_f16ae32") +
             " · Job " +
             jobId +
+            (evalId ? " · Evaluation " + evalId : "") +
             (start && end ? " · Fenster " + start + " – " + end : "") +
-            " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv",
+            (evaluated
+              ? " · Frozen NO_BE50 · SL_FIRST · WIN/LOSS/OPEN · PnL basis gross · Execution-Dedup nicht angewendet"
+              : " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv"),
           false
         );
         applyJobSourceUi(job);
@@ -661,6 +711,7 @@
       "stochFilterHours",
       "stochFilterStrategy",
       "stochFilterResearchJob",
+      "stochFilterResearchEval",
       "stochFilterTierA",
       "stochFilterTimingVariant",
     ].forEach((id) => {
@@ -668,7 +719,10 @@
       if (el) {
         el.addEventListener("change", () => {
           state.page = 0;
-          if (id === "stochFilterResearchJob") applyJobSourceUi();
+          if (id === "stochFilterResearchJob") {
+            applyJobSourceUi();
+            loadResearchEvalCatalog();
+          }
           load();
         });
       }
@@ -719,6 +773,10 @@
   }
 
   function renderTable() {
+    const evalHeads = document.querySelectorAll(".stoch-eval-col");
+    evalHeads.forEach(function (el) {
+      el.hidden = !state.researchEvaluation;
+    });
     const tbody = $("stochSignalsBody");
     const meta = $("stochMeta");
     if (!tbody) return;
@@ -868,6 +926,7 @@
             <td>${chipResult(r.display_result || r.result, r)}</td>
             <td>${fmtPnl(r.net_pnl_pct != null ? r.net_pnl_pct : r.pnl_pct)}</td>
             <td>${fmtDuration(r.duration_seconds, r.display_result || r.result)}</td>
+            ${state.researchEvaluation ? `<td>${r.exit_reason || "–"}</td><td>${r.be50_activated ? "ja" : "nein"}</td><td>${fmtTs(r.exit_time)}</td>` : ""}
           </tr>`;
         })
         .join("");
@@ -1041,6 +1100,59 @@
         sel.value = "";
       }
       applyJobSourceUi();
+      loadResearchEvalCatalog();
+    } catch (_err) {
+      applyJobSourceUi();
+    }
+  }
+
+  function storedEvaluationId() {
+    try {
+      const evid = localStorage.getItem("stoch.research_evaluation_id") || "";
+      if (/^[0-9a-f]{32}$/.test(evid)) return evid;
+    } catch (_) {}
+    return "";
+  }
+
+  async function loadResearchEvalCatalog() {
+    const sel = $("stochFilterResearchEval");
+    if (!sel) return;
+    const jobId = selectedResearchJobId();
+    const wanted = sel.value || storedEvaluationId();
+    sel.innerHTML = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "Keine Evaluation (nur Plan)";
+    sel.appendChild(none);
+    if (!jobId) {
+      sel.value = "";
+      applyJobSourceUi();
+      return;
+    }
+    try {
+      const res = await fetch(
+        "/api/stoch/frozen-fade-evaluations?source_job_id=" + encodeURIComponent(jobId),
+        { credentials: "include" }
+      );
+      const data = await res.json().catch(function () { return {}; });
+      const evals = Array.isArray(data.evaluations) ? data.evaluations : [];
+      evals.forEach(function (ev) {
+        const opt = document.createElement("option");
+        opt.value = ev.evaluation_id;
+        const when = ev.finished_at || ev.created_at || "";
+        opt.textContent =
+          (when ? when.slice(0, 16) + "Z · " : "") +
+          (ev.state || "") +
+          " · WR " +
+          (ev.win_rate_pct == null ? "–" : Number(ev.win_rate_pct).toFixed(1) + "%");
+        sel.appendChild(opt);
+      });
+      if (wanted && Array.prototype.some.call(sel.options, function (o) { return o.value === wanted; })) {
+        sel.value = wanted;
+      } else {
+        sel.value = "";
+      }
+      applyJobSourceUi();
     } catch (_err) {
       applyJobSourceUi();
     }
@@ -1048,7 +1160,9 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     wire();
-    loadResearchJobCatalog().then(function () { load(); });
+    loadResearchJobCatalog().then(function () {
+      return loadResearchEvalCatalog();
+    }).then(function () { load(); });
     startAutoRefresh();
     wireCollector();
     wireUniverse51();
@@ -1949,5 +2063,106 @@
       if (el) el.addEventListener("change", frozenFadeSyncControls);
     });
     loadFrozenFadeStatus();
+    wireFrozenEval();
+  }
+
+  async function loadFrozenEvalStatus() {
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-evaluations/status", { credentials: "include" });
+      const data = await res.json().catch(function () { return {}; });
+      frozenEval.job = data && data.evaluation_id ? data : frozenEval.job;
+      const prog = $("frozenEvalProgress");
+      if (prog) {
+        if (frozenEvalJobActive()) {
+          prog.style.display = "block";
+          prog.textContent =
+            (data.state || "") +
+            " · " +
+            (data.current_symbol || "") +
+            " · " +
+            (data.progress_percent || 0) +
+            "%";
+          startFrozenEvalPoll();
+        } else {
+          prog.style.display = frozenEval.job && frozenEval.job.state ? "block" : "none";
+          if (frozenEval.job && frozenEval.job.state) {
+            prog.textContent = String(frozenEval.job.state);
+          }
+          stopFrozenEvalPoll();
+          if (frozenEval.job && (frozenEval.job.state === "COMPLETED" || frozenEval.job.state === "COMPLETED_WITH_ERRORS")) {
+            loadResearchEvalCatalog();
+          }
+        }
+      }
+      applyJobSourceUi();
+    } catch (_err) {}
+  }
+
+  function startFrozenEvalPoll() {
+    if (frozenEval.pollTimer) return;
+    frozenEval.pollTimer = setInterval(loadFrozenEvalStatus, frozenEval.pollMs);
+  }
+
+  function stopFrozenEvalPoll() {
+    if (frozenEval.pollTimer) {
+      clearInterval(frozenEval.pollTimer);
+      frozenEval.pollTimer = null;
+    }
+  }
+
+  async function startFrozenEvalJob() {
+    const jobId = selectedResearchJobId();
+    if (!jobId || frozenEvalJobActive()) return;
+    const ok = window.confirm(
+      "Frozen-NO_BE50-Outcomes für diesen Job berechnen? Nur Tier-A, unabhängig je Signal, Initial-TP/SL SL_FIRST, ohne BE50, ohne Execution-Dedup, ohne ClickHouse-Writes."
+    );
+    if (!ok) return;
+    setErr("frozenEvalError", "");
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-evaluations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_job_id: jobId }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || data.success === false) {
+        setErr("frozenEvalError", data.error || "Evaluation konnte nicht gestartet werden");
+        return;
+      }
+      frozenEval.job = data;
+      startFrozenEvalPoll();
+      applyJobSourceUi();
+    } catch (_err) {
+      setErr("frozenEvalError", "Evaluation-API nicht erreichbar");
+    }
+  }
+
+  function wireFrozenEval() {
+    const btn = $("frozenEvalStartBtn");
+    if (btn) btn.addEventListener("click", startFrozenEvalJob);
+    const resume = $("frozenEvalResumeBtn");
+    if (resume) {
+      resume.addEventListener("click", async function () {
+        const eid = frozenEval.job && frozenEval.job.evaluation_id;
+        if (!eid || frozenEvalJobActive()) return;
+        try {
+          const res = await fetch(
+            "/api/stoch/frozen-fade-evaluations/" + encodeURIComponent(eid) + "/resume",
+            { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: "{}" }
+          );
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok || data.success === false) {
+            setErr("frozenEvalError", data.error || "Resume fehlgeschlagen");
+            return;
+          }
+          frozenEval.job = data;
+          startFrozenEvalPoll();
+        } catch (_err) {
+          setErr("frozenEvalError", "Resume-API nicht erreichbar");
+        }
+      });
+    }
+    loadFrozenEvalStatus();
   }
 })();

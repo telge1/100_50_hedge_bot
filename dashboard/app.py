@@ -4027,6 +4027,7 @@ async def api_stoch_frozen_fade_jobs_signals(
     timeframe: str | None = Query(None),
     direction: str | None = Query(None),
     sort: str | None = Query("desc"),
+    evaluation_id: str | None = Query(None),
 ):
     from stoch_fade_research_jobs.feed import load_job_signals
 
@@ -4040,6 +4041,7 @@ async def api_stoch_frozen_fade_jobs_signals(
         timeframe=timeframe,
         direction=direction,
         sort=sort,
+        evaluation_id=evaluation_id,
     )
     return JSONResponse(payload, status_code=status)
 
@@ -4070,6 +4072,104 @@ async def api_stoch_frozen_fade_jobs_resume(job_id: str, request: Request, user:
     payload, status = await asyncio.to_thread(
         handle_resume_post,
         job_id=job_id,
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        content_type=content_type,
+        body=raw or None,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
+@app.get("/api/stoch/frozen-fade-evaluations")
+async def api_stoch_frozen_fade_evaluations_catalog(
+    user: dict = Depends(require_auth),
+    source_job_id: str | None = Query(None),
+):
+    from stoch_fade_research_evaluations.feed import catalog_response
+
+    return await asyncio.to_thread(catalog_response, None, source_job_id)
+
+
+@app.post("/api/stoch/frozen-fade-evaluations")
+async def api_stoch_frozen_fade_evaluations_create(request: Request, user: dict = Depends(require_auth)):
+    from stoch_fade_research_evaluations.jobs import handle_create_post
+
+    content_type = request.headers.get("content-type")
+    try:
+        raw = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "JSON_CONTENT_TYPE_REQUIRED"}, status_code=400)
+    if not isinstance(raw, dict):
+        return JSONResponse({"success": False, "error": "UNKNOWN_FIELDS"}, status_code=400)
+    payload, status = await asyncio.to_thread(
+        handle_create_post,
+        body=raw,
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        content_type=content_type,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
+@app.get("/api/stoch/frozen-fade-evaluations/status")
+async def api_stoch_frozen_fade_evaluations_status(user: dict = Depends(require_auth)):
+    from stoch_fade_research_evaluations.jobs import current_or_last_status
+
+    return await asyncio.to_thread(current_or_last_status)
+
+
+@app.get("/api/stoch/frozen-fade-evaluations/{evaluation_id}/outcomes")
+async def api_stoch_frozen_fade_evaluations_outcomes(
+    evaluation_id: str,
+    user: dict = Depends(require_auth),
+    limit: int = Query(300, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    symbol: str | None = Query(None),
+    timeframe: str | None = Query(None),
+    direction: str | None = Query(None),
+):
+    from stoch_fade_research_evaluations.feed import load_outcomes
+
+    payload, status = await asyncio.to_thread(
+        load_outcomes,
+        evaluation_id,
+        limit=limit,
+        offset=offset,
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+    )
+    return JSONResponse(payload, status_code=status)
+
+
+@app.get("/api/stoch/frozen-fade-evaluations/{evaluation_id}")
+async def api_stoch_frozen_fade_evaluations_get(evaluation_id: str, user: dict = Depends(require_auth)):
+    from stoch_fade_research_evaluations.jobs import load_eval_public
+
+    payload = await asyncio.to_thread(load_eval_public, evaluation_id)
+    if payload is None:
+        return JSONResponse({"success": False, "error": "JOB_NOT_FOUND"}, status_code=404)
+    return payload
+
+
+@app.post("/api/stoch/frozen-fade-evaluations/{evaluation_id}/resume")
+async def api_stoch_frozen_fade_evaluations_resume(
+    evaluation_id: str, request: Request, user: dict = Depends(require_auth)
+):
+    from stoch_fade_research_evaluations.jobs import handle_resume_post
+
+    content_type = request.headers.get("content-type")
+    try:
+        raw = await request.json()
+    except Exception:
+        raw = {}
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        return JSONResponse({"success": False, "error": "UNKNOWN_FIELDS"}, status_code=400)
+    payload, status = await asyncio.to_thread(
+        handle_resume_post,
+        evaluation_id=evaluation_id,
         origin=request.headers.get("origin"),
         referer=request.headers.get("referer"),
         content_type=content_type,

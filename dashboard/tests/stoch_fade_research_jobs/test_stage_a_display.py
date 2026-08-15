@@ -61,7 +61,7 @@ def test_job_poll_skipped_baseline_poll_kept():
 
 def test_result_not_computed_chip():
     assert "nicht berechnet" in JS
-    assert "outcomes_computed === false" in JS
+    assert "outcomes_computed !== true" in JS or "outcomes_computed === false" in JS
 
 
 def test_research_chart_job_body_omits_hours_and_no_be50():
@@ -97,7 +97,7 @@ def test_create_job_post_unchanged_path():
 def test_backtester_job_mode_not_no_be50():
     assert 'bt["display_mode"] = "PLANNED_NO_OUTCOME"' in API
     assert 'bt["strategy_version"] = strategy_version or "wave_fade_no_be50_v1"' in API
-    chunk = API.split("if source ==")[1].split("else:")[0]
+    chunk = API.split('if source == "FROZEN_RESEARCH_JOB"')[1].split("else:")[0]
     assert "wave_fade_no_be50_v1" not in chunk
     assert "PLANNED_NO_OUTCOME" in chunk
     assert "plan_only" in BT or "FROZEN_RESEARCH_JOB" in BT

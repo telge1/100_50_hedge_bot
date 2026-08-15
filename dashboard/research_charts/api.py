@@ -330,6 +330,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         strategy_version = str(body.get("strategy_version") or "").strip() or None
         source = str(body.get("source") or "").strip() or None
         job_id = str(body.get("job_id") or "").strip() or None
+        evaluation_id = str(body.get("evaluation_id") or "").strip() or None
+        if evaluation_id:
+            source = "FROZEN_RESEARCH_EVALUATION"
         out = await asyncio.to_thread(
             fetch_stoch_signal_rows,
             symbol=symbol,
@@ -337,6 +340,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             strategy_version=strategy_version,
             source=source,
             job_id=job_id,
+            evaluation_id=evaluation_id,
         )
         rows, err = out[0], out[1]
         job_meta = out[2] if len(out) > 2 else {}
@@ -352,7 +356,23 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(code, "signal_feed_unavailable", err)
         snap = get_workspace().import_stoch_backtester(symbol, rows)
         bt = dict(snap.get("backtester") or {})
-        if source == "FROZEN_RESEARCH_JOB" or job_id:
+        if source == "FROZEN_RESEARCH_EVALUATION" or evaluation_id:
+            first = rows[0] if rows else {}
+            job = job_meta if isinstance(job_meta, dict) else {}
+            bt["source"] = "FROZEN_RESEARCH_EVALUATION"
+            bt["job_id"] = job_id or job.get("job_id")
+            bt["evaluation_id"] = evaluation_id
+            bt["strategy_version"] = "wave_fade_frozen_f16ae32"
+            bt["exit_policy"] = "NO_BE50"
+            bt["outcomes_computed"] = True
+            bt["display_mode"] = "FROZEN_NO_BE50_EVALUATED"
+            bt["signal_strategy_version"] = "wave_fade_frozen_f16ae32"
+            bt["signal_start"] = job.get("signal_start") or first.get("job_signal_start")
+            bt["signal_end_exclusive"] = job.get("signal_end_exclusive") or first.get(
+                "job_signal_end_exclusive"
+            )
+            bt["message"] = "NO_BE50 · SL_FIRST · Entry/TP/SL/Exit · WIN/LOSS/OPEN · PnL basis gross"
+        elif source == "FROZEN_RESEARCH_JOB" or job_id:
             first = rows[0] if rows else {}
             job = job_meta if isinstance(job_meta, dict) else {}
             bt["source"] = "FROZEN_RESEARCH_JOB"
