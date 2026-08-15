@@ -16,6 +16,8 @@
     symbolOptions: [],
     researchMode: false,
     poolResearch: false,
+    frozenResearchJob: false,
+    researchJobId: "",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -68,6 +70,9 @@
   }
 
   function chipResult(r, row) {
+    if (row && (row.outcomes_computed === false || row.source === "FROZEN_RESEARCH_JOB")) {
+      return '<span class="stoch-chip stoch-chip-none">nicht berechnet</span>';
+    }
     const v = String(r || "OPEN").toUpperCase();
     let cls = "stoch-chip-pending";
     if (v === "WIN") cls = "stoch-chip-live";
@@ -184,12 +189,77 @@
     return `${sign}${v.toFixed(1)}%`;
   }
 
+  function selectedResearchJobId() {
+    return (($("stochFilterResearchJob") || {}).value || "").trim();
+  }
+
+  function storedResearchJobId() {
+    try {
+      const source = localStorage.getItem("stoch.signal_source") || "";
+      const jobId = localStorage.getItem("stoch.research_job_id") || "";
+      if (source === "FROZEN_RESEARCH_JOB" && /^[0-9a-f]{32}$/.test(jobId)) return jobId;
+    } catch (_) {}
+    return "";
+  }
+
+  function selectedJobOption() {
+    const sel = $("stochFilterResearchJob");
+    if (!sel || sel.selectedIndex < 0) return null;
+    return sel.options[sel.selectedIndex] || null;
+  }
+
+  function applyJobSourceUi(job) {
+    const jobId = selectedResearchJobId();
+    const on = !!jobId;
+    state.frozenResearchJob = on;
+    state.researchJobId = jobId;
+    const strat = $("stochFilterStrategy");
+    const stratLabel = $("stochFilterStrategyLabel");
+    const stratNote = $("stochStrategyJobNote");
+    const hours = $("stochFilterHours");
+    const hoursLabel = $("stochFilterHoursLabel");
+    const win = $("stochJobWindowNote");
+    if (strat) {
+      strat.disabled = on;
+      strat.hidden = on;
+    }
+    if (stratLabel) stratLabel.hidden = on;
+    if (stratNote) stratNote.hidden = !on;
+    if (hours) {
+      hours.disabled = on;
+      hours.hidden = on;
+    }
+    if (hoursLabel) hoursLabel.hidden = on;
+    if (win) {
+      if (on) {
+        const opt = selectedJobOption();
+        const start = (job && job.signal_start) || (opt && opt.getAttribute("data-start")) || "";
+        const end = (job && job.signal_end_exclusive) || (opt && opt.getAttribute("data-end")) || "";
+        win.hidden = false;
+        win.textContent = start && end
+          ? ("Job-Fenster: " + start + " – " + end)
+          : "Job-Fenster: aus Job-Manifest";
+      } else {
+        win.hidden = true;
+        win.textContent = "";
+      }
+    }
+  }
+
   function persistStochChartBridge() {
-    const sv = (($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1");
+    const jobId = selectedResearchJobId();
     const filterSym = (($("stochFilterSymbol") || {}).value || "").trim().toUpperCase();
     const rowSym = ((state.rows[0] || {}).symbol || "").toString().trim().toUpperCase();
     try {
-      localStorage.setItem("stoch.strategy_version", sv);
+      if (jobId) {
+        localStorage.setItem("stoch.signal_source", "FROZEN_RESEARCH_JOB");
+        localStorage.setItem("stoch.research_job_id", jobId);
+      } else {
+        localStorage.setItem("stoch.signal_source", "FROZEN_BASELINE");
+        localStorage.removeItem("stoch.research_job_id");
+        const sv = (($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1");
+        localStorage.setItem("stoch.strategy_version", sv);
+      }
       if (filterSym || rowSym) localStorage.setItem("stoch.last_symbol", filterSym || rowSym);
     } catch (_) {}
   }
@@ -344,7 +414,7 @@
       const el = $(id);
       if (el) el.textContent = val;
     };
-    set("perfSignals", s.signals != null ? String(s.signals) : "–");
+    set("perfSignals", s.signals != null ? String(s.signals) : (s.filtered_signals != null ? String(s.filtered_signals) : "–"));
     set("perfWins", s.wins != null ? String(s.wins) : "–");
     set("perfLosses", s.losses != null ? String(s.losses) : "–");
     set("perfOpen", s.open != null ? String(s.open) : "–");
@@ -402,6 +472,9 @@
         set("perfIgnored", s.ignored_duplicates != null ? String(s.ignored_duplicates) : "–");
         const totalEl = $("perfTotal");
         if (totalEl) totalEl.textContent = fmtPctSigned(s.net_pnl_pct);
+      } else if (state.frozenResearchJob || s.outcomes_computed === false) {
+        meta.textContent =
+          "Frozen Research Job · Outcomes nicht berechnet · keine Wins/Losses/Open/PnL";
       } else {
         meta.textContent = `PnL basis: gross · Strategy: ${sv} · Stats = alle Treffer der aktiven Filter (nicht nur Seite)`;
       }
@@ -460,11 +533,17 @@
     if (state.loading) return;
     state.loading = true;
     try {
+      const jobId = selectedResearchJobId();
+      state.researchJobId = jobId;
+      state.frozenResearchJob = !!jobId;
+      applyJobSourceUi();
       const qs = new URLSearchParams();
       qs.set("limit", state.researchMode ? "120" : "500");
-      const hours = ($("stochFilterHours") || {}).value || "48";
-      qs.set("hours", hours);
-      if (state.researchMode) {
+      if (!jobId) {
+        const hours = ($("stochFilterHours") || {}).value || "48";
+        qs.set("hours", hours);
+      }
+      if (state.researchMode && !jobId) {
         qs.set("tier_a", "true");
         const variant =
           ($("stochFilterTimingVariant") || {}).value || "WAIT_1M_EXTREME_TURN_CROSS";
@@ -472,10 +551,12 @@
       } else {
         const tierScope = ($("stochFilterTierA") || {}).value || "true";
         qs.set("tier_a", tierScope);
-        const strategy = ($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1";
-        qs.set("strategy_version", strategy);
-        const selected = ($("stochFilterSelected") || {}).value || "";
-        if (selected) qs.set("selected", selected);
+        if (!jobId) {
+          const strategy = ($("stochFilterStrategy") || {}).value || "wave_fade_no_be50_v1";
+          qs.set("strategy_version", strategy);
+          const selected = ($("stochFilterSelected") || {}).value || "";
+          if (selected) qs.set("selected", selected);
+        }
       }
       const sym = ($("stochFilterSymbol") || {}).value || "";
       if (sym) qs.set("symbol", sym);
@@ -484,15 +565,18 @@
       const tf = ($("stochFilterTimeframe") || {}).value || "";
       if (tf) qs.set("timeframe", tf);
 
-      const res = await fetch("/api/stoch/signals?" + qs.toString(), { credentials: "include" });
+      const url = jobId
+        ? "/api/stoch/frozen-fade-jobs/" + encodeURIComponent(jobId) + "/signals?" + qs.toString()
+        : "/api/stoch/signals?" + qs.toString();
+      const res = await fetch(url, { credentials: "include" });
       let data = {};
       try {
         data = await res.json();
       } catch (_) {
         data = {};
       }
-      const poolOn = isPoolStrategy();
-      const emaOn = isEmaFlipStrategy();
+      const poolOn = isPoolStrategy() && !jobId;
+      const emaOn = isEmaFlipStrategy() && !jobId;
       setPoolResearchUi(poolOn && !emaOn, data.banner);
       setEmaFlipResearchUi(emaOn, data.banner);
       if (!res.ok || data.success === false || data.feed_ready === false) {
@@ -500,6 +584,8 @@
         state.filtered = [];
         state.summary = null;
         renderSummary(null);
+        persistStochChartBridge();
+        applyJobSourceUi(data.job);
         setBanner(
           data.message || data.error || `Signal-Feed nicht erreichbar (HTTP ${res.status})`,
           true
@@ -508,17 +594,38 @@
         return;
       }
 
-      const rows = Array.isArray(data.signals)
-        ? data.signals
-        : Array.isArray(data.items)
-          ? data.items
-          : [];
+      const rows = Array.isArray(data.rows)
+        ? data.rows
+        : Array.isArray(data.signals)
+          ? data.signals
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
       state.rows = rows.filter((r) => r && !r.is_demo && r.signal_id);
       state.summary = data.summary || null;
       renderSummary(state.summary);
-      setBanner("");
+      if (jobId) {
+        const job = data.job || {};
+        const start = job.signal_start || "";
+        const end = job.signal_end_exclusive || "";
+        setBanner(
+          "Frozen Research Job " +
+            (job.strategy_version || "wave_fade_frozen_f16ae32") +
+            " · Job " +
+            jobId +
+            (start && end ? " · Fenster " + start + " – " + end : "") +
+            " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv",
+          false
+        );
+        applyJobSourceUi(job);
+        if (Array.isArray(job.selected_symbols) && job.selected_symbols.length) {
+          state.symbolOptions = unique(job.selected_symbols);
+        }
+      } else {
+        setBanner("");
+      }
       if (!sym) {
-        state.symbolOptions = unique(state.rows.map((r) => r.symbol));
+        state.symbolOptions = unique((state.symbolOptions.length ? state.symbolOptions : []).concat(state.rows.map((r) => r.symbol)));
       } else if (!state.symbolOptions.length) {
         state.symbolOptions = unique(state.rows.map((r) => r.symbol));
       }
@@ -553,6 +660,7 @@
       "stochFilterSelected",
       "stochFilterHours",
       "stochFilterStrategy",
+      "stochFilterResearchJob",
       "stochFilterTierA",
       "stochFilterTimingVariant",
     ].forEach((id) => {
@@ -560,6 +668,7 @@
       if (el) {
         el.addEventListener("change", () => {
           state.page = 0;
+          if (id === "stochFilterResearchJob") applyJobSourceUi();
           load();
         });
       }
@@ -624,7 +733,9 @@
           ? "EMA-Pool-Trend-Flip-Artefakt nicht verfügbar"
           : state.poolResearch
           ? "Pool-V1-Artefakt nicht verfügbar"
-          : "Keine echten Tier-A-Signale im gewählten Zeitraum/Filter.";
+          : state.frozenResearchJob
+            ? "Keine Frozen-Research-Job-Signale für den gewählten Filter."
+            : "Keine echten Tier-A-Signale im gewählten Zeitraum/Filter.";
       tbody.innerHTML = `<tr><td colspan="18" class="stoch-empty">${emptyMsg}</td></tr>`;
     } else if (state.researchMode) {
       tbody.innerHTML = slice
@@ -763,7 +874,8 @@
     }
 
     if (meta) {
-      meta.textContent = `${state.filtered.length} Signale · Seite ${state.page + 1}/${Math.max(1, Math.ceil(state.filtered.length / state.pageSize) || 1)} · auto ${state.refreshMs / 1000}s`;
+      meta.textContent = `${state.filtered.length} Signale · Seite ${state.page + 1}/${Math.max(1, Math.ceil(state.filtered.length / state.pageSize) || 1)}` +
+        (state.frozenResearchJob ? " · Job-Artefakt (kein Poll)" : ` · auto ${state.refreshMs / 1000}s`);
       const sv = (($("stochFilterStrategy") || {}).value || "");
       if (sv === "POOL_ORDER_PLAN_V1") {
         meta.textContent += " · RESEARCH/BACKTEST Pool Order Plan";
@@ -802,9 +914,12 @@
           expected_tp: row.plan_status === "NO_PLAN" ? null : row.tp1_price || row.tp_price,
           expected_sl: row.plan_status === "NO_PLAN" ? null : row.sl_price,
           generated_at: row.generated_at,
-          result: row.display_result || row.result,
-          frozen_result: row.frozen_result || row.result,
-          display_result: row.display_result || row.result,
+          result: row.outcomes_computed === false ? null : (row.display_result || row.result),
+          frozen_result: row.outcomes_computed === false ? null : (row.frozen_result || row.result),
+          display_result: row.outcomes_computed === false ? "nicht berechnet" : (row.display_result || row.result),
+          outcomes_computed: row.outcomes_computed,
+          source: row.source,
+          job_id: row.job_id,
           exit_time: row.exit_time,
           exit_price: row.exit_price,
           exit_reason: row.exit_reason,
@@ -878,14 +993,62 @@
   function startAutoRefresh() {
     if (state.refreshTimer) clearInterval(state.refreshTimer);
     state.refreshTimer = setInterval(() => {
-      if (isPoolStrategy() || isEmaFlipStrategy()) return;
+      if (isPoolStrategy() || isEmaFlipStrategy() || selectedResearchJobId()) return;
       load({ preservePage: true });
     }, state.refreshMs);
   }
 
+  async function loadResearchJobCatalog() {
+    const sel = $("stochFilterResearchJob");
+    if (!sel) return;
+    const wanted = sel.value || storedResearchJobId();
+    try {
+      const res = await fetch("/api/stoch/frozen-fade-jobs", { credentials: "include" });
+      const data = await res.json().catch(function () { return {}; });
+      const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+      sel.innerHTML = "";
+      const live = document.createElement("option");
+      live.value = "";
+      live.textContent = "Live-Baseline (Collector)";
+      sel.appendChild(live);
+      jobs.forEach(function (job) {
+        const opt = document.createElement("option");
+        opt.value = job.job_id;
+        opt.setAttribute("data-start", job.signal_start || "");
+        opt.setAttribute("data-end", job.signal_end_exclusive || "");
+        const when = job.finished_at || job.created_at || "";
+        const coins = (job.selected_symbols || []).join(", ");
+        opt.textContent =
+          (when ? when.slice(0, 16) + "Z · " : "") +
+          coins +
+          " · Raw " +
+          (job.raw_total == null ? "–" : job.raw_total) +
+          " / Tier-A " +
+          (job.tier_a_total == null ? "–" : job.tier_a_total) +
+          " · " +
+          (job.state || "");
+        sel.appendChild(opt);
+      });
+      if (wanted && Array.prototype.some.call(sel.options, function (o) { return o.value === wanted; })) {
+        sel.value = wanted;
+      } else if (wanted) {
+        const missing = document.createElement("option");
+        missing.value = wanted;
+        missing.textContent = "Job " + wanted + " (nicht im Katalog)";
+        sel.appendChild(missing);
+        sel.value = wanted;
+      } else {
+        sel.value = "";
+      }
+      applyJobSourceUi();
+    } catch (_err) {
+      applyJobSourceUi();
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     wire();
-    load();
+    loadResearchJobCatalog().then(function () { load(); });
     startAutoRefresh();
     wireCollector();
     wireUniverse51();
@@ -1704,6 +1867,9 @@
       }
       renderFrozenFadeJob();
       renderUniverse51Table();
+      if (data && (data.state === "COMPLETED" || data.state === "COMPLETED_WITH_ERRORS")) {
+        loadResearchJobCatalog();
+      }
     } catch (_err) {
       /* keep page usable */
     }

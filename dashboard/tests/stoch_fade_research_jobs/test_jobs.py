@@ -95,6 +95,7 @@ def _post(env, symbols, **kwargs):
 
 def test_auth_routes_require_auth():
     text = (DASHBOARD / "app.py").read_text(encoding="utf-8")
+    assert '@app.get("/api/stoch/frozen-fade-jobs")' in text
     assert '@app.post("/api/stoch/frozen-fade-jobs")' in text
     assert "api_stoch_frozen_fade_jobs_create" in text
     assert "Depends(require_auth)" in text

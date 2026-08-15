@@ -85,6 +85,9 @@ def signal_to_position_spec(row: dict[str, Any]) -> dict[str, Any] | None:
             end = start + timedelta(seconds=int(dur))
         except (TypeError, ValueError):
             end = None
+    plan_only = row.get("outcomes_computed") is False or str(row.get("source") or "") == "FROZEN_RESEARCH_JOB"
+    if end is None and plan_only:
+        end = start + DEFAULT_OPEN_WIDTH
     if end is None:
         end = trp["ensure_utc"](datetime.now(timezone.utc))
         if end <= start:
@@ -115,9 +118,29 @@ def fetch_stoch_signal_rows(
     hours: int = 48,
     limit: int = 500,
     strategy_version: str | None = None,
+    source: str | None = None,
+    job_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Same feed as /stoch-signale. Pool V1 uses the research artifact, not collector :8787."""
     sv = str(strategy_version or "").strip()
+    job = str(job_id or "").strip()
+    src = str(source or "").strip()
+    if job or src == "FROZEN_RESEARCH_JOB":
+        from stoch_fade_research_jobs.feed import load_job_signals
+
+        payload, status = load_job_signals(
+            job,
+            limit=min(500, int(limit or 500)),
+            offset=0,
+            tier_a=True,
+            symbol=symbol,
+        )
+        if status != 200 or not payload or not payload.get("success"):
+            return [], str((payload or {}).get("error") or "JOB_NOT_FOUND"), {}
+        raw = payload.get("rows") or payload.get("signals") or []
+        return [r for r in raw if isinstance(r, dict)], None, dict(payload.get("job") or {})
+    if sv == "wave_fade_frozen_f16ae32":
+        return [], "FROZEN_STRATEGY_REQUIRES_RESEARCH_JOB"
     if sv == "EMA_POOL_TREND_FLIP_V1":
         from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
         from ema_pool_trend_flip_v1.research_feed import research_signals_response as ema_flip_response

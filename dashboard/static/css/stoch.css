@@ -566,6 +566,16 @@
     color: #fbbf24;
     border: 1px solid rgba(251, 191, 36, 0.45);
 }
+.stoch-chip-none {
+    background: rgba(148, 163, 184, 0.18);
+    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+.stoch-job-filter-note {
+    color: #fbbf24;
+    font-size: 0.82rem;
+    max-width: 420px;
+}
 .stoch-universe51-note {
     margin: 0 0 10px 0;
     color: #9ca3af;

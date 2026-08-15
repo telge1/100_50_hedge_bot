@@ -328,17 +328,53 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(400, "symbol_required", "symbol required")
         hours = int(body.get("hours") or 48)
         strategy_version = str(body.get("strategy_version") or "").strip() or None
-        rows, err = await asyncio.to_thread(
+        source = str(body.get("source") or "").strip() or None
+        job_id = str(body.get("job_id") or "").strip() or None
+        out = await asyncio.to_thread(
             fetch_stoch_signal_rows,
             symbol=symbol,
             hours=hours,
             strategy_version=strategy_version,
+            source=source,
+            job_id=job_id,
         )
+        rows, err = out[0], out[1]
+        job_meta = out[2] if len(out) > 2 else {}
         if err:
-            return _error(503, "signal_feed_unavailable", err)
+            code = 400 if err in (
+                "FROZEN_STRATEGY_REQUIRES_RESEARCH_JOB",
+                "JOB_NOT_SELECTABLE",
+                "JOB_ID_INVALID",
+                "JOB_NOT_FOUND",
+                "JOB_ARTIFACT_INVALID",
+                "FROZEN_IDENTITY_MISMATCH",
+            ) else 503
+            return _error(code, "signal_feed_unavailable", err)
         snap = get_workspace().import_stoch_backtester(symbol, rows)
         bt = dict(snap.get("backtester") or {})
-        bt["strategy_version"] = strategy_version or "wave_fade_no_be50_v1"
+        if source == "FROZEN_RESEARCH_JOB" or job_id:
+            first = rows[0] if rows else {}
+            job = job_meta if isinstance(job_meta, dict) else {}
+            bt["source"] = "FROZEN_RESEARCH_JOB"
+            bt["job_id"] = job_id or job.get("job_id")
+            bt["strategy_version"] = str(
+                job.get("strategy_version")
+                or first.get("strategy_version")
+                or "wave_fade_frozen_f16ae32"
+            )
+            bt["outcomes_computed"] = False
+            bt["display_mode"] = "PLANNED_NO_OUTCOME"
+            bt["signal_start"] = job.get("signal_start") or first.get("job_signal_start")
+            bt["signal_end_exclusive"] = job.get("signal_end_exclusive") or first.get(
+                "job_signal_end_exclusive"
+            )
+            bt["plan_horizon"] = "4h visual projection only"
+            bt["message"] = (
+                "PLANNED_NO_OUTCOME · Entry/TP/SL · Outcomes nicht berechnet · "
+                "4h-Planhorizont nur visuelle Projektion"
+            )
+        else:
+            bt["strategy_version"] = strategy_version or "wave_fade_no_be50_v1"
         if strategy_version == "POOL_ORDER_PLAN_V1" and not rows:
             bt["message"] = f"Pool-V1 hat keine Signale für {symbol}"
         if strategy_version == "EMA_POOL_TREND_FLIP_V1" and not rows:

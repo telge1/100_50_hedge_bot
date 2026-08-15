@@ -3808,6 +3808,22 @@ async def api_stoch_signals(
         tier_param = t_raw
 
     sv = (strategy_version or "wave_fade_no_be50_v1").strip()
+    if sv == "wave_fade_frozen_f16ae32":
+        return JSONResponse(
+            {
+                "success": False,
+                "error": "FROZEN_STRATEGY_REQUIRES_RESEARCH_JOB",
+                "source": "FROZEN_BASELINE",
+                "message": (
+                    "wave_fade_frozen_f16ae32 wird nicht auf den Collector-/ClickHouse-Feed gemappt. "
+                    "Bitte einen abgeschlossenen Frozen-Research-Job auswählen."
+                ),
+                "signals": [],
+                "items": [],
+                "summary": None,
+            },
+            status_code=400,
+        )
     if sv == "EMA_POOL_TREND_FLIP_V1":
         from ema_pool_trend_flip_v1.config import enable_ema_pool_trend_flip_v1
         from ema_pool_trend_flip_v1.research_feed import research_signals_response as ema_flip_signals_response
@@ -3963,6 +3979,14 @@ async def api_stoch_universe_51_update_job(job_id: str, user: dict = Depends(req
     return payload
 
 
+@app.get("/api/stoch/frozen-fade-jobs")
+async def api_stoch_frozen_fade_jobs_catalog(user: dict = Depends(require_auth)):
+    """Read-only catalog of completed Frozen research jobs. Does not start a job."""
+    from stoch_fade_research_jobs.feed import catalog_response
+
+    return await asyncio.to_thread(catalog_response)
+
+
 @app.post("/api/stoch/frozen-fade-jobs")
 async def api_stoch_frozen_fade_jobs_create(request: Request, user: dict = Depends(require_auth)):
     """Start sequential Frozen Wave-Fade signal research job. CSRF: Origin/Referer + JSON."""
@@ -3990,6 +4014,34 @@ async def api_stoch_frozen_fade_jobs_status(user: dict = Depends(require_auth)):
     from stoch_fade_research_jobs.jobs import current_or_last_status
 
     return await asyncio.to_thread(current_or_last_status)
+
+
+@app.get("/api/stoch/frozen-fade-jobs/{job_id}/signals")
+async def api_stoch_frozen_fade_jobs_signals(
+    job_id: str,
+    user: dict = Depends(require_auth),
+    limit: int = Query(300, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    tier_a: str | None = Query("true"),
+    symbol: str | None = Query(None),
+    timeframe: str | None = Query(None),
+    direction: str | None = Query(None),
+    sort: str | None = Query("desc"),
+):
+    from stoch_fade_research_jobs.feed import load_job_signals
+
+    payload, status = await asyncio.to_thread(
+        load_job_signals,
+        job_id,
+        limit=limit,
+        offset=offset,
+        tier_a=tier_a,
+        symbol=symbol,
+        timeframe=timeframe,
+        direction=direction,
+        sort=sort,
+    )
+    return JSONResponse(payload, status_code=status)
 
 
 @app.get("/api/stoch/frozen-fade-jobs/{job_id}")
