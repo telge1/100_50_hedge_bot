@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-08-11T16:49:17.274679+00:00",
+  "selection_method": "targeted_december_history_repair",
+  "source": "clickhouse_51_coin_history_integrity_audit",
+  "symbols": [
+    "ETHUSDT",
+    "BTCUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "HYPEUSDT",
+    "ZECUSDT",
+    "DOGEUSDT",
+    "AVAXUSDT",
+    "APTUSDT"
+  ],
+  "target_size": 9
+}

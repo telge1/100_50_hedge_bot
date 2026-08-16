@@ -1,0 +1,52 @@
+# Virtualenv / packaging
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+src/*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets (never commit). Keep .env.example.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Logs
+logs/
+*.log
+
+# Results, backtests, runtime artifacts
+results/
+/data/
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+
+# Collector operational state (not source config)
+collector.lock
+*.pid
+*.lock
+
+# IDE / Cursor / OS
+.idea/
+.vscode/
+.cursor/
+*.swp
+.DS_Store
+
+# Nested scanner repo has its own .git; do not absorb by accident
+# (leave untracked or add later as a submodule — do not copy secrets from it)
+coin_scanner/

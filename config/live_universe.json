@@ -1,0 +1,19 @@
+{
+  "exchange": "bybit",
+  "category": "linear",
+  "interval": "1m",
+  "updated_at": "2026-08-10T00:00:00+00:00",
+  "notes": "Editable live collector universe. Do not hardcode symbols in collector code; load this file. BTCUSDT intentionally excluded.",
+  "symbols": [
+    "APTUSDT",
+    "DOGEUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "AVAXUSDT",
+    "HYPEUSDT",
+    "ZECUSDT",
+    "ACEUSDT",
+    "BMTUSDT",
+    "TUTUSDT"
+  ]
+}

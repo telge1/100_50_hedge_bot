@@ -1,0 +1,26 @@
+[Unit]
+Description=Bybit Live 1m Collector + Shadow Signals (signal_generator)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves
+EnvironmentFile=-/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.env
+# Supervisor lives inside run_live_collector_service.py:
+# - desired_state=RUNNING → restart collector after crash
+# - desired_state=STOPPED → stay idle (no immediate collector restart)
+# Process-level Restart=on-failure only recovers the supervisor itself.
+ExecStart=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python \
+  scripts/run_live_collector_service.py \
+  --live-universe config/live_universe.json \
+  --api-host 127.0.0.1 \
+  --api-port 8787 \
+  --default-desired RUNNING
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
