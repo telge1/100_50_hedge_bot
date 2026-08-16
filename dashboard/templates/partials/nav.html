@@ -2,7 +2,13 @@
             <a href="/dashboard" class="nav-link{% if nav_active == 'dashboard' %} active{% endif %}">📊 Dashboard</a>
             <a href="/live-orderbook" class="nav-link{% if nav_active == 'live-orderbook' %} active{% endif %}">📡 Live Orderbook</a>
             <a href="/position-calculator" class="nav-link nav-link-position-calculator{% if nav_active == 'position-calculator' %} active{% endif %}">🧮 Position Calculator</a>
-            <a href="https://dash.immotel.de/profit-verlauf" class="nav-link{% if nav_active == 'profit-verlauf' %} active{% endif %}">📈 Profit-Verlauf</a>
+            <div class="nav-dropdown{% if nav_active and nav_active.startswith('profit-verlauf') %} is-active{% endif %}">
+                <a href="/profit-verlauf" class="nav-link{% if nav_active and nav_active.startswith('profit-verlauf') %} active{% endif %}">📈 Profit-Verlauf</a>
+                <div class="nav-dropdown-menu" role="menu" aria-label="Profit-Verlauf">
+                    <a href="/profit-verlauf" class="nav-dropdown-link{% if nav_active == 'profit-verlauf' %} active{% endif %}" role="menuitem">Profit-Verlauf</a>
+                    <a href="/profit-verlauf/gold-shadow" class="nav-dropdown-link{% if nav_active == 'profit-verlauf-gold-shadow' %} active{% endif %}" role="menuitem">Gold Shadow</a>
+                </div>
+            </div>
             <div class="nav-dropdown{% if nav_active and nav_active.startswith('live-charts') %} is-active{% endif %}">
                 <a href="/live-charts/hedge" class="nav-link{% if nav_active and nav_active.startswith('live-charts') %} active{% endif %}">📈 Live Charts</a>
                 <div class="nav-dropdown-menu" role="menu" aria-label="Live Charts">
