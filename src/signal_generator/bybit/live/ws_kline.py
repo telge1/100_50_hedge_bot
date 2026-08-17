@@ -19,6 +19,12 @@ from decimal import Decimal
 from typing import Any, Awaitable, Callable, Sequence
 
 from signal_generator.bybit.history import ensure_utc, millis_to_utc
+from signal_generator.bybit.live.ws_public_trade import (
+    WsPublicTrade,
+    parse_public_trade_topic,
+    parse_ws_public_trade_payload,
+    public_trade_topic_for_symbol,
+)
 from signal_generator.db.candles import Candle1m
 
 logger = logging.getLogger(__name__)
@@ -33,6 +39,7 @@ LIVE_SOURCE = "bybit_live"
 
 
 OnClosedCandle = Callable[[Candle1m], Awaitable[None] | None]
+OnPublicTrade = Callable[[WsPublicTrade], Awaitable[None] | None]
 OnEvent = Callable[[str, dict[str, Any]], Awaitable[None] | None]
 
 
@@ -109,8 +116,11 @@ def subscribe_arg_chunks(
     *,
     chunk_size: int = SUBSCRIBE_CHUNK_SIZE,
     interval: str = "1",
+    public_trade_symbols: Sequence[str] | None = None,
 ) -> list[list[str]]:
     topics = [topic_for_symbol(s, interval=interval) for s in symbols]
+    if public_trade_symbols:
+        topics.extend(public_trade_topic_for_symbol(s) for s in public_trade_symbols)
     return chunk_sequence(topics, chunk_size)
 
 
@@ -145,6 +155,8 @@ class BybitKlineWebSocket:
         ping_interval_s: float = PING_INTERVAL_S,
         stale_timeout_s: float = STALE_CONNECTION_TIMEOUT_S,
         on_closed_candle: OnClosedCandle | None = None,
+        on_public_trade: OnPublicTrade | None = None,
+        public_trade_symbols: Sequence[str] | None = None,
         on_event: OnEvent | None = None,
         open_connection: Callable[..., Awaitable[Any]] | None = None,
         subscribe_chunk_size: int = SUBSCRIBE_CHUNK_SIZE,
@@ -154,6 +166,10 @@ class BybitKlineWebSocket:
         self.ping_interval_s = ping_interval_s
         self.stale_timeout_s = stale_timeout_s
         self.on_closed_candle = on_closed_candle
+        self.on_public_trade = on_public_trade
+        self.public_trade_symbols = (
+            [s.upper() for s in public_trade_symbols] if public_trade_symbols else []
+        )
         self.on_event = on_event
         self._open_connection = open_connection
         self.subscribe_chunk_size = subscribe_chunk_size
@@ -214,7 +230,19 @@ class BybitKlineWebSocket:
             await self._emit("other", payload)
             return
 
-        symbol = parse_topic_symbol(str(topic))
+        topic_s = str(topic)
+        if topic_s.startswith("publicTrade."):
+            symbol = parse_public_trade_topic(topic_s)
+            if symbol:
+                await self._emit("topic_message", {"symbol": symbol, "kind": "publicTrade"})
+                for trade in parse_ws_public_trade_payload(payload):
+                    if self.on_public_trade:
+                        res = self.on_public_trade(trade)
+                        if asyncio.iscoroutine(res):
+                            await res
+            return
+
+        symbol = parse_topic_symbol(topic_s)
         if not symbol:
             return
         # Any kline topic message implies subscription is live for that symbol
@@ -267,7 +295,9 @@ class BybitKlineWebSocket:
             self._ws_conn = ws
             await self._emit("connected", {"url": self.url})
             self._subscribe_chunks = subscribe_arg_chunks(
-                self.symbols, chunk_size=self.subscribe_chunk_size
+                self.symbols,
+                chunk_size=self.subscribe_chunk_size,
+                public_trade_symbols=self.public_trade_symbols or None,
             )
             self._subscribe_chunk_index = 0
             self.subscribed_topics.clear()

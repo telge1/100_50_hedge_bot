@@ -100,6 +100,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-signals", action="store_true")
     p.add_argument("--no-internal-repair", action="store_true")
     p.add_argument(
+        "--enable-public-trades",
+        action="store_true",
+        help=(
+            "Subscribe publicTrade.{symbol} for the 51 candle-universe coins and "
+            "insert into orderbook_analysis.public_trades_canonical. Default off."
+        ),
+    )
+    p.add_argument("--public-trade-queue-maxsize", type=int, default=5000)
+    p.add_argument("--public-trade-batch-size", type=int, default=500)
+    p.add_argument(
         "--lock-file",
         type=Path,
         default=ROOT / "results" / "live_collector" / "collector.lock",
@@ -261,6 +271,10 @@ async def run_supervised(args: argparse.Namespace) -> int:
                 signal_workers=args.signal_workers,
                 signal_queue_maxsize=args.signal_queue_maxsize,
                 signal_shutdown_drain_s=args.signal_shutdown_drain_s,
+                enable_public_trades=args.enable_public_trades,
+                public_trade_symbols=candle_syms if args.enable_public_trades else None,
+                public_trade_queue_maxsize=args.public_trade_queue_maxsize,
+                public_trade_batch_size=args.public_trade_batch_size,
             )
             collector.health.invalid_symbols = invalid_meta
             service.health = collector.health

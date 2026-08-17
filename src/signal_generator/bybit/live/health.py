@@ -127,6 +127,20 @@ class HealthState:
     max_signal_lag_seconds: float | None = None
     signal_dirty_symbols: list[str] = field(default_factory=list)
     signal_overflow_count: int = 0
+    public_trades_enabled: bool = False
+    public_trade_symbols: list[str] = field(default_factory=list)
+    last_trade_event_ts: datetime | None = None
+    last_trade_ingest_ts: datetime | None = None
+    public_trade_lag_seconds: float | None = None
+    public_trade_rows_received: int = 0
+    public_trade_rows_inserted: int = 0
+    public_trade_duplicate_rows_skipped: int = 0
+    public_trade_reconnect_count: int = 0
+    public_trade_queue_depth: int = 0
+    public_trade_queue_maxsize: int = 0
+    public_trade_dropped_events: int = 0
+    public_trade_insert_failures: int = 0
+    public_trade_last_error: str | None = None
     _signal_metrics_provider: Callable[[], dict[str, Any]] | None = field(
         default=None, repr=False, compare=False
     )
@@ -341,6 +355,22 @@ class HealthState:
             "max_signal_lag_seconds": self.max_signal_lag_seconds,
             "signal_dirty_symbols": list(self.signal_dirty_symbols),
             "signal_overflow_count": self.signal_overflow_count,
+            "public_trades_enabled": self.public_trades_enabled,
+            "public_trade_symbols": list(self.public_trade_symbols),
+            "public_trade_metrics": {
+                "last_trade_event_ts": _iso(self.last_trade_event_ts),
+                "last_trade_ingest_ts": _iso(self.last_trade_ingest_ts),
+                "lag_seconds": self.public_trade_lag_seconds,
+                "rows_received": self.public_trade_rows_received,
+                "rows_inserted": self.public_trade_rows_inserted,
+                "duplicate_rows_skipped": self.public_trade_duplicate_rows_skipped,
+                "reconnect_count": self.public_trade_reconnect_count,
+                "queue_depth": self.public_trade_queue_depth,
+                "queue_maxsize": self.public_trade_queue_maxsize,
+                "dropped_events": self.public_trade_dropped_events,
+                "insert_failures": self.public_trade_insert_failures,
+                "last_error": self.public_trade_last_error,
+            },
             "symbols": [
                 self.symbol_health[s].to_dict()
                 for s in self.configured_symbols
@@ -368,3 +398,24 @@ class HealthState:
         dirty = metrics.get("signal_dirty_symbols") or []
         self.signal_dirty_symbols = list(dirty)
         self.signal_overflow_count = int(metrics.get("signal_overflow_count") or 0)
+
+    def apply_public_trade_metrics(self, metrics: dict[str, Any]) -> None:
+        self.public_trades_enabled = True
+        let = metrics.get("last_trade_event_ts")
+        if let:
+            self.last_trade_event_ts = datetime.fromisoformat(str(let))
+        lit = metrics.get("last_trade_ingest_ts")
+        if lit:
+            self.last_trade_ingest_ts = datetime.fromisoformat(str(lit))
+        self.public_trade_lag_seconds = metrics.get("lag_seconds")
+        self.public_trade_rows_received = int(metrics.get("rows_received") or 0)
+        self.public_trade_rows_inserted = int(metrics.get("rows_inserted") or 0)
+        self.public_trade_duplicate_rows_skipped = int(
+            metrics.get("duplicate_rows_skipped") or 0
+        )
+        self.public_trade_reconnect_count = int(metrics.get("reconnect_count") or 0)
+        self.public_trade_queue_depth = int(metrics.get("queue_depth") or 0)
+        self.public_trade_queue_maxsize = int(metrics.get("queue_maxsize") or 0)
+        self.public_trade_dropped_events = int(metrics.get("dropped_events") or 0)
+        self.public_trade_insert_failures = int(metrics.get("insert_failures") or 0)
+        self.public_trade_last_error = metrics.get("last_error")

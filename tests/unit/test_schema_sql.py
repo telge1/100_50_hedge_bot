@@ -8,6 +8,9 @@ from signal_generator.db.setup import _split_sql_statements
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = (ROOT / "migrations" / "001_initial_schema.sql").read_text(encoding="utf-8")
+SCHEMA_002 = (ROOT / "migrations" / "002_public_trades_canonical.sql").read_text(
+    encoding="utf-8"
+)
 
 
 def test_migration_splits_into_create_statements():
@@ -40,3 +43,15 @@ def test_signal_outcomes_keyed_by_signal_and_horizon():
 
 def test_signals_order_by_supports_chart_query():
     assert "ORDER BY (symbol, timeframe, candle_open_time, signal_id)" in SCHEMA
+
+
+def test_canonical_public_trades_migration_is_create_if_not_exists_only():
+    stmts = _split_sql_statements(SCHEMA_002)
+    assert any("public_trades_canonical" in s for s in stmts)
+    for stmt in stmts:
+        upper = stmt.upper()
+        assert not upper.lstrip().startswith("DROP")
+        assert "TRUNCATE TABLE" not in upper
+        assert "INSERT INTO" not in upper
+        assert "ORDERBOOK_DELTAS" not in upper
+        assert "CANDLES_1M" not in upper

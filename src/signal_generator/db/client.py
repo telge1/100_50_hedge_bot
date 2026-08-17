@@ -43,15 +43,21 @@ class ClickHouseClient:
         table: str,
         data: Sequence[Sequence[Any]],
         column_names: Sequence[str],
+        *,
+        database: str | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> Any:
         if not data:
             return None
-        return self._client.insert(
-            table=table,
-            data=list(data),
-            column_names=list(column_names),
-            database=self.database,
-        )
+        kwargs: dict[str, Any] = {
+            "table": table,
+            "data": list(data),
+            "column_names": list(column_names),
+            "database": database or self.database,
+        }
+        if settings:
+            kwargs["settings"] = settings
+        return self._client.insert(**kwargs)
 
     def ping(self) -> tuple[str, str, str]:
         result = self._client.query(

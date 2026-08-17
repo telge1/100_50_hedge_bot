@@ -60,6 +60,7 @@ from signal_generator.db.candles import Candle1m, CandleRepository
 from signal_generator.db.client import ClickHouseClient
 from signal_generator.db.processing_state import ProcessingStateRepository
 from signal_generator.db.signals import SignalRepository
+from signal_generator.db.public_trades import CanonicalPublicTradeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,10 @@ class Live1mCollector:
         signal_shutdown_drain_s: float = DEFAULT_SHUTDOWN_DRAIN_S,
         candle_symbols: Sequence[str] | None = None,
         signal_symbols: Sequence[str] | None = None,
+        enable_public_trades: bool = False,
+        public_trade_symbols: Sequence[str] | None = None,
+        public_trade_queue_maxsize: int = 5000,
+        public_trade_batch_size: int = 500,
     ) -> None:
         assert_shadow_only()
         if candle_symbols is None:
@@ -157,6 +162,27 @@ class Live1mCollector:
         self._signal_workers = signal_workers
         self._signal_queue_maxsize = signal_queue_maxsize
         self._signal_shutdown_drain_s = signal_shutdown_drain_s
+        self.enable_public_trades = bool(enable_public_trades)
+        candle_set = set(self.candle_symbols)
+        if public_trade_symbols is None:
+            pt_syms = list(self.candle_symbols) if self.enable_public_trades else []
+        else:
+            pt_syms = [s.upper() for s in public_trade_symbols]
+        if self.enable_public_trades:
+            extra = [s for s in pt_syms if s not in candle_set]
+            if extra:
+                raise ValueError(
+                    "public_trade_symbols must be a subset of candle universe: "
+                    + ",".join(extra)
+                )
+            if "XAUUSDT" in pt_syms:
+                raise ValueError("XAUUSDT must not be subscribed for public trades")
+        self.public_trade_symbols = pt_syms if self.enable_public_trades else []
+        self._public_trade_queue_maxsize = public_trade_queue_maxsize
+        self._public_trade_batch_size = public_trade_batch_size
+        self._trade_buffer = None
+        self.health.public_trades_enabled = self.enable_public_trades
+        self.health.public_trade_symbols = list(self.public_trade_symbols)
 
     def set_desired_state(self, value: str) -> None:
         self.health.desired_state = value
@@ -167,6 +193,8 @@ class Live1mCollector:
             self._signal_pool._accepting = False  # noqa: SLF001 — fast STOP
         if self._outcome_pool is not None:
             self._outcome_pool._accepting = False  # noqa: SLF001
+        if self._trade_buffer is not None:
+            self._trade_buffer._stop.set()
         if self._ws:
             self._ws.request_stop()
 
@@ -256,6 +284,32 @@ class Live1mCollector:
             op = self._ensure_outcome_pool()
             if op is not None:
                 op.enqueue(candle.symbol, ensure_utc(candle.close_time))
+
+    async def _on_public_trade(self, trade) -> None:
+        """Enqueue live public trade; never raise into the kline WS path."""
+        buf = self._trade_buffer
+        if buf is None:
+            return
+        try:
+            buf.enqueue(trade)
+            self.health.apply_public_trade_metrics(buf.metrics.to_dict())
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("public trade enqueue failed: %s", exc)
+            self.health.public_trade_last_error = str(exc)[:300]
+
+    def _ensure_trade_buffer(self):
+        if not self.enable_public_trades or not self.public_trade_symbols:
+            return None
+        if self._trade_buffer is None:
+            from signal_generator.bybit.live.trade_buffer import PublicTradeInsertBuffer
+
+            repo = CanonicalPublicTradeRepository(self.ch)
+            self._trade_buffer = PublicTradeInsertBuffer(
+                repo,
+                queue_maxsize=self._public_trade_queue_maxsize,
+                batch_size=self._public_trade_batch_size,
+            )
+        return self._trade_buffer
 
     async def _catchup_symbol_blocking(self, symbol: str, *, end: datetime) -> None:
         """Startup/reconnect/stale blocking catch-up (allowed to gate LIVE)."""
@@ -498,9 +552,17 @@ class Live1mCollector:
 
             await self._start_signal_pool()
 
+            trade_buf = self._ensure_trade_buffer()
+            if trade_buf is not None:
+                trade_buf.start()
+                trade_buf.note_reconnect()
+                self.health.apply_public_trade_metrics(trade_buf.metrics.to_dict())
+
             self._ws = self.ws_factory(
                 self.symbols,
                 on_closed_candle=self._insert_closed,
+                on_public_trade=self._on_public_trade if trade_buf is not None else None,
+                public_trade_symbols=self.public_trade_symbols or None,
                 on_event=self._on_ws_event,
             )
             stale_task = asyncio.create_task(self._stale_symbol_loop())
@@ -544,6 +606,9 @@ class Live1mCollector:
             sh.state = SymbolRuntimeState.STOPPED
         await self._stop_signal_pool()
         await asyncio.to_thread(self.buffer.flush)
+        if self._trade_buffer is not None:
+            await self._trade_buffer.stop()
+            self.health.apply_public_trade_metrics(self._trade_buffer.metrics.to_dict())
         # Final blocking catch-up — watermark SoT; short because STOP must stay snappy
         if self.enable_signals:
             try:
