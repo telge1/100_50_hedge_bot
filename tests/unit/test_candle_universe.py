@@ -11,6 +11,9 @@ import pytest
 from signal_generator.bybit.live.candle_universe import (
     filter_signal_demand,
     load_candle_universe,
+    load_universe_symbols,
+    public_trade_symbols_from_universe,
+    resolve_collector_symbol_sets,
     resolve_universes,
 )
 from signal_generator.bybit.live.collector import Live1mCollector
@@ -154,3 +157,85 @@ def test_confirm_false_still_not_a_candle():
 
 def test_filter_signal_demand_drops_btc_only():
     assert filter_signal_demand(["btcusdt", "ADAUSDT", "ADAUSDT"]) == ["ADAUSDT"]
+
+
+def test_universe_symbols_are_exactly_51_without_xau():
+    universe = load_universe_symbols(GOLD_51)
+    assert len(universe) == 51
+    assert len(set(universe)) == 51
+    assert "XAUUSDT" not in universe
+    pts = public_trade_symbols_from_universe(universe)
+    assert pts == universe
+    assert pts is not universe
+
+
+def test_resolve_collector_sets_keeps_xau_on_candles_only():
+    universe = load_universe_symbols(GOLD_51)
+    sets = resolve_collector_symbol_sets(
+        universe_symbols=universe,
+        demand_symbols=["XAUUSDT"],
+        enable_public_trades=True,
+    )
+    assert len(sets.universe_symbols) == 51
+    assert len(sets.candle_symbols) == 52
+    assert len(sets.public_trade_symbols) == 51
+    assert sets.public_trade_symbols == sets.universe_symbols
+    assert sets.public_trade_symbols is not sets.candle_symbols
+    assert "XAUUSDT" in sets.candle_symbols
+    assert "XAUUSDT" not in sets.public_trade_symbols
+    assert set(sets.public_trade_symbols) == set(universe)
+    assert set(sets.public_trade_symbols).issubset(set(sets.candle_symbols))
+
+
+def test_demand_already_in_universe_does_not_duplicate_public_trades():
+    universe = load_universe_symbols(GOLD_51)
+    sets = resolve_collector_symbol_sets(
+        universe_symbols=universe,
+        demand_symbols=["ADAUSDT"],
+        enable_public_trades=True,
+    )
+    assert len(sets.candle_symbols) == 51
+    assert len(sets.public_trade_symbols) == 51
+    assert sets.public_trade_symbols.count("ADAUSDT") == 1
+    assert len(set(sets.public_trade_symbols)) == 51
+
+
+def test_extra_demand_symbols_stay_off_public_trades():
+    universe = load_universe_symbols(GOLD_51)
+    sets = resolve_collector_symbol_sets(
+        universe_symbols=universe,
+        demand_symbols=["XAUUSDT", "FAKEGOLDUSDT"],
+        enable_public_trades=True,
+    )
+    assert "XAUUSDT" in sets.candle_symbols
+    assert "FAKEGOLDUSDT" in sets.candle_symbols
+    assert len(sets.candle_symbols) == 53
+    assert "XAUUSDT" not in sets.public_trade_symbols
+    assert "FAKEGOLDUSDT" not in sets.public_trade_symbols
+    assert len(sets.public_trade_symbols) == 51
+
+
+def test_public_trades_flag_off_leaves_empty_public_set():
+    universe = load_universe_symbols(GOLD_51)
+    sets = resolve_collector_symbol_sets(
+        universe_symbols=universe,
+        demand_symbols=["XAUUSDT"],
+        enable_public_trades=False,
+    )
+    assert len(sets.candle_symbols) == 52
+    assert "XAUUSDT" in sets.candle_symbols
+    assert sets.public_trade_symbols == ()
+
+
+def test_enable_public_trades_without_universe_is_rejected():
+    with pytest.raises(ValueError, match="candle-universe"):
+        resolve_collector_symbol_sets(
+            universe_symbols=None,
+            demand_symbols=["XAUUSDT"],
+            enable_public_trades=True,
+        )
+
+
+def test_xau_in_universe_source_is_rejected_for_public_trades():
+    with pytest.raises(ValueError, match="XAUUSDT"):
+        public_trade_symbols_from_universe(["DOGEUSDT", "XAUUSDT"])

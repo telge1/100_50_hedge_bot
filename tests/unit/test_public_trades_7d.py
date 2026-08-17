@@ -299,7 +299,7 @@ def test_collector_public_trades_default_off(monkeypatch):
         enable_signals=False,
     )
     assert c.enable_public_trades is False
-    assert c.public_trade_symbols == []
+    assert c.public_trade_symbols == ()
 
 
 @pytest.mark.asyncio

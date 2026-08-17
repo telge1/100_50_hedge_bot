@@ -17,6 +17,7 @@ import logging
 import signal as signal_mod
 import sys
 from pathlib import Path
+from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -32,9 +33,9 @@ from signal_generator.bybit.live.control_api import (  # noqa: E402
     start_control_api,
 )
 from signal_generator.bybit.live.candle_universe import (  # noqa: E402
-    filter_signal_demand,
-    load_candle_universe,
-    resolve_universes,
+    CollectorSymbolSets,
+    load_universe_symbols,
+    resolve_collector_symbol_sets,
 )
 from signal_generator.bybit.live.demand_symbols import (  # noqa: E402
     DemandSymbolStore,
@@ -103,7 +104,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--enable-public-trades",
         action="store_true",
         help=(
-            "Subscribe publicTrade.{symbol} for the 51 candle-universe coins and "
+            "Subscribe publicTrade.{symbol} for the 51 coins in "
+            "config/universe_tradeable_51.json (not the candle/demand union). "
             "insert into orderbook_analysis.public_trades_canonical. Default off."
         ),
     )
@@ -116,6 +118,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--log-level", default="INFO")
     return p
+
+
+def collector_symbol_sets_from_cli(
+    args: argparse.Namespace,
+    demand_symbols: Sequence[str],
+) -> CollectorSymbolSets:
+    """Runtime symbol split used by the live collector service.
+
+    Public trades copy ``universe_tradeable_51.json``. They are never derived
+    from the candle/demand union.
+    """
+    universe = (
+        load_universe_symbols(args.candle_universe)
+        if args.candle_universe is not None
+        else None
+    )
+    return resolve_collector_symbol_sets(
+        universe_symbols=universe,
+        demand_symbols=demand_symbols,
+        enable_public_trades=args.enable_public_trades,
+    )
+
+
+def live_collector_symbol_kwargs(
+    sets: CollectorSymbolSets,
+    *,
+    enable_public_trades: bool,
+) -> dict:
+    """Exact Live1mCollector symbol kwargs used by the service loop."""
+    return {
+        "candle_symbols": list(sets.candle_symbols),
+        "signal_symbols": list(sets.signal_symbols),
+        "enable_public_trades": enable_public_trades,
+        "public_trade_symbols": (
+            tuple(sets.public_trade_symbols) if enable_public_trades else None
+        ),
+    }
 
 
 async def run_supervised(args: argparse.Namespace) -> int:
@@ -188,16 +227,8 @@ async def run_supervised(args: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001
         logger.exception("watermark seed failed (continuing)")
 
-    def _active_universes() -> tuple[list[str], list[str]]:
-        demand_syms = demand.read()
-        if args.candle_universe is not None:
-            loaded = load_candle_universe(args.candle_universe)
-            return resolve_universes(
-                candle_symbols=loaded,
-                signal_symbols=demand_syms,
-            )
-        signals = filter_signal_demand(demand_syms)
-        return signals, signals
+    def _active_symbol_sets():
+        return collector_symbol_sets_from_cli(args, demand.read())
 
     service = CollectorControlService(
         health=idle_health,
@@ -241,7 +272,13 @@ async def run_supervised(args: argparse.Namespace) -> int:
                 except asyncio.TimeoutError:
                     continue
 
-            candle_syms, signal_syms = _active_universes()
+            sets = _active_symbol_sets()
+            symbol_kwargs = live_collector_symbol_kwargs(
+                sets, enable_public_trades=args.enable_public_trades
+            )
+            candle_syms = symbol_kwargs["candle_symbols"]
+            signal_syms = symbol_kwargs["signal_symbols"]
+            public_trade_syms = symbol_kwargs["public_trade_symbols"] or ()
             idle_health.init_symbols(candle_syms)
             idle_health.candle_symbols = list(candle_syms)
             idle_health.signal_symbols = list(signal_syms)
@@ -256,8 +293,6 @@ async def run_supervised(args: argparse.Namespace) -> int:
                     continue
 
             collector = Live1mCollector(
-                candle_symbols=candle_syms,
-                signal_symbols=signal_syms,
                 ch=ch,
                 history=history,
                 stale_symbol_minutes=args.stale_symbol_minutes,
@@ -271,18 +306,19 @@ async def run_supervised(args: argparse.Namespace) -> int:
                 signal_workers=args.signal_workers,
                 signal_queue_maxsize=args.signal_queue_maxsize,
                 signal_shutdown_drain_s=args.signal_shutdown_drain_s,
-                enable_public_trades=args.enable_public_trades,
-                public_trade_symbols=candle_syms if args.enable_public_trades else None,
                 public_trade_queue_maxsize=args.public_trade_queue_maxsize,
                 public_trade_batch_size=args.public_trade_batch_size,
+                **symbol_kwargs,
             )
             collector.health.invalid_symbols = invalid_meta
             service.health = collector.health
             install_signal_handlers(collector, loop)
             logger.info(
-                "collector start candle_symbols=%s signal_symbols=%s db=%s desired=%s",
+                "collector start candle_symbols=%s signal_symbols=%s "
+                "public_trade_symbols=%s db=%s desired=%s",
                 candle_syms,
                 signal_syms,
+                list(public_trade_syms),
                 settings.database,
                 ds,
             )

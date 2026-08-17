@@ -163,12 +163,16 @@ class Live1mCollector:
         self._signal_queue_maxsize = signal_queue_maxsize
         self._signal_shutdown_drain_s = signal_shutdown_drain_s
         self.enable_public_trades = bool(enable_public_trades)
-        candle_set = set(self.candle_symbols)
-        if public_trade_symbols is None:
-            pt_syms = list(self.candle_symbols) if self.enable_public_trades else []
+        if not self.enable_public_trades:
+            self.public_trade_symbols: tuple[str, ...] = ()
         else:
-            pt_syms = [s.upper() for s in public_trade_symbols]
-        if self.enable_public_trades:
+            if public_trade_symbols is None:
+                raise ValueError(
+                    "public_trade_symbols is required when enable_public_trades=True; "
+                    "pass universe_tradeable_51 symbols, not candle_symbols"
+                )
+            pt_syms = tuple(normalize_symbols(public_trade_symbols))
+            candle_set = set(self.candle_symbols)
             extra = [s for s in pt_syms if s not in candle_set]
             if extra:
                 raise ValueError(
@@ -177,7 +181,7 @@ class Live1mCollector:
                 )
             if "XAUUSDT" in pt_syms:
                 raise ValueError("XAUUSDT must not be subscribed for public trades")
-        self.public_trade_symbols = pt_syms if self.enable_public_trades else []
+            self.public_trade_symbols = pt_syms
         self._public_trade_queue_maxsize = public_trade_queue_maxsize
         self._public_trade_batch_size = public_trade_batch_size
         self._trade_buffer = None
@@ -310,6 +314,19 @@ class Live1mCollector:
                 batch_size=self._public_trade_batch_size,
             )
         return self._trade_buffer
+
+    def _assert_public_trade_subscription_set(self) -> None:
+        """Guard immediately before WS subscribe; do not derive from candles."""
+        if not self.enable_public_trades:
+            return
+        if "XAUUSDT" in self.public_trade_symbols:
+            raise ValueError("XAUUSDT must not be subscribed for public trades")
+        extra = [s for s in self.public_trade_symbols if s not in set(self.candle_symbols)]
+        if extra:
+            raise ValueError(
+                "public_trade_symbols must be a subset of candle universe: "
+                + ",".join(extra)
+            )
 
     async def _catchup_symbol_blocking(self, symbol: str, *, end: datetime) -> None:
         """Startup/reconnect/stale blocking catch-up (allowed to gate LIVE)."""
@@ -552,6 +569,7 @@ class Live1mCollector:
 
             await self._start_signal_pool()
 
+            self._assert_public_trade_subscription_set()
             trade_buf = self._ensure_trade_buffer()
             if trade_buf is not None:
                 trade_buf.start()

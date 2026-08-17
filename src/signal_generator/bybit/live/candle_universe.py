@@ -7,10 +7,12 @@ Candle ingest may include BTCUSDT. The existing (non-Gold) signal worker must no
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 SIGNAL_BLOCKED_SYMBOLS = frozenset({"BTCUSDT"})
+PUBLIC_TRADE_BLOCKED_SYMBOLS = frozenset({"XAUUSDT"})
 
 DEFAULT_CANDLE_UNIVERSE_PATH = (
     Path(__file__).resolve().parents[4] / "config" / "universe_tradeable_51.json"
@@ -73,3 +75,76 @@ def resolve_universes(
     assert_no_signal_btc(signals)
     extra = [s for s in signals if s not in set(candles)]
     return candles + extra, signals
+
+
+@dataclass(frozen=True, slots=True)
+class CollectorSymbolSets:
+    """Separated collector universes. Public trades never reuse the candle list."""
+
+    universe_symbols: tuple[str, ...]
+    candle_symbols: tuple[str, ...]
+    signal_symbols: tuple[str, ...]
+    public_trade_symbols: tuple[str, ...]
+
+
+def load_universe_symbols(path: Path | None = None) -> tuple[str, ...]:
+    """SoT for Gold-51 / public trades: ``universe_tradeable_51.json`` as a new tuple."""
+    return tuple(load_candle_universe(path))
+
+
+def public_trade_symbols_from_universe(
+    universe_symbols: Sequence[str],
+) -> tuple[str, ...]:
+    """Independent public-trade set from the 51-coin SoT, never from candle union."""
+    symbols = tuple(normalize_symbols(universe_symbols))
+    blocked = [s for s in symbols if s in PUBLIC_TRADE_BLOCKED_SYMBOLS]
+    if blocked:
+        raise ValueError(
+            "XAUUSDT must not be subscribed for public trades: " + ",".join(blocked)
+        )
+    return symbols
+
+
+def resolve_collector_symbol_sets(
+    *,
+    universe_symbols: Sequence[str] | None,
+    demand_symbols: Sequence[str],
+    enable_public_trades: bool,
+) -> CollectorSymbolSets:
+    """CLI/runtime symbol split: candle union vs public-trade universe.
+
+    ``universe_symbols`` is the SoT from ``universe_tradeable_51.json``.
+    Demand (e.g. XAUUSDT) may join candles/signals only. Public trades copy
+    the universe tuple; they are never derived from ``candle_symbols``.
+    """
+    if universe_symbols is None:
+        if enable_public_trades:
+            raise ValueError(
+                "--enable-public-trades requires --candle-universe "
+                "(config/universe_tradeable_51.json); public trades must not "
+                "use the candle/demand union"
+            )
+        signals = tuple(filter_signal_demand(demand_symbols))
+        return CollectorSymbolSets(
+            universe_symbols=(),
+            candle_symbols=signals,
+            signal_symbols=signals,
+            public_trade_symbols=(),
+        )
+
+    universe = tuple(normalize_symbols(universe_symbols))
+    candles, signals = resolve_universes(
+        candle_symbols=universe,
+        signal_symbols=demand_symbols,
+    )
+    public_trades: tuple[str, ...]
+    if enable_public_trades:
+        public_trades = public_trade_symbols_from_universe(universe)
+    else:
+        public_trades = ()
+    return CollectorSymbolSets(
+        universe_symbols=universe,
+        candle_symbols=tuple(candles),
+        signal_symbols=tuple(signals),
+        public_trade_symbols=public_trades,
+    )
