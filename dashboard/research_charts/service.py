@@ -19,14 +19,26 @@ from .trp_import import load_trp
 
 DEFAULT_LIMIT = 1500
 MAX_LIMIT = 3000
+# HTF panes need more completed bars so LLD can keep distant highs/lows.
+# Calendar coverage (approx): 5m ~5d, 15m ~17d, 30m ~38d, 1h ~92d, 4h ~10m.
 DEFAULT_LIMIT_BY_TF = {
     "1m": 1500,
     "5m": 1500,
-    "15m": 1200,
-    "30m": 1000,
-    "1h": 800,
-    "4h": 600,
+    "15m": 1600,
+    "30m": 1800,
+    "1h": 2200,
+    "4h": 1800,
 }
+# Pine `amount` is a newest-N box cap. Same cap on 1h/4h drops old extreme pools.
+LLD_AMOUNT_MULTIPLIER_BY_TF = {
+    "1m": 1.0,
+    "5m": 1.0,
+    "15m": 1.5,
+    "30m": 2.0,
+    "1h": 3.0,
+    "4h": 4.0,
+}
+MAX_LLD_AMOUNT = 4000
 # Layout 4 default panes — 1m visible for smoke + HTF stack.
 DEFAULT_PANE_TIMEFRAMES = ("1m", "5m", "15m", "1h")
 DEFAULT_SOURCE_KIND = "clickhouse"
@@ -177,6 +189,20 @@ def symbol_meta(symbol: str) -> dict[str, Any] | None:
 
 def default_limit(timeframe: str) -> int:
     return int(DEFAULT_LIMIT_BY_TF.get(timeframe, DEFAULT_LIMIT))
+
+
+def scaled_lld_amount(amount: int, timeframe: str) -> int:
+    """Keep more displayed pools on higher timeframes without changing the 5m base."""
+    base = max(1, int(amount))
+    mult = float(LLD_AMOUNT_MULTIPLIER_BY_TF.get(str(timeframe), 1.0))
+    return max(1, min(int(round(base * mult)), MAX_LLD_AMOUNT))
+
+
+def lld_config_for_timeframe(config, timeframe: str):
+    """Copy LLD config with a TF-scaled display amount. Detection lengths stay as set."""
+    trp = load_trp()
+    tf = str(timeframe or "")
+    return trp["dc_replace"](config, amount=scaled_lld_amount(int(config.amount), tf))
 
 
 def load_candles(
@@ -432,6 +458,7 @@ def _indicators_from_candles(
         else trp["LiquidityLocationConfig"].defaults()
     )
     if bool(lld_cfg.enabled):
+        lld_cfg = lld_config_for_timeframe(lld_cfg, packed.get("timeframe") or "")
         lld_result = trp["run_liquidity_location"](candles, lld_cfg)
         clusters = None
         if bool(lld_cfg.clusters_enabled):

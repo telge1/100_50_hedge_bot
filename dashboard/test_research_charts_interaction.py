@@ -756,6 +756,39 @@ def test_pool_v1_backtester_uses_artifact_not_collector(tmp_path, monkeypatch):
     assert empty == []
 
 
+def test_htf_liquidity_uses_longer_history_and_more_pools():
+    from research_charts.service import (
+        default_limit,
+        lld_config_for_timeframe,
+        scaled_lld_amount,
+    )
+    from research_charts.trp_import import load_trp
+
+    assert default_limit("1m") == 1500
+    assert default_limit("5m") == 1500
+    assert default_limit("15m") == 1600
+    assert default_limit("30m") == 1800
+    assert default_limit("1h") == 2200
+    assert default_limit("4h") == 1800
+    assert default_limit("1h") > default_limit("5m")
+    assert default_limit("4h") > 600
+
+    assert scaled_lld_amount(300, "5m") == 300
+    assert scaled_lld_amount(300, "15m") == 450
+    assert scaled_lld_amount(300, "1h") == 900
+    assert scaled_lld_amount(300, "4h") == 1200
+    assert scaled_lld_amount(300, "4h") > scaled_lld_amount(300, "1h")
+
+    trp = load_trp()
+    base = trp["LiquidityLocationConfig"](enabled=True, amount=300, highest_len=5, lowest_len=5)
+    h1 = lld_config_for_timeframe(base, "1h")
+    h4 = lld_config_for_timeframe(base, "4h")
+    assert h1.amount == 900
+    assert h4.amount == 1200
+    assert h1.highest_len == 5
+    assert h4.lowest_len == 5
+
+
 def test_playwright_unavailable_is_explicit():
     try:
         import playwright  # noqa: F401

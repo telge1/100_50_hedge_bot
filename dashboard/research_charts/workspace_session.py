@@ -623,6 +623,10 @@ class ResearchWorkspace:
         }
         if not cfg.enabled:
             return [], empty_ema, {"3": 0, "4-5": 0, "6+": 0}
+        from .service import lld_config_for_timeframe
+
+        tf = str(getattr(candles[0], "timeframe", "") or "") if candles else ""
+        cfg = lld_config_for_timeframe(cfg, tf)
         result = trp["run_liquidity_location"](candles, cfg)
         clusters = None
         counts = {"3": 0, "4-5": 0, "6+": 0}
