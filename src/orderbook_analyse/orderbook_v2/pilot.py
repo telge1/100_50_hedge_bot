@@ -1,9 +1,10 @@
-"""ORDERBOOK_V2_ADAUSDT_7D_PILOT – main import script.
+"""ORDERBOOK_V2 historical import CLI.
 
 Usage:
     python -m orderbook_analyse.orderbook_v2.pilot [--symbol ADAUSDT] [--days 7]
 
-Reads ClickHouse connection from same .env as the OI/Liquidation collector.
+ClickHouse is configured via CLICKHOUSE_* environment variables or project .env.
+OPTIMIZE TABLE ... FINAL is off by default; pass --optimize-final to enable it.
 Never writes to orderbook_deltas. Never stops live collectors.
 """
 from __future__ import annotations
@@ -23,15 +24,23 @@ from orderbook_analyse.orderbook_v2.ch_writer import (
 from orderbook_analyse.orderbook_v2.downloader import (
     DayAvailability, DownloadResult, download_day, list_available_days, pilot_days,
 )
+from orderbook_analyse.orderbook_v2.ch_client import get_clickhouse_client
 from orderbook_analyse.orderbook_v2.parser import parse_day_zip
 from orderbook_analyse.orderbook_v2.schema import apply_schema
 
 
 def _ch_client():
-    from orderbook_analyse.oi_liquidation_collector.settings import load_oi_settings
-    from orderbook_analyse.oi_liquidation_collector.collector import default_client_factory
-    settings = load_oi_settings()
-    return default_client_factory(settings)()
+    return get_clickhouse_client()
+
+
+def maybe_optimize_tables(client, *, dry_run: bool, optimize_final: bool) -> bool:
+    """Run OPTIMIZE FINAL only when explicitly requested and not a dry-run."""
+    if dry_run or not optimize_final:
+        return False
+    print("\nRunning OPTIMIZE FINAL on _v2 tables...")
+    optimize_tables(client)
+    print("OPTIMIZE done")
+    return True
 
 
 def _utcnow() -> datetime:
@@ -44,7 +53,7 @@ def run_pilot(
     n_days: int = 7,
     data_root: Path | None = None,
     dry_run: bool = False,
-    optimize_final: bool = True,
+    optimize_final: bool = False,
 ) -> dict:
     """Full pilot run. Returns summary dict."""
     if data_root is None:
@@ -212,12 +221,7 @@ def run_pilot(
         ds["status"] = "COMPLETE"
         day_summaries.append(ds)
 
-    # Optimize to deduplicate ReplacingMergeTree (optional).
-    # For provenance/consistency tests we may intentionally skip this step.
-    if not dry_run and optimize_final:
-        print("\nRunning OPTIMIZE FINAL on _v2 tables...")
-        optimize_tables(client)
-        print("OPTIMIZE done")
+    maybe_optimize_tables(client, dry_run=dry_run, optimize_final=optimize_final)
 
     pilot_secs = time.time() - pilot_start_ts
     print(f"\nPilot total time: {pilot_secs:.0f}s")
@@ -268,9 +272,12 @@ def main() -> None:
     p.add_argument("--days", type=int, default=7)
     p.add_argument("--dry-run", action="store_true")
     p.add_argument(
-        "--skip-optimize-final",
+        "--optimize-final",
         action="store_true",
-        help="Skip OPTIMIZE TABLE ... FINAL after insertions.",
+        help=(
+            "After inserts, run OPTIMIZE TABLE ... FINAL on the _v2 tables. "
+            "Off by default; do not use for multi-coin historical rollouts."
+        ),
     )
     p.add_argument("--data-root", default=None)
     args = p.parse_args()
@@ -279,7 +286,7 @@ def main() -> None:
     summary = run_pilot(
         symbol=args.symbol, n_days=args.days,
         data_root=data_root, dry_run=args.dry_run,
-        optimize_final=not args.skip_optimize_final,
+        optimize_final=args.optimize_final,
     )
     print(f"\n{'='*60}")
     print(f"DECISION: {summary['decision']}")

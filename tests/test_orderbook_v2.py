@@ -23,6 +23,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import sys
 import tempfile
 import zipfile
 from datetime import datetime, timezone
@@ -671,3 +672,175 @@ def test_v2_path_has_no_ob200_v1_constant_left():
 
     src = inspect.getsource(v2_features)
     assert "ob200_v1" not in src
+
+
+def test_v2_modules_import_without_clickhouse_connection(monkeypatch):
+    """Importing the V2 package must not construct a ClickHouse client."""
+    import sys
+    import types
+
+    fake = types.ModuleType("clickhouse_connect")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("clickhouse_connect.get_client must not run on import")
+
+    fake.get_client = _boom
+    monkeypatch.setitem(sys.modules, "clickhouse_connect", fake)
+
+    import importlib
+    import orderbook_analyse.orderbook_v2 as pkg
+    import orderbook_analyse.orderbook_v2.pilot as pilot_mod
+    import orderbook_analyse.orderbook_v2.ch_client as ch_client
+    import orderbook_analyse.orderbook_v2.ch_writer as ch_writer
+    importlib.reload(pkg)
+    importlib.reload(ch_client)
+    importlib.reload(ch_writer)
+    importlib.reload(pilot_mod)
+    assert pkg.PARSER_VERSION == "ob200_v2"
+
+
+def test_pilot_help_does_not_touch_clickhouse():
+    import subprocess
+    import sys
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+    proc = subprocess.run(
+        [sys.executable, "-m", "orderbook_analyse.orderbook_v2.pilot", "--help"],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "--optimize-final" in proc.stdout
+    assert "--skip-optimize-final" not in proc.stdout
+    assert "OPTIMIZE" in proc.stdout
+
+
+def test_missing_clickhouse_config_raises_clear_error(monkeypatch):
+    from orderbook_analyse.orderbook_v2.ch_client import (
+        ClickHouseConfigError,
+        load_clickhouse_settings,
+    )
+
+    for name in (
+        "CLICKHOUSE_HOST",
+        "CLICKHOUSE_HTTP_PORT",
+        "CLICKHOUSE_DATABASE",
+        "CLICKHOUSE_USER",
+        "CLICKHOUSE_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    try:
+        load_clickhouse_settings(load_env_file=False)
+        raise AssertionError("expected ClickHouseConfigError")
+    except ClickHouseConfigError as exc:
+        msg = str(exc)
+        assert "CLICKHOUSE_HOST" in msg
+        assert "CLICKHOUSE_USER" in msg
+        assert "incomplete" in msg.lower() or "Missing" in msg
+
+
+def test_clickhouse_factory_uses_env_not_hardcoded_secrets(monkeypatch):
+    from orderbook_analyse.orderbook_v2 import ch_client as ch_mod
+
+    monkeypatch.setenv("CLICKHOUSE_HOST", "ch.example.test")
+    monkeypatch.setenv("CLICKHOUSE_HTTP_PORT", "8124")
+    monkeypatch.setenv("CLICKHOUSE_DATABASE", "orderbook_analysis")
+    monkeypatch.setenv("CLICKHOUSE_USER", "importer")
+    monkeypatch.setenv("CLICKHOUSE_PASSWORD", "not-a-real-secret-for-test")
+
+    cfg = ch_mod.load_clickhouse_settings(load_env_file=False)
+    assert cfg.host == "ch.example.test"
+    assert cfg.http_port == 8124
+    assert cfg.database == "orderbook_analysis"
+    assert cfg.user == "importer"
+    assert cfg.password == "not-a-real-secret-for-test"
+
+    src = inspect.getsource(ch_mod)
+    assert "password=" not in src.lower() or 'password=cfg.password' in src.replace(" ", "")
+    assert "CLICKHOUSE_PASSWORD" in src
+    assert "not-a-real-secret-for-test" not in src
+    assert "127.0.0.1" not in src
+
+
+def test_get_clickhouse_client_passes_settings(monkeypatch):
+    from orderbook_analyse.orderbook_v2.ch_client import (
+        ClickHouseSettings,
+        get_clickhouse_client,
+    )
+
+    captured = {}
+
+    class _Fake:
+        @staticmethod
+        def get_client(**kwargs):
+            captured.update(kwargs)
+            return "client"
+
+    monkeypatch.setitem(__import__("sys").modules, "clickhouse_connect", _Fake)
+    settings = ClickHouseSettings(
+        host="h", http_port=9, database="d", user="u", password="p",
+    )
+    client = get_clickhouse_client(settings)
+    assert client == "client"
+    assert captured["host"] == "h"
+    assert captured["port"] == 9
+    assert captured["username"] == "u"
+    assert captured["database"] == "d"
+    assert captured["password"] == "p"
+
+
+def test_optimize_is_opt_in_only():
+    from orderbook_analyse.orderbook_v2 import pilot
+
+    calls: list[str] = []
+
+    class _Client:
+        pass
+
+    def _fake_optimize(_client):
+        calls.append("optimize")
+
+    original = pilot.optimize_tables
+    try:
+        pilot.optimize_tables = _fake_optimize  # type: ignore[method-assign]
+        assert inspect.signature(pilot.run_pilot).parameters["optimize_final"].default is False
+        assert pilot.maybe_optimize_tables(_Client(), dry_run=False, optimize_final=False) is False
+        assert calls == []
+        assert pilot.maybe_optimize_tables(_Client(), dry_run=True, optimize_final=True) is False
+        assert calls == []
+        assert pilot.maybe_optimize_tables(_Client(), dry_run=False, optimize_final=True) is True
+        assert calls == ["optimize"]
+    finally:
+        pilot.optimize_tables = original
+
+
+def test_cli_optimize_final_flag_wiring(monkeypatch):
+    from orderbook_analyse.orderbook_v2 import pilot
+
+    captured: dict = {}
+
+    def _fake_run_pilot(**kwargs):
+        captured.update(kwargs)
+        return {"decision": "DRY"}
+
+    monkeypatch.setattr(pilot, "run_pilot", _fake_run_pilot)
+    monkeypatch.setattr(sys, "argv", ["pilot"])
+    pilot.main()
+    assert captured["optimize_final"] is False
+
+    captured.clear()
+    monkeypatch.setattr(sys, "argv", ["pilot", "--optimize-final"])
+    pilot.main()
+    assert captured["optimize_final"] is True
+
+
+def test_pilot_does_not_import_oi_collector():
+    from orderbook_analyse.orderbook_v2 import ch_client, pilot
+
+    assert "oi_liquidation_collector" not in inspect.getsource(pilot)
+    assert "oi_liquidation_collector" not in inspect.getsource(ch_client)
