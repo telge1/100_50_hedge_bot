@@ -619,17 +619,18 @@ def test_cf_J_state_features_match_previous_book():
         os.unlink(zp)
 
 
-def test_parser_version_compute_features_writes_ob200_v2():
+def test_parser_version_compute_features_writes_ob200_v3():
     from orderbook_analyse.orderbook_v2 import PARSER_VERSION
 
     book = _simple_book(n=20, bid_base=1.0, ask_base=1.002)
     row = compute_features(book, 0, 0, 0, 1, symbol="TEST")
     assert row["parser_version"] == PARSER_VERSION
-    assert PARSER_VERSION == "ob200_v2"
+    assert PARSER_VERSION == "ob200_v3"
+    assert row["parser_version"] == "ob200_v3"
 
 
-def test_cf_and_event_rows_have_same_ob200_v2_parser_version():
-    """Ensure parse_day_zip emits ob200_v2 for both event and carry-forward rows."""
+def test_cf_and_event_rows_have_same_ob200_v3_parser_version():
+    """Ensure parse_day_zip emits ob200_v3 for both event and carry-forward rows."""
     t = 1_700_000_000_000  # second 0
     lines = [
         _event(t, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=1),
@@ -641,7 +642,7 @@ def test_cf_and_event_rows_have_same_ob200_v2_parser_version():
         rows, _ = parse_day_zip(zp, symbol="TEST", day_start_ms=t)
 
         v = rows[0]["parser_version"]
-        assert v == "ob200_v2"
+        assert v == "ob200_v3"
 
         event_rows = [r for r in rows if "carried_forward" not in r["quality_flags"]]
         cf_rows = [r for r in rows if "carried_forward" in r["quality_flags"]]
@@ -655,16 +656,19 @@ def test_cf_and_event_rows_have_same_ob200_v2_parser_version():
         os.unlink(zp)
 
 
-def test_pilot_and_manifest_use_ob200_v2_parser_version():
+def test_pilot_and_manifest_use_ob200_v3_parser_version():
     from orderbook_analyse.orderbook_v2 import PARSER_VERSION
     from orderbook_analyse.orderbook_v2 import pilot
+    from orderbook_analyse.orderbook_v2 import parser as parser_mod
 
-    assert pilot.PARSER_VERSION == PARSER_VERSION
-    assert PARSER_VERSION == "ob200_v2"
+    assert pilot.PARSER_VERSION is PARSER_VERSION or pilot.PARSER_VERSION == PARSER_VERSION
+    assert PARSER_VERSION == "ob200_v3"
+    assert parser_mod.PARSER_VERSION == PARSER_VERSION
 
-    # The manifest row should be constructed using the same PARSER_VERSION symbol.
     src = inspect.getsource(pilot.run_pilot)
     assert '"parser_version": PARSER_VERSION' in src
+    assert "ob200_v2" not in src
+    assert "ob200_v3" not in src  # must not hardcode; uses PARSER_VERSION symbol
 
 
 def test_v2_path_has_no_ob200_v1_constant_left():
@@ -696,7 +700,7 @@ def test_v2_modules_import_without_clickhouse_connection(monkeypatch):
     importlib.reload(ch_client)
     importlib.reload(ch_writer)
     importlib.reload(pilot_mod)
-    assert pkg.PARSER_VERSION == "ob200_v2"
+    assert pkg.PARSER_VERSION == "ob200_v3"
 
 
 def test_pilot_help_does_not_touch_clickhouse():
@@ -715,6 +719,7 @@ def test_pilot_help_does_not_touch_clickhouse():
     )
     assert proc.returncode == 0, proc.stderr
     assert "--optimize-final" in proc.stdout
+    assert "--warmup-previous-day" in proc.stdout
     assert "--skip-optimize-final" not in proc.stdout
     assert "OPTIMIZE" in proc.stdout
 
@@ -832,6 +837,7 @@ def test_cli_optimize_final_flag_wiring(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["pilot"])
     pilot.main()
     assert captured["optimize_final"] is False
+    assert captured.get("warmup_previous_day") is False
 
     captured.clear()
     monkeypatch.setattr(sys, "argv", ["pilot", "--optimize-final"])
@@ -844,3 +850,238 @@ def test_pilot_does_not_import_oi_collector():
 
     assert "oi_liquidation_collector" not in inspect.getsource(pilot)
     assert "oi_liquidation_collector" not in inspect.getsource(ch_client)
+
+
+def test_decision_label_uses_actual_symbol():
+    from orderbook_analyse.orderbook_v2.pilot import decision_label, _decide
+
+    assert decision_label("ETHUSDT", 7, "PASSED") == "ETHUSDT_OB_V2_7D_PILOT_PASSED"
+    assert "ADAUSDT" not in _decide("ETHUSDT", 7, [{"status": "DRY_RUN"}])
+    assert _decide("ETHUSDT", 7, [{"status": "WINDOW_MISALIGNED"}]).endswith("FAILED")
+
+
+def test_main_failed_decision_nonzero_exit(monkeypatch):
+    from orderbook_analyse.orderbook_v2 import pilot
+
+    monkeypatch.setattr(
+        pilot, "run_pilot",
+        lambda **k: {"decision": "ETHUSDT_OB_V2_7D_PILOT_FAILED"},
+    )
+    monkeypatch.setattr(sys, "argv", ["pilot", "--dry-run", "--symbol", "ETHUSDT"])
+    assert pilot.main() == 1
+    monkeypatch.setattr(
+        pilot, "run_pilot",
+        lambda **k: {"decision": "ETHUSDT_OB_V2_7D_PILOT_PASSED"},
+    )
+    assert pilot.main() == 0
+
+
+def test_ada_like_start_at_midnight():
+    t = 1_700_000_000_000
+    lines = [
+        _event(t + 90, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=1),
+        _event(t + 1500, "delta", [["1.000", "110"]], [], u=2),
+    ]
+    zp = _make_zip(lines)
+    try:
+        rows, stats = parse_day_zip(
+            zp, symbol="TEST", day_start_ms=t, expected_seconds=3,
+        )
+        buckets = [int(r["bucket_start"].timestamp() * 1000) for r in rows]
+        assert buckets == [t, t + 1000, t + 2000]
+        assert rows[0]["is_valid"] == 1
+        assert "no_valid_book" not in rows[0]["quality_flags"]
+        assert rows[0]["best_bid_qty"] == Decimal("100")
+        assert stats.missing_seconds == 0
+        assert t + 3000 not in buckets
+    finally:
+        os.unlink(zp)
+
+
+def test_snapshot_replaces_warmup_state():
+    t = 1_700_000_000_000
+    book = apply_snapshot(make_snapshot([["9.000", "1"]], [["9.001", "1"]], u=1))
+    zp = _make_zip([
+        _event(t + 10, "snapshot", [["1.000", "50"]], [["1.001", "50"]], u=2),
+    ])
+    try:
+        rows, _ = parse_day_zip(
+            zp, symbol="TEST", day_start_ms=t, expected_seconds=1,
+            initial_book=book, seen_us={1},
+        )
+        assert rows[0]["best_bid_price"] == Decimal("1.000")
+        assert rows[0]["best_bid_qty"] == Decimal("50")
+    finally:
+        os.unlink(zp)
+
+
+def test_calendar_window_not_shifted_when_first_event_is_late():
+    t = 1_700_000_000_000
+    lines = [
+        _event(t + 1730, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=10),
+        _event(t + 2000, "delta", [["1.000", "110"]], [], u=11),
+    ]
+    zp = _make_zip(lines)
+    try:
+        rows, stats = parse_day_zip(
+            zp, symbol="TEST", day_start_ms=t, expected_seconds=4,
+        )
+        buckets = [int(r["bucket_start"].timestamp() * 1000) for r in rows]
+        assert buckets[0] == t
+        assert buckets[-1] == t + 3000
+        assert t + 4000 not in buckets
+        prefix = rows[0]
+        assert prefix["is_valid"] == 0
+        assert "no_valid_book" in prefix["quality_flags"]
+        assert "carried_forward" not in prefix["quality_flags"]
+        assert stats.invalid_seconds >= 1
+        assert stats.missing_seconds == 0
+        assert len(rows) == 4
+    finally:
+        os.unlink(zp)
+
+
+def test_warmup_midnight_events_and_no_overflow_row():
+    t = 1_700_000_000_000
+    warmup = [
+        _event(t - 1000, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=1),
+        _event(t + 31, "delta", [["1.000", "120"]], [], u=2),
+        _event(t + 1730, "snapshot", [["1.000", "130"]], [["1.001", "50"]], u=3),
+    ]
+    day = [
+        _event(t + 1730, "snapshot", [["1.000", "130"]], [["1.001", "50"]], u=3),
+        _event(t + 2000, "delta", [["1.000", "140"]], [], u=4),
+        _event(t + 4000, "snapshot", [["2.000", "1"]], [["2.001", "1"]], u=5),
+    ]
+    wz = _make_zip(warmup)
+    dz = _make_zip(day)
+    try:
+        rows, stats = parse_day_zip(
+            dz, symbol="TEST", day_start_ms=t, warmup_zips=[wz],
+            expected_seconds=4,
+        )
+        buckets = [int(r["bucket_start"].timestamp() * 1000) for r in rows]
+        assert buckets == [t, t + 1000, t + 2000, t + 3000]
+        midn = rows[0]
+        assert midn["is_valid"] == 1
+        assert "carried_forward" not in midn["quality_flags"]
+        assert midn["best_bid_qty"] == Decimal("120")
+        snap_sec = rows[1]
+        assert snap_sec["best_bid_qty"] == Decimal("130")
+        assert stats.skipped_duplicate_events >= 1
+        assert t + 4000 not in buckets
+        ok, msg = __import__(
+            "orderbook_analyse.orderbook_v2.parser", fromlist=["validate_calendar_feature_rows"]
+        ).validate_calendar_feature_rows(
+            rows, day_start_ms=t, expected_seconds=4,
+        )
+        assert ok, msg
+    finally:
+        os.unlink(wz)
+        os.unlink(dz)
+
+
+def test_no_lookahead_from_later_snapshot():
+    t = 1_700_000_000_000
+    lines = [
+        _event(t + 1730, "snapshot", [["1.000", "999"]], [["1.001", "50"]], u=10),
+    ]
+    zp = _make_zip(lines)
+    try:
+        rows, _ = parse_day_zip(zp, symbol="TEST", day_start_ms=t, expected_seconds=2)
+        assert rows[0]["is_valid"] == 0
+        assert rows[0]["best_bid_qty"] == Decimal("0")
+        assert rows[1]["best_bid_qty"] == Decimal("999")
+    finally:
+        os.unlink(zp)
+
+
+def test_first_event_delta_without_warmup_is_invalid():
+    t = 1_700_000_000_000
+    zp = _make_zip([_event(t, "delta", [["1.000", "100"]], [["1.001", "50"]], u=2)])
+    try:
+        rows, _ = parse_day_zip(zp, symbol="TEST", day_start_ms=t, expected_seconds=1)
+        assert rows[0]["is_valid"] == 0
+        assert "no_valid_book" in rows[0]["quality_flags"] or "no_start_snapshot" in rows[0]["quality_flags"]
+    finally:
+        os.unlink(zp)
+
+
+def test_first_event_delta_with_warmup_state_is_valid():
+    t = 1_700_000_000_000
+    book = apply_snapshot(make_snapshot([["1.000", "100"]], [["1.001", "50"]], u=1))
+    zp = _make_zip([_event(t + 50, "delta", [["1.000", "150"]], [], u=2)])
+    try:
+        rows, _ = parse_day_zip(
+            zp, symbol="TEST", day_start_ms=t, expected_seconds=1,
+            initial_book=book, seen_us={1},
+        )
+        assert rows[0]["is_valid"] == 1
+        assert rows[0]["best_bid_qty"] == Decimal("150")
+    finally:
+        os.unlink(zp)
+
+
+def test_seq_gap_across_midnight_invalidates_until_snapshot():
+    t = 1_700_000_000_000
+    warmup = [
+        _event(t - 500, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=1),
+        _event(t + 10, "delta", [["1.000", "110"]], [], u=5),
+    ]
+    day = [_event(t + 1500, "snapshot", [["1.000", "200"]], [["1.001", "50"]], u=20)]
+    wz = _make_zip(warmup)
+    dz = _make_zip(day)
+    try:
+        rows, stats = parse_day_zip(
+            dz, symbol="TEST", day_start_ms=t, warmup_zips=[wz], expected_seconds=2,
+        )
+        assert stats.n_seq_gaps >= 1
+        assert rows[1]["is_valid"] == 1
+        assert rows[1]["best_bid_qty"] == Decimal("200")
+    finally:
+        os.unlink(wz)
+        os.unlink(dz)
+
+
+def test_manifest_guard_rejects_shifted_window():
+    from orderbook_analyse.orderbook_v2.parser import validate_calendar_feature_rows
+    from datetime import datetime, timezone
+
+    t = 1_700_000_000_000
+    row = compute_features(
+        _simple_book(), t + 1000, t + 1000, t + 1000, 1, symbol="TEST",
+    )
+    ok, msg = validate_calendar_feature_rows([row], day_start_ms=t, expected_seconds=1)
+    assert not ok
+    assert "WINDOW_MISALIGNED" in msg
+
+
+def test_pilot_days_processed_oldest_first():
+    from orderbook_analyse.orderbook_v2.pilot import _target_days
+    from orderbook_analyse.orderbook_v2.downloader import pilot_days
+
+    days = _target_days(7)
+    assert days == sorted(pilot_days(7))
+    pinned = _target_days(7, "2026-08-11", "2026-08-17")
+    assert pinned[0].isoformat() == "2026-08-11"
+    assert pinned[-1].isoformat() == "2026-08-17"
+    src = inspect.getsource(__import__("orderbook_analyse.orderbook_v2.pilot", fromlist=["run_pilot"]).run_pilot)
+    assert "_target_days" in src
+    assert "oldest-first" in src
+
+
+def test_idempotent_dry_parse():
+    t = 1_700_000_000_000
+    lines = [
+        _event(t, "snapshot", [["1.000", "100"]], [["1.001", "50"]], u=1),
+        _event(t + 2000, "delta", [["1.000", "110"]], [], u=2),
+    ]
+    zp = _make_zip(lines)
+    try:
+        a, sa = parse_day_zip(zp, symbol="TEST", day_start_ms=t, expected_seconds=4)
+        b, sb = parse_day_zip(zp, symbol="TEST", day_start_ms=t, expected_seconds=4)
+        assert [r["bucket_start"] for r in a] == [r["bucket_start"] for r in b]
+        assert sa.event_seconds == sb.event_seconds
+        assert sa.carried_forward_seconds == sb.carried_forward_seconds
+    finally:
+        os.unlink(zp)
