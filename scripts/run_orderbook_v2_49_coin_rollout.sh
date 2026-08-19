@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Sequential, lock-protected, resumable Orderbook V2 import for 49 remaining coins.
+# Sequential, lock-protected, resumable Orderbook V3 import for 48 remaining coins.
 # Does not enable OPTIMIZE FINAL. Never issues destructive SQL.
-# ADAUSDT and BTCUSDT are excluded by construction.
+# ADAUSDT, BTCUSDT, ETHUSDT and XAUUSDT are excluded by construction.
 
 set -u
 set -o pipefail
 
 PROJECT_ROOT="/home/telgenbuescher/projects/orderbook_analyse"
-EXPECTED_HEAD="21e001c89811d04e8bf28871ed53ccaa62cfafd3"
+MIN_HEAD="af1623f16f02ac770bb24a9c45669949b51778e1"
 COLLECTOR_PID="147111"
 DATA_ROOT_BASE="/home/telgenbuescher/projects/data/orderbook_raw_v2/bybit/linear/ob200"
-RESULT_DIR="${PROJECT_ROOT}/results/orderbook_v2_manual_rollout"
+RESULT_DIR="${PROJECT_ROOT}/results/orderbook_v3_48_coin_rollout"
 PROGRESS_FILE="${RESULT_DIR}/progress.json"
 LOCK_FILE="${RESULT_DIR}/rollout.lock"
 LIB="${PROJECT_ROOT}/scripts/orderbook_v2_49_rollout_lib.py"
@@ -21,6 +21,7 @@ cd "${PROJECT_ROOT}" || exit 1
 source "${PROJECT_ROOT}/.venv/bin/activate"
 export PYTHONPATH=src
 EXPECTED_PARSER="$("${PYTHON}" -c 'from orderbook_analyse.orderbook_v2 import PARSER_VERSION; print(PARSER_VERSION)')"
+EXPECTED_HEAD="$(git rev-parse HEAD)"
 
 mkdir -p "${RESULT_DIR}"
 
@@ -44,7 +45,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path("/home/telgenbuescher/projects/orderbook_analyse/scripts")))
-from orderbook_v2_49_rollout_lib import SYMBOLS_49, EXPECTED_HEAD, EXPECTED_PARSER, write_progress_atomic
+from orderbook_v2_49_rollout_lib import SYMBOLS_48, EXPECTED_HEAD, EXPECTED_PARSER, write_progress_atomic
 
 path, status, current, failed = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 prev = {}
@@ -54,7 +55,7 @@ if p.is_file():
 completed = list(prev.get("completed_symbols") or [])
 skipped = list(prev.get("skipped_complete_symbols") or [])
 done = set(completed) | set(skipped)
-remaining = [s for s in SYMBOLS_49 if s not in done]
+remaining = [s for s in SYMBOLS_48 if s not in done]
 payload = {
     "run_started_at": prev.get("run_started_at") or datetime.now(timezone.utc).isoformat(),
     "current_symbol": current or None,
@@ -82,7 +83,7 @@ import json, sys
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path("/home/telgenbuescher/projects/orderbook_analyse/scripts")))
-from orderbook_v2_49_rollout_lib import SYMBOLS_49, EXPECTED_HEAD, EXPECTED_PARSER, write_progress_atomic
+from orderbook_v2_49_rollout_lib import SYMBOLS_48, EXPECTED_HEAD, EXPECTED_PARSER, write_progress_atomic
 
 path, kind, symbol = sys.argv[1], sys.argv[2], sys.argv[3]
 prev = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -93,7 +94,7 @@ if kind == "completed" and symbol not in completed:
 if kind == "skipped" and symbol not in skipped:
     skipped.append(symbol)
 done = set(completed) | set(skipped)
-remaining = [s for s in SYMBOLS_49 if s not in done]
+remaining = [s for s in SYMBOLS_48 if s not in done]
 payload = {
     "run_started_at": prev.get("run_started_at"),
     "current_symbol": None,
@@ -125,6 +126,9 @@ HEAD_NOW="$(git rev-parse HEAD)"
 if [ "${HEAD_NOW}" != "${EXPECTED_HEAD}" ]; then
   stop_with "STOPPED_INCONSISTENT" "STOP: HEAD ${HEAD_NOW} != ${EXPECTED_HEAD}"
 fi
+if ! git merge-base --is-ancestor "${MIN_HEAD}" HEAD; then
+  stop_with "STOPPED_INCONSISTENT" "STOP: HEAD is not a descendant of V3 checkpoint ${MIN_HEAD}"
+fi
 
 PARSER_NOW="$("${PYTHON}" -c 'from orderbook_analyse.orderbook_v2 import PARSER_VERSION; print(PARSER_VERSION)')"
 if [ "${PARSER_NOW}" != "${EXPECTED_PARSER}" ]; then
@@ -132,11 +136,11 @@ if [ "${PARSER_NOW}" != "${EXPECTED_PARSER}" ]; then
 fi
 
 mapfile -t SYMBOLS < <("${PYTHON}" "${LIB}" list-symbols)
-if [ "${#SYMBOLS[@]}" -ne 49 ]; then
-  stop_with "STOPPED_INCONSISTENT" "STOP: symbol count ${#SYMBOLS[@]} != 49"
+if [ "${#SYMBOLS[@]}" -ne 48 ]; then
+  stop_with "STOPPED_INCONSISTENT" "STOP: symbol count ${#SYMBOLS[@]} != 48"
 fi
 
-if printf '%s\n' "${SYMBOLS[@]}" | grep -Exq 'ADAUSDT|BTCUSDT|XAUUSDT'; then
+if printf '%s\n' "${SYMBOLS[@]}" | grep -Exq 'ADAUSDT|BTCUSDT|ETHUSDT|XAUUSDT'; then
   stop_with "STOPPED_INCONSISTENT" "STOP: forbidden symbol in list"
 fi
 
@@ -198,6 +202,9 @@ for OB_SYMBOL in "${SYMBOLS[@]}"; do
   "${PYTHON}" -m orderbook_analyse.orderbook_v2.pilot \
     --symbol "${OB_SYMBOL}" \
     --days 7 \
+    --start-day 2026-08-11 \
+    --end-day 2026-08-17 \
+    --warmup-previous-day \
     --data-root "${DATA_ROOT_BASE}/${OB_SYMBOL}" \
     >"${coin_log}" 2>&1
   import_rc=$?

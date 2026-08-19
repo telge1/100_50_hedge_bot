@@ -47,13 +47,14 @@ class FakeClient:
         return FakeQuery(self.responses.pop(0))
 
 
-def test_symbol_set_is_exactly_49_without_ada_btc_xau():
+def test_symbol_set_is_exactly_48_without_ada_btc_eth_xau():
     lib.validate_symbol_set()
-    assert len(lib.SYMBOLS_49) == 49
-    assert len(set(lib.SYMBOLS_49)) == 49
-    assert "ADAUSDT" not in lib.SYMBOLS_49
-    assert "BTCUSDT" not in lib.SYMBOLS_49
-    assert "XAUUSDT" not in lib.SYMBOLS_49
+    assert len(lib.SYMBOLS_48) == 48
+    assert len(set(lib.SYMBOLS_48)) == 48
+    assert "ADAUSDT" not in lib.SYMBOLS_48
+    assert "BTCUSDT" not in lib.SYMBOLS_48
+    assert "ETHUSDT" not in lib.SYMBOLS_48
+    assert "XAUUSDT" not in lib.SYMBOLS_48
 
 
 def test_check_window_ok_and_bad():
@@ -136,7 +137,7 @@ def test_audit_pass_and_fail(monkeypatch):
             [(0,)],
             manifest,
             [(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 800)],
-            [(0,)],
+            [],
             [(0, 0)],
         ]
     )
@@ -151,7 +152,7 @@ def test_audit_pass_and_fail(monkeypatch):
             [(1,)],
             [],
             [(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
-            [(0,)],
+            [],
             [(0, 0)],
         ]
     )
@@ -191,6 +192,35 @@ def test_shell_script_safety_and_counts():
     assert "STOPPED_AUDIT_FAILED" in text
     assert "STOPPED_IMPORT_FAILED" in text
     assert "[o]rderbook_analyse.orderbook_v2.pilot" in text
+    assert "--warmup-previous-day" in text
+    assert "--start-day 2026-08-11" in text
+    assert "--end-day 2026-08-17" in text
+    assert "orderbook_v3_48_coin_rollout" in text
+    assert "ADAUSDT|BTCUSDT|ETHUSDT|XAUUSDT" in text
+    assert 'symbol count ${#SYMBOLS[@]} != 48' in text
+    assert "STOPPED_AUDIT_FAILED" in text
+    assert "flock" in text
+
+
+def test_expected_head_matches_git_and_has_v3_ancestor():
+    import subprocess
+    root = Path(__file__).resolve().parents[1]
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    assert lib.EXPECTED_HEAD == head
+    assert lib.MIN_HEAD == "af1623f16f02ac770bb24a9c45669949b51778e1"
+    subprocess.check_call(["git", "merge-base", "--is-ancestor", lib.MIN_HEAD, "HEAD"], cwd=root)
+    sh = SH_PATH.read_text(encoding="utf-8")
+    assert f'MIN_HEAD="{lib.MIN_HEAD}"' in sh
+    assert 'EXPECTED_HEAD="$(git rev-parse HEAD)"' in sh
+    assert "merge-base --is-ancestor" in sh
+
+
+def test_legacy_eth_overflow_allowed_v3_overflow_blocked():
+    assert lib._legacy_overflow_ok("ETHUSDT", [("ob200_v2", 1)], 1)
+    assert not lib._legacy_overflow_ok("ETHUSDT", [("ob200_v3", 1)], 1)
+    assert not lib._legacy_overflow_ok("SOLUSDT", [("ob200_v2", 1)], 1)
+    assert lib._legacy_overflow_ok("SOLUSDT", [], 0)
+    assert lib._legacy_overflow_ok("ADAUSDT", [("ob200_v1", 1)], 1)
 
 
 def test_decision_parser_accepts_only_exact_passed(tmp_path):
@@ -252,7 +282,7 @@ def test_audit_rejects_legacy_ob200_v2_parser(monkeypatch):
             [(0,)],
             manifest,
             [(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 800)],
-            [(0,)],
+            [],
             [(0, 0)],
         ]
     )

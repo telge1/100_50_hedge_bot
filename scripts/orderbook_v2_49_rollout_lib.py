@@ -14,7 +14,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-EXPECTED_HEAD = "21e001c89811d04e8bf28871ed53ccaa62cfafd3"
+MIN_HEAD = "af1623f16f02ac770bb24a9c45669949b51778e1"
+
+
+def current_head() -> str:
+    root = Path(__file__).resolve().parents[1]
+    import subprocess
+
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=root, text=True,
+    ).strip()
+
+
+EXPECTED_HEAD = current_head()
 from orderbook_analyse.orderbook_v2 import PARSER_VERSION as EXPECTED_PARSER
 WINDOW_START = "2026-08-11"
 WINDOW_END_INCLUSIVE = "2026-08-17"
@@ -24,8 +36,7 @@ PASS_DECISION_TEMPLATE = "{symbol}_OB_V2_7D_PILOT_PASSED"
 N_EXPECTED_SECONDS = 604800
 N_DAY_SECONDS = 86400
 
-SYMBOLS_49: tuple[str, ...] = (
-    "ETHUSDT",
+SYMBOLS_48: tuple[str, ...] = (
     "SOLUSDT",
     "XRPUSDT",
     "BNBUSDT",
@@ -76,7 +87,7 @@ SYMBOLS_49: tuple[str, ...] = (
     "PAXGUSDT",
 )
 
-FORBIDDEN_SYMBOLS = frozenset({"ADAUSDT", "BTCUSDT", "XAUUSDT"})
+FORBIDDEN_SYMBOLS = frozenset({"ADAUSDT", "BTCUSDT", "ETHUSDT", "XAUUSDT"})
 REQUIRED_ENV = (
     "CLICKHOUSE_HOST",
     "CLICKHOUSE_HTTP_PORT",
@@ -84,10 +95,32 @@ REQUIRED_ENV = (
     "CLICKHOUSE_USER",
 )
 
+# Known leftover rows at 2026-08-18 00:00:00 that must not be deleted in this task.
+# A new ob200_v3 row at that timestamp is never allowed.
+KNOWN_LEGACY_OVERFLOW: dict[str, tuple[str, int]] = {
+    "ETHUSDT": ("ob200_v2", 1),
+    "ADAUSDT": ("ob200_v1", 1),
+}
 
-def validate_symbol_set(symbols: tuple[str, ...] = SYMBOLS_49) -> None:
-    if len(symbols) != 49:
-        raise ValueError(f"expected 49 symbols, got {len(symbols)}")
+
+def _legacy_overflow_ok(
+    symbol: str,
+    overflow_rows: list[Any],
+    overflow_total: int,
+) -> bool:
+    if overflow_total == 0:
+        return True
+    allowed = KNOWN_LEGACY_OVERFLOW.get(symbol)
+    if allowed is None:
+        return False
+    exp_ver, exp_n = allowed
+    got = [(str(ver), int(n)) for ver, n in overflow_rows]
+    return got == [(exp_ver, exp_n)]
+
+
+def validate_symbol_set(symbols: tuple[str, ...] = SYMBOLS_48) -> None:
+    if len(symbols) != 48:
+        raise ValueError(f"expected 48 symbols, got {len(symbols)}")
     if len(set(symbols)) != len(symbols):
         raise ValueError("duplicate symbols")
     hit = FORBIDDEN_SYMBOLS.intersection(symbols)
@@ -285,15 +318,19 @@ def audit_symbol(client: Any, symbol: str) -> tuple[bool, str]:
         """,
         parameters=p,
     ).result_rows[0]
-    overflow = client.query(
+    overflow_rows = client.query(
         """
-        SELECT count()
+        SELECT parser_version, count()
         FROM orderbook_analysis.orderbook_features_1s_v2 FINAL
         WHERE symbol = {sym:String}
           AND bucket_start = toDateTime64('2026-08-18 00:00:00', 3, 'UTC')
+        GROUP BY parser_version
+        ORDER BY parser_version
         """,
         parameters=p,
-    ).result_rows[0][0]
+    ).result_rows
+    overflow_v3 = sum(int(n) for ver, n in overflow_rows if ver == EXPECTED_PARSER)
+    overflow_total = sum(int(n) for _ver, n in overflow_rows)
     seq_mismatch = client.query(
         f"""
         WITH base AS (
@@ -344,7 +381,8 @@ def audit_symbol(client: Any, symbol: str) -> tuple[bool, str]:
         "cf_count": (cf_n == 0) or int(cf_anom[-1]) == cf_n,
         "cf_seq": (cf_n == 0) or (int(seq_mismatch[0]) == 0 and int(seq_mismatch[1]) == 0),
         "collector": col_ok,
-        "overflow_dplus1": int(overflow) == 0,
+        "overflow_v3": overflow_v3 == 0,
+        "overflow_dplus1": _legacy_overflow_ok(symbol, overflow_rows, overflow_total),
         "no_valid_book_prefix": invalid == 0,
     }
     failed = [k for k, v in checks.items() if not v]
@@ -366,7 +404,7 @@ def clickhouse_reachable(client: Any) -> bool:
 
 def _cmd_list_symbols() -> int:
     validate_symbol_set()
-    for s in SYMBOLS_49:
+    for s in SYMBOLS_48:
         print(s)
     return 0
 
