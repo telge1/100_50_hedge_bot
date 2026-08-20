@@ -22,6 +22,7 @@
 |---|---|
 | `CONFIRMED` | Passed acceptance including robustness/holdout where required |
 | `PARTIAL` | Interesting in-sample or discovery, but incomplete / fragile |
+| `PARTIAL_WATCHLIST` | Filter/trigger interesting enough to freeze for retest; **not** live-confirm / **not** live-alert |
 | `REJECTED_AS_STANDALONE` | Failed as a solo trigger; still usable as context |
 | `CONTEXT_ONLY` | Marks regime/activity/risk, not a directional edge |
 | `REJECTED_FULLY` | Do not reuse even as context without a new thesis |
@@ -42,8 +43,11 @@
 | SHORT_RARE_IMB_DELTA_TPS_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+flow extreme confluence |
 | LONG_RARE_IMB_OFI_DELTA_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+OFI+flow confluence |
 | RARE_CONFLUENCE_QUIET_ENTRY_V2 | 11–17 / 51c | 1h + 4h | `PARTIAL` / `CONTEXT_ONLY` | Quiet-entry risk gate (not alert) |
+| TIERA_LONG_ONLY_IN_HIGH_VOL_V1 | 11–17 Tier-A | TRADE / TRADE_NO_BE50 | `PARTIAL_WATCHLIST` | Filter existing Tier-A LONGs; SHORT passthrough |
 
 ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Related ADAUSDT studies** — not multi-coin production candidates.
+
+Tier-A **filter** candidates (existing `signal_generator` Tier-A signals, not new entries) are detailed in §11 and `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md`.
 
 ---
 
@@ -267,6 +271,33 @@ ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Rela
 
 ---
 
+## 11) Tier-A LONG-only High-Vol filter (`TIERA_LONG_ONLY_IN_HIGH_VOL_V1`)
+
+| Field | Value |
+|---|---|
+| **Name** | `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` |
+| **Type** | **Filter on existing Tier-A signals** — **no new entry**, no retune of strategy params |
+| **Source of Truth** | ClickHouse `signal_generator.signals` (`tier_a=1`) + `signal_outcomes`; versions `wave_fade_no_be50_v1` / `wave_fade_shadow_pipeline_v1` |
+| **Outcome horizons** | `TRADE` and `TRADE_NO_BE50` (identical in this window; no BE50 activations) |
+| **Window** | 2026-08-11 … 2026-08-17; 51-coin OB universe context; evaluate OB-resolved subset separately; **no OI/Liq** |
+| **Rule** | **SHORT always passthrough.** LONG keep only if **high_vol** active. No other conditions. |
+| **Variant A (primary)** | `vol_ratio_15m >= 1.257911` (= regime-audit window **p66 / high_vol**) |
+| **Variant B (parallel a-priori)** | `vol_ratio_15m >= 1.0` (practical comparison; not optimized) |
+| **Key metrics — A** | ALL WR **64.2% → 73.5%** (+9.4 pp). LONG **55.9% → 71.4%** (+15.5 pp, n_after=21). LONG OB **47.9% → 64.3%** (+16.4 pp, n_after=**14**). SHORT **74.5%** unchanged. Removed all LONG **18W/20L**; OB LONG **14W/20L**. LOO LONG lifts positive; n thin. ACE/XAU **not** sole driver. |
+| **Key metrics — B** | ALL **+10.5 pp**; LONG OB **+22.1 pp**; more keep, simpler absolute threshold |
+| **Prior related** | `FROZEN_TIERA_LONG_FILTER_VOL_RATIO_15M_V1` (PARTIAL; LONG `vol>=1` + OB/vol required) aligned with Variant B story; universal vol filter on ALL sides was **REJECTED** (hurts SHORT) |
+| **Verdict** | **`TIERA_LONG_ONLY_IN_HIGH_VOL_V1_PARTIAL`** → status **`PARTIAL_WATCHLIST`** |
+| **Status** | **`PARTIAL_WATCHLIST`** — **no live-confirm, no live-alert** |
+| **Interpretation** | LONGs need high-vol / movement; SHORTs in this window should stay unfiltered. Currently **best practical Tier-A filter signal**, but PARTIAL due to small n and 7-day OB window |
+| **Retest when** | New OB holdout **after 2026-08-20** with **exact** Variant A (and report B). Threshold change → new name `…_V2`. OI/Liq only as `…_OI_V1` |
+
+**Artifacts:**  
+- `results/frozen_signal_filter_tests/TIERA_LONG_ONLY_IN_HIGH_VOL_V1_20260811_17/`  
+- Context: `results/frozen_signal_regime_audit/20260811_17/`, `results/frozen_signal_ob_feature_audit/20260811_17/`, `results/frozen_signal_filter_tests/FROZEN_TIERA_LONG_FILTER_VOL_RATIO_15M_V1_20260811_17/`  
+- Watchlist doc: `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md`
+
+---
+
 ## Related ADAUSDT-only studies (context)
 
 Not multi-coin frozen candidates; useful history for detector design.
@@ -286,7 +317,7 @@ Not multi-coin frozen candidates; useful history for detector design.
 
 | Context bucket | Features that survived as useful | Do not use alone as alert |
 |---|---|---|
-| **Volatility** | `vol_ratio_*`, R≥5 episode flag, pre-range 5m/15m | Yes — range both ways |
+| **Volatility** | `vol_ratio_*`, R≥5 episode flag, pre-range 5m/15m; **Tier-A LONG high_vol gate** (`PARTIAL_WATCHLIST`) | Yes as solo alert — OK as Tier-A LONG filter candidate only |
 | **Activity** | `tps_ratio`, `tc_5m`, TPS top1/2% | Yes — unless rarified + OB |
 | **Flow** | `delta_5m`, delta extremes, buy/sell share, exhaustion asymmetry | Yes — TPS3-scale spam |
 | **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok` | Partial — need confluence + holdout |
@@ -299,9 +330,10 @@ Not multi-coin frozen candidates; useful history for detector design.
 
 1. **More OB days** after 2026-08-20: replay **exact** `SHORT_…_V1` and `LONG_…_V1` (new artifact folder; same names).
 2. Optional: replay **exact Quiet-Entry Variant A** on longer holdout (`RARE_CONFLUENCE_QUIET_ENTRY_V2` unchanged); if gates change → **`…_V3`**.
-3. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
-4. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
-5. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
+3. **Tier-A filter holdout:** replay **exact** `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` Variant A (`vol_ratio_15m >= 1.257911`) on OB days **after 2026-08-20**; report Variant B (`>= 1.0`) in parallel. No threshold edit without `…_V2`.
+4. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
+5. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
+6. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
 
 ---
 
@@ -310,13 +342,18 @@ Not multi-coin frozen candidates; useful history for detector design.
 | Path | Contents |
 |---|---|
 | `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` | This inventory |
-| `docs/research/FROZEN_RARE_CONFLUENCE_WATCHLIST.md` | Frozen V1 definitions |
+| `docs/research/FROZEN_RARE_CONFLUENCE_WATCHLIST.md` | Frozen rare-confluence V1 definitions |
+| `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md` | Frozen Tier-A filter watchlist (LONG high-vol) |
 | `results/frozen_precondition_hard_test/flow_tps3_20260811_17/` | TPS3 A/B reject |
 | `results/big_move_precondition_discovery/20260811_17_51coins/` | Big-move discovery |
 | `results/rare_confluence_discovery/20260811_17_51coins/` | Rare confluence discovery |
 | `results/frozen_hard_tests/SHORT_RARE_IMB_DELTA_TPS_V1_20260811_17/` | SHORT V1 1h hard-test |
 | `results/frozen_rare_confluence_watchlist/20260811_17/` | SHORT+LONG 1h/4h freeze cycle |
 | `results/frozen_hard_tests/RARE_CONFLUENCE_QUIET_ENTRY_V2_20260811_17/` | Quiet-Entry V2 hard-test (PARTIAL) |
+| `results/frozen_signal_ob_feature_audit/20260811_17/` | Tier-A OB feature audit |
+| `results/frozen_signal_regime_audit/20260811_17/` | Tier-A regime audit |
+| `results/frozen_signal_filter_tests/FROZEN_TIERA_LONG_FILTER_VOL_RATIO_15M_V1_20260811_17/` | Prior LONG vol≥1 filter (PARTIAL) |
+| `results/frozen_signal_filter_tests/TIERA_LONG_ONLY_IN_HIGH_VOL_V1_20260811_17/` | LONG high-vol filter (PARTIAL_WATCHLIST) |
 | `results/volatility_event_detector/` | ADA detector / continuation lineage |
 | *(deleted after reject)* | `results/condition_1h_moves/*`, `MULTI_20260811_19_*` — see sections 1–2 & 5 |
 
@@ -328,3 +365,4 @@ Not multi-coin frozen candidates; useful history for detector design.
 |---|---|
 | 2026-08-20 | Initial inventory compiled from remaining artifacts + documented deleted rejects |
 | 2026-08-20 | Added `RARE_CONFLUENCE_QUIET_ENTRY_V2` (PARTIAL / CONTEXT_ONLY; Variant A best; holdout fail; no alert) |
+| 2026-08-20 | Added `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` (`PARTIAL_WATCHLIST`); new `FROZEN_TIERA_FILTER_WATCHLIST.md` |
