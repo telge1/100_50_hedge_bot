@@ -44,3 +44,7 @@ results/*
 !/data/checkpoints/.gitkeep
 !/logs/.gitkeep
 !/results/.gitkeep
+
+# Local cleanup bulk (research dumps; do not commit 10GB+ trees)
+/archive/
+/dump/
