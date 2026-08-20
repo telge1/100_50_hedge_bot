@@ -52,6 +52,13 @@ from orderbook_analyse.orderbook_v2.book import (
     sorted_asks,
     sorted_bids,
 )
+from orderbook_analyse.orderbook_v2.dynamics import (
+    build_carry_forward_row,
+    build_event_feature_row,
+    compute_dynamics as _compute_dynamics,
+    mid_of,
+    zero_dynamics as _zero_dynamics,
+)
 from orderbook_analyse.orderbook_v2.features import compute_features
 
 # Calendar window of source_date D is always:
@@ -115,95 +122,6 @@ def _sha256_of_zip(zip_path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def _compute_dynamics(
-    delta_events: list[dict[str, Any]],
-    prev_book: BookState,
-) -> dict[str, Any]:
-    """Compute delta-derived dynamics for a second from a list of delta data-dicts."""
-    bid_added = ZERO
-    bid_removed = ZERO
-    ask_added = ZERO
-    ask_removed = ZERO
-    bid_add_n = 0
-    bid_rem_n = 0
-    ask_add_n = 0
-    ask_rem_n = 0
-    ofi = ZERO
-
-    prev_best_bid = max(prev_book.bids.keys(), default=ZERO)
-    prev_best_ask = min(prev_book.asks.keys(), default=ZERO)
-
-    for d in delta_events:
-        for item in d.get("b") or []:
-            p = Decimal(item[0])
-            q = Decimal(item[1])
-            old_q = prev_book.bids.get(p, ZERO)
-            if q == ZERO:
-                if old_q > ZERO:
-                    bid_removed += old_q
-                    bid_rem_n += 1
-                    if p == prev_best_bid:
-                        ofi -= old_q
-            else:
-                delta_q = q - old_q
-                if delta_q > ZERO:
-                    bid_added += delta_q
-                    bid_add_n += 1
-                else:
-                    bid_removed += abs(delta_q)
-                    bid_rem_n += 1
-                if p == prev_best_bid:
-                    ofi += (q - old_q)
-
-        for item in d.get("a") or []:
-            p = Decimal(item[0])
-            q = Decimal(item[1])
-            old_q = prev_book.asks.get(p, ZERO)
-            if q == ZERO:
-                if old_q > ZERO:
-                    ask_removed += old_q
-                    ask_rem_n += 1
-                    if p == prev_best_ask:
-                        ofi += old_q
-            else:
-                delta_q = q - old_q
-                if delta_q > ZERO:
-                    ask_added += delta_q
-                    ask_add_n += 1
-                else:
-                    ask_removed += abs(delta_q)
-                    ask_rem_n += 1
-                if p == prev_best_ask:
-                    ofi -= (q - old_q)
-
-    return {
-        "bid_qty_added": bid_added,
-        "bid_qty_removed": bid_removed,
-        "ask_qty_added": ask_added,
-        "ask_qty_removed": ask_removed,
-        "bid_add_count": bid_add_n,
-        "bid_remove_count": bid_rem_n,
-        "ask_add_count": ask_add_n,
-        "ask_remove_count": ask_rem_n,
-        "ofi": ofi,
-    }
-
-
-def _zero_dynamics() -> dict[str, Any]:
-    """Activity metrics for a carry-forward second: no events → all zero (not None)."""
-    return {
-        "bid_qty_added": ZERO,
-        "bid_qty_removed": ZERO,
-        "ask_qty_added": ZERO,
-        "ask_qty_removed": ZERO,
-        "bid_add_count": 0,
-        "bid_remove_count": 0,
-        "ask_add_count": 0,
-        "ask_remove_count": 0,
-        "ofi": ZERO,
-    }
 
 
 def calendar_day_start_ms(day: date | str) -> int:
@@ -434,13 +352,6 @@ def parse_day_zip(
     feature_rows: list[dict[str, Any]] = []
     seen: set[int] = set(seen_us or ())
 
-    def _mid_of(bk: BookState) -> Decimal | None:
-        bds = sorted_bids(bk)
-        aks = sorted_asks(bk)
-        if bds and aks:
-            return (bds[0][0] + aks[0][0]) / Decimal("2")
-        return None
-
     def _ensure_calendar_window(first_bucket_ms: int) -> None:
         nonlocal emit_start_ms, emit_end_ms, window_end_ms
         if emit_start_ms is not None:
@@ -473,23 +384,14 @@ def parse_day_zip(
                 emit_invalid_empty(bucket_ms)
             return
         if last_valid_book is not None and last_valid_book.is_valid:
-            dyn: dict[str, Any] = {}
-            mid_change: Decimal | None = None
-            if delta_data_in_bucket and book_at_bucket_start is not None:
-                dyn = _compute_dynamics(delta_data_in_bucket, book_at_bucket_start)
-                if prev_mid_for_change is not None:
-                    cur_mid = _mid_of(last_valid_book)
-                    if cur_mid is not None:
-                        mid_change = cur_mid - prev_mid_for_change
-            row = compute_features(
+            row = build_event_feature_row(
                 last_valid_book, bucket_ms, first_ts_in_bucket, last_ts,
                 n_updates_in_bucket,
                 exchange=exchange, market=market, symbol=symbol, depth=depth,
                 quality_flags=bucket_quality_flags if bucket_quality_flags else None,
-                **dyn,
-                mid_price_change=mid_change,
-                imbalance_l10_change=None,
-                imbalance_l50_change=None,
+                delta_data=delta_data_in_bucket,
+                book_at_bucket_start=book_at_bucket_start,
+                prev_mid=prev_mid_for_change,
             )
             feature_rows.append(row)
             if row["is_valid"]:
@@ -516,15 +418,9 @@ def parse_day_zip(
 
     def emit_carry_forward(bucket_ms: int, carry_book: BookState) -> None:
         nonlocal stats
-        row = compute_features(
-            carry_book, bucket_ms, bucket_ms, bucket_ms,
-            processed_updates=0,
+        row = build_carry_forward_row(
+            carry_book, bucket_ms,
             exchange=exchange, market=market, symbol=symbol, depth=depth,
-            quality_flags=["carried_forward"],
-            **_zero_dynamics(),
-            mid_price_change=None,
-            imbalance_l10_change=None,
-            imbalance_l50_change=None,
         )
         feature_rows.append(row)
         if row["is_valid"]:
@@ -556,7 +452,7 @@ def parse_day_zip(
         nonlocal prev_mid_for_change, last_valid_book
         if last_valid_book is not None and last_valid_book.is_valid:
             book_at_bucket_start = last_valid_book
-            prev_mid_for_change = _mid_of(last_valid_book)
+            prev_mid_for_change = mid_of(last_valid_book)
         else:
             book_at_bucket_start = None
             prev_mid_for_change = None

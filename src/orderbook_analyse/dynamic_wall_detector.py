@@ -595,9 +595,12 @@ def find_bootstrap_snapshot(
 ) -> tuple[datetime, int, int]:
     """Return (exchange_ts, update_id, cross_sequence) for bootstrap snapshot.
 
-    Preference:
-    1) first snapshot inside [start, end]
+    Preference (as-of ``end``):
+    1) newest snapshot inside [start, end]
     2) else last snapshot strictly before start
+
+    Choosing the newest in-window snapshot minimizes replay length and avoids
+    early update_id gaps that later snapshots already reseat.
     """
     rows = db.query(
         """
@@ -607,7 +610,7 @@ def find_bootstrap_snapshot(
           AND message_type = 'snapshot'
           AND exchange_ts >= %(start)s
           AND exchange_ts <= %(end)s
-        ORDER BY exchange_ts ASC, cross_sequence ASC, update_id ASC
+        ORDER BY exchange_ts DESC, cross_sequence DESC, update_id DESC
         LIMIT 1
         """,
         parameters={"symbol": symbol, "start": start, "end": end},
@@ -643,6 +646,37 @@ def find_bootstrap_snapshot(
     else:
         ts = ts.astimezone(timezone.utc)
     return ts, int(rows[0][1]), int(rows[0][2])
+
+
+def filter_events_after_bootstrap(
+    events: Sequence[BookLevelEvent],
+    *,
+    snapshot_u: int,
+    snapshot_seq: int,
+) -> list[BookLevelEvent]:
+    """Keep bootstrap snapshot, later snapshots, and later deltas.
+
+    Later snapshots must be retained: Bybit-style resyncs skip update_ids and
+    reseat ``last_update_id``. Dropping them caused false ``update_id gap``
+    failures (e.g. expected N+1, got N+k after an omitted mid-stream snapshot).
+    """
+    filtered: list[BookLevelEvent] = []
+    for event in events:
+        if event.message_type == "snapshot":
+            if event.update_id == snapshot_u and event.cross_sequence == snapshot_seq:
+                filtered.append(event)
+                continue
+            # Later reseat snapshot (after bootstrap)
+            if (event.cross_sequence > snapshot_seq) or (
+                event.cross_sequence == snapshot_seq and event.update_id > snapshot_u
+            ):
+                filtered.append(event)
+            continue
+        if (event.cross_sequence > snapshot_seq) or (
+            event.cross_sequence == snapshot_seq and event.update_id > snapshot_u
+        ):
+            filtered.append(event)
+    return filtered
 
 
 def load_events(
@@ -687,18 +721,9 @@ def load_events(
     )
     cols = list(result.column_names)
     events = [event_from_row(dict(zip(cols, row, strict=True))) for row in result.result_rows]
-    # Keep only bootstrap snapshot + later messages (filter stray older rows)
-    filtered: list[BookLevelEvent] = []
-    for event in events:
-        if event.message_type == "snapshot":
-            if event.update_id == snapshot_u and event.cross_sequence == snapshot_seq:
-                filtered.append(event)
-            continue
-        if (event.cross_sequence > snapshot_seq) or (
-            event.cross_sequence == snapshot_seq and event.update_id > snapshot_u
-        ):
-            filtered.append(event)
-    return filtered
+    return filter_events_after_bootstrap(
+        events, snapshot_u=snapshot_u, snapshot_seq=snapshot_seq
+    )
 
 
 def load_trade_context(

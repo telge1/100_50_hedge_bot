@@ -304,3 +304,97 @@ def test_score_buckets_excludes_self_from_local_median() -> None:
     wall = next(s for s in scored if s.bucket_price == Decimal("0.615"))
     assert wall.local_median_notional < float(wall.notional)
     assert wall.wall_multiple > 1
+
+
+def test_filter_keeps_later_snapshot_and_avoids_false_gap() -> None:
+    """HYPE-style: delta chain skips IDs that a mid-stream snapshot reseats."""
+    from orderbook_analyse.dynamic_wall_detector import filter_events_after_bootstrap
+    from orderbook_analyse.orderbook_replay import group_messages
+
+    boot_u, boot_seq = 9266140, 159428999945
+    ts0 = TS0
+    ts1 = TS0 + timedelta(seconds=1)
+    ts2 = TS0 + timedelta(seconds=2)
+    events = [
+        _evt(ts=ts0, side="bid", price="0.62", qty="1", msg="snapshot", u=boot_u, seq=boot_seq, idx=0),
+        _evt(ts=ts0, side="ask", price="0.63", qty="1", msg="snapshot", u=boot_u, seq=boot_seq, idx=1),
+        _evt(ts=ts1, side="bid", price="0.62", qty="2", msg="delta", u=9266141, seq=boot_seq + 10, idx=0),
+        # Reseat snapshot (9266142..9266145 never appear as deltas)
+        _evt(ts=ts2, side="bid", price="0.621", qty="5", msg="snapshot", u=9266146, seq=boot_seq + 20, idx=0),
+        _evt(ts=ts2, side="ask", price="0.631", qty="5", msg="snapshot", u=9266146, seq=boot_seq + 20, idx=1),
+        _evt(
+            ts=ts2 + timedelta(milliseconds=1),
+            side="bid",
+            price="0.621",
+            qty="6",
+            msg="delta",
+            u=9266147,
+            seq=boot_seq + 21,
+            idx=0,
+        ),
+    ]
+    filtered = filter_events_after_bootstrap(events, snapshot_u=boot_u, snapshot_seq=boot_seq)
+    snap_uids = {e.update_id for e in filtered if e.message_type == "snapshot"}
+    assert snap_uids == {boot_u, 9266146}
+
+    # Old filter behavior (bootstrap snap only) fails with the production error.
+    old_style = [e for e in filtered if not (e.message_type == "snapshot" and e.update_id != boot_u)]
+    with pytest.raises(ReplayError, match="update_id gap: expected 9266142, got 9266147"):
+        bad = OrderBookReplayer()
+        for message_type, update_id, seq, ts, levels in group_messages(old_style):
+            bad.apply_message(message_type, update_id, seq, ts, levels)
+
+    replayer = OrderBookReplayer()
+    for message_type, update_id, seq, ts, levels in group_messages(filtered):
+        replayer.apply_message(message_type, update_id, seq, ts, levels)
+    assert replayer.book.last_update_id == 9266147
+    assert replayer.book.has_snapshot
+
+
+def test_filter_drops_older_stray_snapshot() -> None:
+    from orderbook_analyse.dynamic_wall_detector import filter_events_after_bootstrap
+
+    boot_u, boot_seq = 100, 1000
+    older = _evt(ts=TS0, side="bid", price="1", qty="1", msg="snapshot", u=50, seq=900, idx=0)
+    boot = _evt(ts=TS0, side="bid", price="1", qty="1", msg="snapshot", u=boot_u, seq=boot_seq, idx=0)
+    filtered = filter_events_after_bootstrap(
+        [older, boot], snapshot_u=boot_u, snapshot_seq=boot_seq
+    )
+    assert [e.update_id for e in filtered] == [boot_u]
+
+
+def test_find_bootstrap_snapshot_prefers_newest_in_window() -> None:
+    from orderbook_analyse.dynamic_wall_detector import find_bootstrap_snapshot
+
+    class _Result:
+        def __init__(self, rows):
+            self.result_rows = rows
+
+    class _FakeDb:
+        def __init__(self):
+            self.queries: list[str] = []
+
+        def query(self, sql, parameters=None):
+            self.queries.append(sql)
+            if "exchange_ts >= %(start)s" in sql and "exchange_ts <= %(end)s" in sql:
+                assert "ORDER BY exchange_ts DESC" in sql
+                return _Result(
+                    [
+                        (
+                            datetime(2026, 8, 3, 11, 58, 29, 628000, tzinfo=timezone.utc),
+                            9266725,
+                            159429576372,
+                        )
+                    ]
+                )
+            return _Result([])
+
+    db = _FakeDb()
+    start = datetime(2026, 8, 3, 9, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 8, 3, 15, 0, tzinfo=timezone.utc)
+    ts, u, seq = find_bootstrap_snapshot(db, symbol="HYPEUSDT", start=start, end=end)
+    assert u == 9266725
+    assert seq == 159429576372
+    assert ts.isoformat().startswith("2026-08-03T11:58:29")
+    assert "ORDER BY exchange_ts DESC" in db.queries[0]
+    assert "ORDER BY exchange_ts ASC" not in db.queries[0]
