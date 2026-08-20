@@ -33,4 +33,24 @@ python -m orderbook_analyse.orderbook_v2_live --mode universe51 --confirm-univer
 - `results/orderbook_v3_48_coin_rollout/`
 - `results/oi_liquidation_collector/`
 
-Research one-offs belong under `archive/20260820_cleanup/results/`.
+Research one-offs belong under `archive/20260820_cleanup/`.
+
+## Cleanup layout (2026-08-20)
+
+| Path | Contents |
+|---|---|
+| `archive/20260820_cleanup/results/` | Old research result trees |
+| `archive/20260820_cleanup/src_research/` | Research Python packages/modules |
+| `archive/20260820_cleanup/scripts_research/` | One-off `run_*` audit scripts |
+| `archive/20260820_cleanup/tests_research/` | Matching research tests |
+| `archive/20260820_cleanup/research_code_archive_manifest.json` | Move manifest |
+
+Kept under `src/orderbook_analyse/`: `orderbook_v2`, `orderbook_v2_live`,
+`oi_liquidation_collector`, `public_trade_source`, `ob_data_source`,
+`market_data_coverage`, `wall_transition_collector` (pid helpers for health;
+CLI scripts archived), plus shared helpers used by those packages
+(`dynamic_wall_detector`, `orderbook_replay`, `execution_wall_detector`,
+`wall_toxicity_audit`, recorder/config).
+
+Wall-transition **runner scripts** are archived; restoring a full wall-transition
+live run needs the archived dependency chain (bearish / live_level_zones / …).
