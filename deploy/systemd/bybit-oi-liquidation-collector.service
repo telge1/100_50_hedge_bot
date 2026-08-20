@@ -1,0 +1,23 @@
+[Unit]
+Description=Bybit linear OI + allLiquidation collector (no orderbook, no trading)
+After=network-online.target docker.service
+Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+WorkingDirectory=/home/telgenbuescher/projects/orderbook_analyse
+Environment=PYTHONPATH=src
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/telgenbuescher/projects/orderbook_analyse/.env
+ExecStart=/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=append:/home/telgenbuescher/projects/orderbook_analyse/logs/oi_liquidation_live.log
+StandardError=append:/home/telgenbuescher/projects/orderbook_analyse/logs/oi_liquidation_live.log
+
+[Install]
+WantedBy=default.target
