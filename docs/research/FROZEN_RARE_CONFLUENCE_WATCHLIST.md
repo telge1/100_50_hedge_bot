@@ -114,6 +114,7 @@ Splits: full 11–17, discovery 11–15, holdout 16–17, leave-one-day-out, lea
 | This doc | `docs/research/FROZEN_RARE_CONFLUENCE_WATCHLIST.md` |
 | Watchlist 1h+4h run | `results/frozen_rare_confluence_watchlist/20260811_17/` |
 | Prior SHORT 1h hard-test | `results/frozen_hard_tests/SHORT_RARE_IMB_DELTA_TPS_V1_20260811_17/` |
+| Quiet-Entry V2 hard-test (PARTIAL) | `results/frozen_hard_tests/RARE_CONFLUENCE_QUIET_ENTRY_V2_20260811_17/` |
 | Discovery source | `results/rare_confluence_discovery/20260811_17_51coins/` |
 | Runner (research) | `research/frozen_rare_confluence_watchlist_1h4h.py` |
 
@@ -130,3 +131,25 @@ Splits: full 11–17, discovery 11–15, holdout 16–17, leave-one-day-out, lea
 - SHORT: **SHORT_RARE_IMB_DELTA_TPS_V1_REJECTED**
 - LONG: **LONG_RARE_IMB_OFI_DELTA_V1_REJECTED**
 - Artifacts: `/home/telgenbuescher/projects/orderbook_analyse/results/frozen_rare_confluence_watchlist/20260811_17`
+
+---
+
+## Follow-up (does **not** change V1): Quiet-Entry V2
+
+**Candidate:** `RARE_CONFLUENCE_QUIET_ENTRY_V2`  
+**Status:** **`PARTIAL` / `CONTEXT_ONLY`** — **not watchlist, no alert, not confirmed**  
+**Window:** same clean OB window only (`2026-08-11`…`2026-08-17`, 51 coins). No OI/Liq.  
+**Rule:** V1 definitions unchanged; V2 = cooldowned V1 events **subset** with a-priori quiet gate only (no retuning, no extra filters).
+
+| Variant | Gate | Result |
+|---|---|---|
+| **A (best)** | `abs(event_minute_return) ≤ 0.15%` | In-sample MAE↓ / ratio↑; **holdout fail** |
+| B | `≤ 0.10%` | Similar direction, smaller n |
+| C | `≤ 2 × trailing_24h median |ret_1m|` | Too aggressive → rejected for promotion |
+
+**Variant A headline (1h):** combined n=18 (of 33 V1); Hit075≈38.9%; ØMAE≈0.28% (vs V1 combined ratio 1.56 → V2 ratio **2.50**); holdout holds = **False**.
+
+**Reuse:** Quiet-Entry remains a **timing / risk context** (“signal minute already moved → entry likely late”). Any parameter change requires a **new name** (`…_V3`). Do not silently edit V1.
+
+**Artifacts:** `results/frozen_hard_tests/RARE_CONFLUENCE_QUIET_ENTRY_V2_20260811_17/`  
+**Inventory:** `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` §10

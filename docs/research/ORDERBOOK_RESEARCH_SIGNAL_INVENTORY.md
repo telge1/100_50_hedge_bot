@@ -41,6 +41,7 @@
 | Rare Confluence Discovery | 11–17 / 51c | labels 1h MFE | `CONFIRMED` (discovery only) | Source of frozen V1s |
 | SHORT_RARE_IMB_DELTA_TPS_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+flow extreme confluence |
 | LONG_RARE_IMB_OFI_DELTA_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+OFI+flow confluence |
+| RARE_CONFLUENCE_QUIET_ENTRY_V2 | 11–17 / 51c | 1h + 4h | `PARTIAL` / `CONTEXT_ONLY` | Quiet-entry risk gate (not alert) |
 
 ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Related ADAUSDT studies** — not multi-coin production candidates.
 
@@ -238,6 +239,34 @@ ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Rela
 
 ---
 
+## 10) `RARE_CONFLUENCE_QUIET_ENTRY_V2`
+
+| Field | Value |
+|---|---|
+| **Name** | `RARE_CONFLUENCE_QUIET_ENTRY_V2` (**named follow-up; does not overwrite V1**) |
+| **Window** | 2026-08-11 … 2026-08-17 only, 51 coins, `ob200_v3` — **no post-Aug17, no OI/Liq** |
+| **Sources** | candles_1m, public_trades_canonical, OB; LLD context only (not a filter) |
+| **Horizons** | **1h + 4h** (same path contract as V1) |
+| **Definition** | Exact frozen V1 legs (`SHORT_RARE_IMB_DELTA_TPS_V1` / `LONG_RARE_IMB_OFI_DELTA_V1`) after V1 cooldown, **plus** a-priori quiet-entry gate only. V2 ⊆ cooldowned V1. **No retuning** of V1 quantiles/gates; no extra filters beyond A/B/C. |
+| **Quiet variants (a-priori)** | **A:** `abs(event_minute_return) ≤ 0.15%` (best). **B:** `≤ 0.10%` (similar, smaller n). **C:** `≤ 2 × trailing_24h_median(|ret_1m|)` causal — too aggressive / rejected. |
+| **Direction** | SHORT and LONG separately + combined |
+| **V1 baseline (1h, this run)** | SHORT n=12 Hit075=25% ØMFE=0.5722% ØMAE=0.3307% ratio=1.7304; LONG n=21 Hit075=33.33% ØMFE=0.8586% ØMAE=0.5721% ratio=1.5007 |
+| **Key metrics — Variant A (best)** | SHORT n=4 (holdout n=0): Hit075=50%, ØMFE=0.7061%, ØMAE=0.1282%, ratio=5.5063. LONG n=14 (holdout n=5): Hit075=35.71%, ØMFE=0.6966%, ØMAE=0.3227%, ratio=2.1586. **COMBINED n=18:** Hit075=38.89%, ØMFE=0.6987%, ØMAE=0.2795%, ratio=**2.50** vs V1 combined ratio **1.5577** (MAE ~**−20.5%** vs V1). |
+| **Control** | Full-window better than matched controls for A (in-sample) |
+| **Holdout** | **FAIL** (`holdout_holds=False`). LONG A holdout Hit075 lift negative vs controls; SHORT A has **no** holdout events |
+| **Verdict** | **`RARE_CONFLUENCE_QUIET_ENTRY_V2_PARTIAL`** — **not watchlist, no alert, not confirmed** |
+| **Status** | **`PARTIAL` / `CONTEXT_ONLY`** |
+| **Still useful** | **Risk Warning / Timing Context:** if signal minute already moved hard, entry is likely late. Reuse quiet-entry as context in a **new named** candidate later; do not silently patch V1. Any threshold change → **`…_V3`**. |
+| **Retest when** | Longer clean OB holdout with **exact** Variant A definition; or new name if gates change |
+
+**Artifacts:**  
+- `results/frozen_hard_tests/RARE_CONFLUENCE_QUIET_ENTRY_V2_20260811_17/`  
+- Runner: `scripts/run_frozen_quiet_entry_v2.py`
+
+**Interpretation:** Quiet-Entry improves V1 **in-sample** MAE and MFE/MAE, but **does not fix** the Aug16–17 holdout failure. Keep as timing risk feature, not as a released trigger.
+
+---
+
 ## Related ADAUSDT-only studies (context)
 
 Not multi-coin frozen candidates; useful history for detector design.
@@ -262,16 +291,17 @@ Not multi-coin frozen candidates; useful history for detector design.
 | **Flow** | `delta_5m`, delta extremes, buy/sell share, exhaustion asymmetry | Yes — TPS3-scale spam |
 | **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok` | Partial — need confluence + holdout |
 | **Level / LLD** | `lld_dist_*`, near/touch/break | Yes — standalone touch failed |
-| **Risk warning** | High MAE after R≥5 / high TPS; early adverse time-to-MAE | Use as caution, not entry |
+| **Risk warning** | High MAE after R≥5 / high TPS; early adverse time-to-MAE; **`|ret_1m|` already large at signal close** (Quiet-Entry V2 lesson) | Use as caution, not entry |
 
 ---
 
-## Suggested next tests (no retune of V1)
+## Suggested next tests (no retune of V1 / no silent V2 retune)
 
 1. **More OB days** after 2026-08-20: replay **exact** `SHORT_…_V1` and `LONG_…_V1` (new artifact folder; same names).
-2. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1.
-3. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
-4. **Combinations:** any merge of rejected legs → **new candidate name** + discovery → frozen hard-test → holdout.
+2. Optional: replay **exact Quiet-Entry Variant A** on longer holdout (`RARE_CONFLUENCE_QUIET_ENTRY_V2` unchanged); if gates change → **`…_V3`**.
+3. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
+4. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
+5. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
 
 ---
 
@@ -286,6 +316,7 @@ Not multi-coin frozen candidates; useful history for detector design.
 | `results/rare_confluence_discovery/20260811_17_51coins/` | Rare confluence discovery |
 | `results/frozen_hard_tests/SHORT_RARE_IMB_DELTA_TPS_V1_20260811_17/` | SHORT V1 1h hard-test |
 | `results/frozen_rare_confluence_watchlist/20260811_17/` | SHORT+LONG 1h/4h freeze cycle |
+| `results/frozen_hard_tests/RARE_CONFLUENCE_QUIET_ENTRY_V2_20260811_17/` | Quiet-Entry V2 hard-test (PARTIAL) |
 | `results/volatility_event_detector/` | ADA detector / continuation lineage |
 | *(deleted after reject)* | `results/condition_1h_moves/*`, `MULTI_20260811_19_*` — see sections 1–2 & 5 |
 
@@ -296,3 +327,4 @@ Not multi-coin frozen candidates; useful history for detector design.
 | Date (UTC) | Note |
 |---|---|
 | 2026-08-20 | Initial inventory compiled from remaining artifacts + documented deleted rejects |
+| 2026-08-20 | Added `RARE_CONFLUENCE_QUIET_ENTRY_V2` (PARTIAL / CONTEXT_ONLY; Variant A best; holdout fail; no alert) |
