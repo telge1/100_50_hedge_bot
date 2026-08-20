@@ -12,39 +12,32 @@ venv/
 # Secrets
 .env
 
-# Runtime data
-data/raw/*
-data/checkpoints/*
-logs/*
-results/*
-
-# Platzhalter behalten
-!data/raw/.gitkeep
-!data/checkpoints/.gitkeep
-!logs/.gitkeep
-!results/.gitkeep
-
 # IDE / OS
 .idea/
 .vscode/
 .DS_Store
 
-# ClickHouse runtime data
-/data/clickhouse/
-/logs/clickhouse/
-
-# Local runtime output
-/data/raw/*
-/data/checkpoints/*
+# Runtime / local collector output (never commit bulk data)
 /logs/*
 /results/*
+/data/raw/*
+/data/checkpoints/*
+/data/clickhouse/
+/data/oi_liquidation_collector/
+/data/wall_transitions/
+/logs/clickhouse/
 
-# Platzhalter behalten
-!/data/raw/.gitkeep
-!/data/checkpoints/.gitkeep
+# Keep empty dir placeholders
 !/logs/.gitkeep
 !/results/.gitkeep
+!/data/raw/.gitkeep
+!/data/checkpoints/.gitkeep
 
-# Local cleanup bulk (research dumps; do not commit 10GB+ trees)
+# Archived research & cleanup dumps (do not commit)
 /archive/
 /dump/
+
+# Former top-level research trees (if recreated locally)
+/imports/
+/research/
+/tradingview/
