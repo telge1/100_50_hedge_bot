@@ -1,0 +1,6 @@
+{"topic": "orderbook.200.ADAUSDT", "type": "snapshot", "ts": 1700000000000, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.50", "100"], ["0.49", "80"], ["0.48", "60"]], "a": [["0.51", "90"], ["0.52", "70"], ["0.53", "40"]], "u": 10, "seq": 100}}
+{"topic": "orderbook.200.ADAUSDT", "type": "delta", "ts": 1700000000200, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.50", "110"]], "a": [], "u": 11, "seq": 101}}
+{"topic": "orderbook.200.ADAUSDT", "type": "delta", "ts": 1700000000800, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.47", "25"]], "a": [["0.51", "0"]], "u": 12, "seq": 102}}
+{"topic": "orderbook.200.ADAUSDT", "type": "delta", "ts": 1700000001200, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.50", "90"]], "a": [["0.51", "50"]], "u": 13, "seq": 103}}
+{"topic": "orderbook.200.ADAUSDT", "type": "delta", "ts": 1700000002500, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.49", "0"]], "a": [], "u": 14, "seq": 104}}
+{"topic": "orderbook.200.ADAUSDT", "type": "delta", "ts": 1700000003100, "cts": null, "data": {"s": "ADAUSDT", "b": [["0.50", "95"]], "a": [["0.52", "80"]], "u": 15, "seq": 105}}
