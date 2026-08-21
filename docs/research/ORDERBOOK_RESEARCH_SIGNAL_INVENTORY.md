@@ -44,10 +44,13 @@
 | LONG_RARE_IMB_OFI_DELTA_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+OFI+flow confluence |
 | RARE_CONFLUENCE_QUIET_ENTRY_V2 | 11–17 / 51c | 1h + 4h | `PARTIAL` / `CONTEXT_ONLY` | Quiet-entry risk gate (not alert) |
 | TIERA_LONG_ONLY_IN_HIGH_VOL_V1 | 11–17 Tier-A | TRADE / TRADE_NO_BE50 | `PARTIAL_WATCHLIST` | Filter existing Tier-A LONGs; SHORT passthrough |
+| RANGE60_BREAKOUT_OB_V1 | 11–17 / 51c | 1h + 4h | `PARTIAL_WATCHLIST` | Consolidation range → breakout continuation |
 
 ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Related ADAUSDT studies** — not multi-coin production candidates.
 
 Tier-A **filter** candidates (existing `signal_generator` Tier-A signals, not new entries) are detailed in §11 and `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md`.
+
+Range-breakout watchlist: §12 and `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`.
 
 ---
 
@@ -298,6 +301,34 @@ Tier-A **filter** candidates (existing `signal_generator` Tier-A signals, not ne
 
 ---
 
+## 12) `RANGE60_BREAKOUT_OB_V1` (from RANGE_CONSOLIDATION_BREAKOUT_V1 / A)
+
+| Field | Value |
+|---|---|
+| **Name** | `RANGE60_BREAKOUT_OB_V1` (**frozen watchlist name**) |
+| **Source test** | `RANGE_CONSOLIDATION_BREAKOUT_V1` Variant **A RANGE60_PRIMARY** |
+| **Window** | 2026-08-11 … 2026-08-17, 51 coins, `ob200_v3` — **no OI/Liq** |
+| **Sources** | candles_1m, public_trades_canonical, OB; LLD **context slice only** (not in frozen rule) |
+| **Horizons** | **1h + 4h** after entry |
+| **Definition** | 60m consolidation range (width trailing p20–p70; no strong trend; ≥2 spaced touches on breakout edge) → clear break → aligned `delta_3m`/`delta_5m` → TPS ≥ trailing p90 → spread ≤ trailing p75 → OB not opposed → **2/3** holds outside range → entry = next 1m open after confirm; confirm `ret_1m` directed ≤ 0.30%. Exact text in watchlist doc. |
+| **Not included** | 120m strict, compression-before-break, LLD-near as filter (all weaker / rejected in same hard-test) |
+| **Direction** | LONG and SHORT; **LONG better** in primary window |
+| **Key metrics (BOTH 1h)** | n=**121**; ~**17.3**/day; Hit075 lift **+11.1 pp**; MAE ok; MFE/MAE better; Top2 share ~**10%**; without-Top2 lift **+10.9 pp** |
+| **Holdout 16–17** | Hit075 lift **+0.2 pp** (positive but thin — blocks CONFIRMED) |
+| **Sibling variants** | B RANGE120_STRICT **REJECTED**; C NO_OB weaker (+9.5 pp, holdout negative); D COMPRESSION weaker |
+| **Prior lineage** | Level-break discovery → `BREAKOUT_CONTINUATION_STRICT_V1` (REJECTED on frequency) → consolidation gate |
+| **Verdict** | **`RANGE_CONSOLIDATION_BREAKOUT_V1_PARTIAL`** → freeze as **`PARTIAL_WATCHLIST`** |
+| **Status** | **`PARTIAL_WATCHLIST`** — **no live-alert, no CONFIRMED** |
+| **Why not CONFIRMED** | Holdout barely holds (+0.2 pp); only 7 clean OB days; need identical replay on longer window |
+| **Retest when** | **Exact** same definition on **30d** OB window `2026-07-19` … `2026-08-17` once OB-30d import finishes. Any parameter change → **`RANGE60_BREAKOUT_OB_V2`** (or new name) |
+
+**Artifacts:**  
+- `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/`  
+- Watchlist doc: `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`  
+- Runner (research, not committed as freeze): `research/frozen_hard_test_RANGE_CONSOLIDATION_BREAKOUT_V1.py`
+
+---
+
 ## Related ADAUSDT-only studies (context)
 
 Not multi-coin frozen candidates; useful history for detector design.
@@ -320,8 +351,8 @@ Not multi-coin frozen candidates; useful history for detector design.
 | **Volatility** | `vol_ratio_*`, R≥5 episode flag, pre-range 5m/15m; **Tier-A LONG high_vol gate** (`PARTIAL_WATCHLIST`) | Yes as solo alert — OK as Tier-A LONG filter candidate only |
 | **Activity** | `tps_ratio`, `tc_5m`, TPS top1/2% | Yes — unless rarified + OB |
 | **Flow** | `delta_5m`, delta extremes, buy/sell share, exhaustion asymmetry | Yes — TPS3-scale spam |
-| **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok` | Partial — need confluence + holdout |
-| **Level / LLD** | `lld_dist_*`, near/touch/break | Yes — standalone touch failed |
+| **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok`; **range-breakout “OB not opposed”** (`PARTIAL_WATCHLIST`) | Partial — need confluence + holdout |
+| **Level / LLD** | `lld_dist_*`, near/touch/break; **60m consolidation range + touches** (`RANGE60_BREAKOUT_OB_V1`) | LLD-near alone failed; 120m strict failed |
 | **Risk warning** | High MAE after R≥5 / high TPS; early adverse time-to-MAE; **`|ret_1m|` already large at signal close** (Quiet-Entry V2 lesson) | Use as caution, not entry |
 
 ---
@@ -331,9 +362,10 @@ Not multi-coin frozen candidates; useful history for detector design.
 1. **More OB days** after 2026-08-20: replay **exact** `SHORT_…_V1` and `LONG_…_V1` (new artifact folder; same names).
 2. Optional: replay **exact Quiet-Entry Variant A** on longer holdout (`RARE_CONFLUENCE_QUIET_ENTRY_V2` unchanged); if gates change → **`…_V3`**.
 3. **Tier-A filter holdout:** replay **exact** `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` Variant A (`vol_ratio_15m >= 1.257911`) on OB days **after 2026-08-20**; report Variant B (`>= 1.0`) in parallel. No threshold edit without `…_V2`.
-4. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
-5. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
-6. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
+4. **Range breakout 30d retest:** replay **exact** `RANGE60_BREAKOUT_OB_V1` on OB window **2026-07-19 … 2026-08-17** when 30d import completes. No threshold edit without `RANGE60_BREAKOUT_OB_V2`.
+5. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
+6. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
+7. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
 
 ---
 
@@ -344,6 +376,10 @@ Not multi-coin frozen candidates; useful history for detector design.
 | `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` | This inventory |
 | `docs/research/FROZEN_RARE_CONFLUENCE_WATCHLIST.md` | Frozen rare-confluence V1 definitions |
 | `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md` | Frozen Tier-A filter watchlist (LONG high-vol) |
+| `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md` | Frozen range breakout watchlist (`RANGE60_BREAKOUT_OB_V1`) |
+| `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/` | Source PARTIAL hard-test (Variant A → watchlist) |
+| `results/frozen_hard_tests/BREAKOUT_CONTINUATION_STRICT_V1_20260811_17/` | Prior broad breakout strict (REJECTED on frequency) |
+| `results/level_break_reclaim_discovery/20260811_17_51coins/` | Level break/reclaim discovery lineage |
 | `results/frozen_precondition_hard_test/flow_tps3_20260811_17/` | TPS3 A/B reject |
 | `results/big_move_precondition_discovery/20260811_17_51coins/` | Big-move discovery |
 | `results/rare_confluence_discovery/20260811_17_51coins/` | Rare confluence discovery |
@@ -366,3 +402,4 @@ Not multi-coin frozen candidates; useful history for detector design.
 | 2026-08-20 | Initial inventory compiled from remaining artifacts + documented deleted rejects |
 | 2026-08-20 | Added `RARE_CONFLUENCE_QUIET_ENTRY_V2` (PARTIAL / CONTEXT_ONLY; Variant A best; holdout fail; no alert) |
 | 2026-08-20 | Added `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` (`PARTIAL_WATCHLIST`); new `FROZEN_TIERA_FILTER_WATCHLIST.md` |
+| 2026-08-21 | Added `RANGE60_BREAKOUT_OB_V1` (`PARTIAL_WATCHLIST`); new `FROZEN_RANGE_BREAKOUT_WATCHLIST.md` |
