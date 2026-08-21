@@ -3,144 +3,153 @@
 **Status date (UTC):** 2026-08-21  
 **Branch:** `research/confirmed-orderbook-entries`  
 **Repo:** `orderbook_analyse`  
-**Related inventory:** `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` (§12)
+**Related inventory:** `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` (§12–§15)
 
 ## Purpose
 
-Freeze one consolidation → breakout continuation candidate as a **research watchlist**.
+Document the consolidation → breakout research line after **30d OB** replay, regime gating, and SHORT-C trade-management diagnostics.
 
-- **Not** live-confirm  
-- **Not** live-alert  
-- **Not** CONFIRMED  
-- **No** silent retuning of thresholds  
+- **Not** live auto-trade  
+- **No** silent retuning of frozen V1  
+- Rejected ≠ deleted  
 
 | Candidate | Status |
 |---|---|
-| `RANGE60_BREAKOUT_OB_V1` | **`PARTIAL_WATCHLIST`** |
+| `RANGE60_BREAKOUT_OB_V1` | **`REJECTED_AS_STANDALONE` / `CONTEXT_ONLY`** |
+| `RANGE60_BREAKOUT_OB_REGIME_V2` (best: **C `VOL_PLUS_CONTINUATION`**) | **`CONFIRMED_WATCHLIST`** — watchlist/alert research only; **no live trade** |
+| SHORT-C trade management (on Regime C SHORT) | **`WATCHLIST_ONLY`** |
+| `SHORT_C_STRONG_PRESSURE_V2` (best pre-entry: **A `STRONG_FLOW`**) | **`STRONG_PRESSURE_PARTIAL` / `PAPER_HYPOTHESIS`** |
 
-## Source artifact
+## Lineage
 
-| Kind | Path |
+| Step | Path / note |
 |---|---|
-| Hard-test (source) | `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/` |
-| Source verdict | `RANGE_CONSOLIDATION_BREAKOUT_V1_PARTIAL` |
-| Best variant frozen | **A `RANGE60_PRIMARY`** → renamed for watchlist as **`RANGE60_BREAKOUT_OB_V1`** |
-| Runner (research) | `research/frozen_hard_test_RANGE_CONSOLIDATION_BREAKOUT_V1.py` |
+| Discovery | `results/level_break_reclaim_discovery/20260811_17_51coins/` |
+| Broad breakout | `BREAKOUT_CONTINUATION_STRICT_V1` — **REJECTED** (frequency) |
+| 7d freeze source | `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/` Variant **A** → name `RANGE60_BREAKOUT_OB_V1` |
+| 30d V1 replay | `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_V1_30D_20260719_0817/` |
+| Regime V2 | `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/` |
+| SHORT-C TM | `…/short_c_trade_management/` |
+| Strong pressure | `…/short_c_strong_pressure_v2/` |
 
-Lineage (do not revive as this freeze):
+---
 
-- `results/level_break_reclaim_discovery/20260811_17_51coins/` — discovery
-- `results/frozen_hard_tests/BREAKOUT_CONTINUATION_STRICT_V1_20260811_17/` — broad breakout; **REJECTED** (frequency)
+## A) `RANGE60_BREAKOUT_OB_V1` — 30d standalone
 
-## Data window (primary)
-
-- **Evaluation:** `2026-08-11T00:00:00Z` … `2026-08-17T23:59:59Z`
-- **Universe:** 51 coins with full `ob200_v3` / `depth=200` coverage
-- **Sources:** `candles_1m`, `public_trades_canonical`, `orderbook_features_1s_v2`
-- **LLD / pools:** context / descriptive slice only — **not** part of the frozen rule
-- **OI / liquidations:** **not used**
-
-## Status and metrics (Variant A → `RANGE60_BREAKOUT_OB_V1`)
-
-| Metric | Value |
+| Field | Value |
 |---|---|
-| Status | **`PARTIAL_WATCHLIST`** |
-| n | 121 |
-| Signals/day | ~17.3 |
-| Hit075 lift (1h vs control) | **+11.1 pp** |
-| MAE vs control | **ok** (MAE ≤ control; MFE/MAE also better) |
-| Holdout 16–17 Hit075 lift | **+0.2 pp** |
-| Top2 coin share | ~10% |
-| Without Top2 Hit075 lift | **+10.9 pp** |
-| Side | **LONG better than SHORT** |
-| OB vs NO_OB (sibling C) | OB helps lightly (higher lift, slightly rarer; C holdout negative) |
+| **Status** | **`REJECTED_AS_STANDALONE` / `CONTEXT_ONLY`** |
+| **Artifact** | `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_V1_30D_20260719_0817/` |
+| **Window** | 2026-07-19 … 2026-08-17, 51 coins, `ob200_v3` |
+| **n** | 516 |
+| **Signals/day** | ~17.2 |
+| **Hit075 lift** | 60m **+5.44 pp**; 120m **+6.06 pp** (both **&lt; +10 pp**) |
+| **MAE** | **Worse than control** |
+| **Weeks** | **Not stable** (W3 flat/negative on matched lifts) |
 
-### Explicitly **not** frozen from the same hard-test
+**Interpretation:** Alone not sufficient for CONFIRMED. Remains a **context / building block** for Regime V2. **Do not silently edit** this definition.
 
-| Sibling | Why not watchlisted |
-|---|---|
-| B `RANGE120_STRICT` | Negative Hit075 lift / holdout fail |
-| C `RANGE60_NO_OB` | Weaker lift; holdout negative |
-| D `RANGE60_COMPRESSION` | Weaker lift; holdout fail |
-| LLD-near as filter | Near-LLD slice worse than not-near |
+### Frozen definition (unchanged)
 
-## Frozen definition (`RANGE60_BREAKOUT_OB_V1`)
-
-Causal rules; **do not edit in place**.
+Causal rules; **do not edit in place**. Any gate change → new name (`…_V2` / sibling).
 
 Shared:
 
-- Range and features only from data **before** the break minute
-- Signal decision at **hold/confirm minute close** (break + 3 after evaluating 3 follow minutes)
-- **Entry** = next 1m **open** after confirmation
-- Measure **60m and 240m** MFE / MAE / return / hits after entry
-- Cooldown used in source test: **60m** per coin per side (keep on retest)
+- Range and features only from data **before** the break minute  
+- Signal decision at **hold/confirm minute close** (break + 3 follow minutes)  
+- **Entry** = next 1m **open** after confirmation  
+- Cooldown in source tests: **60m** per coin per side  
 
-### Range / consolidation (60m)
+**Range (60m):** prior 60m high/low; width in trailing 24h **p20–p70**; no strong trend; ≥2 spaced touches on breakout edge.
 
-1. `range_high` / `range_low` = max(high) / min(low) over the **prior 60 minutes** (exclusive of break minute)
-2. `range_width` = `(range_high - range_low) / mid`
-3. `range_width` in trailing 24h **p20–p70** for that symbol (causal trailing)
-4. No strong trend in range: `abs(return_window) <= 0.40 * range_width`; close position not stuck at extremes
-5. ≥ **2** touches/rejections on the breakout edge (upper for LONG, lower for SHORT), spaced ≥ **5** minutes; touch tolerance fixed (source: 7.5 bps or 10% of range width)
+**Breakout + flow + OB:** clear break; aligned `delta_3m`/`delta_5m`; TPS ≥ trailing p90; spread ≤ trailing p75; OB not opposed (LONG: OFI≥0 or imb≥med; SHORT mirror); **2/3** holds outside range; confirm directed `ret_1m` ≤ **0.30%**.
 
-### Breakout + flow + OB
+Exact prose of the original freeze remains authoritative for replay; see also inventory §12.
 
-**LONG**
+---
 
-- Break-minute close **above** `range_high` with clear break ≥ **5 bps** or ≥ **10%** of `range_width`
-- `delta_3m > 0` and `delta_5m > 0` (through confirm)
-- Break/hold-zone `trade_count` ≥ trailing 24h **p90**
-- `spread` ≤ trailing 24h **p75**
-- OB not opposed: `OFI_5m >= 0` **or** `imbalance_l50 >=` trailing 24h median
+## B) `RANGE60_BREAKOUT_OB_REGIME_V2`
 
-**SHORT** (mirror)
-
-- Close **below** `range_low` with same clear-break rule
-- `delta_3m < 0` and `delta_5m < 0`
-- Same TPS / spread gates
-- OB not opposed: `OFI_5m <= 0` **or** `imbalance_l50 <=` trailing 24h median
-
-### Hold + entry protection
-
-- At least **2 of 3** follow minutes close **outside** the range (above high / below low)
-- Confirm-minute directed `ret_1m` ≤ **0.30%** (late entries may be flagged for analysis; frozen primary is the on-time gate as in source A)
-
-## Why PARTIAL, not CONFIRMED
-
-1. Holdout Aug16–17 is only **barely** positive (+0.2 pp Hit075 lift) — not robust enough for CONFIRMED.
-2. Primary clean OB sample is still **7 days / 51 coins**; n=121 is usable but small for promotion.
-3. Sibling variants (120m, compression, NO_OB) did **not** confirm the edge — watchlist is specifically the **60m + OB** stack.
-
-Acceptance that **did** pass in-sample for A: ≤20 signals/day, Hit075 lift ≥ +10 pp, MFE > control, MAE ok, not 1–2-coin driven.
-
-## Retest rule
-
-When the OB-V3 **30d import** for `2026-07-19` … `2026-08-17` is complete, retest **exactly** this definition:
-
-- Same name: `RANGE60_BREAKOUT_OB_V1`
-- Same gates / hold / entry / metrics / matched-control contract
-- New artifact folder (do not overwrite 11–17 source)
-- Report full / discovery-holdout split appropriate to the longer window
-- **No** parameter changes on this name
-
-## No-retune rule
-
-| Change | Required action |
+| Field | Value |
 |---|---|
-| Any threshold / window / OB gate / touch / hold edit | **New candidate name** (e.g. `RANGE60_BREAKOUT_OB_V2`) |
-| Add LLD / OI / Liq / compression / 120m | **New name**, not an edit of V1 |
-| Quiet-entry or late-entry filter as hard gate | **New name** |
-| Watchlist → alert | Requires CONFIRMED-level acceptance on longer holdout with **exact** V1 |
+| **Status** | **`CONFIRMED_WATCHLIST`** — **no live trade** |
+| **Best variant** | **C `VOL_PLUS_CONTINUATION`** (= vol regime **A** + continuation **B**) |
+| **Artifact** | `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/` |
+| **Base** | Exact V1 signals + **a-priori regime gates** (not a silent V1 edit) |
+| **Signals/day** | ~**5.8** |
+| **Hit075 lift** | 120m **+10.15 pp**; 60m **+9.7 pp** |
+| **Weeks** | All **4 weeks** positive lift; W3 problem **reduced** |
+| **Side** | **SHORT stronger than LONG** |
+| **MAE** | Absolute MAE **worse** than control; **MFE/MAE ratio better** |
+
+**Gates (research):**  
+- **A** `VOL_REGIME_PRIMARY`: `coin_rv_24h` ≥ cross-sectional universe median at t **and** `range_width` ≥ V1-30d median  
+- **B** `CONTINUATION_REGIME`: directed 1h pre-return in signal direction **and** (BTC 1h aligned **or** BTC RV ≥ trailing median)  
+- **C** = A ∧ B  
+- **D** = V1 baseline (comparison only)
+
+**Interpretation:** Regime-gating matters. Edge appears mainly in suitable vol/continuation conditions. Suitable for **watchlist / research alert**, **not** auto-trade.
+
+---
+
+## C) SHORT-C trade management
+
+| Field | Value |
+|---|---|
+| **Status** | **`WATCHLIST_ONLY`** |
+| **Artifact** | `…/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/short_c_trade_management/` |
+| **Universe** | Regime V2 variant **C**, **SHORT only** |
+| **Exit check** | TP **0.75%** / SL **1.00%** / max **120m**, **SL_FIRST** |
+
+| Metric (TP0.75/SL1.0/max120) | Value |
+|---|---|
+| n | 76 |
+| TP / SL / Timeout | **40 / 19 / 17** |
+| Avg PnL @ **0.11%** RT | **+0.0132%** (thin) |
+| Weeks @ 0.11% | **Not stable** |
+| Higher TP check | **`TP_NOT_THE_MAIN_PROBLEM`** — higher TPs **worse** |
+
+**Interpretation:** Signal often sees movement, but **fees + week instability** block a tradeable claim. No live claim.
+
+---
+
+## D) `SHORT_C_STRONG_PRESSURE_V2`
+
+| Field | Value |
+|---|---|
+| **Status** | **`STRONG_PRESSURE_PARTIAL` / `PAPER_HYPOTHESIS`** |
+| **Artifact** | `…/short_c_strong_pressure_v2/` |
+| **Best real pre-entry** | **A `STRONG_FLOW`** |
+| **A n** | **15** (small) |
+| **A SL share** | **13.3%** (baseline SHORT-C ~25%) |
+| **A wr @ 0.11%** | **73%** |
+| **A avg @ 0.11%** | **+0.191%**; tot/100 ≈ **+2.9** |
+| **Removed vs kept** | Removed **worse** than kept |
+| **Weeks** | 4/4 positive @ 0.11% but **n too small** for confirm |
+| **Variant C** | Numerically better but **`POST_ENTRY_CONFIRMATION`** (no reclaim in first 5m) — **not** a normal entry filter |
+
+**Interpretation:** Stronger breakout pressure helps. **n too small** for CONFIRMED. Paper / watchlist hypothesis only.
+
+---
 
 ## Hard rules
 
-1. Watchlist ≠ live alert.  
-2. Do not commit runners/results as the freeze — this doc + inventory are the freeze record.  
-3. Do not touch OB-30d import / collectors for documentation commits.  
+1. **Do not silently change V1.** Exact replay only under the same name.  
+2. **V2 is a new candidate** (regime gate on top of V1 signals).  
+3. **Any new threshold / gate / horizon edit → new name.**  
+4. **Rejected ≠ delete** — keep as context / lineage.  
+5. **No live-trading claim** from this doc.  
+6. Watchlist / paper ≠ auto-trade.  
+
+## Next steps
+
+1. **Holdout / forward paper** on Regime V2 C and Strong Pressure A (new artifact folders; same names if exact).  
+2. **`COIN_REGIME_SCANNER_V1`** — coin-level regime context (new candidate).  
+3. Do not promote SHORT-C exits to live without fee-aware, multi-week holdout.
 
 ## Changelog
 
 | Date (UTC) | Note |
 |---|---|
-| 2026-08-21 | Initial freeze: `RANGE60_BREAKOUT_OB_V1` from `RANGE_CONSOLIDATION_BREAKOUT_V1` Variant A (`PARTIAL_WATCHLIST`) |
+| 2026-08-21 | Initial freeze: `RANGE60_BREAKOUT_OB_V1` from consolidation Variant A (`PARTIAL_WATCHLIST`) |
+| 2026-08-21 | 30d V1 → `REJECTED_AS_STANDALONE`/`CONTEXT_ONLY`; add Regime V2 `CONFIRMED_WATCHLIST`; SHORT-C TM `WATCHLIST_ONLY`; Strong Pressure `PAPER_HYPOTHESIS` |

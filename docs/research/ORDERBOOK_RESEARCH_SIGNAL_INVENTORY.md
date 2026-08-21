@@ -21,8 +21,11 @@
 | Status | Meaning |
 |---|---|
 | `CONFIRMED` | Passed acceptance including robustness/holdout where required |
+| `CONFIRMED_WATCHLIST` | Passed research acceptance for **watchlist/alert research**; **not** live auto-trade |
 | `PARTIAL` | Interesting in-sample or discovery, but incomplete / fragile |
 | `PARTIAL_WATCHLIST` | Filter/trigger interesting enough to freeze for retest; **not** live-confirm / **not** live-alert |
+| `WATCHLIST_ONLY` | Interesting path/exit research; fees/stability block tradeable claim |
+| `PAPER_HYPOTHESIS` / `STRONG_PRESSURE_PARTIAL` | Small-n or fragile improvement; paper only |
 | `REJECTED_AS_STANDALONE` | Failed as a solo trigger; still usable as context |
 | `CONTEXT_ONLY` | Marks regime/activity/risk, not a directional edge |
 | `REJECTED_FULLY` | Do not reuse even as context without a new thesis |
@@ -44,13 +47,16 @@
 | LONG_RARE_IMB_OFI_DELTA_V1 | 11–17 / 51c | 1h + 4h | `REJECTED_AS_STANDALONE` | OB+OFI+flow confluence |
 | RARE_CONFLUENCE_QUIET_ENTRY_V2 | 11–17 / 51c | 1h + 4h | `PARTIAL` / `CONTEXT_ONLY` | Quiet-entry risk gate (not alert) |
 | TIERA_LONG_ONLY_IN_HIGH_VOL_V1 | 11–17 Tier-A | TRADE / TRADE_NO_BE50 | `PARTIAL_WATCHLIST` | Filter existing Tier-A LONGs; SHORT passthrough |
-| RANGE60_BREAKOUT_OB_V1 | 11–17 / 51c | 1h + 4h | `PARTIAL_WATCHLIST` | Consolidation range → breakout continuation |
+| RANGE60_BREAKOUT_OB_V1 | 11–17 + **30d** / 51c | 1h + 2h | `REJECTED_AS_STANDALONE` / `CONTEXT_ONLY` | 30d standalone fail; building block for Regime V2 |
+| RANGE60_BREAKOUT_OB_REGIME_V2 (C) | 30d / 51c | 1h + 2h | `CONFIRMED_WATCHLIST` | V1 + vol/continuation regime gate; **no live trade** |
+| SHORT-C trade management | 30d Regime-C SHORT | TP/SL path | `WATCHLIST_ONLY` | Fees/weeks block tradeable |
+| SHORT_C_STRONG_PRESSURE_V2 (A) | 30d SHORT-C | TP0.75/SL1.0 | `STRONG_PRESSURE_PARTIAL` / `PAPER_HYPOTHESIS` | Stronger flow/break pressure; n small |
 
 ADAUSDT-only detector / continuation studies (Jul–Aug) are listed under **Related ADAUSDT studies** — not multi-coin production candidates.
 
 Tier-A **filter** candidates (existing `signal_generator` Tier-A signals, not new entries) are detailed in §11 and `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md`.
 
-Range-breakout watchlist: §12 and `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`.
+Range-breakout / regime watchlist: §12–§15 and `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`.
 
 ---
 
@@ -305,27 +311,68 @@ Range-breakout watchlist: §12 and `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIS
 
 | Field | Value |
 |---|---|
-| **Name** | `RANGE60_BREAKOUT_OB_V1` (**frozen watchlist name**) |
-| **Source test** | `RANGE_CONSOLIDATION_BREAKOUT_V1` Variant **A RANGE60_PRIMARY** |
-| **Window** | 2026-08-11 … 2026-08-17, 51 coins, `ob200_v3` — **no OI/Liq** |
-| **Sources** | candles_1m, public_trades_canonical, OB; LLD **context slice only** (not in frozen rule) |
-| **Horizons** | **1h + 4h** after entry |
-| **Definition** | 60m consolidation range (width trailing p20–p70; no strong trend; ≥2 spaced touches on breakout edge) → clear break → aligned `delta_3m`/`delta_5m` → TPS ≥ trailing p90 → spread ≤ trailing p75 → OB not opposed → **2/3** holds outside range → entry = next 1m open after confirm; confirm `ret_1m` directed ≤ 0.30%. Exact text in watchlist doc. |
-| **Not included** | 120m strict, compression-before-break, LLD-near as filter (all weaker / rejected in same hard-test) |
-| **Direction** | LONG and SHORT; **LONG better** in primary window |
-| **Key metrics (BOTH 1h)** | n=**121**; ~**17.3**/day; Hit075 lift **+11.1 pp**; MAE ok; MFE/MAE better; Top2 share ~**10%**; without-Top2 lift **+10.9 pp** |
-| **Holdout 16–17** | Hit075 lift **+0.2 pp** (positive but thin — blocks CONFIRMED) |
-| **Sibling variants** | B RANGE120_STRICT **REJECTED**; C NO_OB weaker (+9.5 pp, holdout negative); D COMPRESSION weaker |
-| **Prior lineage** | Level-break discovery → `BREAKOUT_CONTINUATION_STRICT_V1` (REJECTED on frequency) → consolidation gate |
-| **Verdict** | **`RANGE_CONSOLIDATION_BREAKOUT_V1_PARTIAL`** → freeze as **`PARTIAL_WATCHLIST`** |
-| **Status** | **`PARTIAL_WATCHLIST`** — **no live-alert, no CONFIRMED** |
-| **Why not CONFIRMED** | Holdout barely holds (+0.2 pp); only 7 clean OB days; need identical replay on longer window |
-| **Retest when** | **Exact** same definition on **30d** OB window `2026-07-19` … `2026-08-17` once OB-30d import finishes. Any parameter change → **`RANGE60_BREAKOUT_OB_V2`** (or new name) |
+| **Name** | `RANGE60_BREAKOUT_OB_V1` (**frozen definition — do not silent-edit**) |
+| **Source test (7d)** | `RANGE_CONSOLIDATION_BREAKOUT_V1` Variant **A RANGE60_PRIMARY** |
+| **7d window** | 2026-08-11 … 2026-08-17, 51 coins — then PARTIAL_WATCHLIST freeze |
+| **30d retest** | Exact V1 on `2026-07-19` … `2026-08-17` |
+| **Definition** | Unchanged: 60m consolidation → clear break → aligned delta → TPS/spread/OB gates → 2/3 hold → next open. Exact text in watchlist doc. |
+| **30d metrics** | n=**516**; ~**17.2**/day; Hit075 lift 60m **+5.44 pp**, 120m **+6.06 pp**; **MAE worse than control**; weeks **not stable** |
+| **7d reference (historical)** | n=121; ~17.3/day; Hit075 +11.1 pp; MAE ok; holdout 16–17 only +0.2 pp |
+| **Verdict (30d)** | **`REJECTED_AS_STANDALONE` / `CONTEXT_ONLY`** |
+| **Status** | Building block for Regime V2 — **not** a standalone live/alert candidate |
+| **Rule** | Any parameter change → **new name** (not an in-place V1 edit) |
 
 **Artifacts:**  
-- `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/`  
-- Watchlist doc: `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`  
-- Runner (research, not committed as freeze): `research/frozen_hard_test_RANGE_CONSOLIDATION_BREAKOUT_V1.py`
+- 7d: `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/`  
+- 30d: `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_V1_30D_20260719_0817/`  
+- Watchlist doc: `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md`
+
+---
+
+## 13) `RANGE60_BREAKOUT_OB_REGIME_V2`
+
+| Field | Value |
+|---|---|
+| **Name** | `RANGE60_BREAKOUT_OB_REGIME_V2` (**new candidate** — V1 + a-priori regime gates) |
+| **Best variant** | **C `VOL_PLUS_CONTINUATION`** |
+| **Window** | 2026-07-19 … 2026-08-17, 51 coins |
+| **Base** | Exact V1 30d signals; filter only |
+| **Key metrics (C)** | ~**5.8**/day; Hit075 lift 120m **+10.15 pp**, 60m **+9.7 pp**; all **4 weeks** positive lift; W3 reduced; **SHORT > LONG** |
+| **MAE** | Absolute MAE worse vs control; **MFE/MAE better** |
+| **Verdict** | **`CONFIRMED_WATCHLIST`** |
+| **Status** | Watchlist / research alert — **no live auto-trade** |
+
+**Artifacts:** `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/`
+
+---
+
+## 14) SHORT-C trade management (Regime V2 C SHORT)
+
+| Field | Value |
+|---|---|
+| **Scope** | SHORT signals from Regime V2 variant C only |
+| **Exit checked** | TP **0.75%** / SL **1.00%** / max **120m**, SL_FIRST |
+| **n** | 76 (TP 40 / SL 19 / Timeout 17) |
+| **Avg PnL @ 0.11% RT** | **+0.0132%** (thin); weeks **not stable** |
+| **Higher TP** | `TP_NOT_THE_MAIN_PROBLEM` — higher TPs worse |
+| **Verdict** | **`WATCHLIST_ONLY`** |
+
+**Artifacts:** `…/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/short_c_trade_management/`
+
+---
+
+## 15) `SHORT_C_STRONG_PRESSURE_V2`
+
+| Field | Value |
+|---|---|
+| **Name** | `SHORT_C_STRONG_PRESSURE_V2` |
+| **Best pre-entry** | **A `STRONG_FLOW`** (directed delta + tps_ratio + clear_break ≥ SHORT-C medians) |
+| **A metrics** | n=**15**; SL **13.3%**; wr@0.11 **73%**; avg@0.11 **+0.191%**; tot/100 **+2.9**; removed worse than kept |
+| **Weeks** | 4/4 positive @0.11% but **n too small** |
+| **Variant C** | Better numerically but **`POST_ENTRY_CONFIRMATION`** — not a normal entry filter |
+| **Verdict** | **`STRONG_PRESSURE_PARTIAL` / `PAPER_HYPOTHESIS`** |
+
+**Artifacts:** `…/short_c_strong_pressure_v2/`
 
 ---
 
@@ -351,9 +398,9 @@ Not multi-coin frozen candidates; useful history for detector design.
 | **Volatility** | `vol_ratio_*`, R≥5 episode flag, pre-range 5m/15m; **Tier-A LONG high_vol gate** (`PARTIAL_WATCHLIST`) | Yes as solo alert — OK as Tier-A LONG filter candidate only |
 | **Activity** | `tps_ratio`, `tc_5m`, TPS top1/2% | Yes — unless rarified + OB |
 | **Flow** | `delta_5m`, delta extremes, buy/sell share, exhaustion asymmetry | Yes — TPS3-scale spam |
-| **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok`; **range-breakout “OB not opposed”** (`PARTIAL_WATCHLIST`) | Partial — need confluence + holdout |
-| **Level / LLD** | `lld_dist_*`, near/touch/break; **60m consolidation range + touches** (`RANGE60_BREAKOUT_OB_V1`) | LLD-near alone failed; 120m strict failed |
-| **Risk warning** | High MAE after R≥5 / high TPS; early adverse time-to-MAE; **`|ret_1m|` already large at signal close** (Quiet-Entry V2 lesson) | Use as caution, not entry |
+| **OB** | `imb50_5m` extremes, `ofi_5m` extremes, depth asymmetry, `ob_ok`; range-breakout “OB not opposed”; **Regime V2 vol/continuation gates** (`CONFIRMED_WATCHLIST`) | Partial as solo — need confluence + regime |
+| **Level / LLD** | `lld_dist_*`, near/touch/break; **60m consolidation range + touches** (`RANGE60_BREAKOUT_OB_V1` = context after 30d reject) | LLD-near alone failed; V1 standalone failed 30d |
+| **Risk warning** | High MAE after R≥5 / high TPS; early adverse time-to-MAE; **`|ret_1m|` already large at signal close** (Quiet-Entry V2 lesson); SHORT-C fee fragility | Use as caution, not entry |
 
 ---
 
@@ -362,10 +409,11 @@ Not multi-coin frozen candidates; useful history for detector design.
 1. **More OB days** after 2026-08-20: replay **exact** `SHORT_…_V1` and `LONG_…_V1` (new artifact folder; same names).
 2. Optional: replay **exact Quiet-Entry Variant A** on longer holdout (`RARE_CONFLUENCE_QUIET_ENTRY_V2` unchanged); if gates change → **`…_V3`**.
 3. **Tier-A filter holdout:** replay **exact** `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` Variant A (`vol_ratio_15m >= 1.257911`) on OB days **after 2026-08-20**; report Variant B (`>= 1.0`) in parallel. No threshold edit without `…_V2`.
-4. **Range breakout 30d retest:** replay **exact** `RANGE60_BREAKOUT_OB_V1` on OB window **2026-07-19 … 2026-08-17** when 30d import completes. No threshold edit without `RANGE60_BREAKOUT_OB_V2`.
-5. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
-6. **Horizons:** keep reporting **1h and 4h** for any new freeze; 4h MAE tails matter.
-7. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
+4. **Regime V2 / Strong Pressure holdout:** exact replay of `RANGE60_BREAKOUT_OB_REGIME_V2` C and `SHORT_C_STRONG_PRESSURE_V2` A on forward/holdout windows — **no** threshold edit without new names.
+5. **`COIN_REGIME_SCANNER_V1`:** coin-level regime context (new candidate).
+6. **OI/Liq overlap window** (from ~2026-08-18 16:00Z): new candidates only (`…_OI_V1`), never silently add OI to V1/V2.
+7. **Horizons:** keep reporting **1h and 4h** (or 60m/120m/240m as used) for any new freeze; fee-aware exits where claiming tradeable.
+8. **Combinations:** any merge of rejected/partial legs → **new candidate name** + discovery → frozen hard-test → holdout.
 
 ---
 
@@ -376,8 +424,12 @@ Not multi-coin frozen candidates; useful history for detector design.
 | `docs/research/ORDERBOOK_RESEARCH_SIGNAL_INVENTORY.md` | This inventory |
 | `docs/research/FROZEN_RARE_CONFLUENCE_WATCHLIST.md` | Frozen rare-confluence V1 definitions |
 | `docs/research/FROZEN_TIERA_FILTER_WATCHLIST.md` | Frozen Tier-A filter watchlist (LONG high-vol) |
-| `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md` | Frozen range breakout watchlist (`RANGE60_BREAKOUT_OB_V1`) |
-| `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/` | Source PARTIAL hard-test (Variant A → watchlist) |
+| `docs/research/FROZEN_RANGE_BREAKOUT_WATCHLIST.md` | Range / regime / SHORT-C watchlist record |
+| `results/frozen_hard_tests/RANGE_CONSOLIDATION_BREAKOUT_V1_20260811_17/` | 7d source PARTIAL (Variant A → V1 name) |
+| `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_V1_30D_20260719_0817/` | V1 30d standalone (**REJECTED_AS_STANDALONE**) |
+| `results/frozen_hard_tests/RANGE60_BREAKOUT_OB_REGIME_V2_30D_20260719_0817/` | Regime V2 (**CONFIRMED_WATCHLIST**) |
+| `…/short_c_trade_management/` | SHORT-C TP/SL diagnostics (**WATCHLIST_ONLY**) |
+| `…/short_c_strong_pressure_v2/` | Strong pressure filter (**PAPER_HYPOTHESIS**) |
 | `results/frozen_hard_tests/BREAKOUT_CONTINUATION_STRICT_V1_20260811_17/` | Prior broad breakout strict (REJECTED on frequency) |
 | `results/level_break_reclaim_discovery/20260811_17_51coins/` | Level break/reclaim discovery lineage |
 | `results/frozen_precondition_hard_test/flow_tps3_20260811_17/` | TPS3 A/B reject |
@@ -403,3 +455,4 @@ Not multi-coin frozen candidates; useful history for detector design.
 | 2026-08-20 | Added `RARE_CONFLUENCE_QUIET_ENTRY_V2` (PARTIAL / CONTEXT_ONLY; Variant A best; holdout fail; no alert) |
 | 2026-08-20 | Added `TIERA_LONG_ONLY_IN_HIGH_VOL_V1` (`PARTIAL_WATCHLIST`); new `FROZEN_TIERA_FILTER_WATCHLIST.md` |
 | 2026-08-21 | Added `RANGE60_BREAKOUT_OB_V1` (`PARTIAL_WATCHLIST`); new `FROZEN_RANGE_BREAKOUT_WATCHLIST.md` |
+| 2026-08-21 | 30d V1 → `REJECTED_AS_STANDALONE`/`CONTEXT_ONLY`; Regime V2 `CONFIRMED_WATCHLIST`; SHORT-C TM `WATCHLIST_ONLY`; Strong Pressure `PAPER_HYPOTHESIS` |
