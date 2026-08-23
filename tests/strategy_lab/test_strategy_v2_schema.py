@@ -275,6 +275,45 @@ def test_v2_schema_validation_recursion_and_constraints() -> None:
         )
 
 
+def test_v2_granularity_and_padding_unions_closed() -> None:
+    schema = generate_strategy_spec_v2_schema()
+    defs = schema["$defs"]
+    granularity = defs["DataGranularityV2"]
+    assert "oneOf" in granularity
+    gran_refs = {item["$ref"].split("/")[-1] for item in granularity["oneOf"]}
+    assert gran_refs == {
+        "EventStreamGranularityV2",
+        "SelectedSignalTimeframeGranularityV2",
+        "SnapshotGranularityV2",
+        "TimeframeGranularityV2",
+    }
+    for name in gran_refs:
+        assert defs[name]["properties"]["kind"]["const"] in {
+            "event_stream",
+            "selected_signal_timeframe",
+            "snapshot",
+            "timeframe",
+        }
+    padding = defs["PaddingDurationV2"]
+    pad_refs = {item["$ref"].split("/")[-1] for item in padding["oneOf"]}
+    assert pad_refs == {"DurationValue", "PaddingNotApplicable"}
+
+
+def test_v2_plugin_ref_v2_schema() -> None:
+    schema = generate_strategy_spec_v2_schema()
+    plugin_ref = schema["$defs"]["PluginRefV2"]
+    assert "plugin_id" in plugin_ref["required"]
+    assert "contract_version" in plugin_ref["required"]
+    assert "id" not in plugin_ref["properties"]
+
+
+def test_v2_entry_spec_v2_no_delay_field() -> None:
+    schema = generate_strategy_spec_v2_schema()
+    entry = schema["$defs"]["EntrySpecV2"]
+    assert "minimum_causal_delay_bars" not in entry["properties"]
+    assert "entry_reference_rule" in entry["required"]
+
+
 def test_v1_schema_has_no_v2_root() -> None:
     schema = generate_strategy_spec_schema()
     assert "StrategySpecV2" not in schema.get("$defs", {})

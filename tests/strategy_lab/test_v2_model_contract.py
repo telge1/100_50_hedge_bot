@@ -19,6 +19,9 @@ V2_MODEL_MODULES = (
     "orderbook_analyse.strategy_lab.models.state_machine",
     "orderbook_analyse.strategy_lab.models.signals",
     "orderbook_analyse.strategy_lab.models.strategy_v2",
+    "orderbook_analyse.strategy_lab.models.plugin_ref_v2",
+    "orderbook_analyse.strategy_lab.models.warmup_v2",
+    "orderbook_analyse.strategy_lab.models.contracts_v2",
 )
 
 STRATEGY_LAB_SRC = (
@@ -80,13 +83,18 @@ def test_v2_modules_no_legacy_imports() -> None:
     )
     for mod_name in V2_MODEL_MODULES:
         rel = mod_name.removeprefix("orderbook_analyse.strategy_lab.")
-        path = STRATEGY_LAB_SRC / Path(*rel.split(".")).with_suffix(".py")
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
+        path = STRATEGY_LAB_SRC / Path(*rel.split("."))
+        if path.is_dir():
+            paths = sorted(path.rglob("*.py"))
+        else:
+            paths = [path.with_suffix(".py")]
+        for file_path in paths:
+            tree = ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        for root in forbidden:
+                            assert not alias.name.startswith(root), file_path
+                elif isinstance(node, ast.ImportFrom) and node.module:
                     for root in forbidden:
-                        assert not alias.name.startswith(root), path
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                for root in forbidden:
-                    assert not node.module.startswith(root), path
+                        assert not node.module.startswith(root), file_path

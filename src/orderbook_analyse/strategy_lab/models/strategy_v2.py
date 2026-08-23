@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from orderbook_analyse.strategy_lab.models.contracts_v2.data_requirement import (
+    DataRequirementSpecV2,
+    EntrySpecV2,
+)
 from orderbook_analyse.strategy_lab.models.features import FeatureBindingSpec
 from orderbook_analyse.strategy_lab.models.provenance import ProvenanceSpec
 from orderbook_analyse.strategy_lab.models.signals import SignalDefinition
 from orderbook_analyse.strategy_lab.models.strategy import (
     AnalysisRequirements,
     BaselineSpec,
-    DataRequirement,
-    EntrySpec,
     ExecutionAssumptions,
     ExitSpec,
     FeesSpec,
@@ -23,8 +25,8 @@ from orderbook_analyse.strategy_lab.models.strategy import (
     Timeframes,
     UniverseSpec,
     ValidationRequirements,
-    WarmupSpec,
 )
+from orderbook_analyse.strategy_lab.models.warmup_v2 import WarmupSpecV2
 
 STRATEGY_SPEC_V2_SCHEMA_VERSION = "strategy_spec/v2"
 
@@ -36,11 +38,11 @@ class StrategySpecV2:
     metadata: Metadata
     universe: UniverseSpec
     timeframes: Timeframes
-    data_requirements: tuple[DataRequirement, ...]
-    warmup: WarmupSpec
+    data_requirements: tuple[DataRequirementSpecV2, ...]
+    warmup: WarmupSpecV2
     features: tuple[FeatureBindingSpec, ...]
     signal: SignalDefinition
-    entry: EntrySpec
+    entry: EntrySpecV2
     exit: ExitSpec
     intrabar_policy: IntrabarPolicy
     execution_assumptions: ExecutionAssumptions

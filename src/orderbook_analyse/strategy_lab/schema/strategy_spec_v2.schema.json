@@ -53,6 +53,17 @@
       "title": "AnalysisRequirements",
       "type": "object"
     },
+    "AvailabilityTimingV2": {
+      "enum": [
+        "signal_bar_close",
+        "prior_bar_open",
+        "confirmation_bar_close",
+        "entry_bar_open",
+        "window_edge"
+      ],
+      "title": "AvailabilityTimingV2",
+      "type": "string"
+    },
     "BaselineCell": {
       "additionalProperties": false,
       "properties": {
@@ -364,72 +375,101 @@
       "title": "ContractVersion",
       "type": "object"
     },
-    "DataRequirement": {
+    "DataGranularityV2": {
+      "description": "Closed data granularity union. Each variant includes a const ``kind`` discriminator derived from ``_schema_kind``.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/EventStreamGranularityV2"
+        },
+        {
+          "$ref": "#/$defs/SelectedSignalTimeframeGranularityV2"
+        },
+        {
+          "$ref": "#/$defs/SnapshotGranularityV2"
+        },
+        {
+          "$ref": "#/$defs/TimeframeGranularityV2"
+        }
+      ],
+      "title": "DataGranularityV2"
+    },
+    "DataRequirementRoleV2": {
+      "enum": [
+        "signal_required",
+        "execution_required",
+        "confirmation_required",
+        "analysis_optional",
+        "validation_optional"
+      ],
+      "title": "DataRequirementRoleV2",
+      "type": "string"
+    },
+    "DataRequirementSpecV2": {
       "additionalProperties": false,
       "properties": {
-        "group": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "availability": {
+          "$ref": "#/$defs/AvailabilityTimingV2"
         },
-        "id": {
+        "granularity": {
+          "$ref": "#/$defs/DataGranularityV2"
+        },
+        "provenance": {
+          "items": {
+            "$ref": "#/$defs/LegacyProvenanceRefV2"
+          },
+          "type": "array"
+        },
+        "rationale": {
           "type": "string"
         },
-        "notes": {
+        "required": {
+          "type": "boolean"
+        },
+        "required_for_policy": {
           "oneOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/ResearchConfirmationPolicyV2"
             },
             {
               "type": "null"
             }
           ]
         },
-        "source": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "requirement_id": {
+          "$ref": "#/$defs/StableIdentifier"
         },
-        "status": {
-          "$ref": "#/$defs/DataRequirementStatus"
+        "role": {
+          "$ref": "#/$defs/DataRequirementRoleV2"
         },
-        "timeframe": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/TimeframeValue"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "source_kind": {
+          "$ref": "#/$defs/DataSourceKindV2"
         }
       },
       "required": [
-        "id",
-        "status"
+        "availability",
+        "granularity",
+        "provenance",
+        "rationale",
+        "required",
+        "required_for_policy",
+        "requirement_id",
+        "role",
+        "source_kind"
       ],
-      "title": "DataRequirement",
+      "title": "DataRequirementSpecV2",
       "type": "object"
     },
-    "DataRequirementStatus": {
+    "DataSourceKindV2": {
       "enum": [
-        "required",
-        "optional",
-        "required_for_group",
-        "unavailable",
-        "not_applicable"
+        "candles_signal_tf",
+        "candles_execution_1m",
+        "public_trades_1m",
+        "orderbook_ob200_v3_1m",
+        "open_interest_1m",
+        "liquidations",
+        "liquidity_locations"
       ],
-      "title": "DataRequirementStatus",
+      "title": "DataSourceKindV2",
       "type": "string"
     },
     "DecimalParam": {
@@ -505,12 +545,24 @@
       "title": "DurationValue",
       "type": "object"
     },
-    "EntrySpec": {
+    "EntryPriceReferenceV2": {
+      "enum": [
+        "next_signal_tf_open"
+      ],
+      "title": "EntryPriceReferenceV2",
+      "type": "string"
+    },
+    "EntryReferenceRuleV2": {
+      "enum": [
+        "signal_tf_next_open_after_signal_bar",
+        "next_bar_open_after_confirmation_bar"
+      ],
+      "title": "EntryReferenceRuleV2",
+      "type": "string"
+    },
+    "EntrySpecV2": {
       "additionalProperties": false,
       "properties": {
-        "decision_point": {
-          "type": "string"
-        },
         "description": {
           "oneOf": [
             {
@@ -521,24 +573,44 @@
             }
           ]
         },
-        "plugin": {
+        "entry_plugin": {
           "$ref": "#/$defs/PluginRef"
         },
-        "rule_id": {
-          "type": "string"
+        "entry_price_reference": {
+          "$ref": "#/$defs/EntryPriceReferenceV2"
         },
-        "tradable_point": {
-          "type": "string"
+        "entry_reference_rule": {
+          "$ref": "#/$defs/EntryReferenceRuleV2"
+        },
+        "entry_timing_anchor": {
+          "$ref": "#/$defs/EntryTimingAnchorV2"
+        },
+        "execution_timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
+        },
+        "signal_decision_timing": {
+          "$ref": "#/$defs/AvailabilityTimingV2"
         }
       },
       "required": [
-        "decision_point",
-        "plugin",
-        "rule_id",
-        "tradable_point"
+        "description",
+        "entry_plugin",
+        "entry_price_reference",
+        "entry_reference_rule",
+        "entry_timing_anchor",
+        "execution_timeframe",
+        "signal_decision_timing"
       ],
-      "title": "EntrySpec",
+      "title": "EntrySpecV2",
       "type": "object"
+    },
+    "EntryTimingAnchorV2": {
+      "enum": [
+        "signal_bar_close",
+        "confirmation_bar_close"
+      ],
+      "title": "EntryTimingAnchorV2",
+      "type": "string"
     },
     "EvaluationTiming": {
       "enum": [
@@ -546,6 +618,24 @@
       ],
       "title": "EvaluationTiming",
       "type": "string"
+    },
+    "EventStreamGranularityV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "event_stream",
+          "type": "string"
+        },
+        "native_event_stream": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "native_event_stream"
+      ],
+      "title": "EventStreamGranularityV2",
+      "type": "object"
     },
     "ExecutionAssumptions": {
       "additionalProperties": false,
@@ -593,7 +683,7 @@
         "horizon": {
           "oneOf": [
             {
-              "$ref": "#/$defs/DurationValue"
+              "$ref": "#/$defs/PaddingDurationV2"
             },
             {
               "type": "null"
@@ -846,6 +936,45 @@
       "title": "InvalidationSpec",
       "type": "object"
     },
+    "LegacyProvenanceRefV2": {
+      "additionalProperties": false,
+      "properties": {
+        "module": {
+          "type": "string"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "symbol": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "module",
+        "notes",
+        "path",
+        "symbol"
+      ],
+      "title": "LegacyProvenanceRefV2",
+      "type": "object"
+    },
     "LiteralOperand": {
       "additionalProperties": false,
       "properties": {
@@ -970,6 +1099,49 @@
       ],
       "title": "Operand"
     },
+    "OutcomeEvaluationPaddingV2": {
+      "additionalProperties": false,
+      "properties": {
+        "post_window_duration": {
+          "$ref": "#/$defs/PaddingDurationV2"
+        }
+      },
+      "required": [
+        "post_window_duration"
+      ],
+      "title": "OutcomeEvaluationPaddingV2",
+      "type": "object"
+    },
+    "PaddingDurationV2": {
+      "description": "Duration padding or explicit not-applicable marker.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DurationValue"
+        },
+        {
+          "$ref": "#/$defs/PaddingNotApplicable"
+        }
+      ],
+      "title": "PaddingDurationV2"
+    },
+    "PaddingNotApplicable": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "not_applicable",
+          "type": "string"
+        },
+        "not_applicable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "not_applicable"
+      ],
+      "title": "PaddingNotApplicable",
+      "type": "object"
+    },
     "ParamValue": {
       "description": "Closed ParamValue union. Each variant object includes a const ``kind`` discriminator derived from ``_schema_kind``.",
       "oneOf": [
@@ -1057,6 +1229,30 @@
       "title": "PluginRef",
       "type": "object"
     },
+    "PluginRefV2": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "items": {
+            "$ref": "#/$defs/ConfigEntry"
+          },
+          "type": "array"
+        },
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/StableIdentifier"
+        }
+      },
+      "required": [
+        "config",
+        "contract_version",
+        "plugin_id"
+      ],
+      "title": "PluginRefV2",
+      "type": "object"
+    },
     "PluginSignalSpec": {
       "additionalProperties": false,
       "properties": {
@@ -1066,7 +1262,7 @@
         "confirmation_policy": {
           "oneOf": [
             {
-              "$ref": "#/$defs/IdentifierParam"
+              "$ref": "#/$defs/ResearchConfirmationPolicyV2"
             },
             {
               "type": "null"
@@ -1094,7 +1290,7 @@
           ]
         },
         "plugin": {
-          "$ref": "#/$defs/PluginRef"
+          "$ref": "#/$defs/PluginRefV2"
         },
         "rules_embedded_in_yaml": {
           "const": false,
@@ -1259,6 +1455,13 @@
       "title": "RateValue",
       "type": "object"
     },
+    "ResearchConfirmationPolicyV2": {
+      "enum": [
+        "core_research_supportive"
+      ],
+      "title": "ResearchConfirmationPolicyV2",
+      "type": "string"
+    },
     "ResearchParameterSpace": {
       "additionalProperties": false,
       "properties": {
@@ -1391,6 +1594,24 @@
       "title": "SameBarPriority",
       "type": "string"
     },
+    "SelectedSignalTimeframeGranularityV2": {
+      "additionalProperties": false,
+      "properties": {
+        "binds_to_selected_signal_timeframe": {
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "selected_signal_timeframe",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binds_to_selected_signal_timeframe",
+        "kind"
+      ],
+      "title": "SelectedSignalTimeframeGranularityV2",
+      "type": "object"
+    },
     "SetupSpec": {
       "additionalProperties": false,
       "properties": {
@@ -1508,6 +1729,58 @@
       "title": "SignalEmissionSpec",
       "type": "object"
     },
+    "SignalEngineWarmupV2": {
+      "additionalProperties": false,
+      "properties": {
+        "bar_timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
+        },
+        "minimum_bars": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bar_timeframe",
+        "minimum_bars"
+      ],
+      "title": "SignalEngineWarmupV2",
+      "type": "object"
+    },
+    "SnapshotGranularityV2": {
+      "additionalProperties": false,
+      "properties": {
+        "aligned_timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
+        },
+        "kind": {
+          "const": "snapshot",
+          "type": "string"
+        }
+      },
+      "required": [
+        "aligned_timeframe",
+        "kind"
+      ],
+      "title": "SnapshotGranularityV2",
+      "type": "object"
+    },
+    "SourceLoadingPaddingV2": {
+      "additionalProperties": false,
+      "properties": {
+        "auxiliary_source_history": {
+          "$ref": "#/$defs/PaddingDurationV2"
+        },
+        "candle_history": {
+          "$ref": "#/$defs/PaddingDurationV2"
+        }
+      },
+      "required": [
+        "auxiliary_source_history",
+        "candle_history"
+      ],
+      "title": "SourceLoadingPaddingV2",
+      "type": "object"
+    },
     "StableIdentifier": {
       "additionalProperties": false,
       "properties": {
@@ -1620,12 +1893,12 @@
         },
         "data_requirements": {
           "items": {
-            "$ref": "#/$defs/DataRequirement"
+            "$ref": "#/$defs/DataRequirementSpecV2"
           },
           "type": "array"
         },
         "entry": {
-          "$ref": "#/$defs/EntrySpec"
+          "$ref": "#/$defs/EntrySpecV2"
         },
         "execution_assumptions": {
           "$ref": "#/$defs/ExecutionAssumptions"
@@ -1676,7 +1949,7 @@
           "$ref": "#/$defs/ValidationRequirements"
         },
         "warmup": {
-          "$ref": "#/$defs/WarmupSpec"
+          "$ref": "#/$defs/WarmupSpecV2"
         }
       },
       "required": [
@@ -1720,6 +1993,24 @@
         "value"
       ],
       "title": "StringParam",
+      "type": "object"
+    },
+    "TimeframeGranularityV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "timeframe",
+          "type": "string"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
+        }
+      },
+      "required": [
+        "kind",
+        "timeframe"
+      ],
+      "title": "TimeframeGranularityV2",
       "type": "object"
     },
     "TimeframeParam": {
@@ -1994,33 +2285,25 @@
       "title": "ValidationRequirements",
       "type": "object"
     },
-    "WarmupSpec": {
+    "WarmupSpecV2": {
       "additionalProperties": false,
       "properties": {
-        "ema_slow_bars": {
-          "type": "integer"
+        "outcome_evaluation": {
+          "$ref": "#/$defs/OutcomeEvaluationPaddingV2"
         },
-        "extra_bars": {
-          "type": "integer"
+        "signal_engine": {
+          "$ref": "#/$defs/SignalEngineWarmupV2"
         },
-        "outcome_pad_hours": {
-          "type": "integer"
-        },
-        "pad_days": {
-          "type": "integer"
-        },
-        "source_pad_hours": {
-          "type": "integer"
+        "source_loading": {
+          "$ref": "#/$defs/SourceLoadingPaddingV2"
         }
       },
       "required": [
-        "ema_slow_bars",
-        "extra_bars",
-        "outcome_pad_hours",
-        "pad_days",
-        "source_pad_hours"
+        "outcome_evaluation",
+        "signal_engine",
+        "source_loading"
       ],
-      "title": "WarmupSpec",
+      "title": "WarmupSpecV2",
       "type": "object"
     }
   },

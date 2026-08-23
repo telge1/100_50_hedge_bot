@@ -289,6 +289,14 @@ def _json_literal(value: object) -> object | None:
 # StrategySpec V2 schema generation (V1 functions above remain unchanged)
 # ---------------------------------------------------------------------------
 
+from orderbook_analyse.strategy_lab.models.contracts_v2.granularity import (
+    DataGranularityV2,
+    _DATA_GRANULARITY_V2_TYPES,
+)
+from orderbook_analyse.strategy_lab.models.contracts_v2.padding import (
+    PaddingDurationV2,
+    _PADDING_DURATION_V2_TYPES,
+)
 from orderbook_analyse.strategy_lab.models.rules import (  # noqa: E402
     BooleanAndExpression,
     BooleanExpression,
@@ -339,6 +347,39 @@ _STABLE_ID_PATTERN = r"^[a-z][a-z0-9_]*$"
 _CONTRACT_VERSION_PATTERN = r"^[a-z][a-z0-9_]+/v[0-9]+$"
 
 
+def _ensure_data_granularity_v2_def(defs: dict[str, dict[str, object]]) -> None:
+    if "DataGranularityV2" in defs:
+        return
+    variants: list[dict[str, object]] = []
+    for cls in sorted(_DATA_GRANULARITY_V2_TYPES, key=lambda c: c.__name__):
+        _ensure_dataclass_def_v2(cls, defs, path=f"DataGranularityV2.{cls.__name__}")
+        variants.append({"$ref": _ref_name(cls.__name__)})
+    defs["DataGranularityV2"] = {
+        "title": "DataGranularityV2",
+        "oneOf": variants,
+        "description": (
+            "Closed data granularity union. Each variant includes a const "
+            "``kind`` discriminator derived from ``_schema_kind``."
+        ),
+    }
+
+
+def _ensure_padding_duration_v2_def(defs: dict[str, dict[str, object]]) -> None:
+    if "PaddingDurationV2" in defs:
+        return
+    variants: list[dict[str, object]] = []
+    for cls in sorted(_PADDING_DURATION_V2_TYPES, key=lambda c: c.__name__):
+        _ensure_dataclass_def_v2(cls, defs, path=f"PaddingDurationV2.{cls.__name__}")
+        variants.append({"$ref": _ref_name(cls.__name__)})
+    defs["PaddingDurationV2"] = {
+        "title": "PaddingDurationV2",
+        "oneOf": variants,
+        "description": (
+            "Duration padding or explicit not-applicable marker."
+        ),
+    }
+
+
 def generate_strategy_spec_v2_schema() -> dict[str, object]:
     """Build a deterministic JSON Schema document for StrategySpec V2."""
     defs: dict[str, dict[str, object]] = {}
@@ -347,6 +388,8 @@ def generate_strategy_spec_v2_schema() -> dict[str, object]:
     _ensure_operand_def(defs)
     _ensure_boolean_expression_def(defs)
     _ensure_signal_definition_def(defs)
+    _ensure_data_granularity_v2_def(defs)
+    _ensure_padding_duration_v2_def(defs)
     _apply_v2_schema_patches(defs)
 
     ordered_defs = {name: defs[name] for name in sorted(defs)}
@@ -526,6 +569,12 @@ def _schema_for_v2_annotation(
     if annotation is ParamValue:
         _ensure_param_value_def_v2(defs)
         return {"$ref": _ref_name("ParamValue")}
+    if annotation is DataGranularityV2:
+        _ensure_data_granularity_v2_def(defs)
+        return {"$ref": _ref_name("DataGranularityV2")}
+    if annotation is PaddingDurationV2:
+        _ensure_padding_duration_v2_def(defs)
+        return {"$ref": _ref_name("PaddingDurationV2")}
     if annotation is Operand:
         _ensure_operand_def(defs)
         return {"$ref": _ref_name("Operand")}
@@ -544,6 +593,18 @@ def _schema_for_v2_annotation(
         non_none = [a for a in union_args if a is not type(None)]
         has_none = len(non_none) != len(union_args)
         non_none_set = set(non_none)
+        if non_none_set and non_none_set <= set(_DATA_GRANULARITY_V2_TYPES):
+            _ensure_data_granularity_v2_def(defs)
+            inner_gran: dict[str, object] = {"$ref": _ref_name("DataGranularityV2")}
+            if has_none:
+                return {"oneOf": [inner_gran, {"type": "null"}]}
+            return inner_gran
+        if non_none_set and non_none_set <= set(_PADDING_DURATION_V2_TYPES):
+            _ensure_padding_duration_v2_def(defs)
+            inner_pad: dict[str, object] = {"$ref": _ref_name("PaddingDurationV2")}
+            if has_none:
+                return {"oneOf": [inner_pad, {"type": "null"}]}
+            return inner_pad
         if non_none_set and non_none_set <= set(_BOOLEAN_EXPRESSION_TYPES):
             _ensure_boolean_expression_def(defs)
             inner: dict[str, object] = {"$ref": _ref_name("BooleanExpression")}

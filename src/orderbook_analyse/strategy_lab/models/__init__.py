@@ -60,6 +60,25 @@ from orderbook_analyse.strategy_lab.models.state_machine import (
     TimeoutTransitionSpec,
     TransitionSpec,
 )
+from orderbook_analyse.strategy_lab.models.contracts_v2 import (
+    AvailabilityTimingV2,
+    DataRequirementRoleV2,
+    DataRequirementSpecV2,
+    DataSourceKindV2,
+    EntryPriceReferenceV2,
+    EntryReferenceRuleV2,
+    EntrySpecV2,
+    EntryTimingAnchorV2,
+    EventStreamGranularityV2,
+    OutcomeEvaluationPaddingV2,
+    PaddingNotApplicable,
+    SelectedSignalTimeframeGranularityV2,
+    SignalEngineWarmupV2,
+    SourceLoadingPaddingV2,
+    TimeframeGranularityV2,
+)
+from orderbook_analyse.strategy_lab.models.plugin_ref_v2 import PluginRefV2
+from orderbook_analyse.strategy_lab.models.warmup_v2 import WarmupSpecV2
 from orderbook_analyse.strategy_lab.models.strategy import (
     STRATEGY_SPEC_SCHEMA_VERSION,
     AnalysisRequirements,
@@ -198,4 +217,21 @@ __all__ = [
     "UniverseSpec",
     "ValidationRequirements",
     "WarmupSpec",
+    "AvailabilityTimingV2",
+    "DataRequirementRoleV2",
+    "DataRequirementSpecV2",
+    "DataSourceKindV2",
+    "EntryPriceReferenceV2",
+    "EntryReferenceRuleV2",
+    "EntrySpecV2",
+    "EntryTimingAnchorV2",
+    "EventStreamGranularityV2",
+    "OutcomeEvaluationPaddingV2",
+    "PaddingNotApplicable",
+    "SelectedSignalTimeframeGranularityV2",
+    "PluginRefV2",
+    "SignalEngineWarmupV2",
+    "SourceLoadingPaddingV2",
+    "TimeframeGranularityV2",
+    "WarmupSpecV2",
 ]

@@ -7,19 +7,23 @@ from decimal import Decimal
 from orderbook_analyse.strategy_lab.models import (
     STRATEGY_SPEC_V2_SCHEMA_VERSION,
     AnalysisRequirements,
+    AvailabilityTimingV2,
     BaselineCell,
     BaselineSpec,
-    BoolParam,
     CausalityStatus,
     ComparisonExpression,
     ConfirmationSpec,
     ContractVersion,
-    DataRequirement,
-    DataRequirementStatus,
+    DataRequirementRoleV2,
+    DataRequirementSpecV2,
+    DataSourceKindV2,
     Directionality,
     DurationUnit,
     DurationValue,
-    EntrySpec,
+    EntryPriceReferenceV2,
+    EntryReferenceRuleV2,
+    EntrySpecV2,
+    EntryTimingAnchorV2,
     EvaluationTiming,
     ExecutionAssumptions,
     ExitMode,
@@ -36,14 +40,15 @@ from orderbook_analyse.strategy_lab.models import (
     Metadata,
     ModelingStatus,
     ModelingStatusBlock,
+    OutcomeEvaluationPaddingV2,
     PluginKind,
     PluginProvenanceRef,
     PluginRef,
+    PluginRefV2,
     PluginSignalSpec,
     PortfolioAssumptions,
     ProvenanceSpec,
     RateUnit,
-    RateValue,
     ResearchParameterSpace,
     ResetEvent,
     ResetRule,
@@ -53,12 +58,13 @@ from orderbook_analyse.strategy_lab.models import (
     SideName,
     SideRuleBundle,
     SignalEmissionSpec,
+    SignalEngineWarmupV2,
+    SourceLoadingPaddingV2,
     StableIdentifier,
     StateMachineSignalSpec,
     StateSpec,
     StrategySpecV2,
-    TimeframeUnit,
-    TimeframeValue,
+    TimeframeGranularityV2,
     Timeframes,
     TransitionConflictPolicy,
     TransitionExecutionPolicy,
@@ -67,13 +73,72 @@ from orderbook_analyse.strategy_lab.models import (
     TriggerSpec,
     UniverseSpec,
     ValidationRequirements,
-    WarmupSpec,
+    WarmupSpecV2,
 )
-from tests.strategy_lab.conftest import _dur, _plugin, _rate, _tf
+from tests.strategy_lab.conftest import _dur, _rate, _tf
 
 
 def sid(name: str) -> StableIdentifier:
     return StableIdentifier(value=name)
+
+
+def _plugin_v2(
+    pid: str = "edc_m0_strict_sync",
+    *,
+    contract_version: str = "catalog/v2",
+) -> PluginRefV2:
+    return PluginRefV2(
+        plugin_id=sid(pid),
+        contract_version=ContractVersion(value=contract_version),
+        config=(),
+    )
+
+
+def _entry_v2() -> EntrySpecV2:
+    return EntrySpecV2(
+        signal_decision_timing=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+        entry_reference_rule=EntryReferenceRuleV2.SIGNAL_TF_NEXT_OPEN_AFTER_SIGNAL_BAR,
+        entry_timing_anchor=EntryTimingAnchorV2.SIGNAL_BAR_CLOSE,
+        entry_price_reference=EntryPriceReferenceV2.NEXT_SIGNAL_TF_OPEN,
+        execution_timeframe=_tf(1),
+        entry_plugin=PluginRef(
+            id="entry.next_open",
+            version="1.0.0",
+            kind=PluginKind.ENTRY,
+        ),
+        description="Next signal-TF open after signal bar close.",
+    )
+
+
+def _warmup_v2() -> WarmupSpecV2:
+    return WarmupSpecV2(
+        signal_engine=SignalEngineWarmupV2(minimum_bars=79, bar_timeframe=_tf(5)),
+        source_loading=SourceLoadingPaddingV2(
+            candle_history=DurationValue(value=Decimal("120"), unit=DurationUnit.HOURS),
+            auxiliary_source_history=DurationValue(
+                value=Decimal("2"), unit=DurationUnit.HOURS
+            ),
+        ),
+        outcome_evaluation=OutcomeEvaluationPaddingV2(
+            post_window_duration=DurationValue(
+                value=Decimal("12"), unit=DurationUnit.HOURS
+            ),
+        ),
+    )
+
+
+def _data_requirement_v2() -> DataRequirementSpecV2:
+    return DataRequirementSpecV2(
+        requirement_id=sid("edc_candles_signal_tf"),
+        source_kind=DataSourceKindV2.CANDLES_SIGNAL_TF,
+        role=DataRequirementRoleV2.SIGNAL_REQUIRED,
+        required=True,
+        granularity=TimeframeGranularityV2(timeframe=_tf(5)),
+        availability=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+        rationale="Signal-TF candles for unit-test fixture.",
+        required_for_policy=None,
+        provenance=(),
+    )
 
 
 def _comparison(
@@ -113,21 +178,8 @@ def _v2_base_kwargs() -> dict[str, object]:
         ),
         "universe": UniverseSpec(role="fixed", symbols=("XRPUSDT",)),
         "timeframes": Timeframes(signal=_tf(5), execution=_tf(1)),
-        "data_requirements": (
-            DataRequirement(
-                id="klines_1m",
-                status=DataRequirementStatus.REQUIRED,
-                source="clickhouse",
-                timeframe=_tf(1),
-            ),
-        ),
-        "warmup": WarmupSpec(
-            ema_slow_bars=200,
-            extra_bars=50,
-            pad_days=1,
-            outcome_pad_hours=8,
-            source_pad_hours=2,
-        ),
+        "data_requirements": (_data_requirement_v2(),),
+        "warmup": _warmup_v2(),
         "features": (
             FeatureBindingSpec(
                 alias=sid("ema_fast"),
@@ -141,12 +193,7 @@ def _v2_base_kwargs() -> dict[str, object]:
                 ),
             ),
         ),
-        "entry": EntrySpec(
-            decision_point="signal_bar_close",
-            tradable_point="next_execution_bar_open",
-            rule_id="entry.next_open",
-            plugin=_plugin("entry.next_open", PluginKind.ENTRY),
-        ),
+        "entry": _entry_v2(),
         "exit": ExitSpec(
             mode=ExitMode.PARAMETRIC,
             take_profit=_rate("0.75", RateUnit.PERCENT),
@@ -199,7 +246,7 @@ def _v2_base_kwargs() -> dict[str, object]:
 
 def plugin_signal_v2(**overrides: object) -> PluginSignalSpec:
     base: dict[str, object] = {
-        "plugin": _plugin("signal.edc", PluginKind.SIGNAL),
+        "plugin": _plugin_v2(),
         "mode_id": sid("mode_a"),
         "directionality": Directionality.BOTH,
         "rules_embedded_in_yaml": False,

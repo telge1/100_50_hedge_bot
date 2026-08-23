@@ -20,11 +20,13 @@ from orderbook_analyse.strategy_lab.models.state_machine import (
     TimeoutTransitionSpec,
     TransitionSpec,
 )
+from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
+    ResearchConfirmationPolicyV2,
+)
+from orderbook_analyse.strategy_lab.models.plugin_ref_v2 import PluginRefV2
 from orderbook_analyse.strategy_lab.models.strategy import (
     ConfirmationSpec,
-    IdentifierParam,
     InvalidationSpec,
-    PluginRef,
     SetupSpec,
     TriggerSpec,
 )
@@ -33,11 +35,11 @@ from orderbook_analyse.strategy_lab.models.strategy import (
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PluginSignalSpec:
     _schema_kind: ClassVar[str] = "plugin"
-    plugin: PluginRef
+    plugin: PluginRefV2
     mode_id: StableIdentifier | None
     directionality: Directionality
     rules_embedded_in_yaml: bool
-    confirmation_policy: IdentifierParam | None
+    confirmation_policy: ResearchConfirmationPolicyV2 | None
     setup: SetupSpec
     trigger: TriggerSpec
     confirmation: ConfirmationSpec
