@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import ClassVar
 
 from orderbook_analyse.strategy_lab.models.enums import (
     CausalityStatus,
@@ -77,6 +78,9 @@ class TimeframeValue:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class StringParam:
+    """Free-form string parameter. ``_schema_kind`` discriminates ParamValue."""
+
+    _schema_kind: ClassVar[str] = "string"
     value: str
 
     def __post_init__(self) -> None:
@@ -86,6 +90,7 @@ class StringParam:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BoolParam:
+    _schema_kind: ClassVar[str] = "boolean"
     value: bool
 
     def __post_init__(self) -> None:
@@ -95,6 +100,7 @@ class BoolParam:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class IntParam:
+    _schema_kind: ClassVar[str] = "integer"
     value: int
 
     def __post_init__(self) -> None:
@@ -107,6 +113,7 @@ class IntParam:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DecimalParam:
+    _schema_kind: ClassVar[str] = "decimal"
     value: Decimal
 
     def __post_init__(self) -> None:
@@ -118,16 +125,19 @@ class DecimalParam:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RateParam:
+    _schema_kind: ClassVar[str] = "rate"
     value: RateValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DurationParam:
+    _schema_kind: ClassVar[str] = "duration"
     value: DurationValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TimeframeParam:
+    _schema_kind: ClassVar[str] = "timeframe"
     value: TimeframeValue
 
 
@@ -135,6 +145,7 @@ class TimeframeParam:
 class IdentifierParam:
     """Enum / reference identifier (semantically distinct from free-form string)."""
 
+    _schema_kind: ClassVar[str] = "identifier"
     value: str
 
     def __post_init__(self) -> None:

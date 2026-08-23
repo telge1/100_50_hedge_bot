@@ -8,3 +8,4 @@ zstandard
 pandas
 pyarrow
 pytest
+PyYAML>=6.0,<7.0

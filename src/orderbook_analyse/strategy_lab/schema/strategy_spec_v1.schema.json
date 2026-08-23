@@ -1,0 +1,1469 @@
+{
+  "$defs": {
+    "AnalysisRequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "forbidden_leakage_features": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "min_symbols": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_trades": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required_label_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "required_label_fields"
+      ],
+      "title": "AnalysisRequirements",
+      "type": "object"
+    },
+    "BaselineCell": {
+      "additionalProperties": false,
+      "properties": {
+        "cell_id": {
+          "type": "string"
+        },
+        "cost": {
+          "$ref": "#/$defs/RateValue"
+        },
+        "group": {
+          "type": "string"
+        },
+        "horizon": {
+          "$ref": "#/$defs/DurationValue"
+        },
+        "mode_id": {
+          "type": "string"
+        },
+        "stop_loss": {
+          "$ref": "#/$defs/RateValue"
+        },
+        "take_profit": {
+          "$ref": "#/$defs/RateValue"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
+        }
+      },
+      "required": [
+        "cell_id",
+        "cost",
+        "group",
+        "horizon",
+        "mode_id",
+        "stop_loss",
+        "take_profit",
+        "timeframe"
+      ],
+      "title": "BaselineCell",
+      "type": "object"
+    },
+    "BaselineSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/$defs/BaselineCell"
+        },
+        "is_reference": {
+          "type": "boolean"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cell",
+        "is_reference"
+      ],
+      "title": "BaselineSpec",
+      "type": "object"
+    },
+    "BoolParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "boolean",
+          "type": "string"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "BoolParam",
+      "type": "object"
+    },
+    "CausalityStatus": {
+      "enum": [
+        "causal_proven",
+        "causal_reusable_when_dependency_available",
+        "causality_unproven",
+        "not_applicable"
+      ],
+      "title": "CausalityStatus",
+      "type": "string"
+    },
+    "ConfigEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ParamValue"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "ConfigEntry",
+      "type": "object"
+    },
+    "ConfirmationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "gates_policy_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gates_policy_version": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plugin": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PluginRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rules_embedded_in_yaml": {
+          "default": false,
+          "type": "boolean"
+        },
+        "status": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ModelingStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "ConfirmationSpec",
+      "type": "object"
+    },
+    "DataRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/DataRequirementStatus"
+        },
+        "timeframe": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TimeframeValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "title": "DataRequirement",
+      "type": "object"
+    },
+    "DataRequirementStatus": {
+      "enum": [
+        "required",
+        "optional",
+        "required_for_group",
+        "unavailable",
+        "not_applicable"
+      ],
+      "title": "DataRequirementStatus",
+      "type": "string"
+    },
+    "DecimalParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "decimal",
+          "type": "string"
+        },
+        "value": {
+          "description": "Decimal authoring value. Schema type is number; the YAML loader preserves numeric scalars as decimal.Decimal (never float).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "DecimalParam",
+      "type": "object"
+    },
+    "Directionality": {
+      "enum": [
+        "long",
+        "short",
+        "both"
+      ],
+      "title": "Directionality",
+      "type": "string"
+    },
+    "DurationParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "duration",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/DurationValue"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "DurationParam",
+      "type": "object"
+    },
+    "DurationUnit": {
+      "enum": [
+        "minutes",
+        "hours",
+        "bars"
+      ],
+      "title": "DurationUnit",
+      "type": "string"
+    },
+    "DurationValue": {
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/DurationUnit"
+        },
+        "value": {
+          "description": "Decimal authoring value. Schema type is number; the YAML loader preserves numeric scalars as decimal.Decimal (never float).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "unit",
+        "value"
+      ],
+      "title": "DurationValue",
+      "type": "object"
+    },
+    "EntrySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_point": {
+          "type": "string"
+        },
+        "description": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plugin": {
+          "$ref": "#/$defs/PluginRef"
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "tradable_point": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision_point",
+        "plugin",
+        "rule_id",
+        "tradable_point"
+      ],
+      "title": "EntrySpec",
+      "type": "object"
+    },
+    "ExecutionAssumptions": {
+      "additionalProperties": false,
+      "properties": {
+        "fill_model": {
+          "type": "string"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notional": {
+          "description": "Decimal authoring value. Schema type is number; the YAML loader preserves numeric scalars as decimal.Decimal (never float).",
+          "type": "number"
+        },
+        "notional_currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fill_model",
+        "notional",
+        "notional_currency"
+      ],
+      "title": "ExecutionAssumptions",
+      "type": "object"
+    },
+    "ExitMode": {
+      "enum": [
+        "parametric",
+        "plugin"
+      ],
+      "title": "ExitMode",
+      "type": "string"
+    },
+    "ExitSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "horizon": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DurationValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incomplete_outcome_reason": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/ExitMode"
+        },
+        "plugin": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PluginRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "require_full_horizon": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "same_bar_priority": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SameBarPriority"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stop_loss": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RateValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "take_profit": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RateValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "ExitSpec",
+      "type": "object"
+    },
+    "FeatureRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "title": "FeatureRef",
+      "type": "object"
+    },
+    "FeesSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "roundtrip_cost": {
+          "$ref": "#/$defs/RateValue"
+        }
+      },
+      "required": [
+        "roundtrip_cost"
+      ],
+      "title": "FeesSpec",
+      "type": "object"
+    },
+    "IdentifierParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "identifier",
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "IdentifierParam",
+      "type": "object"
+    },
+    "IntParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "integer",
+          "type": "string"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "IntParam",
+      "type": "object"
+    },
+    "IntrabarPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "same_bar_priority": {
+          "$ref": "#/$defs/SameBarPriority"
+        }
+      },
+      "required": [
+        "same_bar_priority"
+      ],
+      "title": "IntrabarPolicy",
+      "type": "object"
+    },
+    "InvalidationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "plugin": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PluginRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rules_embedded_in_yaml": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "InvalidationSpec",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "family": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "status": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strategy_id": {
+          "type": "string"
+        },
+        "strategy_version": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "family",
+        "schema_version",
+        "strategy_id",
+        "strategy_version",
+        "title",
+        "variant"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "MirrorMode": {
+      "enum": [
+        "none",
+        "full_mirror",
+        "sign_flip"
+      ],
+      "title": "MirrorMode",
+      "type": "string"
+    },
+    "ModelingStatus": {
+      "enum": [
+        "modeled",
+        "not_modeled",
+        "not_applicable",
+        "unavailable"
+      ],
+      "title": "ModelingStatus",
+      "type": "string"
+    },
+    "ModelingStatusBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ConfigEntry"
+          },
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/ModelingStatus"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ModelingStatusBlock",
+      "type": "object"
+    },
+    "ParamValue": {
+      "description": "Closed ParamValue union. Each variant object includes a const ``kind`` discriminator derived from ``_schema_kind``.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BoolParam"
+        },
+        {
+          "$ref": "#/$defs/DecimalParam"
+        },
+        {
+          "$ref": "#/$defs/DurationParam"
+        },
+        {
+          "$ref": "#/$defs/IdentifierParam"
+        },
+        {
+          "$ref": "#/$defs/IntParam"
+        },
+        {
+          "$ref": "#/$defs/RateParam"
+        },
+        {
+          "$ref": "#/$defs/StringParam"
+        },
+        {
+          "$ref": "#/$defs/TimeframeParam"
+        }
+      ],
+      "title": "ParamValue"
+    },
+    "PluginKind": {
+      "enum": [
+        "signal",
+        "gate",
+        "entry",
+        "exit",
+        "feature",
+        "other"
+      ],
+      "title": "PluginKind",
+      "type": "string"
+    },
+    "PluginProvenanceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "plugin_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "version"
+      ],
+      "title": "PluginProvenanceRef",
+      "type": "object"
+    },
+    "PluginRef": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ConfigEntry"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/PluginKind"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "version"
+      ],
+      "title": "PluginRef",
+      "type": "object"
+    },
+    "PortfolioAssumptions": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_mode": {
+          "type": "string"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "one_trade_per_candidate": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "evaluation_mode",
+        "one_trade_per_candidate"
+      ],
+      "title": "PortfolioAssumptions",
+      "type": "object"
+    },
+    "ProvenanceSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "causality_claim": {
+          "type": "string"
+        },
+        "causality_status": {
+          "$ref": "#/$defs/CausalityStatus"
+        },
+        "external_runtime_dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "git_commit": {
+          "type": "string"
+        },
+        "known_limitations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "plugin_refs": {
+          "items": {
+            "$ref": "#/$defs/PluginProvenanceRef"
+          },
+          "type": "array"
+        },
+        "policy_ref": {
+          "type": "string"
+        },
+        "source_of_truth_module": {
+          "type": "string"
+        },
+        "source_of_truth_path": {
+          "type": "string"
+        },
+        "strategy_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "causality_claim",
+        "causality_status",
+        "external_runtime_dependencies",
+        "git_commit",
+        "known_limitations",
+        "plugin_refs",
+        "policy_ref",
+        "source_of_truth_module",
+        "source_of_truth_path",
+        "strategy_ref"
+      ],
+      "title": "ProvenanceSpec",
+      "type": "object"
+    },
+    "RateParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rate",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/RateValue"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "RateParam",
+      "type": "object"
+    },
+    "RateUnit": {
+      "enum": [
+        "percent",
+        "fraction",
+        "basis_points"
+      ],
+      "title": "RateUnit",
+      "type": "string"
+    },
+    "RateValue": {
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/RateUnit"
+        },
+        "value": {
+          "description": "Decimal authoring value. Schema type is number; the YAML loader preserves numeric scalars as decimal.Decimal (never float).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "unit",
+        "value"
+      ],
+      "title": "RateValue",
+      "type": "object"
+    },
+    "ResearchParameterSpace": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/BaselineCell"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cells"
+      ],
+      "title": "ResearchParameterSpace",
+      "type": "object"
+    },
+    "SameBarPriority": {
+      "enum": [
+        "sl_first",
+        "tp_first"
+      ],
+      "title": "SameBarPriority",
+      "type": "string"
+    },
+    "SetupSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "decision_at",
+        "description"
+      ],
+      "title": "SetupSpec",
+      "type": "object"
+    },
+    "SideName": {
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "SideName",
+      "type": "string"
+    },
+    "SideSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "mirror_mode": {
+          "$ref": "#/$defs/MirrorMode"
+        },
+        "mirror_of": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SideName"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/SideName"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sign_flip_fields": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mirror_mode",
+        "name"
+      ],
+      "title": "SideSpec",
+      "type": "object"
+    },
+    "SignalSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "directionality": {
+          "$ref": "#/$defs/Directionality",
+          "default": "both"
+        },
+        "mode_id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plugin": {
+          "$ref": "#/$defs/PluginRef"
+        },
+        "rules_embedded_in_yaml": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "plugin"
+      ],
+      "title": "SignalSpec",
+      "type": "object"
+    },
+    "StrategySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "analysis_requirements": {
+          "$ref": "#/$defs/AnalysisRequirements"
+        },
+        "baseline": {
+          "$ref": "#/$defs/BaselineSpec"
+        },
+        "confirmation": {
+          "$ref": "#/$defs/ConfirmationSpec"
+        },
+        "data_requirements": {
+          "items": {
+            "$ref": "#/$defs/DataRequirement"
+          },
+          "type": "array"
+        },
+        "entry": {
+          "$ref": "#/$defs/EntrySpec"
+        },
+        "execution_assumptions": {
+          "$ref": "#/$defs/ExecutionAssumptions"
+        },
+        "exit": {
+          "$ref": "#/$defs/ExitSpec"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeatureRef"
+          },
+          "type": "array"
+        },
+        "fees": {
+          "$ref": "#/$defs/FeesSpec"
+        },
+        "funding": {
+          "$ref": "#/$defs/ModelingStatusBlock"
+        },
+        "intrabar_policy": {
+          "$ref": "#/$defs/IntrabarPolicy"
+        },
+        "invalidation": {
+          "$ref": "#/$defs/InvalidationSpec"
+        },
+        "long": {
+          "$ref": "#/$defs/SideSpec"
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "portfolio_assumptions": {
+          "$ref": "#/$defs/PortfolioAssumptions"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ProvenanceSpec"
+        },
+        "research_parameter_space": {
+          "$ref": "#/$defs/ResearchParameterSpace"
+        },
+        "setup": {
+          "$ref": "#/$defs/SetupSpec"
+        },
+        "short": {
+          "$ref": "#/$defs/SideSpec"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalSpec"
+        },
+        "slippage": {
+          "$ref": "#/$defs/ModelingStatusBlock"
+        },
+        "timeframes": {
+          "$ref": "#/$defs/Timeframes"
+        },
+        "trigger": {
+          "$ref": "#/$defs/TriggerSpec"
+        },
+        "universe": {
+          "$ref": "#/$defs/UniverseSpec"
+        },
+        "validation_requirements": {
+          "$ref": "#/$defs/ValidationRequirements"
+        },
+        "warmup": {
+          "$ref": "#/$defs/WarmupSpec"
+        }
+      },
+      "required": [
+        "analysis_requirements",
+        "baseline",
+        "confirmation",
+        "data_requirements",
+        "entry",
+        "execution_assumptions",
+        "exit",
+        "features",
+        "fees",
+        "funding",
+        "intrabar_policy",
+        "invalidation",
+        "long",
+        "metadata",
+        "portfolio_assumptions",
+        "provenance",
+        "research_parameter_space",
+        "setup",
+        "short",
+        "signal",
+        "slippage",
+        "timeframes",
+        "trigger",
+        "universe",
+        "validation_requirements",
+        "warmup"
+      ],
+      "title": "StrategySpec",
+      "type": "object"
+    },
+    "StringParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "string",
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "StringParam",
+      "type": "object"
+    },
+    "TimeframeParam": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "timeframe",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/TimeframeValue"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "TimeframeParam",
+      "type": "object"
+    },
+    "TimeframeUnit": {
+      "enum": [
+        "minutes"
+      ],
+      "title": "TimeframeUnit",
+      "type": "string"
+    },
+    "TimeframeValue": {
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/TimeframeUnit"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "unit",
+        "value"
+      ],
+      "title": "TimeframeValue",
+      "type": "object"
+    },
+    "Timeframes": {
+      "additionalProperties": false,
+      "properties": {
+        "execution": {
+          "$ref": "#/$defs/TimeframeValue"
+        },
+        "signal": {
+          "$ref": "#/$defs/TimeframeValue"
+        }
+      },
+      "required": [
+        "execution",
+        "signal"
+      ],
+      "title": "Timeframes",
+      "type": "object"
+    },
+    "TriggerSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "plugin": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PluginRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plugin_ref": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "TriggerSpec",
+      "type": "object"
+    },
+    "UniverseSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "exclude_symbols": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ref": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "type": "string"
+        },
+        "symbols": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "UniverseSpec",
+      "type": "object"
+    },
+    "ValidationRequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_causality_statuses": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CausalityStatus"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "require_causality_audit": {
+          "type": "boolean"
+        },
+        "require_strategy_parity_check": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "require_causality_audit",
+        "require_strategy_parity_check"
+      ],
+      "title": "ValidationRequirements",
+      "type": "object"
+    },
+    "WarmupSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "ema_slow_bars": {
+          "type": "integer"
+        },
+        "extra_bars": {
+          "type": "integer"
+        },
+        "outcome_pad_hours": {
+          "type": "integer"
+        },
+        "pad_days": {
+          "type": "integer"
+        },
+        "source_pad_hours": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ema_slow_bars",
+        "extra_bars",
+        "outcome_pad_hours",
+        "pad_days",
+        "source_pad_hours"
+      ],
+      "title": "WarmupSpec",
+      "type": "object"
+    }
+  },
+  "$id": "https://orderbook-analyse.local/strategy_lab/strategy_spec_v1.schema.json",
+  "$ref": "#/$defs/StrategySpec",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "title": "StrategySpec V1",
+  "type": "object",
+  "x-decimal-authoring": "number_in_schema__decimal_in_loader",
+  "x-strategy-spec-schema-version": "strategy_spec/v1"
+}
