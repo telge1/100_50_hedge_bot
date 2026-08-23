@@ -87,3 +87,46 @@ class ExitMode(str, Enum):
 
     PARAMETRIC = "parametric"
     PLUGIN = "plugin"
+
+
+class SignalKind(str, Enum):
+    PLUGIN = "plugin"
+    RULE_BASED = "rule_based"
+    STATE_MACHINE = "state_machine"
+
+
+class ExprKind(str, Enum):
+    COMPARISON = "comparison"
+    BOOLEAN_AND = "boolean_and"
+    BOOLEAN_OR = "boolean_or"
+    BOOLEAN_NOT = "boolean_not"
+    COMPONENT_REF = "component_ref"
+
+
+class OperandKind(str, Enum):
+    FEATURE_OUTPUT = "feature_output"
+    LITERAL = "literal"
+
+
+class EvaluationTiming(str, Enum):
+    SIGNAL_BAR_CLOSE = "signal_bar_close"
+
+
+class TransitionPurpose(str, Enum):
+    NORMAL = "normal"
+    INVALIDATION = "invalidation"
+
+
+class TransitionExecutionPolicy(str, Enum):
+    ONE_PER_EVALUATION_BAR = "one_per_evaluation_bar"
+
+
+class TransitionConflictPolicy(str, Enum):
+    ERROR_ON_MULTIPLE = "error_on_multiple"
+    PRIORITY_WINS = "priority_wins"
+
+
+class ResetEvent(str, Enum):
+    SIGNAL_EMITTED = "signal_emitted"
+    INVALIDATED = "invalidated"
+    TIMEOUT = "timeout"

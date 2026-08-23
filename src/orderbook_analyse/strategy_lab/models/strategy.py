@@ -480,3 +480,6 @@ class StrategySpec:
             raise ValueError("long.name must be SideName.LONG")
         if self.short.name is not SideName.SHORT:
             raise ValueError("short.name must be SideName.SHORT")
+
+
+StrategySpecV1 = StrategySpec
