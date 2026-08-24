@@ -42,6 +42,12 @@ class FeatureResolutionIndex:
     def has_alias(self, alias: StableIdentifier) -> bool:
         return alias.value in self._aliases
 
+    def get_binding_and_feature(
+        self,
+        alias: StableIdentifier,
+    ) -> tuple[FeatureBindingSpec, FeatureDescriptorV2] | None:
+        return self._aliases.get(alias.value)
+
     def resolve_output(
         self,
         alias: StableIdentifier,

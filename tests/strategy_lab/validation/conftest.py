@@ -185,3 +185,192 @@ def valid_state_machine_long_strategy():
         signal=state_machine_signal_v2(),
         features=edc_features(),
     )
+
+
+def _p4c_root_overrides(*, plugin_id: str, signal_minutes: int = 5):
+    """Build StrategySpecV2 root overrides that satisfy P4C for production plugins."""
+    import dataclasses
+    from orderbook_analyse.strategy_lab.catalogs.v2.registry import PLUGIN_CATALOG_V2
+    from orderbook_analyse.strategy_lab.models import (
+        CausalityStatus,
+        PluginProvenanceRefV2,
+        ProvenanceSpecV2,
+        ResearchParameterSpaceV2,
+        ValidationRequirements,
+        WarmupSpecV2,
+        SignalEngineWarmupV2,
+        ContractVersion,
+    )
+    from orderbook_analyse.strategy_lab.models.contracts_v2.padding import (
+        PaddingNotApplicable,
+        SourceLoadingPaddingV2,
+        OutcomeEvaluationPaddingV2,
+    )
+    from tests.strategy_lab.conftest import _tf
+
+    plugin = PLUGIN_CATALOG_V2.get(plugin_id)
+    source = plugin.source_loading_padding
+    outcome = plugin.outcome_evaluation_padding
+    if source is None:
+        source_loading = SourceLoadingPaddingV2(
+            candle_history=PaddingNotApplicable(not_applicable=True),
+            auxiliary_source_history=PaddingNotApplicable(not_applicable=True),
+        )
+    else:
+        source_loading = source
+    if outcome is None:
+        outcome_evaluation = OutcomeEvaluationPaddingV2(
+            post_window_duration=PaddingNotApplicable(not_applicable=True),
+        )
+    else:
+        outcome_evaluation = outcome
+
+    return {
+        "data_requirements": plugin.data_requirements,
+        "warmup": WarmupSpecV2(
+            signal_engine=SignalEngineWarmupV2(
+                minimum_bars=max(plugin.signal_warmup.minimum_bars, 79),
+                bar_timeframe=_tf(signal_minutes),
+            ),
+            source_loading=source_loading,
+            outcome_evaluation=outcome_evaluation,
+        ),
+        "timeframes": dataclasses.replace(
+            minimal_strategy_spec_v2().timeframes,
+            signal=_tf(signal_minutes),
+        ),
+        "research_parameter_space": ResearchParameterSpaceV2(dimensions=()),
+        "validation_requirements": ValidationRequirements(
+            require_causality_audit=True,
+            require_strategy_parity_check=True,
+            allowed_causality_statuses=(),
+        ),
+        "provenance": ProvenanceSpecV2(
+            git_commit="0000000000000000000000000000000000000000",
+            source_repository="orderbook_analyse",
+            source_paths=("tests/strategy_lab/",),
+            catalog_contract_version=ContractVersion(value="catalog/v2"),
+            plugin_refs=(
+                PluginProvenanceRefV2(
+                    plugin_id=sid(plugin_id),
+                    contract_version=ContractVersion(value="catalog/v2"),
+                ),
+            ),
+            causality_status=plugin.causality_status,
+        ),
+    }
+
+
+def p4c_valid_edc_strategy():
+    import dataclasses
+    from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
+        AvailabilityTimingV2,
+        EntryReferenceRuleV2,
+    )
+
+    base = valid_edc_strategy()
+    overrides = _p4c_root_overrides(plugin_id="edc_m0_strict_sync", signal_minutes=5)
+    return dataclasses.replace(
+        base,
+        **overrides,
+        entry=dataclasses.replace(
+            base.entry,
+            signal_decision_timing=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            entry_reference_rule=EntryReferenceRuleV2.SIGNAL_TF_NEXT_OPEN_AFTER_SIGNAL_BAR,
+        ),
+    )
+
+
+def p4c_valid_cluster_strategy(*, signal_minutes: int = 15):
+    import dataclasses
+    from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
+        AvailabilityTimingV2,
+        EntryReferenceRuleV2,
+    )
+
+    base = valid_cluster_strategy()
+    overrides = _p4c_root_overrides(
+        plugin_id="cluster_sweep",
+        signal_minutes=signal_minutes,
+    )
+    return dataclasses.replace(
+        base,
+        **overrides,
+        entry=dataclasses.replace(
+            base.entry,
+            signal_decision_timing=AvailabilityTimingV2.CONFIRMATION_BAR_CLOSE,
+            entry_reference_rule=EntryReferenceRuleV2.NEXT_BAR_OPEN_AFTER_CONFIRMATION_BAR,
+        ),
+    )
+
+
+def p4c_valid_rule_based_long_strategy():
+    import dataclasses
+    from orderbook_analyse.strategy_lab.models import (
+        ProvenanceSpecV2,
+        ResearchParameterSpaceV2,
+        ValidationRequirements,
+        WarmupSpecV2,
+        SignalEngineWarmupV2,
+        ContractVersion,
+        CausalityStatus,
+    )
+    from orderbook_analyse.strategy_lab.catalogs.v2.registry import FEATURE_CATALOG_V2
+    from orderbook_analyse.strategy_lab.models.contracts_v2.padding import (
+        SourceLoadingPaddingV2,
+        OutcomeEvaluationPaddingV2,
+        PaddingNotApplicable,
+    )
+    from tests.strategy_lab.conftest import _tf, _dur
+    from orderbook_analyse.strategy_lab.models.enums import DurationUnit
+    from decimal import Decimal
+    from orderbook_analyse.strategy_lab.models.strategy import DurationValue
+
+    base = valid_rule_based_long_strategy()
+    reqs = []
+    for binding in base.features:
+        feature = FEATURE_CATALOG_V2.get(binding.catalog_feature_id.value)
+        reqs.extend(feature.data_requirements)
+    # Deduplicate by requirement_id while keeping first
+    seen = set()
+    unique = []
+    for req in reqs:
+        if req.requirement_id.value in seen:
+            continue
+        seen.add(req.requirement_id.value)
+        unique.append(req)
+    return dataclasses.replace(
+        base,
+        data_requirements=tuple(unique),
+        warmup=WarmupSpecV2(
+            signal_engine=SignalEngineWarmupV2(
+                minimum_bars=20,
+                bar_timeframe=_tf(5),
+            ),
+            source_loading=SourceLoadingPaddingV2(
+                candle_history=DurationValue(value=Decimal("120"), unit=DurationUnit.HOURS),
+                auxiliary_source_history=DurationValue(
+                    value=Decimal("2"), unit=DurationUnit.HOURS
+                ),
+            ),
+            outcome_evaluation=OutcomeEvaluationPaddingV2(
+                post_window_duration=DurationValue(
+                    value=Decimal("12"), unit=DurationUnit.HOURS
+                ),
+            ),
+        ),
+        research_parameter_space=ResearchParameterSpaceV2(dimensions=()),
+        validation_requirements=ValidationRequirements(
+            require_causality_audit=True,
+            require_strategy_parity_check=True,
+            allowed_causality_statuses=(),
+        ),
+        provenance=ProvenanceSpecV2(
+            git_commit="0000000000000000000000000000000000000000",
+            source_repository="orderbook_analyse",
+            source_paths=("tests/strategy_lab/",),
+            catalog_contract_version=ContractVersion(value="catalog/v2"),
+            plugin_refs=(),
+            causality_status=CausalityStatus.CAUSALITY_UNPROVEN,
+        ),
+    )

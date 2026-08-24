@@ -86,7 +86,7 @@ def validate_parameter_bindings(
             continue
 
         issues.extend(
-            _validate_parameter_value(
+            validate_parameter_value(
                 path=value_path,
                 definition=definition,
                 value=value,
@@ -126,13 +126,14 @@ def validate_plugin_config_bindings(
     )
 
 
-def _validate_parameter_value(
+def validate_parameter_value(
     *,
     path: str,
     definition: ParameterDefinitionV2,
     value: ParamValue,
     code_prefix: str,
 ) -> tuple[ValidationIssue, ...]:
+    """Validate one ParamValue against a closed ParameterDefinitionV2."""
     issues: list[ValidationIssue] = []
     try:
         actual_type = param_value_to_parameter_type(value)
@@ -285,6 +286,40 @@ def _validate_parameter_value(
         )
 
     return tuple(issues)
+
+
+def remap_parameter_issues_to_research(
+    issues: tuple[ValidationIssue, ...],
+) -> tuple[ValidationIssue, ...]:
+    """Map FEATURE_/PLUGIN_ parameter issues onto research candidate codes."""
+    remapped: list[ValidationIssue] = []
+    saw_type = False
+    for issue in issues:
+        name = issue.code.name
+        if name.endswith("PARAMETER_TYPE"):
+            saw_type = True
+            remapped.append(
+                ValidationIssue(
+                    code=ValidationIssueCode.RESEARCH_CANDIDATE_TYPE,
+                    severity=issue.severity,
+                    path=issue.path,
+                    message=issue.message,
+                    context=issue.context,
+                )
+            )
+        elif name.endswith(("PARAMETER_BOUNDS", "RATE_UNIT", "IDENTIFIER_VALUE")):
+            if saw_type:
+                continue
+            remapped.append(
+                ValidationIssue(
+                    code=ValidationIssueCode.RESEARCH_CANDIDATE_CONSTRAINT,
+                    severity=issue.severity,
+                    path=issue.path,
+                    message=issue.message,
+                    context=issue.context,
+                )
+            )
+    return tuple(remapped)
 
 
 def _code(prefix: str, suffix: str) -> ValidationIssueCode:

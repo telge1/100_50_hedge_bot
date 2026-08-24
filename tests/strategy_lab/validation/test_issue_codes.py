@@ -73,7 +73,23 @@ from tests.strategy_lab.validation.conftest import (
 P4A_ISSUE_CODES: frozenset[ValidationIssueCode] = frozenset(
     code
     for code in ValidationIssueCode
-    if not code.name.startswith(("COMPONENT_", "RULE_", "SM_"))
+    if not code.name.startswith(
+        (
+            "COMPONENT_",
+            "RULE_",
+            "SM_",
+            "DATA_",
+            "TIMEFRAME_",
+            "WARMUP_",
+            "ENTRY_",
+            "EXIT_",
+            "COST_",
+            "EXECUTION_",
+            "PORTFOLIO_",
+            "RESEARCH_",
+            "PROVENANCE_",
+        )
+    )
 )
 
 
