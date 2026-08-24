@@ -175,13 +175,25 @@ features:
   catalog_feature_id:
     value: ema
 - alias:
-    value: ema_slow
+    value: ema_medium
   bindings:
   - name:
       value: period
     value:
       kind: integer
       value: 20
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_slow
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 59
   catalog_contract_version:
     value: catalog/v2
   catalog_feature_id:

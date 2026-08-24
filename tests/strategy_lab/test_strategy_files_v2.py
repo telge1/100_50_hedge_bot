@@ -169,7 +169,7 @@ def test_strategy_value_change_changes_hash(catalogs) -> None:
 
 
 def test_edc_feature_contract_matches_plugin_required_features(catalogs) -> None:
-    """Freeze the current catalog contract: ema_fast=9, ema_slow=20, atr=14 only."""
+    """Freeze lossless EDC M0 contract: ema_fast=9, ema_medium=20, ema_slow=59, atr=14."""
     from orderbook_analyse.strategy_lab.catalogs.v2.registry import PLUGIN_CATALOG_V2
 
     plugin = PLUGIN_CATALOG_V2.get("edc_m0_strict_sync")
@@ -183,11 +183,11 @@ def test_edc_feature_contract_matches_plugin_required_features(catalogs) -> None
     }
     assert required == {
         "ema_fast": ("ema", "period", 9),
-        "ema_slow": ("ema", "period", 20),
+        "ema_medium": ("ema", "period", 20),
+        "ema_slow": ("ema", "period", 59),
         "atr": ("atr_wilder", "period", 14),
     }
-    assert "ema_medium" not in required
-    assert all(period != 59 for _, _, period in required.values())
+    assert plugin.signal_warmup.minimum_bars == 79
 
     edc = load_strategy_v2_yaml_file(EDC_YAML)
     require_valid_strategy_v2_p4c(edc, catalogs)
@@ -202,9 +202,40 @@ def test_edc_feature_contract_matches_plugin_required_features(catalogs) -> None
     assert bound == required
     assert [f.alias.value for f in edc.features] == [
         "ema_fast",
+        "ema_medium",
         "ema_slow",
         "atr",
     ]
+    assert edc.warmup.signal_engine.minimum_bars == 79
+
+
+def test_edc_missing_required_ema_alias_rejected(catalogs) -> None:
+    """Existing P4A plugin checks reject EDC YAML missing ema_medium or ema_slow."""
+    from orderbook_analyse.strategy_lab.decoder_v2 import decode_strategy_v2
+    from orderbook_analyse.strategy_lab.validation import validate_strategy_v2_p4a
+    from orderbook_analyse.strategy_lab.validation.models import ValidationIssueCode
+
+    raw = copy.deepcopy(load_strategy_yaml(EDC_YAML))
+    raw["features"] = [
+        f for f in raw["features"] if f["alias"]["value"] != "ema_medium"
+    ]
+    report = validate_strategy_v2_p4a(decode_strategy_v2(raw), catalogs)
+    assert not report.is_valid
+    assert any(
+        issue.code is ValidationIssueCode.PLUGIN_REQUIRED_FEATURE_MISSING
+        for issue in report.issues
+    )
+
+    raw2 = copy.deepcopy(load_strategy_yaml(EDC_YAML))
+    raw2["features"] = [
+        f for f in raw2["features"] if f["alias"]["value"] != "ema_slow"
+    ]
+    report2 = validate_strategy_v2_p4a(decode_strategy_v2(raw2), catalogs)
+    assert not report2.is_valid
+    assert any(
+        issue.code is ValidationIssueCode.PLUGIN_REQUIRED_FEATURE_MISSING
+        for issue in report2.issues
+    )
 
 
 def test_edc_baseline_and_research_values(catalogs) -> None:

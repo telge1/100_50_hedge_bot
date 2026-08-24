@@ -57,15 +57,14 @@ Runtime decoder/validator/compiler **do not** open that file.
 ## EDC baseline
 
 - Signal TF 5m, execution TF 1m
-- Features (frozen `edc_m0_strict_sync` catalog contract in `catalogs/v2/plugins.py`):
+- Features (frozen lossless `edc_m0_strict_sync` catalog contract):
   - `ema_fast` → `ema` period **9**
-  - `ema_slow` → `ema` period **20**
+  - `ema_medium` → `ema` period **20**
+  - `ema_slow` → `ema` period **59**
   - `atr` → `atr_wilder` period **14**
-  - **no** `ema_medium`, **no** period **59** in the plugin `required_features`
-- Note: legacy research `EmaDualCrossConfig` still defaults to 9/20/59 and warmup
-  `59+20=79`, and catalog warmup reuses 79 bars — but the Phase-1 V2 plugin feature
-  contract intentionally binds only the dual-cross pair as `ema_fast=9` /
-  `ema_slow=20` plus ATR. EMA 9/20/59 belongs to **cluster_sweep**, not EDC V2.
+- Legacy M0 (`ema_candidate.detect_cross_events`) evaluates EMA9 and EMA20
+  **against EMA59**; the V2 plugin/YAML bindings mirror that exactly.
+- Warm-up **79** bars = `ema_slow(59) + 20`, consistent with the EMA59 dependency.
 - Decision: signal bar close → next signal-TF bar open @ bar open
 - Notional 1000 USDT
 - TP 0.75%, SL 0.50%, horizon 8h
@@ -76,6 +75,8 @@ Runtime decoder/validator/compiler **do not** open that file.
 - Research candidates: TP 0.40/0.50/0.60/0.75; SL 0.50/1.00; horizon 4/6/8h;
   roundtrip 0.11/0.15/0.20 (0.11 is baseline; 0.15/0.20 stress)
 - Root values are the baseline (no separate baseline object)
+
+See also: [`version_rules.md`](version_rules.md).
 
 ## Cluster baseline
 

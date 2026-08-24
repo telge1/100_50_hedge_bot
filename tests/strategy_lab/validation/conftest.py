@@ -88,7 +88,8 @@ def cluster_binding() -> FeatureBindingSpec:
 def edc_features() -> tuple[FeatureBindingSpec, ...]:
     return (
         ema_binding("ema_fast", 9),
-        ema_binding("ema_slow", 20),
+        ema_binding("ema_medium", 20),
+        ema_binding("ema_slow", 59),
         atr_binding(),
     )
 
@@ -344,7 +345,7 @@ def p4c_valid_rule_based_long_strategy():
         data_requirements=tuple(unique),
         warmup=WarmupSpecV2(
             signal_engine=SignalEngineWarmupV2(
-                minimum_bars=20,
+                minimum_bars=79,
                 bar_timeframe=_tf(5),
             ),
             source_loading=SourceLoadingPaddingV2(

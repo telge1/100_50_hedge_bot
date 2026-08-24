@@ -117,12 +117,22 @@ EDC_M0_STRICT_SYNC = PluginDescriptorV2(
             ),
         ),
         BoundFeatureRequirementV2(
-            alias=_SID(value="ema_slow"),
+            alias=_SID(value="ema_medium"),
             feature_id=_SID(value="ema"),
             bindings=(
                 BoundParameterBindingV2(
                     name=_SID(value="period"),
                     value=IntParam(value=20),
+                ),
+            ),
+        ),
+        BoundFeatureRequirementV2(
+            alias=_SID(value="ema_slow"),
+            feature_id=_SID(value="ema"),
+            bindings=(
+                BoundParameterBindingV2(
+                    name=_SID(value="period"),
+                    value=IntParam(value=59),
                 ),
             ),
         ),

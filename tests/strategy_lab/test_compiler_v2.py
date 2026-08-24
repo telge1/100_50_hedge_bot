@@ -88,7 +88,7 @@ def _p4c_valid_state_machine_strategy():
         base,
         data_requirements=tuple(reqs),
         warmup=WarmupSpecV2(
-            signal_engine=SignalEngineWarmupV2(minimum_bars=20, bar_timeframe=_tf(5)),
+            signal_engine=SignalEngineWarmupV2(minimum_bars=79, bar_timeframe=_tf(5)),
             source_loading=SourceLoadingPaddingV2(
                 candle_history=DurationValue(
                     value=Decimal("120"), unit=DurationUnit.HOURS
