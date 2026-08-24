@@ -9,6 +9,8 @@ from orderbook_analyse.strategy_lab.catalogs.v2.models import (
 from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     AvailabilityTimingV2,
     CollectionShape,
+    DataRequirementRoleV2,
+    DataRequirementSpecV2,
     DataSourceKindV2,
     FeatureOutputDescriptorV2,
     FeatureOutputValueType,
@@ -19,12 +21,35 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     MissingValuePolicyV2,
     ParameterDefinitionV2,
     ParameterValueType,
+    SelectedSignalTimeframeGranularityV2,
     TemporalShape,
 )
 from orderbook_analyse.strategy_lab.models.enums import RateUnit
 from orderbook_analyse.strategy_lab.models.identifiers import ContractVersion, StableIdentifier
 
 _SID = StableIdentifier
+
+
+def _selected_signal_tf_requirement(
+    requirement_id: str,
+    source_kind: DataSourceKindV2,
+    availability: AvailabilityTimingV2,
+    rationale: str,
+    provenance: tuple[LegacyProvenanceRefV2, ...],
+) -> DataRequirementSpecV2:
+    return DataRequirementSpecV2(
+        requirement_id=_SID(value=requirement_id),
+        source_kind=source_kind,
+        role=DataRequirementRoleV2.SIGNAL_REQUIRED,
+        required=True,
+        granularity=SelectedSignalTimeframeGranularityV2(
+            binds_to_selected_signal_timeframe=True
+        ),
+        availability=availability,
+        rationale=rationale,
+        required_for_policy=None,
+        provenance=provenance,
+    )
 
 _VALUE_OUTPUT = FeatureOutputDescriptorV2(
     output_id=_SID(value="value"),
@@ -90,7 +115,22 @@ EMA = FeatureDescriptorV2(
             baseline_defining=False,
         ),
     ),
-    data_requirements=(DataSourceKindV2.CANDLES_SIGNAL_TF.value,),
+    data_requirements=(
+        _selected_signal_tf_requirement(
+            "ema_signal_tf_candles",
+            DataSourceKindV2.CANDLES_SIGNAL_TF,
+            AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            "EMA consumes signal-timeframe candles aligned to the selected strategy signal TF.",
+            (
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.cluster_sweep_research.ema_features",
+                    path="src/orderbook_analyse/cluster_sweep_research/ema_features.py",
+                    symbol="attach_emas",
+                    notes="Shared by EDC and cluster sweep via attach_emas().",
+                ),
+            ),
+        ),
+    ),
     provenance=(
         LegacyProvenanceRefV2(
             module="orderbook_analyse.cluster_sweep_research.ema_features",
@@ -125,7 +165,28 @@ ATR_WILDER = FeatureDescriptorV2(
             baseline_defining=False,
         ),
     ),
-    data_requirements=(DataSourceKindV2.CANDLES_SIGNAL_TF.value,),
+    data_requirements=(
+        _selected_signal_tf_requirement(
+            "atr_signal_tf_candles",
+            DataSourceKindV2.CANDLES_SIGNAL_TF,
+            AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            "ATR consumes signal-timeframe candles aligned to the selected strategy signal TF.",
+            (
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.ema_dual_cross_multisource.ema_candidate",
+                    path="src/orderbook_analyse/ema_dual_cross_multisource/ema_candidate.py",
+                    symbol="attach_atr",
+                    notes="EDC detection uses ATR for compression and flat-slope guards.",
+                ),
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.cluster_sweep_research.event_detector",
+                    path="src/orderbook_analyse/cluster_sweep_research/event_detector.py",
+                    symbol="_atr",
+                    notes="Cluster sweep computes atr_14 on the signal frame.",
+                ),
+            ),
+        ),
+    ),
     provenance=(
         LegacyProvenanceRefV2(
             module="orderbook_analyse.ema_dual_cross_multisource.ema_candidate",
@@ -226,8 +287,34 @@ LLD_LIQUIDITY_CLUSTERS = FeatureDescriptorV2(
         ),
     ),
     data_requirements=(
-        DataSourceKindV2.CANDLES_SIGNAL_TF.value,
-        DataSourceKindV2.LIQUIDITY_LOCATIONS.value,
+        _selected_signal_tf_requirement(
+            "lld_signal_tf_candles",
+            DataSourceKindV2.CANDLES_SIGNAL_TF,
+            AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            "LLD cluster snapshots derive from signal-timeframe candles aligned to the selected strategy signal TF.",
+            (
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.cluster_sweep_research.cluster_adapter",
+                    path="src/orderbook_analyse/cluster_sweep_research/cluster_adapter.py",
+                    symbol="active_clusters_as_of",
+                    notes="Returns list[ClusterSnapshot] preserving filter_clusters order.",
+                ),
+            ),
+        ),
+        _selected_signal_tf_requirement(
+            "lld_liquidity_locations",
+            DataSourceKindV2.LIQUIDITY_LOCATIONS,
+            AvailabilityTimingV2.PRIOR_BAR_OPEN,
+            "LLD cluster snapshots require causal liquidity-location input aligned to the selected strategy signal TF.",
+            (
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.cluster_sweep_research.cluster_adapter",
+                    path="src/orderbook_analyse/cluster_sweep_research/cluster_adapter.py",
+                    symbol="active_clusters_as_of",
+                    notes="Returns list[ClusterSnapshot] preserving filter_clusters order.",
+                ),
+            ),
+        ),
     ),
     provenance=(
         LegacyProvenanceRefV2(

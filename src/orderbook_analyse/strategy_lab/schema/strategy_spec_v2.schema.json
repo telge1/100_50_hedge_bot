@@ -64,74 +64,6 @@
       "title": "AvailabilityTimingV2",
       "type": "string"
     },
-    "BaselineCell": {
-      "additionalProperties": false,
-      "properties": {
-        "cell_id": {
-          "type": "string"
-        },
-        "cost": {
-          "$ref": "#/$defs/RateValue"
-        },
-        "group": {
-          "type": "string"
-        },
-        "horizon": {
-          "$ref": "#/$defs/DurationValue"
-        },
-        "mode_id": {
-          "type": "string"
-        },
-        "stop_loss": {
-          "$ref": "#/$defs/RateValue"
-        },
-        "take_profit": {
-          "$ref": "#/$defs/RateValue"
-        },
-        "timeframe": {
-          "$ref": "#/$defs/TimeframeValue"
-        }
-      },
-      "required": [
-        "cell_id",
-        "cost",
-        "group",
-        "horizon",
-        "mode_id",
-        "stop_loss",
-        "take_profit",
-        "timeframe"
-      ],
-      "title": "BaselineCell",
-      "type": "object"
-    },
-    "BaselineSpec": {
-      "additionalProperties": false,
-      "properties": {
-        "cell": {
-          "$ref": "#/$defs/BaselineCell"
-        },
-        "is_reference": {
-          "type": "boolean"
-        },
-        "notes": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "cell",
-        "is_reference"
-      ],
-      "title": "BaselineSpec",
-      "type": "object"
-    },
     "BoolParam": {
       "additionalProperties": false,
       "properties": {
@@ -375,6 +307,27 @@
       "title": "ContractVersion",
       "type": "object"
     },
+    "CostsSpecV2": {
+      "additionalProperties": false,
+      "properties": {
+        "funding": {
+          "$ref": "#/$defs/ModelingStatus"
+        },
+        "roundtrip_cost": {
+          "$ref": "#/$defs/RateValue"
+        },
+        "slippage": {
+          "$ref": "#/$defs/ModelingStatus"
+        }
+      },
+      "required": [
+        "funding",
+        "roundtrip_cost",
+        "slippage"
+      ],
+      "title": "CostsSpecV2",
+      "type": "object"
+    },
     "DataGranularityV2": {
       "description": "Closed data granularity union. Each variant includes a const ``kind`` discriminator derived from ``_schema_kind``.",
       "oneOf": [
@@ -547,7 +500,7 @@
     },
     "EntryPriceReferenceV2": {
       "enum": [
-        "next_signal_tf_open"
+        "bar_open"
       ],
       "title": "EntryPriceReferenceV2",
       "type": "string"
@@ -563,19 +516,6 @@
     "EntrySpecV2": {
       "additionalProperties": false,
       "properties": {
-        "description": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "entry_plugin": {
-          "$ref": "#/$defs/PluginRef"
-        },
         "entry_price_reference": {
           "$ref": "#/$defs/EntryPriceReferenceV2"
         },
@@ -585,20 +525,14 @@
         "entry_timing_anchor": {
           "$ref": "#/$defs/EntryTimingAnchorV2"
         },
-        "execution_timeframe": {
-          "$ref": "#/$defs/TimeframeValue"
-        },
         "signal_decision_timing": {
           "$ref": "#/$defs/AvailabilityTimingV2"
         }
       },
       "required": [
-        "description",
-        "entry_plugin",
         "entry_price_reference",
         "entry_reference_rule",
         "entry_timing_anchor",
-        "execution_timeframe",
         "signal_decision_timing"
       ],
       "title": "EntrySpecV2",
@@ -606,8 +540,7 @@
     },
     "EntryTimingAnchorV2": {
       "enum": [
-        "signal_bar_close",
-        "confirmation_bar_close"
+        "signal_timeframe_bar_open"
       ],
       "title": "EntryTimingAnchorV2",
       "type": "string"
@@ -637,127 +570,73 @@
       "title": "EventStreamGranularityV2",
       "type": "object"
     },
-    "ExecutionAssumptions": {
+    "ExecutionAssumptionsV2": {
       "additionalProperties": false,
       "properties": {
-        "fill_model": {
-          "type": "string"
+        "execution_timeframe": {
+          "$ref": "#/$defs/TimeframeValue"
         },
-        "notes": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "fill_price_reference": {
+          "$ref": "#/$defs/EntryPriceReferenceV2"
         },
-        "notional": {
+        "fixed_notional": {
           "description": "Decimal authoring value. Schema type is number; the YAML loader preserves numeric scalars as decimal.Decimal (never float).",
           "type": "number"
         },
         "notional_currency": {
-          "type": "string"
+          "$ref": "#/$defs/NotionalCurrencyV2"
+        },
+        "rounding_status": {
+          "$ref": "#/$defs/ModelingStatus"
         }
       },
       "required": [
-        "fill_model",
-        "notional",
-        "notional_currency"
+        "execution_timeframe",
+        "fill_price_reference",
+        "fixed_notional",
+        "notional_currency",
+        "rounding_status"
       ],
-      "title": "ExecutionAssumptions",
+      "title": "ExecutionAssumptionsV2",
       "type": "object"
     },
-    "ExitMode": {
-      "enum": [
-        "parametric",
-        "plugin"
+    "ExitParameterTargetV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "exit_parameter",
+          "type": "string"
+        },
+        "parameter_name": {
+          "$ref": "#/$defs/StableIdentifier"
+        }
+      },
+      "required": [
+        "kind",
+        "parameter_name"
       ],
-      "title": "ExitMode",
-      "type": "string"
+      "title": "ExitParameterTargetV2",
+      "type": "object"
     },
-    "ExitSpec": {
+    "ExitSpecV2": {
       "additionalProperties": false,
       "properties": {
         "horizon": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/PaddingDurationV2"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "incomplete_outcome_reason": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "mode": {
-          "$ref": "#/$defs/ExitMode"
-        },
-        "plugin": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/PluginRef"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "require_full_horizon": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "same_bar_priority": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/SameBarPriority"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/DurationValue"
         },
         "stop_loss": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/RateValue"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/RateValue"
         },
         "take_profit": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/RateValue"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/RateValue"
         }
       },
       "required": [
-        "mode"
+        "horizon",
+        "stop_loss",
+        "take_profit"
       ],
-      "title": "ExitSpec",
+      "title": "ExitSpecV2",
       "type": "object"
     },
     "FeatureBindingSpec": {
@@ -827,27 +706,26 @@
       "title": "FeatureParameterBinding",
       "type": "object"
     },
-    "FeesSpec": {
+    "FeatureParameterTargetV2": {
       "additionalProperties": false,
       "properties": {
-        "notes": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "feature_alias": {
+          "$ref": "#/$defs/StableIdentifier"
         },
-        "roundtrip_cost": {
-          "$ref": "#/$defs/RateValue"
+        "kind": {
+          "const": "feature_parameter",
+          "type": "string"
+        },
+        "parameter_name": {
+          "$ref": "#/$defs/StableIdentifier"
         }
       },
       "required": [
-        "roundtrip_cost"
+        "feature_alias",
+        "kind",
+        "parameter_name"
       ],
-      "title": "FeesSpec",
+      "title": "FeatureParameterTargetV2",
       "type": "object"
     },
     "IdentifierParam": {
@@ -1057,35 +935,12 @@
       "title": "ModelingStatus",
       "type": "string"
     },
-    "ModelingStatusBlock": {
-      "additionalProperties": false,
-      "properties": {
-        "detail": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "parameters": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/ConfigEntry"
-          },
-          "type": "array"
-        },
-        "status": {
-          "$ref": "#/$defs/ModelingStatus"
-        }
-      },
-      "required": [
-        "status"
+    "NotionalCurrencyV2": {
+      "enum": [
+        "USDT"
       ],
-      "title": "ModelingStatusBlock",
-      "type": "object"
+      "title": "NotionalCurrencyV2",
+      "type": "string"
     },
     "Operand": {
       "description": "Closed Operand union. Each variant object includes a const ``kind`` discriminator derived from ``_schema_kind``.",
@@ -1172,6 +1027,24 @@
       ],
       "title": "ParamValue"
     },
+    "PluginConfigParameterTargetV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "plugin_config_parameter",
+          "type": "string"
+        },
+        "parameter_name": {
+          "$ref": "#/$defs/StableIdentifier"
+        }
+      },
+      "required": [
+        "kind",
+        "parameter_name"
+      ],
+      "title": "PluginConfigParameterTargetV2",
+      "type": "object"
+    },
     "PluginKind": {
       "enum": [
         "signal",
@@ -1184,21 +1057,21 @@
       "title": "PluginKind",
       "type": "string"
     },
-    "PluginProvenanceRef": {
+    "PluginProvenanceRefV2": {
       "additionalProperties": false,
       "properties": {
-        "plugin_id": {
-          "type": "string"
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
         },
-        "version": {
-          "type": "string"
+        "plugin_id": {
+          "$ref": "#/$defs/StableIdentifier"
         }
       },
       "required": [
-        "plugin_id",
-        "version"
+        "contract_version",
+        "plugin_id"
       ],
-      "title": "PluginProvenanceRef",
+      "title": "PluginProvenanceRefV2",
       "type": "object"
     },
     "PluginRef": {
@@ -1318,96 +1191,67 @@
       "title": "PluginSignalSpec",
       "type": "object"
     },
-    "PortfolioAssumptions": {
+    "PortfolioAssumptionsV2": {
       "additionalProperties": false,
       "properties": {
-        "evaluation_mode": {
-          "type": "string"
-        },
-        "notes": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "one_trade_per_candidate": {
+        "compounding": {
           "type": "boolean"
+        },
+        "evaluation_mode": {
+          "$ref": "#/$defs/PortfolioEvaluationModeV2"
         }
       },
       "required": [
-        "evaluation_mode",
-        "one_trade_per_candidate"
+        "compounding",
+        "evaluation_mode"
       ],
-      "title": "PortfolioAssumptions",
+      "title": "PortfolioAssumptionsV2",
       "type": "object"
     },
-    "ProvenanceSpec": {
+    "PortfolioEvaluationModeV2": {
+      "enum": [
+        "per_trade_independent"
+      ],
+      "title": "PortfolioEvaluationModeV2",
+      "type": "string"
+    },
+    "ProvenanceSpecV2": {
       "additionalProperties": false,
       "properties": {
-        "causality_claim": {
-          "type": "string"
+        "catalog_contract_version": {
+          "$ref": "#/$defs/ContractVersion"
         },
         "causality_status": {
           "$ref": "#/$defs/CausalityStatus"
         },
-        "external_runtime_dependencies": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "git_commit": {
           "type": "string"
         },
-        "known_limitations": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "notes": {
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "plugin_refs": {
           "items": {
-            "$ref": "#/$defs/PluginProvenanceRef"
+            "$ref": "#/$defs/PluginProvenanceRefV2"
           },
           "type": "array"
         },
-        "policy_ref": {
-          "type": "string"
+        "source_paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
-        "source_of_truth_module": {
-          "type": "string"
-        },
-        "source_of_truth_path": {
-          "type": "string"
-        },
-        "strategy_ref": {
+        "source_repository": {
           "type": "string"
         }
       },
       "required": [
-        "causality_claim",
+        "catalog_contract_version",
         "causality_status",
-        "external_runtime_dependencies",
         "git_commit",
-        "known_limitations",
         "plugin_refs",
-        "policy_ref",
-        "source_of_truth_module",
-        "source_of_truth_path",
-        "strategy_ref"
+        "source_paths",
+        "source_repository"
       ],
-      "title": "ProvenanceSpec",
+      "title": "ProvenanceSpecV2",
       "type": "object"
     },
     "RateParam": {
@@ -1462,30 +1306,60 @@
       "title": "ResearchConfirmationPolicyV2",
       "type": "string"
     },
-    "ResearchParameterSpace": {
+    "ResearchDimensionV2": {
       "additionalProperties": false,
       "properties": {
-        "cells": {
+        "candidates": {
           "items": {
-            "$ref": "#/$defs/BaselineCell"
+            "$ref": "#/$defs/ParamValue"
           },
           "type": "array"
         },
-        "notes": {
+        "dimension_id": {
+          "$ref": "#/$defs/StableIdentifier"
+        },
+        "target": {
           "oneOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/SignalTimeframeTargetV2"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/FeatureParameterTargetV2"
+            },
+            {
+              "$ref": "#/$defs/PluginConfigParameterTargetV2"
+            },
+            {
+              "$ref": "#/$defs/ExitParameterTargetV2"
+            },
+            {
+              "$ref": "#/$defs/RoundtripCostTargetV2"
             }
           ]
         }
       },
       "required": [
-        "cells"
+        "candidates",
+        "dimension_id",
+        "target"
       ],
-      "title": "ResearchParameterSpace",
+      "title": "ResearchDimensionV2",
+      "type": "object"
+    },
+    "ResearchParameterSpaceV2": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "items": {
+            "$ref": "#/$defs/ResearchDimensionV2"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "dimensions"
+      ],
+      "title": "ResearchParameterSpaceV2",
       "type": "object"
     },
     "ResetEvent": {
@@ -1512,6 +1386,20 @@
         "target_state"
       ],
       "title": "ResetRule",
+      "type": "object"
+    },
+    "RoundtripCostTargetV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "roundtrip_cost",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "RoundtripCostTargetV2",
       "type": "object"
     },
     "RuleBasedSignalSpec": {
@@ -1750,6 +1638,20 @@
       "title": "SignalEngineWarmupV2",
       "type": "object"
     },
+    "SignalTimeframeTargetV2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "signal_timeframe",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "SignalTimeframeTargetV2",
+      "type": "object"
+    },
     "SnapshotGranularityV2": {
       "additionalProperties": false,
       "properties": {
@@ -1896,8 +1798,8 @@
         "analysis_requirements": {
           "$ref": "#/$defs/AnalysisRequirements"
         },
-        "baseline": {
-          "$ref": "#/$defs/BaselineSpec"
+        "costs": {
+          "$ref": "#/$defs/CostsSpecV2"
         },
         "data_requirements": {
           "items": {
@@ -1909,22 +1811,16 @@
           "$ref": "#/$defs/EntrySpecV2"
         },
         "execution_assumptions": {
-          "$ref": "#/$defs/ExecutionAssumptions"
+          "$ref": "#/$defs/ExecutionAssumptionsV2"
         },
         "exit": {
-          "$ref": "#/$defs/ExitSpec"
+          "$ref": "#/$defs/ExitSpecV2"
         },
         "features": {
           "items": {
             "$ref": "#/$defs/FeatureBindingSpec"
           },
           "type": "array"
-        },
-        "fees": {
-          "$ref": "#/$defs/FeesSpec"
-        },
-        "funding": {
-          "$ref": "#/$defs/ModelingStatusBlock"
         },
         "intrabar_policy": {
           "$ref": "#/$defs/IntrabarPolicy"
@@ -1933,25 +1829,22 @@
           "$ref": "#/$defs/Metadata"
         },
         "portfolio_assumptions": {
-          "$ref": "#/$defs/PortfolioAssumptions"
+          "$ref": "#/$defs/PortfolioAssumptionsV2"
         },
         "provenance": {
-          "$ref": "#/$defs/ProvenanceSpec"
+          "$ref": "#/$defs/ProvenanceSpecV2"
         },
         "research_parameter_space": {
-          "$ref": "#/$defs/ResearchParameterSpace"
+          "$ref": "#/$defs/ResearchParameterSpaceV2"
         },
         "signal": {
           "$ref": "#/$defs/SignalDefinition"
-        },
-        "slippage": {
-          "$ref": "#/$defs/ModelingStatusBlock"
         },
         "timeframes": {
           "$ref": "#/$defs/Timeframes"
         },
         "universe": {
-          "$ref": "#/$defs/UniverseSpec"
+          "$ref": "#/$defs/VersionedUniverseRefV2"
         },
         "validation_requirements": {
           "$ref": "#/$defs/ValidationRequirements"
@@ -1962,21 +1855,18 @@
       },
       "required": [
         "analysis_requirements",
-        "baseline",
+        "costs",
         "data_requirements",
         "entry",
         "execution_assumptions",
         "exit",
         "features",
-        "fees",
-        "funding",
         "intrabar_policy",
         "metadata",
         "portfolio_assumptions",
         "provenance",
         "research_parameter_space",
         "signal",
-        "slippage",
         "timeframes",
         "universe",
         "validation_requirements",
@@ -2212,53 +2102,6 @@
       "title": "TriggerSpec",
       "type": "object"
     },
-    "UniverseSpec": {
-      "additionalProperties": false,
-      "properties": {
-        "exclude_symbols": {
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "notes": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "ref": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "role": {
-          "type": "string"
-        },
-        "symbols": {
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "role"
-      ],
-      "title": "UniverseSpec",
-      "type": "object"
-    },
     "ValidationRequirements": {
       "additionalProperties": false,
       "properties": {
@@ -2291,6 +2134,27 @@
         "require_strategy_parity_check"
       ],
       "title": "ValidationRequirements",
+      "type": "object"
+    },
+    "VersionedUniverseRefV2": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "type": "string"
+        },
+        "universe_id": {
+          "$ref": "#/$defs/StableIdentifier"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "content_hash",
+        "universe_id",
+        "version"
+      ],
+      "title": "VersionedUniverseRefV2",
       "type": "object"
     },
     "WarmupSpecV2": {

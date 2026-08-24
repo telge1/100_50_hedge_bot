@@ -272,11 +272,11 @@ def _validate_plugin_entry_contract(
                 entry_id=pid,
             )
         )
-    if plugin.entry_price_reference is not EntryPriceReferenceV2.NEXT_SIGNAL_TF_OPEN:
+    if plugin.entry_price_reference is not EntryPriceReferenceV2.BAR_OPEN:
         issues.append(
             CatalogIntegrityIssueV2(
                 code="INVALID_ENTRY_PRICE_REFERENCE",
-                message="entry_price_reference must be next_signal_tf_open",
+                message="entry_price_reference must be bar_open",
                 entry_id=pid,
             )
         )

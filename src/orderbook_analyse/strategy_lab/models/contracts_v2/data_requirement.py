@@ -18,7 +18,6 @@ from orderbook_analyse.strategy_lab.models.contracts_v2.provenance import (
     LegacyProvenanceRefV2,
 )
 from orderbook_analyse.strategy_lab.models.identifiers import StableIdentifier
-from orderbook_analyse.strategy_lab.models.strategy import PluginRef, TimeframeValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -44,6 +43,3 @@ class EntrySpecV2:
     entry_reference_rule: EntryReferenceRuleV2
     entry_timing_anchor: EntryTimingAnchorV2
     entry_price_reference: EntryPriceReferenceV2
-    execution_timeframe: TimeframeValue
-    entry_plugin: PluginRef
-    description: str | None

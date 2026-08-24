@@ -13,14 +13,12 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     PaddingNotApplicable,
     SourceLoadingPaddingV2,
 )
-from orderbook_analyse.strategy_lab.models.enums import TimeframeUnit
-from orderbook_analyse.strategy_lab.models.strategy import TimeframeValue
 from tests.strategy_lab.v2_fixtures import _entry_v2, _warmup_v2, minimal_strategy_spec_v2
 
 
 def test_entry_next_signal_tf_open() -> None:
     entry = _entry_v2()
-    assert entry.entry_price_reference is EntryPriceReferenceV2.NEXT_SIGNAL_TF_OPEN
+    assert entry.entry_price_reference is EntryPriceReferenceV2.BAR_OPEN
     assert (
         entry.entry_reference_rule
         is EntryReferenceRuleV2.SIGNAL_TF_NEXT_OPEN_AFTER_SIGNAL_BAR
@@ -32,10 +30,11 @@ def test_entry_has_no_minimum_causal_delay_field() -> None:
     assert "minimum_causal_delay_bars" not in names
 
 
-def test_execution_timeframe_does_not_change_entry_anchor_semantics() -> None:
+def test_execution_timeframe_lives_only_in_execution_assumptions_v2() -> None:
     entry = _entry_v2()
-    assert entry.execution_timeframe == TimeframeValue(value=1, unit=TimeframeUnit.MINUTES)
-    assert entry.entry_timing_anchor is EntryTimingAnchorV2.SIGNAL_BAR_CLOSE
+    assert "execution_timeframe" not in {f.name for f in dataclasses.fields(type(entry))}
+    assert entry.entry_timing_anchor is EntryTimingAnchorV2.SIGNAL_TIMEFRAME_BAR_OPEN
+    assert minimal_strategy_spec_v2().execution_assumptions.execution_timeframe.value == 1
 
 
 def test_edc_and_cluster_entry_rules() -> None:
@@ -49,7 +48,8 @@ def test_edc_and_cluster_entry_rules() -> None:
         cluster.entry_reference_rule
         is EntryReferenceRuleV2.NEXT_BAR_OPEN_AFTER_CONFIRMATION_BAR
     )
-    assert cluster.entry_timing_anchor is EntryTimingAnchorV2.CONFIRMATION_BAR_CLOSE
+    assert edc.entry_timing_anchor is EntryTimingAnchorV2.SIGNAL_TIMEFRAME_BAR_OPEN
+    assert cluster.entry_timing_anchor is EntryTimingAnchorV2.SIGNAL_TIMEFRAME_BAR_OPEN
 
 
 def test_source_and_outcome_padding_separate_types() -> None:

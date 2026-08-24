@@ -169,6 +169,11 @@ def test_v2_schema_structural_constraints_match_python() -> None:
     assert "output_id" in fout["properties"]
     root_props = set(defs["StrategySpecV2"]["properties"])
     assert not {"setup", "trigger", "confirmation", "invalidation", "long", "short"} & root_props
+    assert "baseline" not in root_props
+    assert "fees" not in root_props
+    assert "slippage" not in root_props
+    assert "funding" not in root_props
+    assert "costs" in root_props
 
 
 def _v2_subschema(schema: dict[str, object], name: str) -> dict[str, object]:
@@ -312,6 +317,17 @@ def test_v2_entry_spec_v2_no_delay_field() -> None:
     entry = schema["$defs"]["EntrySpecV2"]
     assert "minimum_causal_delay_bars" not in entry["properties"]
     assert "entry_reference_rule" in entry["required"]
+    assert "execution_timeframe" not in entry["properties"]
+    assert "entry_plugin" not in entry["properties"]
+
+
+def test_v2_entry_enums_match_phase1_bar_open_contract() -> None:
+    schema = generate_strategy_spec_v2_schema()
+    anchor = schema["$defs"]["EntryTimingAnchorV2"]["enum"]
+    price = schema["$defs"]["EntryPriceReferenceV2"]["enum"]
+    assert anchor == ["signal_timeframe_bar_open"]
+    assert price == ["bar_open"]
+    assert schema["$defs"]["NotionalCurrencyV2"]["enum"] == ["USDT"]
 
 
 def test_v1_schema_has_no_v2_root() -> None:

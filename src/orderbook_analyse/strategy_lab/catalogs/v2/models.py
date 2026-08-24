@@ -58,7 +58,7 @@ class FeatureDescriptorV2:
     description: str
     outputs: tuple[FeatureOutputDescriptorV2, ...]
     parameters: tuple[ParameterDefinitionV2, ...]
-    data_requirements: tuple[str, ...]
+    data_requirements: tuple[DataRequirementSpecV2, ...]
     provenance: tuple[LegacyProvenanceRefV2, ...]
 
 

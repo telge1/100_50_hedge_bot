@@ -143,14 +143,25 @@ class EntryReferenceRuleV2(str, Enum):
 class EntryTimingAnchorV2(str, Enum):
     """Evaluation anchor that precedes tradable entry."""
 
-    SIGNAL_BAR_CLOSE = "signal_bar_close"
-    CONFIRMATION_BAR_CLOSE = "confirmation_bar_close"
+    SIGNAL_TIMEFRAME_BAR_OPEN = "signal_timeframe_bar_open"
 
 
 class EntryPriceReferenceV2(str, Enum):
     """Price reference for tradable entry."""
 
-    NEXT_SIGNAL_TF_OPEN = "next_signal_tf_open"
+    BAR_OPEN = "bar_open"
+
+
+class PortfolioEvaluationModeV2(str, Enum):
+    """Minimal portfolio evaluation mode for phase-1 research."""
+
+    PER_TRADE_INDEPENDENT = "per_trade_independent"
+
+
+class NotionalCurrencyV2(str, Enum):
+    """Closed phase-1 trade notional currency."""
+
+    USDT = "USDT"
 
 
 class SignalTimeframeModeV2(str, Enum):
