@@ -62,6 +62,20 @@ class FeatureAliasContext:
     feature_alias: StableIdentifier
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ComponentCycleContext:
+    _schema_kind: ClassVar[str] = "component_cycle"
+    cycle_path: tuple[StableIdentifier, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StatePriorityContext:
+    _schema_kind: ClassVar[str] = "state_priority"
+    state_id: StableIdentifier
+    priority: int
+    event_ids: tuple[StableIdentifier, ...]
+
+
 IssueContext = (
     UnknownIdentifierContext
     | ExpectedActualTypeContext
@@ -70,4 +84,6 @@ IssueContext = (
     | BoundsContext
     | OperatorSignatureContext
     | FeatureAliasContext
+    | ComponentCycleContext
+    | StatePriorityContext
 )

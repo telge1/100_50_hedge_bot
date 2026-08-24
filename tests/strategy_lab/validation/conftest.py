@@ -167,3 +167,21 @@ def valid_cluster_strategy():
         signal=cluster_plugin_signal(),
         features=cluster_features(),
     )
+
+
+def valid_rule_based_long_strategy():
+    from tests.strategy_lab.v2_fixtures import rule_based_signal_v2
+
+    return minimal_strategy_spec_v2(
+        signal=rule_based_signal_v2(Directionality.LONG),
+        features=edc_features(),
+    )
+
+
+def valid_state_machine_long_strategy():
+    from tests.strategy_lab.v2_fixtures import state_machine_signal_v2
+
+    return minimal_strategy_spec_v2(
+        signal=state_machine_signal_v2(),
+        features=edc_features(),
+    )

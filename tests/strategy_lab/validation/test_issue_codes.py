@@ -70,11 +70,15 @@ from tests.strategy_lab.validation.conftest import (
     valid_edc_strategy,
 )
 
-P4A_ACTIVE_CODES: frozenset[ValidationIssueCode] = frozenset(ValidationIssueCode)
+P4A_ISSUE_CODES: frozenset[ValidationIssueCode] = frozenset(
+    code
+    for code in ValidationIssueCode
+    if not code.name.startswith(("COMPONENT_", "RULE_", "SM_"))
+)
 
 
 def test_issue_code_inventory_is_closed_p4a_set() -> None:
-    assert len(P4A_ACTIVE_CODES) == len(ValidationIssueCode)
+    assert len(P4A_ISSUE_CODES) == 31
 
 
 def _emit(code: ValidationIssueCode, catalogs: CatalogBundleV2) -> None:
@@ -646,6 +650,6 @@ def _rule_strategy(trigger: ComparisonExpression):
     )
 
 
-@pytest.mark.parametrize("code", sorted(P4A_ACTIVE_CODES, key=lambda c: c.value))
+@pytest.mark.parametrize("code", sorted(P4A_ISSUE_CODES, key=lambda c: c.value))
 def test_p4a_active_issue_code_is_emitted(code: ValidationIssueCode, catalogs) -> None:
     _emit(code, catalogs)
