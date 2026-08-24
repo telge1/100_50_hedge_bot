@@ -20,7 +20,7 @@ from orderbook_analyse.strategy_lab.decoder_v2 import (
     load_strategy_v2_yaml_file,
 )
 from orderbook_analyse.strategy_lab.loader import load_strategy_yaml
-from orderbook_analyse.strategy_lab.models.enums import RateUnit
+from orderbook_analyse.strategy_lab.models.enums import ModelingStatus, RateUnit
 from orderbook_analyse.strategy_lab.models.contracts_v2.enums import AvailabilityTimingV2
 from orderbook_analyse.strategy_lab.schema import COMMITTED_SCHEMA_V2_PATH
 from orderbook_analyse.strategy_lab.validation import (
@@ -215,7 +215,8 @@ def test_edc_baseline_and_research_values(catalogs) -> None:
         "0.50"
     )
     assert edc.exit.horizon.value == Decimal("8")
-    assert edc.costs.roundtrip_cost.value == Decimal("0.15")
+    assert edc.costs.roundtrip_cost.value == Decimal("0.11")
+    assert edc.costs.roundtrip_cost.unit == RateUnit.PERCENT
     assert edc.execution_assumptions.fixed_notional == Decimal("1000")
     assert edc.timeframes.signal.value == 5
     assert edc.timeframes.execution.value == 1
@@ -244,6 +245,41 @@ def test_edc_baseline_and_research_values(catalogs) -> None:
     ]
 
 
+def test_roundtrip_trading_fee_011_percent_baseline(catalogs) -> None:
+    """Entry 0.055% + exit 0.055% = roundtrip 0.11% (PERCENT); slippage/funding separate."""
+    entry_taker_fee = Decimal("0.055")
+    exit_taker_fee = Decimal("0.055")
+    roundtrip_fee = entry_taker_fee + exit_taker_fee
+    assert roundtrip_fee == Decimal("0.11")
+
+    for path, json_path, sha_path in (
+        (EDC_YAML, EDC_JSON, EDC_SHA),
+        (CLUSTER_YAML, CLUSTER_JSON, CLUSTER_SHA),
+    ):
+        spec = load_strategy_v2_yaml_file(path)
+        require_valid_strategy_v2_p4c(spec, catalogs)
+        cost = spec.costs.roundtrip_cost
+        assert type(cost.value) is Decimal
+        assert cost.value == Decimal("0.11")
+        assert cost.unit is RateUnit.PERCENT
+        # 0.11 means 0.11 percent, not fraction 0.11 (=11%) and not 11 percent.
+        assert cost.value != Decimal("11")
+        assert cost.unit is not RateUnit.FRACTION
+        assert cost.unit is not RateUnit.BASIS_POINTS
+        assert spec.costs.slippage is ModelingStatus.NOT_MODELED
+        assert spec.costs.funding is ModelingStatus.NOT_MODELED
+        compiled = compile_strategy_v2(spec, catalogs)
+        assert compiled.canonical_bytes == json_path.read_bytes()
+        assert compiled.strategy_hash == sha_path.read_text(encoding="utf-8").strip()
+        payload = json.loads(compiled.canonical_bytes)
+        assert payload["costs"]["roundtrip_cost"] == {
+            "unit": "percent",
+            "value": 0.11,
+        }
+        assert payload["costs"]["slippage"] == "not_modeled"
+        assert payload["costs"]["funding"] == "not_modeled"
+
+
 def test_cluster_semantics(catalogs) -> None:
     cluster = load_strategy_v2_yaml_file(CLUSTER_YAML)
     require_valid_strategy_v2_p4c(cluster, catalogs)
@@ -252,6 +288,8 @@ def test_cluster_semantics(catalogs) -> None:
         == AvailabilityTimingV2.CONFIRMATION_BAR_CLOSE
     )
     assert cluster.research_parameter_space.dimensions == ()
+    assert cluster.costs.roundtrip_cost.value == Decimal("0.11")
+    assert cluster.costs.roundtrip_cost.unit is RateUnit.PERCENT
     clusters = next(f for f in cluster.features if f.alias.value == "clusters")
     gap = next(b for b in clusters.bindings if b.name.value == "gap_pct")
     pools = next(b for b in clusters.bindings if b.name.value == "minimum_pools")

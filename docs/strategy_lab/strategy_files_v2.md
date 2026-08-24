@@ -68,9 +68,13 @@ Runtime decoder/validator/compiler **do not** open that file.
   `ema_slow=20` plus ATR. EMA 9/20/59 belongs to **cluster_sweep**, not EDC V2.
 - Decision: signal bar close → next signal-TF bar open @ bar open
 - Notional 1000 USDT
-- TP 0.75%, SL 0.50%, horizon 8h, roundtrip 0.15%
-- Slippage/funding `not_modeled`, compounding `false`
-- Research candidates: TP 0.40/0.50/0.60/0.75; SL 0.50/1.00; horizon 4/6/8h; roundtrip 0.11/0.15/0.20
+- TP 0.75%, SL 0.50%, horizon 8h
+- Roundtrip trading fee **0.11%** (`RateUnit.PERCENT`: `0.11` means 0.11 percent) =
+  entry taker 0.055% + exit taker 0.055%
+- Slippage/funding remain separate `not_modeled` statuses (not included in 0.11%)
+- Compounding `false`
+- Research candidates: TP 0.40/0.50/0.60/0.75; SL 0.50/1.00; horizon 4/6/8h;
+  roundtrip 0.11/0.15/0.20 (0.11 is baseline; 0.15/0.20 stress)
 - Root values are the baseline (no separate baseline object)
 
 ## Cluster baseline
@@ -79,9 +83,11 @@ Runtime decoder/validator/compiler **do not** open that file.
 - Features: EMA 9/20/59, ATR 14, LLD clusters `gap_pct=0.10%`, `minimum_pools=3`
 - Decision: confirmation bar close → next bar open after confirmation @ bar open
 - Research space empty (valid)
-- **Research assumption:** TP 0.75%, SL 0.50%, horizon 8h, roundtrip 0.15% are Phase-1
-  placeholders required by `ExitSpecV2` / `CostsSpecV2`. They are **not** claimed as a
-  frozen legacy cluster production baseline.
+- Roundtrip trading fee **0.11%** (entry 0.055% + exit 0.055%); slippage/funding
+  separately `not_modeled`
+- **Research assumption:** TP 0.75%, SL 0.50%, horizon 8h are Phase-1 placeholders
+  required by `ExitSpecV2`. They are **not** claimed as a frozen legacy cluster
+  production baseline.
 
 ## Provenance
 

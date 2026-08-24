@@ -11,7 +11,7 @@ costs:
   funding: not_modeled
   roundtrip_cost:
     unit: percent
-    value: 0.15
+    value: 0.11
   slippage: not_modeled
 data_requirements:
 - availability: signal_bar_close
