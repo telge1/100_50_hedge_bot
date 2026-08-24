@@ -1,0 +1,352 @@
+analysis_requirements:
+  forbidden_leakage_features: []
+  min_symbols: null
+  min_trades: null
+  notes: null
+  required_label_fields:
+  - mfe
+  - mae
+  - realized_pnl
+costs:
+  funding: not_modeled
+  roundtrip_cost:
+    unit: percent
+    value: 0.15
+  slippage: not_modeled
+data_requirements:
+- availability: signal_bar_close
+  granularity:
+    binds_to_selected_signal_timeframe: true
+    kind: selected_signal_timeframe
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.event_detector
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/event_detector.py
+    symbol: detect_candidates
+  rationale: EMA, ATR, sweep detection, confirmation, and primary outcomes; granularity follows the strategy's
+    chosen signal timeframe (5m or 15m).
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: cluster_candles_signal_tf
+  role: signal_required
+  source_kind: candles_signal_tf
+- availability: prior_bar_open
+  granularity:
+    binds_to_selected_signal_timeframe: true
+    kind: selected_signal_timeframe
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.cluster_adapter
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/cluster_adapter.py
+    symbol: active_clusters_as_of
+  rationale: TRP LLD clusters derived from signal-TF OHLCV; causal as_of prior bar; aligned to the strategy's
+    chosen signal timeframe.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: cluster_liquidity_locations
+  role: signal_required
+  source_kind: liquidity_locations
+- availability: entry_bar_open
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.clickhouse_source
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/clickhouse_source.py
+    symbol: fetch_candles_1m
+  rationale: Base 1m feed aggregated to signal TF and used for extended analysis.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: cluster_candles_execution_1m
+  role: execution_required
+  source_kind: candles_execution_1m
+- availability: window_edge
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.feature_enrichment
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/feature_enrichment.py
+    symbol: enrich_event_orderflow
+  rationale: Optional 1m-aggregated trade features for orderflow enrichment; legacy fetch_trades_1m groups
+    toStartOfMinute.
+  required: false
+  required_for_policy: null
+  requirement_id:
+    value: cluster_public_trades_1m
+  role: analysis_optional
+  source_kind: public_trades_1m
+- availability: window_edge
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.feature_enrichment
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/feature_enrichment.py
+    symbol: enrich_event_orderflow
+  rationale: Optional 1m-aggregated orderbook features; legacy fetch_ob_1m groups ob200_v3 1s buckets
+    toStartOfMinute.
+  required: false
+  required_for_policy: null
+  requirement_id:
+    value: cluster_orderbook_ob200_v3_1m
+  role: analysis_optional
+  source_kind: orderbook_ob200_v3_1m
+- availability: window_edge
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.feature_enrichment
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/feature_enrichment.py
+    symbol: enrich_event_orderflow
+  rationale: Optional 1m-aggregated open-interest series; legacy fetch_oi_1m groups open_interest_5s toStartOfMinute.
+  required: false
+  required_for_policy: null
+  requirement_id:
+    value: cluster_open_interest_1m
+  role: analysis_optional
+  source_kind: open_interest_1m
+- availability: window_edge
+  granularity:
+    kind: event_stream
+    native_event_stream: true
+  provenance:
+  - module: orderbook_analyse.cluster_sweep_research.feature_enrichment
+    notes: null
+    path: src/orderbook_analyse/cluster_sweep_research/feature_enrichment.py
+    symbol: enrich_event_orderflow
+  rationale: Optional native liquidation events; legacy fetch_liquidations returns per-event rows keyed
+    by event_time.
+  required: false
+  required_for_policy: null
+  requirement_id:
+    value: cluster_liquidations
+  role: analysis_optional
+  source_kind: liquidations
+entry:
+  entry_price_reference: bar_open
+  entry_reference_rule: next_bar_open_after_confirmation_bar
+  entry_timing_anchor: signal_timeframe_bar_open
+  signal_decision_timing: confirmation_bar_close
+execution_assumptions:
+  execution_timeframe:
+    unit: minutes
+    value: 1
+  fill_price_reference: bar_open
+  fixed_notional: !!float '1000'
+  notional_currency: USDT
+  rounding_status: not_modeled
+exit:
+  horizon:
+    unit: hours
+    value: !!float '8'
+  stop_loss:
+    unit: percent
+    value: 0.5
+  take_profit:
+    unit: percent
+    value: 0.75
+features:
+- alias:
+    value: ema_fast
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 9
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_medium
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 20
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_slow
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 59
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: atr
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 14
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: atr_wilder
+- alias:
+    value: clusters
+  bindings:
+  - name:
+      value: gap_pct
+    value:
+      kind: rate
+      value:
+        unit: percent
+        value: 0.1
+  - name:
+      value: minimum_pools
+    value:
+      kind: integer
+      value: 3
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: lld_liquidity_clusters
+intrabar_policy:
+  notes: null
+  same_bar_priority: sl_first
+metadata:
+  description: Phase-1 StrategySpec V2 for cluster_sweep. TP/SL/horizon/roundtrip use Phase-1 research
+    baseline assumptions.
+  family: cluster_sweep
+  schema_version: strategy_spec/v2
+  status: phase1_research
+  strategy_id: cluster_sweep_v2
+  strategy_version: 1.0.0
+  title: Cluster Sweep V2
+  variant: phase1_baseline
+portfolio_assumptions:
+  compounding: false
+  evaluation_mode: per_trade_independent
+provenance:
+  catalog_contract_version:
+    value: catalog/v2
+  causality_status: causal_reusable_when_dependency_available
+  git_commit: 3a2af3f6c3df168399b2663383cbb445e0188eb9
+  plugin_refs:
+  - contract_version:
+      value: catalog/v2
+    plugin_id:
+      value: cluster_sweep
+  source_paths:
+  - strategies/strategy_lab/
+  source_repository: orderbook_analyse
+research_parameter_space:
+  dimensions: []
+signal:
+  confirmation:
+    description: Confirmation bar close gate
+    gates_policy_id: null
+    gates_policy_version: null
+    plugin: null
+    rules_embedded_in_yaml: false
+    status: null
+  confirmation_policy: null
+  directionality: both
+  invalidation:
+    description: Cluster invalidation
+    plugin: null
+    rules_embedded_in_yaml: false
+  kind: plugin
+  mode_id: null
+  plugin:
+    config:
+    - key: minimum_cluster_pools
+      value:
+        kind: integer
+        value: 3
+    - key: expire_bars
+      value:
+        kind: integer
+        value: 24
+    - key: approach_bps
+      value:
+        kind: rate
+        value:
+          unit: basis_points
+          value: !!float '25'
+    - key: require_cluster_entry
+      value:
+        kind: boolean
+        value: true
+    - key: gap_pct
+      value:
+        kind: rate
+        value:
+          unit: percent
+          value: 0.1
+    contract_version:
+      value: catalog/v2
+    plugin_id:
+      value: cluster_sweep
+  rules_embedded_in_yaml: false
+  setup:
+    decision_at: confirmation_bar_close
+    description: Cluster approach setup
+    notes: null
+  trigger:
+    description: Cluster sweep trigger
+    plugin: null
+    plugin_ref: null
+timeframes:
+  execution:
+    unit: minutes
+    value: 1
+  signal:
+    unit: minutes
+    value: 15
+universe:
+  content_hash: sha256:796ace7b68178a52279aee256ea7c1a109a3aa780b8ebf36d965f89a300b49bb
+  universe_id:
+    value: tradeable_51
+  version: v1
+validation_requirements:
+  allowed_causality_statuses: []
+  notes: null
+  require_causality_audit: true
+  require_strategy_parity_check: true
+warmup:
+  outcome_evaluation:
+    post_window_duration:
+      kind: not_applicable
+      not_applicable: true
+  signal_engine:
+    bar_timeframe:
+      unit: minutes
+      value: 15
+    minimum_bars: 79
+  source_loading:
+    auxiliary_source_history:
+      kind: not_applicable
+      not_applicable: true
+    candle_history:
+      kind: not_applicable
+      not_applicable: true
