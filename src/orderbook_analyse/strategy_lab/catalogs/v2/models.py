@@ -14,6 +14,7 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     OperatorSignatureV2,
     OutcomeEvaluationPaddingV2,
     ParameterDefinitionV2,
+    PluginModeContractV2,
     PluginParameterDefinitionV2,
     SignalEngineWarmupRequirementV2,
     SignalTimeframeContractV2,
@@ -76,6 +77,7 @@ class PluginDescriptorV2:
     kind: PluginKind
     description: str
     parameters: tuple[PluginParameterDefinitionV2, ...]
+    mode_contract: PluginModeContractV2
     required_features: tuple[BoundFeatureRequirementV2, ...]
     data_requirements: tuple[DataRequirementSpecV2, ...]
     confirmation_policy: ResearchConfirmationPolicyV2 | None

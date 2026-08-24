@@ -7,6 +7,7 @@ import dataclasses
 import pytest
 
 from orderbook_analyse.strategy_lab.models import (
+    ContractVersion,
     ResetEvent,
     ResetRule,
     StateMachineSignalSpec,
@@ -23,6 +24,7 @@ from tests.strategy_lab.v2_fixtures import _comparison, sid, state_machine_signa
 def test_state_machine_requires_at_least_one_state() -> None:
     with pytest.raises(ValueError, match="at least one state"):
         StateMachineSignalSpec(
+            operator_contract_version=ContractVersion(value="catalog/v2"),
             directionality=state_machine_signal_v2().directionality,
             evaluation_timing=state_machine_signal_v2().evaluation_timing,
             initial_state=sid("idle"),

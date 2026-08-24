@@ -20,6 +20,8 @@ from orderbook_analyse.strategy_lab.catalogs.v2.operators import OPERATOR_DESCRI
 from orderbook_analyse.strategy_lab.catalogs.v2.plugins import PLUGIN_DESCRIPTORS_V2
 from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     DataRequirementRoleV2,
+    PluginModeRequirementV2,
+    PluginParameterBindingTargetV2,
     SelectedSignalTimeframeGranularityV2,
     SignalTimeframeModeV2,
     SnapshotGranularityV2,
@@ -188,6 +190,7 @@ def validate_catalog_integrity_v2() -> CatalogIntegrityReportV2:
                     entry_id=_stable_id_value(operator.operator_id),
                 )
             )
+        issues.extend(_validate_operator_signatures(operator))
 
     for plugin in PLUGIN_CATALOG_V2:
         pid = _stable_id_value(plugin.plugin_id)
@@ -210,10 +213,42 @@ def validate_catalog_integrity_v2() -> CatalogIntegrityReportV2:
                 )
 
         issues.extend(_validate_plugin_entry_contract(plugin))
+        issues.extend(_validate_plugin_parameters(plugin))
         issues.extend(_validate_plugin_features(plugin, feature_by_id))
         issues.extend(_validate_plugin_data_requirements(plugin))
 
     return CatalogIntegrityReportV2(issues=tuple(issues))
+
+
+def _validate_operator_signatures(
+    operator: OperatorDescriptorV2,
+) -> list[CatalogIntegrityIssueV2]:
+    oid = _stable_id_value(operator.operator_id)
+    issues: list[CatalogIntegrityIssueV2] = []
+    seen: set[tuple[object, ...]] = set()
+
+    for signature in operator.signatures:
+        if len(signature.operands) != 2:
+            continue
+        key = (
+            signature.operands[0].origin,
+            signature.operands[0].type_constraint,
+            signature.operands[1].origin,
+            signature.operands[1].type_constraint,
+        )
+        if key in seen:
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="AMBIGUOUS_OPERATOR_SIGNATURE",
+                    message=(
+                        f"duplicate operand signature overload for operator {oid!r}"
+                    ),
+                    entry_id=oid,
+                )
+            )
+        seen.add(key)
+
+    return issues
 
 
 def _validate_plugin_entry_contract(
@@ -245,6 +280,80 @@ def _validate_plugin_entry_contract(
                 entry_id=pid,
             )
         )
+    return issues
+
+
+def _validate_plugin_parameters(
+    plugin: PluginDescriptorV2,
+) -> list[CatalogIntegrityIssueV2]:
+    pid = _stable_id_value(plugin.plugin_id)
+    issues: list[CatalogIntegrityIssueV2] = []
+    seen_names: set[str] = set()
+    config_names: set[str] = set()
+    signal_names: set[str] = set()
+
+    for parameter in plugin.parameters:
+        if type(parameter.binding_target) is not PluginParameterBindingTargetV2:
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="INVALID_BINDING_TARGET",
+                    message="plugin parameter binding_target must be PluginParameterBindingTargetV2",
+                    entry_id=pid,
+                )
+            )
+            continue
+        pname = _stable_id_value(parameter.definition.name)
+        if pname in seen_names:
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="DUPLICATE_PLUGIN_PARAMETER",
+                    message=f"duplicate plugin parameter {pname!r}",
+                    entry_id=pid,
+                )
+            )
+        seen_names.add(pname)
+        if parameter.binding_target is PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG:
+            config_names.add(pname)
+        else:
+            signal_names.add(pname)
+
+    overlap = config_names & signal_names
+    for pname in sorted(overlap):
+        issues.append(
+            CatalogIntegrityIssueV2(
+                code="AMBIGUOUS_BINDING_TARGET",
+                message=f"parameter {pname!r} has conflicting binding targets",
+                entry_id=pid,
+            )
+        )
+
+    mode_contract = plugin.mode_contract
+    if type(mode_contract.requirement) is not PluginModeRequirementV2:
+        issues.append(
+            CatalogIntegrityIssueV2(
+                code="INVALID_MODE_CONTRACT",
+                message="mode_contract.requirement must be PluginModeRequirementV2",
+                entry_id=pid,
+            )
+        )
+    elif mode_contract.requirement is PluginModeRequirementV2.NOT_APPLICABLE:
+        if mode_contract.allowed_modes:
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="INVALID_MODE_CONTRACT",
+                    message="not_applicable mode_contract must have empty allowed_modes",
+                    entry_id=pid,
+                )
+            )
+    elif not mode_contract.allowed_modes:
+        issues.append(
+            CatalogIntegrityIssueV2(
+                code="INVALID_MODE_CONTRACT",
+                message="required/optional mode_contract must declare allowed_modes",
+                entry_id=pid,
+            )
+        )
+
     return issues
 
 

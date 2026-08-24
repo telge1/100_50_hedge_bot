@@ -21,6 +21,8 @@ from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
     OperandOriginV2,
     OperandTypeConstraintV2,
     ParameterValueType,
+    PluginModeRequirementV2,
+    PluginParameterBindingTargetV2,
     ResearchConfirmationPolicyV2,
     SignalTimeframeModeV2,
     TemporalShape,
@@ -40,6 +42,9 @@ from orderbook_analyse.strategy_lab.models.contracts_v2.granularity import (
     TimeframeGranularityV2,
     _DATA_GRANULARITY_V2_TYPES,
 )
+from orderbook_analyse.strategy_lab.models.contracts_v2.mode import (
+    PluginModeContractV2,
+)
 from orderbook_analyse.strategy_lab.models.contracts_v2.operator import (
     ObservationContractV2,
     OperatorOperandSpecV2,
@@ -54,6 +59,9 @@ from orderbook_analyse.strategy_lab.models.contracts_v2.padding import (
 )
 from orderbook_analyse.strategy_lab.models.contracts_v2.param_mapping import (
     param_value_to_parameter_type,
+)
+from orderbook_analyse.strategy_lab.models.contracts_v2.mode import (
+    PluginModeContractV2,
 )
 from orderbook_analyse.strategy_lab.models.contracts_v2.plugin import (
     BoundFeatureRequirementV2,
@@ -112,6 +120,9 @@ __all__ = [
     "PaddingNotApplicable",
     "ParameterDefinitionV2",
     "ParameterValueType",
+    "PluginModeContractV2",
+    "PluginModeRequirementV2",
+    "PluginParameterBindingTargetV2",
     "PluginParameterBindingValueV2",
     "PluginParameterDefinitionV2",
     "ResearchConfirmationPolicyV2",

@@ -125,6 +125,34 @@ def test_plugin_descriptors_complete() -> None:
     assert cluster.confirmation_policy is None
 
 
+def test_edc_mode_contract_required_m0_strict_sync() -> None:
+    from orderbook_analyse.strategy_lab.models.contracts_v2 import (
+        PluginModeRequirementV2,
+    )
+
+    edc = get_plugin_v2("edc_m0_strict_sync")
+    assert edc.mode_contract.requirement is PluginModeRequirementV2.REQUIRED
+    assert tuple(mode.value for mode in edc.mode_contract.allowed_modes) == (
+        "m0_strict_sync",
+    )
+
+
+def test_cluster_mode_contract_not_applicable() -> None:
+    from orderbook_analyse.strategy_lab.models.contracts_v2 import (
+        PluginModeRequirementV2,
+        PluginParameterBindingTargetV2,
+    )
+
+    cluster = get_plugin_v2("cluster_sweep")
+    assert cluster.mode_contract.requirement is PluginModeRequirementV2.NOT_APPLICABLE
+    assert cluster.mode_contract.allowed_modes == ()
+    assert cluster.parameters
+    assert all(
+        item.binding_target is PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG
+        for item in cluster.parameters
+    )
+
+
 def test_cluster_warmup_selected_signal_timeframe() -> None:
     cluster = get_plugin_v2("cluster_sweep")
     warmup = cluster.signal_warmup

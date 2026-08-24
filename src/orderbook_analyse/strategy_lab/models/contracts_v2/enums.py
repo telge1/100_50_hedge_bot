@@ -167,3 +167,18 @@ class AdapterBindingStatusV2(str, Enum):
     CATALOG_ONLY = "catalog_only"
     ADAPTER_PENDING = "adapter_pending"
     ADAPTER_AVAILABLE = "adapter_available"
+
+
+class PluginParameterBindingTargetV2(str, Enum):
+    """Where a plugin parameter value must be bound in StrategySpecV2."""
+
+    PLUGIN_REF_CONFIG = "plugin_ref_config"
+    PLUGIN_SIGNAL_SPEC = "plugin_signal_spec"
+
+
+class PluginModeRequirementV2(str, Enum):
+    """Whether and how a plugin uses mode_id on PluginSignalSpec."""
+
+    REQUIRED = "required"
+    OPTIONAL = "optional"
+    NOT_APPLICABLE = "not_applicable"

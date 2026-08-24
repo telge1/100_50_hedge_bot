@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
+    PluginModeRequirementV2,
+    PluginParameterBindingTargetV2,
+)
 from orderbook_analyse.strategy_lab.models.contracts_v2.feature import ParameterDefinitionV2
 from orderbook_analyse.strategy_lab.models.identifiers import StableIdentifier
 from orderbook_analyse.strategy_lab.models.strategy import (
@@ -42,9 +46,17 @@ _PLUGIN_PARAMETER_BINDING_VALUE_TYPES: tuple[type, ...] = (
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PluginParameterDefinitionV2:
-    """Plugin-level parameter with typed allowed identifiers."""
+    """Plugin-level parameter with explicit binding target."""
 
     definition: ParameterDefinitionV2
+    binding_target: PluginParameterBindingTargetV2
+
+    def __post_init__(self) -> None:
+        if type(self.binding_target) is not PluginParameterBindingTargetV2:
+            raise TypeError(
+                "PluginParameterDefinitionV2.binding_target must be "
+                "PluginParameterBindingTargetV2"
+            )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

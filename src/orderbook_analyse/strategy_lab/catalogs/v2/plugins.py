@@ -26,6 +26,9 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     PaddingNotApplicable,
     ParameterDefinitionV2,
     ParameterValueType,
+    PluginModeContractV2,
+    PluginModeRequirementV2,
+    PluginParameterBindingTargetV2,
     PluginParameterDefinitionV2,
     ResearchConfirmationPolicyV2,
     SelectedSignalTimeframeGranularityV2,
@@ -98,6 +101,10 @@ EDC_M0_STRICT_SYNC = PluginDescriptorV2(
         "CORE_RESEARCH_SUPPORTIVE confirmation policy."
     ),
     parameters=(),
+    mode_contract=PluginModeContractV2(
+        requirement=PluginModeRequirementV2.REQUIRED,
+        allowed_modes=(_SID(value="m0_strict_sync"),),
+    ),
     required_features=(
         BoundFeatureRequirementV2(
             alias=_SID(value="ema_fast"),
@@ -386,6 +393,7 @@ CLUSTER_SWEEP = PluginDescriptorV2(
                 research_space_varies=True,
                 baseline_defining=True,
             ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
         ),
         PluginParameterDefinitionV2(
             definition=ParameterDefinitionV2(
@@ -402,6 +410,7 @@ CLUSTER_SWEEP = PluginDescriptorV2(
                 research_space_varies=True,
                 baseline_defining=False,
             ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
         ),
         PluginParameterDefinitionV2(
             definition=ParameterDefinitionV2(
@@ -418,6 +427,7 @@ CLUSTER_SWEEP = PluginDescriptorV2(
                 research_space_varies=True,
                 baseline_defining=True,
             ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
         ),
         PluginParameterDefinitionV2(
             definition=ParameterDefinitionV2(
@@ -434,6 +444,7 @@ CLUSTER_SWEEP = PluginDescriptorV2(
                 research_space_varies=False,
                 baseline_defining=True,
             ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
         ),
         PluginParameterDefinitionV2(
             definition=ParameterDefinitionV2(
@@ -453,7 +464,12 @@ CLUSTER_SWEEP = PluginDescriptorV2(
                 research_space_varies=False,
                 baseline_defining=True,
             ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
         ),
+    ),
+    mode_contract=PluginModeContractV2(
+        requirement=PluginModeRequirementV2.NOT_APPLICABLE,
+        allowed_modes=(),
     ),
     required_features=(
         BoundFeatureRequirementV2(

@@ -12,7 +12,7 @@ from orderbook_analyse.strategy_lab.models.enums import (
     TransitionConflictPolicy,
     TransitionExecutionPolicy,
 )
-from orderbook_analyse.strategy_lab.models.identifiers import StableIdentifier
+from orderbook_analyse.strategy_lab.models.identifiers import ContractVersion, StableIdentifier
 from orderbook_analyse.strategy_lab.models.rules import BooleanExpression, RuleComponentSpec
 from orderbook_analyse.strategy_lab.models.state_machine import (
     ResetRule,
@@ -64,6 +64,7 @@ class SideRuleBundle:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RuleBasedSignalSpec:
     _schema_kind: ClassVar[str] = "rule_based"
+    operator_contract_version: ContractVersion
     directionality: Directionality
     evaluation_timing: EvaluationTiming
     components: tuple[RuleComponentSpec, ...] = ()
@@ -74,6 +75,7 @@ class RuleBasedSignalSpec:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class StateMachineSignalSpec:
     _schema_kind: ClassVar[str] = "state_machine"
+    operator_contract_version: ContractVersion
     directionality: Directionality
     evaluation_timing: EvaluationTiming
     initial_state: StableIdentifier

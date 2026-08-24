@@ -82,6 +82,10 @@ def sid(name: str) -> StableIdentifier:
     return StableIdentifier(value=name)
 
 
+def _catalog_v2() -> ContractVersion:
+    return ContractVersion(value="catalog/v2")
+
+
 def _plugin_v2(
     pid: str = "edc_m0_strict_sync",
     *,
@@ -299,6 +303,7 @@ def rule_based_signal_v2(
             invalidation=None,
         )
     return RuleBasedSignalSpec(
+        operator_contract_version=_catalog_v2(),
         directionality=directionality,
         evaluation_timing=EvaluationTiming.SIGNAL_BAR_CLOSE,
         long=long,
@@ -311,6 +316,7 @@ def state_machine_signal_v2() -> StateMachineSignalSpec:
     armed = sid("armed")
     condition = _comparison()
     return StateMachineSignalSpec(
+        operator_contract_version=_catalog_v2(),
         directionality=Directionality.LONG,
         evaluation_timing=EvaluationTiming.SIGNAL_BAR_CLOSE,
         initial_state=idle,

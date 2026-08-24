@@ -1544,6 +1544,9 @@
             }
           ]
         },
+        "operator_contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
         "short": {
           "oneOf": [
             {
@@ -1560,6 +1563,7 @@
         "evaluation_timing",
         "kind",
         "long",
+        "operator_contract_version",
         "short"
       ],
       "title": "RuleBasedSignalSpec",
@@ -1818,6 +1822,9 @@
           "const": "state_machine",
           "type": "string"
         },
+        "operator_contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
         "reset_rules": {
           "items": {
             "$ref": "#/$defs/ResetRule"
@@ -1856,6 +1863,7 @@
         "evaluation_timing",
         "initial_state",
         "kind",
+        "operator_contract_version",
         "reset_rules",
         "states",
         "transition_conflict_policy",

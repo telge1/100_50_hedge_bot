@@ -126,6 +126,29 @@ Cluster: next signal-TF open after confirmation bar close.
 - `contract_version: ContractVersion` (e.g. `catalog/v2`)
 - `config: tuple[ConfigEntry, ...]`
 
+Plugin parameters declare an explicit `binding_target`:
+
+- `plugin_ref_config` — value belongs in `PluginRefV2.config`
+- `plugin_signal_spec` — value belongs on promoted `PluginSignalSpec` fields
+
+Promoted fields (`mode_id`, `confirmation_policy`) must not appear in config.
+See `RESERVED_PLUGIN_CONFIG_KEYS`.
+
+`PluginModeContractV2` on each plugin descriptor:
+
+- `required` + closed `allowed_modes` (EDC: `m0_strict_sync`, legacy `M0_STRICT_SYNC`)
+- `optional` + closed `allowed_modes`
+- `not_applicable` (cluster sweep)
+
+## Rule-based operator catalog version
+
+`RuleBasedSignalSpec` and `StateMachineSignalSpec` require
+`operator_contract_version: ContractVersion` (e.g. `catalog/v2`). All rule trees
+and embedded components under that signal share this frozen operator semantics.
+
+`PluginSignalSpec` does not carry operator catalog version; plugin rules are not
+embedded in the strategy file.
+
 Reserved config keys (typed `StableIdentifier`): `mode_id`, `confirmation_policy`,
 `plugin_id`, `contract_version`.
 
