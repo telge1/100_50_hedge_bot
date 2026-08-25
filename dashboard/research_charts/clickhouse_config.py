@@ -21,6 +21,19 @@ DEFAULT_HTTP_PORT = 8123
 DEFAULT_EXCHANGE = "bybit"
 DEFAULT_TABLE = "candles_1m"
 
+# Process env may be polluted by orderbook_analyse dotenv (orderbook_analysis DB).
+# Research candles always read credentials + DB from the collector .env unless
+# RESEARCH_CLICKHOUSE_* overrides are set explicitly.
+_CONFIG_OVERLAY_KEYS = (
+    "CLICKHOUSE_HOST",
+    "CLICKHOUSE_HTTP_PORT",
+    "CLICKHOUSE_PORT",
+    "CLICKHOUSE_USER",
+    "CLICKHOUSE_PASSWORD",
+    "RESEARCH_CLICKHOUSE_DATABASE",
+    "RESEARCH_CANDLE_EXCHANGE",
+    "RESEARCH_CANDLE_TABLE",
+)
 
 @dataclass(frozen=True)
 class ClickHouseConfig:
@@ -57,15 +70,25 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 def load_clickhouse_config(environ: dict[str, str] | None = None) -> ClickHouseConfig:
     file_env = _parse_env_file(DEFAULT_ENV_FILE)
-    env = {**file_env, **(environ if environ is not None else dict(os.environ))}
+    overlay = environ if environ is not None else dict(os.environ)
+    env = dict(file_env)
+    for key in _CONFIG_OVERLAY_KEYS:
+        val = overlay.get(key)
+        if val:
+            env[key] = val
     port_raw = env.get("CLICKHOUSE_HTTP_PORT") or env.get("CLICKHOUSE_PORT") or str(DEFAULT_HTTP_PORT)
     missing = [key for key in ("CLICKHOUSE_USER", "CLICKHOUSE_PASSWORD") if key not in env]
     if missing:
         raise RuntimeError("Missing ClickHouse config: " + ", ".join(missing))
+    database = str(
+        env.get("RESEARCH_CLICKHOUSE_DATABASE")
+        or env.get("CLICKHOUSE_DATABASE")
+        or DEFAULT_DATABASE
+    ).strip()
     return ClickHouseConfig(
         host=str(env.get("CLICKHOUSE_HOST") or DEFAULT_HOST).strip(),
         port=int(str(port_raw).strip()),
-        database=str(env.get("CLICKHOUSE_DATABASE") or DEFAULT_DATABASE).strip(),
+        database=database,
         user=str(env["CLICKHOUSE_USER"]).strip(),
         password=str(env.get("CLICKHOUSE_PASSWORD", "")),
         exchange=str(env.get("RESEARCH_CANDLE_EXCHANGE") or DEFAULT_EXCHANGE).strip() or DEFAULT_EXCHANGE,

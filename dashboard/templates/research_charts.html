@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=time-clip-1">
+    <link rel="stylesheet" href="/static/css/research.css?v=history-3">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -41,8 +41,29 @@
                     <select id="researchSymbol" class="trp-select"></select>
                     <label class="trp-check"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair Sync</label>
                     <label class="trp-check"><input type="checkbox" id="researchOverlayTest"> Overlay Test</label>
-                    <button type="button" class="trp-text-btn trp-primary" id="researchBacktesterBtn" title="Stoch-Signale als Long/Short mit Entry/TP/SL laden">Backtester</button>
+                    <button type="button" class="trp-text-btn trp-primary" id="researchBacktesterBtn" title="Backtester-Ergebnisse ein-/ausblenden">Backtester</button>
+                    <select id="researchBtStrategy" class="trp-select" title="Research-Strategie">
+                        <option value="stoch_fade">Stochastic Fade</option>
+                        <option value="cluster_sweep_ema_9_20_59">Cluster Sweep EMA 9/20/59 (LEGACY)</option>
+                        <option value="ema_dual_cross_multisource_v1">EMA Dual Cross Multi-Source v1</option>
+                    </select>
+                    <button type="button" class="trp-text-btn" id="researchBtRunBtn" title="Cluster-Sweep Backtest starten" hidden>Backtest starten</button>
+                    <button type="button" class="trp-text-btn" id="researchCswSettingsBtn" title="Cluster-Sweep Einstellungen" hidden>⚙ CS</button>
                     <span id="researchJobSourceNote" class="research-job-source-note" hidden></span>
+                    <button type="button" class="trp-text-btn" id="researchEdcSettingsBtn" title="EMA Dual Cross Einstellungen" hidden>⚙ EDC</button>
+                    <span id="researchCswNav" class="research-csw-nav" hidden>
+                        <button type="button" class="trp-text-btn" id="researchCswPrev" title="Vorheriges Event">◀</button>
+                        <span id="researchCswIndex" class="research-chip">0/0</span>
+                        <button type="button" class="trp-text-btn" id="researchCswNext" title="Nächstes Event">▶</button>
+                        <button type="button" class="trp-text-btn" id="researchCswZoom" title="Zoom auf Event">Zoom</button>
+                    </span>
+                    <span id="researchEdcNav" class="research-csw-nav" hidden>
+                        <button type="button" class="trp-text-btn" id="researchEdcPrev" title="Vorheriger Kandidat">◀</button>
+                        <span id="researchEdcIndex" class="research-chip">0/0</span>
+                        <button type="button" class="trp-text-btn" id="researchEdcNext" title="Nächster Kandidat">▶</button>
+                        <button type="button" class="trp-text-btn" id="researchEdcZoom" title="Zoom auf Kandidat">Zoom</button>
+                    </span>
+                    <span id="researchCswDebugBadge" class="research-chip research-csw-debug" hidden>Low-pool debug</span>
                 </div>
                 <div class="trp-footerbar">
                     <span class="trp-field-label">EMA OVERLAYS</span>
@@ -64,6 +85,25 @@
             <div class="trp-chart-dock" id="researchChartDock">
                 <div class="trp-dock-bar" id="researchDockBar">
                     <div class="trp-resize-n" id="researchHeightHandle" title="Leiste nach oben/unten ziehen"></div>
+                    <span class="trp-field-label">HISTORY</span>
+                    <select id="researchHistoryPreset" class="trp-select" title="Candle-History on demand (UTC)">
+                        <option value="rolling">Rolling (~17d)</option>
+                        <option value="7d">7 Tage</option>
+                        <option value="30d" selected>30 Tage</option>
+                        <option value="90d">90 Tage</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <span id="researchHistoryCustomWrap" class="research-history-custom" hidden>
+                        <input type="datetime-local" id="researchHistoryStart" title="History Start UTC" aria-label="History Start UTC">
+                        <input type="datetime-local" id="researchHistoryEnd" title="History Ende UTC" aria-label="History Ende UTC">
+                    </span>
+                    <button type="button" class="trp-text-btn" id="researchHistoryApply" title="History für sichtbare Panes laden">Laden</button>
+                    <span class="trp-field-label">GO TO</span>
+                    <input type="datetime-local" id="researchGoTo" title="Datum/Zeit UTC" aria-label="Go To UTC">
+                    <button type="button" class="trp-text-btn" id="researchGoToBtn" title="Zu Datum springen">Springen</button>
+                    <span id="researchHistoryHint" class="trp-muted research-history-hint"></span>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchSyncChartAfterBt" checked> Chart nach Backtest</label>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
                     <span class="trp-field-label">LAYOUT</span>
                     <div class="trp-layout-group" id="trpLayouts">
                         <button type="button" class="trp-layout-btn active" data-layout="1">1</button>
@@ -77,6 +117,31 @@
                     <button type="button" class="trp-text-btn" id="trpStochSettings" title="Stochastic Settings">⚙</button>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Liquidity Location</label>
                     <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchVpEnabled"> Volume Profile</label>
+                    <select id="researchVpRows" class="trp-select trp-width" title="Rows" aria-label="Volume Profile Rows">
+                        <option value="auto">Auto</option>
+                        <option value="24">24</option>
+                        <option value="48">48</option>
+                        <option value="72">72</option>
+                        <option value="100">100</option>
+                    </select>
+                    <select id="researchVpDisplay" class="trp-select" title="Darstellung" aria-label="Volume Profile Display">
+                        <option value="buy_sell">Buy/Sell</option>
+                        <option value="total">Gesamt</option>
+                        <option value="delta">Delta</option>
+                    </select>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchVpPoc" checked> POC</label>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchVpVa" checked> Value Area</label>
+                    <select id="researchVpWidth" class="trp-select trp-width" title="Profilbreite" aria-label="Profilbreite">
+                        <option value="compact">Kompakt</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="wide">Breit</option>
+                    </select>
+                    <select id="researchVpMode" class="trp-select trp-width" title="Volumen" aria-label="Volume mode">
+                        <option value="base">Base</option>
+                        <option value="quote">Quote</option>
+                    </select>
                     <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
                     <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
@@ -204,7 +269,98 @@
         </div>
     </div>
 
-    <script src="/static/js/research/research_charts.js?v=time-clip-1"></script>
+    <div class="trp-modal" id="modalCsw" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>Cluster Sweep EMA 9/20/59</h2>
+            <p class="trp-muted">Research-only · ClickHouse read-only · Zeiten UTC · keine Live-Orders</p>
+            <fieldset><legend>Zeitraum (UTC)</legend>
+                <label>Start <input type="datetime-local" id="cswStart"></label>
+                <label>Ende <input type="datetime-local" id="cswEnd"></label>
+                <label>Timeframe
+                    <select id="cswTf">
+                        <option value="5m" selected>5m</option>
+                        <option value="15m">15m</option>
+                    </select>
+                </label>
+            </fieldset>
+            <fieldset><legend>Cluster / EMA</legend>
+                <label>minimum_cluster_pools <input type="number" id="cswMinPools" min="1" max="20" value="3"></label>
+                <label class="trp-check"><input type="checkbox" id="cswDebugLowPool"> Low-pool debug zones (&lt;3)</label>
+                <label>EMA fast <input type="number" id="cswEmaFast" min="1" max="200" value="9"></label>
+                <label>EMA medium <input type="number" id="cswEmaMed" min="1" max="200" value="20"></label>
+                <label>EMA slow <input type="number" id="cswEmaSlow" min="1" max="500" value="59"></label>
+                <label class="trp-check"><input type="checkbox" id="cswDetailMarkers"> Detail-Marker (Approach/Touch/…)</label>
+            </fieldset>
+            <details>
+                <summary>Erweiterte Research-Einstellungen</summary>
+                <label>Expire bars <input type="number" id="cswExpire" min="1" max="200" value="24"></label>
+                <p class="trp-muted">Confirmation-Varianten werden alle gemessen; die UI zeigt die früheste gefeuerte Variante.</p>
+            </details>
+            <div id="cswEventPanel" class="research-csw-panel" hidden>
+                <h3>Event-Detail</h3>
+                <pre id="cswEventDetail" class="research-csw-detail"></pre>
+                <label>manual_chart_verdict
+                    <select id="cswManualVerdict">
+                        <option value="">—</option>
+                        <option>MATCH</option>
+                        <option>FALSE_POSITIVE</option>
+                        <option>MISSED_EVENT</option>
+                        <option>WRONG_CLUSTER</option>
+                        <option>WRONG_TIMESTAMP</option>
+                        <option>LOOKAHEAD</option>
+                        <option>UNCLEAR</option>
+                        <option>INCONCLUSIVE_DATA</option>
+                    </select>
+                </label>
+                <label>manual_reason <input type="text" id="cswManualReason"></label>
+                <label>reviewer_notes <input type="text" id="cswReviewerNotes"></label>
+                <p class="trp-muted">Review-Felder lokal — keine Auto-MATCH, keine DB-Migration.</p>
+            </div>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-close="modalCsw">Schließen</button>
+                <button type="button" class="trp-text-btn trp-primary" id="cswRunFromModal">Backtest starten</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalEdc" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>EMA Dual Cross Multi-Source v1</h2>
+            <p class="trp-muted">Research-only · EMA-Kandidat → Multi-Source Gate → ALLOW/BLOCK/INCONCLUSIVE · LLD nur Confluence</p>
+            <fieldset><legend>Zeitraum (UTC)</legend>
+                <p id="edcRangeHint" class="trp-muted">Standard: letzte 30 Tage · nur aktuelles Symbol</p>
+                <label>Start <input type="datetime-local" id="edcStart"></label>
+                <label>Ende <input type="datetime-local" id="edcEnd"></label>
+                <label>Timeframe
+                    <select id="edcTf">
+                        <option value="15m" selected>15m</option>
+                        <option value="5m">5m</option>
+                    </select>
+                </label>
+            </fieldset>
+            <fieldset><legend>Kandidaten-Typen</legend>
+                <label class="trp-check"><input type="checkbox" id="edcEnableSync" checked> Synchroner Dual-EMA-Cross</label>
+                <label class="trp-check"><input type="checkbox" id="edcEnableRebound"> Compressed EMA59 Rebound</label>
+            </fieldset>
+            <fieldset><legend>Marker-Sichtbarkeit</legend>
+                <label class="trp-check"><input type="checkbox" id="edcShowCand" checked> Kandidaten (B-CAND/S-CAND)</label>
+                <label class="trp-check"><input type="checkbox" id="edcShowAllow" checked> ALLOW + ENT</label>
+                <label class="trp-check"><input type="checkbox" id="edcShowBlock"> BLOCK</label>
+                <label class="trp-check"><input type="checkbox" id="edcShowInc"> INCONCLUSIVE</label>
+                <label class="trp-check"><input type="checkbox" id="edcShowRej"> Verworfene EMA-Crosses (REJ)</label>
+            </fieldset>
+            <div id="edcCandidatePanel" class="research-csw-panel" hidden>
+                <h3>Kandidaten-Detail</h3>
+                <pre id="edcCandidateDetail" class="research-csw-detail"></pre>
+            </div>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-close="modalEdc">Schließen</button>
+                <button type="button" class="trp-text-btn trp-primary" id="edcRunFromModal">Backtest starten</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/research/research_charts.js?v=history-5"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

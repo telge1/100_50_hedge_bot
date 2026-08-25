@@ -12,7 +12,15 @@ from stoch_fade_research_jobs.feed import JOB_ID_RE, parse_job_id
 from stoch_fade_research_jobs.jobs import redact_public
 
 from .artifacts import load_combined_summary, read_outcomes_prefer_root
-from .config import EXIT_POLICY, SIGNAL_SCOPE, SOURCE, STRATEGY_VERSION, evaluations_root
+from .config import (
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
+    EXIT_POLICY,
+    SIGNAL_SCOPE,
+    SOURCE,
+    STRATEGY_VERSION,
+    evaluations_root,
+)
 
 SELECTABLE = frozenset({"COMPLETED", "COMPLETED_WITH_ERRORS"})
 MAX_LIMIT = 500
@@ -28,6 +36,17 @@ def _stored_exit_policy(directory: Path) -> str:
         except Exception:  # noqa: BLE001
             return ""
     return ""
+
+
+def _stored_request(directory: Path) -> dict[str, Any]:
+    req = directory / "request.json"
+    if not req.is_file():
+        return {}
+    try:
+        data = read_json(req)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def list_evaluations(environ: dict | None = None, *, source_job_id: str | None = None) -> list[dict[str, Any]]:
@@ -48,11 +67,19 @@ def list_evaluations(environ: dict | None = None, *, source_job_id: str | None =
             continue
         if str(status.get("state") or "") not in SELECTABLE:
             continue
+        req = _stored_request(child)
         if _stored_exit_policy(child) != EXIT_POLICY:
             continue
         if want and str(status.get("source_job_id") or "") != want:
             continue
         combined = load_combined_summary(child, status)
+        identity_kind = (
+            "CAUSAL_CANONICAL"
+            if str(req.get("confirmation_policy") or "") == CONFIRMATION_POLICY
+            and str(req.get("causal_manifest_hash") or "") == CAUSAL_MANIFEST_HASH
+            and str(req.get("fixed_strategy_version") or "") == STRATEGY_VERSION
+            else "LEGACY_WAVE_END_NON_CAUSAL"
+        )
         rows.append(
             {
                 "evaluation_id": child.name,
@@ -68,6 +95,9 @@ def list_evaluations(environ: dict | None = None, *, source_job_id: str | None =
                 "exit_policy": EXIT_POLICY,
                 "signal_strategy_version": STRATEGY_VERSION,
                 "outcome_engine": "evaluate_signal_no_be50",
+                "confirmation_policy": req.get("confirmation_policy"),
+                "identity_kind": identity_kind,
+                "legacy_warning": identity_kind != "CAUSAL_CANONICAL",
                 "intrabar_policy": "SL_FIRST",
                 "signal_scope": SIGNAL_SCOPE,
                 "execution_dedup_applied": False,

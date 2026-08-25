@@ -276,7 +276,7 @@ def test_worker_order_argv_and_continue(tmp_path, monkeypatch):
     man = json.loads((directory / "job_manifest.json").read_text())
     assert man["sequential"] is True
     assert man["max_parallelism"] == 1
-    assert man["fixed_strategy_version"] == "wave_fade_frozen_f16ae32"
+    assert man["fixed_strategy_version"] == "wave_fade_frozen_f16ae32_causal_entry_v1"
 
 
 def test_timeout_and_single_child(tmp_path, monkeypatch):
@@ -337,6 +337,108 @@ def test_orphan_lock_and_no_kill_foreign(tmp_path, monkeypatch):
     status = json.loads((d / "status.json").read_text())
     assert status["state"] == "INTERRUPTED"
     assert not lock_path(env).exists()
+
+
+def test_orphan_running_coin_not_left_running(tmp_path, monkeypatch):
+    env, _, jobs = _env(tmp_path, monkeypatch)
+    job_id = "deadrun1deadrun1deadrun1deadrun1"
+    d = jobs / job_id
+    d.mkdir()
+    coins = [
+        {
+            "symbol": "XRPUSDT",
+            "state": "RUNNING",
+            "warmup_complete": None,
+            "warmup_complete_by_tf": {},
+            "warmup_schema_error": None,
+        },
+        {
+            "symbol": "SOLUSDT",
+            "state": "PENDING",
+            "warmup_complete": None,
+            "warmup_complete_by_tf": {},
+            "warmup_schema_error": None,
+        },
+    ]
+    atomic(d / "status.json", {"job_id": job_id, "state": "RUNNING", "coins": coins, "worker_pid": 1})
+    atomic(d / "progress.json", {"coins": coins})
+    atomic(lock_path(env), {"job_id": job_id, "pid": 1})
+    monkeypatch.setattr("stoch_fade_research_jobs.jobs.pid_alive", lambda pid: True)
+    monkeypatch.setattr("stoch_fade_research_jobs.jobs._proc_cmdline", lambda pid: "/usr/bin/sshd")
+    monkeypatch.setattr("stoch_fade_research_jobs.jobs.worker_is_live", lambda pid, job_id: False)
+    assert reconcile_lock(env) is None
+    status = json.loads((d / "status.json").read_text())
+    progress = json.loads((d / "progress.json").read_text())
+    assert status["state"] == "INTERRUPTED"
+    assert status["worker_pid"] is None
+    by = {c["symbol"]: c for c in status["coins"]}
+    assert by["XRPUSDT"]["state"] == "INTERRUPTED"
+    assert by["SOLUSDT"]["state"] == "PENDING"
+    pby = {c["symbol"]: c for c in progress["coins"]}
+    assert pby["XRPUSDT"]["state"] == "INTERRUPTED"
+    assert pby["SOLUSDT"]["state"] == "PENDING"
+
+
+def test_warmup_display_label_pending_not_artifact_error():
+    from stoch_fade_research_jobs.jobs import public_coin, warmup_display_label
+
+    pending = {
+        "symbol": "SOLUSDT",
+        "state": "PENDING",
+        "warmup_complete": None,
+        "warmup_complete_by_tf": {},
+        "warmup_schema_error": None,
+    }
+    running = {**pending, "state": "RUNNING", "symbol": "XRPUSDT"}
+    interrupted = {**pending, "state": "INTERRUPTED"}
+    failed = {**pending, "state": "FAILED", "warmup_schema_error": "WARMUP_SCHEMA_MISSING"}
+    complete_bad = {
+        "symbol": "ETHUSDT",
+        "state": "COMPLETED",
+        "warmup_complete": True,
+        "warmup_complete_by_tf": {},
+        "warmup_schema_error": "WARMUP_SCHEMA_MISSING",
+    }
+    complete_ok = {
+        "symbol": "ETHUSDT",
+        "state": "COMPLETED",
+        "warmup_complete": True,
+        "warmup_complete_by_tf": {"15m": True, "30m": True, "1h": True, "4h": True},
+        "warmup_schema_error": None,
+    }
+    assert warmup_display_label(pending) == "Noch nicht gestartet"
+    assert warmup_display_label(running) == "Läuft"
+    assert warmup_display_label(interrupted) == "Unterbrochen"
+    assert warmup_display_label(failed) == "Artefaktfehler"
+    assert warmup_display_label(complete_bad) == "Artefaktfehler"
+    assert warmup_display_label(complete_ok) == "vollständig"
+    assert public_coin(pending)["warmup_label"] == "Noch nicht gestartet"
+    assert public_coin(running)["warmup_label"] == "Läuft"
+
+
+def test_sg_python_preflight_fail_closed(tmp_path):
+    from worker_env import PINNED_SG_PYTHON, sg_python_preflight
+
+    missing = sg_python_preflight({"STOCH_FADE_SG_PYTHON": str(tmp_path / "no-such-python")})
+    assert missing["ok"] is False
+    assert missing["error_code"] == "MISSING_SG_PYTHON"
+    shell = sg_python_preflight({"STOCH_FADE_SG_PYTHON": "python3"})
+    assert shell["ok"] is False
+    assert shell["error_code"] == "MISSING_SG_PYTHON"
+    foreign = sg_python_preflight(
+        {
+            "STOCH_FADE_SG_PYTHON": (
+                "/home/telgenbuescher/projects/Signal_Generator_Ralf/"
+                "signal_generator_stoch_waves/.venv/bin/python"
+            )
+        }
+    )
+    assert foreign["ok"] is False
+    assert foreign["error_code"] == "GOLD_VENV_IMPORT_ORIGIN_FAIL"
+    if PINNED_SG_PYTHON.is_file():
+        ok = sg_python_preflight({})
+        assert ok["ok"] is True
+        assert str(ok["python_path"]).endswith("/wave_fade_gold_f16ae32/.venv/bin/python")
 
 
 def test_resume_skips_complete(tmp_path, monkeypatch):
@@ -404,7 +506,9 @@ def test_ui_and_default_strategy_unchanged():
     html = (DASHBOARD / "templates" / "stoch_signale.html").read_text(encoding="utf-8")
     js = (DASHBOARD / "static" / "js" / "stoch_signale.js").read_text(encoding="utf-8")
     assert "Frozen Stochastic Fade – Signale berechnen" in html
-    assert "Frozen-Signale berechnen" in html
+    assert "Kausalen Backtest starten" in html
+    assert "Kausaler Backtest Ergebnis" in html
+    assert 'id="frozenFadeResultCard"' in html
     assert "Nur Signalerzeugung" in html
     assert 'option value="wave_fade_no_be50_v1" selected' in html
     assert "universe51SelectAll" in html
@@ -685,5 +789,9 @@ def test_ui_cross_lock_and_warmup_copy():
     assert "frozenFadeJobActive()" in js
     assert "frozenFadeWarmupCell" in js
     assert "Artefaktfehler" in js
+    assert "Noch nicht gestartet" in js
+    assert 'state === "PENDING"' in js
+    assert 'state === "INTERRUPTED"' in js
+    assert "c.warmup_label" in js
     assert "setDesiredState" in js
     assert "universe51JobActive() || (typeof frozenFadeJobActive" in js

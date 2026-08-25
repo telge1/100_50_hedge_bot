@@ -585,6 +585,17 @@ def _is_circuit_breaker_exempt(path: str) -> bool:
         return True
     if path.startswith("/api/research/forming-bar"):
         return True
+    # Research chart reads poll frequently; transient CH slowness must not block the UI for 60s.
+    if path.startswith("/api/research/candles"):
+        return True
+    if path.startswith("/api/research/indicators"):
+        return True
+    if path.startswith("/api/research/overlays"):
+        return True
+    if path.startswith("/api/research/volume-profile"):
+        return True
+    if path.startswith("/api/research/backtester/"):
+        return True
     return False
 
 
@@ -2613,14 +2624,15 @@ async def timeout_and_error_handler(request: Request, call_next):
             return response
         except asyncio.TimeoutError:
             logger.error(f"⏱️ Timeout für {endpoint} nach 150s")
-            # Erhöhe Circuit Breaker Failures
-            if endpoint not in circuit_breaker:
-                circuit_breaker[endpoint] = {'failures': 0, 'last_failure': 0, 'state': 'closed'}
-            circuit_breaker[endpoint]['failures'] += 1
-            circuit_breaker[endpoint]['last_failure'] = time.time()
-            if circuit_breaker[endpoint]['failures'] >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
-                circuit_breaker[endpoint]['state'] = 'open'
-                logger.error(f"🚫 Circuit Breaker für {endpoint} → OPEN (zu viele Timeouts)")
+            if not _is_circuit_breaker_exempt(request.url.path):
+                # Erhöhe Circuit Breaker Failures
+                if endpoint not in circuit_breaker:
+                    circuit_breaker[endpoint] = {'failures': 0, 'last_failure': 0, 'state': 'closed'}
+                circuit_breaker[endpoint]['failures'] += 1
+                circuit_breaker[endpoint]['last_failure'] = time.time()
+                if circuit_breaker[endpoint]['failures'] >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
+                    circuit_breaker[endpoint]['state'] = 'open'
+                    logger.error(f"🚫 Circuit Breaker für {endpoint} → OPEN (zu viele Timeouts)")
             
             return JSONResponse(
                 status_code=504,
@@ -2632,14 +2644,15 @@ async def timeout_and_error_handler(request: Request, call_next):
             )
         except Exception as e:
             logger.error(f"❌ Fehler in Middleware für {endpoint}: {e}", exc_info=True)
-            # Erhöhe Circuit Breaker Failures
-            if endpoint not in circuit_breaker:
-                circuit_breaker[endpoint] = {'failures': 0, 'last_failure': 0, 'state': 'closed'}
-            circuit_breaker[endpoint]['failures'] += 1
-            circuit_breaker[endpoint]['last_failure'] = time.time()
-            if circuit_breaker[endpoint]['failures'] >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
-                circuit_breaker[endpoint]['state'] = 'open'
-                logger.error(f"🚫 Circuit Breaker für {endpoint} → OPEN (zu viele Fehler)")
+            if not _is_circuit_breaker_exempt(request.url.path):
+                # Erhöhe Circuit Breaker Failures
+                if endpoint not in circuit_breaker:
+                    circuit_breaker[endpoint] = {'failures': 0, 'last_failure': 0, 'state': 'closed'}
+                circuit_breaker[endpoint]['failures'] += 1
+                circuit_breaker[endpoint]['last_failure'] = time.time()
+                if circuit_breaker[endpoint]['failures'] >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
+                    circuit_breaker[endpoint]['state'] = 'open'
+                    logger.error(f"🚫 Circuit Breaker für {endpoint} → OPEN (zu viele Fehler)")
             
             return JSONResponse(
                 status_code=500,
@@ -4315,6 +4328,63 @@ async def _proxy_collector_api(
 async def api_collector_status(user: dict = Depends(require_auth)):
     """Proxy to signal_generator live collector status (localhost)."""
     return await _proxy_collector_api("GET", "/api/collector/status")
+
+
+@app.get("/api/collector/live-feeds")
+async def api_collector_live_feeds(user: dict = Depends(require_auth)):
+    """Read-only OB V3 live + OI/Liq process probe (no start/stop)."""
+    from live_feed_status import live_feeds_overview
+
+    return JSONResponse(await asyncio.to_thread(live_feeds_overview))
+
+
+@app.get("/api/collector/services")
+async def api_collector_services(user: dict = Depends(require_auth)):
+    """Status matrix for Stoch/Public (+ read-only OB/OI)."""
+    from stoch_collector_control import services_overview
+
+    return JSONResponse(await asyncio.to_thread(services_overview))
+
+
+@app.post("/api/collector/services/{service_id}/{action}")
+async def api_collector_service_action(
+    service_id: str,
+    action: str,
+    request: Request,
+    user: dict = Depends(require_auth),
+):
+    """Start/stop/restart Stoch or Public. OB/OI/Import rejected.
+
+    Body (optional JSON):
+      {"confirm": true, "public_gap_lookback_days": 3}
+    """
+    from stoch_collector_control import apply_service_action
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    confirm = bool(body.get("confirm"))
+    lookback = body.get("public_gap_lookback_days")
+    lookback_i = int(lookback) if lookback is not None else None
+    result = await asyncio.to_thread(
+        apply_service_action,
+        service_id,
+        action,
+        confirm=confirm,
+        public_gap_lookback_days=lookback_i,
+    )
+    code = 200 if result.get("ok") else (
+        409 if result.get("error") in (
+            "confirm_required",
+            "already_running_different_mode",
+            "service_not_controllable_yet",
+            "service_not_controllable",
+        ) else 400
+    )
+    return JSONResponse(result, status_code=code)
 
 
 @app.get("/api/collector/desired_state")

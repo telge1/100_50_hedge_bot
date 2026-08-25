@@ -7,7 +7,9 @@ from typing import Any
 
 from stoch_universe_51.jsonio import read_json
 
-from .config import SOURCE_COMMIT, STRATEGY_VERSION
+from .config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, SOURCE_COMMIT, STRATEGY_VERSION
+
+LEGACY_STRATEGY_VERSION = "wave_fade_frozen_f16ae32"
 
 SIGNAL_TFS = ("15m", "30m", "1h", "4h")
 
@@ -60,8 +62,14 @@ def coin_run_is_complete(run_dir: Path, *, symbol: str, signal_start: str, signa
     selected = manifest.get("selected_symbol") or (manifest.get("selected_symbols") or [None])[0]
     if selected != symbol:
         return False
-    if str(manifest.get("strategy_id") or STRATEGY_VERSION) != STRATEGY_VERSION:
+    strategy_id = str(manifest.get("strategy_id") or STRATEGY_VERSION)
+    if strategy_id not in {STRATEGY_VERSION, LEGACY_STRATEGY_VERSION}:
         return False
+    if strategy_id == STRATEGY_VERSION:
+        if str(manifest.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+            return False
+        if str(manifest.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+            return False
     start = str(manifest.get("signal_start") or "").replace("+00:00", "Z")
     end = str(manifest.get("signal_end_exclusive") or "").replace("+00:00", "Z")
     want_start = signal_start.replace("+00:00", "Z")

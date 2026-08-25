@@ -16,6 +16,7 @@ from stoch_universe_51.origin import update_post_guard
 from stoch_universe_51.update_jobs import active_job_id as update_job_active_id
 
 import stoch_heavy_job_gate as heavy_gate
+from worker_env import inject_worker_env
 from stoch_fade_research_jobs.complete import coin_run_is_complete
 from stoch_fade_research_jobs.config import STRATEGY_VERSION as FROZEN_STRATEGY
 from stoch_fade_research_jobs.cross_lock import start_gate
@@ -29,6 +30,9 @@ from stoch_fade_research_jobs.jobs import (
 
 from .artifacts import SIDE_EFFECT_FLAGS, apply_source_counts, empty_coin_row
 from .config import (
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
+    CONFIRMATION_SOURCE,
     COIN_TERM_GRACE_S,
     DISK_RESERVE_BYTES,
     EXIT_POLICY,
@@ -258,6 +262,10 @@ def _validate_source_job(source_job_id: str, environ: dict | None = None) -> tup
         return None, "SOURCE_JOB_NOT_SELECTABLE"
     if str(request.get("fixed_strategy_version") or FROZEN_STRATEGY) != FROZEN_STRATEGY:
         return None, "FROZEN_IDENTITY_MISMATCH"
+    if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+        return None, "FROZEN_IDENTITY_MISMATCH"
+    if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+        return None, "FROZEN_IDENTITY_MISMATCH"
     symbols = [str(s) for s in (request.get("selected_symbols") or []) if s]
     coins = []
     tier_a = 0
@@ -314,8 +322,10 @@ def _write_eval_files(
     source: dict[str, Any],
     created: datetime,
     resume: bool,
+    outcome_data_end: str | None = None,
     prev_status: dict[str, Any] | None = None,
 ) -> None:
+    resolved_outcome_data_end = outcome_data_end or str(source.get("signal_end_exclusive") or "")
     coins = [empty_coin_row(c["symbol"], c) for c in source["coins"]]
     if resume and prev_status:
         prev = {c["symbol"]: c for c in (prev_status.get("coins") or [])}
@@ -333,6 +343,9 @@ def _write_eval_files(
         "fixed_strategy_version": STRATEGY_VERSION,
         "signal_strategy_version": SIGNAL_STRATEGY_VERSION,
         "signal_source_commit": SIGNAL_SOURCE_COMMIT,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
         "exit_policy": EXIT_POLICY,
         "outcome_engine": OUTCOME_ENGINE,
         "intrabar_policy": INTRABAR_POLICY,
@@ -340,6 +353,7 @@ def _write_eval_files(
         "execution_dedup_applied": False,
         "selected_symbols": source["selected_symbols"],
         "requested_at": iso_z(created),
+        "outcome_data_end": resolved_outcome_data_end,
     }
     manifest = {
         "evaluation_id": evaluation_id,
@@ -349,6 +363,9 @@ def _write_eval_files(
         "strategy_version": STRATEGY_VERSION,
         "signal_strategy_version": SIGNAL_STRATEGY_VERSION,
         "signal_source_commit": SIGNAL_SOURCE_COMMIT,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
         "exit_policy": EXIT_POLICY,
         "outcome_engine": OUTCOME_ENGINE,
         "intrabar_policy": INTRABAR_POLICY,
@@ -359,7 +376,7 @@ def _write_eval_files(
         "fee_policy": "cards_use_gross_only",
         "candle_source": "signal_generator.candles_1m FINAL",
         "evaluation_data_start": source["signal_start"],
-        "evaluation_data_end": None,
+        "evaluation_data_end": resolved_outcome_data_end,
         "side_effect_flags": dict(SIDE_EFFECT_FLAGS),
         "created_at": iso_z(created),
     }
@@ -405,6 +422,9 @@ def _spawn(evaluation_id: str, directory: Path, environ: dict | None = None, spa
     if spawn is not None:
         pid = spawn(argv, str(REPO_ROOT), str(log_path))
     else:
+        env = dict(os.environ)
+        env, _meta = inject_worker_env(env)
+        env["STOCH_FADE_SG_PYTHON"] = str(sg_python(env))
         log_path.touch()
         with log_path.open("ab") as log:
             proc = subprocess.Popen(
@@ -413,6 +433,7 @@ def _spawn(evaluation_id: str, directory: Path, environ: dict | None = None, spa
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
+                env=env,
             )
         pid = int(proc.pid)
     if not pid:
@@ -437,6 +458,7 @@ def start_evaluation(
     now: datetime | None = None,
     spawn: SpawnFn | None = None,
     disk_free: int | None = None,
+    outcome_data_end: str | None = None,
 ) -> tuple[dict[str, Any], int]:
     source, err = _validate_source_job(source_job_id, environ)
     if err or source is None:
@@ -470,7 +492,14 @@ def start_evaluation(
         except Exception:
             heavy_gate.release(evaluation_id, environ=environ)
             raise
-        _write_eval_files(directory, evaluation_id=evaluation_id, source=source, created=created, resume=False)
+        _write_eval_files(
+            directory,
+            evaluation_id=evaluation_id,
+            source=source,
+            created=created,
+            resume=False,
+            outcome_data_end=outcome_data_end,
+        )
         payload, code = _spawn(evaluation_id, directory, environ=environ, spawn=spawn)
         if code != 200:
             heavy_gate.release(evaluation_id, environ=environ)
@@ -503,6 +532,12 @@ def resume_evaluation(
             return {"success": False, "error": "JOB_NOT_FOUND"}, 404
         request = read_json(directory / "request.json")
         status = read_json(directory / "status.json")
+        if str(request.get("fixed_strategy_version") or "") != STRATEGY_VERSION:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+        if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+        if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
         if str(request.get("exit_policy") or "") != EXIT_POLICY:
             return {"success": False, "error": "LEGACY_BE50_EVALUATION_NOT_RESUMABLE"}, 409
         if str(status.get("state")) in JOB_ACTIVE_STATES:
@@ -526,6 +561,7 @@ def resume_evaluation(
             source=source,
             created=_utcnow(),
             resume=True,
+            outcome_data_end=request.get("outcome_data_end"),
             prev_status=status,
         )
         payload, code = _spawn(parsed, directory, environ=environ, spawn=spawn)
@@ -551,7 +587,13 @@ def handle_create_post(
         parsed = FrozenFadeEvalBody(**body)
     except Exception:  # noqa: BLE001
         return {"success": False, "error": "UNKNOWN_FIELDS"}, 400
-    return start_evaluation(parsed.source_job_id, environ=environ, spawn=spawn, disk_free=disk_free)
+    return start_evaluation(
+        parsed.source_job_id,
+        environ=environ,
+        spawn=spawn,
+        disk_free=disk_free,
+        outcome_data_end=getattr(parsed, "outcome_data_end", None),
+    )
 
 
 def handle_resume_post(

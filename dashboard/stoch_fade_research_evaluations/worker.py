@@ -32,6 +32,12 @@ from stoch_fade_research_evaluations.config import (  # noqa: E402
 from stoch_fade_research_evaluations.jobs import public_message  # noqa: E402
 from stoch_fade_research_jobs.config import jobs_root  # noqa: E402
 from stoch_fade_research_jobs.feed import parse_job_id  # noqa: E402
+from worker_env import (  # noqa: E402
+    PINNED_GOLD_ROOT,
+    clickhouse_preflight,
+    inject_worker_env,
+    sg_python_preflight,
+)
 
 import stoch_heavy_job_gate as heavy_gate  # noqa: E402
 
@@ -47,7 +53,16 @@ def iso_z(ts: datetime | None = None) -> str:
     return now.astimezone(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def evaluator_argv(*, python: str, symbol: str, signals_jsonl: str, out_dir: str, evaluation_id: str, source_job_id: str) -> list[str]:
+def evaluator_argv(
+    *,
+    python: str,
+    symbol: str,
+    signals_jsonl: str,
+    out_dir: str,
+    evaluation_id: str,
+    source_job_id: str,
+    pin_candle_data_to: str,
+) -> list[str]:
     argv = [
         python,
         "-m",
@@ -63,6 +78,8 @@ def evaluator_argv(*, python: str, symbol: str, signals_jsonl: str, out_dir: str
         evaluation_id,
         "--source-job-id",
         source_job_id,
+        "--pin-candle-data-to",
+        pin_candle_data_to,
     ]
     if argv.count("--symbol") != 1:
         raise RuntimeError("exactly one --symbol required")
@@ -128,8 +145,24 @@ def _run_coin_process(argv: list[str], cwd: Path, log_path: Path, timeout_s: int
         )
         return "ok", 0
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    gold_src = str(PINNED_GOLD_ROOT / "src")
+    env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + gold_src + os.pathsep + env.get("PYTHONPATH", "")
+    env["STOCH_FADE_SG_PYTHON"] = str(argv[0])
+    env["STOCH_FADE_SIGNAL_GENERATOR_ROOT"] = str(PINNED_GOLD_ROOT)
     with log_path.open("ab") as log:
-        proc = subprocess.Popen(argv, cwd=str(cwd), stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            proc = subprocess.Popen(
+                argv,
+                cwd=str(cwd),
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                env=env,
+            )
+        except FileNotFoundError:
+            log.write(b"MISSING_SG_PYTHON\n")
+            return "MISSING_SG_PYTHON", 127
         _ACTIVE_CHILD = proc
         try:
             returncode = proc.wait(timeout=timeout_s)
@@ -224,11 +257,15 @@ def _merge_summaries(directory: Path, coins: list[dict[str, Any]]) -> dict[str, 
 
 
 def run_evaluation(directory: Path) -> None:
+    inject_worker_env(os.environ)
     request = read_json(directory / "request.json")
     status = read_json(directory / "status.json")
     index = read_json(directory / "source_index.json")
     evaluation_id = str(request["evaluation_id"])
     source_job_id = str(request["source_job_id"])
+    pin_candle_data_to = str(request.get("outcome_data_end") or "")
+    if not pin_candle_data_to:
+        raise RuntimeError("MISSING_OUTCOME_DATA_END")
     job_dir = jobs_root() / source_job_id
     coins = list(status.get("coins") or [])
     by_symbol = {c["symbol"]: c for c in coins}
@@ -239,6 +276,19 @@ def run_evaluation(directory: Path) -> None:
     failed = 0
     timeout_s = coin_timeout_s()
     python = sg_python()
+    stubbed = bool(str(os.environ.get("STOCH_FADE_EVAL_STUB") or "").strip())
+    interp = {"ok": True, "error_code": None} if stubbed else sg_python_preflight(os.environ)
+    preflight = clickhouse_preflight(os.environ)
+    if not interp.get("ok") or not preflight.get("ok"):
+        status["state"] = "FAILED"
+        status["finished_at"] = iso_z()
+        status["worker_pid"] = None
+        status["message"] = public_message(
+            str(interp.get("error_code") or preflight.get("error_code") or "CLICKHOUSE_PREFLIGHT_FAILED")
+        )
+        write_json_atomic(directory / "status.json", status)
+        heavy_gate.release(evaluation_id)
+        return
     src_by_symbol = {c["symbol"]: c for c in index.get("coins") or []}
     for i, src in enumerate(index.get("coins") or []):
         symbol = src["symbol"]
@@ -268,6 +318,7 @@ def run_evaluation(directory: Path) -> None:
             out_dir=str(out_dir),
             evaluation_id=evaluation_id,
             source_job_id=source_job_id,
+            pin_candle_data_to=pin_candle_data_to,
         )
         t0 = time.time()
         msg, code = _run_coin_process(argv, REPO_ROOT, directory / "worker.log", timeout_s)

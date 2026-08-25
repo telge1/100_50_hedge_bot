@@ -165,7 +165,7 @@ def test_host_iframe_ready_handshake():
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
     assert 'pane.html?v=" + ASSET_V' in host
-    assert 'const ASSET_V = "time-clip-1"' in host
+    assert 'const ASSET_V = "vp-2"' in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -240,7 +240,7 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=time-clip-1" in pane
+    assert "chart.js?v=history-5" in pane
     assert "function snapUnixToBar" in js
     assert "preserveView" in js
     assert "preserveView: true" in host

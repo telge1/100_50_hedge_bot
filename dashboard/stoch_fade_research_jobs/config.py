@@ -8,17 +8,20 @@ from pathlib import Path
 
 DASHBOARD_ROOT = Path(__file__).resolve().parent.parent
 REPO_ROOT = DASHBOARD_ROOT.parent
-DEFAULT_SG_ROOT = Path(
-    "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves"
-)
+DEFAULT_SG_ROOT = Path("/home/telgenbuescher/projects/wave_fade_gold_f16ae32")
 DEFAULT_SG_PYTHON = DEFAULT_SG_ROOT / ".venv" / "bin" / "python"
 DEFAULT_JOBS_ROOT = REPO_ROOT / "results" / "stoch_fade_research_jobs"
 DEFAULT_UNIVERSE = DEFAULT_SG_ROOT / "config" / "universe_tradeable_51.json"
 WORKER_SCRIPT = Path(__file__).resolve().parent / "worker.py"
 
-STRATEGY_VERSION = "wave_fade_frozen_f16ae32"
+STRATEGY_VERSION = "wave_fade_frozen_f16ae32_causal_entry_v1"
 SOURCE_COMMIT = "f16ae32da38da86f39e75b09c63c31f62d11996b"
 EDGES_VERSION = "apt_is_q4_frozen_20260808"
+CAUSAL_MANIFEST_HASH = "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf"
+CONFIRMATION_POLICY = "cross_recognition"
+CONFIRMATION_SOURCE = CONFIRMATION_POLICY
+EXIT_POLICY = "NO_BE50"
+INTRABAR_POLICY = "SL_FIRST"
 DEFAULT_SIGNAL_START = datetime(2025, 12, 11, 0, 0, 0, tzinfo=timezone.utc)
 MAX_SYMBOLS = 51
 MAX_WINDOW_DAYS = 400
@@ -85,7 +88,7 @@ def universe_path(environ: dict | None = None) -> Path:
 
 def sg_python(environ: dict | None = None) -> Path:
     env = environ if environ is not None else os.environ
-    override = str(env.get("STOCH_FADE_SG_PYTHON") or env.get("STOCH_UNIVERSE_51_SG_PYTHON") or "").strip()
+    override = str(env.get("STOCH_FADE_SG_PYTHON") or "").strip()
     if override:
         return Path(override)
     return DEFAULT_SG_PYTHON

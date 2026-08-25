@@ -64,6 +64,8 @@
   let lastLowerPayload = null;
   let lowerVisible = false;
   let timeSyncLock = false;
+  let programmaticNavDepth = 0;
+  const TIME_SYNC_MAX_DEPTH = 6;
   let localXhairLock = false;
   let oscValueByTime = new Map();
   let lastAppliedOscSize = { w: 0, h: 0 };
@@ -78,6 +80,32 @@
   let lastCursorPrice = null;
   let lastCursorXy = null;
   let lastPriceFormat = { type: "price", precision: 2, minMove: 0.01 };
+  let vpPayload = null;
+  let vpSettings = {
+    enabled: false,
+    display: "buy_sell",
+    poc: true,
+    value_area: true,
+    width: "normal",
+  };
+  let vpHoverIndex = -1;
+
+  function beginProgrammaticNav() {
+    programmaticNavDepth += 1;
+  }
+
+  function endProgrammaticNav() {
+    programmaticNavDepth = Math.max(0, programmaticNavDepth - 1);
+  }
+
+  function runProgrammaticNav(fn) {
+    beginProgrammaticNav();
+    try {
+      return fn();
+    } finally {
+      endProgrammaticNav();
+    }
+  }
 
   function $(id) {
     return document.getElementById(id);
@@ -320,6 +348,7 @@
         lastCursorXy = { x: param.point.x, y: param.point.y };
         const px = candleSeries.coordinateToPrice(param.point.y);
         if (px != null && !Number.isNaN(Number(px))) lastCursorPrice = Number(px);
+        updateVolumeProfileHover(param.point.x, param.point.y);
       }
       updateLegend(param);
       updateSelectedLine();
@@ -412,6 +441,7 @@
     });
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+      if (programmaticNavDepth > 0) return;
       syncOscLogicalFromMain(range);
     });
 
@@ -479,6 +509,7 @@
     }
     clipOverlayLayerToPlot();
     layoutOverlays();
+    drawVolumeProfile();
     updateSelectedLine();
     resizeOsc();
   }
@@ -590,6 +621,7 @@
 
   function setData(payload, opts) {
     const preserveView = !!(opts && opts.preserveView);
+    const skipDefaultView = !!(opts && opts.skipDefaultView);
     let savedRange = null;
     if (preserveView && chart) {
       try {
@@ -629,16 +661,19 @@
     }
     applySeriesData(lastPayload);
     updateOscTimeBase();
-    if (!preserveView) {
+    if (!preserveView && !skipDefaultView) {
       applyDefaultView();
       resize();
-    } else if (savedRange) {
+    } else if (preserveView && savedRange) {
       try {
         chart.timeScale().setVisibleLogicalRange(savedRange);
       } catch (err) {
         /* keep current view */
       }
       syncOscLogicalFromMain(savedRange);
+      resize();
+    } else {
+      resize();
     }
     if (lastSelectedUnix != null) {
       applySelectedMarker(lastSelectedUnix);
@@ -731,14 +766,17 @@
     series.applyOptions({ visible: !!visible });
   }
 
-  function setEmaOverlays(payload) {
+  function setEmaOverlays(payload, opts) {
     lastEmaOverlays = payload || { series: [] };
     if (!chart) return;
+    const skipRangeRestore = !!(opts && opts.skipRangeRestore);
     let savedRange = null;
-    try {
-      savedRange = chart.timeScale().getVisibleLogicalRange();
-    } catch (err) {
-      savedRange = null;
+    if (!skipRangeRestore) {
+      try {
+        savedRange = chart.timeScale().getVisibleLogicalRange();
+      } catch (err) {
+        savedRange = null;
+      }
     }
     const wanted = {};
     const list = lastEmaOverlays.series || [];
@@ -778,12 +816,14 @@
       series.setData(spec.data || []);
     });
     if (savedRange) {
-      try {
-        chart.timeScale().setVisibleLogicalRange(savedRange);
-      } catch (err) {
-        /* ignore */
-      }
-      syncOscLogicalFromMain(savedRange);
+      runProgrammaticNav(function () {
+        try {
+          chart.timeScale().setVisibleLogicalRange(savedRange);
+        } catch (err) {
+          /* ignore */
+        }
+        syncOscLogicalFromMain(savedRange);
+      });
     }
   }
 
@@ -901,8 +941,9 @@
   }
 
   function scaleWatchTick() {
-    if (priceMapChanged()) {
+      if (priceMapChanged()) {
       layoutOverlays();
+      drawVolumeProfile();
       updateSelectedLine();
     }
     const keep = pointerScaleWatch || performance.now() < scaleWatchUntil;
@@ -1748,6 +1789,324 @@
     }
   }
 
+  function vpWidthFrac() {
+    if (vpSettings.width === "compact") return 0.18;
+    if (vpSettings.width === "wide") return 0.32;
+    return 0.25;
+  }
+
+  function vpRegion() {
+    const size = chartSize();
+    const right = plotRightX();
+    const w = Math.max(48, Math.min(right * vpWidthFrac(), right * 0.4));
+    return { x0: right - w, x1: right, w: w, h: size.h };
+  }
+
+  function setVolumeProfile(payload, settings) {
+    vpPayload = payload || null;
+    if (settings) {
+      vpSettings = Object.assign({}, vpSettings, settings);
+    }
+    drawVolumeProfile();
+    return true;
+  }
+
+  function clearVolumeProfile() {
+    vpPayload = null;
+    vpHoverIndex = -1;
+    drawVolumeProfile();
+    const tip = $("vp-tooltip");
+    if (tip) {
+      tip.hidden = true;
+      tip.textContent = "";
+    }
+    const badge = $("vp-badge");
+    if (badge) {
+      badge.hidden = true;
+      badge.textContent = "";
+    }
+    return true;
+  }
+
+  function getVisibleTimeRange() {
+    if (!chart) return null;
+    try {
+      const range = chart.timeScale().getVisibleRange();
+      if (!range || range.from == null || range.to == null) return null;
+      const candles = (lastPayload && lastPayload.candles) || [];
+      let first = null;
+      let last = null;
+      const from = Number(range.from);
+      const to = Number(range.to);
+      for (let i = 0; i < candles.length; i++) {
+        const t = Number(candles[i].time);
+        if (t >= from && t <= to) {
+          if (first == null) first = t;
+          last = t;
+        }
+      }
+      if (first == null && candles.length) {
+        first = Number(candles[0].time);
+        last = Number(candles[candles.length - 1].time);
+      }
+      return {
+        from: from,
+        to: to,
+        firstCandle: first,
+        lastCandle: last,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyVisibleTimeRange(fromUnix, toUnix) {
+    if (!chart) return false;
+    const from = Number(fromUnix);
+    const to = Number(toUnix);
+    if (!(to > from)) return false;
+    try {
+      chart.timeScale().setVisibleRange({ from: from, to: to });
+      syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
+      layoutOverlays();
+      updateSelectedLine();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setVisibleTimeRange(fromUnix, toUnix) {
+    if (programmaticNavDepth > 0) return applyVisibleTimeRange(fromUnix, toUnix);
+    return runProgrammaticNav(function () {
+      return applyVisibleTimeRange(fromUnix, toUnix);
+    });
+  }
+
+  function estimateBarSec(candles) {
+    const rows = candles || (lastPayload && lastPayload.candles) || [];
+    if (rows.length < 2) return 60;
+    const d = Number(rows[rows.length - 1].time) - Number(rows[rows.length - 2].time);
+    return Number.isFinite(d) && d > 0 ? d : 60;
+  }
+
+  function focusOnTime(centerUnix, padSec) {
+    if (!chart) return false;
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length) return false;
+    return runProgrammaticNav(function () {
+      const target = Math.floor(Number(centerUnix));
+      const firstT = Number(candles[0].time);
+      const lastT = Number(candles[candles.length - 1].time);
+      if (!Number.isFinite(target) || target < firstT || target > lastT) return false;
+      const center = snapUnixToBar(target);
+      if (center < firstT || center > lastT) return false;
+      const pad = Math.max(Number(padSec) || 3600, estimateBarSec(candles) * 10);
+      const wantFrom = Math.max(firstT, center - pad);
+      const wantTo = Math.min(lastT, center + pad);
+      if (wantTo <= wantFrom) return false;
+      if (applyVisibleTimeRange(wantFrom, wantTo)) return true;
+      let idx = 0;
+      for (let i = 0; i < candles.length; i++) {
+        if (Number(candles[i].time) <= center) idx = i;
+        else break;
+      }
+      const barSec = estimateBarSec(candles);
+      const padBars = Math.max(30, Math.ceil(pad / barSec));
+      const fromIdx = Math.max(0, idx - padBars);
+      const toIdx = Math.min(candles.length - 1, idx + padBars);
+      try {
+        chart.timeScale().setVisibleLogicalRange({
+          from: fromIdx,
+          to: toIdx + DEFAULT_RIGHT_OFFSET,
+        });
+        syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
+        layoutOverlays();
+        updateSelectedLine();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+  }
+
+  function drawVolumeProfile() {
+    const canvas = $("vp-overlay");
+    if (!canvas) return;
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(size.w * dpr));
+    canvas.height = Math.max(1, Math.floor(size.h * dpr));
+    canvas.style.width = size.w + "px";
+    canvas.style.height = size.h + "px";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size.w, size.h);
+    const badge = $("vp-badge");
+    if (!vpSettings.enabled || !vpPayload || !vpPayload.bins || !vpPayload.bins.length) {
+      if (badge) {
+        const warn = vpPayload && vpPayload.warning;
+        if (vpSettings.enabled && warn) {
+          badge.hidden = false;
+          badge.textContent = warn;
+        } else {
+          badge.hidden = true;
+          badge.textContent = "";
+        }
+      }
+      return;
+    }
+    const bins = vpPayload.bins;
+    const region = vpRegion();
+    const display = vpSettings.display || "buy_sell";
+    let maxLen = 0;
+    for (let i = 0; i < bins.length; i++) {
+      const b = bins[i];
+      let len = Number(b.total_volume) || 0;
+      if (display === "delta") len = Math.abs(Number(b.delta) || 0);
+      if (len > maxLen) maxLen = len;
+    }
+    if (maxLen <= 0) maxLen = 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, region.x1, size.h);
+    ctx.clip();
+    for (let i = 0; i < bins.length; i++) {
+      const b = bins[i];
+      const yTop = yOf(b.price_high);
+      const yBot = yOf(b.price_low);
+      if (yTop == null || yBot == null) continue;
+      const y0 = Math.min(yTop, yBot);
+      const y1 = Math.max(yTop, yBot);
+      const h = Math.max(1, y1 - y0);
+      const va = !!b.in_value_area;
+      const alpha = va ? 0.82 : 0.45;
+      if (display === "delta") {
+        const d = Number(b.delta) || 0;
+        const w = (Math.abs(d) / maxLen) * region.w;
+        ctx.fillStyle = d >= 0 ? "rgba(56, 189, 248, " + alpha + ")" : "rgba(245, 158, 11, " + alpha + ")";
+        ctx.fillRect(region.x1 - w, y0, w, h);
+      } else if (display === "total") {
+        const w = (Number(b.total_volume) / maxLen) * region.w;
+        ctx.fillStyle = va ? "rgba(148, 163, 184, " + alpha + ")" : "rgba(100, 116, 139, " + (alpha * 0.7) + ")";
+        ctx.fillRect(region.x1 - w, y0, w, h);
+      } else {
+        const buy = Number(b.buy_volume) || 0;
+        const sell = Number(b.sell_volume) || 0;
+        const tot = buy + sell;
+        const w = (tot / maxLen) * region.w;
+        const sellW = tot > 0 ? (sell / tot) * w : 0;
+        const buyW = tot > 0 ? (buy / tot) * w : 0;
+        ctx.fillStyle = "rgba(245, 158, 11, " + alpha + ")";
+        ctx.fillRect(region.x1 - sellW, y0, sellW, h);
+        ctx.fillStyle = "rgba(34, 211, 238, " + alpha + ")";
+        ctx.fillRect(region.x1 - sellW - buyW, y0, buyW, h);
+      }
+      if (i === vpHoverIndex) {
+        ctx.strokeStyle = "rgba(255,255,255,0.55)";
+        ctx.strokeRect(region.x0, y0, region.w, h);
+      }
+    }
+    if (vpSettings.poc && vpPayload.poc && vpPayload.poc.price_mid != null) {
+      const y = yOf(vpPayload.poc.price_mid);
+      if (y != null) {
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(region.x1, y);
+        ctx.stroke();
+      }
+    }
+    if (vpSettings.value_area) {
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1;
+      if (vpPayload.vah != null) {
+        const y = yOf(vpPayload.vah);
+        if (y != null) {
+          ctx.strokeStyle = "rgba(226, 232, 240, 0.7)";
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(region.x1, y);
+          ctx.stroke();
+        }
+      }
+      if (vpPayload.val != null) {
+        const y = yOf(vpPayload.val);
+        if (y != null) {
+          ctx.strokeStyle = "rgba(148, 163, 184, 0.7)";
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(region.x1, y);
+          ctx.stroke();
+        }
+      }
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    if (badge) {
+      const warn = vpPayload.warning || (vpPayload.coverage_complete ? "" : vpPayload.coverage_label);
+      if (warn) {
+        badge.hidden = false;
+        badge.textContent = warn;
+      } else {
+        badge.hidden = true;
+        badge.textContent = "";
+      }
+    }
+  }
+
+  function vpBinAt(x, y) {
+    if (!vpSettings.enabled || !vpPayload || !vpPayload.bins) return -1;
+    const region = vpRegion();
+    if (x < region.x0 || x > region.x1) return -1;
+    const bins = vpPayload.bins;
+    for (let i = 0; i < bins.length; i++) {
+      const yTop = yOf(bins[i].price_high);
+      const yBot = yOf(bins[i].price_low);
+      if (yTop == null || yBot == null) continue;
+      const y0 = Math.min(yTop, yBot);
+      const y1 = Math.max(yTop, yBot);
+      if (y >= y0 && y <= y1) return i;
+    }
+    return -1;
+  }
+
+  function updateVolumeProfileHover(x, y) {
+    const tip = $("vp-tooltip");
+    const idx = vpBinAt(x, y);
+    if (idx !== vpHoverIndex) {
+      vpHoverIndex = idx;
+      drawVolumeProfile();
+    }
+    if (!tip) return;
+    if (idx < 0 || !vpPayload || !vpPayload.bins[idx]) {
+      tip.hidden = true;
+      return;
+    }
+    const b = vpPayload.bins[idx];
+    const fmtN = function (n) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return "—";
+      const abs = Math.abs(v);
+      if (abs >= 1000) return v.toFixed(1);
+      if (abs >= 1) return v.toFixed(4);
+      return v.toFixed(6);
+    };
+    tip.hidden = false;
+    tip.style.left = Math.max(8, x - 170) + "px";
+    tip.style.top = Math.max(8, y - 8) + "px";
+    tip.innerHTML =
+      "<div>" + fmtN(b.price_low) + " – " + fmtN(b.price_high) + "</div>" +
+      "<div>Buy " + fmtN(b.buy_volume) + "</div>" +
+      "<div>Sell " + fmtN(b.sell_volume) + "</div>" +
+      "<div>Total " + fmtN(b.total_volume) + "</div>" +
+      "<div>Delta " + fmtN(b.delta) + "</div>" +
+      "<div>Trades " + (b.total_count || 0) + "</div>" +
+      "<div>" + (b.is_poc ? "POC · " : "") + (b.in_value_area ? "Value Area" : "Outside VA") + "</div>";
+  }
+
   function layoutOverlays() {
     overlayLayoutCount += 1;
     clipOverlayLayerToPlot();
@@ -1755,6 +2114,7 @@
       renderOneOverlay(rec);
     });
     layoutShiftMeasure();
+    drawVolumeProfile();
   }
 
   function overlayDebugSamples() {
@@ -3175,6 +3535,7 @@
     });
 
     oscChart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
+      if (programmaticNavDepth > 0) return;
       if (!chart || !lowerVisible || timeSyncLock || !range) return;
       timeSyncLock = true;
       try {
@@ -3222,11 +3583,13 @@
 
   function sameLogical(a, b) {
     if (!a || !b) return false;
-    return a.from === b.from && a.to === b.to;
+    return Math.abs(Number(a.from) - Number(b.from)) < 0.05
+      && Math.abs(Number(a.to) - Number(b.to)) < 0.05;
   }
 
   function syncOscLogicalFromMain(range) {
     if (!oscChart || !lowerVisible || timeSyncLock || !range) return;
+    if (programmaticNavDepth > TIME_SYNC_MAX_DEPTH) return;
     timeSyncLock = true;
     try {
       const cur = oscChart.timeScale().getVisibleLogicalRange();
@@ -3602,6 +3965,11 @@
     dismissShiftMeasureByClick: clearShiftMeasureIfIdle,
     destroyUi: destroyUi,
     setHostShift: setHostShift,
+    setVolumeProfile: setVolumeProfile,
+    clearVolumeProfile: clearVolumeProfile,
+    getVisibleTimeRange: getVisibleTimeRange,
+    setVisibleTimeRange: setVisibleTimeRange,
+    focusOnTime: focusOnTime,
     debugInfo: debugInfo,
   };
 

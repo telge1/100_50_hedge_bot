@@ -13,7 +13,7 @@ from typing import Any
 from stoch_universe_51.jsonio import read_json
 
 from .complete import coin_run_is_complete
-from .config import STRATEGY_VERSION, jobs_root
+from .config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, STRATEGY_VERSION, jobs_root
 from .jobs import redact_public, safe_artifact_reference
 from stoch_fade_research_evaluations.config import EXIT_POLICY as EVAL_EXIT_POLICY
 
@@ -114,7 +114,20 @@ def _identity_ok(status: dict[str, Any], request: dict[str, Any]) -> bool:
     sv = str(request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
     if sv and sv != STRATEGY_VERSION:
         return False
+    if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+        return False
+    if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+        return False
     return True
+
+
+def _identity_kind(status: dict[str, Any], request: dict[str, Any]) -> str:
+    sv = str(request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
+    if sv == STRATEGY_VERSION and _identity_ok(status, request):
+        return "CAUSAL_CANONICAL"
+    if sv == "wave_fade_frozen_f16ae32":
+        return "LEGACY_WAVE_END_NON_CAUSAL"
+    return "UNKNOWN"
 
 
 def catalog_entry(directory: Path) -> dict[str, Any] | None:
@@ -128,8 +141,7 @@ def catalog_entry(directory: Path) -> dict[str, Any] | None:
     state = str(status.get("state") or "")
     if state not in SELECTABLE_STATES:
         return None
-    if not _identity_ok(status, request):
-        return None
+    identity_kind = _identity_kind(status, request)
     symbols = request.get("selected_symbols") or []
     if not isinstance(symbols, list):
         symbols = []
@@ -148,6 +160,10 @@ def catalog_entry(directory: Path) -> dict[str, Any] | None:
         "raw_total": int(status.get("raw_total") or combined.get("raw_candidates") or 0),
         "tier_a_total": int(status.get("tier_a_total") or combined.get("tier_a") or 0),
         "fixed_strategy_version": STRATEGY_VERSION,
+        "job_strategy_version": str(request.get("fixed_strategy_version") or ""),
+        "identity_kind": identity_kind,
+        "confirmation_policy": request.get("confirmation_policy"),
+        "legacy_warning": identity_kind == "LEGACY_WAVE_END_NON_CAUSAL",
         "outcome_evaluation_enabled": False,
         "execution_dedup_applied": False,
     }
@@ -251,7 +267,7 @@ def map_job_signal(
         "candle_close_time": raw.get("candle_close_time"),
         "confirmation_available_at": raw.get("confirmation_available_at"),
         "generated_at": raw.get("generated_at"),
-        "strategy_version": STRATEGY_VERSION,
+        "strategy_version": str(raw.get("strategy_version") or STRATEGY_VERSION),
         "signal_state": "TIER_A" if raw.get("tier_a") else "CANDIDATE",
         "source": SOURCE,
         "job_id": job_id,
@@ -260,6 +276,13 @@ def map_job_signal(
         "execution_dedup_applied": False,
         "be50_outcome_active": False,
         "plan_status": "PLANNED_NO_OUTCOME",
+        "setup_id": raw.get("setup_id"),
+        "end_ts": raw.get("end_ts"),
+        "end_available_at": raw.get("end_available_at"),
+        "recognition_ts": raw.get("recognition_ts"),
+        "recognition_available_at": raw.get("recognition_available_at"),
+        "confirmation_policy": raw.get("confirmation_policy"),
+        "confirmation_source": raw.get("confirmation_source"),
         "job_signal_start": job_start,
         "job_signal_end_exclusive": job_end,
     }
@@ -304,8 +327,7 @@ def load_job_signals(
     state = str(status.get("state") or "")
     if state not in SELECTABLE_STATES:
         return {"success": False, "error": "JOB_NOT_SELECTABLE", "source": SOURCE, "state": state}, 409
-    if not _identity_ok(status, request):
-        return {"success": False, "error": "FROZEN_IDENTITY_MISMATCH", "source": SOURCE}, 409
+    identity_kind = _identity_kind(status, request)
 
     signal_start = str(request.get("signal_start") or "")
     signal_end = str(request.get("signal_end_exclusive") or "")
@@ -427,11 +449,13 @@ def load_job_signals(
         "source": "FROZEN_RESEARCH_EVALUATION" if eval_meta else SOURCE,
         "job": {
             "job_id": parsed,
-            "strategy_version": STRATEGY_VERSION,
+            "strategy_version": str(request.get("fixed_strategy_version") or STRATEGY_VERSION),
             "signal_start": signal_start,
             "signal_end_exclusive": signal_end,
             "selected_symbols": selected,
             "state": state,
+            "identity_kind": identity_kind,
+            "legacy_warning": identity_kind == "LEGACY_WAVE_END_NON_CAUSAL",
         },
         "outcomes_computed": bool(eval_meta),
         "execution_dedup_applied": False,

@@ -17,11 +17,17 @@ from stoch_universe_51.universe import load_tradeable_51
 from stoch_universe_51.update_jobs import active_job_id as update_job_active_id
 
 import stoch_heavy_job_gate as heavy_gate
+from worker_env import inject_worker_env
 from .complete import SIGNAL_TFS
 
 from .config import (
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
+    CONFIRMATION_SOURCE,
     DASHBOARD_ROOT,
+    EXIT_POLICY,
     FROZEN_MODULE_HASHES,
+    INTRABAR_POLICY,
     REPO_ROOT,
     SIDE_EFFECT_FLAGS,
     SOURCE_COMMIT,
@@ -133,7 +139,18 @@ def reconcile_lock(environ: dict | None = None) -> dict[str, Any] | None:
             status["finished_at"] = iso_z(_utcnow())
             status["error_summary"] = public_message("verwaister Research-Worker")
             status["message"] = status["error_summary"]
+            status["worker_pid"] = None
+            coins = status.get("coins") or []
+            for coin in coins:
+                if not isinstance(coin, dict):
+                    continue
+                if str(coin.get("state")) == "RUNNING":
+                    coin["state"] = "INTERRUPTED"
+                    coin["error_code"] = "INTERRUPTED"
+                    coin["message"] = status["error_summary"]
+            status["coins"] = coins
             write_json_atomic(status_path, status)
+            write_json_atomic(status_path.parent / "progress.json", {"coins": coins})
     clear_lock(environ)
     return None
 
@@ -219,6 +236,38 @@ def redact_public(obj: Any) -> Any:
     return obj
 
 
+def warmup_display_label(row: dict[str, Any]) -> str:
+    """UI warmup column. PENDING coins without artifacts are not artifact errors."""
+    state = str(row.get("state") or "")
+    if state == "PENDING":
+        return "Noch nicht gestartet"
+    if state == "RUNNING":
+        return "Läuft"
+    if state == "INTERRUPTED":
+        return "Unterbrochen"
+    by = row.get("warmup_complete_by_tf") or {}
+    if not isinstance(by, dict):
+        by = {}
+    missing = [tf for tf in SIGNAL_TFS if not isinstance(by.get(tf), bool)]
+    schema_err = bool(row.get("warmup_schema_error"))
+    if state in ("FAILED", "TIMEOUT") and (schema_err or missing):
+        return "Artefaktfehler"
+    if state in ("COMPLETED", "SKIPPED_RESUME_COMPLETE"):
+        if schema_err or missing:
+            return "Artefaktfehler"
+        bad = [tf for tf in SIGNAL_TFS if by.get(tf) is False]
+        if row.get("warmup_complete") is True and not bad:
+            return "vollständig"
+        if row.get("warmup_complete") is False or len(bad) == 4:
+            return "unvollständig"
+        if bad:
+            return "teilweise (" + ", ".join(bad) + ")"
+        return "unvollständig"
+    if schema_err:
+        return "Artefaktfehler"
+    return "–"
+
+
 def public_coin(row: dict[str, Any]) -> dict[str, Any]:
     by = row.get("warmup_complete_by_tf") or {}
     if not isinstance(by, dict):
@@ -237,6 +286,7 @@ def public_coin(row: dict[str, Any]) -> dict[str, Any]:
         "warmup_complete": row.get("warmup_complete") if isinstance(row.get("warmup_complete"), bool) else None,
         "warmup_complete_by_tf": by_out,
         "warmup_schema_error": row.get("warmup_schema_error"),
+        "warmup_label": warmup_display_label({**row, "warmup_complete_by_tf": by_out}),
         "multi_tf_collision_count": row.get("multi_tf_collision_count"),
         "returncode": row.get("returncode"),
         "error_code": public_message(str(row.get("error_code") or "")),
@@ -286,6 +336,9 @@ def public_status(status: dict[str, Any], progress: dict[str, Any] | None = None
         "outcome_evaluation_enabled": False,
         "writes_to_clickhouse": False,
         "fixed_strategy_version": STRATEGY_VERSION,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
     }
     return redact_public(payload)
 
@@ -313,6 +366,7 @@ def defaults_payload(*, now: datetime | None = None) -> dict[str, Any]:
         "signal_start": window_iso(start),
         "signal_end_exclusive": window_iso(end),
         "fixed_strategy_version": STRATEGY_VERSION,
+        "confirmation_policy": CONFIRMATION_POLICY,
         "max_window_days": 400,
         "note": "end is exclusive UTC; last closed 1m plus one minute. Open minute excluded.",
     }
@@ -365,6 +419,8 @@ def default_spawn_worker(argv: list[str], cwd: Path, log_path: Path) -> int:
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
+    env, _meta = inject_worker_env(env)
+    env["STOCH_FADE_SG_PYTHON"] = str(sg_python(env))
     dash = str(DASHBOARD_ROOT)
     env["PYTHONPATH"] = dash + os.pathsep + env.get("PYTHONPATH", "")
     with log_path.open("a", encoding="utf-8") as log_fh:
@@ -375,6 +431,7 @@ def default_spawn_worker(argv: list[str], cwd: Path, log_path: Path) -> int:
             stderr=sp.STDOUT,
             shell=False,
             env=env,
+            start_new_session=True,
         )
         return int(proc.pid)
 
@@ -398,6 +455,11 @@ def _write_job_files(
         "signal_start": window_iso(start),
         "signal_end_exclusive": window_iso(end),
         "fixed_strategy_version": STRATEGY_VERSION,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
+        "exit_policy": EXIT_POLICY,
+        "intrabar_policy": INTRABAR_POLICY,
         "universe_source": str(uni_path),
         "universe_count": len(load_tradeable_51(uni_path)),
         "jobs_root": str(jobs_root(environ)),
@@ -407,6 +469,11 @@ def _write_job_files(
         "runner_code_revision": code_revision(environ),
         "frozen_source_commit": SOURCE_COMMIT,
         "frozen_module_hashes": dict(FROZEN_MODULE_HASHES),
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "exit_policy": EXIT_POLICY,
+        "intrabar_policy": INTRABAR_POLICY,
         "side_effect_flags": dict(SIDE_EFFECT_FLAGS),
         "python_path": str(sg_python(environ)),
         "sequential": True,
@@ -492,7 +559,7 @@ def _spawn_and_lock(
     status["worker_pid"] = pid
     status["last_worker_pid"] = pid
     status["started_at"] = iso_z(_utcnow())
-    status["message"] = "Frozen-Signale werden berechnet"
+    status["message"] = "Kausaler Backtest wird berechnet"
     write_json_atomic(directory / "status.json", status)
     write_json_atomic(
         lock_path(environ),
@@ -615,6 +682,12 @@ def resume_frozen_job(
             return {"success": False, "error": "JOB_NOT_FOUND"}, 404
         request = read_json(req_path)
         status = read_json(status_path)
+        if str(request.get("fixed_strategy_version") or "") != STRATEGY_VERSION:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+        if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+        if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
         if str(status.get("state")) in JOB_ACTIVE_STATES:
             return {"success": False, "error": "JOB_STILL_ACTIVE"}, 409
         if str(status.get("state")) not in RESUME_STATES:

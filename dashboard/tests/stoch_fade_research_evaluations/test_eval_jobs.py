@@ -6,7 +6,7 @@ from pathlib import Path
 
 from stoch_fade_research_evaluations.jobs import handle_create_post, handle_resume_post, start_evaluation
 from stoch_fade_research_evaluations.worker import run_evaluation
-from stoch_fade_research_jobs.config import STRATEGY_VERSION
+from stoch_fade_research_jobs.config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, STRATEGY_VERSION
 from stoch_universe_51.jsonio import write_json_atomic as atomic
 
 NOW = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -27,6 +27,8 @@ def _write_source_job(root: Path) -> None:
         {
             "job_id": JOB,
             "fixed_strategy_version": STRATEGY_VERSION,
+            "confirmation_policy": CONFIRMATION_POLICY,
+            "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
             "selected_symbols": ["AAVEUSDT"],
             "signal_start": START,
             "signal_end_exclusive": END,
@@ -57,6 +59,8 @@ def _write_source_job(root: Path) -> None:
             "run_id": RUN,
             "selected_symbol": "AAVEUSDT",
             "strategy_id": STRATEGY_VERSION,
+            "confirmation_policy": CONFIRMATION_POLICY,
+            "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
             "signal_start": START,
             "signal_end_exclusive": END,
             "source_commit_pin": "f16ae32",

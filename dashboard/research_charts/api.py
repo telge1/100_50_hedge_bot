@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, Depends, Query, Request
@@ -23,11 +24,17 @@ from .service import (
     candle_source_name,
     compute_indicators,
     default_limit,
+    known_symbols,
     list_symbols,
     load_candles,
     pane_bundle,
     symbol_meta,
 )
+from .public_trades_profile import (
+    VolumeProfileQueryError,
+    load_volume_profile,
+)
+from .volume_profile import MAX_RANGE_SECONDS
 from .workspace_session import get_workspace
 
 FEED_MESSAGE = (
@@ -106,6 +113,59 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         except Exception as exc:
             return _error(500, "candle_load_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.get("/api/research/volume-profile")
+    async def api_research_volume_profile(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        start: int = Query(..., description="UTC unix seconds, inclusive"),
+        end: int = Query(..., description="UTC unix seconds, exclusive"),
+        rows: str = Query("auto"),
+        volume_mode: str = Query("base"),
+    ):
+        """Visible-range volume profile from public_trades_canonical.
+
+        Value area: POC-expand to 70% of total base volume.
+        Dedup: ReplacingMergeTree FINAL on (symbol, trade_id) inside the window.
+        """
+        sym = str(symbol or "").strip().upper()
+        try:
+            start_dt = datetime.fromtimestamp(int(start), tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            return _error(400, "invalid_time_range", "start and end must be UTC unix seconds")
+        known = True
+        if sym != "XAUUSDT":
+            try:
+                known = sym in known_symbols()
+            except Exception:
+                known = True
+        try:
+            payload = await asyncio.to_thread(
+                load_volume_profile,
+                symbol=sym,
+                start=start_dt,
+                end=end_dt,
+                rows=rows,
+                volume_mode=str(volume_mode or "base"),
+                known_symbol=known,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", f"unknown symbol {sym}")
+        except ValueError as exc:
+            code = str(exc)
+            if code == "time_range_too_large":
+                return _error(
+                    400,
+                    code,
+                    f"time range exceeds {MAX_RANGE_SECONDS} seconds (7 days)",
+                )
+            return _error(400, code, str(exc))
+        except VolumeProfileQueryError as exc:
+            return _error(exc.status, exc.code, str(exc))
+        except Exception as exc:
+            return _error(500, "volume_profile_failed", str(exc))
+        return payload
 
     @router.post("/api/research/pane")
     async def api_research_pane(
@@ -291,6 +351,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 ema=body.get("ema"),
                 stochastic=body.get("stochastic"),
                 liquidity=body.get("liquidity"),
+                volume_profile=body.get("volume_profile"),
             )
         except ValueError as exc:
             return _error(400, "invalid_settings", str(exc))
@@ -321,11 +382,34 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         user: dict = Depends(require_auth),
         body: dict[str, Any] = Body(default_factory=dict),
     ):
+        strategy_id = str(body.get("strategy_id") or "").strip()
+        if strategy_id in ("cluster_sweep_ema_9_20_59", "cluster_sweep"):
+            # Toggle / show last cluster-sweep run markers
+            symbol = str(body.get("symbol") or "").strip().upper()
+            visible = body.get("visible")
+            ws = get_workspace()
+            if visible is None:
+                cur = bool((ws.snapshot().get("cluster_sweep") or {}).get("visible"))
+                visible = not cur
+            snap = ws.set_cluster_sweep_visible(bool(visible), symbol or None)
+            return snap
+        if strategy_id in ("ema_dual_cross_multisource_v1", "ema_dual_cross"):
+            symbol = str(body.get("symbol") or "").strip().upper()
+            visible = body.get("visible")
+            ws = get_workspace()
+            if visible is None:
+                cur = bool((ws.snapshot().get("ema_dual_cross") or {}).get("visible"))
+                visible = not cur
+            snap = ws.set_ema_dual_cross_visible(bool(visible), symbol or None)
+            return snap
+
         from .stoch_backtester import fetch_stoch_signal_rows
 
         symbol = str(body.get("symbol") or "").strip().upper()
         if not symbol:
             return _error(400, "symbol_required", "symbol required")
+        # Clear cluster-sweep markers when loading stoch so strategies don't mix
+        get_workspace().clear_backtester_strategy(symbol, strategy_id="cluster_sweep_ema_9_20_59")
         hours = int(body.get("hours") or 48)
         strategy_version = str(body.get("strategy_version") or "").strip() or None
         source = str(body.get("source") or "").strip() or None
@@ -399,8 +483,142 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             bt["message"] = f"Pool-V1 hat keine Signale für {symbol}"
         if strategy_version == "EMA_POOL_TREND_FLIP_V1" and not rows:
             bt["message"] = f"EMA Pool Trend Flip V1 hat keine Signale für {symbol}"
+        bt["strategy_id"] = "stoch_fade"
         snap["backtester"] = bt
         return snap
+
+    @router.post("/api/research/backtester/run")
+    async def api_research_backtester_run(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Run a research strategy backtest. Stoch Fade remains job-based."""
+        strategy_id = str(body.get("strategy_id") or "").strip()
+        symbol = str(body.get("symbol") or "").strip().upper()
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        if "," in symbol or " " in symbol:
+            return _error(400, "single_symbol_required", "exactly one symbol per run")
+        start_raw = body.get("start")
+        end_raw = body.get("end")
+        if not start_raw or not end_raw:
+            return _error(400, "range_required", "start and end required (ISO UTC)")
+        try:
+            start = datetime.fromisoformat(str(start_raw).replace("Z", "+00:00"))
+            end = datetime.fromisoformat(str(end_raw).replace("Z", "+00:00"))
+        except ValueError:
+            return _error(400, "invalid_time", "start/end must be ISO UTC")
+
+        if strategy_id in ("ema_dual_cross_multisource_v1", "ema_dual_cross"):
+            from .ema_dual_cross_backtester import run_ema_dual_cross_backtest
+
+            timeframe = str(body.get("timeframe") or "15m").strip() or "15m"
+            try:
+                edc_kw: dict[str, Any] = {}
+                if "enable_sync_cross" in body:
+                    edc_kw["enable_sync_cross"] = bool(body.get("enable_sync_cross"))
+                if "enable_compressed_rebound" in body:
+                    edc_kw["enable_compressed_rebound"] = bool(body.get("enable_compressed_rebound"))
+                result = await asyncio.to_thread(
+                    run_ema_dual_cross_backtest,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    start=start,
+                    end=end,
+                    show_candidates=bool(body.get("show_candidates", True)),
+                    show_allow=bool(body.get("show_allow", True)),
+                    show_block=bool(body.get("show_block", False)),
+                    show_inconclusive=bool(body.get("show_inconclusive", False)),
+                    show_rejected=bool(body.get("show_rejected", False)),
+                    **edc_kw,
+                )
+            except KeyError:
+                return _error(404, "unknown_symbol", f"unknown symbol {symbol}")
+            except ValueError as exc:
+                return _error(400, "invalid_params", str(exc))
+            except Exception as exc:  # noqa: BLE001
+                return _error(503, "ema_dual_cross_failed", str(exc))
+            ws = get_workspace()
+            ws.clear_backtester_strategy(symbol, strategy_id="cluster_sweep_ema_9_20_59")
+            ws.clear_backtester_strategy(symbol, strategy_id="stoch_fade")
+            snap = ws.store_ema_dual_cross_run(result)
+            snap["ema_dual_cross_result"] = {
+                "meta": result.get("meta"),
+                "coverage": result.get("coverage"),
+                "summary": result.get("summary"),
+                "n_candidates": len(result.get("candidates") or []),
+                "candidates": result.get("candidates"),
+            }
+            return snap
+
+        if strategy_id not in ("cluster_sweep_ema_9_20_59", "cluster_sweep"):
+            return _error(
+                400,
+                "unsupported_strategy",
+                "Unterstützt: cluster_sweep_ema_9_20_59, ema_dual_cross_multisource_v1",
+            )
+        from .cluster_sweep_backtester import run_cluster_sweep_backtest
+
+        timeframe = str(body.get("timeframe") or "5m").strip() or "5m"
+        debug_low = bool(body.get("debug_low_pool") or body.get("debug_low_pool_zones"))
+        min_pools = int(body.get("minimum_cluster_pools") or (1 if debug_low else 3))
+        try:
+            result = await asyncio.to_thread(
+                run_cluster_sweep_backtest,
+                symbol=symbol,
+                timeframe=timeframe,
+                start=start,
+                end=end,
+                minimum_cluster_pools=min_pools,
+                ema_fast=int(body.get("ema_fast") or 9),
+                ema_medium=int(body.get("ema_medium") or 20),
+                ema_slow=int(body.get("ema_slow") or 59),
+                show_detail_markers=bool(body.get("show_detail_markers")),
+                debug_low_pool=debug_low,
+                expire_bars=int(body.get("expire_bars") or 24),
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", f"unknown symbol {symbol}")
+        except ValueError as exc:
+            return _error(400, "invalid_params", str(exc))
+        except Exception as exc:  # noqa: BLE001
+            return _error(503, "cluster_sweep_failed", str(exc))
+
+        # Clear other strategy markers for this symbol
+        get_workspace().clear_backtester_strategy(symbol, strategy_id="stoch_fade")
+        get_workspace().clear_backtester_strategy(symbol, strategy_id="ema_dual_cross_multisource_v1")
+        snap = get_workspace().store_cluster_sweep_run(result)
+        snap["cluster_sweep_result"] = {
+            "meta": result.get("meta"),
+            "coverage": result.get("coverage"),
+            "n_events": len(result.get("events") or []),
+            "events": result.get("events"),
+        }
+        return snap
+
+    @router.post("/api/research/backtester/cluster-sweep/nav")
+    async def api_research_cluster_sweep_nav(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        delta = body.get("delta")
+        index = body.get("index")
+        return get_workspace().navigate_cluster_sweep_event(
+            delta=int(delta or 0),
+            index=None if index is None else int(index),
+        )
+
+    @router.post("/api/research/backtester/ema-dual-cross/nav")
+    async def api_research_ema_dual_cross_nav(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        delta = body.get("delta")
+        index = body.get("index")
+        return get_workspace().navigate_ema_dual_cross_candidate(
+            delta=int(delta or 0),
+            index=None if index is None else int(index),
+        )
 
     @router.post("/api/research/drawings/tool")
     async def api_research_drawings_tool(

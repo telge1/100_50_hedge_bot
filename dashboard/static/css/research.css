@@ -280,7 +280,10 @@
     max-width: 280px;
     flex: 0 0 auto;
 }
-.trp-width { width: 52px; height: 32px; }
+#researchVpRows { width: 70px; }
+#researchVpDisplay { min-width: 96px; }
+#researchVpWidth { width: 88px; }
+#researchVpMode { width: 72px; }
 .trp-color {
     width: 32px;
     height: 32px;
@@ -513,3 +516,30 @@ body.research-browser-fs .trp-workspace {
 .trp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .trp-error { color: #f0616d; }
 .trp-ema-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0; }
+
+.research-csw-nav { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+.research-csw-debug { background: #7c2d12; color: #ffedd5; }
+.research-csw-panel { margin-top: 12px; max-height: 280px; overflow: auto; }
+.research-csw-detail { font-size: 11px; white-space: pre-wrap; background: #0f172a; color: #e2e8f0; padding: 8px; border-radius: 6px; }
+
+.research-history-custom {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.research-history-custom input[type="datetime-local"] {
+    font-size: 11px;
+    max-width: 11.5rem;
+}
+.research-history-hint {
+    font-size: 11px;
+    max-width: 22rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#researchGoTo {
+    font-size: 11px;
+    max-width: 11.5rem;
+}

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Research Chart Pane</title>
-  <link rel="stylesheet" href="/static/research_trp/style.css?v=pos-drag-1" />
+  <link rel="stylesheet" href="/static/research_trp/style.css?v=vp-1" />
 </head>
 <body>
   <div id="app">
@@ -15,6 +15,9 @@
       </div>
       <div id="empty">No candles to display</div>
       <div id="overlay-layer"></div>
+      <canvas id="vp-overlay" aria-hidden="true"></canvas>
+      <div id="vp-tooltip" hidden></div>
+      <div id="vp-badge" hidden></div>
       <div id="selected-line"></div>
       <div id="chart"></div>
     </div>
@@ -25,6 +28,6 @@
     </div>
   </div>
   <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
-  <script src="/static/research_trp/chart.js?v=time-clip-1"></script>
+  <script src="/static/research_trp/chart.js?v=history-5"></script>
 </body>
 </html>

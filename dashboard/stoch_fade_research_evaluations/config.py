@@ -7,19 +7,21 @@ from pathlib import Path
 
 DASHBOARD_ROOT = Path(__file__).resolve().parent.parent
 REPO_ROOT = DASHBOARD_ROOT.parent
-DEFAULT_SG_ROOT = Path(
-    "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves"
-)
+DEFAULT_SG_ROOT = Path("/home/telgenbuescher/projects/wave_fade_gold_f16ae32")
 DEFAULT_SG_PYTHON = DEFAULT_SG_ROOT / ".venv" / "bin" / "python"
 DEFAULT_EVAL_ROOT = REPO_ROOT / "results" / "stoch_fade_research_evaluations"
 WORKER_SCRIPT = Path(__file__).resolve().parent / "worker.py"
 
-STRATEGY_VERSION = "wave_fade_frozen_f16ae32"
+STRATEGY_VERSION = "wave_fade_frozen_f16ae32_causal_entry_v1"
 SIGNAL_STRATEGY_VERSION = STRATEGY_VERSION
 SIGNAL_SOURCE_COMMIT = "f16ae32da38da86f39e75b09c63c31f62d11996b"
+CAUSAL_MANIFEST_HASH = "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf"
+CONFIRMATION_POLICY = "cross_recognition"
+CONFIRMATION_SOURCE = CONFIRMATION_POLICY
 EXIT_POLICY = "NO_BE50"
 SIGNAL_SCOPE = "TIER_A_ONLY"
-OUTCOME_ENGINE = "evaluate_signal_no_be50"
+OUTCOME_ENGINE = "evaluate_signal_no_be50_full_1m"
+OUTCOME_ENGINE_QUALNAME = "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m"
 INTRABAR_POLICY = "SL_FIRST"
 SOURCE = "FROZEN_RESEARCH_EVALUATION"
 DEFAULT_COIN_TIMEOUT_S = 600

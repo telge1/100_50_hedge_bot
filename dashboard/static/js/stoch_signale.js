@@ -254,8 +254,8 @@
     if (stratNote) {
       stratNote.hidden = !on;
       stratNote.textContent = evalId
-        ? "Frozen NO_BE50 · SL_FIRST · PnL basis gross · Execution-Dedup nicht angewendet"
-        : "Nicht anwendbar – Outcomes fehlen";
+        ? "Canonical Causal Frozen Tier-A · cross_recognition · NO_BE50 / full 1m / SL_FIRST"
+        : "Canonical Causal Frozen Tier-A · nur Plan-Signale, Outcomes fehlen noch";
     }
     if (hours) {
       hours.disabled = on;
@@ -663,7 +663,7 @@
             (evalId ? " · Evaluation " + evalId : "") +
             (start && end ? " · Fenster " + start + " – " + end : "") +
             (evaluated
-              ? " · Frozen NO_BE50 · SL_FIRST · WIN/LOSS/OPEN · PnL basis gross · Execution-Dedup nicht angewendet"
+              ? " · Canonical Causal Frozen Tier-A · cross_recognition · NO_BE50 / full 1m / SL_FIRST"
               : " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv"),
           false
         );
@@ -1174,6 +1174,8 @@
 
   const collectorUi = {
     status: null,
+    feeds: null,
+    services: null,
     busy: false,
     pollMs: 4000,
     timer: null,
@@ -1225,6 +1227,54 @@
     el.textContent = text;
   }
 
+  function feedChip(active, labelOn, labelOff, title) {
+    const on = !!active;
+    const label = on ? (labelOn || "ON") : (labelOff || "OFF");
+    const cls = on ? "stoch-chip-live" : "stoch-chip-err";
+    const tip = title ? ` title="${String(title).replace(/"/g, "&quot;")}"` : "";
+    return `<span class="stoch-chip ${cls}"${tip}>${label}</span>`;
+  }
+
+  function feedChipState(info) {
+    const label = info.label || (info.active ? "ON" : "OFF");
+    const cls =
+      label === "REC" || label === "WARN"
+        ? "stoch-chip-warn"
+        : info.active
+          ? "stoch-chip-live"
+          : "stoch-chip-err";
+    const tip = info.title ? ` title="${String(info.title).replace(/"/g, "&quot;")}"` : "";
+    return `<span class="stoch-chip ${cls}"${tip}>${label}</span>`;
+  }
+
+  function symbolSet(list) {
+    const out = new Set();
+    (Array.isArray(list) ? list : []).forEach(function (s) {
+      const v = String(s || "").trim().toUpperCase();
+      if (v) out.add(v);
+    });
+    return out;
+  }
+
+  function candleFeedInfo(row, candleSet) {
+    const sym = String(row.symbol || "").toUpperCase();
+    if (!candleSet.has(sym)) {
+      return { active: false, label: "OFF", title: "nicht im Candle-Universe" };
+    }
+    const st = String(row.state || "").toUpperCase();
+    if (st === "LIVE") return { active: true, label: "ON", title: "1m Candles live" };
+    if (
+      st === "RECOVERING" ||
+      st === "CONNECTING" ||
+      st === "SUBSCRIBING" ||
+      st === "STARTING" ||
+      st === "RECONNECTING"
+    ) {
+      return { active: true, label: "REC", title: "Candle-Recovery / Connect" };
+    }
+    return { active: false, label: "OFF", title: "Candle konfiguriert, State=" + (st || "–") };
+  }
+
   function fmtCollectorTs(ts) {
     if (!ts) return "–";
     return fmtTs(ts);
@@ -1264,6 +1314,9 @@
   function renderCollectorStatus(data) {
     collectorUi.status = data || {};
     const st = collectorUi.status;
+    const feeds = collectorUi.feeds || {};
+    const obFeed = feeds.orderbook_live || {};
+    const oiFeed = feeds.oi_liquidation || {};
     const collectorState = st.collector_state || st.state || "–";
     const desired = st.desired_state || "–";
     const shadow =
@@ -1277,22 +1330,34 @@
     setChip("collectorDesiredChip", desired);
     setChip("collectorShadowChip", shadow);
 
-    const configured = countList(st.configured_symbols) || Number(st.configured_count) || 0;
-    const subscribed = countList(st.subscribed_symbols) || Number(st.subscribed_count) || 0;
+    const candleSet = symbolSet(st.candle_symbols || st.configured_symbols);
+    const publicEnabled = !!st.public_trades_enabled;
+    const publicSet = publicEnabled ? symbolSet(st.public_trade_symbols) : new Set();
+    const signalSet = symbolSet(st.signal_symbols);
+    const obSet = obFeed.running ? symbolSet(obFeed.symbols) : new Set();
+    const oiSet = oiFeed.running ? symbolSet(oiFeed.symbols) : new Set();
+
     const live = countList(st.live_symbols) || Number(st.live_count) || 0;
     const recovering = countList(st.recovering_symbols) || Number(st.symbols_recovering) || 0;
     const stale = countList(st.stale_symbols) || 0;
     const ws = st.websocket_connected ? "Connected" : "Disconnected";
+    const ptMetrics = st.public_trade_metrics || {};
 
     const summary = $("collectorStatusSummary");
     if (summary) {
       summary.innerHTML = [
         `<span>WebSocket: <strong class="${st.websocket_connected ? "stoch-pnl-pos" : "stoch-pnl-neg"}">${ws}</strong></span>`,
-        `<span>Subscribed: <strong>${subscribed} / ${configured}</strong></span>`,
-        `<span>Live: <strong>${live} / ${configured}</strong></span>`,
-        `<span>Recovering: <strong>${recovering}</strong></span>`,
-        `<span>Stale: <strong>${stale}</strong></span>`,
-        `<span>Reconnects: <strong>${st.reconnect_count ?? 0}</strong></span>`,
+        `<span>Candles: <strong>${live} live / ${candleSet.size}</strong>${recovering ? " · recovering " + recovering : ""}${stale ? " · stale " + stale : ""}</span>`,
+        `<span>Public: <strong class="${publicEnabled && publicSet.size ? "stoch-pnl-pos" : "stoch-pnl-neg"}">${
+          publicEnabled ? publicSet.size + " symbols" : "OFF"
+        }</strong></span>`,
+        `<span>Signals: <strong>${signalSet.size || 0}</strong></span>`,
+        `<span>OB Live: <strong class="${obFeed.running ? "stoch-pnl-pos" : "stoch-pnl-neg"}">${
+          obFeed.running ? "ON (" + (obFeed.symbol_count || obSet.size) + ")" : "OFF"
+        }</strong></span>`,
+        `<span>OI/Liq: <strong class="${oiFeed.running ? "stoch-pnl-pos" : "stoch-pnl-neg"}">${
+          oiFeed.running ? "ON (" + (oiFeed.symbol_count || oiSet.size) + ")" : "OFF"
+        }</strong></span>`,
       ].join("");
     }
 
@@ -1300,9 +1365,11 @@
     if (meta) {
       meta.innerHTML = [
         `<span>last_message_at: ${fmtCollectorTs(st.last_message_at)}</span>`,
-        `<span>last_ping_at: ${fmtCollectorTs(st.last_ping_at)}</span>`,
-        `<span>last_pong_at: ${fmtCollectorTs(st.last_pong_at)}</span>`,
         `<span>started_at: ${fmtCollectorTs(st.started_at)}</span>`,
+        `<span>reconnects: ${st.reconnect_count ?? 0}</span>`,
+        `<span>public_rows: ${ptMetrics.rows_inserted == null ? "–" : ptMetrics.rows_inserted}</span>`,
+        `<span>OB pid: ${obFeed.pid == null ? "–" : obFeed.pid}</span>`,
+        `<span>OI pid: ${oiFeed.pid == null ? "–" : oiFeed.pid}</span>`,
       ].join("");
     }
 
@@ -1310,23 +1377,54 @@
     if (tbody) {
       const symbols = Array.isArray(st.symbols) ? st.symbols : [];
       if (!symbols.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="stoch-empty">Keine Symbol-Daten im Status.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="stoch-empty">Keine Symbol-Daten im Status.</td></tr>`;
       } else {
         tbody.innerHTML = symbols
-          .map((row) => {
+          .map(function (row) {
+            const sym = String(row.symbol || "").toUpperCase();
             const rowState = row.state || "–";
-            const lag =
-              row.candle_lag_seconds == null || row.candle_lag_seconds === ""
-                ? "–"
-                : `${Number(row.candle_lag_seconds).toFixed(0)}s`;
             const lastCandle = row.last_closed_candle_at || row.last_persisted_open_time || null;
+            const candleInfo = candleFeedInfo(row, candleSet);
+            const publicOn = publicSet.has(sym);
+            const signalOn = signalSet.has(sym);
+            const obOn = obSet.has(sym);
+            const oiOn = oiSet.has(sym);
             return `<tr>
               <td>${row.symbol || "–"}</td>
               <td><span class="stoch-chip ${healthChipClass(rowState)}">${rowState}</span></td>
-              <td>${row.subscribed ? "yes" : "no"}</td>
+              <td>${feedChipState(candleInfo)}</td>
+              <td>${feedChip(
+                publicOn,
+                "ON",
+                "OFF",
+                publicEnabled
+                  ? publicOn
+                    ? "public trades subscribed"
+                    : "nicht in public_trade_symbols"
+                  : "public trades disabled on collector"
+              )}</td>
+              <td>${feedChip(signalOn, "ON", "OFF", signalOn ? "signal worker demand" : "kein Signal-Demand")}</td>
+              <td>${feedChip(
+                obOn,
+                "ON",
+                "OFF",
+                obFeed.running
+                  ? obOn
+                    ? "OB V3 live universe"
+                    : "nicht im OB-Live-Universe"
+                  : "OB V3 Live Collector nicht aktiv"
+              )}</td>
+              <td>${feedChip(
+                oiOn,
+                "ON",
+                "OFF",
+                oiFeed.running
+                  ? oiOn
+                    ? "OI + Liquidationen live"
+                    : "nicht im OI/Liq-Universe"
+                  : "OI/Liq Collector nicht aktiv"
+              )}</td>
               <td>${fmtCollectorTs(lastCandle)}</td>
-              <td>${lag}</td>
-              <td>${row.signal_processor_state || "–"}</td>
             </tr>`;
           })
           .join("");
@@ -1338,8 +1436,21 @@
 
   async function loadCollectorStatus() {
     try {
-      const res = await fetch("/api/collector/status", { credentials: "include" });
+      const [res, feedsRes, svcRes] = await Promise.all([
+        fetch("/api/collector/status", { credentials: "include" }),
+        fetch("/api/collector/live-feeds", { credentials: "include" }),
+        fetch("/api/collector/services", { credentials: "include" }),
+      ]);
       const data = await res.json().catch(() => ({}));
+      const feeds = await feedsRes.json().catch(() => ({}));
+      const services = await svcRes.json().catch(() => ({}));
+      if (feedsRes.ok) {
+        collectorUi.feeds = feeds;
+      }
+      if (svcRes.ok) {
+        collectorUi.services = services;
+        renderCollectorServices(services);
+      }
       if (!res.ok) {
         const msg = data.error || data.detail || `HTTP ${res.status}`;
         setErr("collectorControlError", "Status: " + msg);
@@ -1364,20 +1475,177 @@
     }
   }
 
-  async function setDesiredState(desired) {
+  function renderCollectorServices(services) {
+    const body = $("collectorServicesBody");
+    if (!body) return;
+    const stoch = (services && services.stoch) || {};
+    const pub = (services && services.public) || {};
+    const ob = (services && services.orderbook_live) || {};
+    const oi = (services && services.oi_liquidation) || {};
+    const gap = (pub.gap_backfill || {});
+    setChip(
+      "collectorPublicGapChip",
+      gap.running ? "RUNNING" : "IDLE"
+    );
+
+    function row(name, statusHtml, backfill, actionsHtml) {
+      return (
+        "<tr><td>" +
+        name +
+        "</td><td>" +
+        statusHtml +
+        "</td><td>" +
+        backfill +
+        "</td><td>" +
+        actionsHtml +
+        "</td></tr>"
+      );
+    }
+
+    const stochState = stoch.collector_state || (stoch.running ? "RUNNING" : "STOPPED");
+    const stochStatus =
+      '<span class="stoch-chip ' +
+      healthChipClass(stochState) +
+      '">' +
+      stochState +
+      "</span>" +
+      (stoch.pid ? " · pid " + stoch.pid : "");
+    const pubStatus = feedChip(
+      !!pub.enabled,
+      "ON (" + (pub.symbol_count || 0) + ")",
+      "OFF",
+      pub.backfill_on_enable || ""
+    );
+    const obStatus = feedChip(
+      !!ob.running,
+      "ON (" + (ob.symbol_count || 0) + ")",
+      "OFF",
+      "status only"
+    );
+    const oiStatus = feedChip(
+      !!oi.running,
+      "ON (" + (oi.symbol_count || 0) + ")",
+      "OFF",
+      "status only"
+    );
+
+    const busy = collectorUi.busy ? " disabled" : "";
+    const pubBtn = pub.enabled
+      ? '<button type="button" class="stoch-btn" data-svc="public" data-act="stop"' +
+        busy +
+        ">Public stoppen</button>"
+      : '<button type="button" class="stoch-btn" data-svc="public" data-act="start"' +
+        busy +
+        ">Public starten + Gap-Backfill</button>";
+    const stochBtns =
+      '<button type="button" class="stoch-btn" data-svc="stoch" data-act="restart"' +
+      busy +
+      ">Neu starten (Recovery)</button>";
+    const obBtn = ob.running
+      ? '<button type="button" class="stoch-btn" data-svc="orderbook_live" data-act="stop"' +
+        busy +
+        ">OB stoppen</button> " +
+        '<button type="button" class="stoch-btn" data-svc="orderbook_live" data-act="restart"' +
+        busy +
+        ">OB neu starten</button>"
+      : '<button type="button" class="stoch-btn" data-svc="orderbook_live" data-act="start"' +
+        busy +
+        ">OB starten</button>";
+    const oiBtn = oi.running
+      ? '<button type="button" class="stoch-btn" data-svc="oi_liquidation" data-act="stop"' +
+        busy +
+        ">OI/Liq stoppen</button> " +
+        '<button type="button" class="stoch-btn" data-svc="oi_liquidation" data-act="restart"' +
+        busy +
+        ">OI/Liq neu starten</button>"
+      : '<button type="button" class="stoch-btn" data-svc="oi_liquidation" data-act="start"' +
+        busy +
+        ">OI/Liq starten</button>";
+
+    body.innerHTML = [
+      row(
+        "Candles + Signals",
+        stochStatus,
+        "Auto-RECOVERING bei Start",
+        stochBtns
+      ),
+      row(
+        "Public Trades",
+        pubStatus +
+          (gap.running
+            ? ' · <span class="stoch-chip stoch-chip-warn">Gap-Backfill läuft</span>'
+            : ""),
+        pub.backfill_on_enable || "Live ab Connect + Archiv-Gap",
+        pubBtn
+      ),
+      row(
+        "OB V3 Live",
+        obStatus + (ob.pid ? " · pid " + ob.pid : ""),
+        ob.backfill_on_start || "Recovery on connect (kein 30d)",
+        obBtn
+      ),
+      row(
+        "OI/Liq Live",
+        oiStatus + (oi.pid ? " · pid " + oi.pid : ""),
+        oi.backfill_on_start || "Live ab Connect",
+        oiBtn
+      ),
+    ].join("");
+
+    body.querySelectorAll("button[data-svc]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        runServiceAction(btn.getAttribute("data-svc"), btn.getAttribute("data-act"));
+      });
+    });
+  }
+
+  async function runServiceAction(serviceId, action) {
+    const messages = {
+      "stoch:restart":
+        "Stoch-Collector neu starten?\nCandles: Auto-Recovery (Lücken füllen).\nPublic-Flag bleibt wie bisher.",
+      "stoch:stop":
+        "Stoch-Collector wirklich stoppen?\nCandles/Signals/Public (falls an) stoppen.",
+      "stoch:start": "Stoch-Collector starten (Candles mit Auto-Recovery)?",
+      "public:start":
+        "Public Trades aktivieren?\n1) Stoch-Neustart mit --enable-public-trades\n2) Candle Auto-Recovery\n3) Archiv-Gap-Backfill letzte Tage\nOB/OI/Import werden nicht angefasst.",
+      "public:stop":
+        "Public Trades deaktivieren?\nStoch-Neustart ohne Public-Flag; Candles bleiben mit Recovery an.",
+      "orderbook_live:start":
+        "OB V3 Live starten (universe51)?\nCollector-eigene Recovery beim Connect.\nKein 30d-Import.",
+      "orderbook_live:stop":
+        "OB V3 Live stoppen?\nNur der Live-Collector — 30d-Import bleibt unberührt.",
+      "orderbook_live:restart":
+        "OB V3 Live neu starten?\nKurze Unterbrechung, dann Recovery on connect.\nKein 30d-Import.",
+      "oi_liquidation:start":
+        "OI/Liq Live starten (51 Symbole)?\nLive ab Connect.",
+      "oi_liquidation:stop":
+        "OI/Liq Live stoppen?\nNur dieser Collector.",
+      "oi_liquidation:restart":
+        "OI/Liq Live neu starten?",
+    };
+    const key = String(serviceId) + ":" + String(action);
+    const msg = messages[key] || "Aktion ausführen: " + key + "?";
+    if (!window.confirm(msg)) return;
+
     collectorUi.busy = true;
     updateCollectorButtons();
     setErr("collectorControlError", "");
     try {
-      const res = await fetch("/api/collector/desired_state", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ desired_state: desired }),
-      });
+      const res = await fetch(
+        "/api/collector/services/" +
+          encodeURIComponent(serviceId) +
+          "/" +
+          encodeURIComponent(action),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        }
+      );
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || data.detail || data.detail || `HTTP ${res.status}`);
       }
       await loadCollectorStatus();
     } catch (err) {
@@ -1385,17 +1653,30 @@
     } finally {
       collectorUi.busy = false;
       updateCollectorButtons();
+      renderCollectorServices(collectorUi.services || {});
     }
+  }
+
+  async function setDesiredState(desired) {
+    if (desired === "STOPPED") {
+      await runServiceAction("stoch", "stop");
+      return;
+    }
+    await runServiceAction("stoch", "start");
   }
 
   function wireCollector() {
     const startBtn = $("collectorStartBtn");
     const stopBtn = $("collectorStopBtn");
     if (startBtn) {
-      startBtn.addEventListener("click", () => setDesiredState("RUNNING"));
+      startBtn.addEventListener("click", function () {
+        runServiceAction("stoch", "start");
+      });
     }
     if (stopBtn) {
-      stopBtn.addEventListener("click", () => setDesiredState("STOPPED"));
+      stopBtn.addEventListener("click", function () {
+        runServiceAction("stoch", "stop");
+      });
     }
     loadCollectorStatus();
     if (collectorUi.timer) clearInterval(collectorUi.timer);
@@ -1801,6 +2082,7 @@
     pollMs: 3000,
     windowLocked: false,
     defaultsApplied: false,
+    resultShownJobId: null,
   };
 
   function frozenFadeJobActive() {
@@ -1866,11 +2148,28 @@
   }
 
   function frozenFadeWarmupCell(c) {
+    if (c.warmup_label) return c.warmup_label;
+    const state = String(c.state || "");
+    if (state === "PENDING") return "Noch nicht gestartet";
+    if (state === "RUNNING") return "Läuft";
+    if (state === "INTERRUPTED") return "Unterbrochen";
     if (c.warmup_schema_error) return "Artefaktfehler";
     const by = c.warmup_complete_by_tf || {};
     const tfs = ["15m", "30m", "1h", "4h"];
     const missing = tfs.filter(function (tf) { return typeof by[tf] !== "boolean"; });
-    if (missing.length) return "Artefaktfehler";
+    if (state === "FAILED" || state === "TIMEOUT") {
+      if (missing.length) return "Artefaktfehler";
+    }
+    if (state === "COMPLETED" || state === "SKIPPED_RESUME_COMPLETE") {
+      if (missing.length) return "Artefaktfehler";
+      const ok = tfs.filter(function (tf) { return by[tf] === true; });
+      const bad = tfs.filter(function (tf) { return by[tf] === false; });
+      if (c.warmup_complete === true && bad.length === 0) return "vollständig";
+      if (ok.length && bad.length) return "teilweise (" + bad.join(", ") + ")";
+      if (c.warmup_complete === false || bad.length === 4) return "unvollständig";
+      return "unvollständig";
+    }
+    if (missing.length) return "–";
     const ok = tfs.filter(function (tf) { return by[tf] === true; });
     const bad = tfs.filter(function (tf) { return by[tf] === false; });
     if (c.warmup_complete === true && bad.length === 0) return "vollständig";
@@ -1885,7 +2184,7 @@
     const barWrap = $("frozenFadeBarWrap");
     const bar = $("frozenFadeBar");
     const totals = $("frozenFadeTotals");
-    const wrap = $("frozenFadeResultWrap");
+    const resultCard = $("frozenFadeResultCard");
     const body = $("frozenFadeResultBody");
     const active = frozenFadeJobActive();
     if (prog) {
@@ -1924,9 +2223,16 @@
         " · Multi-TF " + (summary.multi_tf_collisions == null ? "–" : summary.multi_tf_collisions);
     }
     const done = job.state && job.state !== "QUEUED" && job.state !== "RUNNING";
-    if (wrap && body) {
+    if (resultCard && body) {
       if (done && Array.isArray(job.coins) && job.coins.length) {
-        wrap.style.display = "block";
+        const jobId = String(job.job_id || "");
+        const wasHidden = resultCard.style.display === "none";
+        const isNewJob = jobId && jobId !== frozenFade.resultShownJobId;
+        resultCard.style.display = "";
+        if (wasHidden || isNewJob) {
+          resultCard.open = true;
+        }
+        if (jobId) frozenFade.resultShownJobId = jobId;
         body.innerHTML = job.coins.map(function (c) {
           return "<tr><td>" + (c.symbol || "") + "</td><td>" + (c.state || "") +
             "</td><td>" + (c.raw_total == null ? "–" : c.raw_total) +
@@ -1941,7 +2247,9 @@
             "</td></tr>";
         }).join("");
       } else if (!done) {
-        wrap.style.display = "none";
+        resultCard.style.display = "none";
+        resultCard.open = false;
+        frozenFade.resultShownJobId = null;
       }
     }
     frozenFadeSyncControls();

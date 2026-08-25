@@ -25,8 +25,11 @@ from stoch_fade_research_jobs.complete import (  # noqa: E402
     find_complete_coin_run,
 )
 from stoch_fade_research_jobs.config import (  # noqa: E402
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
     COIN_TERM_GRACE_S,
     REPO_ROOT,
+    STRATEGY_VERSION,
     coin_timeout_s,
     sg_python,
 )
@@ -34,6 +37,7 @@ from stoch_fade_research_jobs.jobs import (  # noqa: E402
     empty_coin_row,
     public_message,
 )
+from worker_env import clickhouse_preflight, inject_worker_env, sg_python_preflight, PINNED_GOLD_ROOT  # noqa: E402
 
 TFS = ("15m", "30m", "1h", "4h")
 _ACTIVE_CHILD: subprocess.Popen | None = None
@@ -95,10 +99,12 @@ def _run_coin_process(argv: list[str], cwd: Path, log_path: Path, timeout_s: int
                 "run_id": run_id,
                 "selected_symbol": symbol,
                 "selected_symbols": [symbol],
-                "strategy_id": "wave_fade_frozen_f16ae32",
+                "strategy_id": STRATEGY_VERSION,
                 "source_commit_pin": "f16ae32",
                 "signal_start": start,
                 "signal_end_exclusive": end,
+                "confirmation_policy": CONFIRMATION_POLICY,
+                "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
             },
         )
         write_json_atomic(run_dir / "summary.json", {"run_id": run_id, "raw_total": raw, "tier_a_total": tier})
@@ -119,18 +125,25 @@ def _run_coin_process(argv: list[str], cwd: Path, log_path: Path, timeout_s: int
         return "OK", 0
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    gold_src = str(PINNED_GOLD_ROOT / "src")
+    env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + gold_src + os.pathsep + env.get("PYTHONPATH", "")
+    env["STOCH_FADE_SG_PYTHON"] = str(argv[0])
+    env["STOCH_FADE_SIGNAL_GENERATOR_ROOT"] = str(PINNED_GOLD_ROOT)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log_fh:
-        proc = subprocess.Popen(  # noqa: S603
-            argv,
-            cwd=str(cwd),
-            stdout=log_fh,
-            stderr=subprocess.STDOUT,
-            shell=False,
-            env=env,
-            start_new_session=False,
-        )
+        try:
+            proc = subprocess.Popen(  # noqa: S603
+                argv,
+                cwd=str(cwd),
+                stdout=log_fh,
+                stderr=subprocess.STDOUT,
+                shell=False,
+                env=env,
+                start_new_session=False,
+            )
+        except FileNotFoundError:
+            log_fh.write("MISSING_SG_PYTHON\n")
+            return "FAILED", 127
         _ACTIVE_CHILD = proc
         try:
             rc = proc.wait(timeout=timeout_s)
@@ -190,6 +203,7 @@ def _aggregate(coins: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def run_job(job_dir: Path) -> int:
+    inject_worker_env(os.environ)
     request = read_json(job_dir / "request.json")
     if request.get("jobs_root"):
         os.environ["STOCH_FADE_RESEARCH_JOBS_ROOT"] = str(request["jobs_root"])
@@ -202,6 +216,42 @@ def run_job(job_dir: Path) -> int:
     timeout_s = coin_timeout_s()
     log_path = job_dir / "worker.log"
     interrupted = {"flag": False}
+    stubbed = bool(str(os.environ.get("STOCH_FADE_RUNNER_STUB") or "").strip())
+    interp = {"ok": True, "error_code": None} if stubbed else sg_python_preflight(os.environ)
+    preflight = clickhouse_preflight(os.environ)
+    if not interp.get("ok") or not preflight.get("ok"):
+        err = str(
+            interp.get("error_code")
+            or preflight.get("error_code")
+            or "CLICKHOUSE_PREFLIGHT_FAILED"
+        )
+        row = empty_coin_row(symbols[0]) if symbols else {}
+        if row:
+            row["state"] = "FAILED"
+            row["error_code"] = err
+            row["message"] = public_message(err)
+        status["coins"] = [row] if symbols else []
+        status["completed_coins"] = len(status["coins"])
+        status["failed_coins"] = len(status["coins"])
+        status["successful_coins"] = 0
+        status["state"] = "FAILED"
+        status["finished_at"] = iso_z(_utcnow())
+        status["worker_pid"] = None
+        status["message"] = row["message"]
+        status["error_summary"] = row["error_code"]
+        write_json_atomic(job_dir / "combined_summary.json", {"preflight": preflight, "failed_coins": len(status["coins"])})
+        write_json_atomic(job_dir / "status.json", status)
+        write_json_atomic(job_dir / "progress.json", {"coins": status["coins"]})
+        from stoch_fade_research_jobs.jobs import clear_lock
+
+        clear_lock()
+        try:
+            import stoch_heavy_job_gate as heavy_gate
+
+            heavy_gate.release(str(request.get("job_id") or ""))
+        except Exception:
+            pass
+        return 1
 
     def _on_term(_signum, _frame):
         interrupted["flag"] = True
@@ -286,6 +336,20 @@ def run_job(job_dir: Path) -> int:
         elif rc != 0:
             row["state"] = "FAILED"
             row["error_code"] = "RUNNER_NONZERO"
+            try:
+                lines = log_path.read_text(encoding="utf-8").splitlines()
+                if lines:
+                    last = lines[-1].strip()
+                    if "MISSING_SG_PYTHON" in last or "No such file or directory" in last:
+                        row["error_code"] = "MISSING_SG_PYTHON"
+                    elif "Missing required environment variable: CLICKHOUSE_USER" in last:
+                        row["error_code"] = "MISSING_CLICKHOUSE_ENV"
+                    elif "CAUSAL_DASHBOARD_IDENTITY_FAIL_CLOSED" in last:
+                        row["error_code"] = "STRATEGY_IDENTITY_MISMATCH"
+                    elif "RUNTIME_ROOT_UNSAFE" in last:
+                        row["error_code"] = "RUNTIME_PIN_MISMATCH"
+            except Exception:
+                pass
         elif run_dir is None or not find_complete_coin_run(
             out_root, symbol=symbol, signal_start=start, signal_end_exclusive=end
         ):
@@ -313,14 +377,18 @@ def run_job(job_dir: Path) -> int:
     elif failed_n and summary["successful_coins"]:
         status["state"] = "COMPLETED_WITH_ERRORS"
     elif failed_n:
-        status["state"] = "COMPLETED_WITH_ERRORS"
+        status["state"] = "FAILED"
     else:
         status["state"] = "COMPLETED"
     status["finished_at"] = iso_z(_utcnow())
     status["progress_percent"] = 100
     status["last_worker_pid"] = status.get("worker_pid") or status.get("last_worker_pid")
     status["worker_pid"] = None
-    flush(None, len(symbols), status["state"])
+    status["error_summary"] = ",".join(
+        sorted({str((coins[s].get("error_code") or "")).strip() for s in symbols if coins[s].get("error_code")})
+    )
+    status["message"] = status["error_summary"] or status["state"]
+    flush(None, len(symbols), status["message"])
     from stoch_fade_research_jobs.jobs import clear_lock
 
     clear_lock()

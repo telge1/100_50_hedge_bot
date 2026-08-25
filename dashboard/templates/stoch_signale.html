@@ -84,14 +84,36 @@
                 <summary class="stoch-card-summary">Collector Steuerung</summary>
                 <div class="stoch-card-body">
                     <div class="stoch-collector-error" id="collectorControlError" style="display:none;"></div>
+                    <p class="stoch-universe51-note">
+                        Candles starten immer mit Auto-Recovery (keine Lücken bis „jetzt“).
+                        Public aktivieren = Stoch-Neustart mit Live-WS <strong>plus</strong> Archiv-Gap-Backfill
+                        für die letzten Tage. OB V3 / OI/Liq: Start/Stop der Live-Prozesse
+                        (nicht der einmalige OB-30d-Import).
+                    </p>
                     <div class="stoch-collector-kv">
                         <div><span class="stoch-kv-label">Collector</span> <span class="stoch-chip" id="collectorStateChip">–</span></div>
                         <div><span class="stoch-kv-label">Desired State</span> <span class="stoch-chip" id="collectorDesiredChip">–</span></div>
                         <div><span class="stoch-kv-label">Shadow Mode</span> <span class="stoch-chip" id="collectorShadowChip">–</span></div>
+                        <div><span class="stoch-kv-label">Public Gap</span> <span class="stoch-chip" id="collectorPublicGapChip">–</span></div>
                     </div>
-                    <div class="stoch-collector-actions">
-                        <button type="button" class="btn-service-start" id="collectorStartBtn">Collector starten</button>
-                        <button type="button" class="btn-service-stop" id="collectorStopBtn">Collector stoppen</button>
+                    <div class="stoch-table-wrap">
+                        <table class="stoch-table" id="collectorServicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Dienst</th>
+                                    <th>Status</th>
+                                    <th>Backfill</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="collectorServicesBody">
+                                <tr><td colspan="4" class="stoch-empty">Lade Dienste…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="stoch-collector-actions" style="margin-top:10px;">
+                        <button type="button" class="btn-service-start" id="collectorStartBtn">Candles starten</button>
+                        <button type="button" class="btn-service-stop" id="collectorStopBtn">Candles stoppen</button>
                     </div>
                 </div>
             </details>
@@ -102,11 +124,11 @@
                     <div class="stoch-collector-error" id="collectorStatusError" style="display:none;"></div>
                     <div class="stoch-collector-summary" id="collectorStatusSummary">
                         <span>WebSocket: –</span>
-                        <span>Subscribed: –</span>
-                        <span>Live: –</span>
-                        <span>Recovering: –</span>
-                        <span>Stale: –</span>
-                        <span>Reconnects: –</span>
+                        <span>Candles: –</span>
+                        <span>Public: –</span>
+                        <span>Signals: –</span>
+                        <span>OB Live: –</span>
+                        <span>OI/Liq: –</span>
                     </div>
                     <div class="stoch-collector-meta" id="collectorStatusMeta"></div>
                     <div class="stoch-table-wrap stoch-collector-table-wrap">
@@ -115,14 +137,16 @@
                                 <tr>
                                     <th>Symbol</th>
                                     <th>State</th>
-                                    <th>Subscribed</th>
+                                    <th>Candles</th>
+                                    <th>Public</th>
+                                    <th>Signals</th>
+                                    <th>OB</th>
+                                    <th>OI/Liq</th>
                                     <th>Last Candle</th>
-                                    <th>Lag</th>
-                                    <th>Signal Processor</th>
                                 </tr>
                             </thead>
                             <tbody id="collectorSymbolsBody">
-                                <tr><td colspan="6" class="stoch-empty">Lade Collector-Status…</td></tr>
+                                <tr><td colspan="8" class="stoch-empty">Lade Collector-Status…</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -184,7 +208,10 @@
                 <div class="stoch-card-body">
                     <h2 class="stoch-frozen-title">Frozen Stochastic Fade – Signale berechnen</h2>
                     <p class="stoch-universe51-note">
-                        Feste Strategie: <code>wave_fade_frozen_f16ae32</code>.
+                        Strategie: <strong>Canonical Causal Frozen Tier-A</strong> ·
+                        Version: <code>wave_fade_frozen_f16ae32_causal_entry_v1</code> ·
+                        Confirmation: <code>cross_recognition</code> ·
+                        Exit: <code>NO_BE50 / full 1m / SL_FIRST</code>.
                         Nur Signalerzeugung – noch kein Profit-Backtest.
                         Coin-Auswahl über die Tabelle oben (testbar: FULL / LISTING_LIMITED).
                         Zeiten in UTC. Signalende ist exklusiv.
@@ -203,7 +230,7 @@
                     </p>
                     <div class="stoch-universe51-actions">
                         <button type="button" class="stoch-btn" id="frozenFadeStartBtn" disabled>
-                            Frozen-Signale berechnen
+                            Kausalen Backtest starten
                         </button>
                         <button type="button" class="stoch-btn" id="frozenFadeResumeBtn" style="display:none;">
                             Job fortsetzen
@@ -214,26 +241,31 @@
                         <div class="stoch-frozen-bar" id="frozenFadeBar"></div>
                     </div>
                     <div class="stoch-universe51-meta" id="frozenFadeTotals"></div>
-                    <div class="stoch-table-wrap" id="frozenFadeResultWrap" style="display:none;">
-                        <table class="stoch-table" id="frozenFadeResultTable">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Status</th>
-                                    <th>Raw</th>
-                                    <th>Tier-A</th>
-                                    <th>15m</th>
-                                    <th>30m</th>
-                                    <th>1h</th>
-                                    <th>4h</th>
-                                    <th>Warm-up</th>
-                                    <th>Multi-TF</th>
-                                    <th>Dauer</th>
-                                </tr>
-                            </thead>
-                            <tbody id="frozenFadeResultBody"></tbody>
-                        </table>
-                    </div>
+                    <details class="stoch-card stoch-nested-card" id="frozenFadeResultCard" style="display:none;">
+                        <summary class="stoch-card-summary">Kausaler Backtest Ergebnis</summary>
+                        <div class="stoch-card-body">
+                            <div class="stoch-table-wrap" id="frozenFadeResultWrap">
+                                <table class="stoch-table" id="frozenFadeResultTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Symbol</th>
+                                            <th>Status</th>
+                                            <th>Raw</th>
+                                            <th>Tier-A</th>
+                                            <th>15m</th>
+                                            <th>30m</th>
+                                            <th>1h</th>
+                                            <th>4h</th>
+                                            <th>Warm-up</th>
+                                            <th>Multi-TF</th>
+                                            <th>Dauer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="frozenFadeResultBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
                     <p class="stoch-universe51-note" id="frozenFadeDisclaimers">
                         Keine Execution-Dedup-Policy angewendet.
                         Keine Outcomes berechnet.
@@ -246,7 +278,7 @@
                 <div class="stoch-card-body">
                     <h2 class="stoch-frozen-title">Frozen-NO_BE50-Outcomes berechnen</h2>
                     <p class="stoch-universe51-note">
-                        Wählt zuerst einen Frozen-Research-Job. Signale: <code>wave_fade_frozen_f16ae32</code>.
+                        Wählt zuerst einen kausalen Research-Job. Signale: <code>wave_fade_frozen_f16ae32_causal_entry_v1</code>.
                         Exit-Policy: <code>NO_BE50</code> über <code>evaluate_signal_no_be50</code> / SL_FIRST.
                         Nur Tier-A, unabhängig je Signal. Ergebnisse: WIN / LOSS / OPEN. PnL-Karten: gross.
                     </p>
@@ -306,7 +338,7 @@
                 <label for="stochFilterStrategy" id="stochFilterStrategyLabel">Strategy</label>
                 <select id="stochFilterStrategy">
                     <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
-                    <option value="wave_fade_frozen_f16ae32">BE50 Frozen (Research)</option>
+                    <option value="wave_fade_frozen_f16ae32_causal_entry_v1">Canonical Causal Frozen Tier-A</option>
                     {% if enable_pool_order_plan_v1 %}
                     <option value="POOL_ORDER_PLAN_V1">Pool Order Plan V1 · Research</option>
                     {% endif %}

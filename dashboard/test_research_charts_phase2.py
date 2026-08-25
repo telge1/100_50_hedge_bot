@@ -223,3 +223,11 @@ def test_index_recommendation_no_binary_wrapper():
     src = Path(DASHBOARD_ROOT / "research_charts" / "data_source.py").read_text()
     assert "BINARY" not in src
     assert "timeframe = %s" in src
+
+
+def test_clickhouse_config_ignores_polluted_process_database(monkeypatch):
+    from research_charts.clickhouse_config import load_clickhouse_config
+
+    monkeypatch.setenv("CLICKHOUSE_DATABASE", "orderbook_analysis")
+    cfg = load_clickhouse_config()
+    assert cfg.database == "signal_generator"

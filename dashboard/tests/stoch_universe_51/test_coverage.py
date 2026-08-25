@@ -261,6 +261,17 @@ def test_dashboard_default_strategy_unchanged():
     assert "Test starten" not in html
     assert "collectorControlCard" in html
     assert "collectorStatusCard" in html
+    assert ">Candles</th>" in html
+    assert ">Public</th>" in html
+    assert ">OB</th>" in html
+    assert ">OI/Liq</th>" in html
+    assert "Subscribed</th>" not in html
+    assert "Signal Processor</th>" not in html
+    assert "/api/collector/live-feeds" in js
+    assert "feedChipState" in js
+    assert "/api/collector/services" in js
+    assert "Public starten + Gap-Backfill" in js or "runServiceAction" in js
+    assert "collectorServicesBody" in html
 
 
 def test_api_route_is_read_only_in_app():

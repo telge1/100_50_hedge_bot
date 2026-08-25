@@ -161,7 +161,7 @@ def test_finalize_root_contract(tmp_path):
     assert combined["open"] == 0
     assert combined["be50_activated_count"] == 0
     assert combined["exit_policy"] == "NO_BE50"
-    assert combined["outcome_engine"] == "evaluate_signal_no_be50"
+    assert combined["outcome_engine"] == "evaluate_signal_no_be50_full_1m"
     assert combined["intrabar_policy"] == "SL_FIRST"
     assert combined["side_effect_flags"] == SIDE_EFFECT_FLAGS
     assert (directory / "combined_summary.json").read_bytes() == (directory / "summary.json").read_bytes()

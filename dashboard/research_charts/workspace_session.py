@@ -14,6 +14,11 @@ from .boundary import PANE_COUNT, SUPPORTED_LAYOUTS, SUPPORTED_TIMEFRAMES
 from .stoch_backtester import BACKTESTER_SOURCE, signal_to_position_spec
 from .trp_import import load_trp
 
+CLUSTER_SWEEP_SOURCE = "cluster_sweep_backtester"
+CLUSTER_SWEEP_STRATEGY_ID = "cluster_sweep_ema_9_20_59"
+EMA_DUAL_CROSS_SOURCE = "ema_dual_cross_backtester"
+EMA_DUAL_CROSS_STRATEGY_ID = "ema_dual_cross_multisource_v1"
+
 PANE_IDS = ("pane-0", "pane-1", "pane-2", "pane-3")
 DEFAULT_PANE_TFS = {
     "pane-0": "1m",
@@ -21,6 +26,43 @@ DEFAULT_PANE_TFS = {
     "pane-2": "15m",
     "pane-3": "1h",
 }
+DEFAULT_VOLUME_PROFILE = {
+    "enabled": False,
+    "rows": "auto",
+    "display": "buy_sell",
+    "poc": True,
+    "value_area": True,
+    "width": "normal",
+    "volume_mode": "base",
+    "mode": "visible_range",
+}
+
+
+def normalize_volume_profile(raw: dict | None) -> dict[str, Any]:
+    src = dict(DEFAULT_VOLUME_PROFILE)
+    if isinstance(raw, dict):
+        if "enabled" in raw:
+            src["enabled"] = bool(raw["enabled"])
+        rows = str(raw.get("rows") or src["rows"]).strip().lower()
+        if rows in {"auto", "24", "48", "72", "100"}:
+            src["rows"] = "auto" if rows == "auto" else rows
+        display = str(raw.get("display") or src["display"]).strip().lower()
+        if display in {"buy_sell", "total", "delta"}:
+            src["display"] = display
+        if "poc" in raw:
+            src["poc"] = bool(raw["poc"])
+        if "value_area" in raw:
+            src["value_area"] = bool(raw["value_area"])
+        width = str(raw.get("width") or src["width"]).strip().lower()
+        if width in {"compact", "normal", "wide"}:
+            src["width"] = width
+        mode = str(raw.get("volume_mode") or src["volume_mode"]).strip().lower()
+        if mode in {"base", "quote"}:
+            src["volume_mode"] = mode
+        src["mode"] = "visible_range"
+    return src
+
+
 USER_DATA_DIR = Path(__file__).resolve().parent / "user_data"
 DRAWINGS_PATH = USER_DATA_DIR / "drawings.json"
 SETTINGS_PATH = USER_DATA_DIR / "indicator_settings.json"
@@ -73,6 +115,13 @@ class ResearchWorkspace:
         self.ema_config = self.indicator_store.get_config(trp["EMA_OVERLAYS"])
         self.stoch_config = self.indicator_store.get_config(trp["STOCHASTIC"])
         self.lld_config = self.indicator_store.get_config(trp["LIQUIDITY_LOCATION"])
+        self.volume_profile = dict(DEFAULT_VOLUME_PROFILE)
+        self._cluster_sweep_run: dict[str, Any] | None = None
+        self._cluster_sweep_visible: bool = False
+        self._cluster_sweep_event_index: int = 0
+        self._ema_dual_cross_run: dict[str, Any] | None = None
+        self._ema_dual_cross_visible: bool = False
+        self._ema_dual_cross_event_index: int = 0
         self._load_persisted_drawings()
 
     def _load_persisted_drawings(self) -> None:
@@ -133,6 +182,7 @@ class ResearchWorkspace:
             "ema": self.ema_config.to_dict(),
             "stochastic": self.stoch_config.to_dict(),
             "liquidity": self.lld_config.to_dict(),
+            "volume_profile": dict(self.volume_profile),
             "license_notice": trp["LICENSE_NOTICE"],
             "tools": list(TOOLS),
             "layouts": list(SUPPORTED_LAYOUTS),
@@ -140,6 +190,58 @@ class ResearchWorkspace:
             "pane_ids": list(PANE_IDS),
             "default_pane_timeframes": dict(DEFAULT_PANE_TFS),
             "pane_count": dict(PANE_COUNT),
+            "cluster_sweep": self._cluster_sweep_snapshot(),
+            "ema_dual_cross": self._ema_dual_cross_snapshot(),
+        }
+
+    def _cluster_sweep_snapshot(self) -> dict[str, Any]:
+        run = self._cluster_sweep_run or {}
+        events = list(run.get("events") or [])
+        n = len(events)
+        idx = self._cluster_sweep_event_index if n else 0
+        if n and idx >= n:
+            idx = n - 1
+        cur = events[idx] if n else None
+        return {
+            "strategy_id": CLUSTER_SWEEP_STRATEGY_ID,
+            "loaded": bool(run),
+            "visible": bool(self._cluster_sweep_visible),
+            "meta": run.get("meta") or {},
+            "coverage": run.get("coverage") or {},
+            "n_events": n,
+            "event_index": idx,
+            "event": cur,
+            "events": events,
+            "manual_verdicts_allowed": [
+                "MATCH",
+                "FALSE_POSITIVE",
+                "MISSED_EVENT",
+                "WRONG_CLUSTER",
+                "WRONG_TIMESTAMP",
+                "LOOKAHEAD",
+                "UNCLEAR",
+                "INCONCLUSIVE_DATA",
+            ],
+        }
+
+    def _ema_dual_cross_snapshot(self) -> dict[str, Any]:
+        run = self._ema_dual_cross_run or {}
+        cands = list(run.get("candidates") or [])
+        n = len(cands)
+        idx = self._ema_dual_cross_event_index if n else 0
+        if n and idx >= n:
+            idx = n - 1
+        cur = cands[idx] if n else None
+        return {
+            "strategy_id": EMA_DUAL_CROSS_STRATEGY_ID,
+            "loaded": bool(run),
+            "visible": bool(self._ema_dual_cross_visible),
+            "meta": run.get("meta") or {},
+            "coverage": run.get("coverage") or {},
+            "n_candidates": n,
+            "candidate_index": idx,
+            "candidate": cur,
+            "candidates": cands,
         }
 
     def settings_defaults(self) -> dict[str, Any]:
@@ -148,6 +250,7 @@ class ResearchWorkspace:
             "ema": trp["EmaOverlaysConfig"].defaults().to_dict(),
             "stochastic": trp["StochasticConfig"].defaults().to_dict(),
             "liquidity": trp["LiquidityLocationConfig"].defaults().to_dict(),
+            "volume_profile": dict(DEFAULT_VOLUME_PROFILE),
         }
 
     def apply_settings(
@@ -156,6 +259,7 @@ class ResearchWorkspace:
         ema: dict | None = None,
         stochastic: dict | None = None,
         liquidity: dict | None = None,
+        volume_profile: dict | None = None,
     ) -> dict[str, Any]:
         trp = self._trp
         if ema is not None:
@@ -172,6 +276,8 @@ class ResearchWorkspace:
             if "enabled" not in liquidity:
                 cfg.enabled = enabled
             self.lld_config = cfg
+        if volume_profile is not None:
+            self.volume_profile = normalize_volume_profile(volume_profile)
         self.persist_settings()
         return self.snapshot()
 
@@ -299,6 +405,189 @@ class ResearchWorkspace:
             "source": BACKTESTER_SOURCE,
         }
         return snap
+
+    def _clear_cluster_sweep_overlays(self, symbol: str | None = None) -> int:
+        removed = 0
+        for oid in list(self.overlays.ids()):
+            try:
+                ov = self.overlays.get_overlay(oid)
+            except KeyError:
+                continue
+            meta = getattr(ov, "metadata", None) or {}
+            if meta.get("origin") != CLUSTER_SWEEP_SOURCE and meta.get("strategy_id") != CLUSTER_SWEEP_STRATEGY_ID:
+                continue
+            if symbol and ov.symbol != symbol:
+                continue
+            self.overlays.remove_overlay(oid)
+            removed += 1
+        return removed
+
+    def store_cluster_sweep_run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._cluster_sweep_run = {
+            "meta": payload.get("meta") or {},
+            "events": payload.get("events") or [],
+            "markers": payload.get("markers") or [],
+            "coverage": payload.get("coverage") or {},
+        }
+        self._cluster_sweep_event_index = 0
+        sym = str((payload.get("meta") or {}).get("symbol") or "").upper()
+        if sym:
+            self._clear_cluster_sweep_overlays(sym)
+        self._cluster_sweep_visible = False
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": CLUSTER_SWEEP_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(payload.get("events") or []),
+            "source": CLUSTER_SWEEP_SOURCE,
+            "message": "Cluster Sweep run gespeichert — Backtester klicken zum Einblenden",
+        }
+        return snap
+
+    def set_cluster_sweep_visible(self, visible: bool, symbol: str | None = None) -> dict[str, Any]:
+        from .cluster_sweep_backtester import build_overlay_markers
+
+        run = self._cluster_sweep_run or {}
+        sym = str(symbol or (run.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_cluster_sweep_overlays(sym or None)
+        self._cluster_sweep_visible = bool(visible)
+        if self._cluster_sweep_visible and sym:
+            existing = [
+                d
+                for d in self.drawings.get_drawings(sym, include_hidden=True)
+                if (d.metadata or {}).get("origin") == BACKTESTER_SOURCE
+                or str(d.drawing_id).startswith("stoch-")
+            ]
+            for drawing in existing:
+                self.drawings.remove_drawing(drawing.drawing_id)
+            markers = build_overlay_markers(list(run.get("markers") or []), symbol=sym)
+            for ov in markers:
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+            self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": CLUSTER_SWEEP_STRATEGY_ID,
+            "symbol": sym,
+            "visible": self._cluster_sweep_visible,
+            "loaded": len(run.get("events") or []),
+            "source": CLUSTER_SWEEP_SOURCE,
+        }
+        return snap
+
+    def navigate_cluster_sweep_event(self, *, delta: int = 0, index: int | None = None) -> dict[str, Any]:
+        run = self._cluster_sweep_run or {}
+        events = list(run.get("events") or [])
+        n = len(events)
+        if not n:
+            return self.snapshot()
+        if index is not None:
+            self._cluster_sweep_event_index = max(0, min(n - 1, int(index)))
+        else:
+            self._cluster_sweep_event_index = (self._cluster_sweep_event_index + int(delta)) % n
+        return self.snapshot()
+
+    def _clear_ema_dual_cross_overlays(self, symbol: str | None = None) -> int:
+        removed = 0
+        for oid in list(self.overlays.ids()):
+            try:
+                ov = self.overlays.get_overlay(oid)
+            except KeyError:
+                continue
+            meta = getattr(ov, "metadata", None) or {}
+            if meta.get("origin") != EMA_DUAL_CROSS_SOURCE and meta.get("strategy_id") != EMA_DUAL_CROSS_STRATEGY_ID:
+                continue
+            if symbol and ov.symbol != symbol:
+                continue
+            self.overlays.remove_overlay(oid)
+            removed += 1
+        return removed
+
+    def store_ema_dual_cross_run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._ema_dual_cross_run = {
+            "meta": payload.get("meta") or {},
+            "candidates": payload.get("candidates") or [],
+            "rejected_ema_crosses": payload.get("rejected_ema_crosses") or [],
+            "markers": payload.get("markers") or [],
+            "coverage": payload.get("coverage") or {},
+            "summary": payload.get("summary") or {},
+            "policy": payload.get("policy") or {},
+        }
+        self._ema_dual_cross_event_index = 0
+        sym = str((payload.get("meta") or {}).get("symbol") or "").upper()
+        if sym:
+            self._clear_ema_dual_cross_overlays(sym)
+        self._ema_dual_cross_visible = False
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": EMA_DUAL_CROSS_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(payload.get("candidates") or []),
+            "source": EMA_DUAL_CROSS_SOURCE,
+            "message": "EMA Dual Cross run gespeichert — Backtester klicken zum Einblenden",
+        }
+        return snap
+
+    def set_ema_dual_cross_visible(self, visible: bool, symbol: str | None = None) -> dict[str, Any]:
+        from .ema_dual_cross_backtester import build_overlay_markers
+
+        run = self._ema_dual_cross_run or {}
+        sym = str(symbol or (run.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_ema_dual_cross_overlays(sym or None)
+        self._ema_dual_cross_visible = bool(visible)
+        if self._ema_dual_cross_visible and sym:
+            markers = build_overlay_markers(list(run.get("markers") or []), symbol=sym)
+            for ov in markers:
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+            self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": EMA_DUAL_CROSS_STRATEGY_ID,
+            "symbol": sym,
+            "visible": self._ema_dual_cross_visible,
+            "loaded": len(run.get("candidates") or []),
+            "source": EMA_DUAL_CROSS_SOURCE,
+        }
+        return snap
+
+    def navigate_ema_dual_cross_candidate(self, *, delta: int = 0, index: int | None = None) -> dict[str, Any]:
+        run = self._ema_dual_cross_run or {}
+        cands = list(run.get("candidates") or [])
+        n = len(cands)
+        if not n:
+            return self.snapshot()
+        if index is not None:
+            self._ema_dual_cross_event_index = max(0, min(n - 1, int(index)))
+        else:
+            self._ema_dual_cross_event_index = (self._ema_dual_cross_event_index + int(delta)) % n
+        return self.snapshot()
+
+    def clear_backtester_strategy(self, symbol: str, *, strategy_id: str | None = None) -> dict[str, Any]:
+        sym = str(symbol or "").upper()
+        sid = str(strategy_id or "")
+        if not sid or sid == CLUSTER_SWEEP_STRATEGY_ID or sid == "cluster_sweep":
+            self._clear_cluster_sweep_overlays(sym or None)
+            if sid:
+                self._cluster_sweep_visible = False
+        if not sid or sid == EMA_DUAL_CROSS_STRATEGY_ID or sid == "ema_dual_cross":
+            self._clear_ema_dual_cross_overlays(sym or None)
+            if sid:
+                self._ema_dual_cross_visible = False
+        if not sid or sid.startswith("stoch") or sid == "wave_fade" or sid == BACKTESTER_SOURCE:
+            if sym:
+                existing = [
+                    d
+                    for d in self.drawings.get_drawings(sym, include_hidden=True)
+                    if (d.metadata or {}).get("origin") == BACKTESTER_SOURCE
+                    or str(d.drawing_id).startswith("stoch-")
+                ]
+                for drawing in existing:
+                    self.drawings.remove_drawing(drawing.drawing_id)
+                self.persist_drawings()
+        return self.snapshot()
 
     def apply_style(self, *, color: Optional[str] = None, width: Optional[float] = None) -> dict[str, Any]:
         trp = self._trp
@@ -650,6 +939,8 @@ def overlay_namespace(payload: dict[str, Any]) -> str:
     drawing_type = str(meta.get("drawing_type") or "")
     if oid.startswith("lld:") or oid.startswith("lldc:"):
         return "LLD"
+    if meta.get("origin") == "cluster_sweep_backtester" or meta.get("strategy_id") == "cluster_sweep_ema_9_20_59" or oid.startswith("csw-"):
+        return "CLUSTER_SWEEP"
     if src == "drawing" or meta.get("drawing_id"):
         if payload.get("type") == "position" or drawing_type in ("long_position", "short_position"):
             return "POSITION"

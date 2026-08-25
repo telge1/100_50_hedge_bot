@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from stoch_fade_research_evaluations.feed import catalog_response, load_outcomes
-from stoch_fade_research_jobs.config import STRATEGY_VERSION
+from stoch_fade_research_jobs.config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, STRATEGY_VERSION
 from stoch_fade_research_jobs.feed import load_job_signals
 from stoch_universe_51.jsonio import write_json_atomic as atomic
 
@@ -24,6 +24,8 @@ def _write_job(root: Path) -> None:
         {
             "job_id": JOB,
             "fixed_strategy_version": STRATEGY_VERSION,
+            "confirmation_policy": CONFIRMATION_POLICY,
+            "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
             "selected_symbols": ["AAVEUSDT"],
             "signal_start": START,
             "signal_end_exclusive": END,
@@ -55,6 +57,8 @@ def _write_job(root: Path) -> None:
             "run_id": RUN,
             "selected_symbol": "AAVEUSDT",
             "strategy_id": STRATEGY_VERSION,
+            "confirmation_policy": CONFIRMATION_POLICY,
+            "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
             "signal_start": START,
             "signal_end_exclusive": END,
             "source_commit_pin": "f16ae32",
@@ -106,6 +110,9 @@ def _write_eval(root: Path) -> None:
             "source_job_id": JOB,
             "exit_policy": "NO_BE50",
             "signal_strategy_version": STRATEGY_VERSION,
+            "fixed_strategy_version": STRATEGY_VERSION,
+            "confirmation_policy": CONFIRMATION_POLICY,
+            "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
         },
     )
     atomic(

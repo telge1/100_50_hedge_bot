@@ -406,6 +406,11 @@
     transform: rotate(-90deg);
 }
 
+.stoch-nested-card {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
 .stoch-card-body {
     padding: 12px 14px 14px;
 }

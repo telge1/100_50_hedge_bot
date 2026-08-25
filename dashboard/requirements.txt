@@ -11,4 +11,6 @@ aiofiles==23.2.1
 requests==2.31.0
 pymysql>=1.1.0
 clickhouse-connect>=0.7.0
+pandas>=2.0
+numpy>=1.24
 

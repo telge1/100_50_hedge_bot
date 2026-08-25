@@ -14,7 +14,12 @@
   const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
   const SYMBOL_KEY = "research.symbol";
   const LAYOUT_KEY = "research.layout";
-  const ASSET_V = "time-clip-1";
+  const HISTORY_KEY = "research.history";
+  const SYNC_CHART_KEY = "research.sync_chart_after_bt";
+  const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
+  const ASSET_V = "vp-2";
+  const VP_KEY = "research.volume_profile";
+  const VP_DEBOUNCE_MS = 400;
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const STOCH_JOB_KEY = "stoch.research_job_id";
@@ -61,6 +66,15 @@
     posGuard: false,
     phase: "IFRAME_LOADING",
     hostShift: false,
+    vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
+    history: {
+      preset: "30d",
+      customStart: "",
+      customEnd: "",
+      loadedFrom: null,
+      loadedTo: null,
+      pinned: false,
+    },
   };
   const inflightGets = {};
   const inflightPosts = {};
@@ -100,6 +114,325 @@
     const d = new Date(Number(unix) * 1000);
     const p = (n) => String(n).padStart(2, "0");
     return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+  }
+
+  function toLocalInputValue(d) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate())
+      + "T" + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
+  }
+
+  function utcInputToUnix(v) {
+    if (!v) return null;
+    const ms = Date.parse(String(v).length === 16 ? String(v) + ":00Z" : String(v));
+    return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+  }
+
+  function readHistoryFromUi() {
+    const preset = ($("researchHistoryPreset") || {}).value || "30d";
+    state.history.preset = preset;
+    state.history.customStart = ($("researchHistoryStart") || {}).value || "";
+    state.history.customEnd = ($("researchHistoryEnd") || {}).value || "";
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify({
+        preset: state.history.preset,
+        customStart: state.history.customStart,
+        customEnd: state.history.customEnd,
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function restoreHistoryPrefs() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (o && o.preset) state.history.preset = o.preset;
+        if (o && o.customStart) state.history.customStart = o.customStart;
+        if (o && o.customEnd) state.history.customEnd = o.customEnd;
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      const sync = localStorage.getItem(SYNC_CHART_KEY);
+      if ($("researchSyncChartAfterBt") && sync != null) {
+        $("researchSyncChartAfterBt").checked = sync === "1";
+      }
+    } catch (e2) { /* ignore */ }
+    if ($("researchHistoryPreset")) $("researchHistoryPreset").value = state.history.preset || "30d";
+    if ($("researchHistoryStart") && state.history.customStart) {
+      $("researchHistoryStart").value = state.history.customStart;
+    }
+    if ($("researchHistoryEnd") && state.history.customEnd) {
+      $("researchHistoryEnd").value = state.history.customEnd;
+    }
+    syncHistoryCustomUi();
+    updateHistoryHint();
+  }
+
+  function syncHistoryCustomUi() {
+    const custom = ($("researchHistoryPreset") || {}).value === "custom";
+    if ($("researchHistoryCustomWrap")) $("researchHistoryCustomWrap").hidden = !custom;
+    if (custom && $("researchHistoryStart") && !$("researchHistoryStart").value) {
+      const end = new Date();
+      const start = new Date(end.getTime() - 30 * 86400000);
+      $("researchHistoryStart").value = toLocalInputValue(start);
+      $("researchHistoryEnd").value = toLocalInputValue(end);
+    }
+  }
+
+  function historySpanSeconds() {
+    const p = state.history.preset || "30d";
+    if (p === "custom") {
+      const from = utcInputToUnix(state.history.customStart);
+      const to = utcInputToUnix(state.history.customEnd);
+      if (from != null && to != null && to > from) return to - from;
+    }
+    const days = HISTORY_SPAN_DAYS[p];
+    return (days || 30) * 86400;
+  }
+
+  function computeHistoryRangeUnix(override) {
+    if (override && override.from != null && override.to != null) {
+      return { from: Math.floor(Number(override.from)), to: Math.floor(Number(override.to)) };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const p = state.history.preset || "30d";
+    if (p === "rolling") return { from: null, to: null };
+    if (p === "7d" || p === "30d" || p === "90d") {
+      const days = HISTORY_SPAN_DAYS[p] || 30;
+      return { from: now - days * 86400, to: now };
+    }
+    if (p === "custom") {
+      const from = utcInputToUnix(state.history.customStart);
+      const to = utcInputToUnix(state.history.customEnd);
+      if (from != null && to != null && to > from) return { from: from, to: to };
+    }
+    return { from: null, to: null };
+  }
+
+  function resolvePaneLoadRange(opts) {
+    if (opts && opts.from != null && opts.to != null) {
+      return { from: Math.floor(Number(opts.from)), to: Math.floor(Number(opts.to)) };
+    }
+    return computeHistoryRangeUnix();
+  }
+
+  function updateHistoryHint(range) {
+    const hint = $("researchHistoryHint");
+    if (!hint) return;
+    const r = range || computeHistoryRangeUnix();
+    if (r.from == null || r.to == null) {
+      hint.textContent = "Rolling · Backend-Limit (~17d @15m)";
+      return;
+    }
+    hint.textContent = "Geladen UTC: " + fmtUtc(r.from) + " → " + fmtUtc(r.to);
+  }
+
+  async function reloadVisibleHistory(opts) {
+    readHistoryFromUi();
+    const o = opts || {};
+    const range = resolvePaneLoadRange(o);
+    if (range.from != null) {
+      state.history.loadedFrom = range.from;
+      state.history.loadedTo = range.to;
+      state.history.pinned = true;
+    } else {
+      state.history.loadedFrom = null;
+      state.history.loadedTo = null;
+      state.history.pinned = false;
+    }
+    updateHistoryHint(range);
+    await mapLimit(visibleIds(), PANE_HTTP_LIMIT, function (pid) {
+      return loadPane(pid, Object.assign({
+        force: !o.jumpToUnix,
+        sourceAction: o.sourceAction || "history-reload",
+        from: range.from,
+        to: range.to,
+        jumpToUnix: o.jumpToUnix,
+        jumpPadSec: o.jumpPadSec,
+      }, o));
+    });
+    if (o.jumpToUnix != null) {
+      await jumpChartsToUnix(o.jumpToUnix, o.jumpPadSec);
+    }
+  }
+
+  async function jumpChartsToUnix(ts, padSec) {
+    const center = Math.floor(Number(ts));
+    if (!Number.isFinite(center)) return false;
+    const pad = padSec != null ? padSec : Math.max(900 * 40, Math.floor(historySpanSeconds() / 4));
+    let ok = false;
+    await Promise.all(visibleIds().map(async function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      const chart = api(pane) || await whenReady(pane, 8000);
+      if (!chart) return;
+      if (chart.focusOnTime && chart.focusOnTime(center, pad)) ok = true;
+      else if (chart.setVisibleTimeRange) {
+        try {
+          if (chart.setVisibleTimeRange(center - pad, center + pad)) ok = true;
+        } catch (e) { /* ignore */ }
+      }
+    }));
+    return ok;
+  }
+
+  function paneCandleBounds(pane) {
+    const candles = (pane && pane.pendingData && pane.pendingData.candles) || [];
+    if (!candles.length) return null;
+    const times = candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+    if (!times.length) return null;
+    return { from: Math.min.apply(null, times), to: Math.max.apply(null, times) };
+  }
+
+  function visiblePanesCoverRange(from, to) {
+    if (from == null || to == null) return false;
+    const ids = visibleIds();
+    if (!ids.length) return false;
+    return ids.every(function (pid) {
+      const b = paneCandleBounds(state.panes[pid]);
+      if (!b) return false;
+      return b.from <= from && b.to >= to;
+    });
+  }
+
+  function visiblePanesContainTime(ts) {
+    const t = Math.floor(Number(ts));
+    if (!Number.isFinite(t)) return false;
+    const ids = visibleIds();
+    if (!ids.length) return false;
+    return ids.every(function (pid) {
+      const b = paneCandleBounds(state.panes[pid]);
+      if (!b) return false;
+      return b.from <= t && b.to >= t;
+    });
+  }
+
+  function mergedPaneBounds() {
+    let from = null;
+    let to = null;
+    visibleIds().forEach(function (pid) {
+      const b = paneCandleBounds(state.panes[pid]);
+      if (!b) return;
+      from = from == null ? b.from : Math.min(from, b.from);
+      to = to == null ? b.to : Math.max(to, b.to);
+    });
+    return from == null ? null : { from: from, to: to };
+  }
+
+  async function goToDateTime() {
+    if (!state.symbol) return;
+    const ts = utcInputToUnix(($("researchGoTo") || {}).value);
+    if (ts == null) {
+      setStatus("Go To: Datum/Zeit (UTC) eingeben", "error");
+      return;
+    }
+    const span = historySpanSeconds();
+    const half = Math.max(Math.floor(span / 2), 86400);
+    const viewPad = Math.min(half, 86400 * 14);
+    const now = Math.floor(Date.now() / 1000);
+    let loadFrom = ts - half;
+    let loadTo = ts + half;
+    if (loadTo > now + 900) loadTo = now + 900;
+    state.history.pinned = true;
+    const needsLoad = !visiblePanesContainTime(ts) || !visiblePanesCoverRange(loadFrom, loadTo);
+    if (needsLoad) {
+      setStatus("Go To: History laden " + fmtUtc(loadFrom) + " …");
+      await reloadVisibleHistory({
+        from: loadFrom,
+        to: loadTo,
+        sourceAction: "go-to-load",
+      });
+    }
+    if (!visiblePanesContainTime(ts)) {
+      setStatus("Go To: Nachladen " + fmtUtc(loadFrom) + " …");
+      await reloadVisibleHistory({
+        from: loadFrom,
+        to: loadTo,
+        sourceAction: "go-to-retry",
+      });
+    }
+    if (!visiblePanesContainTime(ts)) {
+      const bounds = mergedPaneBounds();
+      const detail = bounds
+        ? (" · Kerzen UTC " + fmtUtc(bounds.from) + " → " + fmtUtc(bounds.to))
+        : "";
+      setStatus("Go To: " + fmtUtc(ts) + " liegt außerhalb der geladenen Kerzen" + detail, "error");
+      return;
+    }
+    if (!(await jumpChartsToUnix(ts, viewPad))) {
+      setStatus("Go To: Zoom auf " + fmtUtc(ts) + " fehlgeschlagen", "error");
+      return;
+    }
+    setStatus("Go To · " + fmtUtc(ts));
+  }
+
+  async function syncChartAfterBacktest(startIso, endIso, focusIso) {
+    if (!$("researchSyncChartAfterBt") || !$("researchSyncChartAfterBt").checked) return;
+    const start = startIso ? Math.floor(Date.parse(startIso) / 1000) : null;
+    const end = endIso ? Math.floor(Date.parse(endIso) / 1000) : null;
+    if (start == null || end == null || end <= start) return;
+    const warmup = 2 * 86400;
+    const from = start - warmup;
+    const to = end + 86400;
+    const focus = focusIso ? Math.floor(Date.parse(focusIso) / 1000) : Math.floor((start + end) / 2);
+    const pad = Math.min(Math.floor((end - start) / 2) + warmup, 86400 * 10);
+    setStatus("Chart sync Backtest-Fenster …");
+    await reloadVisibleHistory({
+      from: from,
+      to: to,
+      jumpToUnix: focus,
+      jumpPadSec: pad,
+      sourceAction: "backtest-sync",
+    });
+  }
+
+  function bindHistoryUi() {
+    if ($("researchHistoryPreset")) {
+      $("researchHistoryPreset").addEventListener("change", function () {
+        syncHistoryCustomUi();
+        readHistoryFromUi();
+        updateHistoryHint();
+      });
+    }
+    if ($("researchHistoryApply")) {
+      $("researchHistoryApply").addEventListener("click", async function () {
+        readHistoryFromUi();
+        const preset = state.history.preset || "30d";
+        state.history.pinned = preset !== "rolling";
+        setStatus("History laden …");
+        try {
+          await reloadVisibleHistory({ sourceAction: "history-apply" });
+          setStatus("History geladen · " + (($("researchHistoryHint") || {}).textContent || ""));
+        } catch (err) {
+          setStatus("History laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+      });
+    }
+    if ($("researchGoToBtn")) {
+      $("researchGoToBtn").addEventListener("click", function () {
+        goToDateTime().catch(function (err) {
+          setStatus("Go To fehlgeschlagen: " + (err.message || err), "error");
+        });
+      });
+    }
+    if ($("researchGoTo")) {
+      $("researchGoTo").addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          goToDateTime().catch(function (err) {
+            setStatus("Go To fehlgeschlagen: " + (err.message || err), "error");
+          });
+        }
+      });
+    }
+    if ($("researchSyncChartAfterBt")) {
+      $("researchSyncChartAfterBt").addEventListener("change", function () {
+        try {
+          localStorage.setItem(SYNC_CHART_KEY, $("researchSyncChartAfterBt").checked ? "1" : "0");
+        } catch (e) { /* ignore */ }
+      });
+    }
   }
 
   function setStatus(text, kind) {
@@ -273,7 +606,7 @@
       on_crosshair_move: function (unix) { handleHover(pane.id, unix); },
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
-      on_visible_range: function () {},
+      on_visible_range: function (from, to) { scheduleVolumeProfile(pane, from, to); },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
@@ -394,6 +727,9 @@
         overlayPayloads: {},
         lastTimes: new Set(),
         paneGen: 0,
+        vpGen: 0,
+        vpTimer: null,
+        vpAbort: null,
       };
       state.panes[pid] = pane;
       iframe.addEventListener("load", function () {
@@ -645,6 +981,138 @@
     if (el) el.textContent = parts.join("  ·  ");
   }
 
+  function defaultVolumeProfile() {
+    return {
+      enabled: false,
+      rows: "auto",
+      display: "buy_sell",
+      poc: true,
+      value_area: true,
+      width: "normal",
+      volume_mode: "base",
+    };
+  }
+
+  function readStoredVolumeProfile() {
+    try {
+      const raw = localStorage.getItem(VP_KEY);
+      if (!raw) return defaultVolumeProfile();
+      return Object.assign(defaultVolumeProfile(), JSON.parse(raw));
+    } catch (e) {
+      return defaultVolumeProfile();
+    }
+  }
+
+  function persistVolumeProfile() {
+    try { localStorage.setItem(VP_KEY, JSON.stringify(state.vp)); } catch (e) {}
+  }
+
+  function fillVolumeProfileControls() {
+    const vp = state.vp || defaultVolumeProfile();
+    const en = $("researchVpEnabled");
+    if (en) en.checked = !!vp.enabled;
+    const rows = $("researchVpRows");
+    if (rows) rows.value = String(vp.rows || "auto");
+    const display = $("researchVpDisplay");
+    if (display) display.value = vp.display || "buy_sell";
+    const poc = $("researchVpPoc");
+    if (poc) poc.checked = vp.poc !== false;
+    const va = $("researchVpVa");
+    if (va) va.checked = vp.value_area !== false;
+    const width = $("researchVpWidth");
+    if (width) width.value = vp.width || "normal";
+    const mode = $("researchVpMode");
+    if (mode) mode.value = vp.volume_mode || "base";
+  }
+
+  function applyVolumeProfileSettings(raw, skipPersist) {
+    state.vp = Object.assign(defaultVolumeProfile(), raw || {});
+    fillVolumeProfileControls();
+    if (!skipPersist) persistVolumeProfile();
+    if (!state.vp.enabled) {
+      visibleIds().forEach(function (pid) { clearPaneVolumeProfile(state.panes[pid]); });
+      return;
+    }
+    visibleIds().forEach(function (pid) { scheduleVolumeProfile(state.panes[pid]); });
+  }
+
+  function vpSettingsPayload() {
+    const vp = state.vp || defaultVolumeProfile();
+    return {
+      enabled: !!vp.enabled,
+      display: vp.display || "buy_sell",
+      poc: vp.poc !== false,
+      value_area: vp.value_area !== false,
+      width: vp.width || "normal",
+    };
+  }
+
+  function clearPaneVolumeProfile(pane) {
+    if (!pane) return;
+    pane.vpGen += 1;
+    if (pane.vpTimer) {
+      clearTimeout(pane.vpTimer);
+      pane.vpTimer = null;
+    }
+    if (pane.vpAbort) {
+      try { pane.vpAbort.abort(); } catch (e) {}
+      pane.vpAbort = null;
+    }
+    const chart = api(pane);
+    if (chart && chart.clearVolumeProfile) chart.clearVolumeProfile();
+  }
+
+  function scheduleVolumeProfile(pane) {
+    if (!pane) return;
+    if (pane.vpTimer) clearTimeout(pane.vpTimer);
+    pane.vpTimer = setTimeout(function () {
+      pane.vpTimer = null;
+      fetchPaneVolumeProfile(pane);
+    }, VP_DEBOUNCE_MS);
+  }
+
+  async function fetchPaneVolumeProfile(pane) {
+    if (!pane || !state.symbol) return;
+    if (!state.vp || !state.vp.enabled) {
+      clearPaneVolumeProfile(pane);
+      return;
+    }
+    const chart = api(pane);
+    if (!chart || !chart.getVisibleTimeRange) return;
+    const range = chart.getVisibleTimeRange();
+    if (!range || range.firstCandle == null || range.lastCandle == null) return;
+    const step = TF_SEC[pane.tf] || 60;
+    const start = Number(range.firstCandle);
+    const end = Number(range.lastCandle) + step;
+    if (!(end > start)) return;
+    const gen = ++pane.vpGen;
+    if (pane.vpAbort) {
+      try { pane.vpAbort.abort(); } catch (e) {}
+    }
+    pane.vpAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const rows = state.vp.rows || "auto";
+    const url = "/api/research/volume-profile?symbol=" + encodeURIComponent(state.symbol) +
+      "&start=" + encodeURIComponent(String(start)) +
+      "&end=" + encodeURIComponent(String(end)) +
+      "&rows=" + encodeURIComponent(String(rows)) +
+      "&volume_mode=" + encodeURIComponent(state.vp.volume_mode || "base");
+    try {
+      const body = await getJson(url, {
+        sourceAction: "volume-profile",
+        pane: pane.id,
+        timeframe: pane.tf,
+        signal: pane.vpAbort && pane.vpAbort.signal,
+      });
+      if (gen !== pane.vpGen) return;
+      if (!state.vp.enabled) return;
+      const live = api(pane);
+      if (live && live.setVolumeProfile) live.setVolumeProfile(body, vpSettingsPayload());
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      if (gen !== pane.vpGen) return;
+    }
+  }
+
   function applyWorkspace(snap) {
     if (!snap || snap.success === false) return;
     state.workspace = snap;
@@ -658,6 +1126,7 @@
     $("trpPositionSettings").disabled = !snap.position_settings;
     $("researchIndStoch").checked = !!(snap.stochastic && snap.stochastic.enabled);
     $("researchIndLld").checked = !!(snap.liquidity && snap.liquidity.enabled);
+    if (snap.volume_profile) applyVolumeProfileSettings(snap.volume_profile, true);
     const ema = snap.ema || { lines: [] };
     const enabled = (ema.lines || []).filter(function (l) { return l.enabled; }).map(function (l) { return "EMA" + l.period; });
     $("trpEmaSummary").textContent = enabled.length ? enabled.join(", ") : "off";
@@ -807,6 +1276,7 @@
     const nextFp = candleFingerprint(packed.candles || []);
     const skipCandles = !!(opts && opts.indicatorsOnly && pane.pendingData);
     const preserveView = !!(opts && (opts.preserveView || opts.indicatorsOnly));
+    const skipDefaultView = !!(opts && opts.skipDefaultView);
     if (!skipCandles) {
       pane.lastTimes = new Set((packed.candles || []).map(function (c) { return c.time; }));
       pane.pendingData = payload;
@@ -825,11 +1295,16 @@
     const chart = api(pane);
     if (chart) {
       if (!skipCandles) {
-        chart.setData(payload, { preserveView: preserveView });
+        chart.setData(payload, {
+          preserveView: preserveView,
+          skipDefaultView: skipDefaultView,
+        });
         pane.phase = "DATA_READY";
       }
       if (!preserveView && chart.resize) chart.resize();
-      chart.setEmaOverlays(pane.pendingEma);
+      chart.setEmaOverlays(pane.pendingEma, {
+        skipRangeRestore: !!(opts && opts.skipEmaRangeRestore),
+      });
       chart.setLowerPane(pane.pendingLower);
       chart.setLldEma(pane.pendingLldEma);
       chart.setInteractionMode(toolMode());
@@ -848,17 +1323,21 @@
     const gen = (opts && opts.gen != null) ? opts.gen : state.loadGen;
     const paneGen = ++pane.paneGen;
     const ws = state.workspace || {};
-    pane.el.querySelector(".trp-pane-status").textContent = "loading…";
-    let packed;
-    try {
-      packed = await sendJson("/api/research/pane", "POST", {
+    const range = resolvePaneLoadRange(opts || {});
+    const reqBody = {
       symbol: state.symbol,
       timeframe: pane.tf,
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
       liquidity: ws.liquidity || { enabled: false },
       allow_stale: !!(opts && opts.allowStale),
-    }, {
+    };
+    if (range.from != null) reqBody.from = range.from;
+    if (range.to != null) reqBody.to = range.to;
+    pane.el.querySelector(".trp-pane-status").textContent = "loading…";
+    let packed;
+    try {
+      packed = await sendJson("/api/research/pane", "POST", reqBody, {
       sourceAction: (opts && opts.sourceAction) || "pane-load",
       pane: paneId,
       timeframe: pane.tf,
@@ -875,11 +1354,28 @@
     applyPaneBundle(pane, packed, {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
       preserveView: !!(opts && opts.preserveView),
+      skipDefaultView: !!(opts && opts.jumpToUnix != null),
+      skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null),
     });
-    if (force) {
+    if (packed.from != null && packed.to != null) {
+      state.history.loadedFrom = Number(packed.from);
+      state.history.loadedTo = Number(packed.to);
+      updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+    } else if ((packed.candles || []).length) {
+      const times = packed.candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+      if (times.length) {
+        state.history.loadedFrom = Math.min.apply(null, times);
+        state.history.loadedTo = Math.max.apply(null, times);
+        if (state.history.preset === "rolling") {
+          updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+        }
+      }
+    }
+    if (force && !(opts && opts.jumpToUnix != null)) {
       const ready = api(pane);
       if (ready && ready.resetView) ready.resetView();
     }
+    scheduleVolumeProfile(pane);
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -1000,6 +1496,7 @@
 
   async function pollForming(gen) {
     if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    if (state.history.pinned) return;
     const body = await getJson(
       "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol)
     ).catch(function () { return null; });
@@ -1041,6 +1538,7 @@
     const pane = state.panes[paneId];
     if (!pane || !state.symbol) return;
     if (gen !== state.pollGen) return;
+    if (state.history.pinned) return;
     const last = lastClosedBarTime(pane);
     if (last == null || !pane.pendingData) return;
     let url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
@@ -1114,6 +1612,7 @@
       pane.paneGen += 1;
       const chart = api(pane);
       if (chart && chart.clearOverlays) chart.clearOverlays();
+      clearPaneVolumeProfile(pane);
     });
     if (state.overlayTest) {
       applyWorkspace(await sendJson("/api/research/overlay-test", "POST", { enabled: true, symbol: next }, {
@@ -1368,6 +1867,8 @@
   }
 
   function bindUi() {
+    bindHistoryUi();
+    restoreHistoryPrefs();
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         state.paneFs = null;
@@ -1376,6 +1877,49 @@
       });
     });
     $("researchSymbol").addEventListener("change", function () { switchSymbol($("researchSymbol").value); });
+    const vpEn = $("researchVpEnabled");
+    if (vpEn) {
+      vpEn.addEventListener("change", function () {
+        state.vp.enabled = vpEn.checked;
+        persistVolumeProfile();
+        sendJson("/api/research/settings", "PUT", { volume_profile: state.vp }, { sourceAction: "vp-settings" }).catch(function () {});
+        if (!state.vp.enabled) {
+          visibleIds().forEach(function (pid) { clearPaneVolumeProfile(state.panes[pid]); });
+        } else {
+          visibleIds().forEach(function (pid) { scheduleVolumeProfile(state.panes[pid]); });
+        }
+      });
+    }
+    ["researchVpRows", "researchVpDisplay", "researchVpWidth", "researchVpMode"].forEach(function (id) {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", function () {
+        if (id === "researchVpRows") state.vp.rows = el.value;
+        if (id === "researchVpDisplay") state.vp.display = el.value;
+        if (id === "researchVpWidth") state.vp.width = el.value;
+        if (id === "researchVpMode") state.vp.volume_mode = el.value;
+        persistVolumeProfile();
+        sendJson("/api/research/settings", "PUT", { volume_profile: state.vp }, { sourceAction: "vp-settings" }).catch(function () {});
+        visibleIds().forEach(function (pid) { scheduleVolumeProfile(state.panes[pid]); });
+      });
+    });
+    ["researchVpPoc", "researchVpVa"].forEach(function (id) {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", function () {
+        if (id === "researchVpPoc") state.vp.poc = el.checked;
+        if (id === "researchVpVa") state.vp.value_area = el.checked;
+        persistVolumeProfile();
+        sendJson("/api/research/settings", "PUT", { volume_profile: state.vp }, { sourceAction: "vp-settings" }).catch(function () {});
+        visibleIds().forEach(function (pid) {
+          const pane = state.panes[pid];
+          const chart = api(pane);
+          if (chart && chart.setVolumeProfile && pane) {
+            scheduleVolumeProfile(pane);
+          }
+        });
+      });
+    });
     $("researchCrosshairSync").addEventListener("change", function () {
       state.sync = $("researchCrosshairSync").checked;
       if (!state.sync) handleHoverLeft(state.hoverPane);
@@ -1393,16 +1937,467 @@
       fsBtn.addEventListener("click", function () { expandWorkspaceUp(); });
     }
     bindHeightDrag();
+
+    function btStrategy() {
+      const el = $("researchBtStrategy");
+      return el ? el.value : "stoch_fade";
+    }
+
+    function syncBtStrategyUi() {
+      const sid = btStrategy();
+      const isCsw = sid === "cluster_sweep_ema_9_20_59";
+      const isEdc = sid === "ema_dual_cross_multisource_v1";
+      if ($("researchBtRunBtn")) {
+        $("researchBtRunBtn").hidden = !(isCsw || isEdc);
+        $("researchBtRunBtn").title = isEdc ? "EMA Dual Cross Backtest starten" : "Cluster-Sweep Backtest starten";
+      }
+      if ($("researchCswSettingsBtn")) $("researchCswSettingsBtn").hidden = !isCsw;
+      if ($("researchCswNav")) $("researchCswNav").hidden = !isCsw;
+      if ($("researchEdcSettingsBtn")) $("researchEdcSettingsBtn").hidden = !isEdc;
+      if ($("researchEdcNav")) $("researchEdcNav").hidden = !isEdc;
+      applyResearchJobSourceNote();
+    }
+
+    function fromLocalInputValue(v) {
+      // Treat datetime-local as UTC for research (labeled UTC in modal)
+      if (!v) return null;
+      return String(v) + ":00Z";
+    }
+
+    function ensureEdcDefaults() {
+      const end = new Date();
+      const start = new Date(end.getTime() - 30 * 24 * 3600 * 1000);
+      if ($("edcStart") && !$("edcStart").value) $("edcStart").value = toLocalInputValue(start);
+      if ($("edcEnd") && !$("edcEnd").value) $("edcEnd").value = toLocalInputValue(end);
+      const hint = $("edcRangeHint");
+      if (hint && $("edcStart") && $("edcEnd") && $("edcStart").value && $("edcEnd").value) {
+        hint.textContent = "Zeitraum UTC: " + $("edcStart").value.replace("T", " ")
+          + " → " + $("edcEnd").value.replace("T", " ") + " · nur aktuelles Symbol";
+      }
+    }
+
+    function updateEdcNav(snap) {
+      const ed = (snap && snap.ema_dual_cross) || (state.workspace && state.workspace.ema_dual_cross) || {};
+      const n = ed.n_candidates || 0;
+      const idx = (ed.candidate_index || 0) + (n ? 1 : 0);
+      if ($("researchEdcIndex")) $("researchEdcIndex").textContent = (n ? idx : 0) + "/" + n;
+      const panel = $("edcCandidatePanel");
+      const detail = $("edcCandidateDetail");
+      if (panel && detail && ed.candidate) {
+        panel.hidden = false;
+        const c = ed.candidate;
+        detail.textContent = JSON.stringify({
+          setup: {
+            candidate_id: c.candidate_id,
+            episode_id: c.episode_id,
+            direction: c.direction,
+            candidate_type: c.candidate_type,
+            candidate_at: c.candidate_at,
+            decision_at: c.decision_at,
+            entry_at: c.entry_at,
+            entry_price: c.entry_price,
+            final_verdict: c.final_verdict,
+            reason_codes: c.reason_codes,
+            policy_version: c.policy_version,
+          },
+          ema: {
+            before: c.ema_before,
+            after: c.ema_after,
+            metrics: c.ema_metrics,
+          },
+          evidence: {
+            source_verdicts: c.source_verdicts,
+            features: c.features,
+          },
+          coverage: c.coverage,
+          outcomes_1h_4h: fmtCswOutcomes(c.outcomes_1h_4h),
+        }, null, 2);
+      }
+    }
+
+    async function runEmaDualCrossBacktest() {
+      if (!state.symbol) return;
+      ensureEdcDefaults();
+      const tf = (($("edcTf") || {}).value) || "15m";
+      const body = {
+        strategy_id: "ema_dual_cross_multisource_v1",
+        symbol: state.symbol,
+        timeframe: tf,
+        start: fromLocalInputValue($("edcStart").value),
+        end: fromLocalInputValue($("edcEnd").value),
+        show_candidates: !!($("edcShowCand") && $("edcShowCand").checked),
+        show_allow: !!($("edcShowAllow") && $("edcShowAllow").checked),
+        show_block: !!($("edcShowBlock") && $("edcShowBlock").checked),
+        show_inconclusive: !!($("edcShowInc") && $("edcShowInc").checked),
+        show_rejected: !!($("edcShowRej") && $("edcShowRej").checked),
+        enable_sync_cross: !!($("edcEnableSync") && $("edcEnableSync").checked),
+        enable_compressed_rebound: !!($("edcEnableRebound") && $("edcEnableRebound").checked),
+      };
+      setStatus("EMA Dual Cross " + body.symbol + " " + body.timeframe + " …");
+      try {
+        const snap = await sendJson("/api/research/backtester/run", "POST", body, { sourceAction: "edc-run" });
+        applyWorkspace(snap);
+        updateEdcNav(snap);
+        const meta = (snap.ema_dual_cross_result && snap.ema_dual_cross_result.meta) || {};
+        const summary = (snap.ema_dual_cross_result && snap.ema_dual_cross_result.summary) || {};
+        const nCand = snap.ema_dual_cross_result && snap.ema_dual_cross_result.n_candidates;
+        setStatus(
+          "EMA Dual Cross bereit · Kandidaten=" + (nCand != null ? nCand : (summary.n_candidates || 0))
+            + " · ALLOW=" + (summary.n_allow || meta.n_allow || 0)
+            + " BLOCK=" + (summary.n_block || meta.n_block || 0)
+            + " INC=" + (summary.n_inconclusive || meta.n_inconclusive || 0)
+            + " · Backtester klicken zum Einblenden"
+        );
+        const ed = snap.ema_dual_cross || {};
+        const focus = ed.candidate && (ed.candidate.candidate_at || ed.candidate.decision_at);
+        await syncChartAfterBacktest(body.start, body.end, focus);
+      } catch (err) {
+        setStatus("EMA Dual Cross fehlgeschlagen: " + (err.message || err), "error");
+      }
+    }
+
+    async function runActiveBacktest() {
+      if (btStrategy() === "ema_dual_cross_multisource_v1") return runEmaDualCrossBacktest();
+      return runClusterSweepBacktest();
+    }
+
+    function ensureCswDefaults() {
+      const end = new Date();
+      const start = new Date(end.getTime() - 8 * 3600 * 1000);
+      if ($("cswStart") && !$("cswStart").value) $("cswStart").value = toLocalInputValue(start);
+      if ($("cswEnd") && !$("cswEnd").value) $("cswEnd").value = toLocalInputValue(end);
+    }
+
+    function fmtPct(v) {
+      if (v == null || v === "") return "—";
+      const n = Number(v);
+      return Number.isFinite(n) ? n.toFixed(3) + "%" : String(v);
+    }
+
+    function fmtCswHorizonOutcomes(o, label) {
+      if (!o) return null;
+      const p = label;
+      return {
+        mfe_pct: o["mfe_" + p + "_pct"],
+        mfe_at: o["mfe_" + p + "_at"],
+        minutes_to_mfe: o["minutes_to_mfe_" + p],
+        mae_pct: o["mae_" + p + "_pct"],
+        mae_at: o["mae_" + p + "_at"],
+        minutes_to_mae: o["minutes_to_mae_" + p],
+        close_return_pct: o["close_return_" + p + "_pct"],
+        first_extreme: o["first_extreme_" + p],
+        coverage: o["coverage_" + p],
+        first_hit: o["first_hit_" + p] || null,
+      };
+    }
+
+    function fmtCswOutcomes(o) {
+      if (!o) return null;
+      return {
+        entry_variant: o.entry_variant || "AGGRESSIVE",
+        mfe_1h_pct: o.mfe_1h_pct,
+        mae_1h_pct: o.mae_1h_pct,
+        mfe_4h_pct: o.mfe_4h_pct,
+        mae_4h_pct: o.mae_4h_pct,
+        "1h": fmtCswHorizonOutcomes(o, "1h"),
+        "4h": fmtCswHorizonOutcomes(o, "4h"),
+        ema9_side_at_entry: o.ema9_side_at_entry,
+        overlapping_outcome: o.overlapping_outcome,
+        same_cluster_family: o.same_cluster_family,
+        previous_entry_still_in_horizon: o.previous_entry_still_in_horizon,
+      };
+    }
+
+    function updateCswNav(snap) {
+      const cs = (snap && snap.cluster_sweep) || (state.workspace && state.workspace.cluster_sweep) || {};
+      const n = cs.n_events || 0;
+      const idx = (cs.event_index || 0) + (n ? 1 : 0);
+      if ($("researchCswIndex")) $("researchCswIndex").textContent = (n ? idx : 0) + "/" + n;
+      const badge = $("researchCswDebugBadge");
+      if (badge) {
+        const debug = !!(cs.meta && cs.meta.debug_low_pool_zones);
+        badge.hidden = !debug;
+      }
+      const panel = $("cswEventPanel");
+      const detail = $("cswEventDetail");
+      if (panel && detail && cs.event) {
+        panel.hidden = false;
+        const e = cs.event;
+        const oc = e.outcomes_1h_4h || null;
+        detail.textContent = JSON.stringify({
+          setup: {
+            event_id: e.event_id,
+            direction: e.direction,
+            status: e.final_status,
+            confirmation_type: e.confirmation_type,
+            confirmation_at: e.confirmation_at,
+            entry_at: e.entry_at,
+            entry_price: e.entry_price,
+            invalidated_at: e.invalidated_at,
+          },
+          cluster: {
+            cluster_id: e.cluster_id,
+            pool_count: e.cluster_pool_count,
+            bounds: [e.cluster_low, e.cluster_high],
+            strength_mean: e.cluster_strength_mean,
+            created_at: e.cluster_created_at,
+            as_of: e.cluster_as_of,
+            prior_touch_count: e.prior_touch_count,
+          },
+          ema_audit: e.ema_audit,
+          coverage: e.orderflow_coverage,
+          outcomes_1h_4h: fmtCswOutcomes(oc),
+          outcomes_summary_line: oc ? (
+            "MFE 1h " + fmtPct(oc.mfe_1h_pct) + " · MAE 1h " + fmtPct(oc.mae_1h_pct)
+            + " · MFE 4h " + fmtPct(oc.mfe_4h_pct) + " · MAE 4h " + fmtPct(oc.mae_4h_pct)
+            + " · 1h " + (oc.first_extreme_1h || "—")
+            + " · cov1h " + (oc.coverage_1h || "—")
+            + (oc.overlapping_outcome ? " · OVERLAP" : "")
+          ) : null,
+          legacy_bar_outcomes: { mfe: e.mfe, mae: e.mae },
+        }, null, 2);
+      }
+    }
+
+    async function runClusterSweepBacktest() {
+      if (!state.symbol) return;
+      ensureCswDefaults();
+      const debug = !!($("cswDebugLowPool") && $("cswDebugLowPool").checked);
+      let minPools = Number(($("cswMinPools") || {}).value || 3);
+      if (debug) minPools = Math.min(minPools, 1);
+      const tf = (($("cswTf") || {}).value) || "5m";
+      const body = {
+        strategy_id: "cluster_sweep_ema_9_20_59",
+        symbol: state.symbol,
+        timeframe: tf,
+        start: fromLocalInputValue($("cswStart").value),
+        end: fromLocalInputValue($("cswEnd").value),
+        minimum_cluster_pools: minPools,
+        debug_low_pool: debug,
+        ema_fast: Number(($("cswEmaFast") || {}).value || 9),
+        ema_medium: Number(($("cswEmaMed") || {}).value || 20),
+        ema_slow: Number(($("cswEmaSlow") || {}).value || 59),
+        show_detail_markers: !!($("cswDetailMarkers") && $("cswDetailMarkers").checked),
+        expire_bars: Number(($("cswExpire") || {}).value || 24),
+      };
+      setStatus("Cluster Sweep Backtest " + body.symbol + " " + body.timeframe + " …");
+      try {
+        const snap = await sendJson("/api/research/backtester/run", "POST", body, { sourceAction: "csw-run" });
+        applyWorkspace(snap);
+        updateCswNav(snap);
+        const meta = (snap.cluster_sweep_result && snap.cluster_sweep_result.meta) || {};
+        setStatus(
+          "Cluster Sweep bereit · " + (meta.n_events || 0) + " Events · "
+            + "bull=" + (meta.n_bullish || 0) + " bear=" + (meta.n_bearish || 0)
+            + " · Backtester klicken zum Einblenden"
+            + (meta.debug_low_pool_zones ? " · LOW-POOL DEBUG" : "")
+        );
+        const cs = snap.cluster_sweep || {};
+        const ev = cs.event || {};
+        const focus = ev.confirmation_at || ev.entry_at || ev.approach_at || ev.first_touch_at;
+        await syncChartAfterBacktest(body.start, body.end, focus);
+      } catch (err) {
+        setStatus("Cluster Sweep fehlgeschlagen: " + (err.message || err), "error");
+      }
+    }
+
+    async function zoomToClusterEvent(ev) {
+      if (!ev) return;
+      const t0 = Date.parse(ev.approach_at || ev.first_touch_at || ev.cluster_entry_at || "");
+      const t1 = Date.parse(ev.entry_at || ev.confirmation_at || ev.invalidated_at || ev.first_touch_at || "");
+      if (!t0) return;
+      const from = (t0 / 1000) - 30 * 60;
+      const to = ((t1 || t0) / 1000) + 30 * 60;
+      await Promise.all(PANE_IDS.map(async function (pid) {
+        const pane = state.panes[pid];
+        if (!pane) return;
+        const chart = api(pane) || await whenReady(pane, 4000);
+        if (!chart || !chart.setVisibleTimeRange) return;
+        try { chart.setVisibleTimeRange(from, to); } catch (e) { /* ignore */ }
+      }));
+    }
+
+    async function zoomToEdcCandidate(c) {
+      if (!c) return;
+      const t0 = Date.parse(c.candidate_at || c.decision_at || "");
+      if (!t0) return;
+      const tf = String(c.timeframe || "15m");
+      const tfMin = tf.endsWith("m") ? parseInt(tf, 10) || 15 : 15;
+      const pad = 25 * tfMin * 60;
+      const from = (t0 / 1000) - pad;
+      const to = (t0 / 1000) + pad;
+      await Promise.all(PANE_IDS.map(async function (pid) {
+        const pane = state.panes[pid];
+        if (!pane) return;
+        const chart = api(pane) || await whenReady(pane, 4000);
+        if (!chart || !chart.setVisibleTimeRange) return;
+        try { chart.setVisibleTimeRange(from, to); } catch (e) { /* ignore */ }
+      }));
+    }
+
+    if ($("researchBtStrategy")) {
+      $("researchBtStrategy").addEventListener("change", async function () {
+        syncBtStrategyUi();
+        const sid = btStrategy();
+        try {
+          if (sid === "cluster_sweep_ema_9_20_59") {
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "cluster_sweep_ema_9_20_59",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "ema_dual_cross_multisource_v1",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+          } else if (sid === "ema_dual_cross_multisource_v1") {
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "cluster_sweep_ema_9_20_59",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "ema_dual_cross_multisource_v1",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+          } else {
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "cluster_sweep_ema_9_20_59",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "ema_dual_cross_multisource_v1",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+          }
+        } catch (e) { /* ignore */ }
+        await refreshOverlaysVisible();
+        setStatus("Strategie: " + sid + " — Cluster-Sweep-Marker ausgeblendet");
+      });
+      syncBtStrategyUi();
+    }
+    if ($("researchBtRunBtn")) $("researchBtRunBtn").addEventListener("click", runActiveBacktest);
+    if ($("cswRunFromModal")) $("cswRunFromModal").addEventListener("click", async function () {
+      await runClusterSweepBacktest();
+    });
+    if ($("edcRunFromModal")) $("edcRunFromModal").addEventListener("click", async function () {
+      await runEmaDualCrossBacktest();
+    });
+    if ($("researchEdcSettingsBtn")) {
+      $("researchEdcSettingsBtn").addEventListener("click", function () {
+        ensureEdcDefaults();
+        $("modalEdc").hidden = false;
+      });
+    }
+    if ($("researchEdcPrev")) {
+      $("researchEdcPrev").addEventListener("click", async function () {
+        const snap = await sendJson("/api/research/backtester/ema-dual-cross/nav", "POST", { delta: -1 });
+        applyWorkspace(snap);
+        updateEdcNav(snap);
+        await zoomToEdcCandidate(((snap.ema_dual_cross || {}).candidate));
+      });
+    }
+    if ($("researchEdcNext")) {
+      $("researchEdcNext").addEventListener("click", async function () {
+        const snap = await sendJson("/api/research/backtester/ema-dual-cross/nav", "POST", { delta: 1 });
+        applyWorkspace(snap);
+        updateEdcNav(snap);
+        await zoomToEdcCandidate(((snap.ema_dual_cross || {}).candidate));
+      });
+    }
+    if ($("researchEdcZoom")) {
+      $("researchEdcZoom").addEventListener("click", async function () {
+        const ed = (state.workspace || {}).ema_dual_cross || {};
+        await zoomToEdcCandidate(ed.candidate);
+      });
+    }
+    if ($("researchCswSettingsBtn")) {
+      $("researchCswSettingsBtn").addEventListener("click", function () {
+        ensureCswDefaults();
+        $("modalCsw").hidden = false;
+      });
+    }
+    if ($("researchCswPrev")) {
+      $("researchCswPrev").addEventListener("click", async function () {
+        const snap = await sendJson("/api/research/backtester/cluster-sweep/nav", "POST", { delta: -1 });
+        applyWorkspace(snap);
+        updateCswNav(snap);
+        await zoomToClusterEvent((snap.cluster_sweep || {}).event);
+      });
+    }
+    if ($("researchCswNext")) {
+      $("researchCswNext").addEventListener("click", async function () {
+        const snap = await sendJson("/api/research/backtester/cluster-sweep/nav", "POST", { delta: 1 });
+        applyWorkspace(snap);
+        updateCswNav(snap);
+        await zoomToClusterEvent((snap.cluster_sweep || {}).event);
+      });
+    }
+    if ($("researchCswZoom")) {
+      $("researchCswZoom").addEventListener("click", async function () {
+        const cs = (state.workspace || {}).cluster_sweep || {};
+        await zoomToClusterEvent(cs.event);
+      });
+    }
+
     $("researchBacktesterBtn").addEventListener("click", async function () {
       if (!state.symbol) return;
+      if (btStrategy() === "cluster_sweep_ema_9_20_59") {
+        setStatus("Cluster Sweep Backtester umschalten …");
+        try {
+          const snap = await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "cluster_sweep_ema_9_20_59",
+            symbol: state.symbol,
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          updateCswNav(snap);
+          await refreshOverlaysVisible();
+          const bt = snap.backtester || {};
+          const cs = snap.cluster_sweep || {};
+          setStatus(
+            "Cluster Sweep " + state.symbol + " · "
+              + (bt.visible ? "sichtbar" : "ausgeblendet") + " · "
+              + (cs.n_events || 0) + " Events"
+              + ((cs.meta && cs.meta.debug_low_pool_zones) ? " · LOW-POOL DEBUG" : "")
+          );
+        } catch (err) {
+          setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (btStrategy() === "ema_dual_cross_multisource_v1") {
+        setStatus("EMA Dual Cross Backtester umschalten …");
+        try {
+          const snap = await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "ema_dual_cross_multisource_v1",
+            symbol: state.symbol,
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          updateEdcNav(snap);
+          await refreshOverlaysVisible();
+          const bt = snap.backtester || {};
+          const ed = snap.ema_dual_cross || {};
+          setStatus(
+            "EMA Dual Cross " + state.symbol + " · "
+              + (bt.visible ? "sichtbar" : "ausgeblendet") + " · "
+              + (ed.n_candidates || 0) + " Kandidaten"
+          );
+        } catch (err) {
+          setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
       const strategy = lastStochStrategy();
       const jobId = lastStochResearchJob();
       const evalId = lastStochEvaluation();
-      const source = evalId ? "FROZEN_RESEARCH_EVALUATION" : (jobId ? "FROZEN_RESEARCH_JOB" : "");
       applyResearchJobSourceNote();
       setStatus("Backtester: lade " + (evalId ? "Evaluation " + evalId : (jobId ? "Job " + jobId : strategy)) + " für " + state.symbol + " …");
       try {
-        const body = { symbol: state.symbol };
+        const body = { symbol: state.symbol, strategy_id: "stoch_fade" };
         if (jobId) {
           body.job_id = jobId;
           if (evalId) {
@@ -1619,6 +2614,12 @@
     } catch (err) {
       setStatus(String(err.message || err), "error");
     }
+    state.vp = Object.assign(
+      defaultVolumeProfile(),
+      (state.workspace && state.workspace.volume_profile) || {},
+      readStoredVolumeProfile()
+    );
+    fillVolumeProfileControls();
     const start = pickDefaultSymbol(names);
     if (!start) {
       setStatus("No selectable symbol", "empty");

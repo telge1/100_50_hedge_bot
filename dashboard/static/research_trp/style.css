@@ -178,6 +178,43 @@ body {
   z-index: 2;
 }
 
+#vp-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+#vp-tooltip {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: rgba(15, 18, 24, 0.94);
+  border: 1px solid #2a2e39;
+  color: #d1d4dc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  min-width: 140px;
+  max-width: 240px;
+}
+
+#vp-badge {
+  position: absolute;
+  top: 8px;
+  right: 72px;
+  z-index: 5;
+  pointer-events: none;
+  background: rgba(15, 18, 24, 0.88);
+  border: 1px solid #c9a227;
+  color: #fbbf24;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  max-width: 46%;
+}
+
 .ov-vline {
   position: absolute;
   top: 0;
