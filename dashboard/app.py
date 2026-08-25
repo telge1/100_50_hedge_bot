@@ -594,6 +594,8 @@ def _is_circuit_breaker_exempt(path: str) -> bool:
         return True
     if path.startswith("/api/research/volume-profile"):
         return True
+    if path.startswith("/api/research/orderbook-profile"):
+        return True
     if path.startswith("/api/research/backtester/"):
         return True
     return False

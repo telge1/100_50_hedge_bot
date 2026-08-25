@@ -30,6 +30,11 @@ from .service import (
     pane_bundle,
     symbol_meta,
 )
+from .orderbook_profile import (
+    MAX_RANGE_SECONDS as OB_PROFILE_MAX_RANGE_SECONDS,
+    OrderbookProfileQueryError,
+    load_orderbook_profile,
+)
 from .public_trades_profile import (
     VolumeProfileQueryError,
     load_volume_profile,
@@ -165,6 +170,69 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(exc.status, exc.code, str(exc))
         except Exception as exc:
             return _error(500, "volume_profile_failed", str(exc))
+        return payload
+
+    @router.get("/api/research/orderbook-profile")
+    async def api_research_orderbook_profile(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        start: int = Query(..., description="UTC unix seconds, inclusive"),
+        end: int = Query(..., description="UTC unix seconds, exclusive"),
+        at: Optional[int] = Query(
+            None,
+            description="Optional causal snapshot time (UTC unix). Uses last bucket <= at.",
+        ),
+    ):
+        """Aggregated Orderbook Profile from orderbook_features_1s_v2 walls.
+
+        Default: visible-range aggregation of stored Bid/Ask wall prices.
+        With ``at``: causal last snapshot with bucket_start <= at.
+        Never reads Raw OB200 / orderbook_deltas. Not a full L2 book.
+        """
+        sym = str(symbol or "").strip().upper()
+        try:
+            start_dt = datetime.fromtimestamp(int(start), tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            return _error(400, "invalid_time_range", "start and end must be UTC unix seconds")
+        if end_dt <= start_dt:
+            return _error(400, "invalid_time_range", "end must be after start")
+        at_dt = None
+        if at is not None:
+            try:
+                at_dt = datetime.fromtimestamp(int(at), tz=timezone.utc)
+            except (TypeError, ValueError, OSError, OverflowError):
+                return _error(400, "invalid_at", "at must be UTC unix seconds")
+        known = True
+        if sym != "XAUUSDT":
+            try:
+                known = sym in known_symbols()
+            except Exception:
+                known = True
+        try:
+            payload = await asyncio.to_thread(
+                load_orderbook_profile,
+                symbol=sym,
+                start=start_dt,
+                end=end_dt,
+                at=at_dt,
+                known_symbol=known,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", f"unknown symbol {sym}")
+        except ValueError as exc:
+            code = str(exc)
+            if code == "time_range_too_large":
+                return _error(
+                    400,
+                    code,
+                    f"time range exceeds {OB_PROFILE_MAX_RANGE_SECONDS} seconds (7 days)",
+                )
+            return _error(400, code, str(exc))
+        except OrderbookProfileQueryError as exc:
+            return _error(exc.status, exc.code, str(exc))
+        except Exception as exc:
+            return _error(500, "orderbook_profile_failed", str(exc))
         return payload
 
     @router.post("/api/research/pane")
@@ -352,6 +420,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 stochastic=body.get("stochastic"),
                 liquidity=body.get("liquidity"),
                 volume_profile=body.get("volume_profile"),
+                orderbook_profile=body.get("orderbook_profile"),
             )
         except ValueError as exc:
             return _error(400, "invalid_settings", str(exc))

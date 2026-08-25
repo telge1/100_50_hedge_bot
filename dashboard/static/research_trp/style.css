@@ -185,6 +185,13 @@ body {
   z-index: 3;
 }
 
+#obp-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
 #vp-tooltip {
   position: absolute;
   z-index: 6;
@@ -200,6 +207,21 @@ body {
   max-width: 240px;
 }
 
+#obp-tooltip {
+  position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  background: rgba(15, 18, 24, 0.94);
+  border: 1px solid #2a2e39;
+  color: #d1d4dc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  min-width: 160px;
+  max-width: 280px;
+}
+
 #vp-badge {
   position: absolute;
   top: 8px;
@@ -209,6 +231,21 @@ body {
   background: rgba(15, 18, 24, 0.88);
   border: 1px solid #c9a227;
   color: #fbbf24;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  max-width: 46%;
+}
+
+#obp-badge {
+  position: absolute;
+  top: 28px;
+  right: 72px;
+  z-index: 5;
+  pointer-events: none;
+  background: rgba(15, 18, 24, 0.88);
+  border: 1px solid #3dcc91;
+  color: #a7f3d0;
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 11px;

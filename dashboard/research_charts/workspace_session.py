@@ -37,6 +37,12 @@ DEFAULT_VOLUME_PROFILE = {
     "mode": "visible_range",
 }
 
+DEFAULT_ORDERBOOK_PROFILE = {
+    "enabled": False,
+    "width": "normal",
+    "mode": "visible_range",
+}
+
 
 def normalize_volume_profile(raw: dict | None) -> dict[str, Any]:
     src = dict(DEFAULT_VOLUME_PROFILE)
@@ -60,6 +66,22 @@ def normalize_volume_profile(raw: dict | None) -> dict[str, Any]:
         if mode in {"base", "quote"}:
             src["volume_mode"] = mode
         src["mode"] = "visible_range"
+    return src
+
+
+def normalize_orderbook_profile(raw: dict | None) -> dict[str, Any]:
+    src = dict(DEFAULT_ORDERBOOK_PROFILE)
+    if isinstance(raw, dict):
+        if "enabled" in raw:
+            src["enabled"] = bool(raw["enabled"])
+        width = str(raw.get("width") or src["width"]).strip().lower()
+        if width in {"compact", "normal", "wide"}:
+            src["width"] = width
+        mode = str(raw.get("mode") or src["mode"]).strip().lower()
+        if mode in {"visible_range", "snapshot_at"}:
+            src["mode"] = mode
+        else:
+            src["mode"] = "visible_range"
     return src
 
 
@@ -116,6 +138,7 @@ class ResearchWorkspace:
         self.stoch_config = self.indicator_store.get_config(trp["STOCHASTIC"])
         self.lld_config = self.indicator_store.get_config(trp["LIQUIDITY_LOCATION"])
         self.volume_profile = dict(DEFAULT_VOLUME_PROFILE)
+        self.orderbook_profile = dict(DEFAULT_ORDERBOOK_PROFILE)
         self._cluster_sweep_run: dict[str, Any] | None = None
         self._cluster_sweep_visible: bool = False
         self._cluster_sweep_event_index: int = 0
@@ -183,6 +206,7 @@ class ResearchWorkspace:
             "stochastic": self.stoch_config.to_dict(),
             "liquidity": self.lld_config.to_dict(),
             "volume_profile": dict(self.volume_profile),
+            "orderbook_profile": dict(self.orderbook_profile),
             "license_notice": trp["LICENSE_NOTICE"],
             "tools": list(TOOLS),
             "layouts": list(SUPPORTED_LAYOUTS),
@@ -251,6 +275,7 @@ class ResearchWorkspace:
             "stochastic": trp["StochasticConfig"].defaults().to_dict(),
             "liquidity": trp["LiquidityLocationConfig"].defaults().to_dict(),
             "volume_profile": dict(DEFAULT_VOLUME_PROFILE),
+            "orderbook_profile": dict(DEFAULT_ORDERBOOK_PROFILE),
         }
 
     def apply_settings(
@@ -260,6 +285,7 @@ class ResearchWorkspace:
         stochastic: dict | None = None,
         liquidity: dict | None = None,
         volume_profile: dict | None = None,
+        orderbook_profile: dict | None = None,
     ) -> dict[str, Any]:
         trp = self._trp
         if ema is not None:
@@ -278,6 +304,8 @@ class ResearchWorkspace:
             self.lld_config = cfg
         if volume_profile is not None:
             self.volume_profile = normalize_volume_profile(volume_profile)
+        if orderbook_profile is not None:
+            self.orderbook_profile = normalize_orderbook_profile(orderbook_profile)
         self.persist_settings()
         return self.snapshot()
 

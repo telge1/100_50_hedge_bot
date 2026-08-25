@@ -142,6 +142,8 @@
                         <option value="base">Base</option>
                         <option value="quote">Quote</option>
                     </select>
+                    <label class="trp-check trp-dock-ind" title="Aggregated Bid/Ask walls from orderbook_features_1s_v2"><input type="checkbox" id="researchObpEnabled"> Orderbook Profile</label>
+                    <span class="trp-muted research-obp-legend" id="researchObpLegend" hidden>Bid Wall · Ask Wall</span>
                     <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
                     <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
@@ -360,7 +362,7 @@
         </div>
     </div>
 
-    <script src="/static/js/research/research_charts.js?v=history-5"></script>
+    <script src="/static/js/research/research_charts.js?v=history-6"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

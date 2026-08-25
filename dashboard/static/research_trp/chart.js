@@ -89,6 +89,12 @@
     width: "normal",
   };
   let vpHoverIndex = -1;
+  let obpPayload = null;
+  let obpSettings = {
+    enabled: false,
+    width: "normal",
+  };
+  let obpHoverIndex = -1;
 
   function beginProgrammaticNav() {
     programmaticNavDepth += 1;
@@ -1828,6 +1834,180 @@
     return true;
   }
 
+  function obpWidthFrac() {
+    if (obpSettings.width === "compact") return 0.14;
+    if (obpSettings.width === "wide") return 0.26;
+    return 0.2;
+  }
+
+  function obpRegion() {
+    const size = chartSize();
+    const right = plotRightX();
+    const w = Math.max(40, Math.min(right * obpWidthFrac(), right * 0.35));
+    // Sit just left of Volume Profile when both are on, else flush right.
+    let x1 = right;
+    if (vpSettings.enabled && vpPayload && vpPayload.bins && vpPayload.bins.length) {
+      const vp = vpRegion();
+      x1 = Math.max(w + 8, vp.x0 - 4);
+    }
+    return { x0: x1 - w, x1: x1, w: w, h: size.h };
+  }
+
+  function setOrderbookProfile(payload, settings) {
+    obpPayload = payload || null;
+    if (settings) {
+      obpSettings = Object.assign({}, obpSettings, settings);
+    }
+    drawOrderbookProfile();
+    return true;
+  }
+
+  function clearOrderbookProfile() {
+    obpPayload = null;
+    obpHoverIndex = -1;
+    drawOrderbookProfile();
+    const tip = $("obp-tooltip");
+    if (tip) {
+      tip.hidden = true;
+      tip.textContent = "";
+    }
+    const badge = $("obp-badge");
+    if (badge) {
+      badge.hidden = true;
+      badge.textContent = "";
+    }
+    return true;
+  }
+
+  function drawOrderbookProfile() {
+    const canvas = $("obp-overlay");
+    if (!canvas) return;
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(size.w * dpr));
+    canvas.height = Math.max(1, Math.floor(size.h * dpr));
+    canvas.style.width = size.w + "px";
+    canvas.style.height = size.h + "px";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size.w, size.h);
+    const badge = $("obp-badge");
+    if (!obpSettings.enabled || !obpPayload || !obpPayload.bars || !obpPayload.bars.length) {
+      if (badge) {
+        const warn = obpPayload && obpPayload.warning;
+        if (obpSettings.enabled && warn) {
+          badge.hidden = false;
+          badge.textContent = "OB Profile · " + warn;
+        } else {
+          badge.hidden = true;
+          badge.textContent = "";
+        }
+      }
+      return;
+    }
+    const bars = obpPayload.bars;
+    const region = obpRegion();
+    let maxVal = 0;
+    for (let i = 0; i < bars.length; i++) {
+      const v = Number(bars[i].value) || 0;
+      if (v > maxVal) maxVal = v;
+    }
+    if (maxVal <= 0) maxVal = 1;
+    const barH = 5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, region.x1, size.h);
+    ctx.clip();
+    for (let i = 0; i < bars.length; i++) {
+      const b = bars[i];
+      const y = yOf(b.price);
+      if (y == null) continue;
+      const w = Math.max(2, (Number(b.value) / maxVal) * region.w);
+      const y0 = y - barH / 2;
+      const isBid = String(b.side).toUpperCase() === "BID";
+      const alpha = i === obpHoverIndex ? 0.92 : (b.carried_forward ? 0.45 : 0.72);
+      ctx.fillStyle = isBid
+        ? "rgba(61, 204, 145, " + alpha + ")"
+        : "rgba(240, 97, 109, " + alpha + ")";
+      ctx.fillRect(region.x1 - w, y0, w, barH);
+      if (i === obpHoverIndex) {
+        ctx.strokeStyle = "rgba(255,255,255,0.65)";
+        ctx.strokeRect(region.x1 - w, y0, w, barH);
+      }
+    }
+    // Legend ticks near top of region
+    ctx.fillStyle = "rgba(61, 204, 145, 0.9)";
+    ctx.fillRect(region.x0 + 2, 6, 10, 4);
+    ctx.fillStyle = "rgba(240, 97, 109, 0.9)";
+    ctx.fillRect(region.x0 + 2, 14, 10, 4);
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = "10px Inter, Segoe UI, sans-serif";
+    ctx.fillText("Bid Wall", region.x0 + 16, 11);
+    ctx.fillText("Ask Wall", region.x0 + 16, 19);
+    ctx.restore();
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = "Aggregated Orderbook Profile";
+    }
+  }
+
+  function obpBarAt(x, y) {
+    if (!obpSettings.enabled || !obpPayload || !obpPayload.bars) return -1;
+    const region = obpRegion();
+    if (x < region.x0 - 2 || x > region.x1 + 2) return -1;
+    const bars = obpPayload.bars;
+    let best = -1;
+    let bestDist = 8;
+    for (let i = 0; i < bars.length; i++) {
+      const py = yOf(bars[i].price);
+      if (py == null) continue;
+      const d = Math.abs(py - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  function updateOrderbookProfileHover(x, y) {
+    const tip = $("obp-tooltip");
+    const idx = obpBarAt(x, y);
+    if (idx !== obpHoverIndex) {
+      obpHoverIndex = idx;
+      drawOrderbookProfile();
+    }
+    if (!tip) return;
+    if (idx < 0 || !obpPayload || !obpPayload.bars[idx]) {
+      tip.hidden = true;
+      return;
+    }
+    const b = obpPayload.bars[idx];
+    const fmtN = function (n, dig) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return "—";
+      const d = dig != null ? dig : (Math.abs(v) >= 1000 ? 1 : 6);
+      return v.toFixed(d);
+    };
+    const ts = b.timestamp != null ? new Date(Number(b.timestamp) * 1000).toISOString().replace(".000Z", "Z") : "—";
+    tip.hidden = false;
+    tip.style.left = Math.max(8, x - 190) + "px";
+    tip.style.top = Math.max(8, y - 8) + "px";
+    tip.innerHTML =
+      "<div><strong>Aggregated Orderbook Profile</strong></div>" +
+      "<div>" + String(b.side || "") + " Wall</div>" +
+      "<div>Price " + fmtN(b.price) + "</div>" +
+      "<div>Notional " + fmtN(b.value, 2) + " (" + (b.value_type || "notional_quote") + ")</div>" +
+      "<div>Qty " + fmtN(b.qty, 2) + " (" + (b.qty_unit || "base") + ")</div>" +
+      "<div>Mid " + fmtN(b.reference_price) + "</div>" +
+      "<div>Dist " + fmtN(b.distance_abs) + " · " + fmtN(b.distance_bps, 2) + " bps</div>" +
+      "<div>UTC " + ts + "</div>" +
+      "<div>carried_forward: " + (b.carried_forward ? "true" : "false") + "</div>" +
+      "<div>quality: " + (b.quality_flags || "—") + "</div>" +
+      "<div>samples " + (b.samples || 1) + "</div>";
+  }
+
   function getVisibleTimeRange() {
     if (!chart) return null;
     try {
@@ -2055,6 +2235,7 @@
         badge.textContent = "";
       }
     }
+    drawOrderbookProfile();
   }
 
   function vpBinAt(x, y) {
@@ -2083,8 +2264,13 @@
     if (!tip) return;
     if (idx < 0 || !vpPayload || !vpPayload.bins[idx]) {
       tip.hidden = true;
+      // Fall through to OBP tooltip when not on a VP bin.
+      updateOrderbookProfileHover(x, y);
       return;
     }
+    // Prefer VP tooltip when hovering VP region; hide OBP tip.
+    const obpTip = $("obp-tooltip");
+    if (obpTip) obpTip.hidden = true;
     const b = vpPayload.bins[idx];
     const fmtN = function (n) {
       const v = Number(n);
@@ -2115,6 +2301,7 @@
     });
     layoutShiftMeasure();
     drawVolumeProfile();
+    drawOrderbookProfile();
   }
 
   function overlayDebugSamples() {
@@ -3967,6 +4154,8 @@
     setHostShift: setHostShift,
     setVolumeProfile: setVolumeProfile,
     clearVolumeProfile: clearVolumeProfile,
+    setOrderbookProfile: setOrderbookProfile,
+    clearOrderbookProfile: clearOrderbookProfile,
     getVisibleTimeRange: getVisibleTimeRange,
     setVisibleTimeRange: setVisibleTimeRange,
     focusOnTime: focusOnTime,

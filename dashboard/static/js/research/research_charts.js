@@ -17,8 +17,9 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "vp-2";
+  const ASSET_V = "vp-3";
   const VP_KEY = "research.volume_profile";
+  const OBP_KEY = "research.orderbook_profile";
   const VP_DEBOUNCE_MS = 400;
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
@@ -67,6 +68,7 @@
     phase: "IFRAME_LOADING",
     hostShift: false,
     vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
+    obp: { enabled: false, width: "normal", mode: "visible_range" },
     history: {
       preset: "30d",
       customStart: "",
@@ -606,7 +608,10 @@
       on_crosshair_move: function (unix) { handleHover(pane.id, unix); },
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
-      on_visible_range: function (from, to) { scheduleVolumeProfile(pane, from, to); },
+      on_visible_range: function (from, to) {
+        scheduleVolumeProfile(pane, from, to);
+        scheduleOrderbookProfile(pane, from, to);
+      },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
@@ -730,6 +735,9 @@
         vpGen: 0,
         vpTimer: null,
         vpAbort: null,
+        obpGen: 0,
+        obpTimer: null,
+        obpAbort: null,
       };
       state.panes[pid] = pane;
       iframe.addEventListener("load", function () {
@@ -981,6 +989,113 @@
     if (el) el.textContent = parts.join("  ·  ");
   }
 
+  function defaultOrderbookProfile() {
+    return { enabled: false, width: "normal", mode: "visible_range" };
+  }
+
+  function readStoredOrderbookProfile() {
+    try {
+      const raw = localStorage.getItem(OBP_KEY);
+      if (!raw) return defaultOrderbookProfile();
+      return Object.assign(defaultOrderbookProfile(), JSON.parse(raw));
+    } catch (e) {
+      return defaultOrderbookProfile();
+    }
+  }
+
+  function persistOrderbookProfile() {
+    try { localStorage.setItem(OBP_KEY, JSON.stringify(state.obp)); } catch (e) {}
+  }
+
+  function fillOrderbookProfileControls() {
+    const obp = state.obp || defaultOrderbookProfile();
+    const en = $("researchObpEnabled");
+    if (en) en.checked = !!obp.enabled;
+    const legend = $("researchObpLegend");
+    if (legend) legend.hidden = !obp.enabled;
+  }
+
+  function applyOrderbookProfileSettings(raw, skipPersist) {
+    state.obp = Object.assign(defaultOrderbookProfile(), raw || {});
+    fillOrderbookProfileControls();
+    if (!skipPersist) persistOrderbookProfile();
+    if (!state.obp.enabled) {
+      visibleIds().forEach(function (pid) { clearPaneOrderbookProfile(state.panes[pid]); });
+      return;
+    }
+    visibleIds().forEach(function (pid) { scheduleOrderbookProfile(state.panes[pid]); });
+  }
+
+  function obpSettingsPayload() {
+    const obp = state.obp || defaultOrderbookProfile();
+    return { enabled: !!obp.enabled, width: obp.width || "normal" };
+  }
+
+  function clearPaneOrderbookProfile(pane) {
+    if (!pane) return;
+    pane.obpGen += 1;
+    if (pane.obpTimer) {
+      clearTimeout(pane.obpTimer);
+      pane.obpTimer = null;
+    }
+    if (pane.obpAbort) {
+      try { pane.obpAbort.abort(); } catch (e) {}
+      pane.obpAbort = null;
+    }
+    const chart = api(pane);
+    if (chart && chart.clearOrderbookProfile) chart.clearOrderbookProfile();
+  }
+
+  function scheduleOrderbookProfile(pane) {
+    if (!pane) return;
+    if (pane.obpTimer) clearTimeout(pane.obpTimer);
+    pane.obpTimer = setTimeout(function () {
+      pane.obpTimer = null;
+      refreshPaneOrderbookProfile(pane);
+    }, VP_DEBOUNCE_MS);
+  }
+
+  async function refreshPaneOrderbookProfile(pane) {
+    if (!pane || !state.obp || !state.obp.enabled || !state.symbol) {
+      clearPaneOrderbookProfile(pane);
+      return;
+    }
+    const chart = api(pane);
+    if (!chart || !chart.getVisibleTimeRange) return;
+    const range = chart.getVisibleTimeRange();
+    if (!range || range.firstCandle == null || range.lastCandle == null) return;
+    const step = TF_SEC[pane.tf] || 60;
+    const start = Number(range.firstCandle);
+    const end = Number(range.lastCandle) + step;
+    if (!(end > start)) return;
+    const gen = ++pane.obpGen;
+    if (pane.obpAbort) {
+      try { pane.obpAbort.abort(); } catch (e) {}
+    }
+    pane.obpAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    let url = "/api/research/orderbook-profile?symbol=" + encodeURIComponent(state.symbol) +
+      "&start=" + encodeURIComponent(String(start)) +
+      "&end=" + encodeURIComponent(String(end));
+    if (state.selectedUnix != null && state.obp.mode === "snapshot_at") {
+      url += "&at=" + encodeURIComponent(String(Math.floor(Number(state.selectedUnix))));
+    }
+    try {
+      const body = await getJson(url, {
+        sourceAction: "orderbook-profile",
+        pane: pane.id,
+        timeframe: pane.tf,
+        signal: pane.obpAbort && pane.obpAbort.signal,
+      });
+      if (gen !== pane.obpGen) return;
+      if (!state.obp.enabled) return;
+      const live = api(pane);
+      if (live && live.setOrderbookProfile) live.setOrderbookProfile(body, obpSettingsPayload());
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      if (gen !== pane.obpGen) return;
+    }
+  }
+
   function defaultVolumeProfile() {
     return {
       enabled: false,
@@ -1127,6 +1242,7 @@
     $("researchIndStoch").checked = !!(snap.stochastic && snap.stochastic.enabled);
     $("researchIndLld").checked = !!(snap.liquidity && snap.liquidity.enabled);
     if (snap.volume_profile) applyVolumeProfileSettings(snap.volume_profile, true);
+    if (snap.orderbook_profile) applyOrderbookProfileSettings(snap.orderbook_profile, true);
     const ema = snap.ema || { lines: [] };
     const enabled = (ema.lines || []).filter(function (l) { return l.enabled; }).map(function (l) { return "EMA" + l.period; });
     $("trpEmaSummary").textContent = enabled.length ? enabled.join(", ") : "off";
@@ -1376,6 +1492,7 @@
       if (ready && ready.resetView) ready.resetView();
     }
     scheduleVolumeProfile(pane);
+    scheduleOrderbookProfile(pane);
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -1613,6 +1730,7 @@
       const chart = api(pane);
       if (chart && chart.clearOverlays) chart.clearOverlays();
       clearPaneVolumeProfile(pane);
+      clearPaneOrderbookProfile(pane);
     });
     if (state.overlayTest) {
       applyWorkspace(await sendJson("/api/research/overlay-test", "POST", { enabled: true, symbol: next }, {
@@ -1887,6 +2005,20 @@
           visibleIds().forEach(function (pid) { clearPaneVolumeProfile(state.panes[pid]); });
         } else {
           visibleIds().forEach(function (pid) { scheduleVolumeProfile(state.panes[pid]); });
+        }
+      });
+    }
+    const obpEn = $("researchObpEnabled");
+    if (obpEn) {
+      obpEn.addEventListener("change", function () {
+        state.obp.enabled = obpEn.checked;
+        persistOrderbookProfile();
+        fillOrderbookProfileControls();
+        sendJson("/api/research/settings", "PUT", { orderbook_profile: state.obp }, { sourceAction: "obp-settings" }).catch(function () {});
+        if (!state.obp.enabled) {
+          visibleIds().forEach(function (pid) { clearPaneOrderbookProfile(state.panes[pid]); });
+        } else {
+          visibleIds().forEach(function (pid) { scheduleOrderbookProfile(state.panes[pid]); });
         }
       });
     }
@@ -2620,6 +2752,12 @@
       readStoredVolumeProfile()
     );
     fillVolumeProfileControls();
+    state.obp = Object.assign(
+      defaultOrderbookProfile(),
+      (state.workspace && state.workspace.orderbook_profile) || {},
+      readStoredOrderbookProfile()
+    );
+    fillOrderbookProfileControls();
     const start = pickDefaultSymbol(names);
     if (!start) {
       setStatus("No selectable symbol", "empty");
