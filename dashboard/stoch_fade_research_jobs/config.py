@@ -15,6 +15,19 @@ DEFAULT_UNIVERSE = DEFAULT_SG_ROOT / "config" / "universe_tradeable_51.json"
 WORKER_SCRIPT = Path(__file__).resolve().parent / "worker.py"
 
 STRATEGY_VERSION = "wave_fade_frozen_f16ae32_causal_entry_v1"
+EZM_STRATEGY_ID = "ema_zone_microstructure_confirmation_v1"
+EZM_RUN_INTENT = "candidate_discovery"
+EZM_RUNNER_KIND = "ezm_continuous_discovery"
+EZM_RESULT_CONTRACT_VERSION = "ezm_stoch_signale_candidates/v1"
+EZM_COMPUTATION_MODE_EMA_ONLY = "ema_only"
+EZM_COMPUTATION_MODE_EMA_PLUS_MICRO = "ema_plus_microstructure"
+FROZEN_RUNNER_KIND = "stoch_fade_runner"
+FROZEN_RESULT_CONTRACT_VERSION = "frozen_fade_signals/v1"
+FROZEN_RUN_INTENT = "trade_signal_research"
+# Server-side whitelist only — never trust browser values as modules/paths.
+ALLOWED_STRATEGY_IDS = frozenset({STRATEGY_VERSION, EZM_STRATEGY_ID})
+DEFAULT_OA_ROOT = Path("/home/telgenbuescher/projects/orderbook_analyse")
+DEFAULT_EZM_COIN_TIMEOUT_S = 2700
 SOURCE_COMMIT = "f16ae32da38da86f39e75b09c63c31f62d11996b"
 EDGES_VERSION = "apt_is_q4_frozen_20260808"
 CAUSAL_MANIFEST_HASH = "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf"
@@ -101,3 +114,38 @@ def coin_timeout_s(environ: dict | None = None) -> int:
         return max(5, int(raw))
     except ValueError:
         return DEFAULT_COIN_TIMEOUT_S
+
+
+def ezm_coin_timeout_s(environ: dict | None = None) -> int:
+    env = environ if environ is not None else os.environ
+    raw = str(env.get("STOCH_EZM_COIN_TIMEOUT_S") or DEFAULT_EZM_COIN_TIMEOUT_S).strip()
+    try:
+        return max(30, int(raw))
+    except ValueError:
+        return DEFAULT_EZM_COIN_TIMEOUT_S
+
+
+def oa_root(environ: dict | None = None) -> Path:
+    env = environ if environ is not None else os.environ
+    override = str(env.get("ORDERBOOK_ANALYSE_ROOT") or "").strip()
+    if override:
+        return Path(override)
+    return DEFAULT_OA_ROOT
+
+
+def oa_raw_root(environ: dict | None = None) -> Path:
+    env = environ if environ is not None else os.environ
+    override = str(env.get("STOCH_EZM_RAW_ROOT") or "").strip()
+    if override:
+        return Path(override)
+    return oa_root(environ) / "data/orderbook_raw_shadow/ob200_v3"
+
+
+def normalize_ezm_computation_mode(mode: str | None) -> str:
+    """Normalize EZM job computation mode (before job start)."""
+    text = str(mode or "").strip().lower()
+    if text in ("", EZM_COMPUTATION_MODE_EMA_PLUS_MICRO, "ema_plus_micro", "full"):
+        return EZM_COMPUTATION_MODE_EMA_PLUS_MICRO
+    if text == EZM_COMPUTATION_MODE_EMA_ONLY:
+        return EZM_COMPUTATION_MODE_EMA_ONLY
+    raise ValueError("INVALID_COMPUTATION_MODE")

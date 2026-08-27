@@ -26,6 +26,7 @@ from .config import (
     CONFIRMATION_SOURCE,
     DASHBOARD_ROOT,
     EXIT_POLICY,
+    EZM_COMPUTATION_MODE_EMA_PLUS_MICRO,
     FROZEN_MODULE_HASHES,
     INTRABAR_POLICY,
     REPO_ROOT,
@@ -34,13 +35,21 @@ from .config import (
     STRATEGY_VERSION,
     WORKER_SCRIPT,
     coin_timeout_s,
+    ezm_coin_timeout_s,
     jobs_root,
+    normalize_ezm_computation_mode,
     sg_python,
     universe_path,
 )
 from .cross_lock import start_gate
 from .disk import assert_disk
 from .schema import FrozenFadeJobBody
+from .strategy_resolve import (
+    StrategyResolveError,
+    is_ezm_strategy,
+    resolve_strategy_id,
+    strategy_manifest_fields,
+)
 from .symbols import filter_testable, validate_symbols
 from .time_window import iso_z as window_iso
 from .time_window import parse_utc_minute, suggested_end_exclusive, suggested_start, validate_window
@@ -446,34 +455,44 @@ def _write_job_files(
     created: datetime,
     environ: dict | None,
     resume: bool,
+    strategy_id: str = STRATEGY_VERSION,
+    strategy_spec_hash: str = "",
+    computation_mode: str | None = None,
 ) -> None:
     uni_path = universe_path(environ)
+    strat = strategy_manifest_fields(strategy_id, strategy_spec_hash=strategy_spec_hash)
     request = {
         "job_id": job_id,
         "requested_at": iso_z(created),
         "selected_symbols": cleaned,
         "signal_start": window_iso(start),
         "signal_end_exclusive": window_iso(end),
-        "fixed_strategy_version": STRATEGY_VERSION,
-        "confirmation_policy": CONFIRMATION_POLICY,
-        "confirmation_source": CONFIRMATION_SOURCE,
-        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
-        "exit_policy": EXIT_POLICY,
-        "intrabar_policy": INTRABAR_POLICY,
+        "symbols": cleaned,
         "universe_source": str(uni_path),
         "universe_count": len(load_tradeable_51(uni_path)),
         "jobs_root": str(jobs_root(environ)),
+        **strat,
     }
+    if is_ezm_strategy(strategy_id):
+        request["computation_mode"] = normalize_ezm_computation_mode(
+            computation_mode or EZM_COMPUTATION_MODE_EMA_PLUS_MICRO
+        )
+    if not is_ezm_strategy(strategy_id):
+        request.update(
+            {
+                "confirmation_policy": CONFIRMATION_POLICY,
+                "confirmation_source": CONFIRMATION_SOURCE,
+                "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
+                "exit_policy": EXIT_POLICY,
+                "intrabar_policy": INTRABAR_POLICY,
+            }
+        )
+    timeout = (
+        ezm_coin_timeout_s(environ) if is_ezm_strategy(strategy_id) else coin_timeout_s(environ)
+    )
     manifest = {
         **request,
         "runner_code_revision": code_revision(environ),
-        "frozen_source_commit": SOURCE_COMMIT,
-        "frozen_module_hashes": dict(FROZEN_MODULE_HASHES),
-        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
-        "confirmation_policy": CONFIRMATION_POLICY,
-        "confirmation_source": CONFIRMATION_SOURCE,
-        "exit_policy": EXIT_POLICY,
-        "intrabar_policy": INTRABAR_POLICY,
         "side_effect_flags": dict(SIDE_EFFECT_FLAGS),
         "python_path": str(sg_python(environ)),
         "sequential": True,
@@ -483,11 +502,23 @@ def _write_job_files(
         "writes_to_clickhouse": False,
         "publish": False,
         "live_orders": False,
-        "coin_timeout_s": coin_timeout_s(environ),
+        "coin_timeout_s": timeout,
         "jobs_root": str(jobs_root(environ)),
         "repo_root": str(REPO_ROOT),
         "resume": resume,
     }
+    if not is_ezm_strategy(strategy_id):
+        manifest.update(
+            {
+                "frozen_source_commit": SOURCE_COMMIT,
+                "frozen_module_hashes": dict(FROZEN_MODULE_HASHES),
+                "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
+                "confirmation_policy": CONFIRMATION_POLICY,
+                "confirmation_source": CONFIRMATION_SOURCE,
+                "exit_policy": EXIT_POLICY,
+                "intrabar_policy": INTRABAR_POLICY,
+            }
+        )
     coins = [empty_coin_row(s) for s in cleaned]
     status = {
         "job_id": job_id,
@@ -559,7 +590,11 @@ def _spawn_and_lock(
     status["worker_pid"] = pid
     status["last_worker_pid"] = pid
     status["started_at"] = iso_z(_utcnow())
-    status["message"] = "Kausaler Backtest wird berechnet"
+    status["message"] = (
+        "EZM Candidate Discovery wird berechnet"
+        if is_ezm_strategy(str(read_json(directory / "request.json").get("strategy_id") or ""))
+        else "Kausaler Backtest wird berechnet"
+    )
     write_json_atomic(directory / "status.json", status)
     write_json_atomic(
         lock_path(environ),
@@ -575,12 +610,18 @@ def start_frozen_job(
     signal_start: str,
     signal_end_exclusive: str,
     *,
+    strategy_id: str | None = None,
+    computation_mode: str | None = None,
     environ: dict | None = None,
     now: datetime | None = None,
     spawn: SpawnFn | None = None,
     coverage_payload: dict[str, Any] | None = None,
     disk_free: int | None = None,
 ) -> tuple[dict[str, Any], int]:
+    try:
+        resolved_strategy = resolve_strategy_id(strategy_id)
+    except StrategyResolveError as exc:
+        return {"success": False, "error": str(exc)}, 400
     allowed = load_tradeable_51(universe_path(environ))
     cleaned, err = validate_symbols(symbols, allowed)
     if err or cleaned is None:
@@ -599,6 +640,34 @@ def start_frozen_job(
     if terr or testable is None:
         return {"success": False, "error": terr or "SYMBOL_NOT_TESTABLE"}, 400
     cleaned = testable
+
+    strategy_spec_hash = ""
+    ezm_computation_mode: str | None = None
+    if is_ezm_strategy(resolved_strategy):
+        try:
+            ezm_computation_mode = normalize_ezm_computation_mode(
+                computation_mode or EZM_COMPUTATION_MODE_EMA_PLUS_MICRO
+            )
+        except ValueError:
+            return {"success": False, "error": "INVALID_COMPUTATION_MODE"}, 400
+        import os as _os
+
+        env_map = environ if environ is not None else _os.environ
+        if str(env_map.get("STOCH_EZM_RUNNER_STUB") or "").strip():
+            strategy_spec_hash = "stub"
+        else:
+            try:
+                from .ezm_adapter import compile_ezm_contract
+
+                strategy_spec_hash = str(
+                    (compile_ezm_contract(environ) or {}).get("strategy_hash") or ""
+                )
+            except Exception as exc:  # noqa: BLE001
+                return {
+                    "success": False,
+                    "error": "EZM_COMPILE_FAILED",
+                    "detail": public_message(str(exc)),
+                }, 503
 
     root = jobs_root(environ)
     if disk_free is not None:
@@ -651,6 +720,9 @@ def start_frozen_job(
             created=created,
             environ=environ,
             resume=False,
+            strategy_id=resolved_strategy,
+            strategy_spec_hash=strategy_spec_hash,
+            computation_mode=ezm_computation_mode,
         )
         payload, code = _spawn_and_lock(job_id, directory, environ=environ, spawn=spawn)
         if code != 200:
@@ -659,7 +731,11 @@ def start_frozen_job(
         payload["symbols"] = cleaned
         payload["signal_start"] = window_iso(start)
         payload["signal_end_exclusive"] = window_iso(end)
-        payload["fixed_strategy_version"] = STRATEGY_VERSION
+        payload["strategy_id"] = resolved_strategy
+        payload["fixed_strategy_version"] = resolved_strategy
+        payload["run_intent"] = strategy_manifest_fields(resolved_strategy)["run_intent"]
+        if is_ezm_strategy(resolved_strategy):
+            payload["computation_mode"] = ezm_computation_mode
     return payload, code
 
 
@@ -682,12 +758,19 @@ def resume_frozen_job(
             return {"success": False, "error": "JOB_NOT_FOUND"}, 404
         request = read_json(req_path)
         status = read_json(status_path)
-        if str(request.get("fixed_strategy_version") or "") != STRATEGY_VERSION:
-            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
-        if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
-            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
-        if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
-            return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+        req_strategy = str(
+            request.get("strategy_id") or request.get("fixed_strategy_version") or STRATEGY_VERSION
+        )
+        if is_ezm_strategy(req_strategy):
+            if req_strategy != resolve_strategy_id(req_strategy):
+                return {"success": False, "error": "UNKNOWN_STRATEGY_ID"}, 400
+        else:
+            if req_strategy != STRATEGY_VERSION:
+                return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+            if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
+                return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
+            if str(request.get("causal_manifest_hash") or "") != CAUSAL_MANIFEST_HASH:
+                return {"success": False, "error": "LEGACY_WAVE_END_NON_CAUSAL"}, 409
         if str(status.get("state")) in JOB_ACTIVE_STATES:
             return {"success": False, "error": "JOB_STILL_ACTIVE"}, 409
         if str(status.get("state")) not in RESUME_STATES:
@@ -779,6 +862,7 @@ def handle_create_post(
         list(parsed.symbols),
         parsed.signal_start,
         parsed.signal_end_exclusive,
+        strategy_id=getattr(parsed, "strategy_id", None),
         environ=environ,
         now=now,
         spawn=spawn,

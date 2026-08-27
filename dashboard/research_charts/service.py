@@ -12,7 +12,7 @@ from typing import Any, Optional
 from .boundary import SUPPORTED_TIMEFRAMES
 from .clickhouse_source import SOURCE_NAME as CH_SOURCE_NAME
 from .clickhouse_source import ClickHouseResearchCandleSource
-from .collector_control import fetch_collector_status
+from .collector_control import fetch_collector_status, fetch_forming_candle
 from .data_source import MySQLResearchCandleSource, SOURCE_TF
 from .live_universe import classify_live_capability, is_live_configured, load_live_universe_symbols
 from .trp_import import load_trp
@@ -28,6 +28,14 @@ DEFAULT_LIMIT_BY_TF = {
     "30m": 1800,
     "1h": 2200,
     "4h": 1800,
+}
+_TF_SEC = {
+    "1m": 60,
+    "5m": 300,
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "4h": 14400,
 }
 # Pine `amount` is a newest-N box cap. Same cap on 1h/4h drops old extreme pools.
 LLD_AMOUNT_MULTIPLIER_BY_TF = {
@@ -136,6 +144,98 @@ def candles_to_payload(candles) -> list[dict[str, float | int]]:
     ]
 
 
+def apply_live_forming_tip(packed: dict[str, Any]) -> dict[str, Any]:
+    """Stamp collector forming price onto the candle tip (never cached).
+
+    ClickHouse 1m often lags the live forming bar by 1–2 minutes. Without this,
+    Research charts freeze on the last closed CH candle even while forming-bar
+    polls succeed.
+
+    Historical windows (explicit ``to`` / ``end`` far in the past) are left alone.
+    """
+    out = dict(packed)
+    candles = [dict(c) for c in (out.get("candles") or [])]
+    sym = str(out.get("symbol") or "").strip().upper()
+    tf = str(out.get("timeframe") or SOURCE_TF)
+    step = _TF_SEC.get(tf)
+    out["live_tip"] = False
+    if not sym or not step or not candles:
+        return out
+    # Do not mutate historical pinned ranges.
+    end_meta = out.get("to") or out.get("end")
+    try:
+        end_i = int(end_meta) if end_meta is not None else None
+    except (TypeError, ValueError):
+        end_i = None
+    if end_i is not None and end_i < int(time.time()) - 180:
+        out["forming"] = None
+        return out
+    try:
+        forming = fetch_forming_candle(sym, timeout=1.5)
+    except Exception:
+        forming = None
+    out["forming"] = forming
+    if not isinstance(forming, dict):
+        return out
+    try:
+        ft = int(forming["time"])
+        px = float(forming["close"])
+        hi = float(forming["high"] if forming.get("high") is not None else px)
+        lo = float(forming["low"] if forming.get("low") is not None else px)
+        vol = float(forming["volume"] if forming.get("volume") is not None else 0)
+    except (TypeError, ValueError, KeyError):
+        return out
+    if ft <= 0 or px <= 0:
+        return out
+    bucket = (ft // step) * step
+    last = candles[-1]
+    try:
+        last_t = int(last["time"])
+        last_o = float(last["open"])
+        last_h = float(last["high"])
+        last_l = float(last["low"])
+        last_c = float(last["close"])
+    except (TypeError, ValueError, KeyError):
+        return out
+
+    if last_t == bucket:
+        candles[-1] = {
+            **last,
+            "high": max(last_h, hi, px),
+            "low": min(last_l, lo, px),
+            "close": px,
+        }
+    elif last_t < bucket:
+        candles.append(
+            {
+                "time": bucket,
+                "open": last_c,
+                "high": max(last_c, hi, px),
+                "low": min(last_c, lo, px),
+                "close": px,
+                "volume": vol,
+            }
+        )
+        # Keep payload size stable for limit-based loads (drop oldest closed bar).
+        lim = out.get("limit")
+        try:
+            lim_i = int(lim) if lim is not None else None
+        except (TypeError, ValueError):
+            lim_i = None
+        if lim_i is not None and lim_i > 0 and len(candles) > lim_i:
+            candles = candles[-lim_i:]
+    else:
+        candles[-1] = {
+            **last,
+            "high": max(last_h, hi, px),
+            "low": min(last_l, lo, px),
+            "close": px,
+        }
+    out["candles"] = candles
+    out["live_tip"] = True
+    return out
+
+
 def _unix_to_dt(value: int | None) -> Optional[datetime]:
     if value is None:
         return None
@@ -231,7 +331,9 @@ def load_candles(
     cache_key = (sym, timeframe, start, end, lim)
     cached = _cache_get(cache_key)
     if cached is not None:
-        return _packed_from_cached(cached, sym, timeframe, src_name, start, end, lim, t0)
+        return apply_live_forming_tip(
+            _packed_from_cached(cached, sym, timeframe, src_name, start, end, lim, t0)
+        )
 
     leader = False
     with _inflight_lock:
@@ -245,11 +347,15 @@ def load_candles(
             raise TimeoutError("candle_coalesce_timeout")
         if slot["error"] is not None:
             raise slot["error"]
-        return slot["result"]
+        # Re-stamp forming on coalesced waiters so tip stays live.
+        return apply_live_forming_tip(dict(slot["result"] or {}))
     try:
-        packed = _load_candles_compute(
-            trp, sym, timeframe, start, end, lim, src_name, cache_key, t0, t_trp
+        packed = apply_live_forming_tip(
+            _load_candles_compute(
+                trp, sym, timeframe, start, end, lim, src_name, cache_key, t0, t_trp
+            )
         )
+        # Cache store happens inside _load_candles_compute without forming tip.
         slot["result"] = packed
         return packed
     except Exception as exc:
@@ -416,8 +522,10 @@ def resolve_candle_pack(
     cache_key = _cache_key(sym, timeframe, start, end, lim)
     cached = _cache_get(cache_key, allow_stale=allow_stale)
     if cached is not None:
-        return _packed_from_cached(
-            cached, sym, timeframe, candle_source_name(), start, end, lim, time.perf_counter()
+        return apply_live_forming_tip(
+            _packed_from_cached(
+                cached, sym, timeframe, candle_source_name(), start, end, lim, time.perf_counter()
+            )
         )
     return load_candles(symbol, timeframe, start=start, end=end, limit=limit)
 

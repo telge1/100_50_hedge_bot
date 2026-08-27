@@ -28,15 +28,18 @@ from stoch_fade_research_jobs.config import (  # noqa: E402
     CAUSAL_MANIFEST_HASH,
     CONFIRMATION_POLICY,
     COIN_TERM_GRACE_S,
+    EZM_STRATEGY_ID,
     REPO_ROOT,
     STRATEGY_VERSION,
     coin_timeout_s,
+    ezm_coin_timeout_s,
     sg_python,
 )
 from stoch_fade_research_jobs.jobs import (  # noqa: E402
     empty_coin_row,
     public_message,
 )
+from stoch_fade_research_jobs.strategy_resolve import is_ezm_strategy  # noqa: E402
 from worker_env import clickhouse_preflight, inject_worker_env, sg_python_preflight, PINNED_GOLD_ROOT  # noqa: E402
 
 TFS = ("15m", "30m", "1h", "4h")
@@ -176,6 +179,7 @@ def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
 
 def _aggregate(coins: list[dict[str, Any]]) -> dict[str, Any]:
     successful = [c for c in coins if c.get("state") in ("COMPLETED", "SKIPPED_RESUME_COMPLETE")]
+    incomplete = [c for c in coins if c.get("state") == "DATA_INCOMPLETE"]
     failed = [c for c in coins if c.get("state") in ("FAILED", "TIMEOUT", "INTERRUPTED")]
     tf_tot = {tf: {"raw": 0, "tier_a": 0} for tf in TFS}
     for c in successful:
@@ -186,6 +190,7 @@ def _aggregate(coins: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "coins_evaluated": len(coins),
         "successful_coins": len(successful),
+        "incomplete_coins": len(incomplete),
         "failed_coins": len(failed),
         "raw_candidates": sum(int(c.get("raw_total") or 0) for c in successful),
         "tier_a": sum(int(c.get("tier_a_total") or 0) for c in successful),
@@ -212,46 +217,112 @@ def run_job(job_dir: Path) -> int:
     symbols = list(request["selected_symbols"])
     start = str(request["signal_start"])
     end = str(request["signal_end_exclusive"])
+    strategy_id = str(
+        request.get("strategy_id") or request.get("fixed_strategy_version") or STRATEGY_VERSION
+    )
+    ezm_mode = is_ezm_strategy(strategy_id)
     python = str(sg_python())
-    timeout_s = coin_timeout_s()
+    timeout_s = ezm_coin_timeout_s() if ezm_mode else coin_timeout_s()
     log_path = job_dir / "worker.log"
     interrupted = {"flag": False}
     stubbed = bool(str(os.environ.get("STOCH_FADE_RUNNER_STUB") or "").strip())
-    interp = {"ok": True, "error_code": None} if stubbed else sg_python_preflight(os.environ)
-    preflight = clickhouse_preflight(os.environ)
-    if not interp.get("ok") or not preflight.get("ok"):
-        err = str(
-            interp.get("error_code")
-            or preflight.get("error_code")
-            or "CLICKHOUSE_PREFLIGHT_FAILED"
-        )
-        row = empty_coin_row(symbols[0]) if symbols else {}
-        if row:
-            row["state"] = "FAILED"
-            row["error_code"] = err
-            row["message"] = public_message(err)
-        status["coins"] = [row] if symbols else []
-        status["completed_coins"] = len(status["coins"])
-        status["failed_coins"] = len(status["coins"])
-        status["successful_coins"] = 0
-        status["state"] = "FAILED"
-        status["finished_at"] = iso_z(_utcnow())
-        status["worker_pid"] = None
-        status["message"] = row["message"]
-        status["error_summary"] = row["error_code"]
-        write_json_atomic(job_dir / "combined_summary.json", {"preflight": preflight, "failed_coins": len(status["coins"])})
-        write_json_atomic(job_dir / "status.json", status)
-        write_json_atomic(job_dir / "progress.json", {"coins": status["coins"]})
-        from stoch_fade_research_jobs.jobs import clear_lock
+    ezm_stubbed = bool(str(os.environ.get("STOCH_EZM_RUNNER_STUB") or "").strip())
 
-        clear_lock()
-        try:
-            import stoch_heavy_job_gate as heavy_gate
+    if ezm_mode:
+        # EZM needs ClickHouse + OA; skip SG gold python pin.
+        preflight = clickhouse_preflight(os.environ)
+        interp = {"ok": True, "error_code": None}
+        if ezm_stubbed:
+            preflight = {"ok": True}
+        if not preflight.get("ok"):
+            err = str(preflight.get("error_code") or "CLICKHOUSE_PREFLIGHT_FAILED")
+            row = empty_coin_row(symbols[0]) if symbols else {}
+            if row:
+                row["state"] = "FAILED"
+                row["error_code"] = err
+                row["message"] = public_message(err)
+            status["coins"] = [row] if symbols else []
+            status["completed_coins"] = len(status["coins"])
+            status["failed_coins"] = len(status["coins"])
+            status["successful_coins"] = 0
+            status["state"] = "FAILED"
+            status["finished_at"] = iso_z(_utcnow())
+            status["worker_pid"] = None
+            status["message"] = row.get("message") or err
+            status["error_summary"] = err
+            write_json_atomic(job_dir / "combined_summary.json", {"preflight": preflight})
+            write_json_atomic(job_dir / "status.json", status)
+            write_json_atomic(job_dir / "progress.json", {"coins": status["coins"]})
+            from stoch_fade_research_jobs.jobs import clear_lock
 
-            heavy_gate.release(str(request.get("job_id") or ""))
-        except Exception:
-            pass
-        return 1
+            clear_lock()
+            try:
+                import stoch_heavy_job_gate as heavy_gate
+
+                heavy_gate.release(str(request.get("job_id") or ""))
+            except Exception:
+                pass
+            return 1
+        ezm_contract: dict[str, Any] = {
+            "strategy_hash": str(request.get("strategy_spec_hash") or ""),
+        }
+        if not ezm_stubbed:
+            try:
+                from stoch_fade_research_jobs.ezm_adapter import compile_ezm_contract
+
+                ezm_contract = compile_ezm_contract()
+            except Exception as exc:  # noqa: BLE001
+                status["state"] = "FAILED"
+                status["finished_at"] = iso_z(_utcnow())
+                status["message"] = public_message(str(exc))
+                status["error_summary"] = "EZM_COMPILE_FAILED"
+                write_json_atomic(job_dir / "status.json", status)
+                from stoch_fade_research_jobs.jobs import clear_lock
+
+                clear_lock()
+                try:
+                    import stoch_heavy_job_gate as heavy_gate
+
+                    heavy_gate.release(str(request.get("job_id") or ""))
+                except Exception:
+                    pass
+                return 1
+    else:
+        interp = {"ok": True, "error_code": None} if stubbed else sg_python_preflight(os.environ)
+        preflight = clickhouse_preflight(os.environ)
+        if not interp.get("ok") or not preflight.get("ok"):
+            err = str(
+                interp.get("error_code")
+                or preflight.get("error_code")
+                or "CLICKHOUSE_PREFLIGHT_FAILED"
+            )
+            row = empty_coin_row(symbols[0]) if symbols else {}
+            if row:
+                row["state"] = "FAILED"
+                row["error_code"] = err
+                row["message"] = public_message(err)
+            status["coins"] = [row] if symbols else []
+            status["completed_coins"] = len(status["coins"])
+            status["failed_coins"] = len(status["coins"])
+            status["successful_coins"] = 0
+            status["state"] = "FAILED"
+            status["finished_at"] = iso_z(_utcnow())
+            status["worker_pid"] = None
+            status["message"] = row["message"]
+            status["error_summary"] = row["error_code"]
+            write_json_atomic(job_dir / "combined_summary.json", {"preflight": preflight, "failed_coins": len(status["coins"])})
+            write_json_atomic(job_dir / "status.json", status)
+            write_json_atomic(job_dir / "progress.json", {"coins": status["coins"]})
+            from stoch_fade_research_jobs.jobs import clear_lock
+
+            clear_lock()
+            try:
+                import stoch_heavy_job_gate as heavy_gate
+
+                heavy_gate.release(str(request.get("job_id") or ""))
+            except Exception:
+                pass
+            return 1
 
     def _on_term(_signum, _frame):
         interrupted["flag"] = True
@@ -272,19 +343,29 @@ def run_job(job_dir: Path) -> int:
         status["successful_coins"] = sum(
             1 for c in coins.values() if c.get("state") in ("COMPLETED", "SKIPPED_RESUME_COMPLETE")
         )
+        status["incomplete_coins"] = sum(
+            1 for c in coins.values() if c.get("state") == "DATA_INCOMPLETE"
+        )
         status["failed_coins"] = sum(
-            1 for c in coins.values() if c.get("state") in ("FAILED", "TIMEOUT", "INTERRUPTED")
+            1
+            for c in coins.values()
+            if c.get("state") in ("FAILED", "TIMEOUT", "INTERRUPTED")
         )
         status["raw_total"] = sum(int(c.get("raw_total") or 0) for c in coins.values())
         status["tier_a_total"] = sum(int(c.get("tier_a_total") or 0) for c in coins.values())
         status["progress_percent"] = int(100 * done / total)
         status["coins"] = [coins[s] for s in symbols]
+        status["strategy_id"] = strategy_id
         write_json_atomic(job_dir / "status.json", status)
         write_json_atomic(job_dir / "progress.json", {"coins": status["coins"]})
 
     status["state"] = "RUNNING"
     status["started_at"] = status.get("started_at") or iso_z(_utcnow())
-    flush(None, 0, "Frozen-Signale werden berechnet")
+    flush(
+        None,
+        0,
+        "EZM Candidate Discovery wird berechnet" if ezm_mode else "Frozen-Signale werden berechnet",
+    )
 
     for index, symbol in enumerate(symbols, start=1):
         if interrupted["flag"]:
@@ -320,6 +401,51 @@ def run_job(job_dir: Path) -> int:
         t0 = time.monotonic()
         out_root = job_dir / "coin_runs" / symbol
         out_root.mkdir(parents=True, exist_ok=True)
+
+        if ezm_mode:
+            from stoch_fade_research_jobs.ezm_adapter import run_ezm_coin
+
+            try:
+                # Soft timeout via alarm not used; rely on process wall if needed.
+                # Long EZM runs use ezm_coin_timeout_s for future hard wrappers.
+                _ = timeout_s
+                result_row = run_ezm_coin(
+                    symbol=symbol,
+                    signal_start=start,
+                    signal_end_exclusive=end,
+                    out_root=out_root,
+                    contract=ezm_contract,
+                    computation_mode=str(request.get("computation_mode") or ""),
+                )
+                duration = round(time.monotonic() - t0, 3)
+                row.update(result_row)
+                row["duration_seconds"] = duration
+                row["finished_at"] = iso_z(_utcnow())
+                if interrupted["flag"]:
+                    row["state"] = "INTERRUPTED"
+                    row["error_code"] = "INTERRUPTED"
+            except Exception as exc:  # noqa: BLE001
+                duration = round(time.monotonic() - t0, 3)
+                row["duration_seconds"] = duration
+                row["finished_at"] = iso_z(_utcnow())
+                row["state"] = "FAILED"
+                row["error_code"] = "EZM_RUNNER_FAILED"
+                row["message"] = public_message(str(exc))
+            coins[symbol] = row
+            _append_jsonl(
+                job_dir / "per_coin.jsonl",
+                {
+                    "symbol": symbol,
+                    "state": row["state"],
+                    "raw_total": row.get("raw_total"),
+                    "missing_sources": row.get("missing_sources"),
+                },
+            )
+            flush(symbol, index, f"{symbol} {row['state']}")
+            if interrupted["flag"]:
+                break
+            continue
+
         argv = runner_argv(python=python, symbol=symbol, start=start, end=end, out_root=str(out_root))
         outcome, rc = _run_coin_process(argv, REPO_ROOT, log_path, timeout_s)
         duration = round(time.monotonic() - t0, 3)
@@ -369,15 +495,24 @@ def run_job(job_dir: Path) -> int:
             break
 
     summary = _aggregate([coins[s] for s in symbols])
+    summary["strategy_id"] = strategy_id
+    summary["incomplete_coins"] = sum(
+        1 for s in symbols if coins[s].get("state") == "DATA_INCOMPLETE"
+    )
     write_json_atomic(job_dir / "combined_summary.json", summary)
     status["combined_summary"] = summary
     failed_n = summary["failed_coins"]
+    incomplete_n = int(summary.get("incomplete_coins") or 0)
     if interrupted["flag"]:
         status["state"] = "INTERRUPTED"
-    elif failed_n and summary["successful_coins"]:
+    elif failed_n and (summary["successful_coins"] or incomplete_n):
         status["state"] = "COMPLETED_WITH_ERRORS"
     elif failed_n:
         status["state"] = "FAILED"
+    elif incomplete_n and not summary["successful_coins"]:
+        status["state"] = "COMPLETED_WITH_ERRORS"
+    elif incomplete_n:
+        status["state"] = "COMPLETED_WITH_ERRORS"
     else:
         status["state"] = "COMPLETED"
     status["finished_at"] = iso_z(_utcnow())
@@ -387,7 +522,18 @@ def run_job(job_dir: Path) -> int:
     status["error_summary"] = ",".join(
         sorted({str((coins[s].get("error_code") or "")).strip() for s in symbols if coins[s].get("error_code")})
     )
-    status["message"] = status["error_summary"] or status["state"]
+    detail_msgs = [
+        str((coins[s].get("message") or "")).strip()
+        for s in symbols
+        if coins[s].get("error_code") and str((coins[s].get("message") or "")).strip()
+    ]
+    if detail_msgs:
+        # Surface concrete runner detail (e.g. ModuleNotFoundError) for Research UI.
+        status["message"] = detail_msgs[0] if len(set(detail_msgs)) == 1 else (
+            status["error_summary"] + " — " + detail_msgs[0]
+        )
+    else:
+        status["message"] = status["error_summary"] or status["state"]
     flush(None, len(symbols), status["message"])
     from stoch_fade_research_jobs.jobs import clear_lock
 

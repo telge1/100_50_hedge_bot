@@ -2945,9 +2945,43 @@ def render_template(template_name: str, context: dict) -> str:
 # Static files
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+# Compat aliases: older host/iframe URLs omitted the /static prefix and 404'd,
+# which left Research charts without chartApi.updateFormingBar (price appeared frozen).
+app.mount("/js", StaticFiles(directory=str(static_dir / "js")), name="static_js_alias")
+app.mount(
+    "/research_trp",
+    StaticFiles(directory=str(static_dir / "research_trp")),
+    name="static_research_trp_alias",
+)
 
-# Simple session storage (in production, use proper session management)
-sessions = {}
+# Simple session storage (persisted so dashboard restarts don't freeze live charts)
+_SESSIONS_PATH = Path(__file__).resolve().parent / "logs" / "sessions.json"
+sessions: dict = {}
+
+
+def _load_sessions() -> None:
+    global sessions
+    try:
+        if _SESSIONS_PATH.exists():
+            raw = json.loads(_SESSIONS_PATH.read_text(encoding="utf-8") or "{}")
+            if isinstance(raw, dict):
+                sessions = {str(k): v for k, v in raw.items() if isinstance(v, dict)}
+    except Exception as exc:
+        logger.warning("[AUTH] Could not load sessions from %s: %s", _SESSIONS_PATH, exc)
+        sessions = {}
+
+
+def _save_sessions() -> None:
+    try:
+        _SESSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _SESSIONS_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(sessions, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(_SESSIONS_PATH)
+    except Exception as exc:
+        logger.warning("[AUTH] Could not save sessions to %s: %s", _SESSIONS_PATH, exc)
+
+
+_load_sessions()
 
 # Pydantic models for request bodies
 class BotActionRequest(BaseModel):
@@ -3018,6 +3052,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
     import secrets
     session_id = secrets.token_urlsafe(32)
     sessions[session_id] = user
+    _save_sessions()
     
     response = RedirectResponse(url="/dashboard", status_code=302)
     response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=86400)  # 24 Stunden (statt 30 min)
@@ -3030,6 +3065,7 @@ async def logout(request: Request):
     session_id = request.cookies.get("session_id")
     if session_id and session_id in sessions:
         del sessions[session_id]
+        _save_sessions()
     
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("session_id")
@@ -3827,15 +3863,19 @@ async def api_stoch_signals(
         tier_param = t_raw
 
     sv = (strategy_version or "wave_fade_no_be50_v1").strip()
-    if sv == "wave_fade_frozen_f16ae32":
+    if sv in (
+        "wave_fade_frozen_f16ae32",
+        "wave_fade_frozen_f16ae32_causal_entry_v1",
+        "ema_zone_microstructure_confirmation_v1",
+    ):
         return JSONResponse(
             {
                 "success": False,
                 "error": "FROZEN_STRATEGY_REQUIRES_RESEARCH_JOB",
                 "source": "FROZEN_BASELINE",
                 "message": (
-                    "wave_fade_frozen_f16ae32 wird nicht auf den Collector-/ClickHouse-Feed gemappt. "
-                    "Bitte einen abgeschlossenen Frozen-Research-Job auswählen."
+                    f"{sv} wird nicht auf den Collector-/ClickHouse-Feed gemappt. "
+                    "Bitte einen abgeschlossenen Research-Job auswählen."
                 ),
                 "signals": [],
                 "items": [],

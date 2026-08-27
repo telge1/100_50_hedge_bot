@@ -17,10 +17,11 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "vp-3";
+  const ASSET_V = "live-16";
   const VP_KEY = "research.volume_profile";
   const OBP_KEY = "research.orderbook_profile";
   const VP_DEBOUNCE_MS = 400;
+  const OBP_REFRESH_MS = 60 * 1000;
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const STOCH_JOB_KEY = "stoch.research_job_id";
@@ -28,6 +29,8 @@
   const STOCH_EVAL_KEY = "stoch.research_evaluation_id";
   const POLL_MS = 5000;
   const FORMING_MS = 250;
+  const LIVE_DIAG = true;
+
   const TOOLS = [
     ["select", "Auswählen"],
     ["trend", "Trendlinie"],
@@ -51,6 +54,7 @@
     pollGen: 0,
     pollTimer: null,
     formingTimer: null,
+    obpRefreshTimer: null,
     loadGen: 0,
     loadAbort: null,
     initialLoadDone: false,
@@ -68,7 +72,7 @@
     phase: "IFRAME_LOADING",
     hostShift: false,
     vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
-    obp: { enabled: false, width: "normal", mode: "visible_range" },
+    obp: { enabled: false, width: "normal", mode: "snapshot_at" },
     history: {
       preset: "30d",
       customStart: "",
@@ -228,6 +232,20 @@
       return;
     }
     hint.textContent = "Geladen UTC: " + fmtUtc(r.from) + " → " + fmtUtc(r.to);
+  }
+
+  /** Freeze live forming/poll only for true historical pins (past custom/backtest end). */
+  function historyBlocksLive() {
+    if (!state.history || !state.history.pinned) return false;
+    const preset = state.history.preset || "30d";
+    // Rolling / N-day presets are live windows ending at "now".
+    if (preset === "rolling" || preset === "7d" || preset === "30d" || preset === "90d") {
+      return false;
+    }
+    const to = state.history.loadedTo;
+    if (to == null) return false;
+    const now = Math.floor(Date.now() / 1000);
+    return (now - Number(to)) > 300;
   }
 
   async function reloadVisibleHistory(opts) {
@@ -496,7 +514,8 @@
   }
 
   async function getJson(url, meta) {
-    const info = logReq(Object.assign({
+    const silent = !!(meta && meta.silent);
+    const info = silent ? null : logReq(Object.assign({
       method: "GET",
       url: url,
       symbol: state.symbol,
@@ -506,7 +525,7 @@
       generation: state.loadGen,
     }, meta || {}));
     if (inflightGets[url]) {
-      info.coalesced = true;
+      if (info) info.coalesced = true;
       return inflightGets[url];
     }
     const pending = (async function () {
@@ -659,9 +678,21 @@
     Object.keys(prev).forEach(function (id) {
       if (!wanted[id]) chart.removeOverlay(id);
     });
+    function overlayFp(p) {
+      // Avoid JSON.stringify of multi-MB EZM metadata on every sync.
+      return [
+        p.type || "",
+        p.shape || "",
+        p.timestamp || "",
+        p.price || "",
+        p.text || "",
+        (p.style && p.style.color) || "",
+        p.visible === false ? "0" : "1",
+      ].join("|");
+    }
     Object.keys(wanted).forEach(function (id) {
       if (!prev[id]) chart.addOverlay(wanted[id]);
-      else if (JSON.stringify(prev[id]) !== JSON.stringify(wanted[id])) chart.updateOverlay(wanted[id]);
+      else if (overlayFp(prev[id]) !== overlayFp(wanted[id])) chart.updateOverlay(wanted[id]);
     });
     pane.overlayPayloads = wanted;
     pane.pendingOverlays = list;
@@ -990,14 +1021,17 @@
   }
 
   function defaultOrderbookProfile() {
-    return { enabled: false, width: "normal", mode: "visible_range" };
+    return { enabled: false, width: "normal", mode: "snapshot_at" };
   }
 
   function readStoredOrderbookProfile() {
     try {
       const raw = localStorage.getItem(OBP_KEY);
       if (!raw) return defaultOrderbookProfile();
-      return Object.assign(defaultOrderbookProfile(), JSON.parse(raw));
+      const out = Object.assign(defaultOrderbookProfile(), JSON.parse(raw));
+      // Always current snapshot in the UI (ignore legacy history mashup).
+      out.mode = "snapshot_at";
+      return out;
     } catch (e) {
       return defaultOrderbookProfile();
     }
@@ -1020,9 +1054,11 @@
     fillOrderbookProfileControls();
     if (!skipPersist) persistOrderbookProfile();
     if (!state.obp.enabled) {
+      stopOrderbookProfileRefresh();
       visibleIds().forEach(function (pid) { clearPaneOrderbookProfile(state.panes[pid]); });
       return;
     }
+    startOrderbookProfileRefresh();
     visibleIds().forEach(function (pid) { scheduleOrderbookProfile(state.panes[pid]); });
   }
 
@@ -1055,6 +1091,29 @@
     }, VP_DEBOUNCE_MS);
   }
 
+  function refreshOrderbookProfileVisible() {
+    if (!state.obp || !state.obp.enabled) return;
+    visibleIds().forEach(function (pid) {
+      scheduleOrderbookProfile(state.panes[pid]);
+    });
+  }
+
+  function stopOrderbookProfileRefresh() {
+    if (state.obpRefreshTimer) {
+      clearInterval(state.obpRefreshTimer);
+      state.obpRefreshTimer = null;
+    }
+  }
+
+  function startOrderbookProfileRefresh() {
+    stopOrderbookProfileRefresh();
+    if (!state.obp || !state.obp.enabled) return;
+    state.obpRefreshTimer = setInterval(function () {
+      if (!state.obp || !state.obp.enabled || !state.initialLoadDone) return;
+      refreshOrderbookProfileVisible();
+    }, OBP_REFRESH_MS);
+  }
+
   async function refreshPaneOrderbookProfile(pane) {
     if (!pane || !state.obp || !state.obp.enabled || !state.symbol) {
       clearPaneOrderbookProfile(pane);
@@ -1073,12 +1132,15 @@
       try { pane.obpAbort.abort(); } catch (e) {}
     }
     pane.obpAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const tip = Number(range.lastCandle) + step;
+    const nowSec = Math.floor(Date.now() / 1000);
+    // Live tip → use wall-clock now; scrolled history → as-of right edge.
+    const atSec = (nowSec - tip <= 180) ? nowSec : Math.floor(tip);
     let url = "/api/research/orderbook-profile?symbol=" + encodeURIComponent(state.symbol) +
       "&start=" + encodeURIComponent(String(start)) +
-      "&end=" + encodeURIComponent(String(end));
-    if (state.selectedUnix != null && state.obp.mode === "snapshot_at") {
-      url += "&at=" + encodeURIComponent(String(Math.floor(Number(state.selectedUnix))));
-    }
+      "&end=" + encodeURIComponent(String(Math.max(end, atSec + 1))) +
+      "&at=" + encodeURIComponent(String(atSec)) +
+      "&mode=snapshot_at";
     try {
       const body = await getJson(url, {
         sourceAction: "orderbook-profile",
@@ -1089,10 +1151,30 @@
       if (gen !== pane.obpGen) return;
       if (!state.obp.enabled) return;
       const live = api(pane);
-      if (live && live.setOrderbookProfile) live.setOrderbookProfile(body, obpSettingsPayload());
+      if (live && live.setOrderbookProfile) {
+        live.setOrderbookProfile(body, obpSettingsPayload());
+      } else {
+        setStatus("Orderbook Profile: Chart-API fehlt (iframe neu laden)", "error");
+      }
+      if (body && body.warning === "no_wall_data") {
+        setStatus("Orderbook Walls: keine aktuellen Daten", "empty");
+      } else if (body && body.bar_count > 0) {
+        const src = body.profile_kind === "ob200_multi_walls" ? "OB200" : "Features";
+        const ob = body.ob200 || {};
+        const live = ob.live_open ? " · live" : "";
+        const lag = (ob.live_open && ob.lag_seconds != null) ? (" · lag " + Math.round(ob.lag_seconds) + "s") : "";
+        const clamp = body.warning === "ob200_clamped_to_coverage_end" ? " · clamped" : "";
+        setStatus(
+          "Orderbook Walls · " + src + live + " · " + body.bar_count +
+            " (B" + (body.bid_count || 0) + "/A" + (body.ask_count || 0) +
+            (body.as_of ? " @" + fmtUtc(body.as_of) : "") + lag + clamp + ")",
+          body.warning ? "empty" : ""
+        );
+      }
     } catch (err) {
       if (err && err.name === "AbortError") return;
       if (gen !== pane.obpGen) return;
+      setStatus("Orderbook Profile fehlgeschlagen: " + String((err && err.message) || err), "error");
     }
   }
 
@@ -1228,6 +1310,46 @@
     }
   }
 
+  function btStrategy() {
+    const el = $("researchBtStrategy");
+    return el ? el.value : "stoch_fade";
+  }
+
+  function ezmLayerMode() {
+    const el = $("researchEzmLayerMode");
+    return el ? el.value : "both";
+  }
+
+  function ezmComputationMode() {
+    const el = $("researchEzmComputationMode");
+    return el ? el.value : "ema_plus_microstructure";
+  }
+
+  function ezmComputationModeLabel(mode) {
+    if (mode === "ema_only") return "Nur EMA";
+    return "EMA plus Orderbuch";
+  }
+
+  function ezmLayerModeLabel(mode) {
+    if (mode === "ema_only") return "Nur EMA";
+    if (mode === "micro_only") return "Nur Mikrostruktur";
+    return "EMA und Mikrostruktur";
+  }
+
+  function syncEzmLayerUi(snap) {
+    const isEzm = btStrategy() === "ema_zone_microstructure_confirmation_v1";
+    const wrap = $("researchEzmLayerWrap");
+    const compWrap = $("researchEzmComputationWrap");
+    const legend = $("researchEzmLegend");
+    const sel = $("researchEzmLayerMode");
+    if (wrap) wrap.hidden = !isEzm;
+    if (compWrap) compWrap.hidden = !isEzm;
+    if (legend) legend.hidden = !isEzm;
+    if (!isEzm) return;
+    const ez = (snap && snap.ezm) || (state.workspace && state.workspace.ezm) || {};
+    if (sel && ez.layer_mode) sel.value = ez.layer_mode;
+  }
+
   function applyWorkspace(snap) {
     if (!snap || snap.success === false) return;
     state.workspace = snap;
@@ -1246,6 +1368,7 @@
     const ema = snap.ema || { lines: [] };
     const enabled = (ema.lines || []).filter(function (l) { return l.enabled; }).map(function (l) { return "EMA" + l.period; });
     $("trpEmaSummary").textContent = enabled.length ? enabled.join(", ") : "off";
+    syncEzmLayerUi(snap);
     const mode = toolMode();
     PANE_IDS.forEach(function (pid) {
       const pane = state.panes[pid];
@@ -1491,6 +1614,21 @@
       const ready = api(pane);
       if (ready && ready.resetView) ready.resetView();
     }
+    // Stamp live tip immediately so higher TFs don't sit on a frozen closed bar.
+    if (!historyBlocksLive()) {
+      if (packed.forming) {
+        applyFormingToPane(pane, packed.forming);
+      } else if (packed.live_tip && (packed.candles || []).length) {
+        const tip = packed.candles[packed.candles.length - 1];
+        applyFormingToPane(pane, {
+          time: tip.time,
+          open: tip.open,
+          high: tip.high,
+          low: tip.low,
+          close: tip.close,
+        });
+      }
+    }
     scheduleVolumeProfile(pane);
     scheduleOrderbookProfile(pane);
   }
@@ -1582,6 +1720,9 @@
       if (gen !== state.pollGen || !state.initialLoadDone) return;
       pollForming(gen);
     }, FORMING_MS);
+    // Immediate first tick so price moves without waiting for the interval.
+    pollForming(gen);
+    if (state.obp && state.obp.enabled) startOrderbookProfileRefresh();
   }
 
   function formingBarForTf(forming, tfSec, lastCandle) {
@@ -1589,54 +1730,226 @@
     const px = Number(forming && forming.close);
     if (!Number.isFinite(t1) || !Number.isFinite(px) || !tfSec) return null;
     const bucket = Math.floor(t1 / tfSec) * tfSec;
-    if (!lastCandle || Number(lastCandle.time) < bucket) {
-      const o = lastCandle ? Number(lastCandle.close) : Number(forming.open);
+    const fHigh = Number(forming.high);
+    const fLow = Number(forming.low);
+    const hi = Number.isFinite(fHigh) ? fHigh : px;
+    const lo = Number.isFinite(fLow) ? fLow : px;
+
+    if (!lastCandle) {
+      const o = Number(forming.open);
       return {
         time: bucket,
-        open: o,
-        high: Math.max(o, px, Number(forming.high) || px),
-        low: Math.min(o, px, Number(forming.low) || px),
+        open: Number.isFinite(o) ? o : px,
+        high: Math.max(px, hi),
+        low: Math.min(px, lo),
         close: px,
       };
     }
-    if (Number(lastCandle.time) === bucket) {
+
+    const lastT = Number(lastCandle.time);
+    if (!Number.isFinite(lastT)) return null;
+
+    // Normal: extend / update current TF bucket.
+    if (lastT === bucket) {
       return {
         time: bucket,
         open: Number(lastCandle.open),
-        high: Math.max(Number(lastCandle.high), Number(forming.high) || px, px),
-        low: Math.min(Number(lastCandle.low), Number(forming.low) || px, px),
+        high: Math.max(Number(lastCandle.high), hi, px),
+        low: Math.min(Number(lastCandle.low), lo, px),
         close: px,
       };
     }
-    return null;
+    // Gap: CH lags behind forming → open a new tip bucket.
+    if (lastT < bucket) {
+      const o = Number(lastCandle.close);
+      return {
+        time: bucket,
+        open: Number.isFinite(o) ? o : px,
+        high: Math.max(o, hi, px),
+        low: Math.min(o, lo, px),
+        close: px,
+      };
+    }
+    // Desync: tip candle is ahead of forming timestamp → still paint live price on tip.
+    return {
+      time: lastT,
+      open: Number(lastCandle.open),
+      high: Math.max(Number(lastCandle.high), hi, px),
+      low: Math.min(Number(lastCandle.low), lo, px),
+      close: px,
+    };
   }
 
+  function postLiveDiag(row) {
+    if (!LIVE_DIAG) return;
+    try {
+      fetch("/api/research/live-diag", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ t: Date.now() }, row || {})),
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function applyFormingToPane(pane, forming) {
+    const diag = {
+      symbol: state.symbol,
+      pane: pane && pane.id,
+      tf: pane && pane.tf,
+      forming_close: forming && forming.close,
+      forming_time: forming && forming.time,
+      poll_gen: state.pollGen,
+      blocked_history: !!historyBlocksLive(),
+    };
+    function emit(reason, extra) {
+      // Always log failures; throttle successful paints to keep the ring useful.
+      if (reason === "painted" || reason === "skipped_unchanged") {
+        const now = Date.now();
+        const key = "_diagOkAt_" + reason;
+        if (pane && now - (pane[key] || 0) < 1500 && reason === "skipped_unchanged") return;
+        if (pane && reason === "painted") {
+          const closeKey = String(diag.bar_close);
+          if (pane._diagPaintClose === closeKey && now - (pane._diagOkAt_painted || 0) < 2000) return;
+          pane._diagPaintClose = closeKey;
+          pane._diagOkAt_painted = now;
+        } else if (pane) {
+          pane[key] = now;
+        }
+      }
+      postLiveDiag(Object.assign({}, diag, extra || {}, { reason: reason }));
+    }
+    if (!pane || !pane.tf) {
+      emit("no_pending", { detail: "no_pane" });
+      return false;
+    }
+    if (!pane.pendingData || !(pane.pendingData.candles || []).length) {
+      emit("no_pending");
+      return false;
+    }
+    const candles = pane.pendingData.candles;
+    const last = candles[candles.length - 1];
+    diag.last_time = last && last.time;
+    diag.last_close = last && last.close;
+    const bar = formingBarForTf(forming, TF_SEC[pane.tf] || 60, last);
+    if (!bar) {
+      emit("no_pending", { detail: "formingBar_null" });
+      return false;
+    }
+    diag.bar_time = bar.time;
+    diag.bar_close = bar.close;
+    const prev = candles[candles.length - 1];
+    const unchanged = !!(
+      prev &&
+      Number(prev.time) === Number(bar.time) &&
+      Number(prev.open) === Number(bar.open) &&
+      Number(prev.high) === Number(bar.high) &&
+      Number(prev.low) === Number(bar.low) &&
+      Number(prev.close) === Number(bar.close)
+    );
+    const chart = api(pane);
+    if (!chart) {
+      emit("no_chart_api", { unchanged: unchanged });
+      return false;
+    }
+    // Paint the series BEFORE mutating pendingData. pendingData === chart lastPayload
+    // (same object); pre-mutating made updateFormingBar think OHLC was unchanged and
+    // only move the live price line.
+    let painted = false;
+    let updateOk = null;
+    if (chart.updateFormingBar) {
+      updateOk = !!chart.updateFormingBar(bar);
+      painted = updateOk;
+      if (!updateOk) emit("update_false", { unchanged: unchanged });
+    } else {
+      emit("no_chart_api", { detail: "missing_updateFormingBar" });
+    }
+    if (!unchanged) {
+      if (prev && Number(prev.time) === Number(bar.time)) {
+        candles[candles.length - 1] = Object.assign({}, prev, bar);
+      } else if (prev && Number(bar.time) > Number(prev.time)) {
+        candles.push(bar);
+      } else {
+        candles[candles.length - 1] = Object.assign({}, prev, bar);
+      }
+      pane.pendingData.candles = candles;
+    }
+    // If incremental update is unavailable/rejected, push full tip via setData (throttled).
+    if (!painted && chart.setData) {
+      const now = Date.now();
+      if (now - (pane._lastFormingSetDataAt || 0) >= 400) {
+        pane._lastFormingSetDataAt = now;
+        chart.setData(pane.pendingData, { preserveView: true, skipDefaultView: true });
+        painted = true;
+        emit("setdata_fallback", { unchanged: unchanged });
+      }
+    }
+    if (painted) {
+      emit("painted", { unchanged: unchanged, updateOk: updateOk });
+    } else if (unchanged) {
+      emit("skipped_unchanged");
+    } else {
+      emit("update_false", { detail: "unpainted_changed", unchanged: unchanged });
+    }
+    if (painted || !unchanged) {
+      const st = pane.el && pane.el.querySelector(".trp-pane-status");
+      if (st) st.textContent = "live " + Number(bar.close);
+    }
+    return painted || !unchanged;
+  }
+
+  let formingInflight = null;
+  let formingWantRestart = false;
   async function pollForming(gen) {
     if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
-    if (state.history.pinned) return;
-    const body = await getJson(
-      "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol)
-    ).catch(function () { return null; });
-    if (gen !== state.pollGen) return;
-    const forming = body && body.forming;
-    if (!forming) return;
-    visibleIds().forEach(function (pid) {
-      const pane = state.panes[pid];
-      if (!pane || pane.tf !== "1m") return;
-      if (!pane.pendingData || !(pane.pendingData.candles || []).length) return;
-      const candles = pane.pendingData.candles;
-      const last = candles[candles.length - 1];
-      const bar = formingBarForTf(forming, TF_SEC[pane.tf] || 60, last);
-      if (!bar) return;
-      if (Number(bar.time) < Number(last.time)) return;
-      if (Number(candles[candles.length - 1].time) === bar.time) {
-        candles[candles.length - 1] = Object.assign({}, candles[candles.length - 1], bar);
-      } else {
-        candles.push(bar);
-      }
-      const chart = api(pane);
-      if (chart && chart.updateFormingBar) chart.updateFormingBar(bar);
-    });
+    if (historyBlocksLive()) {
+      postLiveDiag({
+        reason: "blocked_history",
+        symbol: state.symbol,
+        pinned: !!(state.history && state.history.pinned),
+        preset: state.history && state.history.preset,
+      });
+      return;
+    }
+    if (formingInflight) {
+      formingWantRestart = true;
+      return;
+    }
+    formingInflight = true;
+    try {
+      do {
+        formingWantRestart = false;
+        let formingStatus = 0;
+        const body = await fetch(
+          "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol),
+          { credentials: "same-origin" }
+        ).then(async function (res) {
+          formingStatus = res.status;
+          const j = await res.json().catch(function () { return null; });
+          if (!res.ok) return null;
+          return j;
+        }).catch(function () { return null; });
+        if (gen !== state.pollGen) return;
+        if (formingStatus === 401) {
+          const now = Date.now();
+          if (now - (pollForming._lastAuthDiagAt || 0) >= 3000) {
+            pollForming._lastAuthDiagAt = now;
+            postLiveDiag({ reason: "auth_401", symbol: state.symbol, status: 401 });
+          }
+          continue;
+        }
+        const forming = body && body.forming;
+        if (!forming) {
+          postLiveDiag({ reason: "no_forming", symbol: state.symbol, status: formingStatus });
+          continue;
+        }
+        visibleIds().forEach(function (pid) {
+          applyFormingToPane(state.panes[pid], forming);
+        });
+      } while (formingWantRestart && gen === state.pollGen);
+    } finally {
+      formingInflight = null;
+    }
   }
 
   async function pollIncremental(gen) {
@@ -1655,7 +1968,7 @@
     const pane = state.panes[paneId];
     if (!pane || !state.symbol) return;
     if (gen !== state.pollGen) return;
-    if (state.history.pinned) return;
+    if (historyBlocksLive()) return;
     const last = lastClosedBarTime(pane);
     if (last == null || !pane.pendingData) return;
     let url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
@@ -1669,18 +1982,52 @@
     if (gen !== state.pollGen || pane.el.querySelector(".trp-pane-symbol").textContent !== state.symbol) return;
     const incoming = packed.candles || [];
     if (!incoming.length) return;
+    const step = TF_SEC[pane.tf] || 60;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const oldTip = (pane.pendingData.candles || [])[(pane.pendingData.candles || []).length - 1] || null;
     const byTime = {};
     (pane.pendingData.candles || []).forEach(function (c) { byTime[c.time] = c; });
     incoming.forEach(function (c) { byTime[c.time] = c; });
+    // Keep unfinished live tip if poll returned only lagged CH bars.
+    if (oldTip && Number(oldTip.time) + step > nowSec) {
+      const t = Number(oldTip.time);
+      const cur = byTime[t];
+      if (!cur) {
+        byTime[t] = oldTip;
+      } else {
+        byTime[t] = Object.assign({}, cur, {
+          high: Math.max(Number(cur.high), Number(oldTip.high)),
+          low: Math.min(Number(cur.low), Number(oldTip.low)),
+          close: Number(oldTip.close),
+        });
+      }
+    }
     const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; }).map(function (t) { return byTime[t]; });
     const nextClosed = closedCandleFingerprint(merged, pane.tf);
-    if (nextClosed === pane.closedFp) return;
+    if (nextClosed === pane.closedFp) {
+      // Still refresh live tip from poll payload if server stamped forming.
+      if (packed.live_tip && packed.forming) applyFormingToPane(pane, packed.forming);
+      return;
+    }
     pane.pendingData = Object.assign({}, pane.pendingData, { candles: merged });
     pane.lastTimes = new Set(merged.map(function (c) { return c.time; }));
     pane.candleFp = candleFingerprint(merged);
     pane.closedFp = nextClosed;
     const chart = api(pane);
     if (chart) chart.setData(pane.pendingData, { preserveView: true });
+    if (packed.forming) {
+      applyFormingToPane(pane, packed.forming);
+    } else {
+      try {
+        const formingBody = await getJson(
+          "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol),
+          { sourceAction: "forming-after-poll", silent: true }
+        );
+        if (gen === state.pollGen && formingBody && formingBody.forming) {
+          applyFormingToPane(pane, formingBody.forming);
+        }
+      } catch (e) {}
+    }
   }
 
   async function refreshLiveBar(ensure) {
@@ -2016,8 +2363,10 @@
         fillOrderbookProfileControls();
         sendJson("/api/research/settings", "PUT", { orderbook_profile: state.obp }, { sourceAction: "obp-settings" }).catch(function () {});
         if (!state.obp.enabled) {
+          stopOrderbookProfileRefresh();
           visibleIds().forEach(function (pid) { clearPaneOrderbookProfile(state.panes[pid]); });
         } else {
+          startOrderbookProfileRefresh();
           visibleIds().forEach(function (pid) { scheduleOrderbookProfile(state.panes[pid]); });
         }
       });
@@ -2070,23 +2419,41 @@
     }
     bindHeightDrag();
 
-    function btStrategy() {
-      const el = $("researchBtStrategy");
-      return el ? el.value : "stoch_fade";
+    async function applyEzmLayerMode(mode) {
+      if (!state.symbol) return;
+      const snap = await sendJson("/api/research/backtester/load", "POST", {
+        strategy_id: "ema_zone_microstructure_confirmation_v1",
+        symbol: state.symbol,
+        ezm_layer_mode: mode,
+        layer_only: true,
+      }, { sourceAction: "ezm-layer" });
+      applyWorkspace(snap);
+      syncEzmLayerUi(snap);
+      await refreshOverlaysVisible();
+      const ez = snap.ezm || {};
+      setStatus(
+        "EZM " + ezmLayerModeLabel(mode) + " · "
+          + (ez.n_setup_markers || 0) + " Setup · "
+          + (ez.n_micro_markers || 0) + " Micro · keine Trades/PnL"
+      );
     }
 
     function syncBtStrategyUi() {
       const sid = btStrategy();
       const isCsw = sid === "cluster_sweep_ema_9_20_59";
       const isEdc = sid === "ema_dual_cross_multisource_v1";
+      const isEzm = sid === "ema_zone_microstructure_confirmation_v1";
       if ($("researchBtRunBtn")) {
-        $("researchBtRunBtn").hidden = !(isCsw || isEdc);
-        $("researchBtRunBtn").title = isEdc ? "EMA Dual Cross Backtest starten" : "Cluster-Sweep Backtest starten";
+        $("researchBtRunBtn").hidden = !(isCsw || isEdc || isEzm);
+        if (isEzm) $("researchBtRunBtn").title = "EZM Candidate Discovery starten";
+        else if (isEdc) $("researchBtRunBtn").title = "EMA Dual Cross Backtest starten";
+        else $("researchBtRunBtn").title = "Cluster-Sweep Backtest starten";
       }
       if ($("researchCswSettingsBtn")) $("researchCswSettingsBtn").hidden = !isCsw;
       if ($("researchCswNav")) $("researchCswNav").hidden = !isCsw;
       if ($("researchEdcSettingsBtn")) $("researchEdcSettingsBtn").hidden = !isEdc;
       if ($("researchEdcNav")) $("researchEdcNav").hidden = !isEdc;
+      syncEzmLayerUi(state.workspace);
       applyResearchJobSourceNote();
     }
 
@@ -2188,7 +2555,155 @@
       }
     }
 
+    function unixToIsoMinuteZ(unix) {
+      const d = new Date(Math.floor(Number(unix)) * 1000);
+      const p = (n) => String(n).padStart(2, "0");
+      return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate())
+        + "T" + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + ":00Z";
+    }
+
+    function resolveEzmWindowIso() {
+      readHistoryFromUi();
+      let from = state.history.loadedFrom;
+      let to = state.history.loadedTo;
+      if (from == null || to == null) {
+        const range = computeHistoryRangeUnix();
+        from = range.from;
+        to = range.to;
+      }
+      if (from == null || to == null || !(Number(to) > Number(from))) {
+        return null;
+      }
+      // Floor to UTC minutes; end is exclusive signal window end.
+      const startUnix = Math.floor(Number(from) / 60) * 60;
+      let endUnix = Math.floor(Number(to) / 60) * 60;
+      if (endUnix <= startUnix) endUnix = startUnix + 60;
+      return {
+        start: unixToIsoMinuteZ(startUnix),
+        end: unixToIsoMinuteZ(endUnix),
+        from: startUnix,
+        to: endUnix,
+      };
+    }
+
+    function ezmCoinFailureDetail(job) {
+      const coin = (job.coins && job.coins[0]) || {};
+      const st = String(coin.state || "");
+      const msg = String(coin.message || coin.error_code || job.error_summary || job.message || st || "");
+      if (st === "DATA_INCOMPLETE" && msg.indexOf("orderbook_ob200_v3_raw") >= 0
+          && ezmComputationMode() === "ema_only") {
+        return msg + " — Job lief vermutlich ohne computation_mode=ema_only (Dashboard neu starten, dann erneut starten)";
+      }
+      if (st === "DATA_INCOMPLETE" && msg.indexOf("orderbook_ob200_v3_raw") >= 0) {
+        return msg + " — für Nur-EMA: Prüfung auf «Nur EMA» stellen (nicht nur Anzeige)";
+      }
+      return msg || st || String(job.state || "FAILED");
+    }
+
+    function formatEzmJobStatus(job) {
+      const jobState = job.state || "?";
+      const pct = job.progress_percent != null ? (job.progress_percent + "%") : "–";
+      const sym = job.current_symbol || state.symbol || "–";
+      const win = (job.signal_start && job.signal_end_exclusive)
+        ? (job.signal_start + " → " + job.signal_end_exclusive)
+        : "";
+      const coin = (job.coins && job.coins[0]) || {};
+      const cov = coin.state || coin.error_code || "";
+      const fail = job.failed_coins != null ? (" · fail=" + job.failed_coins) : "";
+      const msg = coin.message || job.message || job.error_summary || "";
+      return "EZM " + jobState + " · " + pct + " · " + sym
+        + (win ? (" · " + win) : "")
+        + (cov ? (" · " + cov) : "")
+        + fail
+        + (msg ? (" — " + msg) : "");
+    }
+
+    async function pollEzmJob(jobId) {
+      const url = "/api/research/ezm/status?job_id=" + encodeURIComponent(jobId);
+      const res = await fetch(url, { credentials: "same-origin" });
+      const body = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw httpError(res, body, url);
+      return body;
+    }
+
+    async function runEzmCandidateDiscovery() {
+      if (!state.symbol) return;
+      if (state._ezmPollTimer) {
+        clearTimeout(state._ezmPollTimer);
+        state._ezmPollTimer = null;
+      }
+      const win = resolveEzmWindowIso();
+      if (!win) {
+        setStatus("EZM: History-Zeitraum laden (Preset/Custom anwenden)", "error");
+        return;
+      }
+      const body = {
+        symbol: state.symbol,
+        start: win.start,
+        end: win.end,
+        strategy_id: "ema_zone_microstructure_confirmation_v1",
+        computation_mode: ezmComputationMode(),
+      };
+      setStatus(
+        "EZM Candidate Discovery startet · "
+          + ezmComputationModeLabel(body.computation_mode) + " · "
+          + body.symbol + " · " + body.start + " → " + body.end
+      );
+      try {
+        const started = await sendJson("/api/research/ezm/run", "POST", body, { sourceAction: "ezm-run" });
+        const jobId = started.job_id;
+        if (!jobId) throw new Error(started.error || "job_id missing");
+        state._ezmJobId = jobId;
+        setStatus(formatEzmJobStatus(Object.assign({}, started, {
+          signal_start: started.signal_start || body.start,
+          signal_end_exclusive: started.signal_end_exclusive || body.end,
+        })));
+
+        const terminal = { COMPLETED: 1, COMPLETED_WITH_ERRORS: 1, FAILED: 1, CANCELLED: 1 };
+        const pollOnce = async function () {
+          const job = await pollEzmJob(jobId);
+          setStatus(formatEzmJobStatus(job));
+          const st = String(job.state || "");
+          if (terminal[st]) {
+            state._ezmPollTimer = null;
+            const coin = (job.coins && job.coins[0]) || {};
+            const coinState = String(coin.state || "");
+            if (st === "FAILED" || st === "CANCELLED" || coinState === "DATA_INCOMPLETE" || coinState === "FAILED") {
+              setStatus("EZM fehlgeschlagen: " + ezmCoinFailureDetail(job), "error");
+              return;
+            }
+            const snap = await sendJson("/api/research/ezm/import", "POST", {
+              job_id: jobId,
+              symbol: state.symbol,
+            }, { sourceAction: "ezm-import" });
+            applyWorkspace(snap);
+            const ez = snap.ezm_result || {};
+            const ezmSnap = snap.ezm || {};
+            const n = ez.n_markers != null ? ez.n_markers : (ezmSnap.n_markers_total || ezmSnap.n_markers || 0);
+            setStatus(
+              "EZM bereit · " + n + " Marker · "
+                + (ezmSnap.n_ema_setup_events || 0) + " Setup · "
+                + (ezmSnap.n_micro_events || 0) + " Micro · Job " + jobId
+                + " · Backtester klicken"
+                + (st === "COMPLETED_WITH_ERRORS" ? " · mit Fehlern" : "")
+            );
+            await syncChartAfterBacktest(body.start, body.end, null);
+            return;
+          }
+          state._ezmPollTimer = setTimeout(function () {
+            pollOnce().catch(function (err) {
+              setStatus("EZM Statusfehler: " + (err.message || err), "error");
+            });
+          }, 3000);
+        };
+        await pollOnce();
+      } catch (err) {
+        setStatus("EZM Start fehlgeschlagen: " + (err.message || err), "error");
+      }
+    }
+
     async function runActiveBacktest() {
+      if (btStrategy() === "ema_zone_microstructure_confirmation_v1") return runEzmCandidateDiscovery();
       if (btStrategy() === "ema_dual_cross_multisource_v1") return runEmaDualCrossBacktest();
       return runClusterSweepBacktest();
     }
@@ -2372,45 +2887,36 @@
         syncBtStrategyUi();
         const sid = btStrategy();
         try {
-          if (sid === "cluster_sweep_ema_9_20_59") {
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "cluster_sweep_ema_9_20_59",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "ema_dual_cross_multisource_v1",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-          } else if (sid === "ema_dual_cross_multisource_v1") {
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "cluster_sweep_ema_9_20_59",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "ema_dual_cross_multisource_v1",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-          } else {
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "cluster_sweep_ema_9_20_59",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
-              strategy_id: "ema_dual_cross_multisource_v1",
-              symbol: state.symbol,
-              visible: false,
-            }, { sourceAction: "strategy-switch" }));
-          }
+          applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "cluster_sweep_ema_9_20_59",
+            symbol: state.symbol,
+            visible: false,
+          }, { sourceAction: "strategy-switch" }));
+          applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "ema_dual_cross_multisource_v1",
+            symbol: state.symbol,
+            visible: false,
+          }, { sourceAction: "strategy-switch" }));
+          applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "ema_zone_microstructure_confirmation_v1",
+            symbol: state.symbol,
+            visible: false,
+          }, { sourceAction: "strategy-switch" }));
         } catch (e) { /* ignore */ }
         await refreshOverlaysVisible();
-        setStatus("Strategie: " + sid + " — Cluster-Sweep-Marker ausgeblendet");
+        setStatus("Strategie: " + sid);
       });
       syncBtStrategyUi();
+    }
+    if ($("researchEzmLayerMode")) {
+      $("researchEzmLayerMode").addEventListener("change", async function () {
+        if (btStrategy() !== "ema_zone_microstructure_confirmation_v1") return;
+        try {
+          await applyEzmLayerMode(ezmLayerMode());
+        } catch (err) {
+          setStatus("EZM Layer fehlgeschlagen: " + (err.message || err), "error");
+        }
+      });
     }
     if ($("researchBtRunBtn")) $("researchBtRunBtn").addEventListener("click", runActiveBacktest);
     if ($("cswRunFromModal")) $("cswRunFromModal").addEventListener("click", async function () {
@@ -2517,6 +3023,31 @@
             "EMA Dual Cross " + state.symbol + " · "
               + (bt.visible ? "sichtbar" : "ausgeblendet") + " · "
               + (ed.n_candidates || 0) + " Kandidaten"
+          );
+        } catch (err) {
+          setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (btStrategy() === "ema_zone_microstructure_confirmation_v1") {
+        setStatus("EZM Backtester umschalten …");
+        try {
+          const snap = await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "ema_zone_microstructure_confirmation_v1",
+            symbol: state.symbol,
+            ezm_layer_mode: ezmLayerMode(),
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          syncEzmLayerUi(snap);
+          await refreshOverlaysVisible();
+          const bt = snap.backtester || {};
+          const ez = snap.ezm || {};
+          setStatus(
+            "EZM " + state.symbol + " · "
+              + ezmLayerModeLabel(ez.layer_mode || ezmLayerMode()) + " · "
+              + (bt.visible ? "sichtbar" : "ausgeblendet") + " · "
+              + (ez.n_setup_markers || bt.n_setup_markers || 0) + " Setup · "
+              + (ez.n_micro_markers || bt.n_micro_markers || 0) + " Micro · keine Trades/PnL"
           );
         } catch (err) {
           setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");

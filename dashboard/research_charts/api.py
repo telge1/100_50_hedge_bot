@@ -35,6 +35,7 @@ from .orderbook_profile import (
     OrderbookProfileQueryError,
     load_orderbook_profile,
 )
+from .live_diag import clear_live_diag, record_live_diag, snapshot_live_diag
 from .public_trades_profile import (
     VolumeProfileQueryError,
     load_volume_profile,
@@ -180,14 +181,21 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         end: int = Query(..., description="UTC unix seconds, exclusive"),
         at: Optional[int] = Query(
             None,
-            description="Optional causal snapshot time (UTC unix). Uses last bucket <= at.",
+            description="Causal snapshot time (UTC unix). Default: end-ε (current as-of range end).",
+        ),
+        mode: str = Query(
+            "snapshot_at",
+            description=(
+                "snapshot_at (default: OB200 multi-walls when archive exists, else features) | "
+                "ob200 | features | history"
+            ),
         ),
     ):
-        """Aggregated Orderbook Profile from orderbook_features_1s_v2 walls.
+        """Orderbook walls for Research Charts.
 
-        Default: visible-range aggregation of stored Bid/Ask wall prices.
-        With ``at``: causal last snapshot with bucket_start <= at.
-        Never reads Raw OB200 / orderbook_deltas. Not a full L2 book.
+        Default ``snapshot_at``: prefer local OB200 multi-level walls when a raw
+        archive exists for the symbol; otherwise dominant Bid/Ask from
+        ``orderbook_features_1s_v2``. Force with ``ob200`` / ``features``.
         """
         sym = str(symbol or "").strip().upper()
         try:
@@ -203,6 +211,13 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 at_dt = datetime.fromtimestamp(int(at), tz=timezone.utc)
             except (TypeError, ValueError, OSError, OverflowError):
                 return _error(400, "invalid_at", "at must be UTC unix seconds")
+        mode_s = str(mode or "snapshot_at").strip().lower()
+        if mode_s not in {"snapshot_at", "history", "visible_range", "ob200", "features"}:
+            return _error(
+                400,
+                "invalid_mode",
+                "mode must be snapshot_at, ob200, features, or history",
+            )
         known = True
         if sym != "XAUUSDT":
             try:
@@ -216,6 +231,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 start=start_dt,
                 end=end_dt,
                 at=at_dt,
+                mode=mode_s,
                 known_symbol=known,
             )
         except KeyError:
@@ -296,6 +312,29 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "symbol": str(symbol or "").strip().upper(),
             "forming": bar,
         }
+
+    @router.post("/api/research/live-diag")
+    async def api_research_live_diag_post(
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Client-side live-price apply diagnostics (no auth — must work when session dies)."""
+        return record_live_diag(body if isinstance(body, dict) else {})
+
+    @router.get("/api/research/live-diag")
+    async def api_research_live_diag_get(
+        request: Request,
+        limit: int = Query(80, ge=1, le=400),
+    ):
+        # Allow unauthenticated local/ops reads; remote still requires login.
+        host = (request.client.host if request.client else "") or ""
+        if host not in ("127.0.0.1", "::1", "localhost"):
+            require_auth(request)
+        return snapshot_live_diag(limit=limit)
+
+    @router.post("/api/research/live-diag/clear")
+    async def api_research_live_diag_clear(user: dict = Depends(require_auth)):
+        clear_live_diag()
+        return {"success": True, "cleared": True}
 
     @router.get("/api/research/indicators")
     async def api_research_indicators_get(
@@ -471,6 +510,24 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 visible = not cur
             snap = ws.set_ema_dual_cross_visible(bool(visible), symbol or None)
             return snap
+        if strategy_id in ("ema_zone_microstructure_confirmation_v1", "ezm"):
+            symbol = str(body.get("symbol") or "").strip().upper()
+            visible = body.get("visible")
+            layer_mode = body.get("ezm_layer_mode") or body.get("layer_mode")
+            layer_only = bool(body.get("layer_only"))
+            ws = get_workspace()
+            if layer_mode is not None and layer_only:
+                snap = ws.set_ezm_layer_mode(str(layer_mode), symbol or None)
+                return snap
+            if visible is None:
+                cur = bool((ws.snapshot().get("ezm") or {}).get("visible"))
+                visible = not cur
+            snap = ws.set_ezm_visible(
+                bool(visible),
+                symbol or None,
+                layer_mode=str(layer_mode) if layer_mode is not None else None,
+            )
+            return snap
 
         from .stoch_backtester import fetch_stoch_signal_rows
 
@@ -610,6 +667,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             ws = get_workspace()
             ws.clear_backtester_strategy(symbol, strategy_id="cluster_sweep_ema_9_20_59")
             ws.clear_backtester_strategy(symbol, strategy_id="stoch_fade")
+            ws.clear_backtester_strategy(symbol, strategy_id="ema_zone_microstructure_confirmation_v1")
             snap = ws.store_ema_dual_cross_run(result)
             snap["ema_dual_cross_result"] = {
                 "meta": result.get("meta"),
@@ -656,6 +714,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         # Clear other strategy markers for this symbol
         get_workspace().clear_backtester_strategy(symbol, strategy_id="stoch_fade")
         get_workspace().clear_backtester_strategy(symbol, strategy_id="ema_dual_cross_multisource_v1")
+        get_workspace().clear_backtester_strategy(symbol, strategy_id="ema_zone_microstructure_confirmation_v1")
         snap = get_workspace().store_cluster_sweep_run(result)
         snap["cluster_sweep_result"] = {
             "meta": result.get("meta"),
@@ -688,6 +747,52 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             delta=int(delta or 0),
             index=None if index is None else int(index),
         )
+
+    @router.post("/api/research/ezm/run")
+    async def api_research_ezm_run(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .ezm_jobs import start_ezm_research_job
+
+        payload, code = await asyncio.to_thread(
+            start_ezm_research_job,
+            symbol=str(body.get("symbol") or ""),
+            start=str(body.get("start") or body.get("signal_start") or ""),
+            end=str(body.get("end") or body.get("signal_end_exclusive") or ""),
+            computation_mode=str(body.get("computation_mode") or "") or None,
+        )
+        if code != 200:
+            return JSONResponse(payload, status_code=code)
+        return payload
+
+    @router.get("/api/research/ezm/status")
+    async def api_research_ezm_status(
+        user: dict = Depends(require_auth),
+        job_id: str = Query(...),
+    ):
+        from .ezm_jobs import ezm_job_status
+
+        payload, code = await asyncio.to_thread(ezm_job_status, job_id)
+        if code != 200:
+            return JSONResponse(payload, status_code=code)
+        return payload
+
+    @router.post("/api/research/ezm/import")
+    async def api_research_ezm_import(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .ezm_jobs import import_ezm_job_to_workspace
+
+        payload, code = await asyncio.to_thread(
+            import_ezm_job_to_workspace,
+            job_id=str(body.get("job_id") or ""),
+            symbol=str(body.get("symbol") or ""),
+        )
+        if code != 200:
+            return JSONResponse(payload, status_code=code)
+        return payload
 
     @router.post("/api/research/drawings/tool")
     async def api_research_drawings_tool(

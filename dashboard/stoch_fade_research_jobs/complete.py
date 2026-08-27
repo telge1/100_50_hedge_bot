@@ -7,7 +7,7 @@ from typing import Any
 
 from stoch_universe_51.jsonio import read_json
 
-from .config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, SOURCE_COMMIT, STRATEGY_VERSION
+from .config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, EZM_STRATEGY_ID, SOURCE_COMMIT, STRATEGY_VERSION
 
 LEGACY_STRATEGY_VERSION = "wave_fade_frozen_f16ae32"
 
@@ -63,6 +63,24 @@ def coin_run_is_complete(run_dir: Path, *, symbol: str, signal_start: str, signa
     if selected != symbol:
         return False
     strategy_id = str(manifest.get("strategy_id") or STRATEGY_VERSION)
+    if strategy_id == EZM_STRATEGY_ID:
+        if str(manifest.get("run_intent") or "") != "candidate_discovery":
+            return False
+        if str(summary.get("status") or "") == "DATA_INCOMPLETE":
+            return False
+        if str(manifest.get("incomplete_reason") or ""):
+            return False
+        start = str(manifest.get("signal_start") or "").replace("+00:00", "Z")
+        end = str(manifest.get("signal_end_exclusive") or "").replace("+00:00", "Z")
+        want_start = signal_start.replace("+00:00", "Z")
+        want_end = signal_end_exclusive.replace("+00:00", "Z")
+        if start and want_start and start[:19] != want_start[:19]:
+            return False
+        if end and want_end and end[:19] != want_end[:19]:
+            return False
+        if summary.get("run_id") and manifest.get("run_id") and summary.get("run_id") != manifest.get("run_id"):
+            return False
+        return True
     if strategy_id not in {STRATEGY_VERSION, LEGACY_STRATEGY_VERSION}:
         return False
     if strategy_id == STRATEGY_VERSION:

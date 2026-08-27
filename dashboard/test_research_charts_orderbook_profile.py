@@ -15,7 +15,9 @@ if str(ROOT) not in sys.path:
 
 from research_charts.orderbook_profile import (  # noqa: E402
     FEATURES_FQN,
+    EDGE_BY_PRICE,
     MAX_BARS_PER_SIDE,
+    TOP_BY_NOTIONAL,
     _bar_dict,
     _rows_to_bars,
     _snapshot_to_bars,
@@ -127,9 +129,9 @@ def test_rows_to_bars_skips_invalid():
 def test_empty_profile_shape():
     start = datetime(2026, 8, 25, tzinfo=timezone.utc)
     end = start + timedelta(hours=1)
-    p = empty_profile(symbol="XRPUSDT", start=start, end=end, mode="visible_range")
-    assert p["profile_kind"] == "aggregated_orderbook_profile"
-    assert p["label"] == "Aggregated Orderbook Profile"
+    p = empty_profile(symbol="XRPUSDT", start=start, end=end, mode="snapshot_at")
+    assert p["profile_kind"] == "current_orderbook_walls"
+    assert p["label"] == "Current Orderbook Walls"
     assert p["bars"] == []
     assert "Not a full L2" in " ".join(p["notes"])
 
@@ -224,7 +226,7 @@ def test_api_validation_and_empty(monkeypatch):
     )
     assert ok.status_code == 200, ok.text
     body = ok.json()
-    assert body["profile_kind"] == "aggregated_orderbook_profile"
+    assert body["profile_kind"] == "current_orderbook_walls"
     assert body["bars"] == []
 
     causal = client.get(
@@ -248,7 +250,7 @@ def test_host_ui_contracts():
     app_py = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "researchObpEnabled" in html
-    assert "Orderbook Profile" in html
+    assert "Orderbook Walls" in html
     assert "/api/research/orderbook-profile" in host
     assert "scheduleOrderbookProfile" in host
     assert "clearPaneOrderbookProfile" in host
@@ -256,13 +258,14 @@ def test_host_ui_contracts():
     assert "clearOrderbookProfile" in chart
     assert "drawOrderbookProfile" in chart
     assert "obp-overlay" in pane
-    assert "Aggregated Orderbook Profile" in chart
-    assert 'enabled: false, width: "normal", mode: "visible_range"' in host
+    assert "Orderbook Walls" in chart
+    assert 'enabled: false, width: "normal", mode: "snapshot_at"' in host
     assert "researchVpEnabled" in html and "researchObpEnabled" in html
     assert "/api/research/orderbook-profile" in app_py
     obp_mod = (ROOT / "research_charts" / "orderbook_profile.py").read_text(encoding="utf-8")
-    assert "never reads Raw OB200" in obp_mod or "Never reads Raw OB200" in obp_mod
+    assert "snapshot_at" in obp_mod and "ob200_multi_walls" in obp_mod
     assert "orderbook_deltas" in obp_mod  # mentioned as excluded
+    assert (ROOT / "research_charts" / "ob200_walls.py").is_file()
 
 
 def test_causal_snapshot_query_uses_at(monkeypatch):
@@ -281,6 +284,9 @@ def test_causal_snapshot_query_uses_at(monkeypatch):
 
     monkeypatch.setattr(
         "research_charts.orderbook_profile._client", lambda: _FakeClient()
+    )
+    monkeypatch.setattr(
+        "research_charts.orderbook_profile.has_ob200_archive", lambda *_a, **_k: False
     )
     clear_orderbook_profile_cache_for_tests()
     start = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
@@ -340,9 +346,9 @@ def test_visible_range_groups_by_price(monkeypatch):
     start = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
     end = start + timedelta(hours=1)
     payload = load_orderbook_profile(
-        symbol="XRPUSDT", start=start, end=end, known_symbol=True
+        symbol="XRPUSDT", start=start, end=end, mode="history", known_symbol=True
     )
-    assert payload["mode"] == "visible_range"
+    assert payload["mode"] == "history"
     assert payload["bid_count"] == 1
     assert payload["ask_count"] == 1
     sides = {b["side"] for b in payload["bars"]}
@@ -354,4 +360,52 @@ def test_visible_range_groups_by_price(monkeypatch):
 
 
 def test_payload_limit_constant():
-    assert MAX_BARS_PER_SIDE <= 100
+    assert MAX_BARS_PER_SIDE <= 120
+    assert TOP_BY_NOTIONAL > 0
+    assert EDGE_BY_PRICE > 0
+
+
+def test_visible_range_sql_covers_price_edges():
+    src = (ROOT / "research_charts" / "orderbook_profile.py").read_text(encoding="utf-8")
+    assert "rn_edge" in src
+    assert "ORDER BY price ASC" in src
+    assert "ORDER BY price DESC" in src
+    assert "OBP_REFRESH_MS" not in src  # frontend-only
+    host = (ROOT / "static" / "js" / "research" / "research_charts.js").read_text(encoding="utf-8")
+    assert "OBP_REFRESH_MS = 60 * 1000" in host
+    assert "startOrderbookProfileRefresh" in host
+
+
+def test_default_load_is_snapshot(monkeypatch):
+    class _FakeClient:
+        def query(self, sql, parameters=None, settings=None):
+            class R:
+                result_rows = []
+            return R()
+    monkeypatch.setattr("research_charts.orderbook_profile._client", lambda: _FakeClient())
+    monkeypatch.setattr(
+        "research_charts.orderbook_profile.has_ob200_archive", lambda *_a, **_k: False
+    )
+    clear_orderbook_profile_cache_for_tests()
+    start = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    payload = load_orderbook_profile(symbol="XRPUSDT", start=start, end=end, known_symbol=True)
+    assert payload["mode"] == "snapshot_at"
+
+
+def test_doge_ob200_multi_walls_smoke():
+    from research_charts.ob200_walls import has_ob200_archive
+
+    if not has_ob200_archive("DOGEUSDT"):
+        pytest.skip("no local DOGE OB200 archive")
+    clear_orderbook_profile_cache_for_tests()
+    at = datetime(2026, 8, 25, 8, 30, tzinfo=timezone.utc)
+    start = at - timedelta(hours=2)
+    end = at + timedelta(minutes=30)
+    payload = load_orderbook_profile(
+        symbol="DOGEUSDT", start=start, end=end, at=at, mode="ob200", known_symbol=True
+    )
+    assert payload["profile_kind"] == "ob200_multi_walls"
+    assert payload["bar_count"] >= 10
+    assert payload["bid_count"] >= 1 and payload["ask_count"] >= 1
+    assert payload["ob200"]["bid_levels"] == 200

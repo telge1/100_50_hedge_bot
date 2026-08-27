@@ -13,11 +13,19 @@ from typing import Any
 from stoch_universe_51.jsonio import read_json
 
 from .complete import coin_run_is_complete
-from .config import CAUSAL_MANIFEST_HASH, CONFIRMATION_POLICY, STRATEGY_VERSION, jobs_root
+from .config import (
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
+    EZM_STRATEGY_ID,
+    STRATEGY_VERSION,
+    jobs_root,
+)
 from .jobs import redact_public, safe_artifact_reference
+from .strategy_resolve import is_ezm_strategy
 from stoch_fade_research_evaluations.config import EXIT_POLICY as EVAL_EXIT_POLICY
 
 SOURCE = "FROZEN_RESEARCH_JOB"
+EZM_SOURCE = "EZM_CANDIDATE_DISCOVERY"
 JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 SELECTABLE_STATES = frozenset({"COMPLETED", "COMPLETED_WITH_ERRORS"})
 SIGNAL_FILE = "signals.jsonl"
@@ -111,7 +119,9 @@ def _job_status(directory: Path) -> dict[str, Any] | None:
 
 
 def _identity_ok(status: dict[str, Any], request: dict[str, Any]) -> bool:
-    sv = str(request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
+    sv = str(request.get("strategy_id") or request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
+    if is_ezm_strategy(sv):
+        return str(request.get("run_intent") or "") == "candidate_discovery"
     if sv and sv != STRATEGY_VERSION:
         return False
     if str(request.get("confirmation_policy") or "") != CONFIRMATION_POLICY:
@@ -122,7 +132,9 @@ def _identity_ok(status: dict[str, Any], request: dict[str, Any]) -> bool:
 
 
 def _identity_kind(status: dict[str, Any], request: dict[str, Any]) -> str:
-    sv = str(request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
+    sv = str(request.get("strategy_id") or request.get("fixed_strategy_version") or status.get("fixed_strategy_version") or "")
+    if is_ezm_strategy(sv) and _identity_ok(status, request):
+        return "EZM_CANDIDATE_DISCOVERY"
     if sv == STRATEGY_VERSION and _identity_ok(status, request):
         return "CAUSAL_CANONICAL"
     if sv == "wave_fade_frozen_f16ae32":
@@ -147,6 +159,7 @@ def catalog_entry(directory: Path) -> dict[str, Any] | None:
         symbols = []
     symbols = [str(s) for s in symbols if s]
     combined = status.get("combined_summary") if isinstance(status.get("combined_summary"), dict) else {}
+    sid = str(request.get("strategy_id") or request.get("fixed_strategy_version") or STRATEGY_VERSION)
     return {
         "job_id": job_id,
         "state": state,
@@ -157,10 +170,13 @@ def catalog_entry(directory: Path) -> dict[str, Any] | None:
         "selected_symbols": symbols,
         "successful_coins": int(status.get("successful_coins") or combined.get("successful_coins") or 0),
         "failed_coins": int(status.get("failed_coins") or combined.get("failed_coins") or 0),
+        "incomplete_coins": int(status.get("incomplete_coins") or combined.get("incomplete_coins") or 0),
         "raw_total": int(status.get("raw_total") or combined.get("raw_candidates") or 0),
         "tier_a_total": int(status.get("tier_a_total") or combined.get("tier_a") or 0),
-        "fixed_strategy_version": STRATEGY_VERSION,
-        "job_strategy_version": str(request.get("fixed_strategy_version") or ""),
+        "fixed_strategy_version": sid,
+        "strategy_id": sid,
+        "run_intent": request.get("run_intent"),
+        "job_strategy_version": sid,
         "identity_kind": identity_kind,
         "confirmation_policy": request.get("confirmation_policy"),
         "legacy_warning": identity_kind == "LEGACY_WAVE_END_NON_CAUSAL",
@@ -247,7 +263,9 @@ def map_job_signal(
     job_end: str = "",
 ) -> dict[str, Any]:
     direction = str(raw.get("direction") or raw.get("trade_direction") or "").upper()
-    return {
+    strategy_version = str(raw.get("strategy_version") or raw.get("strategy_id") or STRATEGY_VERSION)
+    source = EZM_SOURCE if is_ezm_strategy(strategy_version) else SOURCE
+    row = {
         "signal_id": raw.get("signal_id"),
         "symbol": raw.get("symbol"),
         "timeframe": raw.get("timeframe"),
@@ -259,23 +277,25 @@ def map_job_signal(
         "trend_bucket": raw.get("trend_bucket"),
         "eff_quantile": raw.get("eff_quantile"),
         "entry_valid": raw.get("entry_valid"),
-        "entry_price": raw.get("entry_price"),
-        "entry_time": raw.get("entry_time"),
+        "entry_price": raw.get("entry_price") if raw.get("entry_price") is not None else raw.get("decision_price"),
+        "entry_time": raw.get("entry_time") or raw.get("decision_at"),
         "tp_price": raw.get("tp_price"),
         "sl_price": raw.get("sl_price"),
-        "candle_open_time": raw.get("candle_open_time"),
-        "candle_close_time": raw.get("candle_close_time"),
-        "confirmation_available_at": raw.get("confirmation_available_at"),
-        "generated_at": raw.get("generated_at"),
-        "strategy_version": str(raw.get("strategy_version") or STRATEGY_VERSION),
-        "signal_state": "TIER_A" if raw.get("tier_a") else "CANDIDATE",
-        "source": SOURCE,
+        "candle_open_time": raw.get("candle_open_time") or raw.get("decision_at"),
+        "candle_close_time": raw.get("candle_close_time") or raw.get("decision_at"),
+        "confirmation_available_at": raw.get("confirmation_available_at") or raw.get("decision_at"),
+        "generated_at": raw.get("generated_at") or raw.get("decision_at"),
+        "strategy_version": strategy_version,
+        "strategy_id": strategy_version,
+        "signal_state": raw.get("signal_state")
+        or ("TIER_A" if raw.get("tier_a") else "CANDIDATE"),
+        "source": source,
         "job_id": job_id,
         "runner_run_id": runner_run_id,
         "outcomes_computed": False,
         "execution_dedup_applied": False,
         "be50_outcome_active": False,
-        "plan_status": "PLANNED_NO_OUTCOME",
+        "plan_status": raw.get("plan_status") or "PLANNED_NO_OUTCOME",
         "setup_id": raw.get("setup_id"),
         "end_ts": raw.get("end_ts"),
         "end_available_at": raw.get("end_available_at"),
@@ -285,7 +305,18 @@ def map_job_signal(
         "confirmation_source": raw.get("confirmation_source"),
         "job_signal_start": job_start,
         "job_signal_end_exclusive": job_end,
+        "ezm_research": is_ezm_strategy(strategy_version),
+        "candidate_state": raw.get("candidate_state"),
+        "decision_at": raw.get("decision_at"),
+        "decision_price": raw.get("decision_price"),
+        "episode_id": raw.get("episode_id"),
+        "zone_name": raw.get("zone_name"),
+        "regime": raw.get("regime"),
+        "mechanism": raw.get("mechanism"),
+        "reason_codes": raw.get("reason_codes"),
+        "research_note": raw.get("research_note"),
     }
+    return row
 
 
 def _in_window(row: dict[str, Any], start: str, end: str) -> bool:
@@ -328,6 +359,10 @@ def load_job_signals(
     if state not in SELECTABLE_STATES:
         return {"success": False, "error": "JOB_NOT_SELECTABLE", "source": SOURCE, "state": state}, 409
     identity_kind = _identity_kind(status, request)
+    job_strategy = str(
+        request.get("strategy_id") or request.get("fixed_strategy_version") or STRATEGY_VERSION
+    )
+    ezm_job = is_ezm_strategy(job_strategy)
 
     signal_start = str(request.get("signal_start") or "")
     signal_end = str(request.get("signal_end_exclusive") or "")
@@ -370,8 +405,13 @@ def load_job_signals(
         for raw in rows:
             if str(raw.get("symbol") or "") != coin_symbol:
                 continue
-            if str(raw.get("strategy_version") or STRATEGY_VERSION) != STRATEGY_VERSION:
-                continue
+            raw_sv = str(raw.get("strategy_version") or raw.get("strategy_id") or "")
+            if ezm_job:
+                if not is_ezm_strategy(raw_sv or job_strategy):
+                    continue
+            else:
+                if (raw_sv or STRATEGY_VERSION) != STRATEGY_VERSION:
+                    continue
             if not _in_window(raw, signal_start, signal_end):
                 continue
             raw_total += 1
@@ -437,7 +477,8 @@ def load_job_signals(
         "filtered_signals": len(mapped),
         "signals": len(mapped),
         **OUTCOME_NULL,
-        "strategy_version": STRATEGY_VERSION,
+        "strategy_version": job_strategy,
+        "strategy_id": job_strategy,
         "outcomes_computed": False,
     }
     if eval_meta:
@@ -446,10 +487,16 @@ def load_job_signals(
         summary["pnl_basis"] = "gross"
     payload = {
         "success": True,
-        "source": "FROZEN_RESEARCH_EVALUATION" if eval_meta else SOURCE,
+        "source": (
+            "FROZEN_RESEARCH_EVALUATION"
+            if eval_meta
+            else (EZM_SOURCE if ezm_job else SOURCE)
+        ),
         "job": {
             "job_id": parsed,
-            "strategy_version": str(request.get("fixed_strategy_version") or STRATEGY_VERSION),
+            "strategy_version": job_strategy,
+            "strategy_id": job_strategy,
+            "run_intent": request.get("run_intent"),
             "signal_start": signal_start,
             "signal_end_exclusive": signal_end,
             "selected_symbols": selected,
@@ -478,4 +525,5 @@ def load_job_signals(
 
 
 def frozen_strategy_requires_job(strategy_version: str | None) -> bool:
-    return str(strategy_version or "").strip() == STRATEGY_VERSION
+    text = str(strategy_version or "").strip()
+    return text in {STRATEGY_VERSION, EZM_STRATEGY_ID}

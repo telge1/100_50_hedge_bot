@@ -18,6 +18,8 @@ CLUSTER_SWEEP_SOURCE = "cluster_sweep_backtester"
 CLUSTER_SWEEP_STRATEGY_ID = "cluster_sweep_ema_9_20_59"
 EMA_DUAL_CROSS_SOURCE = "ema_dual_cross_backtester"
 EMA_DUAL_CROSS_STRATEGY_ID = "ema_dual_cross_multisource_v1"
+EZM_SOURCE = "ezm_candidate_discovery"
+EZM_STRATEGY_ID = "ema_zone_microstructure_confirmation_v1"
 
 PANE_IDS = ("pane-0", "pane-1", "pane-2", "pane-3")
 DEFAULT_PANE_TFS = {
@@ -40,7 +42,7 @@ DEFAULT_VOLUME_PROFILE = {
 DEFAULT_ORDERBOOK_PROFILE = {
     "enabled": False,
     "width": "normal",
-    "mode": "visible_range",
+    "mode": "snapshot_at",
 }
 
 
@@ -78,10 +80,13 @@ def normalize_orderbook_profile(raw: dict | None) -> dict[str, Any]:
         if width in {"compact", "normal", "wide"}:
             src["width"] = width
         mode = str(raw.get("mode") or src["mode"]).strip().lower()
-        if mode in {"visible_range", "snapshot_at"}:
-            src["mode"] = mode
+        # UI default is current snapshot only; legacy visible_range → snapshot_at.
+        if mode in {"snapshot_at", "current"}:
+            src["mode"] = "snapshot_at"
+        elif mode in {"history", "visible_range"}:
+            src["mode"] = "history"
         else:
-            src["mode"] = "visible_range"
+            src["mode"] = "snapshot_at"
     return src
 
 
@@ -145,6 +150,9 @@ class ResearchWorkspace:
         self._ema_dual_cross_run: dict[str, Any] | None = None
         self._ema_dual_cross_visible: bool = False
         self._ema_dual_cross_event_index: int = 0
+        self._ezm_run: dict[str, Any] | None = None
+        self._ezm_visible: bool = False
+        self._ezm_layer_mode: str = "both"
         self._load_persisted_drawings()
 
     def _load_persisted_drawings(self) -> None:
@@ -216,6 +224,7 @@ class ResearchWorkspace:
             "pane_count": dict(PANE_COUNT),
             "cluster_sweep": self._cluster_sweep_snapshot(),
             "ema_dual_cross": self._ema_dual_cross_snapshot(),
+            "ezm": self._ezm_snapshot(),
         }
 
     def _cluster_sweep_snapshot(self) -> dict[str, Any]:
@@ -267,6 +276,74 @@ class ResearchWorkspace:
             "candidate": cur,
             "candidates": cands,
         }
+
+    def _ezm_snapshot(self) -> dict[str, Any]:
+        run = self._ezm_run or {}
+        cands = list(run.get("candidates") or [])
+        setup = list(run.get("ema_setup_events") or [])
+        micro = list(run.get("microstructure_confirmation_events") or [])
+        layer_mode = str(self._ezm_layer_mode or "both")
+        show_setup, show_micro = self._ezm_layer_flags(layer_mode)
+        from .ezm_backtester import research_layers_to_marker_specs
+
+        active_specs = research_layers_to_marker_specs(
+            ema_setup_rows=setup,
+            micro_rows=micro or cands,
+            show_ema_setup=show_setup,
+            show_microstructure=show_micro,
+        )
+        setup_n = len([m for m in active_specs if m.get("layer") == "ema_setup"])
+        micro_n = len([m for m in active_specs if m.get("layer") == "microstructure_confirmation"])
+        return {
+            "strategy_id": EZM_STRATEGY_ID,
+            "run_intent": "candidate_discovery",
+            "loaded": bool(run),
+            "visible": bool(self._ezm_visible),
+            "layer_mode": layer_mode,
+            "meta": run.get("meta") or {},
+            "coverage": run.get("coverage") or {},
+            "summary": run.get("summary") or {},
+            "n_candidates": len(cands),
+            "n_ema_setup_events": len(setup),
+            "n_micro_events": len(micro),
+            "n_markers": len(active_specs) if self._ezm_visible else 0,
+            "n_setup_markers": setup_n if self._ezm_visible else 0,
+            "n_micro_markers": micro_n if self._ezm_visible else 0,
+            "n_markers_total": len(active_specs),
+        }
+
+    @staticmethod
+    def _normalize_ezm_layer_mode(mode: str | None) -> str:
+        m = str(mode or "both").strip().lower()
+        if m in {"ema", "ema_only", "setup", "ema_setup"}:
+            return "ema_only"
+        if m in {"micro", "micro_only", "microstructure", "microstructure_only"}:
+            return "micro_only"
+        return "both"
+
+    @staticmethod
+    def _ezm_layer_flags(layer_mode: str) -> tuple[bool, bool]:
+        mode = ResearchWorkspace._normalize_ezm_layer_mode(layer_mode)
+        if mode == "ema_only":
+            return True, False
+        if mode == "micro_only":
+            return False, True
+        return True, True
+
+    def _ezm_marker_specs(self, run: dict[str, Any]) -> list[dict[str, Any]]:
+        from .ezm_backtester import research_layers_to_marker_specs
+
+        setup = list(run.get("ema_setup_events") or [])
+        micro = list(run.get("microstructure_confirmation_events") or [])
+        if not micro:
+            micro = list(run.get("candidates") or [])
+        show_setup, show_micro = self._ezm_layer_flags(self._ezm_layer_mode)
+        return research_layers_to_marker_specs(
+            ema_setup_rows=setup,
+            micro_rows=micro,
+            show_ema_setup=show_setup,
+            show_microstructure=show_micro,
+        )
 
     def settings_defaults(self) -> dict[str, Any]:
         trp = self._trp
@@ -593,6 +670,109 @@ class ResearchWorkspace:
             self._ema_dual_cross_event_index = (self._ema_dual_cross_event_index + int(delta)) % n
         return self.snapshot()
 
+    def _clear_ezm_overlays(self, symbol: str | None = None) -> int:
+        removed = 0
+        for oid in list(self.overlays.ids()):
+            try:
+                ov = self.overlays.get_overlay(oid)
+            except KeyError:
+                continue
+            meta = getattr(ov, "metadata", None) or {}
+            if meta.get("origin") != EZM_SOURCE and meta.get("strategy_id") != EZM_STRATEGY_ID:
+                continue
+            if symbol and ov.symbol != symbol:
+                continue
+            self.overlays.remove_overlay(oid)
+            removed += 1
+        return removed
+
+    def store_ezm_run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._ezm_run = {
+            "meta": payload.get("meta") or {},
+            "candidates": payload.get("candidates") or [],
+            "ema_setup_events": payload.get("ema_setup_events") or [],
+            "microstructure_confirmation_events": payload.get("microstructure_confirmation_events") or [],
+            "markers": payload.get("markers") or [],
+            "coverage": payload.get("coverage") or {},
+            "summary": payload.get("summary") or {},
+        }
+        sym = str((payload.get("meta") or {}).get("symbol") or "").upper()
+        if sym:
+            self._clear_ezm_overlays(sym)
+        self._ezm_visible = False
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": EZM_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(payload.get("markers") or []),
+            "source": EZM_SOURCE,
+            "run_intent": "candidate_discovery",
+            "message": "EZM Candidates gespeichert — Backtester klicken zum Einblenden",
+        }
+        return snap
+
+    def set_ezm_visible(
+        self,
+        visible: bool,
+        symbol: str | None = None,
+        *,
+        layer_mode: str | None = None,
+    ) -> dict[str, Any]:
+        from .ezm_backtester import build_overlay_markers
+
+        if layer_mode is not None:
+            self._ezm_layer_mode = self._normalize_ezm_layer_mode(layer_mode)
+        run = self._ezm_run or {}
+        sym = str(symbol or (run.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_ezm_overlays(sym or None)
+        self._ezm_visible = bool(visible)
+        specs: list[dict[str, Any]] = []
+        if self._ezm_visible and sym:
+            specs = self._ezm_marker_specs(run)
+            markers = build_overlay_markers(specs, symbol=sym)
+            for ov in markers:
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+            # EZM overlays are ephemeral session state — do not rewrite drawings.json
+            # (persist of 1k+ user drawings on every Backtester toggle freezes the UI).
+        snap = self.snapshot()
+        setup_n = len([m for m in specs if m.get("layer") == "ema_setup"])
+        micro_n = len([m for m in specs if m.get("layer") == "microstructure_confirmation"])
+        # Keep event totals from stored run for status; loaded = chart overlays.
+        run_meta = run.get("meta") or {}
+        snap["backtester"] = {
+            "strategy_id": EZM_STRATEGY_ID,
+            "symbol": sym,
+            "visible": self._ezm_visible,
+            "loaded": len(specs),
+            "layer_mode": self._ezm_layer_mode,
+            "n_setup_markers": setup_n,
+            "n_micro_markers": micro_n,
+            "n_ema_setup_events": int(run_meta.get("n_ema_setup_events") or len(run.get("ema_setup_events") or [])),
+            "source": EZM_SOURCE,
+            "run_intent": "candidate_discovery",
+        }
+        return snap
+
+    def set_ezm_layer_mode(self, layer_mode: str, symbol: str | None = None) -> dict[str, Any]:
+        """Switch EMA vs micro chart layers without changing run data."""
+        self._ezm_layer_mode = self._normalize_ezm_layer_mode(layer_mode)
+        if not self._ezm_run:
+            snap = self.snapshot()
+            snap["backtester"] = {
+                "strategy_id": EZM_STRATEGY_ID,
+                "symbol": str(symbol or "").upper(),
+                "visible": False,
+                "loaded": 0,
+                "layer_mode": self._ezm_layer_mode,
+                "source": EZM_SOURCE,
+                "run_intent": "candidate_discovery",
+            }
+            return snap
+        sym = str(symbol or (self._ezm_run.get("meta") or {}).get("symbol") or "").upper()
+        return self.set_ezm_visible(self._ezm_visible, sym)
+
     def clear_backtester_strategy(self, symbol: str, *, strategy_id: str | None = None) -> dict[str, Any]:
         sym = str(symbol or "").upper()
         sid = str(strategy_id or "")
@@ -604,6 +784,10 @@ class ResearchWorkspace:
             self._clear_ema_dual_cross_overlays(sym or None)
             if sid:
                 self._ema_dual_cross_visible = False
+        if not sid or sid == EZM_STRATEGY_ID or sid == "ezm":
+            self._clear_ezm_overlays(sym or None)
+            if sid:
+                self._ezm_visible = False
         if not sid or sid.startswith("stoch") or sid == "wave_fade" or sid == BACKTESTER_SOURCE:
             if sym:
                 existing = [

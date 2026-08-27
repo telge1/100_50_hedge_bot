@@ -112,8 +112,11 @@ def test_host_no_duplicate_initial_candle_gets():
     assert 'sendJson("/api/research/pane"' in host
     assert "PANE_HTTP_LIMIT = 2" in host
     assert "mapLimit(visibleIds(), PANE_HTTP_LIMIT" in host
-    assert "Promise.all(visibleIds().map" not in host
+    # Candle/pane loads must stay concurrency-limited; Promise.all is OK for jump/focus only.
     load_pane = host[host.index("async function loadPane") : host.index("async function refreshIndicatorsVisible")]
+    assert "Promise.all" not in load_pane
+    switch = host[host.index("async function switchSymbol") : host.index("function fillSymbolSelect")]
+    assert "mapLimit(visibleIds()" in switch
     assert "/api/research/candles" not in load_pane
     assert "/api/research/indicators" not in load_pane
 
@@ -143,9 +146,10 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     assert "expandWorkspaceUp" in host
     assert "bindHeightDrag" in host
     assert "research-browser-fs" in host
-    assert 'pane.tf !== "1m"' in host
     assert "lastClosedBarTime" in host
     assert "closedCandleFingerprint" in host
+    assert "formingBarForTf" in host
+    assert "pollForming(gen)" in host
 
 
 def test_host_generation_guard():
@@ -165,7 +169,7 @@ def test_host_iframe_ready_handshake():
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
     assert 'pane.html?v=" + ASSET_V' in host
-    assert 'const ASSET_V = "vp-3"' in host
+    assert 'const ASSET_V = "live-16"' in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -240,7 +244,30 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=history-6" in pane
+    assert "chart.js?v=live-16" in pane
+    assert "Do not stickToLiveEdge here" in js
+    assert "getVisibleRange()" in js
+    assert "if (!force && !autoScaleOn) return false" in js
+    assert "Do not scheduleFit here" in js or "vertical price-axis drag" in js
+    assert "Paint the series BEFORE mutating pendingData" in host
+    assert "candleSeries.update(point)" in js
+    assert 'id="research-markers"' in pane
+    assert "pointer-events:none" in pane or "pointer-events: none" in pane
+    assert "#research-markers" in css
+    assert "pointer-events: none !important" in css
+    assert "function isCanvasResearchMarker" in js
+    assert "function paintResearchMarkers" in js
+    assert "researchMarkers" in js
+    assert 'canvas.style.pointerEvents = "none"' in js
+    assert "function isNearLiveLogicalRange" in js
+    assert "pointerScaleWatch || performance.now() < scaleWatchUntil" in js
+    assert "function fitPriceScaleToVisibleCandles" in js
+    assert "scheduleFitPriceScaleToCandles" in js
+    assert "function excludeOverlayFromAutoscale" in js
+    assert "autoscaleInfoProvider: excludeOverlayFromAutoscale" in js
+    assert "function clipPointsToCandleExtent" in js
+    assert "setVisibleRange" in js
+    assert "Clip warmup-only points" in js or "clipPointsToCandleExtent(spec.data" in js
     assert "function snapUnixToBar" in js
     assert "preserveView" in js
     assert "preserveView: true" in host
@@ -256,6 +283,9 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "function pollForming" in host
     assert "updateFormingBar" in host
     assert "function updateFormingBar" in js
+    assert "function stickToLiveEdge" in js
+    assert "function ensureLivePriceLine" in js
+    assert "FORMING_MS = 250" in host
 
 
 def test_price_scale_precision_from_candles():

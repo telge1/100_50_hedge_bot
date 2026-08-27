@@ -139,7 +139,11 @@ def test_from_to_and_limit():
     times = [c["time"] for c in packed["candles"]]
     assert times
     assert times[0] >= start
-    assert times[-1] <= end
+    # Live tip may extend one forming bucket past a near-realtime end.
+    if packed.get("live_tip"):
+        assert times[-1] <= end + 120
+    else:
+        assert times[-1] <= end
     limited = load_candles("APTUSDT", "1m", limit=25)
     assert len(limited["candles"]) == 25
 

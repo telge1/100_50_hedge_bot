@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import threading
+import time
 from typing import Any
 
 import httpx
@@ -19,6 +21,11 @@ from .live_universe import (
 COLLECTOR_API_BASE = os.environ.get("STOCH_COLLECTOR_API_BASE", "http://127.0.0.1:8787").rstrip("/")
 POLL_INTERVAL_S = 5
 POLL_INTERVAL_MS = POLL_INTERVAL_S * 1000
+
+# Last-good forming tip: collector often returns null briefly (~minute roll / WS gap).
+_FORMING_HOLD_S = 15.0
+_forming_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+_forming_lock = threading.Lock()
 
 ALREADY_ACTIVE_STATES = frozenset(
     {
@@ -62,17 +69,39 @@ def unavailable_status(*, detail: str = "collector_api_unreachable") -> dict[str
 
 
 def fetch_forming_candle(symbol: str, *, timeout: float = 2.0) -> dict[str, Any] | None:
+    """Return live forming candle; briefly reuse last-good bar if collector returns null.
+
+    The collector clears forming around minute rolls / reconnect gaps (~10% of polls).
+    Without a short hold, Research Charts look frozen even though the next tick is fine.
+    """
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        return None
+
     url = f"{_base()}/api/collector/forming"
+    bar: dict[str, Any] | None = None
     try:
         with httpx.Client(timeout=timeout) as client:
-            resp = client.get(url, params={"symbol": str(symbol).strip().upper()})
+            resp = client.get(url, params={"symbol": sym})
         payload = resp.json()
+        if isinstance(payload, dict):
+            raw = payload.get("forming")
+            if isinstance(raw, dict):
+                bar = raw
     except Exception:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    bar = payload.get("forming")
-    return bar if isinstance(bar, dict) else None
+        bar = None
+
+    now = time.monotonic()
+    with _forming_lock:
+        if bar is not None:
+            _forming_cache[sym] = (now, dict(bar))
+            return dict(bar)
+        cached = _forming_cache.get(sym)
+        if cached and (now - float(cached[0])) <= _FORMING_HOLD_S:
+            out = dict(cached[1])
+            out["_stale_hold"] = True
+            return out
+    return None
 
 
 def fetch_collector_status(*, timeout: float = 5.0) -> dict[str, Any]:

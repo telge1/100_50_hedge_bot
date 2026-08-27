@@ -28,6 +28,9 @@
   let lldEmaFastSeries = null;
   let lldEmaSlowSeries = null;
   let lastPayload = null;
+  /** Keep the live tip in view unless the user scrolls away from the right edge. */
+  let followLive = true;
+  let livePriceLine = null;
   let lastCrosshairTime = null;
   let lastSelectedUnix = null;
   let suppressUntilTime = null;
@@ -36,6 +39,11 @@
   let lastCandleSetCount = 0;
   let lastAppliedSize = { w: 0, h: 0 };
   const overlayRegistry = new Map();
+  /** EZM / research point markers — canvas layer (DOM overlays freeze with 1k+ markers). */
+  const researchMarkers = new Map();
+  let researchPaintTimer = null;
+  let researchPaintQueued = false;
+  let researchPaintRaf = null;
   let interactionMode = "select";
   let toolClickCount = 0;
   const ONE_POINT_TOOLS = { hline: true, vline: true };
@@ -337,6 +345,7 @@
       priceScaleId: "right",
       visible: false,
       priceFormat: lastPriceFormat,
+      autoscaleInfoProvider: excludeOverlayFromAutoscale,
     });
     lldEmaSlowSeries = chart.addLineSeries({
       color: "#d40047",
@@ -347,6 +356,7 @@
       priceScaleId: "right",
       visible: false,
       priceFormat: lastPriceFormat,
+      autoscaleInfoProvider: excludeOverlayFromAutoscale,
     });
 
     chart.subscribeCrosshairMove(function (param) {
@@ -430,9 +440,16 @@
     });
 
     let rangeTimer = null;
+    let overlayRangeTimer = null;
     chart.timeScale().subscribeVisibleTimeRangeChange(function (range) {
       updateSelectedLine();
-      layoutOverlays();
+      // During horizontal pan: refresh research markers lightly; defer heavy VP/OBP.
+      scheduleResearchMarkersPaint();
+      if (overlayRangeTimer) clearTimeout(overlayRangeTimer);
+      overlayRangeTimer = setTimeout(function () {
+        overlayRangeTimer = null;
+        layoutOverlays();
+      }, researchMarkers.size > 200 ? 140 : 90);
       if (!range || range.from == null || range.to == null) {
         return;
       }
@@ -449,6 +466,10 @@
     chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
       if (programmaticNavDepth > 0) return;
       syncOscLogicalFromMain(range);
+      const n = ((lastPayload && lastPayload.candles) || []).length;
+      followLive = isNearLiveLogicalRange(range, n);
+      // Keep candlesticks in view after horizontal pan (EMA/walls can pin a bad scale).
+      scheduleFitPriceScaleToCandles(false);
     });
 
     const ro = new ResizeObserver(function () {
@@ -468,6 +489,9 @@
     window.addEventListener("pointercancel", onPointerUp);
     window.addEventListener("pointercancel", onScalePointerUp, true);
     document.addEventListener("keydown", onChartKey);
+
+    const rmCanvas = researchMarkersCanvas();
+    if (rmCanvas) rmCanvas.style.pointerEvents = "none";
 
     initLowerSplit();
     const oscEl = $("oscillator");
@@ -539,7 +563,17 @@
       candle = param.seriesData.get(candleSeries);
     }
     if (!candle && lastPayload.candles && lastPayload.candles.length) {
-      candle = lastPayload.candles[lastPayload.candles.length - 1];
+      // Prefer a candle in the visible window — live tip misleads after history pan.
+      try {
+        const range = chart ? chart.timeScale().getVisibleLogicalRange() : null;
+        const bounds = visibleCandlePriceBounds(range);
+        if (bounds && lastPayload.candles[bounds.toIdx]) {
+          candle = lastPayload.candles[bounds.toIdx];
+        }
+      } catch (err) {
+        candle = null;
+      }
+      if (!candle) candle = lastPayload.candles[lastPayload.candles.length - 1];
     }
     if (!candle) {
       legend.innerHTML = '<span class="sym">' + meta + "</span>";
@@ -590,6 +624,77 @@
     }
   }
 
+  function ensureLivePriceLine(price) {
+    if (!candleSeries || !Number.isFinite(price)) return;
+    try {
+      if (!livePriceLine) {
+        livePriceLine = candleSeries.createPriceLine({
+          price: price,
+          color: "#f0b429",
+          lineWidth: 1,
+          lineStyle: LightweightCharts.LineStyle.SparseDotted,
+          axisLabelVisible: true,
+          title: "live",
+        });
+      } else {
+        livePriceLine.applyOptions({ price: price });
+      }
+    } catch (err) {
+      /* price line is best-effort */
+    }
+  }
+
+  function clearLivePriceLine() {
+    if (!candleSeries || !livePriceLine) {
+      livePriceLine = null;
+      return;
+    }
+    try {
+      candleSeries.removePriceLine(livePriceLine);
+    } catch (err) {
+      /* ignore */
+    }
+    livePriceLine = null;
+  }
+
+  function stickToLiveEdge() {
+    if (!chart || !followLive) return;
+    // Never fight an in-progress user pan/zoom on the time/price scale.
+    if (pointerScaleWatch || performance.now() < scaleWatchUntil) return;
+    try {
+      programmaticNavDepth += 1;
+      chart.timeScale().scrollToRealTime();
+    } catch (err) {
+      /* older builds / empty series */
+    } finally {
+      programmaticNavDepth = Math.max(0, programmaticNavDepth - 1);
+    }
+  }
+
+  function isNearLiveLogicalRange(range, barCount) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length || !chart) return false;
+    // Time-based: logical indices break when overlays expand the timescale
+    // (followLive stayed true → forming ticks yanked horizontal pans back).
+    try {
+      const vr = chart.timeScale().getVisibleRange();
+      if (vr && vr.to != null) {
+        const lastT = Number(candles[candles.length - 1].time);
+        if (!Number.isFinite(lastT)) return false;
+        const barSec = estimateBarSec(candles);
+        return Number(vr.to) >= lastT - barSec * 0.25;
+      }
+    } catch (err) {
+      /* fall through */
+    }
+    const n = Number(barCount) || candles.length;
+    if (!range || n < 1 || range.to == null) return false;
+    const liveTo = (n - 1) + DEFAULT_RIGHT_OFFSET;
+    return Number(range.to) >= liveTo - 0.75;
+  }
+
+  // Always apply series.update when OHLC changed — never trust shared lastPayload
+  // mutations from the host (pendingData === lastPayload).
   function updateFormingBar(bar) {
     if (!candleSeries || !bar || bar.time == null) return false;
     const point = {
@@ -602,16 +707,29 @@
     if (!Number.isFinite(point.time) || !Number.isFinite(point.close)) return false;
     if (!Number.isFinite(point.high) || point.high < point.close) point.high = Math.max(point.open, point.close);
     if (!Number.isFinite(point.low) || point.low > point.close) point.low = Math.min(point.open, point.close);
+    if (point.high < point.low) {
+      const mid = point.close;
+      point.high = Math.max(point.high, mid);
+      point.low = Math.min(point.low, mid);
+    }
     const candles = (lastPayload && lastPayload.candles) || [];
-    if (candles.length) {
-      const lastT = Number(candles[candles.length - 1].time);
-      if (Number.isFinite(lastT) && point.time < lastT) return false;
-    } else {
-      return false;
+    if (!candles.length) return false;
+    const last = candles[candles.length - 1];
+    const lastT = Number(last.time);
+    if (!Number.isFinite(lastT)) return false;
+    // If host tip is behind chart tip, paint live price onto the chart tip.
+    if (point.time < lastT) {
+      point.time = lastT;
+      point.open = Number(last.open);
+      point.high = Math.max(Number(last.high), point.high, point.close);
+      point.low = Math.min(Number(last.low), point.low, point.close);
     }
     try {
+      // Always push to the series so the candle body tracks live price even when
+      // lastPayload was already mutated to match (shared object with host).
       candleSeries.update(point);
     } catch (err) {
+      ensureLivePriceLine(point.close);
       return false;
     }
     if (Number(candles[candles.length - 1].time) === point.time) {
@@ -621,7 +739,13 @@
     }
     lastPayload.candles = candles;
     candleByTime.set(point.time, candles[candles.length - 1]);
-    updateLegend(null);
+    ensureLivePriceLine(point.close);
+    // Do not stickToLiveEdge here — live ticks were yanking horizontal pans back.
+    const now = performance.now();
+    if (now - (updateFormingBar._legendAt || 0) > 250) {
+      updateFormingBar._legendAt = now;
+      updateLegend(null);
+    }
     return true;
   }
 
@@ -656,6 +780,7 @@
       if (candleSeries) {
         applySeriesData(lastPayload);
       }
+      clearLivePriceLine();
       $("legend").textContent = "";
       hideSelectedLine();
       return;
@@ -666,6 +791,8 @@
       return;
     }
     applySeriesData(lastPayload);
+    const tip = candles[candles.length - 1];
+    if (tip && tip.close != null) ensureLivePriceLine(Number(tip.close));
     updateOscTimeBase();
     if (!preserveView && !skipDefaultView) {
       applyDefaultView();
@@ -677,10 +804,13 @@
         /* keep current view */
       }
       syncOscLogicalFromMain(savedRange);
+      if (followLive) stickToLiveEdge();
       resize();
     } else {
+      if (followLive) stickToLiveEdge();
       resize();
     }
+    scheduleFitPriceScaleToCandles(true);
     if (lastSelectedUnix != null) {
       applySelectedMarker(lastSelectedUnix);
     }
@@ -776,12 +906,12 @@
     lastEmaOverlays = payload || { series: [] };
     if (!chart) return;
     const skipRangeRestore = !!(opts && opts.skipRangeRestore);
-    let savedRange = null;
+    let savedTimeRange = null;
     if (!skipRangeRestore) {
       try {
-        savedRange = chart.timeScale().getVisibleLogicalRange();
+        savedTimeRange = chart.timeScale().getVisibleRange();
       } catch (err) {
-        savedRange = null;
+        savedTimeRange = null;
       }
     }
     const wanted = {};
@@ -803,7 +933,7 @@
     Object.keys(wanted).forEach(function (id) {
       const spec = wanted[id];
       let series = emaOverlaySeries.get(id);
-      const opts = {
+      const seriesOpts = applyOverlaySeriesScaleOpts({
         color: spec.color || COLORS.ema20,
         lineWidth: spec.line_width || 2,
         priceLineVisible: false,
@@ -812,25 +942,32 @@
         visible: spec.visible !== false,
         priceScaleId: "right",
         priceFormat: lastPriceFormat,
-      };
+      });
       if (!series) {
-        series = chart.addLineSeries(opts);
+        series = chart.addLineSeries(seriesOpts);
         emaOverlaySeries.set(id, series);
       } else {
-        series.applyOptions(opts);
+        series.applyOptions(seriesOpts);
       }
-      series.setData(spec.data || []);
+      // Clip warmup-only points so overlays cannot expand the timescale past candles.
+      series.setData(clipPointsToCandleExtent(spec.data || []));
     });
-    if (savedRange) {
+    if (followLive) {
+      applyDefaultView();
+    } else if (savedTimeRange && savedTimeRange.from != null && savedTimeRange.to != null) {
       runProgrammaticNav(function () {
         try {
-          chart.timeScale().setVisibleLogicalRange(savedRange);
+          chart.timeScale().setVisibleRange({
+            from: Number(savedTimeRange.from),
+            to: Number(savedTimeRange.to),
+          });
         } catch (err) {
           /* ignore */
         }
-        syncOscLogicalFromMain(savedRange);
+        syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
       });
     }
+    scheduleFitPriceScaleToCandles(true);
   }
 
   function setLldEma(payload) {
@@ -839,15 +976,17 @@
       lldEmaFastSeries.applyOptions({
         color: data.fast_color || "#00ffff",
         visible: !!data.fast_visible,
+        autoscaleInfoProvider: excludeOverlayFromAutoscale,
       });
-      lldEmaFastSeries.setData(data.fast || []);
+      lldEmaFastSeries.setData(clipPointsToCandleExtent(data.fast || []));
     }
     if (lldEmaSlowSeries) {
       lldEmaSlowSeries.applyOptions({
         color: data.slow_color || "#d40047",
         visible: !!data.slow_visible,
+        autoscaleInfoProvider: excludeOverlayFromAutoscale,
       });
-      lldEmaSlowSeries.setData(data.slow || []);
+      lldEmaSlowSeries.setData(clipPointsToCandleExtent(data.slow || []));
     }
   }
 
@@ -865,6 +1004,173 @@
 
   function overlayLayer() {
     return $("overlay-layer");
+  }
+
+  function researchMarkersCanvas() {
+    return $("research-markers");
+  }
+
+  function clipResearchMarkersToPlot() {
+    const canvas = researchMarkersCanvas();
+    if (!canvas) return;
+    canvas.style.right = Math.max(0, priceAxisWidth()) + "px";
+    canvas.style.bottom = Math.max(0, timeAxisHeight()) + "px";
+  }
+
+  function isCanvasResearchMarker(payload) {
+    if (!payload || payload.type !== "marker") return false;
+    if (payload.metadata && payload.metadata.drawing_id) return false;
+    const id = String(payload.id || "");
+    if (id.indexOf("__preview") === 0) return false;
+    if (/^(ezm-|edc-|csw-|stoch-)/.test(id)) return true;
+    const meta = payload.metadata || {};
+    const origin = String(meta.origin || meta.source || "");
+    if (
+      origin === "ezm_candidate_discovery" ||
+      origin.indexOf("backtester") >= 0 ||
+      origin.indexOf("candidate") >= 0
+    ) {
+      return true;
+    }
+    const kind = String(meta.kind || "");
+    return kind.indexOf("EZM") === 0 || kind.indexOf("EDC") === 0 || kind.indexOf("CSW") === 0;
+  }
+
+  function scheduleResearchMarkersPaint(immediate) {
+    if (immediate) {
+      if (researchPaintTimer != null) {
+        clearTimeout(researchPaintTimer);
+        researchPaintTimer = null;
+      }
+      researchPaintQueued = false;
+      paintResearchMarkers();
+      return;
+    }
+    if (researchPaintQueued) return;
+    researchPaintQueued = true;
+    researchPaintTimer = setTimeout(function () {
+      researchPaintTimer = null;
+      researchPaintQueued = false;
+      if (researchPaintRaf != null) cancelAnimationFrame(researchPaintRaf);
+      researchPaintRaf = requestAnimationFrame(function () {
+        researchPaintRaf = null;
+        paintResearchMarkers();
+      });
+    }, researchMarkers.size > 400 ? 48 : 16);
+  }
+
+  function paintResearchMarkers() {
+    const canvas = researchMarkersCanvas();
+    if (!canvas) return;
+    // Must never steal chart drag / pan — even if CSS cache is stale.
+    canvas.style.pointerEvents = "none";
+    clipResearchMarkersToPlot();
+    if (!researchMarkers.size) {
+      const ctxEmpty = canvas.getContext("2d");
+      if (ctxEmpty) {
+        ctxEmpty.setTransform(1, 0, 0, 1, 0, 0);
+        ctxEmpty.clearRect(0, 0, canvas.width || 1, canvas.height || 1);
+      }
+      canvas.style.display = "none";
+      return;
+    }
+    canvas.style.display = "block";
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = Math.max(1, size.w - Math.max(0, priceAxisWidth()));
+    const cssH = Math.max(1, size.h - Math.max(0, timeAxisHeight()));
+    // Prefer CSS inset box; do not fight absolute layout with fixed px width/height
+    // (that previously let the canvas cover the plot and block pan if events leaked).
+    const boxW = canvas.clientWidth > 0 ? canvas.clientWidth : cssW;
+    const boxH = canvas.clientHeight > 0 ? canvas.clientHeight : cssH;
+    const wantW = Math.max(1, Math.floor(boxW * dpr));
+    const wantH = Math.max(1, Math.floor(boxH * dpr));
+    if (canvas.width !== wantW || canvas.height !== wantH) {
+      canvas.width = wantW;
+      canvas.height = wantH;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, boxW, boxH);
+    if (!chart || boxW < 16 || boxH < 16) return;
+
+    const pad = 24;
+    const drawn = [];
+    researchMarkers.forEach(function (rec) {
+      const p = rec.payload;
+      if (!p || p.visible === false) return;
+      const x = xOf(p.timestamp);
+      if (x == null || x < -pad || x > boxW + pad) return;
+      let y = p.price != null ? yOf(p.price) : null;
+      if (y == null) y = 24;
+      if (p.position === "above") y -= 12;
+      if (p.position === "below") y += 12;
+      if (y < -pad || y > boxH + pad) return;
+      drawn.push({
+        x: x,
+        y: y,
+        shape: p.shape || "circle",
+        color: (p.style && p.style.color) || "#888",
+        sizePx: Math.max(4, Number(p.size) || 8),
+        text: p.text || "",
+      });
+    });
+
+    const showText = drawn.length <= 280;
+    for (let i = 0; i < drawn.length; i++) {
+      const m = drawn[i];
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.fillStyle = m.color;
+      ctx.strokeStyle = m.color;
+      if (m.shape === "diamond") {
+        const r = m.sizePx * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r, 0);
+        ctx.lineTo(0, r);
+        ctx.lineTo(-r, 0);
+        ctx.closePath();
+        ctx.fill();
+      } else if (m.shape === "arrow_up") {
+        const hw = m.sizePx;
+        const hh = m.sizePx * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, -hh * 0.55);
+        ctx.lineTo(hw, hh * 0.45);
+        ctx.lineTo(-hw, hh * 0.45);
+        ctx.closePath();
+        ctx.fill();
+      } else if (m.shape === "arrow_down") {
+        const hw = m.sizePx;
+        const hh = m.sizePx * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, hh * 0.55);
+        ctx.lineTo(hw, -hh * 0.45);
+        ctx.lineTo(-hw, -hh * 0.45);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, m.sizePx * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (showText && m.text) {
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        const tw = ctx.measureText(m.text).width;
+        const padX = 3;
+        const bx = m.sizePx * 0.7;
+        const by = -7;
+        ctx.fillStyle = hexAlpha(m.color, 0.18);
+        ctx.fillRect(bx, by, tw + padX * 2, 14);
+        ctx.fillStyle = m.color;
+        ctx.fillText(m.text, bx + padX, by + 7);
+      }
+      ctx.restore();
+    }
   }
 
   function snapUnixToBar(unix) {
@@ -947,10 +1253,15 @@
   }
 
   function scaleWatchTick() {
-      if (priceMapChanged()) {
-      layoutOverlays();
-      drawVolumeProfile();
+    if (priceMapChanged()) {
       updateSelectedLine();
+      // Coalesce heavy overlay paints while the price scale is moving.
+      if (scaleWatchTick._layoutTimer == null) {
+        scaleWatchTick._layoutTimer = setTimeout(function () {
+          scaleWatchTick._layoutTimer = null;
+          layoutOverlays();
+        }, researchMarkers.size > 200 ? 90 : 50);
+      }
     }
     const keep = pointerScaleWatch || performance.now() < scaleWatchUntil;
     if (keep) {
@@ -958,6 +1269,10 @@
       return;
     }
     scaleWatchRaf = null;
+    if (scaleWatchTick._layoutTimer != null) {
+      clearTimeout(scaleWatchTick._layoutTimer);
+      scaleWatchTick._layoutTimer = null;
+    }
     layoutOverlays();
     updateSelectedLine();
   }
@@ -971,6 +1286,9 @@
     if (!pointerScaleWatch) return;
     pointerScaleWatch = false;
     noteScaleInteraction(120);
+    // Do not scheduleFit here: a vertical price-axis drag sets autoScale=false
+    // and must stick. Horizontal time pan recovers via visibleLogicalRangeChange
+    // only while autoScale remains on.
   }
 
   function onScaleWheel() {
@@ -1023,6 +1341,18 @@
     };
   }
 
+  function excludeOverlayFromAutoscale() {
+    // Overlay lines stay on the right scale for alignment, but must not drive
+    // autoscaling — wrong/stale EMA or LLD points hide candlesticks (esp. HTF).
+    return null;
+  }
+
+  function applyOverlaySeriesScaleOpts(opts) {
+    const out = opts || {};
+    out.autoscaleInfoProvider = excludeOverlayFromAutoscale;
+    return out;
+  }
+
   function resetPriceScales() {
     if (chart) {
       try {
@@ -1056,22 +1386,178 @@
     }
   }
 
+  function visibleCandlePriceBounds(range) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length) return null;
+    let fromIdx = 0;
+    let toIdx = candles.length - 1;
+    if (range && range.from != null && range.to != null) {
+      const n = candles.length;
+      let rawFrom = Math.floor(Number(range.from));
+      let rawTo = Math.ceil(Number(range.to));
+      // After TF switches, a stale logical range from a denser TF can sit far
+      // outside the new series — treat that as "use full series".
+      if (rawFrom > n - 1 || rawTo < 0) {
+        rawFrom = 0;
+        rawTo = n - 1;
+      }
+      fromIdx = Math.max(0, rawFrom);
+      toIdx = Math.min(n - 1, rawTo);
+      if (toIdx < fromIdx) {
+        fromIdx = 0;
+        toIdx = n - 1;
+      }
+    }
+    let lo = Infinity;
+    let hi = -Infinity;
+    let count = 0;
+    for (let i = fromIdx; i <= toIdx; i++) {
+      const c = candles[i];
+      if (!c) continue;
+      const low = Number(c.low);
+      const high = Number(c.high);
+      const close = Number(c.close);
+      if (Number.isFinite(low)) lo = Math.min(lo, low);
+      if (Number.isFinite(high)) hi = Math.max(hi, high);
+      if (Number.isFinite(close)) {
+        lo = Math.min(lo, close);
+        hi = Math.max(hi, close);
+        count += 1;
+      }
+    }
+    if (!count || !(hi >= lo) || !Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+    return { lo: lo, hi: hi, n: count, fromIdx: fromIdx, toIdx: toIdx };
+  }
+
+  function candlesOutOfPriceView(range) {
+    if (!candleSeries) return false;
+    const bounds = visibleCandlePriceBounds(range);
+    if (!bounds) return false;
+    const samples = [bounds.lo, bounds.hi, (bounds.lo + bounds.hi) / 2];
+    const plotH = plotBottomY();
+    let outside = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const y = yOf(samples[i]);
+      if (y == null || Number.isNaN(y) || y < -8 || y > plotH + 8) outside += 1;
+    }
+    return outside >= 2;
+  }
+
+  function ensureCandleSeriesVisible() {
+    if (!candleSeries) return;
+    try {
+      candleSeries.applyOptions({ visible: true });
+    } catch (err) {
+      /* ignore */
+    }
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (candles.length && lastCandleSetCount !== candles.length) {
+      applySeriesData(lastPayload);
+    }
+  }
+
+  function fitPriceScaleToVisibleCandles(force) {
+    if (!chart || !candleSeries) return false;
+    ensureCandleSeriesVisible();
+    let range = null;
+    try {
+      range = chart.timeScale().getVisibleLogicalRange();
+    } catch (err) {
+      range = null;
+    }
+    let autoScaleOn = true;
+    try {
+      const opts = chart.priceScale("right").options();
+      autoScaleOn = !opts || opts.autoScale !== false;
+    } catch (err) {
+      autoScaleOn = true;
+    }
+    // Vertical price-axis drag turns autoScale off — never yank it back unless
+    // force (reset / TF change / fresh setData / applyDefaultView).
+    if (!force && !autoScaleOn) return false;
+    const outOfView = candlesOutOfPriceView(range);
+    if (!force && !outOfView) return false;
+    resetPriceScales();
+    return true;
+  }
+
+  let fitPriceTimer = null;
+  function scheduleFitPriceScaleToCandles(force) {
+    if (fitPriceTimer != null) clearTimeout(fitPriceTimer);
+    fitPriceTimer = setTimeout(function () {
+      fitPriceTimer = null;
+      if (pointerScaleWatch && !force) return;
+      fitPriceScaleToVisibleCandles(!!force);
+    }, force ? 30 : 60);
+  }
+
+  function candleTimeExtent() {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length) return null;
+    const from = Number(candles[0].time);
+    const to = Number(candles[candles.length - 1].time);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return null;
+    return { from: from, to: to };
+  }
+
+  function clipPointsToCandleExtent(points) {
+    const ext = candleTimeExtent();
+    const list = points || [];
+    if (!ext || !list.length) return list;
+    const pad = estimateBarSec((lastPayload && lastPayload.candles) || []) || 60;
+    const lo = ext.from - pad;
+    const hi = ext.to + pad;
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      const t = Number(p && p.time);
+      if (!Number.isFinite(t) || t < lo || t > hi) continue;
+      out.push(p);
+    }
+    return out;
+  }
+
   function applyDefaultView() {
     if (!chart) return false;
+    followLive = true;
     resetPriceScales();
     const candles = (lastPayload && lastPayload.candles) || [];
-    const range = computeDefaultLogicalRange(candles.length);
-    if (range) {
-      try {
-        chart.timeScale().setVisibleLogicalRange(range);
-      } catch (err) {
-        return false;
+    if (!candles.length) return false;
+    // Use unix time range from the candle series — never logical indices.
+    // Overlay EMA warmup can expand the timescale far beyond candles; logical
+    // ranges based on candle count then land in an empty (EMA-only) window.
+    const barSec = estimateBarSec(candles);
+    const lastT = Number(candles[candles.length - 1].time);
+    const fromIdx = Math.max(0, candles.length - DEFAULT_VISIBLE_BARS);
+    const fromT = Number(candles[fromIdx].time);
+    let ok = false;
+    try {
+      chart.timeScale().setVisibleRange({
+        from: fromT,
+        to: lastT + barSec * DEFAULT_RIGHT_OFFSET,
+      });
+      ok = true;
+    } catch (err) {
+      const range = computeDefaultLogicalRange(candles.length);
+      if (range) {
+        try {
+          chart.timeScale().setVisibleLogicalRange(range);
+          ok = true;
+        } catch (err2) {
+          try {
+            chart.timeScale().scrollToRealTime();
+            ok = true;
+          } catch (err3) {
+            return false;
+          }
+        }
       }
-      syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange() || range);
     }
+    syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
     layoutOverlays();
     updateSelectedLine();
-    return true;
+    scheduleFitPriceScaleToCandles(true);
+    return ok;
   }
 
   function resetView() {
@@ -1424,18 +1910,34 @@
     }
     if (p.position === "above") y -= 12;
     if (p.position === "below") y += 12;
+    // Fast path: EZM / research markers can be thousands — avoid rebuilding DOM
+    // on every layoutOverlays() tick (forming price / scale watch).
+    const shape = p.shape || "circle";
+    const color = (p.style && p.style.color) || "#888";
+    const size = p.size || 8;
+    const text = p.text || "";
+    const sig = shape + "|" + color + "|" + size + "|" + text;
+    if (rec._mx === x && rec._my === y && rec._msig === sig && el.childNodes.length) {
+      el.style.display = "flex";
+      return;
+    }
+    rec._mx = x;
+    rec._my = y;
     el.style.display = "flex";
     el.style.left = x + "px";
     el.style.top = y + "px";
-    el.textContent = "";
-    el.appendChild(markerShapeEl(p.shape || "circle", p.style.color, p.size || 8));
-    if (p.text) {
-      const t = document.createElement("div");
-      t.className = "ov-marker-text";
-      t.textContent = p.text;
-      t.style.color = p.style.color;
-      t.style.background = hexAlpha(p.style.color, 0.18);
-      el.appendChild(t);
+    if (rec._msig !== sig || !el.childNodes.length) {
+      rec._msig = sig;
+      el.textContent = "";
+      el.appendChild(markerShapeEl(shape, color, size));
+      if (text) {
+        const t = document.createElement("div");
+        t.className = "ov-marker-text";
+        t.textContent = text;
+        t.style.color = color;
+        t.style.background = hexAlpha(color, 0.18);
+        el.appendChild(t);
+      }
     }
   }
 
@@ -1948,7 +2450,9 @@
     ctx.restore();
     if (badge) {
       badge.hidden = false;
-      badge.textContent = "Aggregated Orderbook Profile";
+      const label = (obpPayload && obpPayload.label) || "Orderbook Walls";
+      const n = bars.length;
+      badge.textContent = label + " · " + n;
     }
   }
 
@@ -1995,8 +2499,8 @@
     tip.style.left = Math.max(8, x - 190) + "px";
     tip.style.top = Math.max(8, y - 8) + "px";
     tip.innerHTML =
-      "<div><strong>Aggregated Orderbook Profile</strong></div>" +
-      "<div>" + String(b.side || "") + " Wall</div>" +
+      "<div><strong>Current Orderbook Walls</strong></div>" +
+      "<div>" + String(b.side || "") + " Wall (latest snapshot)</div>" +
       "<div>Price " + fmtN(b.price) + "</div>" +
       "<div>Notional " + fmtN(b.value, 2) + " (" + (b.value_type || "notional_quote") + ")</div>" +
       "<div>Qty " + fmtN(b.qty, 2) + " (" + (b.qty_unit || "base") + ")</div>" +
@@ -2004,8 +2508,7 @@
       "<div>Dist " + fmtN(b.distance_abs) + " · " + fmtN(b.distance_bps, 2) + " bps</div>" +
       "<div>UTC " + ts + "</div>" +
       "<div>carried_forward: " + (b.carried_forward ? "true" : "false") + "</div>" +
-      "<div>quality: " + (b.quality_flags || "—") + "</div>" +
-      "<div>samples " + (b.samples || 1) + "</div>";
+      "<div>quality: " + (b.quality_flags || "—") + "</div>";
   }
 
   function getVisibleTimeRange() {
@@ -2050,6 +2553,7 @@
       syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
       layoutOverlays();
       updateSelectedLine();
+      scheduleFitPriceScaleToCandles(true);
       return true;
     } catch (e) {
       return false;
@@ -2296,9 +2800,11 @@
   function layoutOverlays() {
     overlayLayoutCount += 1;
     clipOverlayLayerToPlot();
+    clipResearchMarkersToPlot();
     overlayRegistry.forEach(function (rec) {
       renderOneOverlay(rec);
     });
+    scheduleResearchMarkersPaint();
     layoutShiftMeasure();
     drawVolumeProfile();
     drawOrderbookProfile();
@@ -2357,6 +2863,26 @@
 
   function addOverlay(payload) {
     if (!payload || !payload.id) return;
+    if (isCanvasResearchMarker(payload)) {
+      // Leave DOM registry if this id was previously a drawing.
+      if (overlayRegistry.has(payload.id)) {
+        removeOverlay(payload.id);
+      }
+      let rec = researchMarkers.get(payload.id);
+      if (!rec) {
+        rec = { payload: payload };
+        researchMarkers.set(payload.id, rec);
+      } else {
+        rec.payload = payload;
+      }
+      scheduleResearchMarkersPaint();
+      return;
+    }
+    // Migrating off canvas → DOM (rare).
+    if (researchMarkers.has(payload.id)) {
+      researchMarkers.delete(payload.id);
+      scheduleResearchMarkersPaint();
+    }
     let rec = overlayRegistry.get(payload.id);
     if (!rec) {
       rec = { payload: payload, priceLine: null, el: null };
@@ -2377,6 +2903,10 @@
   }
 
   function removeOverlay(id) {
+    if (researchMarkers.has(id)) {
+      researchMarkers.delete(id);
+      scheduleResearchMarkersPaint(true);
+    }
     const rec = overlayRegistry.get(id);
     if (!rec) return;
     destroyOverlayVisual(rec);
@@ -2384,6 +2914,8 @@
   }
 
   function clearOverlays() {
+    researchMarkers.clear();
+    scheduleResearchMarkersPaint(true);
     overlayRegistry.forEach(function (rec) {
       destroyOverlayVisual(rec);
     });
@@ -4019,7 +4551,8 @@
       wickVisible: candleOpts ? candleOpts.wickVisible : null,
       logical: logical,
       barsInfo: barsInfo,
-      overlayCount: overlayRegistry.size,
+      overlayCount: overlayRegistry.size + researchMarkers.size,
+      researchMarkerCount: researchMarkers.size,
       overlayLayoutCount: overlayLayoutCount,
       overlaySamples: overlayDebugSamples(),
       priceYSample: lastPriceYSample,

@@ -90,7 +90,7 @@ def test_history_go_to_wiring():
     assert "researchHistoryPreset" in html
     assert "researchGoToBtn" in html
     assert "researchSyncChartAfterBt" in html
-    assert "history-6" in html
+    assert "history-9" in html
     assert "visiblePanesContainTime" in js
     assert "reloadVisibleHistory" in js
     assert "goToDateTime" in js

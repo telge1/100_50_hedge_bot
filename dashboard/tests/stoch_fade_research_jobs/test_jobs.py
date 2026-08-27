@@ -192,6 +192,13 @@ def test_extra_fields_and_strategy_rejected(tmp_path, monkeypatch):
     )
     assert code == 400
     assert payload["error"] == "UNKNOWN_FIELDS"
+    payload, code = _post(
+        env,
+        ["ETHUSDT"],
+        body_extra={"strategy_id": "not_allowed"},
+    )
+    assert code == 400
+    assert payload["error"] == "UNKNOWN_STRATEGY_ID"
 
 
 def test_time_validation(tmp_path, monkeypatch):
@@ -509,7 +516,8 @@ def test_ui_and_default_strategy_unchanged():
     assert "Kausalen Backtest starten" in html
     assert "Kausaler Backtest Ergebnis" in html
     assert 'id="frozenFadeResultCard"' in html
-    assert "Nur Signalerzeugung" in html
+    assert "Candidate Discovery" in html or "Nur Signalerzeugung" in html
+    assert "ema_zone_microstructure_confirmation_v1" in html
     assert 'option value="wave_fade_no_be50_v1" selected' in html
     assert "universe51SelectAll" in html
     assert "universe51UpdateSelected" in html

@@ -543,3 +543,61 @@ body.research-browser-fs .trp-workspace {
     font-size: 11px;
     max-width: 11.5rem;
 }
+
+.research-ezm-layer-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.research-ezm-legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-left: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid #334155;
+    font-size: 0.72rem;
+    color: #cbd5e1;
+}
+
+.research-ezm-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.research-ezm-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    transform: rotate(45deg);
+}
+
+.research-ezm-swatch-setup {
+    background: #9467bd;
+    box-shadow: 0 0 0 1px #c4b5fd inset;
+}
+
+.research-ezm-swatch-confirmed {
+    background: linear-gradient(135deg, #2ca02c 50%, #d62728 50%);
+    border-radius: 999px;
+    transform: none;
+}
+
+.research-ezm-swatch-blocked {
+    background: #bcbd22;
+    border-radius: 999px;
+    transform: none;
+}
+
+.research-ezm-swatch-wait {
+    background: #7f7f7f;
+    border-radius: 999px;
+    transform: none;
+}

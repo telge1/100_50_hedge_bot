@@ -178,6 +178,13 @@ body {
   z-index: 2;
 }
 
+#research-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+  z-index: 2;
+}
+
 #vp-overlay {
   position: absolute;
   inset: 0;
