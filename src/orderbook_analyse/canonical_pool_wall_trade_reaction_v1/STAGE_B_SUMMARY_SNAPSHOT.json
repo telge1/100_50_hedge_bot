@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-08-31T18:48:22Z",
+  "rule_id": "CLEAR_POOL_SELECTION_RULE_V1",
+  "n_candidates": 126,
+  "n_audited": 126,
+  "n_zone_wall_discovered": 126,
+  "zone_label_counts": {
+    "ZONE_PULLED": 38,
+    "ZONE_HELD": 73,
+    "ZONE_UNKNOWN": 15
+  },
+  "evidence_class_counts": {
+    "WALL_CANCEL_OR_MOVE_DOMINANT": 38,
+    "POOL_REJECTION_MIXED_WALL_REACTION": 72,
+    "INSUFFICIENT_DATA": 15,
+    "POOL_REJECTION_WITH_ABSORPTION_EVIDENCE": 1
+  },
+  "evidence_to_zone_map": {
+    "POOL_REJECTION_WITH_ABSORPTION_EVIDENCE": "ZONE_HELD",
+    "POOL_REJECTION_MIXED_WALL_REACTION": "ZONE_HELD",
+    "POOL_BREAKOUT_WITH_ACCEPTANCE": "ZONE_EATEN",
+    "WALL_CANCEL_OR_MOVE_DOMINANT": "ZONE_PULLED",
+    "WALL_NOT_MEANINGFULLY_ATTACKED": "ZONE_UNKNOWN",
+    "WINDOW_CENSORED_ACTIVE": "ZONE_UNKNOWN",
+    "INSUFFICIENT_DATA": "ZONE_UNKNOWN"
+  },
+  "elapsed_s": 342.9,
+  "candidates_file": "/home/telgenbuescher/projects/orderbook_analyse/results/canonical_pool_selection_stage_a_v1/stage_a_candidates.csv",
+  "candidates_gate": "stage_a_a7_raw_ob200_zone_depth",
+  "reused_auditor": "liquidity_pool_six_case_wall_trade_reaction_sample_v1.audit_case"
+}

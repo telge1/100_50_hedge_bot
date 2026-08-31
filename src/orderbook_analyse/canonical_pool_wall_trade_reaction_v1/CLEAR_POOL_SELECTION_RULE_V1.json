@@ -1,0 +1,38 @@
+{
+  "rule_id": "CLEAR_POOL_SELECTION_RULE_V1",
+  "status": "FROZEN",
+  "frozen_at": "2026-08-31T18:00:00Z",
+  "one_line": "Only large HTF pool zones that are full of resting book liquidity on approach; then decide from that zone liquidity behavior; everything else is secondary.",
+  "one_line_de": "Große HTF-Zonen, die beim Anlauf wirklich voll mit Book-Liquidität sind — der Rest ist nachrangig. Entscheidung = Verhalten dieser Zonen-Liquidität.",
+  "stage_a_filter": {
+    "symbol": "BTCUSDT",
+    "pool_source": "canonical_lld",
+    "timeframes": ["15m", "30m"],
+    "min_P": 5,
+    "touch": "mid_inside_zone_band",
+    "book_fill": "resting_liquidity_inside_lower_upper_on_approach",
+    "book_fill_preferred_source": "raw_ob200_zone_depth",
+    "book_fill_proxy_only": "orderbook_features_1s_v2_dominant_wall"
+  },
+  "stage_b_decide": {
+    "observe": "liquidity_inside_candidate_zone_only",
+    "labels": ["ZONE_HELD", "ZONE_EATEN", "ZONE_PULLED", "ZONE_UNKNOWN"],
+    "no_entry": true,
+    "no_pnl": true
+  },
+  "secondary_ignore": [
+    "5m_primary_candidates",
+    "singleton_or_pair_primary",
+    "empty_zones",
+    "1s_dominant_wall_without_zone_depth",
+    "chart_cosmetics_alone",
+    "outcomes_pnl"
+  ],
+  "evidence_dir": "results/canonical_pool_wall_trade_reaction_v1",
+  "evidence_files": [
+    "VALIDATION.md",
+    "validation_check.json",
+    "raw_zone_depth_check.json",
+    "REPORT.md"
+  ]
+}

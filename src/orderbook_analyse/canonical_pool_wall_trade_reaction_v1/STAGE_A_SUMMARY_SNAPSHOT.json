@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-08-31T18:42:07Z",
+  "rule_id": "CLEAR_POOL_SELECTION_RULE_V1",
+  "book_fill_sot": "raw_ob200_zone_depth",
+  "a7_min_zone_levels": 2,
+  "raw_window": {
+    "start": "2026-08-24T00:00:00Z",
+    "end": "2026-08-28T16:26:23Z"
+  },
+  "n_a1_a6_scanned": 226,
+  "n_a7_pass": 126,
+  "n_a7_reject": 100,
+  "a7_fail_reason_counts": {
+    "no_raw_book": 44,
+    "empty_or_thin_zone": 56
+  },
+  "among_a7_pass_1s_wall_proxy_YES": 25,
+  "among_a7_pass_1s_wall_proxy_NO": 101,
+  "median_a7_zone_level_count": 91.0,
+  "median_a7_zone_notional": 1873715.39835,
+  "elapsed_s": 360.1
+}
