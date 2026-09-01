@@ -20,6 +20,10 @@ EMA_DUAL_CROSS_SOURCE = "ema_dual_cross_backtester"
 EMA_DUAL_CROSS_STRATEGY_ID = "ema_dual_cross_multisource_v1"
 EZM_SOURCE = "ezm_candidate_discovery"
 EZM_STRATEGY_ID = "ema_zone_microstructure_confirmation_v1"
+APS_SOURCE = "a_plus_pool_signal_scanner_v1"
+APS_STRATEGY_ID = "a_plus_liquidity_pool_signal_scanner_v1"
+NAP_SOURCE = "a_plus_nested_ask_pool_edge_short_v1"
+NAP_STRATEGY_ID = "a_plus_nested_ask_pool_edge_short_v1"
 
 PANE_IDS = ("pane-0", "pane-1", "pane-2", "pane-3")
 DEFAULT_PANE_TFS = {
@@ -153,6 +157,11 @@ class ResearchWorkspace:
         self._ezm_run: dict[str, Any] | None = None
         self._ezm_visible: bool = False
         self._ezm_layer_mode: str = "both"
+        self._pool_signals_run: dict[str, Any] | None = None
+        self._nested_ask_pool_run: dict[str, Any] | None = None
+        self._nested_ask_pool_visible: bool = False
+        self._nested_ask_pool_show_rejected: bool = False
+        self._pool_signals_display_mode: str = "off"
         self._load_persisted_drawings()
 
     def _load_persisted_drawings(self) -> None:
@@ -225,6 +234,8 @@ class ResearchWorkspace:
             "cluster_sweep": self._cluster_sweep_snapshot(),
             "ema_dual_cross": self._ema_dual_cross_snapshot(),
             "ezm": self._ezm_snapshot(),
+            "pool_signals": self._pool_signals_snapshot(),
+            "nested_ask_pool": self._nested_ask_pool_snapshot(),
         }
 
     def _cluster_sweep_snapshot(self) -> dict[str, Any]:
@@ -773,6 +784,281 @@ class ResearchWorkspace:
         sym = str(symbol or (self._ezm_run.get("meta") or {}).get("symbol") or "").upper()
         return self.set_ezm_visible(self._ezm_visible, sym)
 
+    def _normalize_pool_signals_mode(self, mode: str) -> str:
+        m = str(mode or "confirmed").strip().lower()
+        if m in {"off", "aus", "none", "0"}:
+            return "off"
+        if m in {"debug", "candidates"}:
+            return "debug"
+        if m in {"active", "armed", "active_plans", "aktive"}:
+            return "active"
+        if m in {"all", "all_states", "alle"}:
+            return "all_states"
+        return "confirmed"
+
+    def _pool_signals_time_span(self, run: dict[str, Any]) -> dict[str, Any]:
+        """Earliest/latest signal times for chart sync after import."""
+        times: list[datetime] = []
+        for row in list(run.get("confirmed") or []) + list(run.get("signal_intents") or []):
+            if not isinstance(row, dict):
+                continue
+            for key in (
+                "armed_at",
+                "signal_at",
+                "confirmation_at",
+                "confirmed_at",
+                "decision_at",
+                "hypothetical_filled_at",
+            ):
+                raw = row.get(key)
+                if raw is None:
+                    continue
+                try:
+                    if isinstance(raw, datetime):
+                        times.append(raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc))
+                    else:
+                        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                        # Scanner artifacts are UTC-naive — never treat as local wall time.
+                        times.append(dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc))
+                    break
+                except ValueError:
+                    continue
+        if not times:
+            return {}
+        start = min(times)
+        end = max(times)
+        # Prefer a mid signal as focus
+        focus = times[len(times) // 2]
+        return {
+            "start": start.isoformat().replace("+00:00", "Z"),
+            "end": end.isoformat().replace("+00:00", "Z"),
+            "focus": focus.isoformat().replace("+00:00", "Z"),
+            "n_timed": len(times),
+        }
+
+    def _pool_signals_snapshot(self) -> dict[str, Any]:
+        run = self._pool_signals_run or {}
+        span = self._pool_signals_time_span(run)
+        return {
+            "strategy_id": APS_STRATEGY_ID,
+            "loaded": bool(run),
+            "display_mode": self._pool_signals_display_mode,
+            "meta": run.get("meta") or {},
+            "n_confirmed": len(run.get("confirmed") or []),
+            "n_debug_rows": len(run.get("debug_rows") or []),
+            "source": APS_SOURCE,
+            "run_intent": "candidate_discovery",
+            "time_span": span,
+        }
+
+    def _clear_pool_signals_overlays(self, symbol: str | None = None) -> int:
+        removed = 0
+        for oid in list(self.overlays.ids()):
+            try:
+                ov = self.overlays.get_overlay(oid)
+            except KeyError:
+                continue
+            meta = getattr(ov, "metadata", None) or {}
+            if meta.get("origin") != APS_SOURCE and meta.get("strategy_id") != APS_STRATEGY_ID:
+                continue
+            if not str(oid).startswith("aps-"):
+                continue
+            if symbol and ov.symbol != symbol:
+                continue
+            self.overlays.remove_overlay(oid)
+            removed += 1
+        return removed
+
+    def _pool_signals_marker_specs(self, run: dict[str, Any]) -> list[dict[str, Any]]:
+        try:
+            from .oa_import import ensure_oa_on_path
+
+            ensure_oa_on_path()
+            from orderbook_analyse.a_plus_liquidity_pool_signal_scanner_v1.markers import (
+                dedupe_plan_rows,
+                signals_to_marker_specs,
+            )
+        except Exception:  # noqa: BLE001
+            return []
+        mode = self._pool_signals_display_mode
+        run_id = str((run.get("meta") or {}).get("run_id") or "")
+
+        def _strip_bulk_lines(specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            # Dashboard: never paint ENTRY/TP/SL axis labels for historical imports.
+            # Even "active" includes confirmed rows → 29×3 lines = chaos. Keep arrows only;
+            # levels stay in marker tooltip. Live ARMED-only runs rarely need lines on chart.
+            return [s for s in specs if str(s.get("kind") or "") != "APS_LINE"]
+
+        if mode == "active":
+            # Prefer true armed intents; fall back to confirmed markers (arrows only).
+            armed_rows = dedupe_plan_rows(
+                list(run.get("signal_intents") or [])
+                + [
+                    c
+                    for c in (run.get("candidates") or [])
+                    if str(c.get("state") or "") in {"LIMIT_INTENT_ARMED", "LIMIT_ARMED"}
+                ]
+            )
+            confirmed_rows = list(run.get("confirmed") or [])
+            if armed_rows:
+                specs = signals_to_marker_specs(armed_rows, display_mode="active", run_id=run_id or None)
+                specs += signals_to_marker_specs(
+                    confirmed_rows, display_mode="confirmed", run_id=run_id or None
+                )
+            else:
+                # No live armed plans in this import — show confirmed arrows, not plan lines
+                specs = signals_to_marker_specs(
+                    confirmed_rows, display_mode="confirmed", run_id=run_id or None
+                )
+            return _strip_bulk_lines(specs)
+        if mode == "all_states":
+            rows = dedupe_plan_rows(
+                list(run.get("signal_intents") or [])
+                + list(run.get("candidates") or [])
+                + list(run.get("confirmed") or [])
+                + list(run.get("debug_rows") or [])
+            )
+            return _strip_bulk_lines(
+                signals_to_marker_specs(rows, display_mode="all_states", run_id=run_id or None)
+            )
+        specs = signals_to_marker_specs(run.get("confirmed") or [], display_mode=mode, run_id=run_id or None)
+        if mode == "debug":
+            specs = signals_to_marker_specs(run.get("debug_rows") or [], display_mode="debug", run_id=run_id or None)
+            specs += signals_to_marker_specs(
+                run.get("confirmed") or [], display_mode="confirmed", run_id=run_id or None
+            )
+        return _strip_bulk_lines(specs)
+
+    def store_pool_signals_run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._pool_signals_run = {
+            "meta": payload.get("meta") or {},
+            "confirmed": payload.get("confirmed") or [],
+            "debug_rows": payload.get("debug_rows") or [],
+            "signal_intents": payload.get("signal_intents") or [],
+            "candidates": payload.get("candidates") or [],
+        }
+        sym = str((payload.get("meta") or {}).get("symbol") or "").upper()
+        if sym:
+            self._clear_pool_signals_overlays(sym)
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": APS_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(self._pool_signals_run.get("confirmed") or []),
+            "source": APS_SOURCE,
+            "run_intent": "candidate_discovery",
+            "message": "A+ Pool Signals gespeichert — Anzeige umschalten ohne neuen Job",
+        }
+        return snap
+
+    def set_pool_signals_display_mode(self, mode: str, symbol: str | None = None) -> dict[str, Any]:
+        from .pool_signals_backtester import build_overlay_markers
+
+        self._pool_signals_display_mode = self._normalize_pool_signals_mode(mode)
+        run = self._pool_signals_run or {}
+        sym = str(symbol or (run.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_pool_signals_overlays(sym or None)
+        if self._pool_signals_display_mode != "off" and sym and run:
+            specs = self._pool_signals_marker_specs(run)
+            markers = build_overlay_markers(specs, symbol=sym)
+            for ov in markers:
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": APS_STRATEGY_ID,
+            "symbol": sym,
+            "display_mode": self._pool_signals_display_mode,
+            "loaded": len(self._pool_signals_marker_specs(run)) if run else 0,
+            "source": APS_SOURCE,
+            "run_intent": "candidate_discovery",
+        }
+        return snap
+
+    def _nested_ask_pool_snapshot(self) -> dict[str, Any]:
+        run = self._nested_ask_pool_run or {}
+        meta = run.get("meta") or {}
+        return {
+            "strategy_id": NAP_STRATEGY_ID,
+            "loaded": bool(run),
+            "visible": bool(self._nested_ask_pool_visible),
+            "show_rejected": bool(self._nested_ask_pool_show_rejected),
+            "meta": meta,
+            "summary": run.get("ui_summary") or {},
+            "n_overlays": len(run.get("markers") or []),
+            "source": NAP_SOURCE,
+            "run_intent": "historical_backtest",
+            "time_span": {
+                "start": meta.get("start_utc"),
+                "end": meta.get("end_utc"),
+            },
+        }
+
+    def _clear_nested_ask_pool_overlays(self, symbol: str | None = None) -> int:
+        removed = 0
+        for oid in list(self.overlays.ids()):
+            try:
+                ov = self.overlays.get_overlay(oid)
+            except KeyError:
+                continue
+            meta = getattr(ov, "metadata", None) or {}
+            if meta.get("origin") != NAP_SOURCE and meta.get("strategy_id") != NAP_STRATEGY_ID:
+                continue
+            if not str(oid).startswith("nap-"):
+                continue
+            if symbol and ov.symbol != symbol:
+                continue
+            self.overlays.remove_overlay(oid)
+            removed += 1
+        return removed
+
+    def store_nested_ask_pool_run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        from .nested_ask_pool_backtester import build_overlay_objects, ui_summary_from_payload
+
+        markers = list(payload.get("markers") or (payload.get("overlay") or {}).get("specs") or [])
+        ui_summary = ui_summary_from_payload(payload)
+        self._nested_ask_pool_run = {
+            "meta": payload.get("meta") or {},
+            "summary": payload.get("summary") or {},
+            "provenance": payload.get("provenance") or {},
+            "markers": markers,
+            "ui_summary": ui_summary,
+        }
+        sym = str((payload.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_nested_ask_pool_overlays(sym or None)
+        self._nested_ask_pool_visible = True
+        if sym and markers:
+            for ov in build_overlay_objects(markers, symbol=sym):
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": NAP_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(markers),
+            "source": NAP_SOURCE,
+            "run_intent": "historical_backtest",
+            "summary": ui_summary,
+        }
+        return snap
+
+    def set_nested_ask_pool_visible(self, visible: bool, symbol: str | None = None) -> dict[str, Any]:
+        from .nested_ask_pool_backtester import build_overlay_objects
+
+        run = self._nested_ask_pool_run or {}
+        sym = str(symbol or (run.get("meta") or {}).get("symbol") or "").upper()
+        self._clear_nested_ask_pool_overlays(sym or None)
+        self._nested_ask_pool_visible = bool(visible)
+        if self._nested_ask_pool_visible and sym and run:
+            markers = list(run.get("markers") or [])
+            for ov in build_overlay_objects(markers, symbol=sym):
+                if ov.overlay_id in self.overlays:
+                    self.overlays.remove_overlay(ov.overlay_id)
+                self.overlays.add_overlay(ov)
+        return self.snapshot()
+
     def clear_backtester_strategy(self, symbol: str, *, strategy_id: str | None = None) -> dict[str, Any]:
         sym = str(symbol or "").upper()
         sid = str(strategy_id or "")
@@ -788,6 +1074,14 @@ class ResearchWorkspace:
             self._clear_ezm_overlays(sym or None)
             if sid:
                 self._ezm_visible = False
+        if not sid or sid == APS_STRATEGY_ID or sid == "pool_signals" or sid == "a_plus":
+            self._clear_pool_signals_overlays(sym or None)
+            if sid:
+                self._pool_signals_display_mode = "off"
+        if not sid or sid == NAP_STRATEGY_ID or sid == "nested_ask_pool" or sid == "nested_ask":
+            self._clear_nested_ask_pool_overlays(sym or None)
+            if sid:
+                self._nested_ask_pool_visible = False
         if not sid or sid.startswith("stoch") or sid == "wave_fade" or sid == BACKTESTER_SOURCE:
             if sym:
                 existing = [
@@ -1094,6 +1388,8 @@ class ResearchWorkspace:
         return snap
 
     def composed_overlays(self, symbol: str, timeframe: str, lld_overlays: Optional[list] = None) -> list[dict]:
+        from .nested_ask_pool_backtester import json_safe
+
         trp = self._trp
         items = list(self.overlays.get_overlays(symbol, timeframe))
         if lld_overlays:
@@ -1107,9 +1403,13 @@ class ResearchWorkspace:
             )
         )
         payloads = trp["serialize_overlays"](items)
+        safe: list[dict] = []
         for payload in payloads:
             payload["namespace"] = overlay_namespace(payload)
-        return payloads
+            cleaned = json_safe(payload)
+            if isinstance(cleaned, dict):
+                safe.append(cleaned)
+        return safe
 
     def lld_objects(self, candles, config=None) -> tuple[list, dict, dict]:
         trp = self._trp
@@ -1153,6 +1453,8 @@ def overlay_namespace(payload: dict[str, Any]) -> str:
         return "LLD"
     if meta.get("origin") == "cluster_sweep_backtester" or meta.get("strategy_id") == "cluster_sweep_ema_9_20_59" or oid.startswith("csw-"):
         return "CLUSTER_SWEEP"
+    if meta.get("origin") == APS_SOURCE or meta.get("strategy_id") == APS_STRATEGY_ID or oid.startswith("aps-"):
+        return "POOL_SIGNALS"
     if src == "drawing" or meta.get("drawing_id"):
         if payload.get("type") == "position" or drawing_type in ("long_position", "short_position"):
             return "POSITION"

@@ -1,4 +1,4 @@
-"""Pinned Frozen Wave-Fade research window. Does not mutate live strategy defaults."""
+"""Pinned canonical causal Wave-Fade research window. Does not mutate live strategy defaults."""
 
 from __future__ import annotations
 
@@ -7,21 +7,25 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SG_ROOT = Path(
-    "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves"
-)
+DEFAULT_SG_ROOT = Path("/home/telgenbuescher/projects/wave_fade_gold_f16ae32")
 DEFAULT_RUNS_ROOT = REPO_ROOT / "results" / "stoch_fade_research_runs"
 
-STRATEGY_ID = "wave_fade_frozen_f16ae32"
+STRATEGY_ID = "wave_fade_frozen_f16ae32_causal_entry_v1"
 SOURCE_COMMIT_PIN = "f16ae32"
-GENERATOR_VERSION = "stoch_fade_research_runner_v1"
-PHASE = "2A"
+GENERATOR_VERSION = "stoch_fade_causal_dashboard_runner_v1"
+PHASE = "2A_CAUSAL"
 MAX_SYMBOLS = 1
-DEFAULT_CANARY_SYMBOL = "1000PEPEUSDT"
+DEFAULT_CANARY_SYMBOL = "ETHUSDT"
 CANARY_SYMBOL = DEFAULT_CANARY_SYMBOL
 WARMUP_DAYS = 80
 REQUESTED_SIGNAL_START = datetime(2025, 12, 11, 0, 0, 0, tzinfo=timezone.utc)
 REQUESTED_SIGNAL_END_EXCLUSIVE = datetime(2026, 8, 15, 9, 42, 0, tzinfo=timezone.utc)
+CAUSAL_MANIFEST_HASH = "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf"
+CONFIRMATION_POLICY = "cross_recognition"
+CONFIRMATION_SOURCE = CONFIRMATION_POLICY
+OUTCOME_ENGINE = "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m"
+INTRABAR_POLICY = "SL_FIRST"
+EXIT_POLICY = "NO_BE50"
 
 SIDE_EFFECT_FLAGS = {
     "writes_to_clickhouse": False,
@@ -44,6 +48,7 @@ EVAL_NO_CANDLE = "NO_CANDLE_DATA"
 EVAL_INCOMPLETE = "INCOMPLETE_DATA"
 EVAL_ERROR = "RUNNER_ERROR"
 EVAL_NOT = "NOT_EVALUATED"
+EVAL_RUNTIME_ROOT = "RUNTIME_ROOT_UNSAFE"
 
 
 def sg_root(environ: dict | None = None) -> Path:

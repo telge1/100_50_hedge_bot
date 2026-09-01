@@ -631,6 +631,7 @@ def pane_bundle(
     stochastic: dict | None = None,
     liquidity: dict | None = None,
     allow_stale: bool = False,
+    liquidity_location_as_of: str | None = None,
 ) -> dict[str, Any]:
     """One candle read, then EMA/Stoch/LLD/overlays from that same payload."""
     from .workspace_session import get_workspace
@@ -650,9 +651,49 @@ def pane_bundle(
     lld_config_obj = (
         trp["LiquidityLocationConfig"].from_dict(lld_cfg) if lld_cfg else ws.lld_config
     )
-    lld_objs, lld_ema, clusters = ws.lld_objects(candles, config=lld_config_obj)
-    overlays = ws.composed_overlays(packed["symbol"], packed["timeframe"], lld_objs)
-    lld_serialized = trp["serialize_overlays"](lld_objs) if lld_objs else []
+    liquidity_meta: dict[str, Any] = {"mode": "live", "liquidity_location_as_of": None}
+    lld_asof_raw = str(liquidity_location_as_of or "").strip() or None
+    use_causal = bool(lld_asof_raw) and bool(lld_cfg.get("enabled", lld_config_obj.enabled))
+    if use_causal:
+        # OA path must be bootstrapped before any orderbook_analyse import.
+        from .canonical_lld import build_causal_lld_payload, parse_liquidity_location_as_of
+        from .oa_import import ensure_oa_on_path
+
+        ensure_oa_on_path()
+        as_of_dt = parse_liquidity_location_as_of(lld_asof_raw)
+        render_end_dt = None
+        if end is not None:
+            try:
+                render_end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+            except (TypeError, ValueError, OSError):
+                render_end_dt = None
+        causal = build_causal_lld_payload(
+            symbol=packed["symbol"],
+            timeframe=packed["timeframe"],
+            as_of=as_of_dt,
+            liquidity=lld_cfg,
+            render_end=render_end_dt,
+        )
+        lld_serialized = causal["overlays"]
+        lld_ema = causal["ema"]
+        clusters = causal["clusters"]
+        liquidity_meta = causal["meta"]
+        from .workspace_session import overlay_namespace
+        from .nested_ask_pool_backtester import json_safe
+
+        lld_payloads = []
+        for payload in lld_serialized:
+            row = dict(payload)
+            row["namespace"] = overlay_namespace(row)
+            cleaned = json_safe(row)
+            if isinstance(cleaned, dict):
+                lld_payloads.append(cleaned)
+        overlays = ws.composed_overlays(packed["symbol"], packed["timeframe"], lld_overlays=None)
+        overlays = overlays + lld_payloads
+    else:
+        lld_objs, lld_ema, clusters = ws.lld_objects(candles, config=lld_config_obj)
+        lld_serialized = trp["serialize_overlays"](lld_objs) if lld_objs else []
+        overlays = ws.composed_overlays(packed["symbol"], packed["timeframe"], lld_objs)
     return {
         **packed,
         "success": True,
@@ -663,8 +704,12 @@ def pane_bundle(
             "overlays": lld_serialized,
             "ema": lld_ema,
             "clusters": clusters,
+            "liquidity_location": liquidity_meta,
         },
         "overlays": overlays,
         "lld_ema": lld_ema,
         "clusters": clusters,
+        "liquidity_location_mode": liquidity_meta.get("mode"),
+        "liquidity_location_as_of": liquidity_meta.get("liquidity_location_as_of"),
+        "canonical_snapshot_sha256": liquidity_meta.get("canonical_snapshot_sha256"),
     }

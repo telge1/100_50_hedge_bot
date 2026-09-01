@@ -49,6 +49,20 @@ def _one(client: ReadOnlyQueryClient, sql: str, parameters: dict | None = None) 
     return rows[0] if rows else None
 
 
+def _try_one(client: ReadOnlyQueryClient, sql: str, parameters: dict | None = None) -> tuple[Any, str | None]:
+    try:
+        return _one(client, sql, parameters=parameters), None
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)
+
+
+def _try_query(client: ReadOnlyQueryClient, sql: str, parameters: dict | None = None) -> tuple[Any, str | None]:
+    try:
+        return client.query(sql, parameters=parameters), None
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)
+
+
 def _outcomes_payload(outcomes: Any, *, scope_symbol: str) -> dict[str, Any]:
     if isinstance(outcomes, tuple) and outcomes and outcomes[0] == "error":
         return {
@@ -145,7 +159,7 @@ def capture_snapshot(
         """,
         params,
     )
-    sig = _one(
+    sig, sig_err = _try_one(
         client,
         f"""
         SELECT
@@ -158,7 +172,8 @@ def capture_snapshot(
         """,
         {"symbol": symbol},
     )
-    watermarks = client.query(
+    watermarks, wm_err = _try_query(
+        client,
         f"""
         SELECT symbol, timeframe, strategy_version, last_processed_candle_open_time
         FROM {db}.signal_processing_state FINAL
@@ -167,28 +182,34 @@ def capture_snapshot(
         """,
         {"symbol": symbol},
     )
-    try:
-        outcomes = _one(
-            client,
-            f"""
-            SELECT count(), uniqExact(o.signal_id)
-            FROM {db}.signal_outcomes AS o FINAL
-            INNER JOIN {db}.signals AS s FINAL ON o.signal_id = s.signal_id
-            WHERE s.symbol = {{symbol:String}}
-            """,
-            {"symbol": symbol},
+    outcomes, outcomes_err = _try_one(
+        client,
+        f"""
+        SELECT count(), uniqExact(o.signal_id)
+        FROM {db}.signal_outcomes AS o FINAL
+        INNER JOIN {db}.signals AS s FINAL ON o.signal_id = s.signal_id
+        WHERE s.symbol = {{symbol:String}}
+        """,
+        {"symbol": symbol},
+    )
+    if outcomes_err:
+        fallback, fallback_err = _try_one(
+            client, f"SELECT count(), uniqExact(signal_id) FROM {db}.signal_outcomes FINAL"
         )
-    except Exception as exc:
-        try:
-            outcomes = _one(client, f"SELECT count(), uniqExact(signal_id) FROM {db}.signal_outcomes FINAL")
-            outcomes = ("global_only", int(outcomes[0]) if outcomes else 0, int(outcomes[1]) if outcomes else 0, str(exc))
-        except Exception as exc2:
-            outcomes = ("error", str(exc2))
+        if fallback_err:
+            outcomes = ("error", fallback_err)
+        else:
+            outcomes = (
+                "global_only",
+                int(fallback[0]) if fallback else 0,
+                int(fallback[1]) if fallback else 0,
+                outcomes_err,
+            )
 
     global_counts = {}
     for table in ("candles_1m", "signals", "signal_processing_state"):
-        row = _one(client, f"SELECT count() FROM {db}.{table}")
-        global_counts[table] = int(row[0]) if row else None
+        row, gerr = _try_one(client, f"SELECT count() FROM {db}.{table}")
+        global_counts[table] = int(row[0]) if row and not gerr else None
 
     sg = sg_root()
     payload = {
@@ -228,6 +249,7 @@ def capture_snapshot(
             "uniq_signal_id": int(sig[1]) if sig else 0,
             "min_generated_at": _iso(sig[2]) if sig else None,
             "max_generated_at": _iso(sig[3]) if sig else None,
+            "unavailable": sig_err,
         },
         "watermarks": [
             {
@@ -236,7 +258,7 @@ def capture_snapshot(
                 "strategy_version": r[2],
                 "last_processed_candle_open_time": _iso(r[3]),
             }
-            for r in watermarks.result_rows
+            for r in (watermarks.result_rows if watermarks is not None else [])
         ],
         "outcomes": _outcomes_payload(outcomes, scope_symbol=symbol),
         "global_control_counts": global_counts,
@@ -253,6 +275,9 @@ def capture_snapshot(
             "stoch_signale_default": "wave_fade_no_be50_v1",
         },
         "sg_root": str(DEFAULT_SG_ROOT),
+        "production_tables_optional": True,
+        "production_signals_unavailable": sig_err,
+        "production_watermarks_unavailable": wm_err,
     }
     return payload
 

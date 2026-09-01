@@ -214,33 +214,36 @@ def load_production_signals(
     if not symbol:
         raise ValueError("production load requires explicit run symbol")
     db = client.database
-    result = client.query(
-        f"""
-        SELECT
-            toString(signal_id) AS signal_id,
-            symbol,
-            timeframe,
-            direction,
-            signal_type,
-            candle_open_time,
-            generated_at,
-            tier_a,
-            strategy_version,
-            metadata
-        FROM {db}.signals FINAL
-        WHERE symbol = {{symbol:String}}
-          AND strategy_version = {{sv:String}}
-          AND candle_open_time >= {{start:DateTime64(3, 'UTC')}}
-          AND candle_open_time < {{end:DateTime64(3, 'UTC')}}
-        ORDER BY candle_open_time
-        """,
-        {
-            "symbol": symbol,
-            "sv": CANDIDATE_LIVE_STRATEGY,
-            "start": start or REQUESTED_SIGNAL_START,
-            "end": end or REQUESTED_SIGNAL_END_EXCLUSIVE,
-        },
-    )
+    try:
+        result = client.query(
+            f"""
+            SELECT
+                toString(signal_id) AS signal_id,
+                symbol,
+                timeframe,
+                direction,
+                signal_type,
+                candle_open_time,
+                generated_at,
+                tier_a,
+                strategy_version,
+                metadata
+            FROM {db}.signals FINAL
+            WHERE symbol = {{symbol:String}}
+              AND strategy_version = {{sv:String}}
+              AND candle_open_time >= {{start:DateTime64(3, 'UTC')}}
+              AND candle_open_time < {{end:DateTime64(3, 'UTC')}}
+            ORDER BY candle_open_time
+            """,
+            {
+                "symbol": symbol,
+                "sv": CANDIDATE_LIVE_STRATEGY,
+                "start": start or REQUESTED_SIGNAL_START,
+                "end": end or REQUESTED_SIGNAL_END_EXCLUSIVE,
+            },
+        )
+    except Exception:  # noqa: BLE001
+        return []
     cols = result.column_names
     out = []
     for row in result.result_rows:

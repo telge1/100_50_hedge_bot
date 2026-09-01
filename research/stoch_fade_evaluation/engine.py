@@ -1,20 +1,21 @@
-"""Apply existing NO_BE50 evaluator to Frozen Tier-A job signals. No formula copy."""
+"""Apply Frozen-signal NO_BE50 full-1m TP/SL evaluation. Max-hold does not cap this path."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
 
 from .config import (
+    CONFIRMATION_POLICY,
     EXIT_POLICY,
     PNL_BASIS,
     SIGNAL_SCOPE,
     SIGNAL_STRATEGY_VERSION,
-    ensure_sg_on_path,
     iso_z,
 )
+from .full_1m_scan import evaluate_signal_no_be50_full_1m, parse_utc, truncate_to_pin
 from .identity import frozen_outcome_identity
 
 
@@ -42,38 +43,33 @@ def candles_to_be50_frame(df: pd.DataFrame) -> pd.DataFrame:
     return out[["timestamp", "open", "high", "low", "close"]].sort_values("timestamp").reset_index(drop=True)
 
 
-def outcome_window_for_signals(signals: list[dict[str, Any]]) -> tuple[datetime, datetime, dict[str, int]]:
-    ensure_sg_on_path()
-    from signal_generator.strategy.wave_fade.parameters import STRATEGY_MAX_HOLD_BY_TF
+def outcome_window_for_signals(
+    signals: list[dict[str, Any]],
+    *,
+    candle_data_to: datetime | None = None,
+) -> tuple[datetime, datetime, dict[str, int]]:
+    """Load from earliest entry through pinned last closed 1m (exclusive end = pin+1m).
 
-    holds = dict(STRATEGY_MAX_HOLD_BY_TF)
+    STRATEGY_MAX_HOLD is not used as a load cap on this path.
+    """
     entries: list[datetime] = []
-    max_hold = 24 * 60
     for row in signals:
         raw = row.get("entry_time") or row.get("confirmation_available_at") or row.get("candle_close_time")
-        if not raw:
-            continue
-        ts = pd.Timestamp(raw)
-        if ts.tzinfo is None:
-            ts = ts.tz_localize("UTC")
-        else:
-            ts = ts.tz_convert("UTC")
-        entries.append(ts.to_pydatetime())
-        tf = str(row.get("timeframe") or "15m")
-        max_hold = max(max_hold, int(holds.get(tf, 24 * 60)))
+        parsed = parse_utc(raw)
+        if parsed:
+            entries.append(parsed)
     if not entries:
         now = datetime.now(timezone.utc)
-        return now, now, holds
+        return now, now, {}
     start = min(entries)
-    end = max(entries) + timedelta(minutes=max_hold) + timedelta(minutes=1)
-    return start, end, holds
-
-
-def _as_of_from_candles(df: pd.DataFrame) -> datetime | None:
-    if df is None or df.empty:
-        return None
-    last = pd.to_datetime(df["timestamp"], utc=True).max()
-    return (last + timedelta(minutes=1)).to_pydatetime()
+    if candle_data_to is not None:
+        pin = candle_data_to
+        if pin.tzinfo is None:
+            pin = pin.replace(tzinfo=timezone.utc)
+        end = pin + pd.Timedelta(minutes=1).to_pytimedelta()
+    else:
+        end = max(entries) + pd.Timedelta(minutes=1).to_pytimedelta()
+    return start, end, {"max_hold_applied_to_window": 0}
 
 
 def evaluate_tier_a_signals(
@@ -82,24 +78,22 @@ def evaluate_tier_a_signals(
     *,
     evaluation_id: str,
     source_job_id: str,
+    candle_data_to: datetime | None = None,
     as_of: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-    """Call existing evaluate_signal_no_be50 once per Frozen Tier-A signal. Independent, no dedup."""
-    ensure_sg_on_path()
     identity = frozen_outcome_identity()
-    from signal_generator.pipeline.outcome_eval import evaluate_signal_no_be50, summarize_trade_views
-
     allowed = {"WIN", "LOSS", "OPEN"}
-    frame = candles_to_be50_frame(c1m)
-    as_of_u = as_of or _as_of_from_candles(frame)
-    views = []
-    rows: list[dict[str, Any]] = []
+    pin = candle_data_to or as_of
+    frame = truncate_to_pin(candles_to_be50_frame(c1m), pin)
     last_ts = None
     if not frame.empty:
-        last_ts = pd.to_datetime(frame["timestamp"], utc=True).max()
-    candle_data_to = iso_z(last_ts.to_pydatetime()) if last_ts is not None else None
-    horizon_end = iso_z(as_of_u) if as_of_u is not None else None
+        last_ts = pd.to_datetime(frame["timestamp"], utc=True).max().to_pydatetime()
+    candle_to = iso_z(last_ts) if last_ts is not None else (iso_z(pin) if pin else None)
+    horizon_end = iso_z(last_ts + pd.Timedelta(minutes=1).to_pytimedelta()) if last_ts is not None else None
 
+    rows: list[dict[str, Any]] = []
+    wins = losses = opens = 0
+    gp = gl = 0.0
     for raw in signals:
         if not raw.get("tier_a"):
             continue
@@ -109,28 +103,41 @@ def evaluate_tier_a_signals(
         if not sid:
             continue
         payload = dict(raw)
-        view = evaluate_signal_no_be50(payload, frame, as_of=as_of_u)
-        result = str(view.result or "").upper()
-        display = str(getattr(view, "display_result", None) or result).upper()
+        api = evaluate_signal_no_be50_full_1m(payload, frame, candle_data_to=pin)
+        result = str(api.get("result") or "").upper()
+        display = str(api.get("display_result") or result).upper()
         if result not in allowed or display not in allowed or result.startswith("BE") or "BE /" in display:
             raise RuntimeError(f"NO_BE50_RESULT_VIOLATION:{sid}:{result}:{display}")
-        api = view.as_api()
-        if api.get("be50_activated") or str(api.get("exit_reason") or "").upper() == "BE":
-            raise RuntimeError(f"NO_BE50_BE_EXIT_VIOLATION:{sid}")
-        views.append(view)
-        is_open = result == "OPEN"
+        if result == "WIN":
+            wins += 1
+            if api.get("pnl_pct") is not None:
+                gp += float(api["pnl_pct"])
+        elif result == "LOSS":
+            losses += 1
+            if api.get("pnl_pct") is not None:
+                gl += float(api["pnl_pct"])
+        else:
+            opens += 1
         rows.append(
             {
                 "evaluation_id": evaluation_id,
                 "source_job_id": source_job_id,
                 "signal_id": sid,
+                "setup_id": payload.get("setup_id"),
                 "generation_key": generation_key(payload),
                 "symbol": payload.get("symbol"),
                 "timeframe": payload.get("timeframe"),
                 "direction": str(payload.get("direction") or "").upper(),
                 "signal_type": payload.get("signal_type") or "wave_fade",
-                "signal_strategy_version": SIGNAL_STRATEGY_VERSION,
                 "strategy_version": SIGNAL_STRATEGY_VERSION,
+                "signal_strategy_version": SIGNAL_STRATEGY_VERSION,
+                "confirmation_policy": payload.get("confirmation_policy") or CONFIRMATION_POLICY,
+                "confirmation_source": payload.get("confirmation_source") or CONFIRMATION_POLICY,
+                "end_ts": payload.get("end_ts"),
+                "end_available_at": payload.get("end_available_at"),
+                "recognition_ts": payload.get("recognition_ts"),
+                "recognition_available_at": payload.get("recognition_available_at"),
+                "confirmation_available_at": payload.get("confirmation_available_at"),
                 "entry_time": api.get("entry_time") or payload.get("entry_time"),
                 "entry_price": api.get("entry_price") if api.get("entry_price") is not None else payload.get("entry_price"),
                 "tp_price": payload.get("tp_price"),
@@ -148,28 +155,45 @@ def evaluate_tier_a_signals(
                 "duration_seconds": api.get("duration_seconds"),
                 "be_activated": False,
                 "be_activation_time": None,
-                "candle_data_to": candle_data_to,
+                "candle_data_to": candle_to,
                 "horizon_end": horizon_end,
-                "is_open": is_open,
+                "is_open": result == "OPEN",
                 "error_code": api.get("ambiguity_flag") or None,
                 "ambiguity_flag": api.get("ambiguity_flag"),
                 "signal_scope": SIGNAL_SCOPE,
                 "execution_dedup_applied": False,
+                "max_hold_applied": False,
+                "barrier_scan": "FULL_1M_UNTIL_TOUCH_OR_HISTORY_END",
                 "source": "FROZEN_RESEARCH_EVALUATION",
                 "outcomes_computed": True,
             }
         )
 
-    summary = summarize_trade_views(views)
-    summary["signal_scope"] = SIGNAL_SCOPE
-    summary["execution_dedup_applied"] = False
-    summary["exit_policy"] = EXIT_POLICY
-    summary["signal_strategy_version"] = SIGNAL_STRATEGY_VERSION
-    summary["pnl_basis"] = PNL_BASIS
-    summary["be50_activated_count"] = 0
-    summary["be50_exit_count"] = 0
-    summary["win_rate_denominator"] = "wins+losses (OPEN excluded)"
-    summary["filtered_signals"] = len(rows)
+    closed = wins + losses
+    summary = {
+        "signals": len(rows),
+        "wins": wins,
+        "losses": losses,
+        "open": opens,
+        "win_rate_pct": (wins / closed * 100.0) if closed else None,
+        "gross_profit_pct": gp,
+        "gross_loss_pct": gl,
+        "total_pnl_pct": gp + gl,
+        "pnl_basis": PNL_BASIS,
+        "signal_scope": SIGNAL_SCOPE,
+        "execution_dedup_applied": False,
+        "exit_policy": EXIT_POLICY,
+        "signal_strategy_version": SIGNAL_STRATEGY_VERSION,
+        "be50_activated_count": 0,
+        "be50_exit_count": 0,
+        "win_rate_denominator": "wins+losses (OPEN excluded)",
+        "filtered_signals": len(rows),
+        "max_hold_applied": False,
+        "barrier_scan": "FULL_1M_UNTIL_TOUCH_OR_HISTORY_END",
+    }
     identity["as_of"] = horizon_end
-    identity["candle_data_to"] = candle_data_to
+    identity["candle_data_to"] = candle_to
+    identity["outcome_engine"] = "evaluate_signal_no_be50_full_1m"
+    identity["max_hold_applied"] = False
+    identity["barrier_scan"] = "FULL_1M_UNTIL_TOUCH_OR_HISTORY_END"
     return rows, summary, identity

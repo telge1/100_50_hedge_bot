@@ -298,12 +298,17 @@
       }
       if (openCandle) {
         const isLong = direction === "LONG";
+        const ezm = !!trade.ezm_research;
+        let color = trade.pool_research ? "#3b82f6" : "#808080";
+        if (ezm) color = isLong ? "#22c55e" : "#ef4444";
         markers.push({
           time: openCandle.time,
           position: isLong ? "belowBar" : "aboveBar",
-          color: trade.pool_research ? "#3b82f6" : "#808080",
+          color,
           shape: isLong ? "arrowUp" : "arrowDown",
-          text: `Entry ${fmt(entry, 6)}`,
+          text: ezm
+            ? `${isLong ? "LONG" : "SHORT"} ${fmt(entry, 6)}`
+            : `Entry ${fmt(entry, 6)}`,
         });
       }
     }

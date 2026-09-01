@@ -1,0 +1,471 @@
+/* Anchored market profile page. Dark, matching the research chart look. */
+
+.mp-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mp-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  background: #131722;
+  border: 1px solid #2a2e39;
+  border-radius: 6px;
+}
+
+.mp-bar-toggles {
+  gap: 22px;
+}
+
+.mp-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mp-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #787b86;
+  white-space: nowrap;
+}
+
+.mp-label.mp-inline {
+  letter-spacing: 0.03em;
+  text-transform: none;
+  font-size: 11px;
+}
+
+.mp-select,
+.mp-input {
+  background: #1e222d;
+  color: #d1d4dc;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  padding: 5px 7px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.mp-select-sm,
+.mp-input-sm {
+  padding: 3px 5px;
+  font-size: 11px;
+  width: 72px;
+}
+
+.mp-select:focus,
+.mp-input:focus {
+  outline: none;
+  border-color: #2962ff;
+}
+
+.mp-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #d1d4dc;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mp-check input {
+  accent-color: #2962ff;
+  cursor: pointer;
+}
+
+.mp-btn {
+  background: #1e222d;
+  color: #d1d4dc;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mp-btn:hover:not(:disabled) {
+  border-color: #4a4f5e;
+}
+
+.mp-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mp-btn.mp-primary {
+  background: #2962ff;
+  border-color: #2962ff;
+  color: #fff;
+}
+
+.mp-status {
+  font-size: 11.5px;
+  color: #787b86;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.mp-status.is-error {
+  color: #ef5350;
+}
+
+.mp-status.is-busy {
+  color: #f0b90b;
+}
+
+.mp-advanced {
+  font-size: 11.5px;
+  color: #d1d4dc;
+}
+
+.mp-advanced > summary {
+  cursor: pointer;
+  color: #787b86;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mp-advanced-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+/* The shape verdict is drawn on the chart, so the caveat has to travel with
+   it rather than live in a doc nobody opens. */
+.mp-notice {
+  padding: 8px 12px;
+  background: rgba(240, 185, 11, 0.08);
+  border: 1px solid rgba(240, 185, 11, 0.35);
+  border-left-width: 3px;
+  border-radius: 4px;
+  color: #d8b34a;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.mp-chart-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mp-chart-dock {
+  border-radius: 6px 6px 0 0;
+}
+
+.mp-shift-hint {
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+#mpFullscreenBtn.active {
+  border-color: #5b8def;
+  color: #5b8def;
+}
+
+.mp-chart-wrap {
+  position: relative;
+  height: 640px;
+  background: #131722;
+  border: 1px solid #2a2e39;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.mp-trp-app {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mp-trp-app #price-pane {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mp-trp-app #chart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.mp-trp-app #overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 6;
+}
+
+.mp-trp-app #overlay {
+  position: absolute;
+  z-index: 8;
+  top: 10px;
+  left: 12px;
+  pointer-events: none;
+}
+
+/* Profile histogram sits above candles, below TRP drawing overlays. */
+.mp-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.mp-tooltip {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: rgba(19, 23, 34, 0.96);
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d1d4dc;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.mp-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #787b86;
+  font-size: 13px;
+  z-index: 4;
+}
+
+.mp-empty[hidden] {
+  display: none;
+}
+
+.mp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11px;
+  color: #787b86;
+}
+
+.mp-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mp-swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 1px;
+  display: inline-block;
+}
+
+.mp-swatch.is-dashed {
+  height: 0;
+  border-top: 2px dashed currentColor;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* TRP shift-measure overlay (from research_trp/style.css) */
+#shift-measure {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  display: none;
+}
+
+#shift-measure.visible {
+  display: block;
+}
+
+.sm-rect {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--sm-color, #8b93a7);
+  background: var(--sm-fill, rgba(139, 147, 167, 0.14));
+}
+
+.sm-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sm-line {
+  stroke: var(--sm-color, #8b93a7);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.sm-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--sm-color, #8b93a7);
+  border: 1px solid #0f1218;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.sm-box {
+  position: absolute;
+  min-width: 148px;
+  max-width: 240px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(19, 23, 34, 0.92);
+  border: 1px solid var(--sm-color, #8b93a7);
+  color: #d1d4dc;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.sm-delta {
+  font-weight: 600;
+  color: var(--sm-color, #8b93a7);
+}
+
+.sm-prices,
+.sm-meta,
+.sm-extra {
+  color: #8b93a7;
+  font-size: 11px;
+}
+
+/* TRP drawing / LLD overlay DOM (from research_trp/style.css) */
+.ov-vline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+}
+
+.ov-zone {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.ov-arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ov-handle {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin-left: -5px;
+  margin-top: -5px;
+  background: #d4dce8;
+  border: 1px solid #0f1218;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.ov-zone-label,
+.ov-vline-label,
+.ov-hline-label {
+  position: absolute;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ov-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ov-marker-shape {
+  width: 8px;
+  height: 8px;
+}
+
+.ov-marker-shape.circle { border-radius: 50%; }
+.ov-marker-shape.square { border-radius: 1px; }
+.ov-marker-shape.diamond { transform: rotate(45deg); border-radius: 1px; }
+
+.ov-marker-text,
+.ov-label {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ov-label {
+  position: absolute;
+  white-space: pre;
+  line-height: 1.35;
+}
+
+.ov-selected {
+  outline: 1px dashed rgba(212, 220, 232, 0.85);
+  outline-offset: 1px;
+}
+
+.ov-position {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.ov-position .pos-zone,
+.ov-position .pos-entry {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.ov-position .pos-box {
+  position: absolute;
+  box-sizing: border-box;
+}

@@ -208,11 +208,9 @@
                 <div class="stoch-card-body">
                     <h2 class="stoch-frozen-title">Frozen Stochastic Fade – Signale berechnen</h2>
                     <p class="stoch-universe51-note">
-                        Strategie: <strong>Canonical Causal Frozen Tier-A</strong> ·
-                        Version: <code>wave_fade_frozen_f16ae32_causal_entry_v1</code> ·
-                        Confirmation: <code>cross_recognition</code> ·
-                        Exit: <code>NO_BE50 / full 1m / SL_FIRST</code>.
-                        Nur Signalerzeugung – noch kein Profit-Backtest.
+                        Strategy-Auswahl steuert den Research-Job:
+                        <strong>Canonical Causal Frozen Tier-A</strong> (Signalerzeugung) oder
+                        <strong>EMA Zone Microstructure Confirmation V1</strong> (Candidate Discovery, keine Trades/PnL).
                         Coin-Auswahl über die Tabelle oben (testbar: FULL / LISTING_LIMITED).
                         Zeiten in UTC. Signalende ist exklusiv.
                     </p>
@@ -339,6 +337,7 @@
                 <select id="stochFilterStrategy">
                     <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
                     <option value="wave_fade_frozen_f16ae32_causal_entry_v1">Canonical Causal Frozen Tier-A</option>
+                    <option value="ema_zone_microstructure_confirmation_v1">EMA Zone Microstructure Confirmation V1</option>
                     {% if enable_pool_order_plan_v1 %}
                     <option value="POOL_ORDER_PLAN_V1">Pool Order Plan V1 · Research</option>
                     {% endif %}

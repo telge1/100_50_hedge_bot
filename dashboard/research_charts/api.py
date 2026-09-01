@@ -40,6 +40,7 @@ from .public_trades_profile import (
     VolumeProfileQueryError,
     load_volume_profile,
 )
+from .trade_bubbles import load_bubbles_payload
 from .volume_profile import MAX_RANGE_SECONDS
 from .workspace_session import get_workspace
 
@@ -173,6 +174,48 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "volume_profile_failed", str(exc))
         return payload
 
+    @router.get("/api/research/trade-bubbles")
+    async def api_research_trade_bubbles(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        start: int = Query(..., description="UTC unix seconds, inclusive"),
+        end: int = Query(..., description="UTC unix seconds, exclusive"),
+        as_of: Optional[int] = Query(None, description="Causal cursor UTC unix; default=end"),
+        mode: str = Query("large_medium"),
+    ):
+        """Causal public-trade bubbles for the visible chart window (layer-only).
+
+        Does not start scanner/backtest jobs. Aggregation matches OA public_trade_bubbles.
+        """
+        sym = str(symbol or "").strip().upper()
+        try:
+            start_dt = datetime.fromtimestamp(int(start), tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+            as_of_dt = (
+                datetime.fromtimestamp(int(as_of), tz=timezone.utc)
+                if as_of is not None
+                else end_dt
+            )
+        except (TypeError, ValueError, OSError, OverflowError):
+            return _error(400, "invalid_time_range", "start/end/as_of must be UTC unix seconds")
+        try:
+            payload = await asyncio.to_thread(
+                load_bubbles_payload,
+                symbol=sym,
+                start=start_dt,
+                end=end_dt,
+                as_of=as_of_dt,
+                mode=str(mode or "large_medium"),
+            )
+        except ValueError as exc:
+            code = str(exc)
+            if code == "time_range_too_large":
+                return _error(400, code, "time range exceeds 6 hours")
+            return _error(400, code, str(exc))
+        except Exception as exc:
+            return _error(500, "trade_bubbles_failed", str(exc))
+        return payload
+
     @router.get("/api/research/orderbook-profile")
     async def api_research_orderbook_profile(
         user: dict = Depends(require_auth),
@@ -271,6 +314,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 stochastic=body.get("stochastic"),
                 liquidity=body.get("liquidity"),
                 allow_stale=bool(body.get("allow_stale")),
+                liquidity_location_as_of=body.get("liquidity_location_as_of"),
             )
         except KeyError:
             return _error(404, "unknown_symbol", "no 1m candles for symbol")
@@ -528,6 +572,110 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 layer_mode=str(layer_mode) if layer_mode is not None else None,
             )
             return snap
+        if strategy_id in (
+            "a_plus_nested_ask_pool_edge_short_v1",
+            "nested_ask_pool_edge_short_v1",
+            "nested_ask_pool",
+        ):
+            symbol = str(body.get("symbol") or "").strip().upper()
+            visible = body.get("visible")
+            ws = get_workspace()
+            if visible is None:
+                cur = bool((ws.snapshot().get("nested_ask_pool") or {}).get("visible"))
+                visible = not cur
+            if symbol and body.get("clear_other_strategies"):
+                for other in (
+                    "stoch_fade",
+                    "cluster_sweep_ema_9_20_59",
+                    "ema_dual_cross_multisource_v1",
+                    "ema_zone_microstructure_confirmation_v1",
+                    "a_plus_liquidity_pool_signal_scanner_v1",
+                ):
+                    ws.clear_backtester_strategy(symbol, strategy_id=other)
+            return ws.set_nested_ask_pool_visible(bool(visible), symbol or None)
+        if strategy_id in (
+            "a_plus_liquidity_pool_signal_scanner_v1",
+            "a_plus_pool_signal_scanner_v1",
+            "pool_signals",
+            "a_plus",
+        ):
+            from pathlib import Path
+
+            from .pool_signals_backtester import (
+                auto_import_latest_for_symbol,
+                load_run_dir_payload,
+                load_scanner_payload_from_results,
+            )
+
+            symbol = str(body.get("symbol") or "").strip().upper()
+            display_mode = body.get("display_mode") or body.get("pool_signals_mode")
+            layer_only = bool(body.get("layer_only"))
+            ws = get_workspace()
+            # Never mix A+ pool markers with leftover stoch/wave_fade overlays
+            if symbol and (
+                body.get("clear_other_strategies")
+                or layer_only
+                or display_mode is not None
+            ):
+                ws.clear_backtester_strategy(symbol, strategy_id="stoch_fade")
+                ws.clear_backtester_strategy(symbol, strategy_id="cluster_sweep_ema_9_20_59")
+                ws.clear_backtester_strategy(symbol, strategy_id="ema_dual_cross_multisource_v1")
+                ws.clear_backtester_strategy(symbol, strategy_id="ema_zone_microstructure_confirmation_v1")
+                ws.clear_backtester_strategy(symbol, strategy_id="a_plus_nested_ask_pool_edge_short_v1")
+
+            def _ensure_run_for_symbol(sym: str) -> str | None:
+                """Import latest results when workspace has no confirmed rows for sym."""
+                run = ws._pool_signals_run or {}
+                run_sym = str((run.get("meta") or {}).get("symbol") or "").upper()
+                has = bool(run.get("confirmed")) and (not sym or not run_sym or run_sym == sym)
+                if has and not body.get("force_reimport"):
+                    return None
+                if body.get("auto_import") is False:
+                    return "auto_import_disabled"
+                payload = auto_import_latest_for_symbol(sym)
+                if payload is None:
+                    return f"Keine APS-Results mit confirmed_signals für {sym}"
+                ws.store_pool_signals_run(payload)
+                return None
+
+            if layer_only and display_mode is not None:
+                msg = None
+                if symbol and str(display_mode).lower() not in {"off", "aus", "none", "0"}:
+                    msg = _ensure_run_for_symbol(symbol)
+                snap = ws.set_pool_signals_display_mode(str(display_mode), symbol or None)
+                if msg:
+                    snap.setdefault("pool_signals", {})["message"] = msg
+                    snap.setdefault("backtester", {})["message"] = msg
+                elif symbol and (ws._pool_signals_run or {}).get("meta", {}).get("import_path"):
+                    ip = (ws._pool_signals_run or {}).get("meta", {}).get("import_path")
+                    note = f"import {Path(str(ip)).name}"
+                    snap.setdefault("pool_signals", {})["message"] = note
+                return snap
+            import_path = str(body.get("import_path") or "").strip()
+            if import_path:
+                p = Path(import_path)
+                payload = load_run_dir_payload(p, symbol=symbol or None)
+                sym = symbol or str((payload.get("meta") or {}).get("symbol") or "").upper()
+                snap = ws.store_pool_signals_run(payload)
+                if display_mode is not None:
+                    snap = ws.set_pool_signals_display_mode(str(display_mode), sym or None)
+                return snap
+            if body.get("confirmed") is not None or body.get("result") is not None:
+                raw = body.get("result") if body.get("result") is not None else body
+                payload = load_scanner_payload_from_results(raw) if "confirmed" in raw else raw
+                snap = ws.store_pool_signals_run(payload)
+                if display_mode is not None:
+                    sym = str((payload.get("meta") or {}).get("symbol") or symbol).upper()
+                    snap = ws.set_pool_signals_display_mode(str(display_mode), sym or None)
+                elif ws._pool_signals_display_mode != "off":
+                    sym = str((payload.get("meta") or {}).get("symbol") or symbol).upper()
+                    snap = ws.set_pool_signals_display_mode(ws._pool_signals_display_mode, sym or None)
+                return snap
+            if display_mode is not None:
+                if symbol and str(display_mode).lower() not in {"off", "aus", "none", "0"}:
+                    _ensure_run_for_symbol(symbol)
+                return ws.set_pool_signals_display_mode(str(display_mode), symbol or None)
+            return ws.snapshot()
 
         from .stoch_backtester import fetch_stoch_signal_rows
 
@@ -678,11 +826,67 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             }
             return snap
 
+        if strategy_id in (
+            "a_plus_liquidity_pool_signal_scanner_v1",
+            "a_plus_pool_signal_scanner_v1",
+            "pool_signals",
+            "a_plus",
+        ):
+            from .pool_signals_backtester import run_pool_signals_backtest
+
+            try:
+                payload = await asyncio.to_thread(
+                    run_pool_signals_backtest,
+                    symbol=symbol,
+                    start=start,
+                    end=end,
+                )
+            except ValueError as exc:
+                return _error(400, "invalid_params", str(exc))
+            except Exception as exc:  # noqa: BLE001
+                return _error(503, "pool_signals_failed", str(exc))
+            ws = get_workspace()
+            ws.clear_backtester_strategy(symbol, strategy_id="stoch_fade")
+            ws.clear_backtester_strategy(symbol, strategy_id="cluster_sweep_ema_9_20_59")
+            ws.clear_backtester_strategy(symbol, strategy_id="ema_dual_cross_multisource_v1")
+            ws.clear_backtester_strategy(symbol, strategy_id="ema_zone_microstructure_confirmation_v1")
+            ws.clear_backtester_strategy(symbol, strategy_id="a_plus_nested_ask_pool_edge_short_v1")
+            snap = ws.store_pool_signals_run(payload)
+            mode = str(body.get("display_mode") or "confirmed")
+            snap = ws.set_pool_signals_display_mode(mode, symbol)
+            snap["pool_signals_result"] = {
+                "meta": payload.get("meta"),
+                "n_confirmed": len(payload.get("confirmed") or []),
+                "n_debug_rows": len(payload.get("debug_rows") or []),
+            }
+            return snap
+
+        if strategy_id in (
+            "a_plus_nested_ask_pool_edge_short_v1",
+            "nested_ask_pool_edge_short_v1",
+            "nested_ask_pool",
+        ):
+            from .nested_ask_pool_jobs import start_nested_ask_pool_job
+
+            start = body.get("start") or body.get("signal_start")
+            end = body.get("end") or body.get("signal_end_exclusive") or body.get("end_exclusive")
+            payload, code = await asyncio.to_thread(
+                start_nested_ask_pool_job,
+                symbol=symbol,
+                start=str(start or ""),
+                end=str(end or ""),
+                show_rejected=bool(body.get("show_rejected")),
+            )
+            if code != 200:
+                return JSONResponse(payload, status_code=code)
+            return payload
+
         if strategy_id not in ("cluster_sweep_ema_9_20_59", "cluster_sweep"):
             return _error(
                 400,
                 "unsupported_strategy",
-                "Unterstützt: cluster_sweep_ema_9_20_59, ema_dual_cross_multisource_v1",
+                "Unterstützt: cluster_sweep_ema_9_20_59, ema_dual_cross_multisource_v1, "
+                "a_plus_liquidity_pool_signal_scanner_v1, a_plus_nested_ask_pool_edge_short_v1",
             )
         from .cluster_sweep_backtester import run_cluster_sweep_backtest
 
@@ -747,6 +951,33 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             delta=int(delta or 0),
             index=None if index is None else int(index),
         )
+
+    @router.get("/api/research/nested-ask-pool/status")
+    async def api_research_nested_ask_pool_status(
+        user: dict = Depends(require_auth),
+        job_id: str = Query(...),
+    ):
+        from .nested_ask_pool_jobs import nested_ask_pool_job_status
+
+        payload, code = await asyncio.to_thread(nested_ask_pool_job_status, job_id)
+        if code != 200:
+            return JSONResponse(payload, status_code=code)
+        return payload
+
+    @router.post("/api/research/nested-ask-pool/import")
+    async def api_research_nested_ask_pool_import(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .nested_ask_pool_jobs import import_nested_ask_pool_job_to_workspace
+
+        payload, code = await asyncio.to_thread(
+            import_nested_ask_pool_job_to_workspace,
+            job_id=str(body.get("job_id") or ""),
+        )
+        if code != 200:
+            return JSONResponse(payload, status_code=code)
+        return payload
 
     @router.post("/api/research/ezm/run")
     async def api_research_ezm_run(

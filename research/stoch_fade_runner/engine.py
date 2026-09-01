@@ -1,4 +1,4 @@
-"""In-memory evaluation using frozen Wave-Fade functions. No ClickHouse writes."""
+"""In-memory evaluation using canonical causal Wave-Fade functions. No ClickHouse writes."""
 
 from __future__ import annotations
 
@@ -12,12 +12,16 @@ from .candles import CandleSource
 from .first_valid import attach_confirmation_times, first_valid_from_indicators
 from .htf import audit_htf_buckets
 from .config import (
+    CONFIRMATION_SOURCE,
     EVAL_ERROR,
     EVAL_INCOMPLETE,
     EVAL_NO_CANDLE,
     EVAL_NO_SIGNAL,
     EVAL_WITH_SIGNALS,
+    EXIT_POLICY,
     GENERATOR_VERSION,
+    INTRABAR_POLICY,
+    OUTCOME_ENGINE,
     SIDE_EFFECT_FLAGS,
     STRATEGY_ID,
     WARMUP_DAYS,
@@ -45,16 +49,31 @@ def _iso_maybe(ts: Any) -> str | None:
 
 
 def _signal_record(sig: Any, row: Any, *, entry_valid: bool, rejection: str | None) -> dict[str, Any]:
+    meta = getattr(sig, "metadata", None)
+    try:
+        meta_obj = {} if not meta else __import__("json").loads(meta)
+    except Exception:
+        meta_obj = {}
     return {
+        "setup_id": str(getattr(sig, "setup_id", None) or meta_obj.get("setup_id") or ""),
         "signal_id": str(sig.signal_id),
         "symbol": sig.symbol,
         "timeframe": sig.timeframe,
         "direction": sig.direction,
         "signal_type": sig.signal_type,
+        "start_ts": _iso_maybe(row.get("start_ts")) or meta_obj.get("start_ts"),
+        "end_ts": _iso_maybe(row.get("end_ts")) or meta_obj.get("end_ts"),
+        "start_available_at": _iso_maybe(row.get("start_available_at")) or meta_obj.get("start_available_at"),
+        "end_available_at": _iso_maybe(row.get("end_available_at")) or meta_obj.get("end_available_at"),
+        "recognition_ts": _iso_maybe(row.get("recognition_ts")) or meta_obj.get("recognition_ts"),
+        "recognition_available_at": _iso_maybe(row.get("recognition_available_at"))
+        or meta_obj.get("recognition_available_at"),
         "candle_open_time": sig.candle_open_time.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "candle_close_time": sig.candle_close_time.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "generated_at": sig.generated_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "confirmation_available_at": _iso_maybe(row.get("confirmation_available_at")),
+        "confirmation_policy": str(row.get("confirmation_source") or CONFIRMATION_SOURCE),
+        "confirmation_source": str(row.get("confirmation_source") or CONFIRMATION_SOURCE),
         "tier_a": bool(sig.tier_a),
         "is_q4": bool(row.get("is_q4", False)),
         "trend_bucket": str(row.get("trend_bucket") or ""),
@@ -66,6 +85,11 @@ def _signal_record(sig: Any, row: Any, *, entry_valid: bool, rejection: str | No
         "sl_price": None if row.get("sl_price") is None or pd.isna(row.get("sl_price")) else float(row["sl_price"]),
         "strategy_version": sig.strategy_version,
         "generator_version": sig.generator_version,
+        "exit_policy": EXIT_POLICY,
+        "intrabar_policy": INTRABAR_POLICY,
+        "outcome_engine": OUTCOME_ENGINE,
+        "uses_be50_exit": False,
+        "max_hold": "disabled",
         "rejection_reason": rejection,
         "selection_status": "NOT_APPLIED_AMBIGUOUS",
         "metadata": sig.metadata,
@@ -118,10 +142,10 @@ def evaluate_symbol(
     ensure_sg_on_path()
     from signal_generator.pipeline.mapper import wave_event_to_signal
     from signal_generator.pipeline.trade_plan import attach_resolved_entries
-    from signal_generator.pipeline.versions import EDGES_VERSION, STRATEGY_VERSION_BE50_FROZEN
+    from signal_generator.pipeline.versions import EDGES_VERSION
     from signal_generator.strategy.wave_fade.adapter import bars_to_ohlcv_df, one_minute_books
     from signal_generator.strategy.wave_fade.edges import load_frozen_eff_edges
-    from signal_generator.strategy.wave_fade.parameters import SIGNAL_TFS
+    from signal_generator.strategy.wave_fade.parameters import CONFIRMATION_CROSS_RECOGNITION, SIGNAL_TFS
     from signal_generator.strategy.wave_fade.indicators import attach_indicators
     from signal_generator.strategy.wave_fade.signals import (
         build_symbol_signals,
@@ -229,7 +253,9 @@ def evaluate_symbol(
 
     with rec.stage("signals_batch") as st:
         _count("build_symbol_signals")
-        all_sig = build_symbol_signals(symbol, edges, waves_by_tf)
+        all_sig = build_symbol_signals(
+            symbol, edges, waves_by_tf, confirmation_source=CONFIRMATION_CROSS_RECOGNITION
+        )
         st["output_rows"] = 0 if all_sig is None or all_sig.empty else int(len(all_sig))
 
     raw_candidates: list[dict[str, Any]] = []
@@ -272,7 +298,7 @@ def evaluate_symbol(
                     symbol=symbol,
                     timeframe=tf,
                     generator_version=GENERATOR_VERSION,
-                    strategy_version=STRATEGY_VERSION_BE50_FROZEN,
+                    strategy_version=STRATEGY_ID,
                     edges_version=EDGES_VERSION,
                     selected=False,
                     selection_reason="NOT_APPLIED_AMBIGUOUS",
@@ -351,6 +377,12 @@ def evaluate_symbol(
         "requested_candle_load_start": _iso(load_start),
         "actual_candle_load_start": _iso(actual_load_start),
         "candle_load_start": _iso(load_start),
+        "strategy_version": STRATEGY_ID,
+        "confirmation_policy": CONFIRMATION_SOURCE,
+        "confirmation_source": CONFIRMATION_SOURCE,
+        "exit_policy": EXIT_POLICY,
+        "intrabar_policy": INTRABAR_POLICY,
+        "outcome_engine": OUTCOME_ENGINE,
         "side_effect_flags": dict(SIDE_EFFECT_FLAGS),
         "execution_dedup_policy": "none_phase_2a",
         "selection_status": "NOT_APPLIED_AMBIGUOUS",

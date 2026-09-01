@@ -140,6 +140,8 @@ body {
   width: 100%;
   height: 100%;
   cursor: crosshair;
+  position: relative;
+  z-index: 1;
 }
 
 #chart canvas,
@@ -175,14 +177,25 @@ body {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 2;
+  z-index: 6;
 }
 
 #research-markers {
   position: absolute;
   inset: 0;
   pointer-events: none !important;
-  z-index: 2;
+  z-index: 7;
+}
+
+/* Public-trade bubbles above candles — full pane, sized in JS like VP */
+#ptb-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none !important;
+  z-index: 5;
 }
 
 #vp-overlay {
@@ -227,6 +240,22 @@ body {
   line-height: 1.35;
   min-width: 160px;
   max-width: 280px;
+}
+
+#ptb-tooltip {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  background: rgba(15, 18, 24, 0.94);
+  border: 1px solid #2a2e39;
+  color: #d1d4dc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  min-width: 180px;
+  max-width: 300px;
+  white-space: pre-line;
 }
 
 #vp-badge {

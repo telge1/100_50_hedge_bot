@@ -5,8 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
+    CAUSAL_MANIFEST_HASH,
+    CONFIRMATION_POLICY,
     DEFAULT_CANARY_SYMBOL,
+    EXIT_POLICY,
     GENERATOR_VERSION,
+    INTRABAR_POLICY,
+    OUTCOME_ENGINE,
     PHASE,
     SIDE_EFFECT_FLAGS,
     SOURCE_COMMIT_PIN,
@@ -70,7 +75,16 @@ def write_run_artifacts(
         "run_id": run_id,
         "phase": PHASE,
         "strategy_id": STRATEGY_ID,
+        "strategy_version": STRATEGY_ID,
         "source_commit_pin": SOURCE_COMMIT_PIN,
+        "causal_manifest_hash": CAUSAL_MANIFEST_HASH,
+        "confirmation_policy": CONFIRMATION_POLICY,
+        "confirmation_source": CONFIRMATION_POLICY,
+        "exit_policy": EXIT_POLICY,
+        "intrabar_policy": INTRABAR_POLICY,
+        "outcome_engine": OUTCOME_ENGINE,
+        "uses_be50_exit": False,
+        "max_hold": "disabled",
         "candidate_live_strategy": CANDIDATE_LIVE_STRATEGY,
         "signal_tfs": list(SIGNAL_TFS_PIN),
         "edges_version": EDGES_VERSION_PIN,
@@ -96,6 +110,7 @@ def write_run_artifacts(
         "universe_count": extra.get("universe_count") if extra else None,
         "selected_symbols": list(symbols),
         "symbol_allowlisted": bool(extra.get("symbol_allowlisted")) if extra else True,
+        "runtime_root": str(extra.get("runtime_root")) if extra and extra.get("runtime_root") else None,
     }
     if extra:
         manifest.update(extra)

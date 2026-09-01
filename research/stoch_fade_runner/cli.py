@@ -130,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         "symbol_allowlisted": True,
         "default_canary_symbol": DEFAULT_CANARY_SYMBOL,
         "default_canary_symbol_is_not_run_symbol": True,
+        "runtime_root": str(ensure_sg_on_path().resolve()),
     }
     if args.dry_run_empty:
         source = MemoryCandleSource({})

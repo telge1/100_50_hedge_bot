@@ -141,3 +141,22 @@ def test_cli_aave_dry_run_selected_symbols(tmp_path) -> None:
     assert "canary_symbol" not in man
     assert man["default_canary_symbol"] == "1000PEPEUSDT"
     assert man["default_canary_symbol_is_not_run_symbol"] is True
+
+
+class CandleOnlyClient(RecordingClient):
+    def query(self, sql, parameters=None):
+        lowered = sql.lower()
+        if "signals" in lowered or "signal_processing_state" in lowered or "signal_outcomes" in lowered:
+            raise RuntimeError("ACCESS_DENIED SELECT ON signal_generator.signals")
+        return super().query(sql, parameters)
+
+
+def test_snapshot_survives_missing_signals_grant() -> None:
+    client = CandleOnlyClient()
+    start, end = REQUESTED_SIGNAL_START, REQUESTED_SIGNAL_END_EXCLUSIVE
+    snap = capture_snapshot(client, label="before", symbol="XRPUSDT", start=start, end=end)
+    assert snap["candles"]["count"] == 10
+    assert snap["signals"]["unavailable"]
+    assert snap["production_tables_optional"] is True
+    assert load_production_signals(client, symbol="XRPUSDT") == []
+

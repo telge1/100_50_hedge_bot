@@ -1,4 +1,7 @@
-"""Import orderbook_analyse cluster_sweep_research without copying engines."""
+"""Import orderbook_analyse packages without copying engines.
+
+Bootstrap rule: call ensure_oa_on_path() before any ``import orderbook_analyse...``.
+"""
 
 from __future__ import annotations
 
@@ -8,14 +11,21 @@ from pathlib import Path
 
 OA_ROOT = Path("/home/telgenbuescher/projects/orderbook_analyse")
 OA_SRC = OA_ROOT / "src"
+OA_INIT = OA_SRC / "orderbook_analyse" / "__init__.py"
 
 
 def ensure_oa_on_path() -> str:
-    root = str(OA_SRC)
-    if not OA_SRC.is_dir():
-        raise RuntimeError(f"orderbook_analyse src not found: {root}")
-    if root not in sys.path:
-        sys.path.insert(0, root)
+    """Insert ``<oa_root>/src`` at sys.path[0] before importing orderbook_analyse."""
+    root = str(OA_SRC.resolve())
+    if not OA_INIT.is_file():
+        raise RuntimeError(
+            "orderbook_analyse_src_missing: "
+            f"expected package init at {OA_INIT}"
+        )
+    # Keep a single front entry even if a later duplicate exists.
+    while root in sys.path:
+        sys.path.remove(root)
+    sys.path.insert(0, root)
     return root
 
 
@@ -56,6 +66,39 @@ def load_cluster_sweep():
         "fetch_trades_1m": fetch_trades_1m,
         "required_warmup_bars": required_warmup_bars,
         "run_cluster_sweep_on_candles": run_cluster_sweep_on_candles,
+    }
+
+
+@lru_cache(maxsize=1)
+def load_market_profile():
+    """Anchored market profile compute surface.
+
+    Deliberately excludes ``market_profile.render``: that module is the
+    matplotlib PNG writer for the offline script and would pull a GUI-less
+    plotting stack into the web process for no reason. Everything here is
+    read-only compute over an injected ClickHouse client.
+    """
+    ensure_oa_on_path()
+    from orderbook_analyse.cluster_sweep_research.clickhouse_source import (  # noqa: WPS433
+        aggregate_timeframe,
+        fetch_candles_1m,
+    )
+    from orderbook_analyse.market_profile import SESSIONS  # noqa: WPS433
+    from orderbook_analyse.market_profile.anchor import build_windows  # noqa: WPS433
+    from orderbook_analyse.market_profile.build import (  # noqa: WPS433
+        build_profile,
+        mark_naked_pocs,
+    )
+    from orderbook_analyse.market_profile.contracts import ShapeThresholds  # noqa: WPS433
+
+    return {
+        "SESSIONS": SESSIONS,
+        "ShapeThresholds": ShapeThresholds,
+        "aggregate_timeframe": aggregate_timeframe,
+        "build_profile": build_profile,
+        "build_windows": build_windows,
+        "fetch_candles_1m": fetch_candles_1m,
+        "mark_naked_pocs": mark_naked_pocs,
     }
 
 

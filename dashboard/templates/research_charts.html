@@ -47,7 +47,24 @@
                         <option value="cluster_sweep_ema_9_20_59">Cluster Sweep EMA 9/20/59 (LEGACY)</option>
                         <option value="ema_dual_cross_multisource_v1">EMA Dual Cross Multi-Source v1</option>
                         <option value="ema_zone_microstructure_confirmation_v1">EMA Zone Microstructure Confirmation V1</option>
+                        <option value="a_plus_liquidity_pool_signal_scanner_v1">A+ Pool Signal Scanner V1</option>
+                        <option value="a_plus_nested_ask_pool_edge_short_v1">Nested Ask Pool Edge Short V1 — Research, SHORT only</option>
                     </select>
+                    <span id="researchPoolSignalsWrap" class="research-ezm-layer-wrap" hidden>
+                        <span class="trp-field-label">A+ Pool Signals</span>
+                        <select id="researchPoolSignalsMode" class="trp-select" title="A+ Pool Signal Anzeige (kein neuer Scanner-Job)">
+                            <option value="off">Aus</option>
+                            <option value="confirmed" selected>Bestätigte Signale</option>
+                            <option value="active">Aktive Pläne (ARMED/FILLED)</option>
+                            <option value="all_states">Alle Zustände</option>
+                            <option value="debug">Debug: Kandidaten + Invalidierungen</option>
+                        </select>
+                    </span>
+                    <span id="researchNapRejectedWrap" class="research-ezm-layer-wrap" hidden>
+                        <label class="trp-check" title="Rejected Candidates als graue Marker">
+                            <input type="checkbox" id="researchNapShowRejected"> Rejected Candidates
+                        </label>
+                    </span>
                     <span id="researchEzmComputationWrap" class="research-ezm-layer-wrap" hidden>
                         <span class="trp-field-label">Prüfung</span>
                         <select id="researchEzmComputationMode" class="trp-select" title="EZM Berechnungsmodus vor Jobstart">
@@ -73,6 +90,8 @@
                     <button type="button" class="trp-text-btn" id="researchCswSettingsBtn" title="Cluster-Sweep Einstellungen" hidden>⚙ CS</button>
                     <span id="researchJobSourceNote" class="research-job-source-note" hidden></span>
                     <button type="button" class="trp-text-btn" id="researchEdcSettingsBtn" title="EMA Dual Cross Einstellungen" hidden>⚙ EDC</button>
+                    <button type="button" class="trp-text-btn" id="researchNapSettingsBtn" title="Nested Ask Pool Zeitraum / Einstellungen" hidden>⚙ Nested</button>
+                    <span id="researchNapRangeHint" class="trp-muted research-history-hint" hidden></span>
                     <span id="researchCswNav" class="research-csw-nav" hidden>
                         <button type="button" class="trp-text-btn" id="researchCswPrev" title="Vorheriges Event">◀</button>
                         <span id="researchCswIndex" class="research-chip">0/0</span>
@@ -121,8 +140,12 @@
                     </span>
                     <button type="button" class="trp-text-btn" id="researchHistoryApply" title="History für sichtbare Panes laden">Laden</button>
                     <span class="trp-field-label">GO TO</span>
-                    <input type="datetime-local" id="researchGoTo" title="Datum/Zeit UTC" aria-label="Go To UTC">
+                    <input type="text" id="researchGoTo" class="research-goto-input" size="22"
+                           placeholder="2026-08-26 11:34:51 UTC"
+                           title="UTC Zielzeit (Sekunden): 2026-08-26 11:34:51 oder 26.08.2026, 11:34:51"
+                           aria-label="Go To UTC with seconds">
                     <button type="button" class="trp-text-btn" id="researchGoToBtn" title="Zu Datum springen">Springen</button>
+                    <span id="researchGotoSyncHint" class="trp-muted research-goto-sync-hint" hidden></span>
                     <span id="researchHistoryHint" class="trp-muted research-history-hint"></span>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchSyncChartAfterBt" checked> Chart nach Backtest</label>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
@@ -139,6 +162,8 @@
                     <button type="button" class="trp-text-btn" id="trpStochSettings" title="Stochastic Settings">⚙</button>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Liquidity Location</label>
                     <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
+                    <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    <button type="button" class="trp-text-btn" id="researchLldAsOfClear" hidden title="Live pools (clear as-of)">Live pools</button>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchVpEnabled"> Volume Profile</label>
                     <select id="researchVpRows" class="trp-select trp-width" title="Rows" aria-label="Volume Profile Rows">
@@ -166,6 +191,12 @@
                     </select>
                     <label class="trp-check trp-dock-ind" title="OB200 Multi-Walls wenn Raw-Archive vorhanden (z.B. DOGE/BTC), sonst dominante Features-Walls"><input type="checkbox" id="researchObpEnabled"> Orderbook Walls</label>
                     <span class="trp-muted research-obp-legend" id="researchObpLegend" hidden>Bid · Ask Walls</span>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind" title="Kausale Public-Trade-Bubbles (Research only). Grün=Buy, Rot=Sell."><input type="checkbox" id="researchPtbEnabled"> Trade Bubbles</label>
+                    <label class="trp-muted trp-dock-ind" for="researchPtbMin" title="Nur Bubbles mit total_notional ≥ diesem Wert (Quote USDT)">Min</label>
+                    <input type="number" id="researchPtbMin" class="trp-select trp-width" min="0" step="500" value="5000" title="Min. Notional (USDT Quote)" aria-label="Min Notional USDT" style="width:5.5rem">
+                    <label class="trp-muted trp-dock-ind" for="researchPtbMax" title="Höchstens N größte Bubbles im Fenster (gegen Überlagerung)">Max</label>
+                    <input type="number" id="researchPtbMax" class="trp-select trp-width" min="5" max="500" step="5" value="80" title="Max. Anzahl Bubbles" aria-label="Max Bubbles" style="width:4rem">
                     <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
                     <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
@@ -384,7 +415,33 @@
         </div>
     </div>
 
-    <script src="/static/js/research/research_charts.js?v=live-16"></script>
+    <div class="trp-modal" id="modalNap" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>Nested Ask Pool Edge Short V1</h2>
+            <p class="trp-muted">Research-only · SHORT only · Single-Symbol · Zeiten UTC · keine Live-Orders</p>
+            <fieldset><legend>Backtest-Zeitraum (UTC)</legend>
+                <p id="napRangeHint" class="trp-muted">Definiert den Scan-Zeitraum der Nested-Engine — unabhängig von der Chart-History-Länge.</p>
+                <label>Start <input type="datetime-local" id="napStart"></label>
+                <label>Ende <input type="datetime-local" id="napEnd"></label>
+                <div class="trp-modal-actions" style="margin-top:0.5rem">
+                    <button type="button" class="trp-text-btn" id="napUseChartRange" title="Übernimmt geladene Chart-History">Aus Chart-History</button>
+                    <button type="button" class="trp-text-btn" id="napUse1d" title="Letzte 24 Stunden">1 Tag</button>
+                    <button type="button" class="trp-text-btn" id="napUse3d" title="Letzte 3 Tage">3 Tage</button>
+                </div>
+            </fieldset>
+            <fieldset><legend>Anzeige</legend>
+                <label class="trp-check"><input type="checkbox" id="napShowRejectedModal"> Rejected Candidates (grau)</label>
+            </fieldset>
+            <p class="trp-muted">Hinweis: lange Fenster (z. B. 30 Tage) sind langsam, weil Pools kausal je Minute neu bewertet werden.</p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-close="modalNap">Schließen</button>
+                <button type="button" class="trp-text-btn trp-primary" id="napRunFromModal">Backtest starten</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
+    <script src="/static/js/research/research_charts.js?v=goto-replay-lock-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

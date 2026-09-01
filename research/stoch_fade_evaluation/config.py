@@ -7,18 +7,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SG_ROOT = Path(
-    "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves"
-)
-SIGNAL_STRATEGY_VERSION = "wave_fade_frozen_f16ae32"
+DEFAULT_SG_ROOT = Path("/home/telgenbuescher/projects/wave_fade_gold_f16ae32")
+SIGNAL_STRATEGY_VERSION = "wave_fade_frozen_f16ae32_causal_entry_v1"
 STRATEGY_VERSION = SIGNAL_STRATEGY_VERSION
 SIGNAL_SOURCE_COMMIT = "f16ae32da38da86f39e75b09c63c31f62d11996b"
 SOURCE_COMMIT = SIGNAL_SOURCE_COMMIT
+CAUSAL_MANIFEST_HASH = "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf"
+CONFIRMATION_POLICY = "cross_recognition"
+CONFIRMATION_SOURCE = CONFIRMATION_POLICY
 EXIT_POLICY = "NO_BE50"
 SIGNAL_SCOPE = "TIER_A_ONLY"
-OUTCOME_ENGINE = "signal_generator.pipeline.outcome_eval.evaluate_signal_no_be50"
-OUTCOME_ENGINE_NAME = "evaluate_signal_no_be50"
-SCAN_EXIT = "signal_generator.strategy.wave_fade.exits.scan_exit_sl_first"
+OUTCOME_ENGINE = "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m"
+OUTCOME_ENGINE_NAME = "evaluate_signal_no_be50_full_1m"
+SCAN_EXIT = "research.stoch_fade_evaluation.full_1m_scan.scan_first_barrier_sl_first"
+SG_NO_BE50_ENGINE_UNCHANGED = "signal_generator.pipeline.outcome_eval.evaluate_signal_no_be50"
 PNL_BASIS = "gross"
 FEE_POLICY = "existing_FEE_PCT_diagnostic_only_not_used_for_cards"
 INTRABAR_POLICY = "SL_FIRST"

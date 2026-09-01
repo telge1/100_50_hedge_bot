@@ -11,7 +11,7 @@ from typing import Any
 def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
-    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    text = json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n"
     tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, path)
 

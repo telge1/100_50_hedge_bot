@@ -312,6 +312,21 @@
     return (($("stochFilterStrategy") || {}).value || "") === "EMA_POOL_TREND_FLIP_V1";
   }
 
+  function isEzmStrategy() {
+    return (($("stochFilterStrategy") || {}).value || "") === "ema_zone_microstructure_confirmation_v1";
+  }
+
+  function isCausalFrozenStrategy() {
+    return (($("stochFilterStrategy") || {}).value || "") === "wave_fade_frozen_f16ae32_causal_entry_v1";
+  }
+
+  function researchJobStrategyId() {
+    if (isEzmStrategy()) return "ema_zone_microstructure_confirmation_v1";
+    // Default / causal frozen: omit → server uses Frozen Fade (backward compatible)
+    if (isCausalFrozenStrategy()) return "wave_fade_frozen_f16ae32_causal_entry_v1";
+    return null;
+  }
+
   function setEmaFlipResearchUi(on, banner) {
     state.emaFlipResearch = !!on;
     const el = $("stochPoolResearchBanner");
@@ -656,15 +671,19 @@
         const end = job.signal_end_exclusive || "";
         const evaluated = !!(data.outcomes_computed || evalId);
         setBanner(
-          "Frozen Research Job " +
-            (job.strategy_version || "wave_fade_frozen_f16ae32") +
+          (job.identity_kind === "EZM_CANDIDATE_DISCOVERY" || (job.strategy_id || job.strategy_version || "").indexOf("ema_zone") === 0
+            ? "EZM Candidate Discovery"
+            : "Frozen Research Job ") +
+            (job.strategy_version || job.strategy_id || "wave_fade_frozen_f16ae32") +
             " · Job " +
             jobId +
             (evalId ? " · Evaluation " + evalId : "") +
             (start && end ? " · Fenster " + start + " – " + end : "") +
-            (evaluated
-              ? " · Canonical Causal Frozen Tier-A · cross_recognition · NO_BE50 / full 1m / SL_FIRST"
-              : " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv"),
+            (job.identity_kind === "EZM_CANDIDATE_DISCOVERY"
+              ? " · Research Candidates · keine Trades / kein PnL"
+              : (evaluated
+                ? " · Canonical Causal Frozen Tier-A · cross_recognition · NO_BE50 / full 1m / SL_FIRST"
+                : " · Outcomes nicht berechnet · Exit-Policy nicht angewendet · Execution-Dedup nicht angewendet · BE50-Outcome nicht aktiv")),
           false
         );
         applyJobSourceUi(job);
@@ -964,14 +983,18 @@
           wave_state: row.wave_state,
           is_demo: false,
           entry_price: entry,
-          tp_price: row.tp_price,
-          sl_price: row.sl_price,
-          signal_time: row.candle_close_time || row.signal_time || row.entry_time,
-          expected_open_time: row.candle_close_time || row.signal_time || row.entry_time,
+          tp_price: row.ezm_research ? null : row.tp_price,
+          sl_price: row.ezm_research ? null : row.sl_price,
+          signal_time: row.decision_at || row.candle_close_time || row.signal_time || row.entry_time,
+          expected_open_time: row.decision_at || row.candle_close_time || row.signal_time || row.entry_time,
           expected_open_price: entry,
           open_price: entry,
-          expected_tp: row.plan_status === "NO_PLAN" ? null : row.tp1_price || row.tp_price,
-          expected_sl: row.plan_status === "NO_PLAN" ? null : row.sl_price,
+          expected_tp: row.ezm_research || row.plan_status === "NO_PLAN" || row.plan_status === "RESEARCH_CANDIDATE_NO_TRADE"
+            ? null
+            : row.tp1_price || row.tp_price,
+          expected_sl: row.ezm_research || row.plan_status === "NO_PLAN" || row.plan_status === "RESEARCH_CANDIDATE_NO_TRADE"
+            ? null
+            : row.sl_price,
           generated_at: row.generated_at,
           result: row.outcomes_computed === false ? null : (row.display_result || row.result),
           frozen_result: row.outcomes_computed === false ? null : (row.frozen_result || row.result),
@@ -979,6 +1002,11 @@
           outcomes_computed: row.outcomes_computed,
           source: row.source,
           job_id: row.job_id,
+          ezm_research: !!row.ezm_research,
+          candidate_state: row.candidate_state,
+          decision_at: row.decision_at,
+          decision_price: row.decision_price,
+          research_note: row.research_note,
           exit_time: row.exit_time,
           exit_price: row.exit_price,
           exit_reason: row.exit_reason,
@@ -2302,22 +2330,29 @@
     if (!symbols.length || frozenFadeJobActive() || universe51JobActive()) return;
     const start = fromDatetimeLocalUtc(($("frozenFadeStart") || {}).value);
     const end = fromDatetimeLocalUtc(($("frozenFadeEnd") || {}).value);
-    const text =
-      "Frozen-Signale für " + symbols.length + " Coin(s) berechnen?\n" +
-      "UTC " + start + " → " + end + " (Ende exklusiv)\n" +
-      "Nur Signalerzeugung – noch kein Profit-Backtest.";
+    const strategyId = researchJobStrategyId();
+    const ezm = strategyId === "ema_zone_microstructure_confirmation_v1";
+    const text = ezm
+      ? ("EZM Candidate Discovery für " + symbols.length + " Coin(s)?\n" +
+         "UTC " + start + " → " + end + " (Ende exklusiv)\n" +
+         "Nur Research Candidates – keine Trades / kein PnL.")
+      : ("Frozen-Signale für " + symbols.length + " Coin(s) berechnen?\n" +
+         "UTC " + start + " → " + end + " (Ende exklusiv)\n" +
+         "Nur Signalerzeugung – noch kein Profit-Backtest.");
     if (!window.confirm(text)) return;
     setErr("frozenFadeError", "");
     try {
+      const body = {
+        symbols: symbols,
+        signal_start: start,
+        signal_end_exclusive: end,
+      };
+      if (strategyId) body.strategy_id = strategyId;
       const res = await fetch("/api/stoch/frozen-fade-jobs", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbols: symbols,
-          signal_start: start,
-          signal_end_exclusive: end,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(function () { return {}; });
       if (res.status === 409) {

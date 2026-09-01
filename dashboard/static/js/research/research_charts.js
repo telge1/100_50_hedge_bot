@@ -17,9 +17,12 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "live-16";
+  const ASSET_V = "goto-replay-lock-1";
+  const CHART_TIME_LIVE = "LIVE";
+  const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
   const OBP_KEY = "research.orderbook_profile";
+  const PTB_KEY = "research.trade_bubbles";
   const VP_DEBOUNCE_MS = 400;
   const OBP_REFRESH_MS = 60 * 1000;
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
@@ -81,6 +84,13 @@
       loadedTo: null,
       pinned: false,
     },
+    liquidityLocationAsOf: null,
+    /** Canonical GO TO unix (UTC seconds); drives as-of + chart focus. */
+    gotoTsUtc: null,
+    chartTimeMode: CHART_TIME_LIVE,
+    replayTargetTs: null,
+    replayWindow: null,
+    replayGen: 0,
   };
   const inflightGets = {};
   const inflightPosts = {};
@@ -129,9 +139,45 @@
   }
 
   function utcInputToUnix(v) {
+    // Prefer shared GO-TO parser (always UTC, keeps seconds).
+    if (typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.parseGotoUtcToUnix) {
+      const parsed = ResearchGotoTime.parseGotoUtcToUnix(v);
+      if (parsed != null) return parsed;
+    }
     if (!v) return null;
-    const ms = Date.parse(String(v).length === 16 ? String(v) + ":00Z" : String(v));
+    let s = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) s += ":00Z";
+    else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(s)) s += "Z";
+    const ms = Date.parse(s);
     return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+  }
+
+  function unixToIsoZExact(unix) {
+    if (typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.unixToIsoZ) {
+      return ResearchGotoTime.unixToIsoZ(unix);
+    }
+    return unixToIsoZ(unix);
+  }
+
+  function fmtUtcSeconds(unix) {
+    if (typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.fmtUtcSeconds) {
+      return ResearchGotoTime.fmtUtcSeconds(unix);
+    }
+    return fmtUtc(unix);
+  }
+
+  function gotoWindowForTs(ts) {
+    if (typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.gotoLoadWindow) {
+      return ResearchGotoTime.gotoLoadWindow(ts);
+    }
+    const half = 4 * 3600;
+    return {
+      goto_ts_utc: Math.floor(Number(ts)),
+      from: Math.floor(Number(ts)) - half,
+      to: Math.floor(Number(ts)) + half,
+      viewPad: half,
+      as_of_iso: unixToIsoZExact(ts),
+    };
   }
 
   function readHistoryFromUi() {
@@ -234,8 +280,81 @@
     hint.textContent = "Geladen UTC: " + fmtUtc(r.from) + " → " + fmtUtc(r.to);
   }
 
+  /** Freeze live forming/poll during historical GO-TO replay. */
+  function isHistoricalReplay() {
+    return state.chartTimeMode === CHART_TIME_REPLAY;
+  }
+
+  function replayViewLockPayload(win) {
+    if (!win) return null;
+    return {
+      from: Math.floor(Number(win.from)),
+      to: Math.floor(Number(win.to)),
+      center: Math.floor(Number(win.goto_ts_utc != null ? win.goto_ts_utc : win.center)),
+    };
+  }
+
+  function lockReplayViewOnAllPanes(win) {
+    const lock = replayViewLockPayload(win);
+    if (!lock) return;
+    visibleIds().forEach(function (pid) {
+      const chart = api(state.panes[pid]);
+      if (!chart) return;
+      if (chart.setFollowLive) chart.setFollowLive(false);
+      if (chart.setReplayViewLock) chart.setReplayViewLock(lock);
+    });
+  }
+
+  function unlockReplayViewOnAllPanes() {
+    visibleIds().forEach(function (pid) {
+      const chart = api(state.panes[pid]);
+      if (chart && chart.clearReplayViewLock) chart.clearReplayViewLock();
+      if (chart && chart.setFollowLive) chart.setFollowLive(true);
+    });
+  }
+
+  function enforceReplayViewOnAllPanes() {
+    if (!isHistoricalReplay() || !state.replayWindow) return;
+    lockReplayViewOnAllPanes(state.replayWindow);
+  }
+
+  function abortInflightPaneLoads() {
+    if (state.loadAbort) {
+      try { state.loadAbort.abort(); } catch (e) { /* ignore */ }
+    }
+    state.loadGen += 1;
+    state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane) pane.paneGen += 1;
+    });
+  }
+
+  function enterHistoricalReplay(goto_ts_utc, win) {
+    state.chartTimeMode = CHART_TIME_REPLAY;
+    state.replayTargetTs = Math.floor(Number(goto_ts_utc));
+    state.replayWindow = Object.assign({}, win, { goto_ts_utc: state.replayTargetTs });
+    state.replayGen = (state.replayGen || 0) + 1;
+    state.gotoTsUtc = state.replayTargetTs;
+    abortInflightPaneLoads();
+    stopPoll();
+    lockReplayViewOnAllPanes(state.replayWindow);
+  }
+
+  function exitHistoricalReplay() {
+    state.chartTimeMode = CHART_TIME_LIVE;
+    state.replayTargetTs = null;
+    state.replayWindow = null;
+    state.replayGen = (state.replayGen || 0) + 1;
+    state.gotoTsUtc = null;
+    state.liquidityLocationAsOf = null;
+    unlockReplayViewOnAllPanes();
+    abortInflightPaneLoads();
+  }
+
   /** Freeze live forming/poll only for true historical pins (past custom/backtest end). */
   function historyBlocksLive() {
+    if (isHistoricalReplay()) return true;
     if (!state.history || !state.history.pinned) return false;
     const preset = state.history.preset || "30d";
     // Rolling / N-day presets are live windows ending at "now".
@@ -264,16 +383,20 @@
     updateHistoryHint(range);
     await mapLimit(visibleIds(), PANE_HTTP_LIMIT, function (pid) {
       return loadPane(pid, Object.assign({
-        force: !o.jumpToUnix,
+        force: !o.jumpToUnix && !isHistoricalReplay(),
         sourceAction: o.sourceAction || "history-reload",
         from: range.from,
         to: range.to,
         jumpToUnix: o.jumpToUnix,
         jumpPadSec: o.jumpPadSec,
+        replayGen: o.replayGen != null ? o.replayGen : (isHistoricalReplay() ? state.replayGen : null),
       }, o));
     });
     if (o.jumpToUnix != null) {
-      await jumpChartsToUnix(o.jumpToUnix, o.jumpPadSec);
+      if (!isHistoricalReplay() || o.replayGen == null || o.replayGen === state.replayGen) {
+        await jumpChartsToUnix(o.jumpToUnix, o.jumpPadSec);
+        enforceReplayViewOnAllPanes();
+      }
     }
   }
 
@@ -287,6 +410,9 @@
       if (!pane) return;
       const chart = api(pane) || await whenReady(pane, 8000);
       if (!chart) return;
+      try {
+        if (chart.setFollowLive) chart.setFollowLive(false);
+      } catch (e) { /* optional */ }
       if (chart.focusOnTime && chart.focusOnTime(center, pad)) ok = true;
       else if (chart.setVisibleTimeRange) {
         try {
@@ -340,71 +466,166 @@
     return from == null ? null : { from: from, to: to };
   }
 
-  async function goToDateTime() {
-    if (!state.symbol) return;
-    const ts = utcInputToUnix(($("researchGoTo") || {}).value);
-    if (ts == null) {
-      setStatus("Go To: Datum/Zeit (UTC) eingeben", "error");
+  function unixToIsoZ(unix) {
+    const n = Number(unix);
+    if (!Number.isFinite(n)) return null;
+    return new Date(n * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+
+  function updateLldAsOfHint(serverIso) {
+    const hint = $("researchLldAsOfHint");
+    const clearBtn = $("researchLldAsOfClear");
+    const iso = serverIso || state.liquidityLocationAsOf;
+    if (hint) {
+      if (iso) {
+        hint.textContent = "LLD as-of: " + iso;
+        hint.hidden = false;
+      } else {
+        hint.textContent = "";
+        hint.hidden = true;
+      }
+    }
+    if (clearBtn) clearBtn.hidden = !iso;
+  }
+
+  function updateGotoSyncHint(win) {
+    const el = $("researchGotoSyncHint");
+    if (!el) return;
+    if (!win || win.goto_ts_utc == null) {
+      el.textContent = "";
+      el.hidden = true;
       return;
     }
-    const span = historySpanSeconds();
-    const half = Math.max(Math.floor(span / 2), 86400);
-    const viewPad = Math.min(half, 86400 * 14);
-    const now = Math.floor(Date.now() / 1000);
-    let loadFrom = ts - half;
-    let loadTo = ts + half;
-    if (loadTo > now + 900) loadTo = now + 900;
+    el.textContent =
+      "Ziel-Candle: " + fmtUtcSeconds(win.goto_ts_utc) +
+      " · Fenster: " + fmtUtcSeconds(win.from) + " → " + fmtUtcSeconds(win.to) +
+      (state.liquidityLocationAsOf ? " · LLD as-of: " + state.liquidityLocationAsOf : "");
+    el.hidden = false;
+  }
+
+  async function clearLiquidityLocationAsOf() {
+    exitHistoricalReplay();
+    updateLldAsOfHint(null);
+    updateGotoSyncHint(null);
+    state.history.pinned = false;
+    await reloadVisibleHistory({ sourceAction: "lld-asof-clear" });
+    startPoll();
+    setStatus("Liquidity Location: Live-Pools · GO TO cleared");
+  }
+
+  async function goToDateTime() {
+    if (!state.symbol) return;
+    const raw = (($("researchGoTo") || {}).value || "").trim();
+    const goto_ts_utc = utcInputToUnix(raw);
+    if (goto_ts_utc == null) {
+      setStatus("Go To: UTC-Zeit eingeben (z.B. 2026-08-26 11:34:51)", "error");
+      return;
+    }
+    const win = gotoWindowForTs(goto_ts_utc);
+    if (!win) {
+      setStatus("Go To: ungültiges Zeitfenster", "error");
+      return;
+    }
+    const asOfIso = unixToIsoZExact(goto_ts_utc);
+    if (!asOfIso || !asOfIso.endsWith("Z")) {
+      setStatus("Go To: ISO as-of fehlgeschlagen", "error");
+      return;
+    }
+    const lldOn = $("researchIndLld") && $("researchIndLld").checked;
+    enterHistoricalReplay(goto_ts_utc, win);
+    if (lldOn) {
+      state.liquidityLocationAsOf = asOfIso;
+      updateLldAsOfHint(asOfIso);
+    } else {
+      state.liquidityLocationAsOf = null;
+      updateLldAsOfHint(null);
+    }
     state.history.pinned = true;
-    const needsLoad = !visiblePanesContainTime(ts) || !visiblePanesCoverRange(loadFrom, loadTo);
-    if (needsLoad) {
-      setStatus("Go To: History laden " + fmtUtc(loadFrom) + " …");
-      await reloadVisibleHistory({
-        from: loadFrom,
-        to: loadTo,
-        sourceAction: "go-to-load",
-      });
-    }
-    if (!visiblePanesContainTime(ts)) {
-      setStatus("Go To: Nachladen " + fmtUtc(loadFrom) + " …");
-      await reloadVisibleHistory({
-        from: loadFrom,
-        to: loadTo,
-        sourceAction: "go-to-retry",
-      });
-    }
-    if (!visiblePanesContainTime(ts)) {
+    setStatus(
+      "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
+      (lldOn ? " · LLD as-of laden …" : " · Chart laden …")
+    );
+    const reqReplayGen = state.replayGen;
+    await reloadVisibleHistory({
+      from: win.from,
+      to: win.to,
+      jumpToUnix: goto_ts_utc,
+      jumpPadSec: win.viewPad,
+      sourceAction: "go-to",
+      replayGen: reqReplayGen,
+    });
+    if (!isHistoricalReplay() || reqReplayGen !== state.replayGen) return;
+    if (!visiblePanesContainTime(goto_ts_utc)) {
       const bounds = mergedPaneBounds();
       const detail = bounds
         ? (" · Kerzen UTC " + fmtUtc(bounds.from) + " → " + fmtUtc(bounds.to))
         : "";
-      setStatus("Go To: " + fmtUtc(ts) + " liegt außerhalb der geladenen Kerzen" + detail, "error");
+      setStatus("Go To: " + fmtUtcSeconds(goto_ts_utc) + " außerhalb geladener Kerzen" + detail, "error");
       return;
     }
-    if (!(await jumpChartsToUnix(ts, viewPad))) {
-      setStatus("Go To: Zoom auf " + fmtUtc(ts) + " fehlgeschlagen", "error");
+    lockReplayViewOnAllPanes(state.replayWindow);
+    if (!(await jumpChartsToUnix(goto_ts_utc, win.viewPad))) {
+      setStatus("Go To: Zoom auf " + fmtUtcSeconds(goto_ts_utc) + " fehlgeschlagen", "error");
       return;
     }
-    setStatus("Go To · " + fmtUtc(ts));
+    const focusPane = visibleIds()[0];
+    if (focusPane) handleClick(focusPane, goto_ts_utc);
+    updateGotoSyncHint(win);
+    updateHistoryHint({ from: win.from, to: win.to });
+    setStatus(
+      "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
+      (lldOn ? " · LLD as-of " + asOfIso : "") +
+      " · Replay ±4h"
+    );
   }
 
   async function syncChartAfterBacktest(startIso, endIso, focusIso) {
     if (!$("researchSyncChartAfterBt") || !$("researchSyncChartAfterBt").checked) return;
+    await zoomChartToIsoRange(startIso, endIso, focusIso);
+  }
+
+  async function zoomChartToIsoRange(startIso, endIso, focusIso) {
     const start = startIso ? Math.floor(Date.parse(startIso) / 1000) : null;
     const end = endIso ? Math.floor(Date.parse(endIso) / 1000) : null;
-    if (start == null || end == null || end <= start) return;
-    const warmup = 2 * 86400;
-    const from = start - warmup;
-    const to = end + 86400;
-    const focus = focusIso ? Math.floor(Date.parse(focusIso) / 1000) : Math.floor((start + end) / 2);
-    const pad = Math.min(Math.floor((end - start) / 2) + warmup, 86400 * 10);
-    setStatus("Chart sync Backtest-Fenster …");
+    if (start == null || end == null || !Number.isFinite(start) || !Number.isFinite(end)) return false;
+    const lo = Math.min(start, end);
+    const hi = Math.max(start, end);
+    const pad = Math.max(3600, Math.floor((hi - lo) * 0.15) || 3600);
+    const from = lo - pad;
+    const to = hi + pad;
+    const focus = focusIso ? Math.floor(Date.parse(focusIso) / 1000) : Math.floor((lo + hi) / 2);
+    setStatus("Chart sync Signal-Fenster …");
     await reloadVisibleHistory({
       from: from,
       to: to,
-      jumpToUnix: focus,
-      jumpPadSec: pad,
-      sourceAction: "backtest-sync",
+      jumpToUnix: Number.isFinite(focus) ? focus : Math.floor((lo + hi) / 2),
+      // Keep the whole signal span in view (not a huge multi-day pad that fails).
+      jumpPadSec: Math.max(pad, Math.floor((hi - lo) / 2) + 3600),
+      sourceAction: "aps-signal-zoom",
     });
+    // Explicit visible range on each pane — more reliable than focus-only.
+    let ok = false;
+    await Promise.all(visibleIds().map(async function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      const chart = api(pane) || await whenReady(pane, 4000);
+      if (!chart) return;
+      try {
+        if (chart.setFollowLive) chart.setFollowLive(false);
+      } catch (e) { /* optional */ }
+      if (chart.setVisibleTimeRange) {
+        try {
+          if (chart.setVisibleTimeRange(from, to)) ok = true;
+        } catch (e) { /* ignore */ }
+      }
+      if (!ok && chart.focusOnTime) {
+        try {
+          if (chart.focusOnTime(focus, Math.max(pad, Math.floor((hi - lo) / 2)))) ok = true;
+        } catch (e) { /* ignore */ }
+      }
+    }));
+    await refreshOverlaysVisible();
+    return ok;
   }
 
   function bindHistoryUi() {
@@ -444,6 +665,13 @@
             setStatus("Go To fehlgeschlagen: " + (err.message || err), "error");
           });
         }
+      });
+    }
+    if ($("researchLldAsOfClear")) {
+      $("researchLldAsOfClear").addEventListener("click", function () {
+        clearLiquidityLocationAsOf().catch(function (err) {
+          setStatus("Live pools fehlgeschlagen: " + (err.message || err), "error");
+        });
       });
     }
     if ($("researchSyncChartAfterBt")) {
@@ -537,6 +765,10 @@
       if (!res.ok) throw httpError(res, body, url);
       return body;
     })();
+    // Abortable GETs must not share inflight promises (abort of A would fail B).
+    if (meta && meta.signal) {
+      return pending;
+    }
     inflightGets[url] = pending;
     try {
       return await pending;
@@ -630,6 +862,7 @@
       on_visible_range: function (from, to) {
         scheduleVolumeProfile(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
+        scheduleTradeBubbles(pane, from, to);
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
@@ -769,6 +1002,9 @@
         obpGen: 0,
         obpTimer: null,
         obpAbort: null,
+        ptbGen: 0,
+        ptbTimer: null,
+        ptbAbort: null,
       };
       state.panes[pid] = pane;
       iframe.addEventListener("load", function () {
@@ -777,7 +1013,28 @@
       iframe.src = "/static/research_trp/pane.html?v=" + ASSET_V;
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
-        loadPane(pid, { force: true, sourceAction: "tf-change" });
+        if (isHistoricalReplay() && state.replayWindow && state.replayTargetTs != null) {
+          const rw = state.replayWindow;
+          const reqReplayGen = state.replayGen;
+          loadPane(pid, {
+            force: false,
+            sourceAction: "tf-change-replay",
+            from: rw.from,
+            to: rw.to,
+            jumpToUnix: state.replayTargetTs,
+            jumpPadSec: rw.viewPad,
+            replayGen: reqReplayGen,
+          }).then(function () {
+            if (reqReplayGen !== state.replayGen) return;
+            return jumpChartsToUnix(state.replayTargetTs, rw.viewPad);
+          }).then(function () {
+            enforceReplayViewOnAllPanes();
+          }).catch(function (err) {
+            setStatus("TF-Wechsel Replay fehlgeschlagen: " + (err.message || err), "error");
+          });
+        } else {
+          loadPane(pid, { force: true, sourceAction: "tf-change" });
+        }
       });
       wrap.querySelector(".trp-reset").addEventListener("click", function () {
         const chart = api(pane);
@@ -1010,9 +1267,16 @@
     const parts = [
       state.symbol || "—",
       "layout " + state.layout,
+      isHistoricalReplay() ? "REPLAY" : "LIVE",
       "hover " + fmtUtc(state.hoverUnix),
-      "sel " + fmtUtc(state.selectedUnix),
+      "sel " + fmtUtcSeconds(state.selectedUnix),
     ];
+    if (state.gotoTsUtc != null) {
+      parts.push("GO TO " + fmtUtcSeconds(state.gotoTsUtc));
+    }
+    if (state.liquidityLocationAsOf) {
+      parts.push("LLD as-of " + state.liquidityLocationAsOf);
+    }
     if (!state.sync) parts.push("sync off");
     if (ws.tool && ws.tool !== "select") parts.push("tool " + ws.tool);
     if (ws.selected_id) parts.push("draw " + ws.selected_id);
@@ -1310,6 +1574,221 @@
     }
   }
 
+  function defaultTradeBubbles() {
+    return {
+      enabled: false,
+      min_notional: 5000,
+      max_bubbles: 80,
+    };
+  }
+
+  function normalizeTradeBubbles(raw) {
+    const base = defaultTradeBubbles();
+    const src = Object.assign({}, raw || {});
+    if (src.min_notional == null && src.mode) {
+      const m = String(src.mode);
+      if (m === "off") src.enabled = false;
+      else if (m === "large") src.min_notional = 15000;
+      else if (m === "large_medium" || m === "large+medium") src.min_notional = 5000;
+      else if (m === "all" || m === "delta_debug") src.min_notional = 0;
+      if (m !== "off") src.enabled = src.enabled !== false;
+    }
+    const minN = Number(src.min_notional);
+    const maxB = Number(src.max_bubbles);
+    return {
+      enabled: !!src.enabled,
+      min_notional: Number.isFinite(minN) && minN >= 0 ? minN : base.min_notional,
+      max_bubbles: Number.isFinite(maxB) ? Math.min(500, Math.max(5, Math.round(maxB))) : base.max_bubbles,
+    };
+  }
+
+  function readStoredTradeBubbles() {
+    try {
+      const raw = localStorage.getItem(PTB_KEY);
+      if (!raw) return defaultTradeBubbles();
+      return normalizeTradeBubbles(JSON.parse(raw));
+    } catch (e) {
+      return defaultTradeBubbles();
+    }
+  }
+
+  function persistTradeBubbles() {
+    try { localStorage.setItem(PTB_KEY, JSON.stringify(state.ptb)); } catch (e) {}
+  }
+
+  function fillTradeBubblesControls() {
+    const ptb = state.ptb || defaultTradeBubbles();
+    const en = $("researchPtbEnabled");
+    if (en) en.checked = !!ptb.enabled;
+    const minEl = $("researchPtbMin");
+    if (minEl) minEl.value = String(ptb.min_notional != null ? ptb.min_notional : 5000);
+    const maxEl = $("researchPtbMax");
+    if (maxEl) maxEl.value = String(ptb.max_bubbles != null ? ptb.max_bubbles : 80);
+  }
+
+  function filterTradeBubblesForDisplay(bubbles) {
+    const ptb = state.ptb || defaultTradeBubbles();
+    const minN = Number(ptb.min_notional) || 0;
+    const maxB = Math.min(500, Math.max(5, Number(ptb.max_bubbles) || 80));
+    const list = (bubbles || []).filter(function (b) {
+      return Number(b.total_notional) >= minN;
+    });
+    list.sort(function (a, b) {
+      return Number(b.total_notional) - Number(a.total_notional);
+    });
+    return list.slice(0, maxB);
+  }
+
+  function applyTradeBubblesToPane(pane, rawBubbles) {
+    if (!pane) return;
+    const live = api(pane);
+    if (!live || !live.setTradeBubbles) return;
+    const shown = filterTradeBubblesForDisplay(rawBubbles || []);
+    live.setTradeBubbles(shown, { alpha: 0.5 });
+    pane.lastPtbShown = shown.length;
+  }
+
+  function refilterVisibleTradeBubbles() {
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      if (!state.ptb || !state.ptb.enabled) {
+        clearPaneTradeBubbles(pane);
+        return;
+      }
+      if (pane.lastPtb && pane.lastPtb.bubbles) {
+        applyTradeBubblesToPane(pane, pane.lastPtb.bubbles);
+      } else {
+        scheduleTradeBubbles(pane);
+      }
+    });
+  }
+
+  function clearPaneTradeBubbles(pane) {
+    if (!pane) return;
+    pane.ptbGen = (pane.ptbGen || 0) + 1;
+    if (pane.ptbTimer) {
+      clearTimeout(pane.ptbTimer);
+      pane.ptbTimer = null;
+    }
+    if (pane.ptbAbort) {
+      try { pane.ptbAbort.abort(); } catch (e) {}
+      pane.ptbAbort = null;
+    }
+    const chart = api(pane);
+    if (chart && chart.clearTradeBubbles) chart.clearTradeBubbles();
+    const tip = pane.iframe && pane.iframe.contentDocument && pane.iframe.contentDocument.getElementById("ptb-tooltip");
+    if (tip) {
+      tip.hidden = true;
+      tip.textContent = "";
+    }
+  }
+
+  function scheduleTradeBubbles(pane) {
+    if (!pane) return;
+    if (pane.ptbTimer) clearTimeout(pane.ptbTimer);
+    pane.ptbTimer = setTimeout(function () {
+      pane.ptbTimer = null;
+      fetchPaneTradeBubbles(pane);
+    }, VP_DEBOUNCE_MS);
+  }
+
+  async function fetchPaneTradeBubbles(pane) {
+    if (!pane || !state.symbol) return;
+    const ptb = state.ptb || defaultTradeBubbles();
+    if (!ptb.enabled) {
+      clearPaneTradeBubbles(pane);
+      return;
+    }
+    const chart = api(pane);
+    if (!chart || !chart.getVisibleTimeRange) return;
+    const range = chart.getVisibleTimeRange();
+    if (!range || range.firstCandle == null || range.lastCandle == null) return;
+    const step = TF_SEC[pane.tf] || 60;
+    const start = Number(range.firstCandle);
+    const end = Number(range.lastCandle) + step;
+    if (!(end > start)) return;
+    // Cap client request so visible+warmup stays within server limits (~6h visible)
+    const maxVisible = 5 * 3600 + 50 * 60; // 5h50m < server 6h
+    if (end - start > maxVisible) {
+      const cappedStart = end - maxVisible;
+      return fetchPaneTradeBubblesRange(pane, cappedStart, end);
+    }
+    return fetchPaneTradeBubblesRange(pane, start, end);
+  }
+
+  async function fetchPaneTradeBubblesRange(pane, start, end) {
+    const ptb = state.ptb || defaultTradeBubbles();
+    const gen = ++pane.ptbGen;
+    if (pane.ptbAbort) {
+      try { pane.ptbAbort.abort(); } catch (e) {}
+    }
+    pane.ptbAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const asOf = Math.min(end, Math.floor(Date.now() / 1000));
+    const url = "/api/research/trade-bubbles?symbol=" + encodeURIComponent(state.symbol) +
+      "&start=" + encodeURIComponent(String(Math.floor(start))) +
+      "&end=" + encodeURIComponent(String(Math.floor(end))) +
+      "&as_of=" + encodeURIComponent(String(asOf)) +
+      "&mode=all";
+    try {
+      const body = await getJson(url, {
+        sourceAction: "trade-bubbles",
+        pane: pane.id,
+        timeframe: pane.tf,
+        signal: pane.ptbAbort && pane.ptbAbort.signal,
+      });
+      if (gen !== pane.ptbGen) return;
+      if (!state.ptb || !state.ptb.enabled) return;
+      const bubbles = (body && body.bubbles) || [];
+      if (!bubbles.length && pane.lastPtbCount > 0 && body && body.success === false) {
+        return;
+      }
+      pane.lastPtb = body;
+      pane.lastPtbCount = bubbles.length;
+      applyTradeBubblesToPane(pane, bubbles);
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      if (gen !== pane.ptbGen) return;
+      console.warn("[trade-bubbles]", err && err.message ? err.message : err);
+      setStatus("Trade Bubbles: " + String((err && err.message) || err), "error");
+    }
+  }
+
+  function showTradeBubbleTooltip(pane, bubble) {
+    if (!pane || !pane.iframe || !pane.iframe.contentDocument) return;
+    const tip = pane.iframe.contentDocument.getElementById("ptb-tooltip");
+    if (!tip) return;
+    if (!bubble) {
+      tip.hidden = true;
+      tip.textContent = "";
+      return;
+    }
+    const fmt = function (n) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return "—";
+      if (Math.abs(v) >= 1000) return v.toFixed(0);
+      if (Math.abs(v) >= 1) return v.toFixed(2);
+      return v.toPrecision(4);
+    };
+    const utc = bubble.known_at || (bubble.timestamp
+      ? new Date(bubble.timestamp * 1000).toISOString().replace(".000Z", "Z")
+      : "—");
+    tip.textContent = [
+      "RESEARCH ONLY · Public Trade Bubble",
+      "UTC " + utc,
+      "price " + fmt(bubble.price),
+      "buy " + fmt(bubble.buy_notional) + " · sell " + fmt(bubble.sell_notional),
+      "delta " + fmt(bubble.delta_notional) + " · total " + fmt(bubble.total_notional),
+      "trades " + bubble.trade_count + " · max " + fmt(bubble.max_single_trade_notional),
+      "side " + bubble.dominant_side + " · class " + bubble.size_class +
+        (bubble.forming ? " · FORMING" : ""),
+      "known_at " + (bubble.known_at || "—") + " · " + (bubble.source_quality || "ok"),
+    ].join("\n");
+    tip.hidden = false;
+    tip.style.left = "12px";
+    tip.style.top = "12px";
+  }
+
   function btStrategy() {
     const el = $("researchBtStrategy");
     return el ? el.value : "stoch_fade";
@@ -1334,6 +1813,29 @@
     if (mode === "ema_only") return "Nur EMA";
     if (mode === "micro_only") return "Nur Mikrostruktur";
     return "EMA und Mikrostruktur";
+  }
+
+  function poolSignalsMode() {
+    const el = $("researchPoolSignalsMode");
+    return el ? el.value : "confirmed";
+  }
+
+  function poolSignalsModeLabel(mode) {
+    if (mode === "off") return "Aus";
+    if (mode === "debug") return "Debug";
+    if (mode === "active") return "Aktive Pläne";
+    if (mode === "all_states") return "Alle Zustände";
+    return "Bestätigte Signale";
+  }
+
+  function syncPoolSignalsUi(snap) {
+    const isAps = btStrategy() === "a_plus_liquidity_pool_signal_scanner_v1";
+    const wrap = $("researchPoolSignalsWrap");
+    const sel = $("researchPoolSignalsMode");
+    if (wrap) wrap.hidden = !isAps;
+    if (!isAps) return;
+    const ps = (snap && snap.pool_signals) || (state.workspace && state.workspace.pool_signals) || {};
+    if (sel && ps.display_mode) sel.value = ps.display_mode;
   }
 
   function syncEzmLayerUi(snap) {
@@ -1369,6 +1871,7 @@
     const enabled = (ema.lines || []).filter(function (l) { return l.enabled; }).map(function (l) { return "EMA" + l.period; });
     $("trpEmaSummary").textContent = enabled.length ? enabled.join(", ") : "off";
     syncEzmLayerUi(snap);
+    syncPoolSignalsUi(snap);
     const mode = toolMode();
     PANE_IDS.forEach(function (pid) {
       const pane = state.panes[pid];
@@ -1453,6 +1956,7 @@
         if (chart) chart.setSyncedCrosshair(floorUtc(unix, state.panes[pid].tf), gen);
       });
     }
+    // Bubble tooltip is handled inside chart.js via pixel hit-test (no per-candle spam).
     refreshStatusLine();
   }
 
@@ -1560,6 +2064,7 @@
     if (!pane || !state.symbol) return;
     const force = opts && opts.force;
     const gen = (opts && opts.gen != null) ? opts.gen : state.loadGen;
+    const reqReplayGen = (opts && opts.replayGen != null) ? opts.replayGen : null;
     const paneGen = ++pane.paneGen;
     const ws = state.workspace || {};
     const range = resolvePaneLoadRange(opts || {});
@@ -1573,6 +2078,14 @@
     };
     if (range.from != null) reqBody.from = range.from;
     if (range.to != null) reqBody.to = range.to;
+    if (
+      state.liquidityLocationAsOf &&
+      ws.liquidity &&
+      ws.liquidity.enabled !== false &&
+      ($("researchIndLld") || {}).checked
+    ) {
+      reqBody.liquidity_location_as_of = state.liquidityLocationAsOf;
+    }
     pane.el.querySelector(".trp-pane-status").textContent = "loading…";
     let packed;
     try {
@@ -1587,15 +2100,25 @@
       throw err;
     }
     if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
+    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
     if (packed.timeframe && packed.timeframe !== pane.tf) return;
     await whenReady(pane, 8000);
     if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
+    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
     applyPaneBundle(pane, packed, {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
-      preserveView: !!(opts && opts.preserveView),
-      skipDefaultView: !!(opts && opts.jumpToUnix != null),
-      skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null),
+      preserveView: !!(opts && opts.preserveView) || isHistoricalReplay(),
+      skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
+      skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
     });
+    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
+    enforceReplayViewOnAllPanes();
+    if (packed.liquidity_location_as_of) {
+      state.liquidityLocationAsOf = packed.liquidity_location_as_of;
+    } else if ((opts && opts.sourceAction) === "lld-asof-clear") {
+      state.liquidityLocationAsOf = null;
+    }
+    updateLldAsOfHint(packed.liquidity_location_as_of || null);
     if (packed.from != null && packed.to != null) {
       state.history.loadedFrom = Number(packed.from);
       state.history.loadedTo = Number(packed.to);
@@ -1610,7 +2133,7 @@
         }
       }
     }
-    if (force && !(opts && opts.jumpToUnix != null)) {
+    if (force && !(opts && opts.jumpToUnix != null) && (opts && opts.sourceAction) !== "go-to") {
       const ready = api(pane);
       if (ready && ready.resetView) ready.resetView();
     }
@@ -1631,6 +2154,7 @@
     }
     scheduleVolumeProfile(pane);
     scheduleOrderbookProfile(pane);
+    scheduleTradeBubbles(pane);
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -1793,6 +2317,7 @@
   }
 
   function applyFormingToPane(pane, forming) {
+    if (isHistoricalReplay()) return false;
     const diag = {
       symbol: state.symbol,
       pane: pane && pane.id,
@@ -1902,6 +2427,7 @@
   let formingWantRestart = false;
   async function pollForming(gen) {
     if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    if (isHistoricalReplay()) return;
     if (historyBlocksLive()) {
       postLiveDiag({
         reason: "blocked_history",
@@ -1954,6 +2480,7 @@
 
   async function pollIncremental(gen) {
     if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    if (isHistoricalReplay()) return;
     try {
       await mapLimit(visibleIds(), PANE_HTTP_LIMIT, function (pid) {
         return pollPane(pid, gen);
@@ -2014,7 +2541,13 @@
     pane.candleFp = candleFingerprint(merged);
     pane.closedFp = nextClosed;
     const chart = api(pane);
-    if (chart) chart.setData(pane.pendingData, { preserveView: true });
+    if (chart) {
+      chart.setData(pane.pendingData, {
+        preserveView: true,
+        skipDefaultView: isHistoricalReplay(),
+      });
+      if (isHistoricalReplay()) enforceReplayViewOnAllPanes();
+    }
     if (packed.forming) {
       applyFormingToPane(pane, packed.forming);
     } else {
@@ -2031,6 +2564,7 @@
   }
 
   async function refreshLiveBar(ensure) {
+    if (isHistoricalReplay()) return;
     if (!state.symbol) return;
     const q = ensure ? "&ensure=true" : "&ensure=false";
     const body = await getJson(
@@ -2371,6 +2905,49 @@
         }
       });
     }
+    const ptbEn = $("researchPtbEnabled");
+    if (ptbEn) {
+      ptbEn.addEventListener("change", function () {
+        if (!state.ptb) state.ptb = defaultTradeBubbles();
+        state.ptb = normalizeTradeBubbles(state.ptb);
+        state.ptb.enabled = ptbEn.checked;
+        fillTradeBubblesControls();
+        persistTradeBubbles();
+        if (!state.ptb.enabled) {
+          visibleIds().forEach(function (pid) { clearPaneTradeBubbles(state.panes[pid]); });
+        } else {
+          visibleIds().forEach(function (pid) { scheduleTradeBubbles(state.panes[pid]); });
+        }
+      });
+    }
+    function readPtbNumericFilters() {
+      if (!state.ptb) state.ptb = defaultTradeBubbles();
+      const minEl = $("researchPtbMin");
+      const maxEl = $("researchPtbMax");
+      if (minEl) {
+        const v = Number(minEl.value);
+        state.ptb.min_notional = Number.isFinite(v) && v >= 0 ? v : 0;
+      }
+      if (maxEl) {
+        const v = Number(maxEl.value);
+        state.ptb.max_bubbles = Number.isFinite(v) ? Math.min(500, Math.max(5, Math.round(v))) : 80;
+      }
+      state.ptb = normalizeTradeBubbles(state.ptb);
+      fillTradeBubblesControls();
+      persistTradeBubbles();
+      refilterVisibleTradeBubbles();
+    }
+    ["researchPtbMin", "researchPtbMax"].forEach(function (id) {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", readPtbNumericFilters);
+      el.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          readPtbNumericFilters();
+        }
+      });
+    });
     ["researchVpRows", "researchVpDisplay", "researchVpWidth", "researchVpMode"].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -2419,6 +2996,27 @@
     }
     bindHeightDrag();
 
+    async function applyPoolSignalsMode(mode) {
+      if (!state.symbol) return;
+      const snap = await sendJson("/api/research/backtester/load", "POST", {
+        strategy_id: "a_plus_liquidity_pool_signal_scanner_v1",
+        symbol: state.symbol,
+        display_mode: mode,
+        layer_only: true,
+        clear_other_strategies: true,
+        auto_import: mode !== "off",
+      }, { sourceAction: "pool-signals-mode" });
+      applyWorkspace(snap);
+      syncPoolSignalsUi(snap);
+      await refreshOverlaysVisible();
+      const ps = snap.pool_signals || {};
+      setStatus(
+        "A+ Pool Signals " + poolSignalsModeLabel(mode) + " · "
+          + (ps.n_confirmed || 0) + " bestätigt · Research — keine Orders"
+          + (ps.message ? " — " + ps.message : "")
+      );
+    }
+
     async function applyEzmLayerMode(mode) {
       if (!state.symbol) return;
       const snap = await sendJson("/api/research/backtester/load", "POST", {
@@ -2429,6 +3027,7 @@
       }, { sourceAction: "ezm-layer" });
       applyWorkspace(snap);
       syncEzmLayerUi(snap);
+    syncPoolSignalsUi(snap);
       await refreshOverlaysVisible();
       const ez = snap.ezm || {};
       setStatus(
@@ -2443,9 +3042,13 @@
       const isCsw = sid === "cluster_sweep_ema_9_20_59";
       const isEdc = sid === "ema_dual_cross_multisource_v1";
       const isEzm = sid === "ema_zone_microstructure_confirmation_v1";
+      const isAps = sid === "a_plus_liquidity_pool_signal_scanner_v1";
+      const isNap = sid === "a_plus_nested_ask_pool_edge_short_v1";
       if ($("researchBtRunBtn")) {
-        $("researchBtRunBtn").hidden = !(isCsw || isEdc || isEzm);
-        if (isEzm) $("researchBtRunBtn").title = "EZM Candidate Discovery starten";
+        $("researchBtRunBtn").hidden = !(isCsw || isEdc || isEzm || isAps || isNap);
+        if (isNap) $("researchBtRunBtn").title = "Nested Ask Pool Edge Short V1 Backtest starten";
+        else if (isAps) $("researchBtRunBtn").title = "A+ Pool Signal Scanner starten (CH Replay)";
+        else if (isEzm) $("researchBtRunBtn").title = "EZM Candidate Discovery starten";
         else if (isEdc) $("researchBtRunBtn").title = "EMA Dual Cross Backtest starten";
         else $("researchBtRunBtn").title = "Cluster-Sweep Backtest starten";
       }
@@ -2453,7 +3056,17 @@
       if ($("researchCswNav")) $("researchCswNav").hidden = !isCsw;
       if ($("researchEdcSettingsBtn")) $("researchEdcSettingsBtn").hidden = !isEdc;
       if ($("researchEdcNav")) $("researchEdcNav").hidden = !isEdc;
+      if ($("researchNapSettingsBtn")) $("researchNapSettingsBtn").hidden = !isNap;
+      if ($("researchNapRejectedWrap")) $("researchNapRejectedWrap").hidden = !isNap;
+      if ($("researchNapRangeHint")) {
+        $("researchNapRangeHint").hidden = !isNap;
+        if (isNap) {
+          ensureNapDefaults();
+          updateNapRangeHint();
+        }
+      }
       syncEzmLayerUi(state.workspace);
+      syncPoolSignalsUi(state.workspace);
       applyResearchJobSourceNote();
     }
 
@@ -2705,7 +3318,223 @@
     async function runActiveBacktest() {
       if (btStrategy() === "ema_zone_microstructure_confirmation_v1") return runEzmCandidateDiscovery();
       if (btStrategy() === "ema_dual_cross_multisource_v1") return runEmaDualCrossBacktest();
+      if (btStrategy() === "a_plus_liquidity_pool_signal_scanner_v1") return runPoolSignalsBacktest();
+      if (btStrategy() === "a_plus_nested_ask_pool_edge_short_v1") return runNestedAskPoolBacktest();
       return runClusterSweepBacktest();
+    }
+
+    async function runNestedAskPoolBacktest() {
+      if (!state.symbol) return;
+      if (state._napPollTimer) {
+        clearTimeout(state._napPollTimer);
+        state._napPollTimer = null;
+      }
+      ensureNapDefaults();
+      const win = resolveNapWindowIso();
+      if (!win) {
+        setStatus("Nested Ask Pool: Start/Ende UTC setzen (⚙ Nested)", "error");
+        openModal("modalNap");
+        return;
+      }
+      // Guard: warn on very long windows
+      const spanH = (Date.parse(win.end) - Date.parse(win.start)) / 3600000;
+      if (spanH > 72) {
+        const ok = window.confirm(
+          "Nested-Backtest-Fenster ist " + Math.round(spanH) + " Stunden lang.\n"
+          + win.start + " → " + win.end + "\n\n"
+          + "Lange Fenster sind langsam. Trotzdem starten?"
+        );
+        if (!ok) {
+          openModal("modalNap");
+          return;
+        }
+      }
+      const showRejected = !!(($("napShowRejectedModal") && $("napShowRejectedModal").checked)
+        || ($("researchNapShowRejected") && $("researchNapShowRejected").checked));
+      if ($("researchNapShowRejected")) $("researchNapShowRejected").checked = showRejected;
+      if ($("napShowRejectedModal")) $("napShowRejectedModal").checked = showRejected;
+      const body = {
+        strategy_id: "a_plus_nested_ask_pool_edge_short_v1",
+        symbol: state.symbol,
+        start: win.start,
+        end: win.end,
+        show_rejected: showRejected,
+      };
+      const runBtn = $("researchBtRunBtn");
+      if (runBtn) runBtn.disabled = true;
+      updateNapRangeHint();
+      setStatus(
+        "Nested Ask Pool Edge Short startet · "
+          + body.symbol + " · " + body.start + " → " + body.end
+          + " · Research, SHORT only"
+      );
+      try {
+        const started = await sendJson("/api/research/backtester/run", "POST", body, {
+          sourceAction: "nap-run",
+        });
+        const jobId = started.job_id;
+        if (!jobId) {
+          setStatus("Nested Ask Pool: keine Job-ID", "error");
+          if (runBtn) runBtn.disabled = false;
+          return;
+        }
+        setStatus("Nested Ask Pool Job " + jobId + " · " + (started.state || "queued")
+          + " · " + body.start + " → " + body.end);
+        const pollOnce = async function () {
+          try {
+            const url = "/api/research/nested-ask-pool/status?job_id=" + encodeURIComponent(jobId);
+            const res = await fetch(url, { credentials: "same-origin" });
+            const job = await res.json().catch(function () { return {}; });
+            if (!res.ok) throw httpError(res, job, url);
+            const st = job.state || "?";
+            const pct = job.progress_percent != null ? (job.progress_percent + "%") : "–";
+            setStatus(
+              "Nested Ask Pool " + st + " · " + pct + " · Job " + jobId
+                + " · " + (job.signal_start || body.start) + " → " + (job.signal_end_exclusive || body.end)
+                + (job.message ? (" — " + job.message) : "")
+            );
+            if (st === "completed") {
+              const snap = await sendJson("/api/research/nested-ask-pool/import", "POST", {
+                job_id: jobId,
+              }, { sourceAction: "nap-import" });
+              applyWorkspace(snap);
+              await refreshOverlaysVisible();
+              const sum = (snap.nested_ask_pool_result || {}).summary
+                || ((snap.nested_ask_pool || {}).summary) || {};
+              const bits = [
+                "Nested Ask Pool fertig",
+                "Fenster " + (sum.start_utc || body.start) + " → " + (sum.end_utc || body.end),
+                "Cand=" + (sum.candidates != null ? sum.candidates : "–"),
+                "Fills=" + (sum.fills != null ? sum.fills : "–"),
+                "WR=" + (sum.winrate != null ? Number(sum.winrate).toFixed(3) : "–"),
+                "Exp=" + (sum.net_expectancy != null ? Number(sum.net_expectancy).toFixed(4) : "–"),
+                "PF=" + (sum.profit_factor != null ? Number(sum.profit_factor).toFixed(3) : "–"),
+                "Run=" + (sum.run_id != null ? sum.run_id : "–"),
+                "Research simulation — keine Live-Trades",
+              ];
+              if (sum.sample_note) bits.push(sum.sample_note);
+              setStatus(bits.join(" · "));
+              if (runBtn) runBtn.disabled = false;
+              return;
+            }
+            if (st === "failed") {
+              setStatus(
+                "Nested Ask Pool fehlgeschlagen: " + (job.message || job.error || "failed"),
+                "error"
+              );
+              if (runBtn) runBtn.disabled = false;
+              return;
+            }
+            state._napPollTimer = setTimeout(function () {
+              pollOnce().catch(function (err) {
+                setStatus("Nested Ask Pool Statusfehler: " + (err.message || err), "error");
+                if (runBtn) runBtn.disabled = false;
+              });
+            }, 2500);
+          } catch (err) {
+            setStatus("Nested Ask Pool Statusfehler: " + (err.message || err), "error");
+            if (runBtn) runBtn.disabled = false;
+          }
+        };
+        await pollOnce();
+      } catch (err) {
+        setStatus("Nested Ask Pool Start fehlgeschlagen: " + (err.message || err), "error");
+        if (runBtn) runBtn.disabled = false;
+      }
+    }
+
+    function ensureNapDefaults() {
+      // Prefer explicit modal values; otherwise seed from chart history or last 1 day.
+      if ($("napStart") && $("napStart").value && $("napEnd") && $("napEnd").value) {
+        updateNapRangeHint();
+        return;
+      }
+      const chart = resolveEzmWindowIso();
+      let start;
+      let end;
+      if (chart) {
+        start = new Date(Date.parse(chart.start));
+        end = new Date(Date.parse(chart.end));
+        // If chart history is > 3d, default Nested to last 1d ending at chart end (safer).
+        if ((end - start) > 3 * 86400000) {
+          start = new Date(end.getTime() - 86400000);
+        }
+      } else {
+        end = new Date();
+        start = new Date(end.getTime() - 86400000);
+      }
+      if ($("napStart") && !$("napStart").value) $("napStart").value = toLocalInputValue(start);
+      if ($("napEnd") && !$("napEnd").value) $("napEnd").value = toLocalInputValue(end);
+      updateNapRangeHint();
+    }
+
+    function updateNapRangeHint() {
+      const hint = $("researchNapRangeHint") || $("napRangeHint");
+      const modalHint = $("napRangeHint");
+      const s = ($("napStart") || {}).value || "";
+      const e = ($("napEnd") || {}).value || "";
+      const text = (s && e)
+        ? ("Nested-Fenster UTC: " + s.replace("T", " ") + " → " + e.replace("T", " "))
+        : "Nested-Fenster: bitte Start/Ende setzen (⚙ Nested)";
+      if ($("researchNapRangeHint")) $("researchNapRangeHint").textContent = text;
+      if (modalHint) modalHint.textContent = text + " · nur aktuelles Symbol · Research SHORT only";
+    }
+
+    function resolveNapWindowIso() {
+      ensureNapDefaults();
+      const s = fromLocalInputValue(($("napStart") || {}).value);
+      const e = fromLocalInputValue(($("napEnd") || {}).value);
+      if (!s || !e) return null;
+      if (!(Date.parse(e) > Date.parse(s))) return null;
+      return { start: s, end: e };
+    }
+
+    function setNapWindowFromUnix(fromUnix, toUnix) {
+      if (fromUnix == null || toUnix == null) return;
+      const start = new Date(Math.floor(Number(fromUnix)) * 1000);
+      const end = new Date(Math.floor(Number(toUnix)) * 1000);
+      if ($("napStart")) $("napStart").value = toLocalInputValue(start);
+      if ($("napEnd")) $("napEnd").value = toLocalInputValue(end);
+      updateNapRangeHint();
+    }
+
+    async function runPoolSignalsBacktest() {
+      if (!state.symbol) return;
+      const end = new Date();
+      const start = new Date(end.getTime() - 3 * 86400 * 1000);
+      // Prefer chart history custom range when set
+      let startIso = start.toISOString();
+      let endIso = end.toISOString();
+      if (($("researchHistoryPreset") || {}).value === "custom"
+          && ($("researchHistoryStart") || {}).value
+          && ($("researchHistoryEnd") || {}).value) {
+        startIso = fromLocalInputValue($("researchHistoryStart").value);
+        endIso = fromLocalInputValue($("researchHistoryEnd").value);
+      }
+      const body = {
+        strategy_id: "a_plus_liquidity_pool_signal_scanner_v1",
+        symbol: state.symbol,
+        start: startIso,
+        end: endIso,
+        display_mode: "confirmed",
+      };
+      setStatus("A+ Pool Signals Scan " + body.symbol + " …");
+      try {
+        const snap = await sendJson("/api/research/backtester/run", "POST", body, { sourceAction: "aps-run" });
+        applyWorkspace(snap);
+        syncPoolSignalsUi(snap);
+        await refreshOverlaysVisible();
+        const ps = snap.pool_signals || {};
+        const res = snap.pool_signals_result || {};
+        setStatus(
+          "A+ Pool Signals bereit · "
+            + (res.n_confirmed != null ? res.n_confirmed : (ps.n_confirmed || 0))
+            + " bestätigt · Research — keine Orders"
+            + (ps.message ? " — " + ps.message : "")
+        );
+      } catch (err) {
+        setStatus("A+ Pool Signals fehlgeschlagen: " + (err.message || err), "error");
+      }
     }
 
     function ensureCswDefaults() {
@@ -2902,11 +3731,27 @@
             symbol: state.symbol,
             visible: false,
           }, { sourceAction: "strategy-switch" }));
+          applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "a_plus_liquidity_pool_signal_scanner_v1",
+            symbol: state.symbol,
+            display_mode: "off",
+            layer_only: true,
+          }, { sourceAction: "strategy-switch" }));
         } catch (e) { /* ignore */ }
         await refreshOverlaysVisible();
         setStatus("Strategie: " + sid);
       });
       syncBtStrategyUi();
+    }
+    if ($("researchPoolSignalsMode")) {
+      $("researchPoolSignalsMode").addEventListener("change", async function () {
+        if (btStrategy() !== "a_plus_liquidity_pool_signal_scanner_v1") return;
+        try {
+          await applyPoolSignalsMode(poolSignalsMode());
+        } catch (err) {
+          setStatus("A+ Pool Signals fehlgeschlagen: " + (err.message || err), "error");
+        }
+      });
     }
     if ($("researchEzmLayerMode")) {
       $("researchEzmLayerMode").addEventListener("change", async function () {
@@ -2929,6 +3774,63 @@
       $("researchEdcSettingsBtn").addEventListener("click", function () {
         ensureEdcDefaults();
         $("modalEdc").hidden = false;
+      });
+    }
+    if ($("researchNapSettingsBtn")) {
+      $("researchNapSettingsBtn").addEventListener("click", function () {
+        ensureNapDefaults();
+        if ($("napShowRejectedModal") && $("researchNapShowRejected")) {
+          $("napShowRejectedModal").checked = !!$("researchNapShowRejected").checked;
+        }
+        openModal("modalNap");
+      });
+    }
+    if ($("napRunFromModal")) {
+      $("napRunFromModal").addEventListener("click", async function () {
+        closeModal("modalNap");
+        await runNestedAskPoolBacktest();
+      });
+    }
+    if ($("napUseChartRange")) {
+      $("napUseChartRange").addEventListener("click", function () {
+        const chart = resolveEzmWindowIso();
+        if (!chart) {
+          setStatus("Keine Chart-History geladen — Preset/Custom anwenden", "error");
+          return;
+        }
+        setNapWindowFromUnix(
+          Math.floor(Date.parse(chart.start) / 1000),
+          Math.floor(Date.parse(chart.end) / 1000)
+        );
+      });
+    }
+    if ($("napUse1d")) {
+      $("napUse1d").addEventListener("click", function () {
+        const end = new Date();
+        const start = new Date(end.getTime() - 86400000);
+        if ($("napStart")) $("napStart").value = toLocalInputValue(start);
+        if ($("napEnd")) $("napEnd").value = toLocalInputValue(end);
+        updateNapRangeHint();
+      });
+    }
+    if ($("napUse3d")) {
+      $("napUse3d").addEventListener("click", function () {
+        const end = new Date();
+        const start = new Date(end.getTime() - 3 * 86400000);
+        if ($("napStart")) $("napStart").value = toLocalInputValue(start);
+        if ($("napEnd")) $("napEnd").value = toLocalInputValue(end);
+        updateNapRangeHint();
+      });
+    }
+    ["napStart", "napEnd"].forEach(function (id) {
+      if ($(id)) $(id).addEventListener("change", updateNapRangeHint);
+    });
+    if ($("napShowRejectedModal") && $("researchNapShowRejected")) {
+      $("napShowRejectedModal").addEventListener("change", function () {
+        $("researchNapShowRejected").checked = !!$("napShowRejectedModal").checked;
+      });
+      $("researchNapShowRejected").addEventListener("change", function () {
+        $("napShowRejectedModal").checked = !!$("researchNapShowRejected").checked;
       });
     }
     if ($("researchEdcPrev")) {
@@ -3039,6 +3941,7 @@
           }, { sourceAction: "backtester" });
           applyWorkspace(snap);
           syncEzmLayerUi(snap);
+    syncPoolSignalsUi(snap);
           await refreshOverlaysVisible();
           const bt = snap.backtester || {};
           const ez = snap.ezm || {};
@@ -3048,6 +3951,52 @@
               + (bt.visible ? "sichtbar" : "ausgeblendet") + " · "
               + (ez.n_setup_markers || bt.n_setup_markers || 0) + " Setup · "
               + (ez.n_micro_markers || bt.n_micro_markers || 0) + " Micro · keine Trades/PnL"
+          );
+        } catch (err) {
+          setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (btStrategy() === "a_plus_liquidity_pool_signal_scanner_v1") {
+        setStatus("A+ Pool Signals laden …");
+        try {
+          // Backtester prefers confirmed/debug/all_states. "Aktive Pläne" on historical
+          // imports still paints confirmed as arrows only (no ENTRY/TP/SL axis spam).
+          const desired = poolSignalsMode();
+          const next = (desired === "off") ? "confirmed" : desired;
+          const snap = await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: "a_plus_liquidity_pool_signal_scanner_v1",
+            symbol: state.symbol,
+            display_mode: next,
+            layer_only: true,
+            clear_other_strategies: true,
+            auto_import: true,
+            force_reimport: true,
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          syncPoolSignalsUi(snap);
+          const ps = snap.pool_signals || {};
+          const bt = snap.backtester || {};
+          const n = (ps.n_confirmed != null ? ps.n_confirmed : (bt.loaded || 0));
+          const span = ps.time_span || {};
+          // Markers are time-anchored (unlike old ENTRY/TP/SL price lines). Zoom to the
+          // signal window or they sit off-screen while the chart stays on the live tip.
+          let zoomed = false;
+          if (n > 0 && span.start && span.end) {
+            zoomed = !!(await zoomChartToIsoRange(span.start, span.end, span.focus || span.start));
+          } else {
+            await refreshOverlaysVisible();
+          }
+          setStatus(
+            "Backtester " + state.symbol + " · a_plus_liquidity_pool_signal_scanner_v1 · "
+              + poolSignalsModeLabel(ps.display_mode || next)
+              + ": "
+              + n
+              + " bestätigt · Research — keine Orders"
+              + (ps.message ? " — " + ps.message : "")
+              + (span.start ? " · Zoom " + String(span.start).slice(0, 16) + "…" + String(span.end).slice(5, 16) : "")
+              + (n > 0 && !zoomed ? " · Zoom fehlgeschlagen — manuell zu 25.–28. Aug scrollen" : "")
+              + (n === 0 ? " — kein Import? Dashboard neu starten oder „Backtest starten“" : "")
           );
         } catch (err) {
           setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
@@ -3289,6 +4238,8 @@
       readStoredOrderbookProfile()
     );
     fillOrderbookProfileControls();
+    state.ptb = normalizeTradeBubbles(readStoredTradeBubbles());
+    fillTradeBubblesControls();
     const start = pickDefaultSymbol(names);
     if (!start) {
       setStatus("No selectable symbol", "empty");

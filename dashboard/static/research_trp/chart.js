@@ -30,6 +30,7 @@
   let lastPayload = null;
   /** Keep the live tip in view unless the user scrolls away from the right edge. */
   let followLive = true;
+  let replayViewLock = null;
   let livePriceLine = null;
   let lastCrosshairTime = null;
   let lastSelectedUnix = null;
@@ -41,6 +42,13 @@
   const overlayRegistry = new Map();
   /** EZM / research point markers — canvas layer (DOM overlays freeze with 1k+ markers). */
   const researchMarkers = new Map();
+  /** Public-trade bubbles (causal buckets) — own canvas above candles. */
+  const tradeBubbles = new Map();
+  let tradeBubbleAlpha = 0.55;
+  let tradeBubbleHoverId = null;
+  let tradeBubblePaintTimer = null;
+  let tradeBubblePaintQueued = false;
+  let tradeBubblePaintRaf = null;
   let researchPaintTimer = null;
   let researchPaintQueued = false;
   let researchPaintRaf = null;
@@ -365,6 +373,11 @@
         const px = candleSeries.coordinateToPrice(param.point.y);
         if (px != null && !Number.isNaN(Number(px))) lastCursorPrice = Number(px);
         updateVolumeProfileHover(param.point.x, param.point.y);
+        if (tradeBubbles.size) {
+          showPtbTooltipLocal(tradeBubbleAtPoint(param.point.x, param.point.y));
+        }
+      } else if (tradeBubbles.size) {
+        showPtbTooltipLocal(null);
       }
       updateLegend(param);
       updateSelectedLine();
@@ -445,6 +458,7 @@
       updateSelectedLine();
       // During horizontal pan: refresh research markers lightly; defer heavy VP/OBP.
       scheduleResearchMarkersPaint();
+      scheduleTradeBubblesPaint();
       if (overlayRangeTimer) clearTimeout(overlayRangeTimer);
       overlayRangeTimer = setTimeout(function () {
         overlayRangeTimer = null;
@@ -492,6 +506,8 @@
 
     const rmCanvas = researchMarkersCanvas();
     if (rmCanvas) rmCanvas.style.pointerEvents = "none";
+    const ptbCanvas = ptbOverlayCanvas();
+    if (ptbCanvas) ptbCanvas.style.pointerEvents = "none";
 
     initLowerSplit();
     const oscEl = $("oscillator");
@@ -540,6 +556,8 @@
     clipOverlayLayerToPlot();
     layoutOverlays();
     drawVolumeProfile();
+    scheduleResearchMarkersPaint(true);
+    scheduleTradeBubblesPaint(true);
     updateSelectedLine();
     resizeOsc();
   }
@@ -658,7 +676,7 @@
   }
 
   function stickToLiveEdge() {
-    if (!chart || !followLive) return;
+    if (!chart || !followLive || replayViewLock) return;
     // Never fight an in-progress user pan/zoom on the time/price scale.
     if (pointerScaleWatch || performance.now() < scaleWatchUntil) return;
     try {
@@ -804,10 +822,12 @@
         /* keep current view */
       }
       syncOscLogicalFromMain(savedRange);
-      if (followLive) stickToLiveEdge();
+      if (followLive && !replayViewLock) stickToLiveEdge();
       resize();
     } else {
-      if (followLive) stickToLiveEdge();
+      // skipDefaultView (jumpToUnix pending): never yank to live tip — that hides
+      // historical research markers that the host is about to focus.
+      if (replayViewLock) enforceReplayViewLock();
       resize();
     }
     scheduleFitPriceScaleToCandles(true);
@@ -952,7 +972,9 @@
       // Clip warmup-only points so overlays cannot expand the timescale past candles.
       series.setData(clipPointsToCandleExtent(spec.data || []));
     });
-    if (followLive) {
+    if (replayViewLock) {
+      enforceReplayViewLock();
+    } else if (followLive && !skipRangeRestore) {
       applyDefaultView();
     } else if (savedTimeRange && savedTimeRange.from != null && savedTimeRange.to != null) {
       runProgrammaticNav(function () {
@@ -1022,9 +1044,15 @@
     if (payload.metadata && payload.metadata.drawing_id) return false;
     const id = String(payload.id || "");
     if (id.indexOf("__preview") === 0) return false;
+    // APS uses DOM markers (overlay-layer) — canvas path was easy to miss behind
+    // live-tip view / sizing; 29 arrows are fine as DOM.
+    if (/^aps-/.test(id)) return false;
     if (/^(ezm-|edc-|csw-|stoch-)/.test(id)) return true;
     const meta = payload.metadata || {};
     const origin = String(meta.origin || meta.source || "");
+    if (origin === "a_plus_pool_signal_scanner_v1" || String(meta.strategy_id || "").indexOf("a_plus") === 0) {
+      return false;
+    }
     if (
       origin === "ezm_candidate_discovery" ||
       origin.indexOf("backtester") >= 0 ||
@@ -1033,6 +1061,7 @@
       return true;
     }
     const kind = String(meta.kind || "");
+    if (kind.indexOf("APS") === 0) return false;
     return kind.indexOf("EZM") === 0 || kind.indexOf("EDC") === 0 || kind.indexOf("CSW") === 0;
   }
 
@@ -1057,6 +1086,286 @@
         paintResearchMarkers();
       });
     }, researchMarkers.size > 400 ? 48 : 16);
+  }
+
+  function ptbOverlayCanvas() {
+    return $("ptb-overlay") || researchMarkersCanvas();
+  }
+
+  function clipPtbOverlayToPlot() {
+    const canvas = ptbOverlayCanvas();
+    if (!canvas) return;
+    // Match VP overlay: explicit CSS box so canvas is never stuck at default 300×150.
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, size.w || 0);
+    const h = Math.max(1, size.h || 0);
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    canvas.style.top = "0";
+    canvas.style.right = "auto";
+    canvas.style.bottom = "auto";
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    canvas.style.pointerEvents = "none";
+    canvas.style.zIndex = "5";
+    const wantW = Math.max(1, Math.floor(w * dpr));
+    const wantH = Math.max(1, Math.floor(h * dpr));
+    if (canvas.width !== wantW || canvas.height !== wantH) {
+      canvas.width = wantW;
+      canvas.height = wantH;
+    }
+  }
+
+  function bubbleRadiusPx(sizeClass, totalNotional) {
+    const cls = String(sizeClass || "UNCALIBRATED");
+    // Large enough to read on 1m charts; hard-cap so extremes don't cover the pane
+    if (cls === "EXTREME") return 36;
+    if (cls === "LARGE") return 26;
+    if (cls === "MEDIUM") return 18;
+    if (cls === "SMALL") return 10;
+    const n = Math.max(0, Number(totalNotional) || 0);
+    return Math.min(14, 6 + Math.sqrt(n) / 60);
+  }
+
+  function bubbleFill(side, forming) {
+    const buy = side === "BUY";
+    const base = buy ? COLORS.up : (side === "SELL" ? COLORS.down : COLORS.muted);
+    return hexAlpha(base, forming ? tradeBubbleAlpha * 0.5 : tradeBubbleAlpha);
+  }
+
+  function bubbleStroke(side) {
+    const buy = side === "BUY";
+    return buy ? COLORS.up : (side === "SELL" ? COLORS.down : COLORS.muted);
+  }
+
+  /** Place bubble within the 1m (or TF) bar using sub-bar time fraction. */
+  function xOfBubble(unix) {
+    if (!chart || unix == null) return null;
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return null;
+    const direct = chart.timeScale().timeToCoordinate(t);
+    if (direct != null) return direct;
+    const bar = snapUnixToBar(t);
+    if (bar == null) return null;
+    const x0 = chart.timeScale().timeToCoordinate(bar);
+    if (x0 == null) return null;
+    const candles = (lastPayload && lastPayload.candles) || [];
+    let barSec = 60;
+    const idx = candleByTime.has(bar)
+      ? (function () {
+          for (let i = 0; i < candles.length; i++) {
+            if (Number(candles[i].time) === Number(bar)) return i;
+          }
+          return -1;
+        })()
+      : -1;
+    if (idx >= 0 && idx + 1 < candles.length) {
+      barSec = Math.max(1, Number(candles[idx + 1].time) - Number(bar));
+    }
+    const x1 = chart.timeScale().timeToCoordinate(Number(bar) + barSec);
+    if (x1 == null || x1 === x0) return x0;
+    const frac = Math.max(0, Math.min(0.95, (t - Number(bar)) / barSec));
+    return x0 + frac * (x1 - x0);
+  }
+
+  function scheduleTradeBubblesPaint(immediate) {
+    if (immediate) {
+      if (tradeBubblePaintTimer != null) {
+        clearTimeout(tradeBubblePaintTimer);
+        tradeBubblePaintTimer = null;
+      }
+      tradeBubblePaintQueued = false;
+      paintTradeBubblesLayer();
+      return;
+    }
+    if (tradeBubblePaintQueued) return;
+    tradeBubblePaintQueued = true;
+    tradeBubblePaintTimer = setTimeout(function () {
+      tradeBubblePaintTimer = null;
+      tradeBubblePaintQueued = false;
+      if (tradeBubblePaintRaf != null) cancelAnimationFrame(tradeBubblePaintRaf);
+      tradeBubblePaintRaf = requestAnimationFrame(function () {
+        tradeBubblePaintRaf = null;
+        paintTradeBubblesLayer();
+      });
+    }, tradeBubbles.size > 800 ? 48 : 16);
+  }
+
+  function paintTradeBubblesLayer() {
+    const canvas = ptbOverlayCanvas();
+    if (!canvas) return;
+    clipPtbOverlayToPlot();
+    if (!tradeBubbles.size) {
+      const ctxEmpty = canvas.getContext("2d");
+      if (ctxEmpty) {
+        ctxEmpty.setTransform(1, 0, 0, 1, 0, 0);
+        ctxEmpty.clearRect(0, 0, canvas.width || 1, canvas.height || 1);
+      }
+      canvas.style.display = "none";
+      return;
+    }
+    canvas.style.display = "block";
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const boxW = Math.max(1, size.w);
+    const boxH = Math.max(1, size.h);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, boxW, boxH);
+    if (!chart || boxW < 16 || boxH < 16) return;
+
+    const pad = 24;
+    const maxDraw = 2500;
+    let n = 0;
+    tradeBubbles.forEach(function (b) {
+      if (n >= maxDraw) return;
+      const x = xOfBubble(b.timestamp);
+      if (x == null || x < -pad || x > boxW + pad) return;
+      const y = yOf(b.price);
+      if (y == null || y < -pad || y > boxH + pad) return;
+      const r = Math.min(44, bubbleRadiusPx(b.size_class, b.total_notional));
+      b._x = x;
+      b._y = y;
+      b._r = r;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = bubbleFill(b.dominant_side, !!b.forming);
+      ctx.fill();
+      ctx.strokeStyle = bubbleStroke(b.dominant_side);
+      ctx.lineWidth = b.bubble_id === tradeBubbleHoverId ? 2.5 : (b.forming ? 1.5 : 1.25);
+      if (b.forming) ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      n += 1;
+    });
+  }
+
+  function setTradeBubbles(items, opts) {
+    tradeBubbles.clear();
+    tradeBubbleHoverId = null;
+    if (opts && opts.alpha != null) {
+      const a = Number(opts.alpha);
+      if (Number.isFinite(a)) tradeBubbleAlpha = Math.min(0.85, Math.max(0.2, a));
+    }
+    const seen = Object.create(null);
+    (items || []).forEach(function (raw) {
+      if (!raw || raw.bubble_id == null) return;
+      const id = String(raw.bubble_id);
+      if (seen[id]) return;
+      seen[id] = true;
+      const ts = Number(raw.timestamp);
+      const price = Number(raw.price);
+      if (!Number.isFinite(ts) || !Number.isFinite(price)) return;
+      tradeBubbles.set(id, {
+        bubble_id: id,
+        timestamp: ts,
+        price: price,
+        buy_notional: Number(raw.buy_notional) || 0,
+        sell_notional: Number(raw.sell_notional) || 0,
+        total_notional: Number(raw.total_notional) || 0,
+        delta_notional: Number(raw.delta_notional) || 0,
+        trade_count: Number(raw.trade_count) || 0,
+        max_single_trade_notional: Number(raw.max_single_trade_notional) || 0,
+        dominant_side: String(raw.dominant_side || "FLAT"),
+        size_class: String(raw.size_class || "UNCALIBRATED"),
+        known_at: raw.known_at || "",
+        forming: !!raw.forming,
+        source_quality: raw.source_quality || "ok",
+        research_only: true,
+      });
+    });
+    scheduleTradeBubblesPaint(true);
+    return true;
+  }
+
+  function clearTradeBubbles() {
+    tradeBubbles.clear();
+    tradeBubbleHoverId = null;
+    const tip = $("ptb-tooltip");
+    if (tip) {
+      tip.hidden = true;
+      tip.textContent = "";
+    }
+    scheduleTradeBubblesPaint(true);
+    return true;
+  }
+
+  function tradeBubbleAtPoint(x, y) {
+    if (x == null || y == null || !tradeBubbles.size) return null;
+    let best = null;
+    let bestD = Infinity;
+    tradeBubbles.forEach(function (b) {
+      if (b._x == null || b._y == null) return;
+      const dx = b._x - x;
+      const dy = b._y - y;
+      const hitR = Math.max(10, (b._r || 8) + 4);
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= hitR * hitR && d2 < bestD) {
+        bestD = d2;
+        best = b;
+      }
+    });
+    return best;
+  }
+
+  /** Legacy host API: only exact-second match (no ±90s candle spam). */
+  function tradeBubbleAtUnix(unix) {
+    if (unix == null || !tradeBubbles.size) return null;
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return null;
+    let best = null;
+    let bestDt = Infinity;
+    tradeBubbles.forEach(function (b) {
+      const dt = Math.abs(b.timestamp - t);
+      if (dt < bestDt) {
+        bestDt = dt;
+        best = b;
+      }
+    });
+    if (!best || bestDt > 1.5) return null;
+    return best;
+  }
+
+  function showPtbTooltipLocal(bubble) {
+    const tip = $("ptb-tooltip");
+    if (!tip) return;
+    if (!bubble) {
+      tip.hidden = true;
+      tip.textContent = "";
+      tradeBubbleHoverId = null;
+      scheduleTradeBubblesPaint(true);
+      return;
+    }
+    const fmt = function (n) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return "—";
+      if (Math.abs(v) >= 1000) return v.toFixed(0);
+      if (Math.abs(v) >= 1) return v.toFixed(2);
+      return v.toPrecision(4);
+    };
+    const utc = new Date(bubble.timestamp * 1000).toISOString().replace(".000Z", "Z");
+    tip.textContent = [
+      "RESEARCH ONLY · Public Trade Bubble",
+      "UTC " + utc,
+      "price " + fmt(bubble.price),
+      "buy " + fmt(bubble.buy_notional) + " · sell " + fmt(bubble.sell_notional),
+      "delta " + fmt(bubble.delta_notional) + " · total " + fmt(bubble.total_notional),
+      "trades " + bubble.trade_count + " · max " + fmt(bubble.max_single_trade_notional),
+      "side " + bubble.dominant_side + " · class " + bubble.size_class +
+        (bubble.forming ? " · FORMING" : ""),
+      "known_at " + (bubble.known_at || "—") + " · " + (bubble.source_quality || "ok"),
+    ].join("\n");
+    tip.hidden = false;
+    const left = Math.max(8, Math.min((bubble._x || 12) + 14, (chartSize().w || 400) - 220));
+    const top = Math.max(8, (bubble._y || 24) - 10);
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+    if (tradeBubbleHoverId !== bubble.bubble_id) {
+      tradeBubbleHoverId = bubble.bubble_id;
+      scheduleTradeBubblesPaint(true);
+    }
   }
 
   function paintResearchMarkers() {
@@ -1196,11 +1505,14 @@
 
   function xOf(unix) {
     if (!chart || unix == null) return null;
-    let coord = chart.timeScale().timeToCoordinate(unix);
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return null;
+    let coord = chart.timeScale().timeToCoordinate(t);
     if (coord != null) return coord;
-    const snapped = snapUnixToBar(unix);
-    if (snapped == null || snapped === unix) return null;
-    return chart.timeScale().timeToCoordinate(snapped);
+    const snapped = snapUnixToBar(t);
+    if (snapped == null) return null;
+    coord = chart.timeScale().timeToCoordinate(Number(snapped));
+    return coord != null ? coord : null;
   }
 
   function yOf(price) {
@@ -1517,8 +1829,33 @@
     return out;
   }
 
+  function enforceReplayViewLock() {
+    if (!replayViewLock || !chart) return false;
+    return applyVisibleTimeRange(replayViewLock.from, replayViewLock.to);
+  }
+
+  function setReplayViewLock(lock) {
+    if (lock && lock.from != null && lock.to != null) {
+      replayViewLock = {
+        from: Number(lock.from),
+        to: Number(lock.to),
+        center: lock.center != null ? Number(lock.center) : null,
+      };
+      followLive = false;
+      return enforceReplayViewLock();
+    }
+    replayViewLock = null;
+    return true;
+  }
+
+  function clearReplayViewLock() {
+    replayViewLock = null;
+    return true;
+  }
+
   function applyDefaultView() {
     if (!chart) return false;
+    if (replayViewLock) return enforceReplayViewLock();
     followLive = true;
     resetPriceScales();
     const candles = (lastPayload && lastPayload.candles) || [];
@@ -1779,7 +2116,10 @@
       p.metadata && p.metadata.border_alpha != null
         ? Number(p.metadata.border_alpha)
         : 0.7;
-    if (bw <= 0) {
+    if (p.metadata && p.metadata.projected_after_as_of) {
+      el.style.border =
+        bw + "px dashed " + hexAlpha(bc, bAlpha);
+    } else if (bw <= 0) {
       el.style.border = "none";
     } else {
       el.style.border =
@@ -1795,6 +2135,29 @@
       tag.style.left = "4px";
       tag.style.top = "2px";
       el.appendChild(tag);
+    }
+    // LLD causality tooltip: known_at vs source_timestamp (unix seconds).
+    const meta = p.metadata || {};
+    if (meta.source === "lld" || meta.source === "lld-cluster") {
+      const known = meta.available_at != null ? meta.available_at : (meta.known_at != null ? meta.known_at : p.start_timestamp);
+      const src = meta.source_timestamp != null ? meta.source_timestamp : null;
+      const cStart = meta.confirmation_bar_start != null ? meta.confirmation_bar_start : null;
+      const cEnd = meta.confirmation_bar_end != null ? meta.confirmation_bar_end : null;
+      const lines = [];
+      if (meta.pool_id) lines.push("pool: " + meta.pool_id);
+      if (meta.cluster_id) lines.push("cluster: " + meta.cluster_id);
+      if (known != null) lines.push("available_at: " + new Date(Number(known) * 1000).toISOString());
+      if (known != null) lines.push("known_at: " + new Date(Number(known) * 1000).toISOString());
+      if (cStart != null) lines.push("confirmation_bar_start: " + new Date(Number(cStart) * 1000).toISOString());
+      if (cEnd != null) lines.push("confirmation_bar_end: " + new Date(Number(cEnd) * 1000).toISOString());
+      if (src != null) lines.push("source_timestamp: " + new Date(Number(src) * 1000).toISOString());
+      if (meta.side) lines.push("side: " + meta.side);
+      if (meta.strength != null) lines.push("strength: " + meta.strength);
+      if (meta.pool_status) lines.push("status: " + meta.pool_status);
+      if (meta.closed_bar_confirmed) lines.push("CLOSED-BAR CONFIRMED");
+      el.title = lines.join("\n");
+    } else {
+      el.removeAttribute("title");
     }
   }
 
@@ -2549,15 +2912,22 @@
     const to = Number(toUnix);
     if (!(to > from)) return false;
     try {
+      followLive = false;
       chart.timeScale().setVisibleRange({ from: from, to: to });
       syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
       layoutOverlays();
       updateSelectedLine();
+      scheduleResearchMarkersPaint(true);
       scheduleFitPriceScaleToCandles(true);
       return true;
     } catch (e) {
       return false;
     }
+  }
+
+  function setFollowLive(on) {
+    followLive = !!on;
+    return followLive;
   }
 
   function setVisibleTimeRange(fromUnix, toUnix) {
@@ -4632,6 +5002,12 @@
   }
 
   window.chartApi = {
+    getChart: function () {
+      return chart;
+    },
+    getCandleSeries: function () {
+      return candleSeries;
+    },
     setData: setData,
     updateFormingBar: updateFormingBar,
     setIndicatorVisible: setIndicatorVisible,
@@ -4689,9 +5065,17 @@
     clearVolumeProfile: clearVolumeProfile,
     setOrderbookProfile: setOrderbookProfile,
     clearOrderbookProfile: clearOrderbookProfile,
+    setTradeBubbles: setTradeBubbles,
+    clearTradeBubbles: clearTradeBubbles,
+    tradeBubbleAtUnix: tradeBubbleAtUnix,
+    tradeBubbleAtPoint: tradeBubbleAtPoint,
     getVisibleTimeRange: getVisibleTimeRange,
     setVisibleTimeRange: setVisibleTimeRange,
     focusOnTime: focusOnTime,
+    setFollowLive: setFollowLive,
+    setReplayViewLock: setReplayViewLock,
+    clearReplayViewLock: clearReplayViewLock,
+    enforceReplayViewLock: enforceReplayViewLock,
     debugInfo: debugInfo,
   };
 

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Profile - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/research.css?v=mp-trp-1">
+    <link rel="stylesheet" href="/static/market_profile_v1/style.css?v={{ asset_v }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'live-charts-market-profile' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content mp-shell">
+            <h1 class="visually-hidden">Market Profile</h1>
+
+            <div class="mp-bar">
+                <div class="mp-group">
+                    <label class="mp-label" for="mpSymbol">SYMBOL</label>
+                    <select id="mpSymbol" class="mp-select">
+                        {% for s in symbols %}
+                        <option value="{{ s }}"{% if s == 'BTCUSDT' %} selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mp-group">
+                    <label class="mp-label" for="mpAnchor">ANKER</label>
+                    <select id="mpAnchor" class="mp-select">
+                        <option value="day" selected>Tag (UTC)</option>
+                        <option value="session">Session</option>
+                        <option value="composite">Composite</option>
+                    </select>
+                </div>
+
+                <div class="mp-group mp-sessions" id="mpSessionsGroup" hidden>
+                    <span class="mp-label">SESSIONS</span>
+                    {% for name in sessions %}
+                    <label class="mp-check"><input type="checkbox" class="mp-session" value="{{ name }}" checked> {{ name|upper }}</label>
+                    {% endfor %}
+                </div>
+
+                <div class="mp-group">
+                    <label class="mp-label" for="mpDays">ZEITRAUM</label>
+                    <select id="mpDays" class="mp-select">
+                        <option value="3">3 Tage</option>
+                        <option value="7" selected>7 Tage</option>
+                        <option value="14">14 Tage</option>
+                        <option value="30">30 Tage</option>
+                        <option value="custom">benutzerdefiniert</option>
+                    </select>
+                </div>
+
+                <div class="mp-group mp-custom-range" id="mpCustomRange" hidden>
+                    <label class="mp-label" for="mpStart">VON</label>
+                    <input type="date" id="mpStart" class="mp-input">
+                    <label class="mp-label" for="mpEnd">BIS</label>
+                    <input type="date" id="mpEnd" class="mp-input">
+                </div>
+
+                <div class="mp-group">
+                    <label class="mp-label" for="mpTimeframe">KERZEN</label>
+                    <select id="mpTimeframe" class="mp-select">
+                        {% for tf in timeframes %}
+                        <option value="{{ tf }}"{% if tf == '15m' %} selected{% endif %}>{{ tf }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="button" class="mp-btn mp-primary" id="mpLoad">Laden</button>
+                <span class="mp-status" id="mpStatus">–</span>
+            </div>
+
+            <div class="mp-bar mp-bar-toggles">
+                <div class="mp-group">
+                    <span class="mp-label">PROFIL</span>
+                    <label class="mp-check"><input type="checkbox" id="mpShowHistogram" checked> Histogramm</label>
+                    <label class="mp-check"><input type="checkbox" id="mpSplitBuySell" checked> Buy/Sell getrennt</label>
+                    <label class="mp-label mp-inline" for="mpWidth">Breite</label>
+                    <select id="mpWidth" class="mp-select mp-select-sm">
+                        <option value="0.18">schmal</option>
+                        <option value="0.30" selected>normal</option>
+                        <option value="0.50">breit</option>
+                    </select>
+                </div>
+
+                <div class="mp-group">
+                    <span class="mp-label">LINIEN</span>
+                    <label class="mp-check"><input type="checkbox" id="mpShowPoc" checked> POC</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowValueArea" checked> Value Area</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowHvn"> HVN</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowLvn"> LVN</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowSinglePrints"> Single Prints</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowNakedPoc" checked> Naked POC</label>
+                    <label class="mp-check"><input type="checkbox" id="mpExtendLevels" checked> nach rechts verlängern</label>
+                </div>
+
+                <div class="mp-group">
+                    <span class="mp-label">LABELS</span>
+                    <label class="mp-check"><input type="checkbox" id="mpShowShape" checked> Shape-Verdikt</label>
+                </div>
+
+                <details class="mp-advanced">
+                    <summary>Erweitert</summary>
+                    <div class="mp-advanced-body">
+                        <label class="mp-label mp-inline" for="mpValueAreaPct">Value Area %</label>
+                        <input type="number" id="mpValueAreaPct" class="mp-input mp-input-sm" value="70" min="30" max="95" step="1">
+                        <label class="mp-label mp-inline" for="mpTargetBins">Ziel-Bins</label>
+                        <input type="number" id="mpTargetBins" class="mp-input mp-input-sm" value="160" min="40" max="400" step="10">
+                        <label class="mp-check"><input type="checkbox" id="mpFinal"> FINAL-Dedupe (ca. 60x langsamer)</label>
+                    </div>
+                </details>
+            </div>
+
+            <div class="mp-notice" id="mpShapeNotice">
+                <strong>Hinweis:</strong> {{ shape_notice }}
+            </div>
+
+            <div class="mp-chart-stack" id="mpChartStack">
+                <div class="trp-dock-bar mp-chart-dock">
+                    <span class="trp-field-label">EMA</span>
+                    <button type="button" class="trp-text-btn" id="mpEmaSettings" title="EMA Overlays">Settings</button>
+                    <span class="trp-muted" id="mpEmaSummary">off</span>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind" title="Liquidity Location Detector (Research LLD)">
+                        <input type="checkbox" id="mpShowLiquidity"> Liquidity Location
+                    </label>
+                    <button type="button" class="trp-text-btn" id="mpLldSettings" title="Liquidity Location Settings">⚙</button>
+                    <div class="trp-lld-legend" id="mpLldLegend" hidden>
+                        <span class="trp-muted">Vol Str</span>
+                        <div class="trp-vol-rows">
+                            <div class="trp-vol-row" id="mpVolSupport"></div>
+                            <div class="trp-vol-row" id="mpVolResistance"></div>
+                        </div>
+                        <span class="trp-muted" id="mpClusterCounts"></span>
+                    </div>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <span class="trp-field-label">WERKZEUG</span>
+                    <div class="trp-tools" id="mpTools"></div>
+                    <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
+                    <select id="mpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="mpDelete" title="Löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="mpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                    <button type="button" class="trp-text-btn" id="mpResetView" title="Chart zentrieren / Ansicht zurücksetzen">⟲ Zentrieren</button>
+                    <span class="trp-muted mp-shift-hint">Shift+Klick = messen</span>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="mpFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                </div>
+
+                <div class="mp-chart-wrap" id="mpChart">
+                    <div id="app" class="mp-trp-app">
+                        <div id="price-pane">
+                            <div id="overlay">
+                                <div id="demo-badge" hidden>DEMO</div>
+                                <div id="legend"></div>
+                            </div>
+                            <div id="empty" hidden></div>
+                            <div id="chart"></div>
+                            <div id="overlay-layer"></div>
+                            <canvas id="mpOverlay" class="mp-overlay"></canvas>
+                            <div id="mpTooltip" class="mp-tooltip" hidden></div>
+                        </div>
+                    </div>
+                    <div id="mpEmpty" class="mp-empty">Zeitraum wählen und <em>Laden</em> drücken.</div>
+                </div>
+            </div>
+
+            <div class="mp-legend" id="mpLegend"></div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalEma" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>EMA Overlays</h2>
+            <div id="emaRows" class="trp-ema-rows"></div>
+            <button type="button" class="trp-text-btn" id="emaAdd">+ EMA hinzufügen</button>
+            <p class="trp-error" id="emaError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="ema">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalEma">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="emaApply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalLld" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>Liquidity Location Detector</h2>
+            <p class="trp-muted" id="lldLicense"></p>
+            <fieldset><legend>GENERAL</legend>
+                <label>Amount <input type="number" id="lldAmount" min="1" max="10000" value="300"></label>
+                <p class="trp-muted">Basis für 5m. 1h/4h laden mehr History und behalten mehr Pools (Höhe/Tiefe).</p>
+            </fieldset>
+            <fieldset><legend>LIQUIDITY SETTINGS</legend>
+                <label>Highest Length <input type="number" id="lldHigh" min="1" max="100" value="2"></label>
+                <label>Lowest Length <input type="number" id="lldLow" min="1" max="100" value="2"></label>
+            </fieldset>
+            <fieldset><legend>POOL VISIBILITY</legend>
+                <label class="trp-check"><input type="checkbox" id="lldBorders" checked> Show Individual Pool Borders</label>
+                <label>Normal Border Width <input type="number" id="lldBorderW" min="1" max="4" value="1"></label>
+                <label>Strong Pool Border Width <input type="number" id="lldStrongW" min="1" max="5" value="2"></label>
+                <label>Border Transparency <input type="number" id="lldBorderT" min="0" max="100" value="10"></label>
+            </fieldset>
+            <fieldset><legend>POOL CLUSTERS</legend>
+                <label class="trp-check"><input type="checkbox" id="lldClusters" checked> Enable Clusters</label>
+                <label>Cluster Gap <input type="number" id="lldGap" min="0" max="5" step="0.05" value="0.10"></label>
+                <label>Minimum Pools <input type="number" id="lldMinPools" min="1" max="20" value="3"></label>
+                <label class="trp-check"><input type="checkbox" id="lldShowSingle" checked> Show Single Pools</label>
+                <label class="trp-check"><input type="checkbox" id="lldClusterLabels" checked> Show Cluster Labels</label>
+                <label>Cluster Fill Transparency <input type="number" id="lldClusterFill" min="0" max="100" value="88"></label>
+                <label>Cluster Border Width <input type="number" id="lldClusterBorder" min="1" max="5" value="2"></label>
+            </fieldset>
+            <fieldset><legend>COLOR</legend>
+                <label>Support / Up Color <input type="color" id="lldSupport" value="#228bab"></label>
+                <label>Resistance / Down Color <input type="color" id="lldResist" value="#ec4079"></label>
+                <label>Fill Transparency <input type="number" id="lldFillT" min="0" max="100" value="30"></label>
+                <label>Support Border <input type="color" id="lldSupBorder" value="#00dcff"></label>
+                <label>Resistance Border <input type="color" id="lldResBorder" value="#ff468c"></label>
+            </fieldset>
+            <fieldset><legend>EMA</legend>
+                <label class="trp-check"><input type="checkbox" id="lldEmaFast"> Fast</label>
+                <input type="number" id="lldEmaFastLen" min="1" max="500" value="20">
+                <input type="color" id="lldEmaFastColor" value="#00ffff">
+                <label class="trp-check"><input type="checkbox" id="lldEmaSlow"> Slow</label>
+                <input type="number" id="lldEmaSlowLen" min="1" max="500" value="35">
+                <input type="color" id="lldEmaSlowColor" value="#d40047">
+            </fieldset>
+            <p class="trp-error" id="lldError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="lld">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalLld">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="lldApply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
+    <script>
+    window.bridge = {
+      on_chart_ready: function () {
+        window.__mpChartReady = true;
+        if (window.__mpOnChartReady) window.__mpOnChartReady();
+      },
+      on_visible_range: function () {
+        if (window.__mpOnVisibleRange) window.__mpOnVisibleRange();
+      },
+      on_drawing_event: function (blob) {
+        if (window.__mpOnDrawingEvent) window.__mpOnDrawingEvent(blob);
+      },
+      on_tool_idle: function () {
+        if (window.__mpOnToolIdle) window.__mpOnToolIdle();
+      },
+      on_chart_key: function (key) {
+        if (window.__mpOnChartKey) window.__mpOnChartKey(key);
+      }
+    };
+    </script>
+    <script src="/static/research_trp/chart.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/app.js?v={{ asset_v }}"></script>
+</body>
+</html>

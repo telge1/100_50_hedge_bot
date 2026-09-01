@@ -60,6 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--source-job-id", required=True)
     p.add_argument("--clickhouse-readonly", action="store_true")
     p.add_argument("--candles-parquet", default="")
+    p.add_argument(
+        "--pin-candle-data-to",
+        required=True,
+        help="Pinned last closed 1m open_time (UTC Z). No look-ahead past this bar.",
+    )
     return p
 
 
@@ -93,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     raw = _load_jsonl(signals_path)
     tier_a = [r for r in raw if r.get("tier_a") and str(r.get("symbol") or "").upper() == symbol]
-    start, end, holds = outcome_window_for_signals(tier_a)
+    pin = parse_iso(args.pin_candle_data_to)
+    start, end, holds = outcome_window_for_signals(tier_a, candle_data_to=pin)
     if args.candles_parquet:
         import pandas as pd
 
@@ -111,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         frame,
         evaluation_id=args.evaluation_id,
         source_job_id=args.source_job_id,
+        candle_data_to=pin,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     _write_jsonl(out_dir / "outcomes.jsonl", rows)
@@ -127,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
             "evaluation_data_start": iso_z(start),
             "evaluation_data_end": iso_z(end),
             "hold_minutes_by_tf": holds,
+            "pin_candle_data_to": iso_z(pin),
+            "max_hold_applied": False,
             "identity": identity,
             "finished_at": iso_z(),
         },
@@ -139,6 +148,8 @@ def main(argv: list[str] | None = None) -> int:
             "evaluation_data_start": iso_z(start),
             "evaluation_data_end": iso_z(end),
             "candle_rows": int(len(frame)),
+            "pin_candle_data_to": iso_z(pin),
+            "max_hold_applied": False,
         },
     )
     return 0

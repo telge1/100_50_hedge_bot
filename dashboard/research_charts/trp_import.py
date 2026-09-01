@@ -75,7 +75,7 @@ def load_trp():
         from indicators.settings_store import IndicatorSettingsStore
         from indicators.stochastic import StochasticConfig, compute_stochastic, stochastic_payload
         from overlays.manager import OverlayManager
-        from overlays.models import OverlayMarker, OverlayStyle
+        from overlays.models import OverlayLine, OverlayMarker, OverlayStyle
         from overlays.samples import build_test_overlays, is_test_overlay
         from overlays.serialization import resolve_color, serialize_overlays, to_unix_seconds
     finally:
@@ -137,6 +137,7 @@ def load_trp():
         "make_long_position": make_long_position,
         "make_short_position": make_short_position,
         "OverlayManager": OverlayManager,
+        "OverlayLine": OverlayLine,
         "OverlayMarker": OverlayMarker,
         "OverlayStyle": OverlayStyle,
         "build_test_overlays": build_test_overlays,
