@@ -1,0 +1,16 @@
+{
+  "collector_changes": "none",
+  "collector_restarts": "none",
+  "commit": "none",
+  "dashboard_changes": "none",
+  "existing_database_changes": "none",
+  "existing_results_modified": "none",
+  "existing_untracked_artifacts_modified": "none",
+  "full_history_backfill": "not started",
+  "live_changes": "none",
+  "orderbook_deltas_repair_attempts": "none",
+  "persistent_watcher": "not started",
+  "push": "none",
+  "trading_rule_changes": "none",
+  "writes_outside_btc_doge_research": "none"
+}

@@ -1,0 +1,7 @@
+source_id,symbol,data_type,period_start,period_end,expected_buckets,present_buckets,genuine_buckets,carried_forward_buckets,gap_count,duplicate_count,quality_status,contract_version,ingestion_batch_id
+CH_OPEN_INTEREST_5S,BTCUSDT,open_interest_5s,2026-08-31T18:30:00Z,2026-08-31T19:30:00Z,720,720,720,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:btc_run_018
+FS_RAW_OB200_V3,BTCUSDT,orderbook_1s,2026-08-31T18:30:00Z,2026-08-31T19:30:00Z,3600,3600,3600,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:btc_run_018
+CH_PUBLIC_TRADES_CANONICAL,BTCUSDT,public_trades,2026-08-31T18:30:00Z,2026-08-31T19:30:00Z,80738,80738,80738,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:btc_run_018
+CH_OPEN_INTEREST_5S,DOGEUSDT,open_interest_5s,2026-08-29T11:45:00Z,2026-08-29T12:30:00Z,540,540,540,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:doge_20260829_1145_1230
+FS_RAW_OB200_V3,DOGEUSDT,orderbook_1s,2026-08-29T11:45:00Z,2026-08-29T12:30:00Z,2700,2700,2700,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:doge_20260829_1145_1230
+CH_PUBLIC_TRADES_CANONICAL,DOGEUSDT,public_trades,2026-08-29T11:45:00Z,2026-08-29T12:30:00Z,4275,4275,4275,0,0,0,COMPLETE,btc_doge_research_phase_1_v1,phase1:doge_20260829_1145_1230

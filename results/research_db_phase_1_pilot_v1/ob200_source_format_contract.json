@@ -1,0 +1,17 @@
+{
+  "continuity": "data.u increments by one; data.seq is informational",
+  "dedup_key_version": "ob200_event_key_v1",
+  "event_time": "top-level ts, exchange milliseconds UTC",
+  "format": "zstd compressed NDJSON",
+  "format_version": "ob200_v3_live_archive/v1",
+  "legacy_manifest_contradiction": "old manifests use seq gaps/replayable=false; effective replay independently proven from u",
+  "levels": "data.b/data.a ordered [price,size] updates",
+  "receive_time": "top-level local_receive_ts",
+  "record_types": [
+    "rotation_checkpoint",
+    "snapshot",
+    "delta"
+  ],
+  "segment_initialization": "rotation_checkpoint is a full 200x200 snapshot",
+  "sort": "reconstructed bids descending, asks ascending"
+}

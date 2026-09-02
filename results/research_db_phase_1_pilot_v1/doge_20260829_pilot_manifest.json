@@ -1,0 +1,141 @@
+{
+  "batch_id": "phase1:doge_20260829_1145_1230",
+  "input_fingerprint": "b189606d4b1c6fe05f5e48044417bce6d5db21512d8e6f1fdd802db38906f4fe",
+  "liquidation_source_dedup": {
+    "logical_rows": 4,
+    "physical_duplicates": 0,
+    "physical_rows": 4,
+    "uses_final": false
+  },
+  "normalized_sample_insert_elapsed_ms": 8.324,
+  "normalized_sample_snapshots": 10,
+  "ob200_insert_elapsed_ms": 9072.87,
+  "oi_rows": 540,
+  "pilot_id": "doge_20260829_1145_1230",
+  "reference": "results/aggressor_efficiency_data_audit_v1/ABSCHLUSSBERICHT.md",
+  "row_counts": {
+    "liquidation_events": 4,
+    "market_1m": 45,
+    "market_1s": 2700,
+    "orderbook_1s": 2700,
+    "orderbook_ob200_snapshots": 20415,
+    "pilot_normalized_levels": 4000,
+    "public_trades": 4275,
+    "source_files_new": 2
+  },
+  "source_files": [
+    {
+      "audit": {
+        "duplicate_u": 0,
+        "effective_replayable": true,
+        "emitted_events": 6558,
+        "first_event_time": "2026-08-29T10:59:59.980000Z",
+        "full_file_consumed": true,
+        "identical_timestamp_groups": 0,
+        "last_event_time": "2026-08-29T11:59:59.880000Z",
+        "manifest_replayable": false,
+        "max_ask_levels": 200,
+        "max_bid_levels": 200,
+        "min_ask_levels": 200,
+        "min_bid_levels": 200,
+        "records_read": 26761,
+        "replayable_records": 26761,
+        "short_book_events": 0,
+        "u_gaps": []
+      },
+      "compressed_sha256": "ca1a812004f0c8e4527668313b678cd6137521b670fcba5a34ea5594b2d939e2",
+      "effective_contract": {
+        "continuity_field": "data.u",
+        "rotation_checkpoint_is_full_snapshot": true,
+        "sequence_field": "data.seq informational only"
+      },
+      "legacy_manifest_sequence_gap_count": 26760,
+      "manifest_summary": {
+        "checkpoint_count": 1,
+        "completion_status": "open",
+        "compression": "zstd",
+        "continuity_status": null,
+        "delta_count": 26760,
+        "depth": 200,
+        "end_utc": "2026-08-29T12:00:00.065552Z",
+        "event_count": 26761,
+        "first_u": null,
+        "format_version": "ob200_v3_live_archive/v1",
+        "last_u": null,
+        "native_snapshot_count": 0,
+        "parser_version": "ob200_v3",
+        "queue_overflow": 0,
+        "replay_source": null,
+        "replayable": false,
+        "start_utc": "2026-08-29T11:00:00.069193Z",
+        "writer_errors": 0
+      },
+      "manifest_u_gap_count": 0,
+      "manifest_uncompressed_sha256": "e2b89204936abdeb7c57acacde76f8a3a8812296d96de16f47769226ae0607a7",
+      "source_file_id": "42235eee7d3ed9e98e4350cbe2860793205a4a9c7e67679d6fbe37c83da1c081",
+      "source_relative_path": "DOGEUSDT/2026/08/29/DOGEUSDT_20260829T110000Z_20260829T120000Z_ob200_v3.zst"
+    },
+    {
+      "audit": {
+        "duplicate_u": 0,
+        "effective_replayable": true,
+        "emitted_events": 13857,
+        "first_event_time": "2026-08-29T11:59:59.981000Z",
+        "full_file_consumed": true,
+        "identical_timestamp_groups": 0,
+        "last_event_time": "2026-08-29T12:59:59.880000Z",
+        "manifest_replayable": false,
+        "max_ask_levels": 200,
+        "max_bid_levels": 200,
+        "min_ask_levels": 200,
+        "min_bid_levels": 200,
+        "records_read": 26321,
+        "replayable_records": 26321,
+        "short_book_events": 0,
+        "u_gaps": []
+      },
+      "compressed_sha256": "1f6569175c9c6476a9c9c795e1f2a2f6f160b2720e24966767c8a87573f9d186",
+      "effective_contract": {
+        "continuity_field": "data.u",
+        "rotation_checkpoint_is_full_snapshot": true,
+        "sequence_field": "data.seq informational only"
+      },
+      "legacy_manifest_sequence_gap_count": 26320,
+      "manifest_summary": {
+        "checkpoint_count": 1,
+        "completion_status": "open",
+        "compression": "zstd",
+        "continuity_status": null,
+        "delta_count": 26320,
+        "depth": 200,
+        "end_utc": "2026-08-29T13:00:00.068699Z",
+        "event_count": 26321,
+        "first_u": null,
+        "format_version": "ob200_v3_live_archive/v1",
+        "last_u": null,
+        "native_snapshot_count": 0,
+        "parser_version": "ob200_v3",
+        "queue_overflow": 0,
+        "replay_source": null,
+        "replayable": false,
+        "start_utc": "2026-08-29T12:00:00.065552Z",
+        "writer_errors": 0
+      },
+      "manifest_u_gap_count": 0,
+      "manifest_uncompressed_sha256": "74d97513912b17d09bc6b398757b4fe626601a68ba19378624ff862ff0952ff6",
+      "source_file_id": "a7ab9c80e76cbc4b4e031831b6bd9b9a55aebe6565685bdf6f1a1eb91393d3a2",
+      "source_relative_path": "DOGEUSDT/2026/08/29/DOGEUSDT_20260829T120000Z_20260829T130000Z_ob200_v3.zst"
+    }
+  ],
+  "status": "COMPLETE",
+  "symbol": "DOGEUSDT",
+  "trade_source_dedup": {
+    "logical_rows": 4275,
+    "physical_duplicates": 0,
+    "physical_rows": 4275,
+    "rows_in_duplicate_groups": 0,
+    "uses_final": false
+  },
+  "window_end": "2026-08-29T12:30:00Z",
+  "window_start": "2026-08-29T11:45:00Z"
+}

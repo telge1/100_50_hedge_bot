@@ -1,0 +1,28 @@
+{
+  "issues": [
+    {
+      "detail": "legacy manifests record seq gaps and false/open status; data.u continuity independently proves pilot replay",
+      "id": "LEGACY_OB200_MANIFEST_REPLAYABLE",
+      "status": "EXPLICIT_GAP"
+    },
+    {
+      "id": "OI_STALE_AFTER_2026_09_01",
+      "status": "EXPLICIT_GAP"
+    },
+    {
+      "id": "FUNDING_NOT_AVAILABLE",
+      "status": "NOT_AVAILABLE"
+    },
+    {
+      "evidence": "evidence/timezone_correction.json",
+      "id": "INITIAL_MARKET_TIMEZONE_JOIN",
+      "status": "CORRECTED_WITH_INVALID_TABLES_PRESERVED"
+    },
+    {
+      "detail": "six windows have complete 300/300-second and quality-flag coverage, but mid/depth divergence exceeds tolerance and its exact semantic cause is unproven",
+      "evidence": "ob_history_raw_seam_parity.csv",
+      "id": "HISTORY_RAW_SEAM_VALUE_DIVERGENCE",
+      "status": "BLOCKED"
+    }
+  ]
+}

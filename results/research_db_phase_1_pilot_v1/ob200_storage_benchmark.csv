@@ -1,0 +1,3 @@
+storage_candidate,input_snapshots,physical_rows,compressed_bytes,uncompressed_bytes,bytes_per_snapshot,insert_elapsed_ms,single_snapshot_query_ms,five_minute_query_ms,pool_wall_query_feasibility
+B_NORMALIZED_LEVELS_PILOT_ONLY,20,8000,22614,1064171,1130.7,15.51,4.286,2.448,JOIN/ROW_SCAN_FEASIBLE_BUT_ROW_EXPLOSION
+A_ARRAYS,56414,56414,21562677,568225814,382.2220902612827,25312.389000000003,4.286,2.448,DIRECT_ARRAY_FILTER_FEASIBLE

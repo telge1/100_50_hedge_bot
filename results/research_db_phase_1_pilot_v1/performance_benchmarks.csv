@@ -1,0 +1,14 @@
+query_name,cold_or_first_run,warm_run,rows_read,bytes_read,elapsed_ms,result_rows,uses_final
+single_timestamp_ob200,5.599,4.139,37040,3540157,4.286,1,False
+ob200_plus_minus_5m,2.754,2.427,7287,182175,2.448,1,False
+ob200_plus_minus_30m,2.972,2.805,35999,900021,2.867,1,False
+ob200_one_hour,2.618,2.439,20415,510399,2.459,1,False
+btc_1m,3.025,2.68,60,22979,2.724,60,False
+btc_1s,14.517,16.377,3600,1106354,16.181,3600,False
+doge_1m,3.871,2.996,45,16455,3.039,45,False
+doge_1s,10.692,14.179,2700,864331,11.84,2700,False
+trade_events,3.867,2.842,80738,2664354,2.977,1,False
+liquidations,2.703,2.351,60,10909,2.396,60,False
+orderbook_1s,9.945,10.977,3600,900225,10.369,3600,False
+pool_wall_near_levels,20.539,21.891,1041,3408777,21.588,100,False
+joined_market,5.607,4.742,7200,126046,4.759,3600,False

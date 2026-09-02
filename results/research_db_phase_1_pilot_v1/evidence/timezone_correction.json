@@ -1,0 +1,14 @@
+{
+  "canonical_market_1m_rows": 105,
+  "canonical_market_1s_rows": 6300,
+  "cause": "clickhouse_connect UTC DateTime64 returned naive datetime",
+  "drops": 0,
+  "invalid_tables_preserved": [
+    "research_market_1s_invalid_timezone_v0",
+    "research_market_1m_invalid_timezone_v0"
+  ],
+  "mutations": 0,
+  "status": "CORRECTED",
+  "truncates": 0,
+  "writes_outside_target_database": 0
+}

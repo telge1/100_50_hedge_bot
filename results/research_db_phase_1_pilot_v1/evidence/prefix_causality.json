@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "content_fingerprints_equal": true,
+      "first_cutoff_exclusive": "2026-08-31T18:40:00Z",
+      "first_prefix_events": 6000,
+      "future_events_change_finalized_prefix": false,
+      "later_cutoff_exclusive": "2026-08-31T18:50:00Z",
+      "later_run_same_prefix_events": 6000,
+      "prefix_start": "2026-08-31T18:30:00Z",
+      "source_file_id": "a1f667df2218750c8d013378d476eb148fe62ccf9111bf19c182e137cc41a027",
+      "status": "PASS",
+      "symbol": "BTCUSDT"
+    },
+    {
+      "content_fingerprints_equal": true,
+      "first_cutoff_exclusive": "2026-08-29T11:55:00Z",
+      "first_prefix_events": 4365,
+      "future_events_change_finalized_prefix": false,
+      "later_cutoff_exclusive": "2026-08-29T12:05:00Z",
+      "later_run_same_prefix_events": 4365,
+      "prefix_start": "2026-08-29T11:45:00Z",
+      "source_file_id": "42235eee7d3ed9e98e4350cbe2860793205a4a9c7e67679d6fbe37c83da1c081",
+      "status": "PASS",
+      "symbol": "DOGEUSDT"
+    }
+  ],
+  "status": "PASS"
+}

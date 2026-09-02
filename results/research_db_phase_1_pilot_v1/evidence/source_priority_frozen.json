@@ -1,0 +1,19 @@
+{
+  "contract_version": "research_db_source_priority_v1",
+  "decisions": {
+    "funding": "NOT_AVAILABLE",
+    "liquidations": "orderbook_analysis.all_liquidations with liquidation_flow_facts_v1",
+    "open_interest": "orderbook_analysis.open_interest_5s",
+    "orderbook_1s_history": "orderbook_features_1s_v2 through proven historical end",
+    "orderbook_1s_post_history": "raw ob200_v3 reconstruction",
+    "orderbook_deltas": "BLOCKED_SOURCE",
+    "orderbook_full_levels": "filesystem ob200_v3",
+    "public_trades": "orderbook_analysis.public_trades_canonical"
+  },
+  "frozen": true,
+  "phase0_assumptions_changed": false,
+  "symbols": [
+    "BTCUSDT",
+    "DOGEUSDT"
+  ]
+}

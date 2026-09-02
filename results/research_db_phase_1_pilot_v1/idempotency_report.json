@@ -1,0 +1,278 @@
+{
+  "after": {
+    "research_liquidation_events:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "5693070044955539907",
+      "logical_keys": 60,
+      "max_key": "BYBIT|BTCUSDT|1788203654761|Sell|0.009|79482.00",
+      "min_key": "BYBIT|BTCUSDT|1788201467368|Buy|0.001|78760.30",
+      "physical_rows": 60,
+      "uses_final": false
+    },
+    "research_liquidation_events:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "252754385939822363",
+      "logical_keys": 4,
+      "max_key": "BYBIT|DOGEUSDT|1788006005468|Sell|1500|0.08553",
+      "min_key": "BYBIT|DOGEUSDT|1788006005201|Sell|122|0.08547",
+      "physical_rows": 4,
+      "uses_final": false
+    },
+    "research_market_1m:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "15892768182045863310",
+      "logical_keys": 60,
+      "max_key": "BTCUSDT|2026-08-31T19:29:00+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 60,
+      "uses_final": false
+    },
+    "research_market_1m:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "369529069870158837",
+      "logical_keys": 45,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:00+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 45,
+      "uses_final": false
+    },
+    "research_market_1s:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "2062343205381314041",
+      "logical_keys": 3600,
+      "max_key": "BTCUSDT|2026-08-31T19:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 3600,
+      "uses_final": false
+    },
+    "research_market_1s:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "16427487086432341838",
+      "logical_keys": 2700,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 2700,
+      "uses_final": false
+    },
+    "research_orderbook_1s:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "2062343205381314041",
+      "logical_keys": 3600,
+      "max_key": "BTCUSDT|2026-08-31T19:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 3600,
+      "uses_final": false
+    },
+    "research_orderbook_1s:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "16427487086432341838",
+      "logical_keys": 2700,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 2700,
+      "uses_final": false
+    },
+    "research_orderbook_ob200_snapshots:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "1601400418328699925",
+      "logical_keys": 35999,
+      "max_key": "ffff3eed6aefcb4145ea79cf0fc8c689f0b51d11dfe9fd3727596a49811384ba",
+      "min_key": "0001178285b2d48b13f3dc30134252a179293df04b7f1b996b005e06e1d67581",
+      "physical_rows": 35999,
+      "uses_final": false
+    },
+    "research_orderbook_ob200_snapshots:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "10613978052767195348",
+      "logical_keys": 20415,
+      "max_key": "ffff2086c78a4a6056408c70df097df1d636dcd34cd0b1e9a1bfb8f2bb62b051",
+      "min_key": "0000e1fb9946383784d44d17e92d207c8757157a5acc14472d890779a5a84fae",
+      "physical_rows": 20415,
+      "uses_final": false
+    },
+    "research_public_trades:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "9358544341830936726",
+      "logical_keys": 80738,
+      "max_key": "BTCUSDT|ffff42fe-d5a1-576e-806f-bc37b8b0dfb9",
+      "min_key": "BTCUSDT|00000335-e735-5d93-8204-0262f683c6aa",
+      "physical_rows": 80738,
+      "uses_final": false
+    },
+    "research_public_trades:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "6132423911095494159",
+      "logical_keys": 4275,
+      "max_key": "DOGEUSDT|ffd31b97-c87a-5b92-855b-b6246a6710be",
+      "min_key": "DOGEUSDT|00092b57-ecfa-549c-9df9-b94a5e8f5a0b",
+      "physical_rows": 4275,
+      "uses_final": false
+    },
+    "research_source_files:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "17285302241200469952",
+      "logical_keys": 2,
+      "max_key": "d31c8f81a45834785645a509f42bbe77861cd73e3f0e188806d7a6cf045700bb",
+      "min_key": "a1f667df2218750c8d013378d476eb148fe62ccf9111bf19c182e137cc41a027",
+      "physical_rows": 2,
+      "uses_final": false
+    },
+    "research_source_files:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "922721301981188396",
+      "logical_keys": 2,
+      "max_key": "a7ab9c80e76cbc4b4e031831b6bd9b9a55aebe6565685bdf6f1a1eb91393d3a2",
+      "min_key": "42235eee7d3ed9e98e4350cbe2860793205a4a9c7e67679d6fbe37c83da1c081",
+      "physical_rows": 2,
+      "uses_final": false
+    }
+  },
+  "before": {
+    "research_liquidation_events:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "5693070044955539907",
+      "logical_keys": 60,
+      "max_key": "BYBIT|BTCUSDT|1788203654761|Sell|0.009|79482.00",
+      "min_key": "BYBIT|BTCUSDT|1788201467368|Buy|0.001|78760.30",
+      "physical_rows": 60,
+      "uses_final": false
+    },
+    "research_liquidation_events:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "252754385939822363",
+      "logical_keys": 4,
+      "max_key": "BYBIT|DOGEUSDT|1788006005468|Sell|1500|0.08553",
+      "min_key": "BYBIT|DOGEUSDT|1788006005201|Sell|122|0.08547",
+      "physical_rows": 4,
+      "uses_final": false
+    },
+    "research_market_1m:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "15892768182045863310",
+      "logical_keys": 60,
+      "max_key": "BTCUSDT|2026-08-31T19:29:00+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 60,
+      "uses_final": false
+    },
+    "research_market_1m:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "369529069870158837",
+      "logical_keys": 45,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:00+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 45,
+      "uses_final": false
+    },
+    "research_market_1s:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "2062343205381314041",
+      "logical_keys": 3600,
+      "max_key": "BTCUSDT|2026-08-31T19:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 3600,
+      "uses_final": false
+    },
+    "research_market_1s:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "16427487086432341838",
+      "logical_keys": 2700,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 2700,
+      "uses_final": false
+    },
+    "research_orderbook_1s:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "2062343205381314041",
+      "logical_keys": 3600,
+      "max_key": "BTCUSDT|2026-08-31T19:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "BTCUSDT|2026-08-31T18:30:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 3600,
+      "uses_final": false
+    },
+    "research_orderbook_1s:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "16427487086432341838",
+      "logical_keys": 2700,
+      "max_key": "DOGEUSDT|2026-08-29T12:29:59+00:00|btc_doge_research_phase_1_v1",
+      "min_key": "DOGEUSDT|2026-08-29T11:45:00+00:00|btc_doge_research_phase_1_v1",
+      "physical_rows": 2700,
+      "uses_final": false
+    },
+    "research_orderbook_ob200_snapshots:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "1601400418328699925",
+      "logical_keys": 35999,
+      "max_key": "ffff3eed6aefcb4145ea79cf0fc8c689f0b51d11dfe9fd3727596a49811384ba",
+      "min_key": "0001178285b2d48b13f3dc30134252a179293df04b7f1b996b005e06e1d67581",
+      "physical_rows": 35999,
+      "uses_final": false
+    },
+    "research_orderbook_ob200_snapshots:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "10613978052767195348",
+      "logical_keys": 20415,
+      "max_key": "ffff2086c78a4a6056408c70df097df1d636dcd34cd0b1e9a1bfb8f2bb62b051",
+      "min_key": "0000e1fb9946383784d44d17e92d207c8757157a5acc14472d890779a5a84fae",
+      "physical_rows": 20415,
+      "uses_final": false
+    },
+    "research_public_trades:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "9358544341830936726",
+      "logical_keys": 80738,
+      "max_key": "BTCUSDT|ffff42fe-d5a1-576e-806f-bc37b8b0dfb9",
+      "min_key": "BTCUSDT|00000335-e735-5d93-8204-0262f683c6aa",
+      "physical_rows": 80738,
+      "uses_final": false
+    },
+    "research_public_trades:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "6132423911095494159",
+      "logical_keys": 4275,
+      "max_key": "DOGEUSDT|ffd31b97-c87a-5b92-855b-b6246a6710be",
+      "min_key": "DOGEUSDT|00092b57-ecfa-549c-9df9-b94a5e8f5a0b",
+      "physical_rows": 4275,
+      "uses_final": false
+    },
+    "research_source_files:BTCUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "17285302241200469952",
+      "logical_keys": 2,
+      "max_key": "d31c8f81a45834785645a509f42bbe77861cd73e3f0e188806d7a6cf045700bb",
+      "min_key": "a1f667df2218750c8d013378d476eb148fe62ccf9111bf19c182e137cc41a027",
+      "physical_rows": 2,
+      "uses_final": false
+    },
+    "research_source_files:DOGEUSDT": {
+      "duplicate_keys": 0,
+      "key_fingerprint": "922721301981188396",
+      "logical_keys": 2,
+      "max_key": "a7ab9c80e76cbc4b4e031831b6bd9b9a55aebe6565685bdf6f1a1eb91393d3a2",
+      "min_key": "42235eee7d3ed9e98e4350cbe2860793205a4a9c7e67679d6fbe37c83da1c081",
+      "physical_rows": 2,
+      "uses_final": false
+    }
+  },
+  "no_background_merge_dependency": true,
+  "physical_counts_unchanged": true,
+  "reruns": [
+    {
+      "batch_id": "phase1:btc_run_018",
+      "input_fingerprint": "83b6f315c016bc8d4d530439ea06e40a294eacac30de0ffee337ee23a97207e6",
+      "pilot_id": "btc_run_018",
+      "rows_written": 0,
+      "status": "IDEMPOTENT_SKIP"
+    },
+    {
+      "batch_id": "phase1:doge_20260829_1145_1230",
+      "input_fingerprint": "b189606d4b1c6fe05f5e48044417bce6d5db21512d8e6f1fdd802db38906f4fe",
+      "pilot_id": "doge_20260829_1145_1230",
+      "rows_written": 0,
+      "status": "IDEMPOTENT_SKIP"
+    }
+  ],
+  "status": "PASS",
+  "uses_final": false
+}

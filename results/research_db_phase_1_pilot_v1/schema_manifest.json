@@ -1,0 +1,1552 @@
+{
+  "columns": [
+    {
+      "name": "coverage_key",
+      "table": "research_coverage",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "symbol",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "data_type",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "period_start",
+      "table": "research_coverage",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "period_end",
+      "table": "research_coverage",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "expected_buckets",
+      "table": "research_coverage",
+      "type": "UInt64"
+    },
+    {
+      "name": "present_buckets",
+      "table": "research_coverage",
+      "type": "UInt64"
+    },
+    {
+      "name": "genuine_buckets",
+      "table": "research_coverage",
+      "type": "UInt64"
+    },
+    {
+      "name": "carried_forward_buckets",
+      "table": "research_coverage",
+      "type": "UInt64"
+    },
+    {
+      "name": "gap_count",
+      "table": "research_coverage",
+      "type": "UInt32"
+    },
+    {
+      "name": "duplicate_count",
+      "table": "research_coverage",
+      "type": "UInt32"
+    },
+    {
+      "name": "quality_status",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "contract_version",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_coverage",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_coverage",
+      "type": "String"
+    },
+    {
+      "name": "checked_at",
+      "table": "research_coverage",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "batch_id",
+      "table": "research_ingestion_batches",
+      "type": "String"
+    },
+    {
+      "name": "input_fingerprint",
+      "table": "research_ingestion_batches",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "contract_version",
+      "table": "research_ingestion_batches",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_ingestion_batches",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "symbol",
+      "table": "research_ingestion_batches",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "window_start",
+      "table": "research_ingestion_batches",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "window_end",
+      "table": "research_ingestion_batches",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "status",
+      "table": "research_ingestion_batches",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "rows_written",
+      "table": "research_ingestion_batches",
+      "type": "UInt64"
+    },
+    {
+      "name": "manifest_fingerprint",
+      "table": "research_ingestion_batches",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "started_at",
+      "table": "research_ingestion_batches",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "completed_at",
+      "table": "research_ingestion_batches",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "error",
+      "table": "research_ingestion_batches",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_time",
+      "table": "research_liquidation_events",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "receive_time",
+      "table": "research_liquidation_events",
+      "type": "Nullable(DateTime64(6, 'UTC'))"
+    },
+    {
+      "name": "position_side_raw",
+      "table": "research_liquidation_events",
+      "type": "Enum8('Buy' = 1, 'Sell' = 2)"
+    },
+    {
+      "name": "liquidated_position_side",
+      "table": "research_liquidation_events",
+      "type": "Enum8('LIQUIDATED_LONG' = 1, 'LIQUIDATED_SHORT' = 2)"
+    },
+    {
+      "name": "forced_flow",
+      "table": "research_liquidation_events",
+      "type": "Enum8('FORCED_BUY' = 1, 'FORCED_SELL' = 2)"
+    },
+    {
+      "name": "executed_base_size",
+      "table": "research_liquidation_events",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "bankruptcy_price",
+      "table": "research_liquidation_events",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "bankruptcy_reference_quote",
+      "table": "research_liquidation_events",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "execution_price",
+      "table": "research_liquidation_events",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "execution_notional",
+      "table": "research_liquidation_events",
+      "type": "Nullable(Decimal(24, 8))"
+    },
+    {
+      "name": "event_key",
+      "table": "research_liquidation_events",
+      "type": "String"
+    },
+    {
+      "name": "event_key_version",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_liquidation_events",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_liquidation_events",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_liquidation_events",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_liquidation_events",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "symbol",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_time",
+      "table": "research_market_1m",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "open",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "high",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "low",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "close",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "volume_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "volume_quote",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "taker_buy_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_sell_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_delta_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "trade_count",
+      "table": "research_market_1m",
+      "type": "UInt32"
+    },
+    {
+      "name": "oi_open",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_close",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_delta",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "long_liquidation_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "short_liquidation_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_buy_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_sell_base",
+      "table": "research_market_1m",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "mid_open",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "mid_close",
+      "table": "research_market_1m",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "spread_bps_mean",
+      "table": "research_market_1m",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "imbalance_l50_mean",
+      "table": "research_market_1m",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "genuine_seconds",
+      "table": "research_market_1m",
+      "type": "UInt32"
+    },
+    {
+      "name": "carried_forward_seconds",
+      "table": "research_market_1m",
+      "type": "UInt32"
+    },
+    {
+      "name": "funding_status",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_market_1m",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_market_1m",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_market_1m",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_market_1m",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_key",
+      "table": "research_market_1m",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_time",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "open",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "high",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "low",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "close",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "volume_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "volume_quote",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "taker_buy_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_sell_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_delta_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "trade_count",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "UInt32"
+    },
+    {
+      "name": "oi_open",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_close",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_delta",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "long_liquidation_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "short_liquidation_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_buy_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_sell_base",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "mid_open",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "mid_close",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "spread_bps_mean",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "imbalance_l50_mean",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "genuine_seconds",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "UInt32"
+    },
+    {
+      "name": "carried_forward_seconds",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "UInt32"
+    },
+    {
+      "name": "funding_status",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_key",
+      "table": "research_market_1m_invalid_timezone_v0",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_time",
+      "table": "research_market_1s",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "last_trade_price",
+      "table": "research_market_1s",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "mid",
+      "table": "research_market_1s",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "taker_buy_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_sell_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_buy_quote",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "taker_sell_quote",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "trade_count",
+      "table": "research_market_1s",
+      "type": "UInt32"
+    },
+    {
+      "name": "taker_delta_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "open_interest",
+      "table": "research_market_1s",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_delta",
+      "table": "research_market_1s",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_freshness_ms",
+      "table": "research_market_1s",
+      "type": "Nullable(UInt64)"
+    },
+    {
+      "name": "oi_status",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "long_liquidation_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "short_liquidation_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_buy_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_sell_base",
+      "table": "research_market_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "spread_bps",
+      "table": "research_market_1s",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "imbalance_l50",
+      "table": "research_market_1s",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "ob_is_genuine",
+      "table": "research_market_1s",
+      "type": "Nullable(UInt8)"
+    },
+    {
+      "name": "ob_is_carried_forward",
+      "table": "research_market_1s",
+      "type": "Nullable(UInt8)"
+    },
+    {
+      "name": "funding_status",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_coverage_mask",
+      "table": "research_market_1s",
+      "type": "UInt16"
+    },
+    {
+      "name": "source_id",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_market_1s",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_market_1s",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_market_1s",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_market_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_key",
+      "table": "research_market_1s",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_time",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "last_trade_price",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "mid",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Decimal(18, 8))"
+    },
+    {
+      "name": "taker_buy_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_sell_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "taker_buy_quote",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "taker_sell_quote",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "trade_count",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "UInt32"
+    },
+    {
+      "name": "taker_delta_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "open_interest",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_delta",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Decimal(24, 12))"
+    },
+    {
+      "name": "oi_freshness_ms",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(UInt64)"
+    },
+    {
+      "name": "oi_status",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "long_liquidation_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "short_liquidation_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_buy_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "forced_sell_base",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "spread_bps",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "imbalance_l50",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(Float64)"
+    },
+    {
+      "name": "ob_is_genuine",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(UInt8)"
+    },
+    {
+      "name": "ob_is_carried_forward",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Nullable(UInt8)"
+    },
+    {
+      "name": "funding_status",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_coverage_mask",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "UInt16"
+    },
+    {
+      "name": "source_id",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_key",
+      "table": "research_market_1s_invalid_timezone_v0",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_time",
+      "table": "research_orderbook_1s",
+      "type": "DateTime64(0, 'UTC')"
+    },
+    {
+      "name": "mid",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "best_bid",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "best_ask",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "spread_abs",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "spread_bps",
+      "table": "research_orderbook_1s",
+      "type": "Float64"
+    },
+    {
+      "name": "bid_qty_l50",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "ask_qty_l50",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "imbalance_l50",
+      "table": "research_orderbook_1s",
+      "type": "Float64"
+    },
+    {
+      "name": "bid_notional_l50",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "ask_notional_l50",
+      "table": "research_orderbook_1s",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "bid_level_count",
+      "table": "research_orderbook_1s",
+      "type": "UInt16"
+    },
+    {
+      "name": "ask_level_count",
+      "table": "research_orderbook_1s",
+      "type": "UInt16"
+    },
+    {
+      "name": "is_genuine",
+      "table": "research_orderbook_1s",
+      "type": "UInt8"
+    },
+    {
+      "name": "is_carried_forward",
+      "table": "research_orderbook_1s",
+      "type": "UInt8"
+    },
+    {
+      "name": "source_snapshot_time",
+      "table": "research_orderbook_1s",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "last_update_id",
+      "table": "research_orderbook_1s",
+      "type": "UInt64"
+    },
+    {
+      "name": "sequence_status",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_orderbook_1s",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_orderbook_1s",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_orderbook_1s",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_orderbook_1s",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bucket_key",
+      "table": "research_orderbook_1s",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_orderbook_levels_pilot",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_key",
+      "table": "research_orderbook_levels_pilot",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "event_time",
+      "table": "research_orderbook_levels_pilot",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "side",
+      "table": "research_orderbook_levels_pilot",
+      "type": "Enum8('bid' = 1, 'ask' = 2)"
+    },
+    {
+      "name": "level_rank",
+      "table": "research_orderbook_levels_pilot",
+      "type": "UInt16"
+    },
+    {
+      "name": "price",
+      "table": "research_orderbook_levels_pilot",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "size",
+      "table": "research_orderbook_levels_pilot",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "pilot_status",
+      "table": "research_orderbook_levels_pilot",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_orderbook_levels_pilot",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_time",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "receive_time",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Nullable(DateTime64(6, 'UTC'))"
+    },
+    {
+      "name": "exchange_sequence",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt64"
+    },
+    {
+      "name": "update_id",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt64"
+    },
+    {
+      "name": "raw_event_type",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "bid_prices",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Array(Decimal(18, 8))"
+    },
+    {
+      "name": "bid_sizes",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Array(Decimal(24, 12))"
+    },
+    {
+      "name": "ask_prices",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Array(Decimal(18, 8))"
+    },
+    {
+      "name": "ask_sizes",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Array(Decimal(24, 12))"
+    },
+    {
+      "name": "bid_level_count",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt16"
+    },
+    {
+      "name": "ask_level_count",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt16"
+    },
+    {
+      "name": "is_genuine",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt8"
+    },
+    {
+      "name": "is_carried_forward",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt8"
+    },
+    {
+      "name": "source_file_id",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "source_segment",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "String"
+    },
+    {
+      "name": "source_record",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "UInt64"
+    },
+    {
+      "name": "source_fingerprint",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "parser_version",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_key",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "key_version",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "content_fingerprint",
+      "table": "research_orderbook_ob200_snapshots",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "state_key",
+      "table": "research_pipeline_state",
+      "type": "String"
+    },
+    {
+      "name": "processor",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "symbol",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "last_read_ts",
+      "table": "research_pipeline_state",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "last_finalized_ts",
+      "table": "research_pipeline_state",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "watermark_ts",
+      "table": "research_pipeline_state",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "overlap_seconds",
+      "table": "research_pipeline_state",
+      "type": "UInt32"
+    },
+    {
+      "name": "last_successful_run",
+      "table": "research_pipeline_state",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "rows_read",
+      "table": "research_pipeline_state",
+      "type": "UInt64"
+    },
+    {
+      "name": "rows_written",
+      "table": "research_pipeline_state",
+      "type": "UInt64"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "contract_version",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "status",
+      "table": "research_pipeline_state",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "error",
+      "table": "research_pipeline_state",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_time",
+      "table": "research_public_trades",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "receive_time",
+      "table": "research_public_trades",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "trade_id",
+      "table": "research_public_trades",
+      "type": "String"
+    },
+    {
+      "name": "price",
+      "table": "research_public_trades",
+      "type": "Decimal(18, 8)"
+    },
+    {
+      "name": "base_size",
+      "table": "research_public_trades",
+      "type": "Decimal(24, 12)"
+    },
+    {
+      "name": "quote_notional",
+      "table": "research_public_trades",
+      "type": "Decimal(24, 8)"
+    },
+    {
+      "name": "taker_side",
+      "table": "research_public_trades",
+      "type": "Enum8('Buy' = 1, 'Sell' = 2)"
+    },
+    {
+      "name": "source_id",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "processor_version",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingestion_batch_id",
+      "table": "research_public_trades",
+      "type": "String"
+    },
+    {
+      "name": "ingested_at",
+      "table": "research_public_trades",
+      "type": "DateTime64(6, 'UTC')"
+    },
+    {
+      "name": "quality_flags",
+      "table": "research_public_trades",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "coverage_status",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "finalization_status",
+      "table": "research_public_trades",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_key",
+      "table": "research_public_trades",
+      "type": "String"
+    },
+    {
+      "name": "source_file_id",
+      "table": "research_source_files",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "source_relative_path",
+      "table": "research_source_files",
+      "type": "String"
+    },
+    {
+      "name": "file_name",
+      "table": "research_source_files",
+      "type": "String"
+    },
+    {
+      "name": "symbol",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "segment_start",
+      "table": "research_source_files",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "segment_end",
+      "table": "research_source_files",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "file_size",
+      "table": "research_source_files",
+      "type": "UInt64"
+    },
+    {
+      "name": "compression",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_fingerprint",
+      "table": "research_source_files",
+      "type": "FixedString(64)"
+    },
+    {
+      "name": "parser_version",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "source_contract_version",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "event_count",
+      "table": "research_source_files",
+      "type": "UInt64"
+    },
+    {
+      "name": "import_status",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "import_batch_id",
+      "table": "research_source_files",
+      "type": "String"
+    },
+    {
+      "name": "first_event_time",
+      "table": "research_source_files",
+      "type": "Nullable(DateTime64(3, 'UTC'))"
+    },
+    {
+      "name": "last_event_time",
+      "table": "research_source_files",
+      "type": "Nullable(DateTime64(3, 'UTC'))"
+    },
+    {
+      "name": "duplicate_status",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "overlap_status",
+      "table": "research_source_files",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "error_status",
+      "table": "research_source_files",
+      "type": "String"
+    },
+    {
+      "name": "registered_at",
+      "table": "research_source_files",
+      "type": "DateTime64(6, 'UTC')"
+    }
+  ],
+  "database": "btc_doge_research",
+  "forbidden_neutral_fact_fields": [],
+  "tables": [
+    "research_coverage",
+    "research_ingestion_batches",
+    "research_liquidation_events",
+    "research_market_1m",
+    "research_market_1m_invalid_timezone_v0",
+    "research_market_1s",
+    "research_market_1s_invalid_timezone_v0",
+    "research_orderbook_1s",
+    "research_orderbook_levels_pilot",
+    "research_orderbook_ob200_snapshots",
+    "research_pipeline_state",
+    "research_public_trades",
+    "research_source_files"
+  ],
+  "uses_final": false
+}

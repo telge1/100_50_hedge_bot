@@ -1,0 +1,36 @@
+{
+  "full_result_parity_claimed": false,
+  "pilot_status": "PILOT_WITH_GOLDEN_DESCRIPTIVE_REFERENCE",
+  "probes": [
+    {
+      "actual_buy_quote": 300.00192,
+      "actual_sell_quote": 213759.75555,
+      "expected_approx_buy_quote": 300.0,
+      "expected_approx_sell_quote": 214000.0,
+      "label": "sell_inefficient",
+      "reference_is_rounded": true,
+      "status": "REFERENCE_APPROXIMATE",
+      "trade_count": 81,
+      "window_end": "2026-08-29 11:56:00Z",
+      "window_start": "2026-08-29 11:55:00Z"
+    },
+    {
+      "actual_buy_quote": 1055619.10042,
+      "actual_sell_quote": 202300.06058,
+      "expected_approx_buy_quote": 1060000.0,
+      "expected_approx_sell_quote": 202000.0,
+      "label": "buy_efficient",
+      "reference_is_rounded": true,
+      "status": "REFERENCE_APPROXIMATE",
+      "trade_count": 1300,
+      "window_end": "2026-08-29 12:21:00Z",
+      "window_start": "2026-08-29 12:20:00Z"
+    }
+  ],
+  "selection_reason": "contains both committed audit probes at 11:55 and 12:20 in one bounded 45-minute causal window",
+  "source_aggregation_parity": "PROVEN",
+  "window": [
+    "2026-08-29T11:45:00Z",
+    "2026-08-29T12:30:00Z"
+  ]
+}

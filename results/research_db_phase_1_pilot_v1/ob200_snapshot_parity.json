@@ -1,0 +1,189 @@
+{
+  "all_errors_zero": true,
+  "deterministic_samples": [
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:07:42.180000Z",
+      "a2f50f1dc0553615645251a7e53727b7097fb10e066455cfd8fa8e35ba5a7933",
+      "69334801570a7df3e709bdcad23e101a3e219a8dd2eeff367ecadf1d60c9b8fe",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T18:41:03.528000Z",
+      "53cd309359514ccc668879dbeb0524ab583db509e83fba3981dbb5aac6ceb4ea",
+      "8b533420de80d6b0ef9cb759b8d685c6ae659680b38d18a9d0dac90dba74c940",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:02:39.280000Z",
+      "a6452c6a9e6be1369c66008d093cc6047cd86a04af266f0977b36db649c12ae6",
+      "2f9bdd8da05b36a4f1faf8e92b19506aff93760a7dc0204ec94cdc0f3f949a6f",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:28:33.028000Z",
+      "77e3631e043485895806a6cdcea46032e72022f3537743457c77c66de0d7532f",
+      "1039c1eeb73a9266091780bb3381b48f752c8cc104af2c27d5966aecbc679983",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:06:22.729000Z",
+      "b218f0e5de06b43c46602cb944c54645627b9f85b4eb0870ec700759a8312f1a",
+      "584416fa654eb30b61427f616f64ebefb311595183d9750a85e889d80ec4c4e9",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:21:16.329000Z",
+      "6ea89a47f7c61ecc145e2beafd6f0e12301a84e97a08a9166279f87229753de4",
+      "cbbb79b4c0bc00a116ab7a353d34d455f657b75f87424cdad5bcc46793d9e986",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:00:47.580000Z",
+      "932ea01eeb6f0ea9869842c2755cdf7356663c8a2782608eeff107bee3e5a6f6",
+      "69de709631446a0d7e8389e8010c7a6404a5b167fca7ed724763390854c9a663",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:03:09.680000Z",
+      "726a65ba743262d7dcab29f5dd13970fa7e67bb06a62d0cf253039cfda4f6be0",
+      "48849be512e1603e279c4b1de88dabc1b704b1375dd212f1d759a0f2b3fbf77c",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:07:27.081000Z",
+      "456b3bdbddcc06b23af3bcc98978a88de1e647b2d4a95ffdb8ceeffcb85dd7b6",
+      "d9d9333f763cd75135a22d7c631d2f61b544dfa52b8e0d50e7174b98da0be210",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:16:58.529000Z",
+      "138907a86dc8e2c59d7214c8ac570b48bee3b9dc9e483142093fbd33b9072a54",
+      "43518f9622db38916bb9e7d2f1849fdacfb4a3bc8be2a01fa7ad9d09f68772e0",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T18:41:43.129000Z",
+      "23ff162964ffee3ba6f27ea2c332888c3a5b63dc4b3fbe21b076b3a9da37d1ff",
+      "968333996d828d78d0c7615e545b5cb9e87182be6943ecd207e07ab00d4c810c",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:19:46.729000Z",
+      "102da7219165a489ea47f12ea23b7192cf8a8e6f5ff060b9eedc2c45cb8f2673",
+      "e8ccaa974ba8024cc5a74f42e2399c34abd5ed8e0b677ceab59d41c85d4e656e",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T18:41:43.329000Z",
+      "1c486822de04e8d128f59b7013378071e7d9f2f6bfdff3b3ed8be07992bbf091",
+      "af01ada5e7b137132f9706241d82c0990ab562707f4503b07a43f54032ceda59",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:11:24.229000Z",
+      "d8ade3626bc8102cd2ea9261270d4149a107a4697ee5b8361240971d571b17c6",
+      "286afe6a428dd4b056db34b78b14ce76b5d28c5923aaefffb76f7f5a3f861559",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T12:17:08.280000Z",
+      "ab970cc85b0530a7d0f271081b6c52f02bb7d8227d15f8662b19d5783b6f70d4",
+      "af20e92ddef9f5e94ec15800a91000a9b7445aa4f1de70da6d6fc40beea53f9b",
+      200,
+      200
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-29T11:49:14.680000Z",
+      "c4f7764a50c1472479e8b1a64b2d92169a32d93102bd5db2d15bf22fbb278402",
+      "37536d71b4a8f5013bd674b753318149ce59d0f36f59185b704ce5b604286255",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T18:40:57.630000Z",
+      "3c7b0002d70afc82a41c8a5ba5cfb2b07f2cee925e79b88214ae5d7cd034ae38",
+      "364e0f631b1b89ebe9f35e37a5a48727ea40d3c83749f6127b82091e624c004f",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T18:35:18.929000Z",
+      "6f7695bbba2c40321be33f0fe5f4c1e6ac547d3ef3ed67a209826ba7de7b2f3a",
+      "721ed63a6cb65676ae7f5d36c33a32072a32b91b63efb4ef02024e0847540dbf",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:15:32.129000Z",
+      "98b25c0872c32f6738908e26d9e676037a972a3d09b388550b3cc3f587304eaa",
+      "aa4bd9b8aaec6fd51d1f947860bbf9dbd5c92501358eec778566a28153600256",
+      200,
+      200
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-31T19:20:07.330000Z",
+      "a531e267e89e9a76fabe58ff240cff84fb2aabae897a5c996ed11d193cfd730f",
+      "2a22e48ee4ecf4bdf43b9a58e26f2360c123e8fe13d4c09fe3128812b930f9ec",
+      200,
+      200
+    ]
+  ],
+  "invariants": {
+    "BTCUSDT": {
+      "ask_pair_length_errors": 0,
+      "ask_sort_errors": 0,
+      "bid_sort_errors": 0,
+      "crossed_books": 0,
+      "depth_errors": 0,
+      "nan_errors": 0,
+      "negative_size_errors": 0,
+      "nonpositive_price_errors": 0,
+      "pair_length_errors": 0
+    },
+    "DOGEUSDT": {
+      "ask_pair_length_errors": 0,
+      "ask_sort_errors": 0,
+      "bid_sort_errors": 0,
+      "crossed_books": 0,
+      "depth_errors": 0,
+      "nan_errors": 0,
+      "negative_size_errors": 0,
+      "nonpositive_price_errors": 0,
+      "pair_length_errors": 0
+    }
+  }
+}

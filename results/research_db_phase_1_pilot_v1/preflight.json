@@ -1,0 +1,26 @@
+{
+  "branch": "feature/btc-doge-research-db",
+  "clickhouse_version": "26.7.1.1315",
+  "phase0_contracts_read": [
+    "ABSCHLUSSBERICHT.md",
+    "acceptance_criteria.json",
+    "coverage_matrix.csv",
+    "source_inventory.csv",
+    "source_priority.json",
+    "semantic_contract.md",
+    "proposed_schema.sql",
+    "table_design.md",
+    "incremental_processor_design.md",
+    "full_history_backfill_plan.md",
+    "performance_benchmark_plan.md",
+    "open_questions.json",
+    "preflight_manifest.json",
+    "evidence/inventory_query_results.json",
+    "evidence/supplemental_queries.json"
+  ],
+  "source_orderbook_deltas_status": "BLOCKED_SOURCE_NOT_QUERIED",
+  "start_head": "b0521b3918dff5c049cd22a58e03fec71cb55ff5",
+  "target_database": "btc_doge_research",
+  "target_database_preexisting": true,
+  "writes_allowed_only_to": "btc_doge_research.*"
+}
