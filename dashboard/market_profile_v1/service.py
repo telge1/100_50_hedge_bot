@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,8 @@ import clickhouse_connect
 
 from research_charts.clickhouse_config import load_clickhouse_config
 from research_charts.oa_import import load_market_profile
+
+from .dual_profile import DUAL_CONTRACT_VERSION, build_dual_window_profile
 
 CACHE_TTL_S = 120.0
 CACHE_MAX_ENTRIES = 24
@@ -61,6 +64,7 @@ class ProfileRequestError(ValueError):
 
 _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _cache_lock = threading.Lock()
+_thread_local = threading.local()
 
 
 def clear_cache_for_tests() -> None:
@@ -71,6 +75,15 @@ def clear_cache_for_tests() -> None:
 def _client():
     cfg = load_clickhouse_config()
     return clickhouse_connect.get_client(**cfg.connect_kwargs())
+
+
+def _thread_client() -> Any:
+    """One ClickHouse client per worker thread (driver is not concurrent-safe)."""
+    client = getattr(_thread_local, "client", None)
+    if client is None:
+        client = _client()
+        _thread_local.client = client
+    return client
 
 
 def known_symbols() -> list[str]:
@@ -193,6 +206,7 @@ def _cache_key(req: dict[str, Any], include_bins: bool) -> str:
             str(req["target_bins"]),
             "final" if req["use_final"] else "plain",
             "bins" if include_bins else "nobins",
+            DUAL_CONTRACT_VERSION,
         ]
     )
 
@@ -235,6 +249,31 @@ def _candles_payload(df) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def _build_one_window(
+    *,
+    symbol: str,
+    window: Any,
+    value_area_pct: float,
+    target_bins: int,
+    use_final: bool,
+    thresholds: Any,
+    candles_1m,
+    include_bins: bool,
+) -> tuple[Any, dict[str, Any] | None]:
+    built = build_dual_window_profile(
+        _thread_client(),
+        symbol,
+        window,
+        value_area_pct=value_area_pct,
+        target_bins=target_bins,
+        use_final=use_final,
+        thresholds=thresholds,
+        candles_1m=candles_1m,
+        include_bins=include_bins,
+    )
+    return window, built
 
 
 def load_profiles(
@@ -299,18 +338,27 @@ def load_profiles(
     df_tf = df_1m.copy() if tf in ("1m", "1min") else mp["aggregate_timeframe"](df_1m, tf)
 
     thresholds = mp["ShapeThresholds"]()
-    profiles = []
+    max_workers = min(4, max(1, len(windows)))
+    build_kwargs = [
+        {
+            "symbol": req["symbol"],
+            "window": window,
+            "value_area_pct": req["value_area_pct"],
+            "target_bins": req["target_bins"],
+            "use_final": req["use_final"],
+            "thresholds": thresholds,
+            "candles_1m": df_1m,
+            "include_bins": include_bins,
+        }
+        for window in windows
+    ]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        built_list = list(pool.map(lambda kw: _build_one_window(**kw), build_kwargs))
+
+    profiles: list[dict[str, Any]] = []
     skipped: list[str] = []
-    for window in windows:
-        built = mp["build_profile"](
-            client,
-            req["symbol"],
-            window,
-            value_area_pct=req["value_area_pct"],
-            target_bins=req["target_bins"],
-            use_final=req["use_final"],
-            thresholds=thresholds,
-        )
+    for window, built in built_list:
         if built is None:
             skipped.append(window.window_id)
             continue
@@ -321,8 +369,6 @@ def load_profiles(
             "no_profiles", "no window in that range had trade data"
         )
 
-    profiles = mp["mark_naked_pocs"](profiles, df_1m)
-
     payload = {
         "success": True,
         "symbol": req["symbol"],
@@ -332,7 +378,7 @@ def load_profiles(
         "requested_start": req["start_unix"],
         "requested_end": req["end_unix"],
         "candles": _candles_payload(df_tf),
-        "profiles": [p.to_dict(include_bins=include_bins) for p in profiles],
+        "profiles": profiles,
         "meta": {
             "windows": len(windows),
             "profiles_built": len(profiles),
@@ -343,6 +389,10 @@ def load_profiles(
             "shape_thresholds": thresholds.to_dict(),
             "shape_unvalidated": True,
             "shape_notice": SHAPE_NOTICE,
+            "dual_contract_version": DUAL_CONTRACT_VERSION,
+            "tpo_contract": "tpo_profile_facts_v1",
+            "volume_contract": "volume_profile_facts_v1",
+            "profile_timeframe_independent": True,
         },
         "cached": False,
     }

@@ -176,6 +176,7 @@ def test_meta_exposes_choices_limits_and_the_shape_caveat():
     # The verdict is drawn on the chart, so the API must admit its status.
     assert body["shape_unvalidated"] is True
     assert "unvalidiert" in body["shape_notice"]
+    assert body.get("dual_contract_version") == "market_profile_v1_dual_tpo_volume_v1"
 
 
 def test_bad_requests_return_a_coded_error_not_a_crash():
@@ -265,6 +266,7 @@ def test_the_template_offers_both_histogram_and_level_toggles():
     html = PAGE_HTML.read_text(encoding="utf-8")
     for node in (
         "mpShowHistogram",
+        "mpShowVolumeLine",
         "mpSplitBuySell",
         "mpShowPoc",
         "mpShowValueArea",
@@ -293,12 +295,27 @@ def test_the_template_offers_a_fullscreen_chart_button():
         assert fn in js
 
 
+def test_the_renderer_reads_dual_tpo_and_volume_from_the_payload():
+    js = APP_JS.read_text(encoding="utf-8")
+    for key in ("profileTpo", "profileVolume", "drawTpoHistogram", "drawVolumeBuySellBars"):
+        assert key in js, f"renderer must implement dual helper {key}"
+    hist = js.split("function drawTpoHistogram")[1].split("function drawVolumeBuySellBars")[0]
+    assert "tpo_count" in hist
+    assert "base_volume" not in hist, "TPO histogram must not use base_volume"
+    vol_line = js.split("function drawVolumeProfileLine")[1].split("function drawWindowBackground")[0]
+    assert "base_volume" in vol_line
+    assert "tpo_count" not in vol_line, "volume line must not use tpo_count"
+    buy_sell = js.split("function drawVolumeBuySellBars")[1].split("function drawProfileHistogram")[0]
+    assert "buy_volume" in buy_sell and "sell_volume" in buy_sell
+
+
 def test_the_renderer_reads_every_level_family_from_the_payload():
     js = APP_JS.read_text(encoding="utf-8")
-    for key in ("value_area", "single_print_ranges", "naked_poc", "nodes", "bins"):
+    for key in ("value_area", "single_print_ranges", "naked_poc", "nodes", "tpo", "volume"):
         assert key in js, f"renderer must consume payload key {key}"
     for fn in (
-        "drawProfileHistogram",
+        "drawTpoHistogram",
+        "drawVolumeProfileLine",
         "drawWindowBackground",
         "drawWindowLevels",
         "drawShapeLabel",
@@ -321,7 +338,8 @@ def test_the_histogram_is_drawn_after_the_shaded_background():
     js = APP_JS.read_text(encoding="utf-8")
     body = js.split("function draw()")[1]
     assert body.index("drawWindowBackground(") < body.index("drawProfileHistogram(")
-    assert body.index("drawProfileHistogram(") < body.index("drawWindowLevels(")
+    assert body.index("drawProfileHistogram(") < body.index("drawVolumeProfileLine(")
+    assert body.index("drawVolumeProfileLine(") < body.index("drawWindowLevels(")
 
 
 def test_shape_labels_avoid_stacking_on_each_other():
@@ -384,8 +402,20 @@ def test_the_app_wires_the_router():
     assert "_build_market_profile_router(" in src
 
 
+def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
+    js = APP_JS.read_text(encoding="utf-8")
+    assert "function start()" in js
+    assert "load();" in js
+    assert "Chart bridge can miss the ready event" in js or "Auto-load immediately" in js
+    html = PAGE_HTML.read_text(encoding="utf-8")
+    assert 'value="30" selected' in html
+    assert "Chart wird geladen" in html
+    assert "Zeitraum wählen und" not in html
+
+
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
+    assert ASSET_V == "mp-2"
 
 
 # ----------------------------------------------------------- live smoke test
@@ -419,10 +449,16 @@ def test_a_real_day_anchored_request_returns_usable_profiles():
     assert out["meta"]["shape_unvalidated"] is True
 
     first = out["profiles"][0]
-    va = first["value_area"]
+    assert first.get("dual_contract_version") == "market_profile_v1_dual_tpo_volume_v1"
+    assert "tpo" in first and "volume" in first
+    tpo_va = first["tpo"]["value_area"]
+    vol_va = first["volume"]["value_area"]
     assert first["price_low"] < first["price_high"]
-    assert va["val"] <= va["poc"] <= va["vah"]
-    assert first["bins"], "histogram needs bins"
+    assert tpo_va["val"] <= tpo_va["poc"] <= tpo_va["vah"]
+    assert vol_va["val"] <= vol_va["poc"] <= vol_va["vah"]
+    assert first["tpo"]["bins"], "TPO histogram needs tpo bins"
+    assert first["volume"]["bins"], "volume line needs volume bins"
+    assert "bins" not in first or first.get("bins") is None
     assert first["shape"]["kind"]
     assert "naked_poc" in first
 

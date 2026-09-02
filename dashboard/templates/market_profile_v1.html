@@ -54,9 +54,9 @@
                     <label class="mp-label" for="mpDays">ZEITRAUM</label>
                     <select id="mpDays" class="mp-select">
                         <option value="3">3 Tage</option>
-                        <option value="7" selected>7 Tage</option>
+                        <option value="7">7 Tage</option>
                         <option value="14">14 Tage</option>
-                        <option value="30">30 Tage</option>
+                        <option value="30" selected>30 Tage</option>
                         <option value="custom">benutzerdefiniert</option>
                     </select>
                 </div>
@@ -85,6 +85,7 @@
                 <div class="mp-group">
                     <span class="mp-label">PROFIL</span>
                     <label class="mp-check"><input type="checkbox" id="mpShowHistogram" checked> Histogramm</label>
+                    <label class="mp-check"><input type="checkbox" id="mpShowVolumeLine" checked> Volumenlinie</label>
                     <label class="mp-check"><input type="checkbox" id="mpSplitBuySell" checked> Buy/Sell getrennt</label>
                     <label class="mp-label mp-inline" for="mpWidth">Breite</label>
                     <select id="mpWidth" class="mp-select mp-select-sm">
@@ -172,7 +173,7 @@
                             <div id="mpTooltip" class="mp-tooltip" hidden></div>
                         </div>
                     </div>
-                    <div id="mpEmpty" class="mp-empty">Zeitraum wählen und <em>Laden</em> drücken.</div>
+                    <div id="mpEmpty" class="mp-empty">Chart wird geladen …</div>
                 </div>
             </div>
 

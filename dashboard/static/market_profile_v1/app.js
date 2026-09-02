@@ -18,6 +18,7 @@
     poc: "#ef4444",
     valueArea: "#3b82f6",
     nakedPoc: "#f0b90b",
+    volumeLine: "rgba(255, 255, 255, 0.92)",
     hvn: "#a855f7",
     lvn: "#64748b",
     singlePrint: "rgba(239, 83, 80, 0.10)",
@@ -103,6 +104,7 @@
       end: $("mpEnd").value,
       timeframe: $("mpTimeframe").value,
       showHistogram: $("mpShowHistogram").checked,
+      showVolumeLine: $("mpShowVolumeLine") ? $("mpShowVolumeLine").checked : false,
       splitBuySell: $("mpSplitBuySell").checked,
       width: parseFloat($("mpWidth").value) || 0.45,
       showPoc: $("mpShowPoc").checked,
@@ -155,6 +157,7 @@
     setVal("mpValueAreaPct", s.valueAreaPct);
     setVal("mpTargetBins", s.targetBins);
     setChk("mpShowHistogram", s.showHistogram);
+    setChk("mpShowVolumeLine", s.showVolumeLine);
     setChk("mpSplitBuySell", s.splitBuySell);
     setChk("mpShowPoc", s.showPoc);
     setChk("mpShowValueArea", s.showValueArea);
@@ -210,17 +213,49 @@
   }
 
   function whenChartReady(cb) {
-    if (chartReady && syncChartRefs()) {
-      cb();
-      return;
-    }
-    window.__mpOnChartReady = function () {
+    var done = false;
+    function fire() {
+      if (done) return;
+      done = true;
       chartReady = true;
       syncChartRefs();
       bindChartSurface();
       cb();
+    }
+    if (chartReady && syncChartRefs()) {
+      fire();
+      return;
+    }
+    var prev = window.__mpOnChartReady;
+    window.__mpOnChartReady = function () {
+      if (typeof prev === "function") {
+        try { prev(); } catch (err) { /* ignore prior handler errors */ }
+      }
+      fire();
     };
-    if (window.__mpChartReady) window.__mpOnChartReady();
+    if (window.__mpChartReady) {
+      window.__mpOnChartReady();
+      return;
+    }
+    // Chart bridge can miss the ready event (script order / pane size).
+    // Fall back so auto-load is never stuck on the empty placeholder.
+    setTimeout(function () {
+      if (!done) fire();
+    }, 800);
+  }
+
+  function applyPayloadToChart(s) {
+    if (!payload) return false;
+    var api = chartApi();
+    if (!api || !api.setData) return false;
+    api.setData({
+      symbol: s.symbol,
+      timeframe: s.timeframe,
+      is_demo: false,
+      candles: payload.candles || []
+    });
+    api.setInteractionMode(toolMode());
+    return true;
   }
 
   function bindChartSurface() {
@@ -979,39 +1014,123 @@
     ctx.restore();
   }
 
-  function drawProfileHistogram(ctx, profile, span, s, region) {
-    var bins = profile.bins || [];
+  function profileTpo(profile) {
+    return profile && profile.tpo ? profile.tpo : null;
+  }
+
+  function profileVolume(profile) {
+    return profile && profile.volume ? profile.volume : null;
+  }
+
+  function drawTpoHistogram(ctx, profile, span, s, region) {
+    var tpo = profileTpo(profile);
+    var bins = (tpo && tpo.bins) || [];
+    if (!bins.length) return;
+
+    var slotWidth = Math.max(2, span.x1 - span.x0);
+    var barsWidth = slotWidth * s.width;
+    var maxCount = 0;
+    for (var i = 0; i < bins.length; i += 1) {
+      if (bins[i].tpo_count > maxCount) maxCount = bins[i].tpo_count;
+    }
+    if (maxCount <= 0) return;
+
+    for (var j = 0; j < bins.length; j += 1) {
+      var bin = bins[j];
+      if (!bin.tpo_count) continue;
+      var yTop = priceToY(bin.price_high);
+      var yBot = priceToY(bin.price_low);
+      if (yTop === null || yBot === null) continue;
+      var h = Math.max(1, yBot - yTop);
+      var full = (bin.tpo_count / maxCount) * barsWidth;
+      ctx.fillStyle = COLORS.total;
+      ctx.fillRect(span.x0, yTop, full, h);
+    }
+  }
+
+  function drawVolumeBuySellBars(ctx, profile, span, s, region) {
+    var vol = profileVolume(profile);
+    var bins = (vol && vol.bins) || [];
     if (!bins.length) return;
 
     var slotWidth = Math.max(2, span.x1 - span.x0);
     var barsWidth = slotWidth * s.width;
     var maxVol = 0;
     for (var i = 0; i < bins.length; i += 1) {
-      if (bins[i].volume > maxVol) maxVol = bins[i].volume;
+      var base = bins[i].base_volume || 0;
+      if (base > maxVol) maxVol = base;
     }
     if (maxVol <= 0) return;
 
     for (var j = 0; j < bins.length; j += 1) {
       var bin = bins[j];
-      if (!bin.volume) continue;
+      if (!bin.base_volume) continue;
       var yTop = priceToY(bin.price_high);
       var yBot = priceToY(bin.price_low);
       if (yTop === null || yBot === null) continue;
       var h = Math.max(1, yBot - yTop);
-      var full = (bin.volume / maxVol) * barsWidth;
-
-      if (s.splitBuySell) {
-        var buyW = (bin.buy_volume / maxVol) * barsWidth;
-        var sellW = (bin.sell_volume / maxVol) * barsWidth;
-        ctx.fillStyle = COLORS.buy;
-        ctx.fillRect(span.x0, yTop, buyW, h);
-        ctx.fillStyle = COLORS.sell;
-        ctx.fillRect(span.x0 + buyW, yTop, sellW, h);
-      } else {
-        ctx.fillStyle = COLORS.total;
-        ctx.fillRect(span.x0, yTop, full, h);
-      }
+      var buyW = ((bin.buy_volume || 0) / maxVol) * barsWidth;
+      var sellW = ((bin.sell_volume || 0) / maxVol) * barsWidth;
+      ctx.fillStyle = COLORS.buy;
+      ctx.fillRect(span.x0, yTop, buyW, h);
+      ctx.fillStyle = COLORS.sell;
+      ctx.fillRect(span.x0 + buyW, yTop, sellW, h);
     }
+  }
+
+  function drawProfileHistogram(ctx, profile, span, s, region) {
+    drawTpoHistogram(ctx, profile, span, s, region);
+    if (s.splitBuySell) {
+      drawVolumeBuySellBars(ctx, profile, span, s, region);
+    }
+  }
+
+  /* Volume profile as a single white curve: Y follows price (top→bottom),
+   * X bulges right where traded volume was high. */
+  function drawVolumeProfileLine(ctx, profile, span, s, region) {
+    var vol = profileVolume(profile);
+    var bins = (vol && vol.bins) || [];
+    if (!bins.length) return;
+
+    var slotWidth = Math.max(2, span.x1 - span.x0);
+    var curveWidth = slotWidth * s.width;
+    var maxVol = 0;
+    for (var i = 0; i < bins.length; i += 1) {
+      var base = bins[i].base_volume || 0;
+      if (base > maxVol) maxVol = base;
+    }
+    if (maxVol <= 0) return;
+
+    var sorted = bins.slice().sort(function (a, b) {
+      var midA = a.price_high + a.price_low;
+      var midB = b.price_high + b.price_low;
+      return midB - midA;
+    });
+
+    var points = [];
+    for (var j = 0; j < sorted.length; j += 1) {
+      var bin = sorted[j];
+      var yTop = priceToY(bin.price_high);
+      var yBot = priceToY(bin.price_low);
+      if (yTop === null || yBot === null) continue;
+      var y = (yTop + yBot) / 2;
+      var x = span.x0 + ((bin.base_volume || 0) / maxVol) * curveWidth;
+      points.push({ x: x, y: y });
+    }
+    if (points.length < 2) return;
+
+    ctx.save();
+    ctx.strokeStyle = COLORS.volumeLine;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (var k = 1; k < points.length; k += 1) {
+      ctx.lineTo(points[k].x, points[k].y);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   /* Shaded areas belong strictly inside their own window. Extending a
@@ -1019,7 +1138,8 @@
    * neighbours, and with a week on screen the candles disappear under the
    * stack. Only the level lines reach forward, and only faintly. */
   function drawWindowBackground(ctx, profile, span, s) {
-    var va = profile.value_area || {};
+    var tpo = profileTpo(profile);
+    var va = (tpo && tpo.value_area) || profile.value_area || {};
 
     if (s.showValueArea && va.vah != null && va.val != null) {
       var yH = priceToY(va.vah);
@@ -1031,7 +1151,9 @@
     }
 
     if (s.showSinglePrints) {
-      var ranges = (profile.nodes && profile.nodes.single_print_ranges) || [];
+      var vol = profileVolume(profile);
+      var ranges = (vol && vol.nodes && vol.nodes.single_print_ranges) ||
+        (profile.nodes && profile.nodes.single_print_ranges) || [];
       for (var i = 0; i < ranges.length; i += 1) {
         var yA = priceToY(ranges[i][1]);
         var yB = priceToY(ranges[i][0]);
@@ -1055,7 +1177,9 @@
   }
 
   function drawWindowLevels(ctx, profile, span, s, region) {
-    var va = profile.value_area || {};
+    var tpo = profileTpo(profile);
+    var va = (tpo && tpo.value_area) || profile.value_area || {};
+    var vol = profileVolume(profile);
     var extend = s.extendLevels;
 
     if (s.showValueArea && va.vah != null && va.val != null) {
@@ -1066,7 +1190,8 @@
     }
 
     if (s.showHvn) {
-      var hvn = (profile.nodes && profile.nodes.hvn) || [];
+      var hvn = (vol && vol.nodes && vol.nodes.hvn) ||
+        (profile.nodes && profile.nodes.hvn) || [];
       for (var k = 0; k < hvn.length; k += 1) {
         var yv = priceToY(hvn[k]);
         if (yv !== null) hLine(ctx, span.x0, span.x1, yv, COLORS.hvn, [2, 3], 1);
@@ -1074,7 +1199,8 @@
     }
 
     if (s.showLvn) {
-      var lvn = (profile.nodes && profile.nodes.lvn) || [];
+      var lvn = (vol && vol.nodes && vol.nodes.lvn) ||
+        (profile.nodes && profile.nodes.lvn) || [];
       for (var m = 0; m < lvn.length; m += 1) {
         var yl = priceToY(lvn[m]);
         if (yl !== null) hLine(ctx, span.x0, span.x1, yl, COLORS.lvn, [2, 3], 1);
@@ -1186,6 +1312,12 @@
       }
     }
 
+    if (s.showVolumeLine) {
+      for (v = 0; v < visible.length; v += 1) {
+        drawVolumeProfileLine(ctx, visible[v].profile, visible[v].span, s, region);
+      }
+    }
+
     for (v = 0; v < visible.length; v += 1) {
       drawWindowLevels(ctx, visible[v].profile, visible[v].span, s, region);
     }
@@ -1233,15 +1365,29 @@
     }
 
     var p = hit.profile;
-    var va = p.value_area || {};
+    var tpo = profileTpo(p);
+    var vol = profileVolume(p);
+    var tpoVa = (tpo && tpo.value_area) || {};
+    var volVa = (vol && vol.value_area) || {};
     var shape = p.shape || {};
     var price = candleSeries.coordinateToPrice(y);
-    var bin = null;
-    if (price !== null && price !== undefined && p.bins) {
-      for (var j = 0; j < p.bins.length; j += 1) {
-        if (price >= p.bins[j].price_low && price < p.bins[j].price_high) {
-          bin = p.bins[j];
-          break;
+    var tpoBin = null;
+    var volBin = null;
+    if (price !== null && price !== undefined) {
+      if (tpo && tpo.bins) {
+        for (var j = 0; j < tpo.bins.length; j += 1) {
+          if (price >= tpo.bins[j].price_low && price < tpo.bins[j].price_high) {
+            tpoBin = tpo.bins[j];
+            break;
+          }
+        }
+      }
+      if (vol && vol.bins) {
+        for (var k = 0; k < vol.bins.length; k += 1) {
+          if (price >= vol.bins[k].price_low && price < vol.bins[k].price_high) {
+            volBin = vol.bins[k];
+            break;
+          }
         }
       }
     }
@@ -1250,14 +1396,22 @@
       "<strong>" + p.window.label + "</strong>",
       "Shape: <span style=\"color:" + (SHAPE_COLORS[shape.kind] || "#d1d4dc") + "\">" +
         (shape.kind || "-") + "</span>*",
-      "POC " + fmtPrice(va.poc) + " · VAH " + fmtPrice(va.vah) + " · VAL " + fmtPrice(va.val),
+      "TPO POC " + fmtPrice(tpoVa.poc) + " · VAH " + fmtPrice(tpoVa.vah) + " · VAL " + fmtPrice(tpoVa.val),
+      "Vol VPOC " + fmtPrice(volVa.poc) + " · VVAH " + fmtPrice(volVa.vah) + " · VVAL " + fmtPrice(volVa.val),
       "Range " + fmtPrice(p.price_low) + " – " + fmtPrice(p.price_high),
       "Naked POC: " + (p.naked_poc === true ? "ja" : p.naked_poc === false ? "nein" : "–")
     ];
-    if (bin) {
+    if (tpoBin) {
       rows.push(
-        "— Bin " + fmtPrice(bin.price_low) + "–" + fmtPrice(bin.price_high) +
-          ": Vol " + fmtNum(bin.volume) + ", Δ " + fmtNum(bin.delta) + ", " + bin.trades + " Trades"
+        "— TPO Bin " + fmtPrice(tpoBin.price_low) + "–" + fmtPrice(tpoBin.price_high) +
+          ": count " + fmtNum(tpoBin.tpo_count)
+      );
+    }
+    if (volBin) {
+      rows.push(
+        "— Vol Bin " + fmtPrice(volBin.price_low) + "–" + fmtPrice(volBin.price_high) +
+          ": base " + fmtNum(volBin.base_volume) + ", Δ " + fmtNum(volBin.delta) +
+          ", " + (volBin.trades || 0) + " Trades"
       );
     }
 
@@ -1293,13 +1447,15 @@
 
   function renderLegend() {
     var items = [
-      ["POC", COLORS.poc, false],
-      ["VAH / VAL", COLORS.valueArea, true],
+      ["TPO POC", COLORS.poc, false],
+      ["TPO VAH / VAL", COLORS.valueArea, true],
       ["Naked POC", COLORS.nakedPoc, true],
-      ["HVN", COLORS.hvn, true],
-      ["LVN", COLORS.lvn, true],
+      ["Vol HVN", COLORS.hvn, true],
+      ["Vol LVN", COLORS.lvn, true],
       ["Buy-Volumen", COLORS.buy, false],
-      ["Sell-Volumen", COLORS.sell, false]
+      ["Sell-Volumen", COLORS.sell, false],
+      ["TPO Bracket", COLORS.total, false],
+      ["Volumenlinie", COLORS.volumeLine, true]
     ];
     $("mpLegend").innerHTML = items
       .map(function (it) {
@@ -1345,6 +1501,10 @@
 
     $("mpLoad").disabled = true;
     setStatus("lädt …", "busy");
+    if ($("mpEmpty")) {
+      $("mpEmpty").hidden = false;
+      $("mpEmpty").textContent = "Chart wird geladen …";
+    }
 
     fetch("/api/market-profile/profiles?" + params.toString(), {
       signal: ctrl.signal,
@@ -1358,21 +1518,16 @@
         if (!out.ok || !out.body || out.body.success !== true) {
           var msg = (out.body && (out.body.message || out.body.error)) || "Fehler";
           setStatus(msg, "error");
+          if ($("mpEmpty")) {
+            $("mpEmpty").hidden = false;
+            $("mpEmpty").textContent = msg;
+          }
           return;
         }
         payload = out.body;
         lastLoadRange = range;
         candleTimes = (payload.candles || []).map(function (c) { return c.time; });
-        var api = chartApi();
-        if (api && api.setData) {
-          api.setData({
-            symbol: s.symbol,
-            timeframe: s.timeframe,
-            is_demo: false,
-            candles: payload.candles || []
-          });
-          api.setInteractionMode(toolMode());
-        }
+        applyPayloadToChart(s);
         $("mpEmpty").hidden = true;
         renderLegend();
         scheduleDraw();
@@ -1391,11 +1546,18 @@
               " · " + (payload.candles || []).length + " Kerzen" +
               (payload.cached ? " · cached" : "")
           );
+          // Chart may have become ready after the payload arrived.
+          if (applyPayloadToChart(s)) scheduleDraw();
         });
       })
       .catch(function (err) {
         if (err && err.name === "AbortError") return;
-        setStatus("Netzwerkfehler: " + (err && err.message ? err.message : err), "error");
+        var msg = "Netzwerkfehler: " + (err && err.message ? err.message : err);
+        setStatus(msg, "error");
+        if ($("mpEmpty")) {
+          $("mpEmpty").hidden = false;
+          $("mpEmpty").textContent = msg;
+        }
       })
       .then(function () {
         if (inflight === ctrl) inflight = null;
@@ -1428,11 +1590,13 @@
     // Drawing-only toggles never refetch: the payload already carries every
     // level, so a redraw is enough and costs no ClickHouse work.
     [
-      "mpShowHistogram", "mpSplitBuySell", "mpWidth", "mpShowPoc", "mpShowValueArea",
+      "mpShowHistogram", "mpShowVolumeLine", "mpSplitBuySell", "mpWidth", "mpShowPoc", "mpShowValueArea",
       "mpShowHvn", "mpShowLvn", "mpShowSinglePrints", "mpShowNakedPoc",
       "mpExtendLevels", "mpShowShape"
     ].forEach(function (id) {
-      $(id).addEventListener("change", function () {
+      var el = $(id);
+      if (!el) return;
+      el.addEventListener("change", function () {
         persistSettings();
         scheduleDraw();
       });
@@ -1454,6 +1618,8 @@
 
   function start() {
     restoreSettings();
+    // First visit / stale localStorage: keep 30d as the working default.
+    if (!$("mpDays").value) $("mpDays").value = "30";
     syncConditionalControls();
     bindChartChrome();
     bind();
@@ -1463,8 +1629,14 @@
       applyWorkspace(snap);
     }).catch(function () { /* workspace optional */ });
     whenChartReady(function () {
-      load();
+      if (payload) {
+        applyPayloadToChart(readSettings());
+        scheduleDraw();
+      }
     });
+    // Auto-load immediately with the default/persisted range (do not wait for
+    // the chart bridge — that left the empty placeholder stuck forever).
+    load();
   }
 
   if (document.readyState === "loading") {

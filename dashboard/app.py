@@ -2603,7 +2603,8 @@ async def timeout_and_error_handler(request: Request, call_next):
         
         try:
             # Führe Request mit Timeout aus
-            response = await asyncio.wait_for(call_next(request), timeout=150.0)  # 150s für VPN/Netzwerk-Probleme
+            req_timeout = 300.0 if request.url.path.startswith("/api/market-profile/") else 150.0
+            response = await asyncio.wait_for(call_next(request), timeout=req_timeout)
             
             # Request erfolgreich → reset Circuit Breaker (nur bei erfolgreichen Responses)
             if response.status_code < 400:
@@ -2625,7 +2626,8 @@ async def timeout_and_error_handler(request: Request, call_next):
             
             return response
         except asyncio.TimeoutError:
-            logger.error(f"⏱️ Timeout für {endpoint} nach 150s")
+            req_timeout = 300.0 if request.url.path.startswith("/api/market-profile/") else 150.0
+            logger.error(f"⏱️ Timeout für {endpoint} nach {req_timeout:.0f}s")
             if not _is_circuit_breaker_exempt(request.url.path):
                 # Erhöhe Circuit Breaker Failures
                 if endpoint not in circuit_breaker:
@@ -2640,7 +2642,7 @@ async def timeout_and_error_handler(request: Request, call_next):
                 status_code=504,
                 content={
                     "success": False,
-                    "error": "Request timeout (150s)",
+                    "error": f"Request timeout ({req_timeout:.0f}s)",
                     "endpoint": endpoint
                 }
             )

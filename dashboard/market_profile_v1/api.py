@@ -22,6 +22,7 @@ from .service import (
     load_profiles,
     session_names,
 )
+from .dual_profile import DUAL_CONTRACT_VERSION
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -72,6 +73,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "limits": {"max_windows": MAX_WINDOWS, "max_range_days": MAX_RANGE_DAYS},
             "shape_unvalidated": True,
             "shape_notice": SHAPE_NOTICE,
+            "dual_contract_version": DUAL_CONTRACT_VERSION,
+            "tpo_contract": "tpo_profile_facts_v1",
+            "volume_contract": "volume_profile_facts_v1",
         }
 
     @router.get("/api/market-profile/profiles")
