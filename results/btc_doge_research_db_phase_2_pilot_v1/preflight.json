@@ -1,0 +1,59 @@
+{
+  "status": "PASS_FOR_COVERAGE_AUDIT",
+  "ddl_executed": false,
+  "dml_executed": false,
+  "repository": {
+    "branch": "feature/btc-doge-research-db",
+    "head": "48bf56fbff1e82abee0c8ff09a95a1701df10965",
+    "tracked_worktree_at_start": "clean",
+    "preexisting_untracked_preserved": true,
+    "prior_phase2_attempt_found": false
+  },
+  "runtime": {
+    "research_or_backfill_processes": [],
+    "pytest_processes": [],
+    "collector_pids_observed": [3946369, 147111, 1661773],
+    "disk_free_gib": 372,
+    "disk_used_pct": 58
+  },
+  "clickhouse": {
+    "reachable": true,
+    "version": "26.7.1.1315",
+    "frozen_target_database": "btc_doge_research",
+    "target_database_exists": true,
+    "market_research_exists": false,
+    "market_research_will_be_created": false,
+    "existing_phase1_batches": 2,
+    "existing_phase1_tables": 13,
+    "preserved_invalid_timezone_tables": 2,
+    "phase1_pilot_rows_exist": true,
+    "account_rights_exclusive_to_target": false,
+    "application_write_guard_required": true,
+    "credentials_source": "dashboard/research_charts/clickhouse_config.py",
+    "credentials_embedded_in_report": false
+  },
+  "recovery_answers": {
+    "research_database_already_exists": true,
+    "phase1_tables_only_in_code": [],
+    "pilot_data_already_written": true,
+    "preexisting_tracked_changes": [],
+    "reusable_phase1_contracts": [
+      "TARGET_DATABASE",
+      "source readers",
+      "OB200 parser",
+      "trade and liquidation transforms",
+      "source fingerprints",
+      "batch conflict guards",
+      "compact-array storage"
+    ],
+    "competing_schema_design": "market_research conflicts with frozen btc_doge_research; frozen target wins",
+    "rights_sufficient": true,
+    "rights_overbroad": true
+  },
+  "candidate_day": {
+    "leading_candidate": "2026-08-26",
+    "frozen": false,
+    "reason": "OI 17280/17280 and candles 1440/1440 for both symbols",
+    "remaining_gate": "full 48-segment OB200 replay and fingerprint audit"
+  }
+}

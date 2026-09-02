@@ -1,0 +1,31 @@
+{
+  "ordering_ambiguous": 4,
+  "ordering_ambiguous_buckets": [
+    [
+      "BTCUSDT",
+      "2026-08-25T12:00:14Z"
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-25T12:00:14Z"
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-28T15:00:06Z"
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-28T15:00:12Z"
+    ]
+  ],
+  "pilot_semantics": "raw_ob200_event_time_eos_v1",
+  "receive_time_exact": 1796,
+  "root_cause": [
+    "EVENT_TIME_VS_RECEIVE_TIME",
+    "ASOF_BOUNDARY_DIFFERENCE"
+  ],
+  "samples": 1800,
+  "silent_producer_mix": false,
+  "source_gaps": 0,
+  "status": "PASS"
+}

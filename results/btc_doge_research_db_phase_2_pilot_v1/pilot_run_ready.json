@@ -1,0 +1,42 @@
+{
+  "batch_id": "phase2:20260826:99aebc6d53248407",
+  "build_id": "99aebc6d532484070efa9ae8737217aed88368c64691d6023425095d08d6aa4a",
+  "counts": {
+    "research_liquidation_buckets_500ms": 633,
+    "research_liquidation_events": 933,
+    "research_ob200_snapshots_1s": 172800,
+    "research_open_interest_observations": 34560,
+    "research_profile_levels_session": 12,
+    "research_public_trade_buckets_100ms": 214956,
+    "research_public_trade_buckets_1s": 99251,
+    "research_public_trade_buckets_500ms": 136571,
+    "research_tpo_bracket_ranges_30m": 42,
+    "research_tpo_profile_bins_session": 241,
+    "research_volume_profile_bins_session": 241
+  },
+  "cpu_seconds": 0.536237028,
+  "database": "btc_doge_research",
+  "ddl_count": 14,
+  "liquidation_events": 933,
+  "metadata_rows": 0,
+  "ob_summary": {
+    "recovered": "already present"
+  },
+  "output_fingerprint": "e7bbe6bf463b52e763ca2d3638ad802e27ad303a1afefbb00514166b7277db7c",
+  "peak_rss_kib": 118920,
+  "profile_rows": 12,
+  "profiles": {
+    "recovered": "already present"
+  },
+  "status": "READY",
+  "timings": {
+    "ddl_seconds": 0.00791195803321898,
+    "liquidation_seconds": 0.004305518930777907,
+    "metadata_seconds": 0.0023811350110918283,
+    "ob_seconds": 0.009841241175308824,
+    "oi_seconds": 0.0022535750176757574,
+    "profile_seconds": 0.0018216141033917665,
+    "trade_bucket_seconds": 0.008049017051234841
+  },
+  "wall_seconds": 0.3106186999939382
+}

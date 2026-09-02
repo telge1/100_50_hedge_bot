@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "focused_and_relevant_tests": {
+    "passed": 118,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_seconds": 0.35
+  },
+  "lints": "PASS",
+  "git_diff_check": "PASS",
+  "covered": [
+    "producer lineage",
+    "queue_full incomplete",
+    "no carry across terminal",
+    "event-time versus receive-time",
+    "ORDERING_AMBIGUOUS",
+    "trade bucket conservation",
+    "liquidation mapping and bankruptcy labels",
+    "OI without interpolation",
+    "genuine TPO and separate volume profile",
+    "OB integer ticks and array order",
+    "DDL idempotency",
+    "DML idempotent skip",
+    "batch READY gate",
+    "JSON finite values"
+  ]
+}

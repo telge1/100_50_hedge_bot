@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "writes_outside_btc_doge_research": 0,
+  "research_write_queries_audited": 188,
+  "market_research_created": false,
+  "source_database_changes": "none",
+  "orderbook_deltas_queries_or_repairs": "none",
+  "collector_changes": "none",
+  "collector_restarts": "none",
+  "dashboard_changes": "none",
+  "live_bot_changes": "none",
+  "trading_rule_changes": "none",
+  "watcher_started": false,
+  "full_history_backfill_started": false,
+  "symbols": ["BTCUSDT", "DOGEUSDT"],
+  "utc_days_loaded": ["2026-08-26"],
+  "collector_pids_before": [147111, 1661773, 3946369],
+  "collector_pids_after": [147111, 1661773, 3946369],
+  "disk_free_before_gib": 372,
+  "disk_free_after_gib": 371,
+  "commit": "none",
+  "push": "none"
+}

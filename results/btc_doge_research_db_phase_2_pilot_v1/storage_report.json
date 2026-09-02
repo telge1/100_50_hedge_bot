@@ -1,0 +1,203 @@
+{
+  "full_history_projection": {
+    "basis": "Phase-1 inventory: approximately 210 hours of raw OB200",
+    "assumed_days": 8.75,
+    "projected_bytes": 916078450,
+    "status": "LINEAR_ESTIMATE_NOT_CAPACITY_GUARANTEE"
+  },
+  "pilot_phase2_compressed_bytes": 104694680,
+  "projection_30_days_bytes": 3140840400,
+  "projection_90_days_bytes": 9422521200,
+  "projection_assumption": "linear from one observed day; workload and volatility may change compression",
+  "tables": [
+    {
+      "compressed_bytes": 1611,
+      "compression_ratio": 2.419615145872129,
+      "rows": 10,
+      "table": "research_batch_runs",
+      "uncompressed_bytes": 3898
+    },
+    {
+      "compressed_bytes": 2317,
+      "compression_ratio": 0.7419076391886059,
+      "rows": 6,
+      "table": "research_coverage",
+      "uncompressed_bytes": 1719
+    },
+    {
+      "compressed_bytes": 948,
+      "compression_ratio": 1.1940928270042195,
+      "rows": 4,
+      "table": "research_data_quality_events",
+      "uncompressed_bytes": 1132
+    },
+    {
+      "compressed_bytes": 1449,
+      "compression_ratio": 0.583160800552105,
+      "rows": 2,
+      "table": "research_ingestion_batches",
+      "uncompressed_bytes": 845
+    },
+    {
+      "compressed_bytes": 16761,
+      "compression_ratio": 5.488574667382615,
+      "rows": 633,
+      "table": "research_liquidation_buckets_500ms",
+      "uncompressed_bytes": 91994
+    },
+    {
+      "compressed_bytes": 51391,
+      "compression_ratio": 3.955420209764356,
+      "rows": 997,
+      "table": "research_liquidation_events",
+      "uncompressed_bytes": 203273
+    },
+    {
+      "compressed_bytes": 17075,
+      "compression_ratio": 2.398477306002928,
+      "rows": 105,
+      "table": "research_market_1m",
+      "uncompressed_bytes": 40954
+    },
+    {
+      "compressed_bytes": 7174,
+      "compression_ratio": 3.9269584611095625,
+      "rows": 105,
+      "table": "research_market_1m_invalid_timezone_v0",
+      "uncompressed_bytes": 28172
+    },
+    {
+      "compressed_bytes": 260891,
+      "compression_ratio": 7.796018260499595,
+      "rows": 6300,
+      "table": "research_market_1s",
+      "uncompressed_bytes": 2033911
+    },
+    {
+      "compressed_bytes": 132668,
+      "compression_ratio": 10.43497301534658,
+      "rows": 6300,
+      "table": "research_market_1s_invalid_timezone_v0",
+      "uncompressed_bytes": 1384387
+    },
+    {
+      "compressed_bytes": 82661769,
+      "compression_ratio": 20.57021436354695,
+      "rows": 172800,
+      "table": "research_ob200_snapshots_1s",
+      "uncompressed_bytes": 1700370308
+    },
+    {
+      "compressed_bytes": 880592,
+      "compression_ratio": 5.417167087595618,
+      "rows": 34560,
+      "table": "research_open_interest_observations",
+      "uncompressed_bytes": 4770314
+    },
+    {
+      "compressed_bytes": 402162,
+      "compression_ratio": 4.162056584162601,
+      "rows": 6300,
+      "table": "research_orderbook_1s",
+      "uncompressed_bytes": 1673821
+    },
+    {
+      "compressed_bytes": 22614,
+      "compression_ratio": 47.05806137790749,
+      "rows": 8000,
+      "table": "research_orderbook_levels_pilot",
+      "uncompressed_bytes": 1064171
+    },
+    {
+      "compressed_bytes": 21562677,
+      "compression_ratio": 26.352285200951627,
+      "rows": 56414,
+      "table": "research_orderbook_ob200_snapshots",
+      "uncompressed_bytes": 568225814
+    },
+    {
+      "compressed_bytes": 1578,
+      "compression_ratio": 0.5766793409378961,
+      "rows": 2,
+      "table": "research_pipeline_state",
+      "uncompressed_bytes": 910
+    },
+    {
+      "compressed_bytes": 1589,
+      "compression_ratio": 1.0427942101950913,
+      "rows": 4,
+      "table": "research_producer_lineage",
+      "uncompressed_bytes": 1657
+    },
+    {
+      "compressed_bytes": 1493,
+      "compression_ratio": 1.4139316811788345,
+      "rows": 12,
+      "table": "research_profile_levels_session",
+      "uncompressed_bytes": 2111
+    },
+    {
+      "compressed_bytes": 9505873,
+      "compression_ratio": 4.432429299234274,
+      "rows": 214956,
+      "table": "research_public_trade_buckets_100ms",
+      "uncompressed_bytes": 42134110
+    },
+    {
+      "compressed_bytes": 5024999,
+      "compression_ratio": 3.8716011684778446,
+      "rows": 99251,
+      "table": "research_public_trade_buckets_1s",
+      "uncompressed_bytes": 19454792
+    },
+    {
+      "compressed_bytes": 6576165,
+      "compression_ratio": 4.070749593418048,
+      "rows": 136571,
+      "table": "research_public_trade_buckets_500ms",
+      "uncompressed_bytes": 26769921
+    },
+    {
+      "compressed_bytes": 7217342,
+      "compression_ratio": 2.375487956646644,
+      "rows": 85013,
+      "table": "research_public_trades",
+      "uncompressed_bytes": 17144709
+    },
+    {
+      "compressed_bytes": 360,
+      "compression_ratio": 0.6833333333333333,
+      "rows": 1,
+      "table": "research_schema_versions",
+      "uncompressed_bytes": 246
+    },
+    {
+      "compressed_bytes": 2831,
+      "compression_ratio": 0.7795831861533027,
+      "rows": 4,
+      "table": "research_source_files",
+      "uncompressed_bytes": 2207
+    },
+    {
+      "compressed_bytes": 3395,
+      "compression_ratio": 2.2235640648011783,
+      "rows": 42,
+      "table": "research_tpo_bracket_ranges_30m",
+      "uncompressed_bytes": 7549
+    },
+    {
+      "compressed_bytes": 5971,
+      "compression_ratio": 6.049740411991292,
+      "rows": 241,
+      "table": "research_tpo_profile_bins_session",
+      "uncompressed_bytes": 36123
+    },
+    {
+      "compressed_bytes": 17662,
+      "compression_ratio": 3.0127958328615105,
+      "rows": 241,
+      "table": "research_volume_profile_bins_session",
+      "uncompressed_bytes": 53212
+    }
+  ]
+}

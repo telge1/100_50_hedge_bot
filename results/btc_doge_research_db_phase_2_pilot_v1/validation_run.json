@@ -1,0 +1,61 @@
+{
+  "parity": {
+    "status": "PASS",
+    "public_trades": "PASS",
+    "liquidations": "PASS",
+    "open_interest": "PASS",
+    "tpo": "PASS",
+    "volume_profile": "PASS",
+    "ob200_day": "PASS",
+    "ob_seam": "PASS_WITH_4_ORDERING_AMBIGUOUS",
+    "idempotency": "PASS"
+  },
+  "checks": {
+    "public_trade_raw_to_100ms_500ms_1s": "PASS",
+    "liquidation_count_and_dedup": "PASS",
+    "liquidation_execution_notional_null": "PASS",
+    "oi_original_frequency_no_interpolation": "PASS",
+    "ob_86400_unique_seconds_per_symbol": "PASS",
+    "ob_side_order_and_ticks": "PASS",
+    "batch_ready_exactly_once": "PASS",
+    "idempotent_second_run": "PASS"
+  },
+  "benchmarks": [
+    {
+      "name": "one_hour_trade_liq_oi",
+      "first_ms": 8.590287994593382,
+      "warm_ms": 6.1534440610557795,
+      "result_rows": 1,
+      "target_ms": 3000,
+      "status": "PASS",
+      "uses_final": false
+    },
+    {
+      "name": "profile_session",
+      "first_ms": 2.657464938238263,
+      "warm_ms": 1.8949429504573345,
+      "result_rows": 12,
+      "target_ms": 1000,
+      "status": "PASS",
+      "uses_final": false
+    },
+    {
+      "name": "ob200_3601_seconds",
+      "first_ms": 202.21319305710495,
+      "warm_ms": 227.08935500122607,
+      "result_rows": 3601,
+      "target_ms": 5000,
+      "status": "PASS",
+      "uses_final": false
+    },
+    {
+      "name": "combined_fight_input",
+      "first_ms": 29.117441968992352,
+      "warm_ms": 8.694349089637399,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS",
+      "uses_final": false
+    }
+  ]
+}

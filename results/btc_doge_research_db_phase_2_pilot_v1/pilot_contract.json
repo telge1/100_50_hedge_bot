@@ -1,0 +1,37 @@
+{
+  "contract_version": "btc_doge_research_phase_2_pilot_v1",
+  "build_id": "99aebc6d532484070efa9ae8737217aed88368c64691d6023425095d08d6aa4a",
+  "database": "btc_doge_research",
+  "symbols": ["BTCUSDT", "DOGEUSDT"],
+  "pilot_start": "2026-08-26T00:00:00Z",
+  "pilot_end": "2026-08-27T00:00:00Z",
+  "selection": "first fully proven common candidate day",
+  "selection_evidence": {
+    "candles_per_symbol": 1440,
+    "open_interest_observations_per_symbol": 17280,
+    "public_trades_present_and_trade_id_unique": true,
+    "liquidations_event_source_present": true,
+    "ob200_files_per_symbol": 24,
+    "btc_ob200_events": 863816,
+    "doge_ob200_events": 784972,
+    "ob200_u_gaps": 0,
+    "ob200_duplicate_u": 0,
+    "ob200_queue_overflow": 0,
+    "ob200_writer_errors": 0,
+    "queue_full_terminal_inside_day": false
+  },
+  "source_semantics_version": "raw_ob200_event_time_eos_v1",
+  "ob_reconstruction_clock": "EVENT_TIME_END_OF_SECOND",
+  "profile_session_resolver": "research.btc_ob_fight.volume_profile.profile_session_window",
+  "profile_session_start": "2026-08-26T13:30:00Z",
+  "profile_session_end": "2026-08-27T00:00:00Z",
+  "tpo_contract": "tpo_profile_facts_v1",
+  "volume_profile_contract": "volume_profile_facts_v1",
+  "day_zip_live_mix": false,
+  "ordering_ambiguous_buckets": [
+    ["BTCUSDT", "2026-08-25T12:00:14Z"],
+    ["DOGEUSDT", "2026-08-25T12:00:14Z"],
+    ["DOGEUSDT", "2026-08-28T15:00:06Z"],
+    ["DOGEUSDT", "2026-08-28T15:00:12Z"]
+  ]
+}

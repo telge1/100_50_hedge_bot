@@ -1,0 +1,44 @@
+{
+  "full_profile_and_ob_run_wall_seconds": 304.385,
+  "measurement_note": "full-run wall and peak observed during monitored recovery attempt",
+  "observed_peak_rss_kib": 460644,
+  "query_benchmarks": [
+    {
+      "first_ms": 8.590287994593382,
+      "name": "one_hour_trade_liq_oi",
+      "result_rows": 1,
+      "status": "PASS",
+      "target_ms": 3000,
+      "uses_final": false,
+      "warm_ms": 6.1534440610557795
+    },
+    {
+      "first_ms": 2.657464938238263,
+      "name": "profile_session",
+      "result_rows": 12,
+      "status": "PASS",
+      "target_ms": 1000,
+      "uses_final": false,
+      "warm_ms": 1.8949429504573345
+    },
+    {
+      "first_ms": 202.21319305710495,
+      "name": "ob200_3601_seconds",
+      "result_rows": 3601,
+      "status": "PASS",
+      "target_ms": 5000,
+      "uses_final": false,
+      "warm_ms": 227.08935500122607
+    },
+    {
+      "first_ms": 29.117441968992352,
+      "name": "combined_fight_input",
+      "result_rows": 1,
+      "status": "PASS",
+      "target_ms": 10000,
+      "uses_final": false,
+      "warm_ms": 8.694349089637399
+    }
+  ],
+  "source_manifest_and_u_scan_seconds": 8.727810892
+}

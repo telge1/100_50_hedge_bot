@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "batch_id": "phase2:20260826:99aebc6d53248407",
+  "build_id": "99aebc6d532484070efa9ae8737217aed88368c64691d6023425095d08d6aa4a",
+  "ready_rows": 1,
+  "second_run_behavior": "IDEMPOTENT_SKIP",
+  "batch_rows_before_final_noop_verification": 10,
+  "batch_rows_after_final_noop_verification": 10,
+  "fact_counts_changed": false,
+  "additional_ob_snapshots": 0,
+  "additional_profiles": 0,
+  "additional_volumes": 0,
+  "output_fingerprint": "e7bbe6bf463b52e763ca2d3638ad802e27ad303a1afefbb00514166b7277db7c",
+  "recovery_attempt_rows": "preserved audit history; unique by batch_id, started_at and status",
+  "background_merge_required": false,
+  "final_required": false
+}

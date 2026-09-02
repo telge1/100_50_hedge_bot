@@ -1,0 +1,11 @@
+{
+  "idempotency": "PASS",
+  "liquidations": "PASS",
+  "ob200_day": "PASS",
+  "ob_seam": "PASS_WITH_4_ORDERING_AMBIGUOUS",
+  "open_interest": "PASS",
+  "public_trades": "PASS",
+  "status": "PASS",
+  "tpo": "PASS",
+  "volume_profile": "PASS"
+}

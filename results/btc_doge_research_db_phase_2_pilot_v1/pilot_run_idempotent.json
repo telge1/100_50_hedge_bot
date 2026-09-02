@@ -1,0 +1,17 @@
+{
+  "batch_id": "phase2:20260826:99aebc6d53248407",
+  "counts": {
+    "research_liquidation_buckets_500ms": 633,
+    "research_liquidation_events": 933,
+    "research_ob200_snapshots_1s": 172800,
+    "research_open_interest_observations": 34560,
+    "research_profile_levels_session": 12,
+    "research_public_trade_buckets_100ms": 214956,
+    "research_public_trade_buckets_1s": 99251,
+    "research_public_trade_buckets_500ms": 136571,
+    "research_tpo_bracket_ranges_30m": 42,
+    "research_tpo_profile_bins_session": 241,
+    "research_volume_profile_bins_session": 241
+  },
+  "status": "IDEMPOTENT_SKIP"
+}
