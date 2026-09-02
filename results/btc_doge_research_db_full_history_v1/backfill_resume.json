@@ -1,0 +1,17 @@
+{
+  "cpu_seconds": 52.687820194,
+  "eligible_symbol_days": 0,
+  "loaded": [],
+  "peak_rss_kib": 59508,
+  "pilot_batch_ready": false,
+  "status": "PARTIAL",
+  "storage_gate": {
+    "eligible_symbol_days": 0,
+    "expected_compressed_bytes": 0,
+    "free_gib": 371.31719970703125,
+    "min_reserve_gib": 20,
+    "pass": true
+  },
+  "timings": [],
+  "wall_seconds": 58.85579897882417
+}

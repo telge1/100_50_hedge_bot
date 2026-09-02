@@ -1,0 +1,102 @@
+{
+  "parity_status": "PASS",
+  "ready_batches": 1,
+  "benchmarks": [
+    {
+      "name": "ob200_btcusdt_0",
+      "first_ms": 191.10240507870913,
+      "warm_ms": 212.48554904013872,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_btcusdt_0",
+      "first_ms": 18.076046835631132,
+      "warm_ms": 7.488923845812678,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    },
+    {
+      "name": "ob200_btcusdt_1",
+      "first_ms": 180.85736501961946,
+      "warm_ms": 198.29577882774174,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_btcusdt_1",
+      "first_ms": 8.849537000060081,
+      "warm_ms": 14.404138084501028,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    },
+    {
+      "name": "ob200_btcusdt_2",
+      "first_ms": 172.11274802684784,
+      "warm_ms": 209.2316821217537,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_btcusdt_2",
+      "first_ms": 15.809972072020173,
+      "warm_ms": 7.286903914064169,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    },
+    {
+      "name": "ob200_dogeusdt_3",
+      "first_ms": 152.76749804615974,
+      "warm_ms": 179.48856204748154,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_dogeusdt_3",
+      "first_ms": 15.954633010551333,
+      "warm_ms": 7.221323903650045,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    },
+    {
+      "name": "ob200_dogeusdt_4",
+      "first_ms": 149.23887117765844,
+      "warm_ms": 177.81435907818377,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_dogeusdt_4",
+      "first_ms": 15.51723200827837,
+      "warm_ms": 7.4017951264977455,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    },
+    {
+      "name": "ob200_dogeusdt_5",
+      "first_ms": 154.15151114575565,
+      "warm_ms": 188.23520001024008,
+      "result_rows": 3600,
+      "target_ms": 5000,
+      "status": "PASS"
+    },
+    {
+      "name": "fight_input_dogeusdt_5",
+      "first_ms": 15.572162112221122,
+      "warm_ms": 7.023243932053447,
+      "result_rows": 1,
+      "target_ms": 10000,
+      "status": "PASS"
+    }
+  ]
+}

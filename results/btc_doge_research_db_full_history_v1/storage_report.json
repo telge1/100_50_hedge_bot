@@ -1,0 +1,166 @@
+{
+  "tables": [
+    {
+      "compressed_bytes": 1611,
+      "rows": 10,
+      "table": "research_batch_runs",
+      "uncompressed_bytes": 3898
+    },
+    {
+      "compressed_bytes": 2317,
+      "rows": 6,
+      "table": "research_coverage",
+      "uncompressed_bytes": 1719
+    },
+    {
+      "compressed_bytes": 948,
+      "rows": 4,
+      "table": "research_data_quality_events",
+      "uncompressed_bytes": 1132
+    },
+    {
+      "compressed_bytes": 1449,
+      "rows": 2,
+      "table": "research_ingestion_batches",
+      "uncompressed_bytes": 845
+    },
+    {
+      "compressed_bytes": 16761,
+      "rows": 633,
+      "table": "research_liquidation_buckets_500ms",
+      "uncompressed_bytes": 91994
+    },
+    {
+      "compressed_bytes": 51391,
+      "rows": 997,
+      "table": "research_liquidation_events",
+      "uncompressed_bytes": 203273
+    },
+    {
+      "compressed_bytes": 17075,
+      "rows": 105,
+      "table": "research_market_1m",
+      "uncompressed_bytes": 40954
+    },
+    {
+      "compressed_bytes": 7174,
+      "rows": 105,
+      "table": "research_market_1m_invalid_timezone_v0",
+      "uncompressed_bytes": 28172
+    },
+    {
+      "compressed_bytes": 260891,
+      "rows": 6300,
+      "table": "research_market_1s",
+      "uncompressed_bytes": 2033911
+    },
+    {
+      "compressed_bytes": 132668,
+      "rows": 6300,
+      "table": "research_market_1s_invalid_timezone_v0",
+      "uncompressed_bytes": 1384387
+    },
+    {
+      "compressed_bytes": 82661769,
+      "rows": 172800,
+      "table": "research_ob200_snapshots_1s",
+      "uncompressed_bytes": 1700370308
+    },
+    {
+      "compressed_bytes": 880592,
+      "rows": 34560,
+      "table": "research_open_interest_observations",
+      "uncompressed_bytes": 4770314
+    },
+    {
+      "compressed_bytes": 402162,
+      "rows": 6300,
+      "table": "research_orderbook_1s",
+      "uncompressed_bytes": 1673821
+    },
+    {
+      "compressed_bytes": 22614,
+      "rows": 8000,
+      "table": "research_orderbook_levels_pilot",
+      "uncompressed_bytes": 1064171
+    },
+    {
+      "compressed_bytes": 21562677,
+      "rows": 56414,
+      "table": "research_orderbook_ob200_snapshots",
+      "uncompressed_bytes": 568225814
+    },
+    {
+      "compressed_bytes": 1578,
+      "rows": 2,
+      "table": "research_pipeline_state",
+      "uncompressed_bytes": 910
+    },
+    {
+      "compressed_bytes": 1589,
+      "rows": 4,
+      "table": "research_producer_lineage",
+      "uncompressed_bytes": 1657
+    },
+    {
+      "compressed_bytes": 1493,
+      "rows": 12,
+      "table": "research_profile_levels_session",
+      "uncompressed_bytes": 2111
+    },
+    {
+      "compressed_bytes": 9505873,
+      "rows": 214956,
+      "table": "research_public_trade_buckets_100ms",
+      "uncompressed_bytes": 42134110
+    },
+    {
+      "compressed_bytes": 5024999,
+      "rows": 99251,
+      "table": "research_public_trade_buckets_1s",
+      "uncompressed_bytes": 19454792
+    },
+    {
+      "compressed_bytes": 6576165,
+      "rows": 136571,
+      "table": "research_public_trade_buckets_500ms",
+      "uncompressed_bytes": 26769921
+    },
+    {
+      "compressed_bytes": 7217342,
+      "rows": 85013,
+      "table": "research_public_trades",
+      "uncompressed_bytes": 17144709
+    },
+    {
+      "compressed_bytes": 360,
+      "rows": 1,
+      "table": "research_schema_versions",
+      "uncompressed_bytes": 246
+    },
+    {
+      "compressed_bytes": 2831,
+      "rows": 4,
+      "table": "research_source_files",
+      "uncompressed_bytes": 2207
+    },
+    {
+      "compressed_bytes": 3395,
+      "rows": 42,
+      "table": "research_tpo_bracket_ranges_30m",
+      "uncompressed_bytes": 7549
+    },
+    {
+      "compressed_bytes": 5971,
+      "rows": 241,
+      "table": "research_tpo_profile_bins_session",
+      "uncompressed_bytes": 36123
+    },
+    {
+      "compressed_bytes": 17662,
+      "rows": 241,
+      "table": "research_volume_profile_bins_session",
+      "uncompressed_bytes": 53212
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "contract_version": "btc_doge_research_full_history_v1",
+  "eligible_days_btc": [
+    "2026-08-26"
+  ],
+  "eligible_days_doge": [
+    "2026-08-26"
+  ],
+  "eligible_symbol_days": 2,
+  "excluded_symbol_days": 86,
+  "pilot_day": "2026-08-26",
+  "pilot_ready": 1
+}
