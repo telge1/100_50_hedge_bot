@@ -1,0 +1,19 @@
+already_imported_range,available_from_utc,available_to_utc,complete_days,complete_hours,data_outside_clickhouse,data_quality,data_type,duplicate_ranges,evidence_type,history_live_seam,history_source,known_gaps,live_source,resolution,source_of_truth_candidate,symbol
+2025-12-11..2026-09-02,2025-12-11,2026-09-02,YES,YES,NO,HIGH,candles_1m,NONE,query,N/A,live,NONE_PROVEN,live,1m,CH_CANDLES_1M,BTCUSDT
+2026-07-19..2026-09-02,2026-07-19,2026-09-02,NOT_PROVEN,NOT_PROVEN,NO,HIGH,public_trades,archive+live overlap Aug17-20,query,2026-08-20 canonical import boundary ESTIMATED,archive+live,pre_2026-07-19,live,ms,CH_PUBLIC_TRADES_CANONICAL,BTCUSDT
+2026-07-19..2026-08-28,2026-07-19,2026-08-28,NOT_PROVEN,NOT_PROVEN,NO,HIGH,orderbook_1s_agg,NONE,query,2026-08-28T16:26:23Z,history,post_2026-08-28,static,1s,CH_OB_FEATURES_1S_V2 history; FS_RAW post gap,BTCUSDT
+2026-08-24..2026-09-02,2026-08-24,2026-09-02,NOT_PROVEN,NOT_PROVEN,YES,HIGH,orderbook_raw_ob200,partial overlap with CH agg,manifest,2026-08-24T22:47:53Z,N/A,before_2026-08-24,live_archive,tick,FS_RAW_OB200_V3,BTCUSDT
+2026-08-18..2026-09-01,2026-08-18,2026-09-01,NOT_PROVEN,NOT_PROVEN,NO,MEDIUM,open_interest_5s,NONE,query,2026-08-18,open_interest_5m_history BTC only,collector_stale_since_2026-09-01,broken_live,5s,CH_OPEN_INTEREST_5S,BTCUSDT
+2026-08-18..2026-09-01,2026-08-18,2026-09-01,N/A_event,N/A_event,NO,HIGH,liquidations,NONE,query,N/A,N/A,sparse_not_gap,live,ms_event,CH_ALL_LIQUIDATIONS,BTCUSDT
+UNKNOWN..UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,NO,LOW,funding,NONE,NOT_PROVEN,UNKNOWN,ticker_samples,no_dedicated_table,NO,UNKNOWN,NONE_IN_CH,BTCUSDT
+on_demand..on_demand,on_demand,on_demand,N/A,N/A,NO,HIGH,tpo_volume_profile,N/A,code,N/A,public_trades,N/A,public_trades,session,derived from trades,BTCUSDT
+2026-08-31..2026-08-31,2026-08-31,2026-08-31,1h,1h,partial,MEDIUM,pool_wall_fight_facts,N/A,artifact,N/A,FS+CH,single_case,N/A,1s,recompute via processor,BTCUSDT
+2025-12-11..2026-09-02,2025-12-11,2026-09-02,YES,YES,NO,HIGH,candles_1m,NONE,query,N/A,live,NONE_PROVEN,live,1m,CH_CANDLES_1M,DOGEUSDT
+2026-07-19..2026-09-02,2026-07-19,2026-09-02,NOT_PROVEN,NOT_PROVEN,NO,HIGH,public_trades,archive+live overlap Aug17-20,query,2026-08-20 canonical import boundary ESTIMATED,archive+live,pre_2026-07-19,live,ms,CH_PUBLIC_TRADES_CANONICAL,DOGEUSDT
+2026-07-19..2026-08-28,2026-07-19,2026-08-28,NOT_PROVEN,NOT_PROVEN,NO,HIGH,orderbook_1s_agg,NONE,query,2026-08-28T16:26:23Z,history,post_2026-08-28,static,1s,CH_OB_FEATURES_1S_V2 history; FS_RAW post gap,DOGEUSDT
+2026-08-24..2026-09-02,2026-08-24,2026-09-02,NOT_PROVEN,NOT_PROVEN,YES,HIGH,orderbook_raw_ob200,partial overlap with CH agg,manifest,2026-08-24T22:47:53Z,N/A,before_2026-08-24,live_archive,tick,FS_RAW_OB200_V3,DOGEUSDT
+2026-08-18..2026-09-01,2026-08-18,2026-09-01,NOT_PROVEN,NOT_PROVEN,NO,MEDIUM,open_interest_5s,NONE,query,2026-08-18,open_interest_5m_history BTC only,collector_stale_since_2026-09-01,broken_live,5s,CH_OPEN_INTEREST_5S,DOGEUSDT
+2026-08-18..2026-09-01,2026-08-18,2026-09-01,N/A_event,N/A_event,NO,HIGH,liquidations,NONE,query,N/A,N/A,sparse_not_gap,live,ms_event,CH_ALL_LIQUIDATIONS,DOGEUSDT
+UNKNOWN..UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,NO,LOW,funding,NONE,NOT_PROVEN,UNKNOWN,ticker_samples,no_dedicated_table,NO,UNKNOWN,NONE_IN_CH,DOGEUSDT
+on_demand..on_demand,on_demand,on_demand,N/A,N/A,NO,HIGH,tpo_volume_profile,N/A,code,N/A,public_trades,N/A,public_trades,session,derived from trades,DOGEUSDT
+2026-08-31..2026-08-31,2026-08-31,2026-08-31,1h,1h,partial,MEDIUM,pool_wall_fight_facts,N/A,artifact,N/A,FS+CH,single_case,N/A,1s,recompute via processor,DOGEUSDT

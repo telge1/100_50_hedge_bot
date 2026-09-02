@@ -1,0 +1,69 @@
+{
+  "ticker_samples_cols": [
+    "exchange_ts",
+    "received_ts",
+    "symbol",
+    "last_price",
+    "mark_price",
+    "index_price",
+    "best_bid_price",
+    "best_ask_price",
+    "open_interest",
+    "open_interest_value",
+    "funding_rate",
+    "volume_24h",
+    "turnover_24h"
+  ],
+  "ticker_samples_error": "Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `ts` in scope SELECT min(ts), max(ts), count() FROM orderbook_analysis.ticker_samples WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)",
+  "ob_quality_flags_BTCUSDT": [
+    {
+      "flags": "",
+      "count": 3265024
+    },
+    {
+      "flags": "carried_forward",
+      "count": 35751
+    }
+  ],
+  "ob_quality_flags_DOGEUSDT": [
+    {
+      "flags": "",
+      "count": 3262468
+    },
+    {
+      "flags": "carried_forward",
+      "count": 36343
+    }
+  ],
+  "trades_by_source_BTCUSDT": [
+    {
+      "source": "archive",
+      "min": "2026-07-18T22:00:00.210000Z",
+      "max": "2026-08-20T21:59:59.950000Z",
+      "count": 42664080
+    },
+    {
+      "source": "live",
+      "min": "2026-08-17T09:23:49.896000Z",
+      "max": "2026-09-02T15:18:31.442000Z",
+      "count": 29813119
+    }
+  ],
+  "trades_by_source_DOGEUSDT": [
+    {
+      "source": "live",
+      "min": "2026-08-17T09:23:49.990000Z",
+      "max": "2026-09-02T15:18:30.133000Z",
+      "count": 7468281
+    },
+    {
+      "source": "archive",
+      "min": "2026-07-18T22:00:00.482000Z",
+      "max": "2026-08-20T21:59:55.161000Z",
+      "count": 6006642
+    }
+  ],
+  "oi_max_BTCUSDT": "2026-09-01T14:46:50Z",
+  "oi_max_DOGEUSDT": "2026-09-01T14:46:50Z",
+  "oa_tables_error": "forbidden SQL token detected"
+}

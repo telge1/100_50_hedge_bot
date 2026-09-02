@@ -1,0 +1,69 @@
+{
+  "blockers": [],
+  "open_configuration": [
+    {
+      "id": "OQ_PROCESSOR_INTERVAL",
+      "question": "Processor run interval (10-30s proposed)",
+      "derive_from": "ingest lag p99 ~6-15s for trades; OI collector latency",
+      "status": "OPEN"
+    },
+    {
+      "id": "OQ_OVERLAP_WINDOW",
+      "question": "Late-arrival overlap/reprocess window seconds",
+      "derive_from": "max observed trade ingest lag 14-15s + safety margin",
+      "status": "OPEN"
+    },
+    {
+      "id": "OQ_FINALIZATION_WATERMARK",
+      "question": "When is a 1s/1m bucket final?",
+      "derive_from": "max lag per source type; likely max(trade, oi, liq) + overlap",
+      "status": "OPEN"
+    },
+    {
+      "id": "OQ_TRADE_SEAM_CONFLICT",
+      "question": "archive vs live row conflict when trade_id matches but fields differ",
+      "derive_from": "overlap window 2026-08-17..2026-08-20 sample audit",
+      "status": "OPEN"
+    },
+    {
+      "id": "OQ_OI_COLLECTOR_GAP",
+      "question": "OI collector stopped ~2026-09-01T14:46:50Z — restart before Phase 1?",
+      "derive_from": "ops; not Phase 0 scope",
+      "status": "OPEN"
+    }
+  ],
+  "explicit_gaps": [
+    {
+      "id": "GAP_OB_AGG_POST_2026_08_28",
+      "description": "orderbook_features_1s_v2 ends 2026-08-28T16:26:23Z",
+      "mitigation": "Build research_orderbook_1s from FS ob200_v3 replay"
+    },
+    {
+      "id": "GAP_FS_OB_PRE_2026_08_24",
+      "description": "Raw ob200_v3 archive starts 2026-08-24T22:47:53Z",
+      "mitigation": "Use CH aggregate for 2026-07-19..2026-08-28; document discontinuity"
+    },
+    {
+      "id": "GAP_FUNDING",
+      "description": "No ClickHouse funding table for BTC/DOGE",
+      "mitigation": "Defer research_funding_events to Phase 2 or external import"
+    },
+    {
+      "id": "GAP_PUBLIC_TRADES_PRE_JUL19",
+      "description": "canonical trades start 2026-07-19",
+      "mitigation": "DOGE archive Jan-Feb 2026 separate import if needed"
+    },
+    {
+      "id": "GAP_ORDERBOOK_DELTAS",
+      "description": "orderbook_deltas broken/unattachable",
+      "mitigation": "Do not use; FS raw only"
+    }
+  ],
+  "not_proven": [
+    "Full-day completeness for public_trades before pilot scan",
+    "Ticker_samples current coverage for BTC/DOGE",
+    "OB1000 on-demand socket history persistence",
+    "Exact ReplacingMergeTree version column behavior on OI table",
+    "MySQL/InfluxDB presence — no references found in project configs"
+  ]
+}

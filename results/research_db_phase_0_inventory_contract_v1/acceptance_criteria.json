@@ -1,0 +1,76 @@
+{
+  "phase": 1,
+  "gates": {
+    "UTC_CONTRACT_PROVEN": {
+      "description": "All research tables store UTC DateTime64; bucket boundaries documented and tested",
+      "proof_required": ["unit tests", "pilot window parity audit"]
+    },
+    "SOURCE_PRIORITY_FROZEN": {
+      "description": "source_priority.json frozen after pilot parity",
+      "proof_required": ["signed manifest", "no open BLOCKER conflicts"]
+    },
+    "HISTORY_LIVE_SEAM_PROVEN": {
+      "description": "Trade archive/live overlap and OB aggregate/raw seam validated without silent duplication",
+      "proof_required": ["2026-08-17..20 trade_id parity", "2026-08-28 OB seam parity"]
+    },
+    "PUBLIC_TRADE_DEDUP_PROVEN": {
+      "description": "research_public_trades has exactly one row per trade_id per symbol",
+      "proof_required": ["count == uniqExact(trade_id) on pilot + 7d window"]
+    },
+    "LIQUIDATION_V1_PARITY_PROVEN": {
+      "description": "research_liquidation_events matches liquidation_flow_facts_v1 and all_liquidations dedup",
+      "proof_required": ["run parity vs run_018 golden hour", "side mapping audit"]
+    },
+    "ORDERBOOK_RECONSTRUCTION_PARITY_PROVEN": {
+      "description": "research_orderbook_1s matches raw replay mid/spread/imbalance within tolerance",
+      "proof_required": ["btc_raw_aggregate_parity pattern", "genuine_200 probes"]
+    },
+    "GENUINE_CARRIED_FORWARD_PRESERVED": {
+      "description": "Carried-forward seconds explicitly flagged; never indistinguishable from genuine",
+      "proof_required": ["quality_flags distribution preserved", "CF rate ~1% history baseline"]
+    },
+    "BACKFILL_IDEMPOTENT": {
+      "description": "Re-running same day batch yields identical row counts and checksums",
+      "proof_required": ["double-run hash compare on pilot day"]
+    },
+    "INCREMENTAL_IDEMPOTENT": {
+      "description": "Processor restart with overlap does not duplicate events",
+      "proof_required": ["kill/restart test on pilot symbol"]
+    },
+    "LATE_ARRIVAL_CORRECTION_PROVEN": {
+      "description": "Trades/OI arriving after watermark corrected in overlap window",
+      "proof_required": ["injected late row test or observed lag p99 + overlap reprocess"]
+    },
+    "COVERAGE_COMPLETE_OR_EXPLICITLY_GAPPED": {
+      "description": "research_coverage documents gaps; no silent fill except marked CF",
+      "proof_required": ["coverage table populated per source"]
+    },
+    "NO_HINDSIGHT_IN_LIVE_FACTS": {
+      "description": "research_market_1s/1m contain no PEAK/RECLAIM/HINDSIGHT phase fields",
+      "proof_required": ["schema lint", "phase_role audit"]
+    },
+    "POINT_QUERY_TARGET_MET": {
+      "description": "Single timestamp ±30m query completes in low seconds (benchmark Phase 1)",
+      "proof_required": ["performance_benchmark_plan execution"]
+    },
+    "WINDOW_QUERY_TARGET_MET": {
+      "description": "1h-1d backtest window queries meet targets",
+      "proof_required": ["benchmark SQL timings"]
+    },
+    "COLLECTOR_UNCHANGED": {
+      "description": "No modifications to live collectors or their configs",
+      "proof_required": ["git diff orderbook_analyse collector paths", "process audit"]
+    }
+  },
+  "invariants": [
+    "Every row has source and contract_version provenance",
+    "No invented position direction for OI or liquidations",
+    "No double liq-trade volume allocation in neutral facts",
+    "No strategy signals in neutral fact tables",
+    "Repeated processing yields identical results",
+    "Symbol failure isolation",
+    "Raw sources remain untouched",
+    "No NaN in API/JSON outputs",
+    "Gaps visible in research_coverage not silently filled"
+  ]
+}

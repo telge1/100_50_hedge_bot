@@ -1,0 +1,127 @@
+{
+  "contract_version": "research_db_source_priority_v0",
+  "frozen": false,
+  "symbols": ["BTCUSDT", "DOGEUSDT"],
+  "decisions": {
+    "candles": {
+      "primary_source": "signal_generator.candles_1m",
+      "fallback_source": "aggregate_from_research_public_trades_1m",
+      "historical_source": "signal_generator.candles_1m",
+      "live_source": "signal_generator.candles_1m",
+      "history_live_seam": "single table; filter is_closed=1; overlap not proven problematic",
+      "dedup_rule": "ReplacingMergeTree FINAL on (exchange,symbol,interval,open_time)",
+      "conflict_rule": "prefer is_closed=1 over open bar; never mix open and closed",
+      "rebuild_possible": true,
+      "reason": "Only persisted 1m candle table; complete 7d smoke; aligns with live collector",
+      "evidence": ["coverage query 2026-09-02", "smoke_candles_7d 100% complete"]
+    },
+    "public_trades": {
+      "primary_source": "orderbook_analysis.public_trades_canonical",
+      "fallback_source": "orderbook_analysis.public_trades_archive (DOGE Jan-Feb 2026 only)",
+      "historical_source": "public_trades_canonical source=archive",
+      "live_source": "public_trades_canonical source=live",
+      "history_live_seam": "2026-08-17..2026-08-20 overlap; dedup by trade_id; prefer live ingest_timestamp when duplicate trade_id (Phase 1 proof required)",
+      "dedup_rule": "uniq by trade_id; query with FINAL; no invented seq",
+      "conflict_rule": "identical trade_id -> single row; if price/size differ flag QUALITY_CONFLICT",
+      "rebuild_possible": true,
+      "reason": "Ms-level event time, proven dedup at FINAL, side=taker aggressor documented",
+      "evidence": ["dedup query duplicates=0", "loaders.py", "aggressor_efficiency_data_audit_v1"]
+    },
+    "orderbook_raw": {
+      "primary_source": "filesystem ob200_v3 hourly zst archives",
+      "fallback_source": "NONE for per-level",
+      "historical_source": "FS ob200_v3 from 2026-08-24; CH orderbook_deltas BLOCKED",
+      "live_source": "FS ob200_v3 live archive collector",
+      "history_live_seam": "2026-08-24T22:47:53Z archive start; pre-archive history NOT in FS",
+      "dedup_rule": "replay seq+u continuity; invalidate book on gap",
+      "conflict_rule": "raw event stream wins over aggregates",
+      "rebuild_possible": true,
+      "reason": "Only reproducible per-level SoT; orderbook_deltas unattached",
+      "evidence": ["raw_archive_inventory 211 segments", "ob_replay.py MutableBook"]
+    },
+    "orderbook_1s": {
+      "primary_source": "research_orderbook_1s (to be built)",
+      "fallback_source": "orderbook_analysis.orderbook_features_1s_v2 (history <= 2026-08-28)",
+      "historical_source": "orderbook_features_1s_v2 OR replay from FS",
+      "live_source": "replay FS ob200_v3 -> research_orderbook_1s",
+      "history_live_seam": "2026-08-28T16:26:23Z aggregate end; post-seam build from raw only",
+      "dedup_rule": "ReplacingMergeTree (symbol,bucket_time,contract_version) with processor_version",
+      "conflict_rule": "raw replay beats stale aggregate when both exist; mark quality_flags",
+      "rebuild_possible": true,
+      "reason": "Existing aggregate static and lacks unified genuine/CF contract for live era",
+      "evidence": ["aggregate_end_known", "quality_flags carried_forward ~1.08%"]
+    },
+    "orderbook_levels": {
+      "primary_source": "on-demand replay from FS ob200_v3",
+      "fallback_source": "research_orderbook_levels (Phase 2 optional)",
+      "historical_source": "FS replay",
+      "live_source": "FS replay",
+      "history_live_seam": "same as orderbook_raw",
+      "dedup_rule": "N/A event-level",
+      "conflict_rule": "do not persist levels until pool/wall research requires",
+      "rebuild_possible": true,
+      "reason": "Storage heavy; defer materialization until benchmark proves need",
+      "evidence": ["run_018 ob200_replay_probes genuine_200=true"]
+    },
+    "open_interest": {
+      "primary_source": "orderbook_analysis.open_interest_5s",
+      "fallback_source": "orderbook_analysis.open_interest_5m_history (BTC Jul-Aug only)",
+      "historical_source": "open_interest_5m_history + open_interest_5s",
+      "live_source": "open_interest_5s (when collector healthy)",
+      "history_live_seam": "2026-08-18 collector start; 5m history ends 2026-08-18",
+      "dedup_rule": "latest inserted_at per (symbol,bucket_time) in research layer",
+      "conflict_rule": "total OI only; never infer long/short split",
+      "rebuild_possible": true,
+      "reason": "Canonical 5s buckets with source_event_time provenance",
+      "evidence": ["schema open_interest_5s", "OI max stale 2026-09-01T14:46:50Z"]
+    },
+    "liquidations": {
+      "primary_source": "orderbook_analysis.all_liquidations",
+      "fallback_source": "NONE",
+      "historical_source": "all_liquidations",
+      "live_source": "all_liquidations",
+      "history_live_seam": "single stream from 2026-08-18",
+      "dedup_rule": "event_key per liquidation_flow_facts_v1",
+      "conflict_rule": "frozen Bybit S mapping; execution_price=NULL always",
+      "rebuild_possible": true,
+      "reason": "Frozen contract liquidation_flow_facts_v1; side mapping verified",
+      "evidence": ["liquidation_flow_contract.py", "liq_sample Buy->LONG Sell->SHORT"]
+    },
+    "funding": {
+      "primary_source": "NONE_IN_CLICKHOUSE",
+      "fallback_source": "ticker_samples.funding_rate (stale/low confidence)",
+      "historical_source": "UNKNOWN",
+      "live_source": "UNKNOWN",
+      "history_live_seam": "NOT_PROVEN",
+      "dedup_rule": "TBD external import",
+      "conflict_rule": "exclude from research_market_* until sourced",
+      "rebuild_possible": false,
+      "reason": "No dedicated funding table found; not blocking pilot for OB/trade/OI/liq",
+      "evidence": ["funding_rates table UNKNOWN_TABLE"]
+    },
+    "tpo_volume_profile": {
+      "primary_source": "compute from research_public_trades + research_orderbook_1s",
+      "fallback_source": "orderbook_analyse.market_profile on demand",
+      "historical_source": "recompute",
+      "live_source": "recompute incremental",
+      "history_live_seam": "N/A derived",
+      "dedup_rule": "feature_contract_version keyed",
+      "conflict_rule": "keep in research_features_* not market facts",
+      "rebuild_possible": true,
+      "reason": "Expensive recompute; belongs in versioned feature layer",
+      "evidence": ["market_profile/__init__.py", "btc_ob_fight/tpo_profile.py"]
+    },
+    "pool_wall_fight_facts": {
+      "primary_source": "compute from research_orderbook_levels or replay",
+      "fallback_source": "results/btc_ob_fight_cases golden runs (parity only)",
+      "historical_source": "recompute",
+      "live_source": "recompute",
+      "history_live_seam": "N/A",
+      "dedup_rule": "heuristic_contract_version UNFROZEN",
+      "conflict_rule": "never mix with neutral market facts; HEURISTIC status",
+      "rebuild_possible": true,
+      "reason": "Strategy-adjacent thresholds remain outside neutral fact tables",
+      "evidence": ["btc_ob_fight/config.py HEURISTIC_CONTRACT_VERSION UNFROZEN"]
+    }
+  }
+}

@@ -1,0 +1,798 @@
+{
+  "started_utc": "2026-09-02T17:17:03.971612Z",
+  "ended_utc": "2026-09-02T17:17:19.106518Z",
+  "host": "server-telgenbuescher",
+  "aggregate_end_known": "2026-08-28T16:26:23Z",
+  "coverage": [
+    {
+      "source_id": "CANDLES_1M",
+      "database_or_root": "signal_generator",
+      "table_or_path": "candles_1m",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "BTCUSDT",
+      "resolution": "1m",
+      "timestamp_column": "open_time",
+      "min_ts_utc": "2025-12-11T00:00:00Z",
+      "max_ts_utc": "2026-09-02T17:16:00Z",
+      "rows_exact_or_estimated": 382637,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "",
+      "global_status": "VALID",
+      "global_min": "2025-12-11T00:00:00Z",
+      "global_max": "2026-09-02T17:16:00Z"
+    },
+    {
+      "source_id": "CANDLES_1M",
+      "database_or_root": "signal_generator",
+      "table_or_path": "candles_1m",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "DOGEUSDT",
+      "resolution": "1m",
+      "timestamp_column": "open_time",
+      "min_ts_utc": "2025-12-11T00:00:00Z",
+      "max_ts_utc": "2026-09-02T17:15:00Z",
+      "rows_exact_or_estimated": 382636,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "",
+      "global_status": "VALID",
+      "global_min": "2025-12-11T00:00:00Z",
+      "global_max": "2026-09-02T17:16:00Z"
+    },
+    {
+      "source_id": "PUBLIC_TRADES",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "public_trades_canonical",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "BTCUSDT",
+      "resolution": "tick",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "2026-07-19T00:00:00.210000Z",
+      "max_ts_utc": "2026-09-02T17:17:02.930000Z",
+      "rows_exact_or_estimated": 72475097,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "Side=taker aggressor; dedupe via trade_id/FINAL",
+      "global_status": "VALID",
+      "global_min": "2026-07-19T00:00:00.045000Z",
+      "global_max": "2026-09-02T17:17:02.937000Z"
+    },
+    {
+      "source_id": "PUBLIC_TRADES",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "public_trades_canonical",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "DOGEUSDT",
+      "resolution": "tick",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "2026-07-19T00:00:00.482000Z",
+      "max_ts_utc": "2026-09-02T17:17:02.910000Z",
+      "rows_exact_or_estimated": 13474561,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "Side=taker aggressor; dedupe via trade_id/FINAL",
+      "global_status": "VALID",
+      "global_min": "2026-07-19T00:00:00.045000Z",
+      "global_max": "2026-09-02T17:17:02.937000Z"
+    },
+    {
+      "source_id": "OB_FEATURES_1S",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "orderbook_features_1s_v2",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL_AGG",
+      "symbol": "BTCUSDT",
+      "resolution": "1s",
+      "timestamp_column": "bucket_start",
+      "min_ts_utc": "2026-07-19T00:00:00Z",
+      "max_ts_utc": "2026-08-28T16:26:23Z",
+      "rows_exact_or_estimated": 3300775,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "static_since_2026-08-28",
+      "reconstructable_as_of": "YES",
+      "notes": "Aggregated ob200_v3; not per-level walls",
+      "global_status": "VALID",
+      "global_min": "2026-07-19T00:00:00Z",
+      "global_max": "2026-08-28T16:26:23Z"
+    },
+    {
+      "source_id": "OB_FEATURES_1S",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "orderbook_features_1s_v2",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL_AGG",
+      "symbol": "DOGEUSDT",
+      "resolution": "1s",
+      "timestamp_column": "bucket_start",
+      "min_ts_utc": "2026-07-19T00:00:00Z",
+      "max_ts_utc": "2026-08-28T16:26:23Z",
+      "rows_exact_or_estimated": 3298811,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "static_since_2026-08-28",
+      "reconstructable_as_of": "YES",
+      "notes": "Aggregated ob200_v3; not per-level walls",
+      "global_status": "VALID",
+      "global_min": "2026-07-19T00:00:00Z",
+      "global_max": "2026-08-28T16:26:23Z"
+    },
+    {
+      "source_id": "OPEN_INTEREST_5S",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "open_interest_5s",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "BTCUSDT",
+      "resolution": "5s",
+      "timestamp_column": "bucket_time",
+      "min_ts_utc": "2026-08-18T14:57:15Z",
+      "max_ts_utc": "2026-09-01T16:46:50Z",
+      "rows_exact_or_estimated": 243085,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "",
+      "global_status": "VALID",
+      "global_min": "2026-08-18T14:57:15Z",
+      "global_max": "2026-09-01T16:46:50Z"
+    },
+    {
+      "source_id": "OPEN_INTEREST_5S",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "open_interest_5s",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "DOGEUSDT",
+      "resolution": "5s",
+      "timestamp_column": "bucket_time",
+      "min_ts_utc": "2026-08-18T16:02:05Z",
+      "max_ts_utc": "2026-09-01T16:46:50Z",
+      "rows_exact_or_estimated": 242353,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "",
+      "global_status": "VALID",
+      "global_min": "2026-08-18T14:57:15Z",
+      "global_max": "2026-09-01T16:46:50Z"
+    },
+    {
+      "source_id": "LIQUIDATIONS",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "all_liquidations",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "BTCUSDT",
+      "resolution": "event",
+      "timestamp_column": "event_time",
+      "min_ts_utc": "2026-08-18T15:03:37.910000Z",
+      "max_ts_utc": "2026-09-01T16:36:59.752000Z",
+      "rows_exact_or_estimated": 34900,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "Zero rows in window = no events, not numeric zero",
+      "global_status": "VALID",
+      "global_min": "2026-08-18T15:03:37.910000Z",
+      "global_max": "2026-09-01T16:41:23.392000Z"
+    },
+    {
+      "source_id": "LIQUIDATIONS",
+      "database_or_root": "orderbook_analysis",
+      "table_or_path": "all_liquidations",
+      "raw_or_derived": "derived",
+      "canonical_status": "CANONICAL",
+      "symbol": "DOGEUSDT",
+      "resolution": "event",
+      "timestamp_column": "event_time",
+      "min_ts_utc": "2026-08-18T16:38:48.563000Z",
+      "max_ts_utc": "2026-09-01T16:36:57.907000Z",
+      "rows_exact_or_estimated": 3477,
+      "coverage_pct": "NOT_APPLICABLE",
+      "quality_verdict": "VALID",
+      "live_or_static": "live",
+      "reconstructable_as_of": "YES",
+      "notes": "Zero rows in window = no events, not numeric zero",
+      "global_status": "VALID",
+      "global_min": "2026-08-18T15:03:37.910000Z",
+      "global_max": "2026-09-01T16:41:23.392000Z"
+    }
+  ],
+  "extra_tables": [
+    {
+      "database": "orderbook_analysis",
+      "table": "public_trades",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "1970-01-01T00:00:00Z",
+      "max_ts_utc": "1970-01-01T00:00:00Z",
+      "rows": 0,
+      "status": "EMPTY"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "public_trades",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "2026-08-05T14:45:18.888000Z",
+      "max_ts_utc": "2026-08-11T17:18:27.079000Z",
+      "rows": 875865,
+      "status": "OK"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "public_trades_archive",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "1970-01-01T00:00:00Z",
+      "max_ts_utc": "1970-01-01T00:00:00Z",
+      "rows": 0,
+      "status": "EMPTY"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "public_trades_archive",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "trade_ts",
+      "min_ts_utc": "2026-01-06T00:00:00.555000Z",
+      "max_ts_utc": "2026-02-28T23:59:59.435000Z",
+      "rows": 2710057,
+      "status": "OK"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "ticker_samples",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "sample_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `sample_time` in scope SELECT min(sample_time), max(sample_time), count() FROM orderbook_analysis.ticker_samples WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "ticker_samples",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "sample_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `sample_time` in scope SELECT min(sample_time), max(sample_time), count() FROM orderbook_analysis.ticker_samples WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "open_interest_events",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "event_time",
+      "min_ts_utc": "2026-08-18T14:57:09.783000Z",
+      "max_ts_utc": "2026-09-01T16:46:23.084000Z",
+      "rows": 1039225,
+      "status": "OK"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "open_interest_events",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "event_time",
+      "min_ts_utc": "2026-08-18T16:02:02.934000Z",
+      "max_ts_utc": "2026-09-01T16:46:21.934000Z",
+      "rows": 466671,
+      "status": "OK"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "open_interest_5m_history",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "bucket_time",
+      "min_ts_utc": "2026-07-19T15:10:00Z",
+      "max_ts_utc": "2026-08-18T15:05:00Z",
+      "rows": 8640,
+      "status": "OK"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "open_interest_5m_history",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "bucket_time",
+      "min_ts_utc": "1970-01-01T00:00:00Z",
+      "max_ts_utc": "1970-01-01T00:00:00Z",
+      "rows": 0,
+      "status": "EMPTY"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "liquidations",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "event_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `event_time` in scope SELECT min(event_time), max(event_time), count() FROM orderbook_analysis.liquidations WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "liquidations",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "event_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `event_time` in scope SELECT min(event_time), max(event_time), count() FROM orderbook_analysis.liquidations WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "orderbook_snapshots",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "snapshot_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.orderbook_snapshots' in scope SELECT min(snapshot_time), max(snapshot_time), count() FROM orderbook_analysis.orderbook_snapshots WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "orderbook_snapshots",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "snapshot_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.orderbook_snapshots' in scope SELECT min(snapshot_time), max(snapshot_time), count() FROM orderbook_analysis.orderbook_snapshots WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "funding_rates",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "funding_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.funding_rates' in scope SELECT min(funding_time), max(funding_time), count() FROM orderbook_analysis.funding_rates WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "funding_rates",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "funding_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.funding_rates' in scope SELECT min(funding_time), max(funding_time), count() FROM orderbook_analysis.funding_rates WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "funding_rate_history",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "funding_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.funding_rate_history' in scope SELECT min(funding_time), max(funding_time), count() FROM orderbook_analysis.funding_rate_history WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "funding_rate_history",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "funding_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'orderbook_analysis.funding_rate_history' in scope SELECT min(funding_time), max(funding_time), count() FROM orderbook_analysis.funding_rate_history WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_5m",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_5m' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_5m WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_5m",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_5m' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_5m WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_15m",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_15m' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_15m WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_15m",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_15m' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_15m WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_1h",
+      "symbol": "BTCUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_1h' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_1h WHERE symbol = 'BTCUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_1h",
+      "symbol": "DOGEUSDT",
+      "timestamp_column": "open_time",
+      "status": "ERROR",
+      "error": "DatabaseError: Received ClickHouse exception, code: 60, server response: Code: 60. DB::Exception: Unknown table expression identifier 'signal_generator.candles_1h' in scope SELECT min(open_time), max(open_time), count() FROM signal_generator.candles_1h WHERE symbol = 'DOGEUSDT' SETTINGS max_execution_time = 60. Maybe you meant signal_generator.candles_1m?. (UNKNOWN_TABLE) (for url http://127.0.0.1:8123)"
+    }
+  ],
+  "schemas_column_names": {
+    "orderbook_analysis.public_trades_canonical": [
+      "trade_ts",
+      "ingest_timestamp",
+      "symbol",
+      "trade_id",
+      "side",
+      "price",
+      "size",
+      "notional",
+      "tick_direction",
+      "is_rpi_trade",
+      "source",
+      "source_file",
+      "exchange"
+    ],
+    "orderbook_analysis.all_liquidations": [
+      "exchange",
+      "category",
+      "symbol",
+      "event_time",
+      "system_generated_at",
+      "received_at",
+      "position_side_raw",
+      "liquidated_position_side",
+      "size",
+      "bankruptcy_price",
+      "notional_estimate",
+      "source_topic",
+      "event_key",
+      "raw_payload_hash",
+      "collector_instance_id",
+      "inserted_at"
+    ],
+    "orderbook_analysis.open_interest_5s": [
+      "exchange",
+      "category",
+      "symbol",
+      "bucket_time",
+      "source_event_time",
+      "received_at",
+      "open_interest",
+      "open_interest_value",
+      "single_open_interest",
+      "single_open_interest_value",
+      "last_price",
+      "mark_price",
+      "index_price",
+      "state_age_ms",
+      "state_valid",
+      "source",
+      "collector_instance_id",
+      "inserted_at"
+    ],
+    "orderbook_analysis.orderbook_features_1s_v2": [
+      "exchange",
+      "market",
+      "symbol",
+      "depth",
+      "bucket_start",
+      "first_source_ts",
+      "last_source_ts",
+      "last_update_seq",
+      "processed_updates",
+      "parser_version",
+      "created_at",
+      "quality_flags",
+      "is_valid",
+      "best_bid_price",
+      "best_bid_qty",
+      "best_ask_price",
+      "best_ask_qty",
+      "mid_price",
+      "microprice",
+      "spread_abs",
+      "spread_bps",
+      "bid_qty_l5",
+      "ask_qty_l5",
+      "bid_notional_l5",
+      "ask_notional_l5",
+      "imbalance_l5",
+      "bid_qty_l10",
+      "ask_qty_l10",
+      "bid_notional_l10",
+      "ask_notional_l10",
+      "imbalance_l10",
+      "bid_qty_l25",
+      "ask_qty_l25",
+      "bid_notional_l25",
+      "ask_notional_l25",
+      "imbalance_l25",
+      "bid_qty_l50",
+      "ask_qty_l50",
+      "bid_notional_l50",
+      "ask_notional_l50",
+      "imbalance_l50",
+      "bid_qty_bps5",
+      "ask_qty_bps5",
+      "bid_notional_bps5",
+      "ask_notional_bps5",
+      "imbalance_bps5",
+      "bid_qty_bps10",
+      "ask_qty_bps10",
+      "bid_notional_bps10",
+      "ask_notional_bps10",
+      "imbalance_bps10",
+      "bid_qty_bps25",
+      "ask_qty_bps25",
+      "bid_notional_bps25",
+      "ask_notional_bps25",
+      "imbalance_bps25",
+      "bid_qty_bps50",
+      "ask_qty_bps50",
+      "bid_notional_bps50",
+      "ask_notional_bps50",
+      "imbalance_bps50",
+      "bid_wall_price",
+      "bid_wall_qty",
+      "bid_wall_notional",
+      "bid_wall_bps_dist",
+      "bid_wall_ratio",
+      "ask_wall_price",
+      "ask_wall_qty",
+      "ask_wall_notional",
+      "ask_wall_bps_dist",
+      "ask_wall_ratio",
+      "bid_qty_added",
+      "bid_qty_removed",
+      "ask_qty_added",
+      "ask_qty_removed",
+      "bid_add_count",
+      "bid_remove_count",
+      "ask_add_count",
+      "ask_remove_count",
+      "ofi",
+      "mid_price_change",
+      "imbalance_l10_change",
+      "imbalance_l50_change"
+    ],
+    "signal_generator.candles_1m": [
+      "exchange",
+      "symbol",
+      "interval",
+      "open_time",
+      "close_time",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "turnover",
+      "is_closed",
+      "source",
+      "source_event_time",
+      "ingested_at"
+    ]
+  },
+  "dedup": {
+    "BTCUSDT": {
+      "total": 72475097,
+      "uniq_trade_id": 72475097,
+      "duplicates": 0
+    },
+    "DOGEUSDT": {
+      "total": 13474573,
+      "uniq_trade_id": 13474573,
+      "duplicates": 0
+    }
+  },
+  "ob_quality": {
+    "BTCUSDT": {
+      "valid": 3300775,
+      "invalid": 0,
+      "min": "2026-07-19T00:00:00Z",
+      "max": "2026-08-28T16:26:23Z",
+      "carried_forward": "NOT_PROVEN"
+    },
+    "DOGEUSDT": {
+      "valid": 3298811,
+      "invalid": 0,
+      "min": "2026-07-19T00:00:00Z",
+      "max": "2026-08-28T16:26:23Z",
+      "carried_forward": "NOT_PROVEN"
+    }
+  },
+  "liq_sample": {
+    "BTCUSDT": [
+      {
+        "side": "LIQUIDATED_SHORT",
+        "raw": "Sell",
+        "count": 26190
+      },
+      {
+        "side": "LIQUIDATED_LONG",
+        "raw": "Buy",
+        "count": 8710
+      }
+    ],
+    "DOGEUSDT": [
+      {
+        "side": "LIQUIDATED_LONG",
+        "raw": "Buy",
+        "count": 1878
+      },
+      {
+        "side": "LIQUIDATED_SHORT",
+        "raw": "Sell",
+        "count": 1599
+      }
+    ]
+  },
+  "ingest_lag_24h": {
+    "BTCUSDT": {
+      "p50_ms": 791.0,
+      "p90_ms": 3243.5000000000027,
+      "p99_ms": 6382.450000000001,
+      "max_ms": 14369
+    },
+    "DOGEUSDT": {
+      "p50_ms": 613.0,
+      "p90_ms": 3025.9000000000005,
+      "p99_ms": 6584.750000000011,
+      "max_ms": 15107
+    }
+  },
+  "raw_archive": [
+    {
+      "symbol": "BTCUSDT",
+      "segments": 211,
+      "min_start_utc": "2026-08-24T22:47:53Z",
+      "max_end_utc": "2026-09-02T17:00:00Z",
+      "total_duration_hours": 210.2,
+      "manifest_count": 211,
+      "quality_verdict": "VALID"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "segments": 211,
+      "min_start_utc": "2026-08-24T22:47:53Z",
+      "max_end_utc": "2026-09-02T17:00:00Z",
+      "total_duration_hours": 210.2,
+      "manifest_count": 211,
+      "quality_verdict": "VALID"
+    }
+  ],
+  "smoke_candles_7d": {
+    "BTCUSDT": {
+      "symbol": "BTCUSDT",
+      "window_start": "2026-08-26T17:00:00Z",
+      "window_end": "2026-09-02T17:00:00Z",
+      "rows": 10080,
+      "unique_minutes": 10080,
+      "expected_minutes": 10080,
+      "missing_minutes": 0,
+      "coverage_pct": 100.0,
+      "bad_hl": 0,
+      "bad_px": 0,
+      "quality_verdict": "VALID"
+    },
+    "DOGEUSDT": {
+      "symbol": "DOGEUSDT",
+      "window_start": "2026-08-26T17:00:00Z",
+      "window_end": "2026-09-02T17:00:00Z",
+      "rows": 10080,
+      "unique_minutes": 10080,
+      "expected_minutes": 10080,
+      "missing_minutes": 0,
+      "coverage_pct": 100.0,
+      "bad_hl": 0,
+      "bad_px": 0,
+      "quality_verdict": "VALID"
+    }
+  },
+  "parts_sample": [
+    {
+      "database": "orderbook_analysis",
+      "table": "public_trades_canonical",
+      "error": "forbidden SQL token detected"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "orderbook_features_1s_v2",
+      "error": "forbidden SQL token detected"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "all_liquidations",
+      "error": "forbidden SQL token detected"
+    },
+    {
+      "database": "orderbook_analysis",
+      "table": "open_interest_5s",
+      "error": "forbidden SQL token detected"
+    },
+    {
+      "database": "signal_generator",
+      "table": "candles_1m",
+      "error": "forbidden SQL token detected"
+    }
+  ],
+  "daily_trades_7d": {
+    "BTCUSDT": [
+      {
+        "date": "2026-08-26",
+        "count": 452053
+      },
+      {
+        "date": "2026-08-27",
+        "count": 2365926
+      },
+      {
+        "date": "2026-08-28",
+        "count": 2749782
+      },
+      {
+        "date": "2026-08-29",
+        "count": 643522
+      },
+      {
+        "date": "2026-08-30",
+        "count": 1358152
+      },
+      {
+        "date": "2026-08-31",
+        "count": 2207050
+      },
+      {
+        "date": "2026-09-01",
+        "count": 1973093
+      },
+      {
+        "date": "2026-09-02",
+        "count": 1527426
+      }
+    ],
+    "DOGEUSDT": [
+      {
+        "date": "2026-08-26",
+        "count": 95499
+      },
+      {
+        "date": "2026-08-27",
+        "count": 394397
+      },
+      {
+        "date": "2026-08-28",
+        "count": 413206
+      },
+      {
+        "date": "2026-08-29",
+        "count": 129955
+      },
+      {
+        "date": "2026-08-30",
+        "count": 283576
+      },
+      {
+        "date": "2026-08-31",
+        "count": 256465
+      },
+      {
+        "date": "2026-09-01",
+        "count": 246816
+      },
+      {
+        "date": "2026-09-02",
+        "count": 171389
+      }
+    ]
+  }
+}

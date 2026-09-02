@@ -1,0 +1,109 @@
+{
+  "phase": "0",
+  "format_version": "research_db_phase_0_preflight_v1",
+  "branch": "feature/btc-doge-research-db",
+  "head": "4a083bcdf4cefcc245a3c15ff842df01de411f36",
+  "started_utc": "2026-09-02T17:17:03Z",
+  "ended_utc": "2026-09-02T17:22:00Z",
+  "host": "server-telgenbuescher",
+  "worktree_clean_tracked": true,
+  "untracked_preexisting_respected": true,
+  "systems_examined": [
+    "clickhouse:127.0.0.1:8123",
+    "orderbook_analysis database",
+    "signal_generator database",
+    "filesystem:/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3",
+    "research/btc_ob_fight/",
+    "results/btc_ob_fight_cases/",
+    "results/aggressor_efficiency_data_audit_v1/"
+  ],
+  "systems_not_examined": [
+    "mysql",
+    "influxdb",
+    "full filesystem root scan"
+  ],
+  "read_only_queries_executed": [
+    "coverage_by_symbol for SOURCES x BTCUSDT/DOGEUSDT",
+    "public_trades_canonical dedup count uniqExact(trade_id)",
+    "orderbook_features_1s_v2 quality_flags distribution",
+    "all_liquidations side mapping GROUP BY",
+    "public_trades_canonical source archive/live split",
+    "open_interest_5s max bucket_time",
+    "candles_1m 7d integrity smoke",
+    "extra table existence probes",
+    "ingest lag quantiles 24h",
+    "daily trade counts 7d"
+  ],
+  "query_limits": {
+    "max_execution_time_seconds": 120,
+    "max_threads": 4,
+    "sql_guard": "orderbook_analyse.multisource_data_inventory_v1.sql_guard",
+    "forbidden": ["INSERT", "ALTER", "DROP", "DELETE", "OPTIMIZE", "CREATE", "SYSTEM"]
+  },
+  "paths_examined": [
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/btc_ob_fight/",
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/",
+    "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/multisource_data_inventory_v1/",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/DOGEUSDT",
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/",
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/aggressor_efficiency_data_audit_v1/"
+  ],
+  "output_files": [
+    "ABSCHLUSSBERICHT.md",
+    "source_inventory.csv",
+    "coverage_matrix.csv",
+    "source_priority.json",
+    "semantic_contract.md",
+    "proposed_schema.sql",
+    "table_design.md",
+    "incremental_processor_design.md",
+    "full_history_backfill_plan.md",
+    "performance_benchmark_plan.md",
+    "acceptance_criteria.json",
+    "open_questions.json",
+    "preflight_manifest.json",
+    "evidence/inventory_query_results.json",
+    "evidence/supplemental_queries.json"
+  ],
+  "confirmations": {
+    "clickhouse_writes": "none",
+    "ddl_executed": "none",
+    "dml_executed": "none",
+    "collector_changes": "none",
+    "collector_restarts": "none",
+    "dashboard_changes": "none",
+    "live_changes": "none",
+    "existing_results_modified": "none",
+    "existing_untracked_artifacts_modified": "none",
+    "commit": "none",
+    "push": "none"
+  },
+  "known_uncertainties": [
+    "orderbook_deltas table unattached — 108 broken parts",
+    "OI collector stale since ~2026-09-01T14:46:50Z",
+    "Funding no dedicated CH table",
+    "ticker_samples coverage not re-proven",
+    "Full-day trade completeness not scanned for entire history",
+    "system.tables query blocked by sql_guard SYSTEM token",
+    "carried_forward rate ~1.08% in historical aggregate only"
+  ],
+  "output_fingerprints": {
+    "ABSCHLUSSBERICHT.md": "5e483468499df602c85ca88a901db2ddb71d277adf2ffd906659880deced0842",
+    "preflight_manifest.json": "702487f03e5130c6a669a484e7773903454c724e723fb224ca88e33baf33146b",
+    "source_inventory.csv": "79d36c08d73b70d7f3352d59c2ab4de2864edbf70f5b2c27afd085c4d7fc8cdd",
+    "coverage_matrix.csv": "54ed93707d04b4cd5a100b91416966e0bfb1dcf5fd9447139d6233b593524f7a",
+    "source_priority.json": "987da29727a25c0af966b79d9d280df77ae50c05b924830ac2c5ba4e827f91d0",
+    "semantic_contract.md": "43f85b4fbfc4835c98ff84a606c15e23a5618df8589e0d4833c2ededc7c456f5",
+    "proposed_schema.sql": "5a7959a353d209d68ffa87ca07c2a8839d2dc011366e471fb38fac9d856154ab",
+    "table_design.md": "af8c44a10256069a3957c985c6e114e9513f125f3cddfed03fa4813b540edb4e",
+    "incremental_processor_design.md": "f4f359d97f82347ba1c01b7194f47c5fccf808479825a151b3a87c14fba2b9c9",
+    "full_history_backfill_plan.md": "2c5bfef10758d1e27620236d2568557e8e25027127a7c93fb80d468dad76ca20",
+    "performance_benchmark_plan.md": "add0a94fb05f667c659748b150aa18b941557d7e4b72b46118bfb7b82f4c377e",
+    "acceptance_criteria.json": "deb463b495fe660b0b1f5e47bf07802514f6cdc674434cbc088b22713730ec01",
+    "open_questions.json": "8d411ea0276feff633338a92724d801335ac36ad16ce489d194cdd3f6d203abf",
+    "evidence/inventory_query_results.json": "8a01e48ce5508cedb65f0832809e4568fac86e69f66e7e6d3661bdfa40763772",
+    "evidence/supplemental_queries.json": "6baefa6ca790c4c8e00661ea0a1bd8536041aadf0d1704ece6b6d4dbfe437f0b"
+  },
+  "verdict": "BTC_DOGE_RESEARCH_DB_PHASE_0_READY_WITH_EXPLICIT_GAPS"
+}
