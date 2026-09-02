@@ -435,3 +435,178 @@ def test_no_last_good_raises_controlled_error(monkeypatch):
     monkeypatch.setattr(mod, "replay_book_as_of", boom)
     with pytest.raises(ValueError, match="ob200_missing"):
         load_ob200_levels("UNKNOWNXYZ")
+
+
+def test_audit_sorted_uncrossed_ob200():
+    from research_charts.ob200_levels import audit_book_levels
+
+    bids = [{"price": 100.0 - i * 0.1, "size": 1.0, "side": "bid"} for i in range(50)]
+    asks = [{"price": 100.1 + i * 0.1, "size": 1.0, "side": "ask"} for i in range(50)]
+    audit = audit_book_levels(bids, asks)
+    assert audit["ok"] is True
+    assert audit["sorted_bids"] and audit["sorted_asks"] and audit["uncrossed"]
+    assert audit["best_bid"] < audit["best_ask"]
+    assert abs(audit["mid"] - (audit["best_bid"] + audit["best_ask"]) / 2) < 1e-9
+    assert all(b["price"] <= audit["best_bid"] for b in bids)
+    assert all(a["price"] >= audit["best_ask"] for a in asks)
+
+
+def test_audit_sorted_uncrossed_ob1000_gt_200():
+    from research_charts.ob200_levels import audit_book_levels
+
+    bids = [{"price": 77000.0 - i * 0.5, "size": float(i + 1), "side": "bid"} for i in range(250)]
+    asks = [{"price": 77001.0 + i * 0.5, "size": float(i + 1), "side": "ask"} for i in range(250)]
+    audit = audit_book_levels(bids, asks)
+    assert audit["bid_count"] > 200 and audit["ask_count"] > 200
+    assert audit["ok"] is True
+    assert audit["best_bid"] < audit["best_ask"]
+
+
+def test_aggregate_keeps_bid_ask_strictly_separated():
+    bids = [{"price": 100.0, "size": 1.0, "side": "bid"}, {"price": 99.5, "size": 2.0, "side": "bid"}]
+    asks = [{"price": 101.0, "size": 1.0, "side": "ask"}, {"price": 101.5, "size": 3.0, "side": "ask"}]
+    out_b = aggregate_levels(bids + asks, bucket_size=1.0, side="bid")
+    out_a = aggregate_levels(bids + asks, bucket_size=1.0, side="ask")
+    assert all(x["side"] == "bid" for x in out_b)
+    assert all(x["side"] == "ask" for x in out_a)
+    assert max(x["price"] for x in out_b) < min(x["price"] for x in out_a)
+
+
+def test_desync_up_when_chart_above_best_ask():
+    from research_charts.ob200_levels import book_chart_sync_status
+
+    # Screenshot-like: chart ~77138.60, ~8s-old book whose asks sit below.
+    best_bid = 77050.0
+    best_ask = 77051.0
+    mid = (best_bid + best_ask) / 2.0
+    chart = 77138.60
+    sync = book_chart_sync_status(
+        chart_price=chart,
+        best_bid=best_bid,
+        best_ask=best_ask,
+        mid=mid,
+        tick=0.1,
+        freshness_ms=8000,
+    )
+    assert sync["sync_state"] == "DESYNC_UP"
+    assert sync["misleading_as_live"] is True
+    assert sync["delta"] == pytest.approx(chart - mid)
+    assert abs(sync["delta_pct"]) > 0
+
+
+def test_desync_down_when_chart_below_best_bid():
+    from research_charts.ob200_levels import book_chart_sync_status
+
+    sync = book_chart_sync_status(
+        chart_price=76900.0,
+        best_bid=77050.0,
+        best_ask=77051.0,
+        mid=77050.5,
+        tick=0.1,
+        freshness_ms=8000,
+    )
+    assert sync["sync_state"] == "DESYNC_DOWN"
+    assert sync["misleading_as_live"] is True
+
+
+def test_sync_when_chart_inside_spread_band():
+    from research_charts.ob200_levels import book_chart_sync_status
+
+    sync = book_chart_sync_status(
+        chart_price=77050.4,
+        best_bid=77050.0,
+        best_ask=77051.0,
+        mid=77050.5,
+        tick=0.1,
+        freshness_ms=2000,
+    )
+    assert sync["sync_state"] == "SYNC"
+    assert sync["misleading_as_live"] is False
+
+
+def test_delayed_not_desync_when_price_still_inside_book():
+    from research_charts.ob200_levels import book_chart_sync_status
+
+    sync = book_chart_sync_status(
+        chart_price=77050.5,
+        best_bid=77050.0,
+        best_ask=77051.0,
+        mid=77050.5,
+        tick=0.1,
+        freshness_ms=20_000,
+    )
+    assert sync["sync_state"] == "DELAYED"
+    assert sync["misleading_as_live"] is False
+
+
+def test_stale_overrides_price_position():
+    from research_charts.ob200_levels import book_chart_sync_status
+
+    sync = book_chart_sync_status(
+        chart_price=77050.5,
+        best_bid=77050.0,
+        best_ask=77051.0,
+        mid=77050.5,
+        tick=0.1,
+        freshness_ms=200_000,
+    )
+    assert sync["sync_state"] == "STALE"
+    assert sync["misleading_as_live"] is True
+
+
+def test_sync_tolerance_not_large_percent_band():
+    from research_charts.ob200_levels import sync_tolerance
+
+    mid = 77000.0
+    tol = sync_tolerance(tick=0.1, best_bid=76999.9, best_ask=77000.1, mid=mid)
+    assert tol < mid * 0.001
+    assert tol >= 0.2
+
+
+def test_visible_filter_after_aggregation_preserves_gt_200_raw():
+    bids = [{"price": 100.0 - i * 0.01, "size": 1.0, "side": "bid"} for i in range(250)]
+    asks = [{"price": 101.0 + i * 0.01, "size": 1.0, "side": "ask"} for i in range(250)]
+    agg_b = aggregate_levels(bids, bucket_size=0.05, side="bid")
+    agg_a = aggregate_levels(asks, bucket_size=0.05, side="ask")
+    assert len(bids) > 200 and len(asks) > 200
+    vis_low, vis_high = 99.5, 101.5
+    vis_b = [x for x in agg_b if vis_low <= x["price"] <= vis_high]
+    vis_a = [x for x in agg_a if vis_low <= x["price"] <= vis_high]
+    assert len(vis_b) < len(agg_b) or len(vis_a) < len(agg_a)
+    assert all(x["side"] == "bid" for x in vis_b)
+    assert all(x["side"] == "ask" for x in vis_a)
+
+
+def test_frontend_ob1000_wiring_and_desync_helpers():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    host = (root / "static/js/research/research_charts.js").read_text(encoding="utf-8")
+    chart = (root / "static/research_trp/chart.js").read_text(encoding="utf-8")
+    css = (root / "static/research_trp/style.css").read_text(encoding="utf-8")
+    pane = (root / "static/research_trp/pane.html").read_text(encoding="utf-8")
+    html = (root / "templates/research_charts.html").read_text(encoding="utf-8")
+    assert 'value="200"' in html and 'value="1000"' in html
+    assert "OBL1000_REFRESH_MS = 1 * 1000" in host
+    assert "OBL_REFRESH_MS = 5 * 1000" in host
+    assert "pane.oblInflight" in host
+    assert "isOb1000Mode" in host
+    assert "oblBookChartSyncStatus" in chart
+    assert "DESYNC_UP" in chart and "DESYNC_DOWN" in chart
+    assert "misleading_as_live" in chart
+    assert "oblFilterVisible" in chart
+    assert "position: absolute" in css
+    assert "ob-levels-2" in pane
+    assert "debugOrderbookLevels" in chart
+
+
+def test_price_to_coordinate_ordering_contract():
+    mid = 100.0
+    ask = 101.0
+    bid = 99.0
+    high, low, height = 110.0, 90.0, 400.0
+
+    def y_of(price: float) -> float:
+        return (high - price) / (high - low) * height
+
+    assert y_of(ask) < y_of(mid) < y_of(bid)

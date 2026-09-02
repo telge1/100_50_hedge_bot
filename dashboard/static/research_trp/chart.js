@@ -2783,22 +2783,28 @@
       const idx = Math.floor(p / bucketSize + 1e-12);
       const low = idx * bucketSize;
       const high = low + bucketSize;
-      const midP = low + bucketSize * 0.5;
       if (!buckets[idx]) {
         buckets[idx] = {
-          price: midP,
+          price: p,
           size: s,
           side: sideL,
           bucket_low: low,
           bucket_high: high,
           raw_level_count: 1,
+          _notional: p * s,
         };
       } else {
         buckets[idx].size += s;
         buckets[idx].raw_level_count += 1;
+        buckets[idx]._notional += p * s;
+        buckets[idx].price = buckets[idx].size > 0 ? buckets[idx]._notional / buckets[idx].size : p;
       }
     });
-    const out = Object.keys(buckets).map(function (k) { return buckets[k]; });
+    const out = Object.keys(buckets).map(function (k) {
+      const b = buckets[k];
+      delete b._notional;
+      return b;
+    });
     out.sort(function (a, b) {
       return sideL === "bid" ? b.price - a.price : a.price - b.price;
     });
@@ -2812,6 +2818,114 @@
     const raw = span / 80;
     const n = Math.max(1, Math.ceil(raw / t));
     return n * t;
+  }
+
+  function oblFilterVisible(levels, visLow, visHigh) {
+    if (!(visHigh > visLow) || !Number.isFinite(visLow) || !Number.isFinite(visHigh)) {
+      return { visible: levels.slice(), above: 0, below: 0 };
+    }
+    const visible = [];
+    let above = 0;
+    let below = 0;
+    (levels || []).forEach(function (lvl) {
+      const p = Number(lvl.price);
+      if (!Number.isFinite(p)) return;
+      if (p > visHigh) above += 1;
+      else if (p < visLow) below += 1;
+      else visible.push(lvl);
+    });
+    return { visible: visible, above: above, below: below };
+  }
+
+  function getChartLivePrice() {
+    if (lastPayload && lastPayload.candles && lastPayload.candles.length) {
+      const c = Number(lastPayload.candles[lastPayload.candles.length - 1].close);
+      if (Number.isFinite(c)) return c;
+    }
+    return null;
+  }
+
+  function oblSyncTolerance(tick, bestBid, bestAsk, mid) {
+    const t = tick > 0 && Number.isFinite(tick) ? tick : 0.1;
+    let spread = 0;
+    if (Number.isFinite(bestBid) && Number.isFinite(bestAsk) && bestAsk > bestBid) {
+      spread = bestAsk - bestBid;
+    }
+    const midEps = mid > 0 && Number.isFinite(mid) ? mid * 1e-5 : 0;
+    return Math.max(2 * t, 0.5 * spread, midEps);
+  }
+
+  function oblBookChartSyncStatus(chartPrice, bestBid, bestAsk, mid, tick, freshnessMs) {
+    const bookMid = mid != null && Number.isFinite(mid)
+      ? mid
+      : (Number.isFinite(bestBid) && Number.isFinite(bestAsk) ? (bestBid + bestAsk) / 2 : null);
+    const tol = oblSyncTolerance(tick, bestBid, bestAsk, bookMid);
+    let delta = null;
+    let deltaPct = null;
+    if (chartPrice != null && bookMid != null && Number.isFinite(chartPrice) && Number.isFinite(bookMid)) {
+      delta = chartPrice - bookMid;
+      if (bookMid !== 0) deltaPct = (delta / bookMid) * 100;
+    }
+    let fresh = "unknown";
+    if (freshnessMs == null || freshnessMs < 0) fresh = "unknown";
+    else if (freshnessMs <= 15000) fresh = "fresh";
+    else if (freshnessMs <= 180000) fresh = "delayed";
+    else fresh = "stale";
+
+    let state = "UNKNOWN";
+    if (fresh === "stale") state = "STALE";
+    else if (chartPrice == null || !Number.isFinite(chartPrice)) state = "UNKNOWN";
+    else if (!Number.isFinite(bestBid) || !Number.isFinite(bestAsk)) state = "UNKNOWN";
+    else if (chartPrice > bestAsk + tol) state = "DESYNC_UP";
+    else if (chartPrice < bestBid - tol) state = "DESYNC_DOWN";
+    else if (fresh === "delayed") state = "DELAYED";
+    else if (fresh === "unknown") state = "UNKNOWN";
+    else state = "SYNC";
+
+    return {
+      sync_state: state,
+      chart_price: chartPrice,
+      book_mid: bookMid,
+      best_bid: bestBid,
+      best_ask: bestAsk,
+      tolerance: tol,
+      delta: delta,
+      delta_pct: deltaPct,
+      freshness_ms: freshnessMs,
+      misleading_as_live: state === "DESYNC_UP" || state === "DESYNC_DOWN" || state === "STALE",
+    };
+  }
+
+  function oblAuditLevels(bids, asks) {
+    const bidPrices = (bids || []).map(function (b) { return Number(b.price); }).filter(Number.isFinite);
+    const askPrices = (asks || []).map(function (a) { return Number(a.price); }).filter(Number.isFinite);
+    let sortedBids = true;
+    for (let i = 0; i < bidPrices.length - 1; i++) {
+      if (bidPrices[i] < bidPrices[i + 1]) { sortedBids = false; break; }
+    }
+    let sortedAsks = true;
+    for (let i = 0; i < askPrices.length - 1; i++) {
+      if (askPrices[i] > askPrices[i + 1]) { sortedAsks = false; break; }
+    }
+    const bestBid = bidPrices.length ? bidPrices[0] : null;
+    const bestAsk = askPrices.length ? askPrices[0] : null;
+    const mid = bestBid != null && bestAsk != null ? (bestBid + bestAsk) / 2 : null;
+    const uncrossed = bestBid != null && bestAsk != null && bestBid < bestAsk
+      && bidPrices.every(function (p) { return p <= bestBid + 1e-12; })
+      && askPrices.every(function (p) { return p >= bestAsk - 1e-12; });
+    return {
+      ok: sortedBids && sortedAsks && uncrossed,
+      sorted_bids: sortedBids,
+      sorted_asks: sortedAsks,
+      uncrossed: uncrossed,
+      best_bid: bestBid,
+      best_ask: bestAsk,
+      mid: mid,
+      bid_count: bidPrices.length,
+      ask_count: askPrices.length,
+      lowest_bid: bidPrices.length ? bidPrices[bidPrices.length - 1] : null,
+      highest_ask: askPrices.length ? askPrices[askPrices.length - 1] : null,
+    };
   }
 
   function applyObLevelsPanelLayout() {
@@ -2912,6 +3026,7 @@
     const canvas = $("ob-levels-canvas");
     const headerMeta = $("ob-levels-meta");
     const headerFresh = $("ob-levels-fresh");
+    const headerTitle = $("ob-levels-title");
     if (!panel || !canvas) return;
     if (!oblSettings.enabled) {
       panel.hidden = true;
@@ -2919,7 +3034,9 @@
       return;
     }
     panel.hidden = false;
+    const chartEl = $("chart");
     const rect = canvas.getBoundingClientRect();
+    const chartRect = chartEl ? chartEl.getBoundingClientRect() : null;
     const w = Math.max(1, Math.floor(rect.width));
     const h = Math.max(1, Math.floor(rect.height));
     const dpr = window.devicePixelRatio || 1;
@@ -2932,30 +3049,54 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const stale = !!(oblPayload && (oblPayload.freshness_state === "stale" || oblPayload.freshness_state === "unknown"));
-    panel.classList.toggle("stale-book", stale);
-
-    if (headerMeta) {
-      const mode = String(oblSettings.mode || "aggregated");
-      const sym = (oblPayload && oblPayload.symbol) || "";
-      headerMeta.textContent = [sym, mode === "raw" ? "Raw" : "Agg", oblSettings.scale || "sqrt"].filter(Boolean).join(" · ");
-    }
-    if (headerFresh) {
-      const st = (oblPayload && oblPayload.freshness_state) || "unknown";
-      const ms = oblPayload && oblPayload.freshness_ms != null ? Number(oblPayload.freshness_ms) : null;
-      headerFresh.className = "ob-levels-fresh " + st;
-      if (st === "stale") headerFresh.textContent = "STALE" + (ms != null ? (" " + Math.round(ms / 1000) + "s") : "");
-      else if (st === "delayed") headerFresh.textContent = "delayed " + (ms != null ? Math.round(ms / 1000) + "s" : "");
-      else if (st === "fresh") headerFresh.textContent = ms != null ? (Math.round(ms / 1000) + "s") : "fresh";
-      else headerFresh.textContent = "no data";
-    }
+    // Canvas fills the full panel (header overlays). Chart and panel share height,
+    // so priceToCoordinate maps 1:1 without a synthetic pixel offset.
+    const headerOffsetPx = chartRect ? Math.round(rect.top - chartRect.top) : 0;
+    const heightDeltaPx = chartRect ? Math.round(rect.height - chartRect.height) : 0;
 
     if (!oblPayload || !candleSeries) {
       oblHitBars = [];
+      panel.classList.remove("stale-book", "desync-book");
       return;
     }
 
+    const depth = oblPayload.depth != null ? Number(oblPayload.depth) : 200;
+    const depthLabel = depth === 1000 ? "OB1000" : "OB200";
+    if (headerTitle) headerTitle.textContent = depthLabel;
+
+    const rawBids = (oblPayload.bids || []).slice();
+    const rawAsks = (oblPayload.asks || []).slice();
+    const audit = oblAuditLevels(rawBids, rawAsks);
+    const bestBid = audit.best_bid != null ? audit.best_bid : (oblPayload.best_bid != null ? Number(oblPayload.best_bid) : null);
+    const bestAsk = audit.best_ask != null ? audit.best_ask : (oblPayload.best_ask != null ? Number(oblPayload.best_ask) : null);
+    const bookMid = audit.mid != null ? audit.mid : (oblPayload.mid != null ? Number(oblPayload.mid) : null);
     const tick = Number(oblPayload.tick_size) || 0.0001;
+    const chartPrice = getChartLivePrice();
+    const sync = oblBookChartSyncStatus(
+      chartPrice,
+      bestBid,
+      bestAsk,
+      bookMid,
+      tick,
+      oblPayload.freshness_ms != null ? Number(oblPayload.freshness_ms) : null
+    );
+    oblPayload._audit = audit;
+    oblPayload._sync = sync;
+    oblPayload._geometry = {
+      canvas_css_h: h,
+      canvas_css_w: w,
+      canvas_pixel_h: canvas.height,
+      canvas_pixel_w: canvas.width,
+      dpr: dpr,
+      header_offset_px: headerOffsetPx,
+      height_delta_px: heightDeltaPx,
+      chart_h: chartRect ? Math.round(chartRect.height) : null,
+    };
+
+    const desync = !!sync.misleading_as_live;
+    panel.classList.toggle("stale-book", sync.sync_state === "STALE");
+    panel.classList.toggle("desync-book", desync && sync.sync_state !== "STALE");
+
     let visLow = null;
     let visHigh = null;
     try {
@@ -2968,13 +3109,103 @@
       }
     } catch (e) {}
 
-    let bids = oblPayload.bids || [];
-    let asks = oblPayload.asks || [];
+    // Aggregate sides separately on the full book, then filter by visible range.
+    let bids = rawBids;
+    let asks = rawAsks;
     let bucketSize = null;
     if (String(oblSettings.mode) === "aggregated") {
       bucketSize = oblAutoBucket(tick, visLow, visHigh);
       bids = oblAggregate(bids, bucketSize, "bid");
       asks = oblAggregate(asks, bucketSize, "ask");
+    }
+    const bidVis = oblFilterVisible(bids, visLow, visHigh);
+    const askVis = oblFilterVisible(asks, visLow, visHigh);
+    bids = bidVis.visible;
+    asks = askVis.visible;
+
+    const ageSec = oblPayload.freshness_ms != null ? Math.round(Number(oblPayload.freshness_ms) / 1000) : null;
+    const covLow = audit.lowest_bid;
+    const covHigh = audit.highest_ask;
+    let covBelowPct = null;
+    let covAbovePct = null;
+    if (bookMid && bookMid > 0 && covLow != null) covBelowPct = ((bookMid - covLow) / bookMid) * 100;
+    if (bookMid && bookMid > 0 && covHigh != null) covAbovePct = ((covHigh - bookMid) / bookMid) * 100;
+
+    if (headerMeta) {
+      const mode = String(oblSettings.mode || "aggregated");
+      const parts = [
+        depthLabel,
+        mode === "raw" ? "Raw" : "Agg",
+        "B " + bidVis.visible.length + "/" + (bidVis.visible.length + bidVis.above + bidVis.below),
+        "A " + askVis.visible.length + "/" + (askVis.visible.length + askVis.above + askVis.below),
+      ];
+      if (covLow != null && covHigh != null) {
+        parts.push("cov " + covLow.toFixed(1) + "…" + covHigh.toFixed(1));
+      }
+      if (covBelowPct != null && covAbovePct != null) {
+        parts.push((-covBelowPct).toFixed(2) + "% / +" + covAbovePct.toFixed(2) + "%");
+      }
+      if (bookMid != null) parts.push("mid " + bookMid.toFixed(2));
+      if (sync.delta != null) parts.push("Δ " + (sync.delta >= 0 ? "+" : "") + sync.delta.toFixed(2));
+      if (bucketSize != null) parts.push("Δpx " + bucketSize);
+      headerMeta.textContent = parts.join(" · ");
+    }
+    if (headerFresh) {
+      if (oblPayload.ui_state && depth === 1000 && !desync) {
+        const labels = {
+          DISABLED: "OB1000 DISABLED",
+          STARTING: "OB1000 STARTING",
+          LIVE: "OB1000 LIVE",
+          DELAYED: "OB1000 DELAYED",
+          STALE: "OB1000 STALE",
+          CAPACITY: "OB1000 CAPACITY",
+          OFFLINE: "OB1000 COLLECTOR OFFLINE",
+          NO_DATA: "OB1000 NO DATA",
+        };
+        headerFresh.className = "ob-levels-fresh " + String(oblPayload.ui_state).toLowerCase();
+        headerFresh.textContent = labels[oblPayload.ui_state] || String(oblPayload.ui_state);
+      } else {
+        const st = sync.sync_state;
+        headerFresh.className = "ob-levels-fresh " + String(st).toLowerCase();
+        if (st === "DESYNC_UP") {
+          headerFresh.textContent = "DESYNC ↑" + (ageSec != null ? (" " + ageSec + "s") : "");
+        } else if (st === "DESYNC_DOWN") {
+          headerFresh.textContent = "DESYNC ↓" + (ageSec != null ? (" " + ageSec + "s") : "");
+        } else if (st === "STALE") {
+          headerFresh.textContent = "STALE" + (ageSec != null ? (" " + ageSec + "s") : "");
+        } else if (st === "DELAYED") {
+          headerFresh.textContent = "delayed " + (ageSec != null ? ageSec + "s" : "");
+        } else if (st === "SYNC") {
+          headerFresh.textContent = ageSec != null ? (ageSec + "s") : "sync";
+        } else {
+          headerFresh.textContent = "no data";
+        }
+      }
+    }
+
+    // Desync/stale: do not paint as a normal live book (no recolor, no move).
+    if (desync) {
+      oblHitBars = [];
+      // Coverage indicators only — no misleading live bars.
+      if (bidVis.above + askVis.above > 0) {
+        ctx.fillStyle = "rgba(240, 97, 109, 0.55)";
+        ctx.beginPath();
+        ctx.moveTo(w * 0.5, 4);
+        ctx.lineTo(w * 0.5 - 6, 14);
+        ctx.lineTo(w * 0.5 + 6, 14);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (bidVis.below + askVis.below > 0) {
+        ctx.fillStyle = "rgba(61, 204, 145, 0.55)";
+        ctx.beginPath();
+        ctx.moveTo(w * 0.5, h - 4);
+        ctx.lineTo(w * 0.5 - 6, h - 14);
+        ctx.lineTo(w * 0.5 + 6, h - 14);
+        ctx.closePath();
+        ctx.fill();
+      }
+      return;
     }
 
     const levels = bids.concat(asks);
@@ -3017,12 +3248,12 @@
       ctx.globalAlpha = 1;
     }
 
-    paintSide(asks, "rgba(240, 97, 109, 0.9)", oblPayload.best_ask);
-    paintSide(bids, "rgba(61, 204, 145, 0.9)", oblPayload.best_bid);
+    // Ask = red/pink above mid; Bid = green/teal below mid. Never recolor by chart price.
+    paintSide(asks, "rgba(240, 97, 109, 0.9)", bestAsk);
+    paintSide(bids, "rgba(61, 204, 145, 0.9)", bestBid);
 
-    // Spread gap marker (mid line)
-    if (oblPayload.mid != null) {
-      const ym = yOf(oblPayload.mid);
+    if (bookMid != null) {
+      const ym = yOf(bookMid);
       if (ym != null && ym >= 0 && ym <= h) {
         ctx.strokeStyle = "rgba(139, 147, 167, 0.55)";
         ctx.setLineDash([3, 3]);
@@ -3034,9 +3265,36 @@
       }
     }
 
-    if (headerMeta && bucketSize != null && String(oblSettings.mode) === "aggregated") {
-      headerMeta.textContent += " · Δ" + bucketSize;
+    // Outside-viewport coverage indicators (no bars on wrong prices).
+    if (askVis.above + bidVis.above > 0) {
+      ctx.fillStyle = "rgba(240, 97, 109, 0.7)";
+      ctx.beginPath();
+      ctx.moveTo(w - 10, 6);
+      ctx.lineTo(w - 4, 14);
+      ctx.lineTo(w - 16, 14);
+      ctx.closePath();
+      ctx.fill();
     }
+    if (askVis.below + bidVis.below > 0) {
+      ctx.fillStyle = "rgba(61, 204, 145, 0.7)";
+      ctx.beginPath();
+      ctx.moveTo(w - 10, h - 6);
+      ctx.lineTo(w - 4, h - 14);
+      ctx.lineTo(w - 16, h - 14);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function debugOrderbookLevels() {
+    return {
+      payload: oblPayload,
+      settings: oblSettings,
+      geometry: oblPayload && oblPayload._geometry,
+      audit: oblPayload && oblPayload._audit,
+      sync: oblPayload && oblPayload._sync,
+      chart_price: getChartLivePrice(),
+    };
   }
 
   function drawOrderbookProfile() {
@@ -5363,6 +5621,7 @@
     clearOrderbookProfile: clearOrderbookProfile,
     setOrderbookLevels: setOrderbookLevels,
     clearOrderbookLevels: clearOrderbookLevels,
+    debugOrderbookLevels: debugOrderbookLevels,
     setTradeBubbles: setTradeBubbles,
     clearTradeBubbles: clearTradeBubbles,
     tradeBubbleAtUnix: tradeBubbleAtUnix,

@@ -193,6 +193,10 @@
                     <span class="trp-muted research-obp-legend" id="researchObpLegend" hidden>Bid · Ask Walls</span>
                     <label class="trp-check trp-dock-ind" title="Reale OB200 Preislevel als Side-Panel rechts der Preisskala"><input type="checkbox" id="researchOblEnabled"> Orderbook Levels</label>
                     <span id="researchOblControls" class="research-obl-controls" hidden>
+                      <select id="researchOblDepth" class="trp-select trp-width" title="Orderbook depth" aria-label="OB Levels Depth">
+                        <option value="200" selected>OB200</option>
+                        <option value="1000">OB1000</option>
+                      </select>
                       <select id="researchOblMode" class="trp-select trp-width" title="Raw vs Aggregated" aria-label="OB Levels Mode">
                         <option value="aggregated" selected>Aggregated</option>
                         <option value="raw">Raw</option>
@@ -453,7 +457,7 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_charts.js?v=ob-levels-1"></script>
+    <script src="/static/js/research/research_charts.js?v=ob-levels-2"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

@@ -197,6 +197,144 @@ def freshness_state(freshness_ms: int | None) -> str:
     return "stale"
 
 
+def audit_book_levels(
+    bids: list[dict[str, Any]],
+    asks: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Numeric book audit before render. Never invents or moves levels."""
+    bids_ok = all(
+        isinstance(b.get("price"), (int, float))
+        and isinstance(b.get("size"), (int, float))
+        and math.isfinite(b["price"])
+        and math.isfinite(b["size"])
+        for b in bids
+    )
+    asks_ok = all(
+        isinstance(a.get("price"), (int, float))
+        and isinstance(a.get("size"), (int, float))
+        and math.isfinite(a["price"])
+        and math.isfinite(a["size"])
+        for a in asks
+    )
+    bid_prices = [float(b["price"]) for b in bids]
+    ask_prices = [float(a["price"]) for a in asks]
+    sorted_bids = all(bid_prices[i] >= bid_prices[i + 1] for i in range(len(bid_prices) - 1))
+    sorted_asks = all(ask_prices[i] <= ask_prices[i + 1] for i in range(len(ask_prices) - 1))
+    best_bid = bid_prices[0] if bid_prices else None
+    best_ask = ask_prices[0] if ask_prices else None
+    mid = None
+    if best_bid is not None and best_ask is not None:
+        mid = (best_bid + best_ask) / 2.0
+    uncrossed = (
+        best_bid is not None
+        and best_ask is not None
+        and best_bid < best_ask
+        and all(p <= best_bid + 1e-12 for p in bid_prices)
+        and all(p >= best_ask - 1e-12 for p in ask_prices)
+    )
+    return {
+        "ok": bool(bids_ok and asks_ok and sorted_bids and sorted_asks and uncrossed),
+        "bids_ok": bids_ok,
+        "asks_ok": asks_ok,
+        "sorted_bids": sorted_bids,
+        "sorted_asks": sorted_asks,
+        "uncrossed": uncrossed,
+        "best_bid": best_bid,
+        "best_ask": best_ask,
+        "mid": mid,
+        "bid_count": len(bids),
+        "ask_count": len(asks),
+        "lowest_bid": bid_prices[-1] if bid_prices else None,
+        "highest_ask": ask_prices[-1] if ask_prices else None,
+    }
+
+
+def sync_tolerance(
+    *,
+    tick: float | None,
+    best_bid: float | None,
+    best_ask: float | None,
+    mid: float | None,
+) -> float:
+    """Tight desync tolerance from tick and half-spread — not a large percent band.
+
+    Documented rule:
+    - at least 2 ticks
+    - at least half the current spread
+    - at least mid * 1e-5 (≈0.1 bps) for float noise on large prices
+    """
+    t = tick if tick is not None and math.isfinite(tick) and tick > 0 else 0.1
+    spread = 0.0
+    if (
+        best_bid is not None
+        and best_ask is not None
+        and math.isfinite(best_bid)
+        and math.isfinite(best_ask)
+        and best_ask > best_bid
+    ):
+        spread = best_ask - best_bid
+    mid_eps = 0.0
+    if mid is not None and math.isfinite(mid) and mid > 0:
+        mid_eps = mid * 1e-5
+    return max(2.0 * t, 0.5 * spread, mid_eps)
+
+
+def book_chart_sync_status(
+    *,
+    chart_price: float | None,
+    best_bid: float | None,
+    best_ask: float | None,
+    mid: float | None = None,
+    tick: float | None = None,
+    freshness_ms: int | None = None,
+) -> dict[str, Any]:
+    """Compare live chart price to the book snapshot without reclassifying sides.
+
+    Returns sync_state in:
+    SYNC | DELAYED | DESYNC_UP | DESYNC_DOWN | STALE | UNKNOWN
+    """
+    if mid is None and best_bid is not None and best_ask is not None:
+        mid = (best_bid + best_ask) / 2.0
+    tol = sync_tolerance(tick=tick, best_bid=best_bid, best_ask=best_ask, mid=mid)
+    delta = None
+    delta_pct = None
+    if chart_price is not None and mid is not None and math.isfinite(chart_price) and math.isfinite(mid):
+        delta = chart_price - mid
+        if mid != 0:
+            delta_pct = (delta / mid) * 100.0
+
+    fresh = freshness_state(freshness_ms)
+    if fresh == "stale":
+        state = "STALE"
+    elif chart_price is None or not math.isfinite(chart_price):
+        state = "UNKNOWN"
+    elif best_bid is None or best_ask is None:
+        state = "UNKNOWN"
+    elif chart_price > best_ask + tol:
+        state = "DESYNC_UP"
+    elif chart_price < best_bid - tol:
+        state = "DESYNC_DOWN"
+    elif fresh == "delayed":
+        state = "DELAYED"
+    elif fresh == "unknown":
+        state = "UNKNOWN"
+    else:
+        state = "SYNC"
+
+    return {
+        "sync_state": state,
+        "chart_price": chart_price,
+        "book_mid": mid,
+        "best_bid": best_bid,
+        "best_ask": best_ask,
+        "tolerance": tol,
+        "delta": delta,
+        "delta_pct": delta_pct,
+        "freshness_ms": freshness_ms,
+        "misleading_as_live": state in {"DESYNC_UP", "DESYNC_DOWN", "STALE"},
+    }
+
+
 def _parse_timestamp_utc(ts: str | None) -> datetime | None:
     if not ts:
         return None

@@ -17,7 +17,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "ob-levels-1";
+  const ASSET_V = "ob-levels-2";
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
@@ -27,6 +27,9 @@
   const VP_DEBOUNCE_MS = 400;
   const OBP_REFRESH_MS = 60 * 1000;
   const OBL_REFRESH_MS = 5 * 1000;
+  const OBL1000_REFRESH_MS = 1 * 1000;
+  const OBL1000_HEARTBEAT_MS = 15 * 1000;
+  const OBL1000_LEASE_KEY = "research.ob1000.lease_id";
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const STOCH_JOB_KEY = "stoch.research_job_id";
@@ -79,7 +82,8 @@
     hostShift: false,
     vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
     obp: { enabled: false, width: "normal", mode: "snapshot_at" },
-    obl: { enabled: false, mode: "aggregated", scale: "sqrt", width_px: 140 },
+    obl: { enabled: false, depth: 200, mode: "aggregated", scale: "sqrt", width_px: 140 },
+    obl1000: { leaseId: null, leaseGen: 0, heartbeatTimer: null, leaseSymbol: null, uiState: "DISABLED" },
     history: {
       preset: "30d",
       customStart: "",
@@ -1010,6 +1014,7 @@
         oblGen: 0,
         oblTimer: null,
         oblAbort: null,
+        oblInflight: false,
         ptbGen: 0,
         ptbTimer: null,
         ptbAbort: null,
@@ -1387,7 +1392,154 @@
   }
 
   function defaultOrderbookLevels() {
-    return { enabled: false, mode: "aggregated", scale: "sqrt", width_px: 140 };
+    return { enabled: false, depth: 200, mode: "aggregated", scale: "sqrt", width_px: 140 };
+  }
+
+  function oblDataDepth() {
+    const d = state.obl && state.obl.depth != null ? Number(state.obl.depth) : 200;
+    return d === 1000 ? 1000 : 200;
+  }
+
+  function isOb1000Mode() {
+    return !!(state.obl && state.obl.enabled && oblDataDepth() === 1000 && !isHistoricalReplay());
+  }
+
+  function getOb1000LeaseId() {
+    try {
+      let id = sessionStorage.getItem(OBL1000_LEASE_KEY);
+      if (!id) {
+        id = "tab-" + Math.random().toString(36).slice(2) + "-" + Date.now();
+        sessionStorage.setItem(OBL1000_LEASE_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return "tab-" + Date.now();
+    }
+  }
+
+  function parseOb1000ApiError(err) {
+    if (!err) return null;
+    const msg = String(err.message || err);
+    if (msg.indexOf("disabled") >= 0) return { code: "disabled", status: 503 };
+    if (msg.indexOf("collector_unavailable") >= 0 || msg.indexOf("503") >= 0) {
+      return { code: "collector_unavailable", status: 503 };
+    }
+    if (msg.indexOf("capacity_reached") >= 0 || msg.indexOf("429") >= 0) {
+      return { code: "capacity_reached", status: 429 };
+    }
+    return { code: "error", message: msg };
+  }
+
+  function ob1000UiLabel(code) {
+    const map = {
+      DISABLED: "OB1000 DISABLED",
+      STARTING: "OB1000 STARTING",
+      LIVE: "OB1000 LIVE",
+      DELAYED: "OB1000 DELAYED",
+      STALE: "OB1000 STALE",
+      CAPACITY: "OB1000 CAPACITY",
+      OFFLINE: "OB1000 COLLECTOR OFFLINE",
+      NO_DATA: "OB1000 NO DATA",
+    };
+    return map[code] || code;
+  }
+
+  function computeOb1000UiState(payload, err) {
+    if (!state.obl || !state.obl.enabled) return "DISABLED";
+    if (oblDataDepth() !== 1000) return "DISABLED";
+    if (isHistoricalReplay()) return "DISABLED";
+    if (err && err.code === "disabled") return "DISABLED";
+    if (err && (err.code === "collector_unavailable" || err.status === 503)) return "OFFLINE";
+    if (err && err.code === "capacity_reached") return "CAPACITY";
+    const sub = payload && payload.subscription_state ? String(payload.subscription_state) : "starting";
+    if (sub === "capacity") return "CAPACITY";
+    if (sub === "starting" || sub === "grace") return "STARTING";
+    const fresh = payload && payload.freshness_state ? String(payload.freshness_state) : "unknown";
+    const hasLevels = payload && ((payload.bids && payload.bids.length) || (payload.asks && payload.asks.length));
+    if (!hasLevels) return sub === "live" ? "NO_DATA" : "STARTING";
+    if (fresh === "stale") return "STALE";
+    if (fresh === "delayed") return "DELAYED";
+    if (fresh === "fresh") return "LIVE";
+    return "NO_DATA";
+  }
+
+  function stopOb1000Heartbeat() {
+    if (state.obl1000 && state.obl1000.heartbeatTimer) {
+      clearInterval(state.obl1000.heartbeatTimer);
+      state.obl1000.heartbeatTimer = null;
+    }
+  }
+
+  function releaseOb1000LeaseBestEffort() {
+    if (!state.obl1000 || !state.obl1000.leaseId) return;
+    const body = { op: "release", lease_id: state.obl1000.leaseId };
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/api/research/ob1000/lease", new Blob([JSON.stringify(body)], { type: "application/json" }));
+      } else {
+        fetch("/api/research/ob1000/lease", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          keepalive: true,
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  async function stopOb1000Lease() {
+    stopOb1000Heartbeat();
+    state.obl1000.leaseGen += 1;
+    const leaseId = state.obl1000.leaseId;
+    state.obl1000.leaseId = null;
+    state.obl1000.leaseSymbol = null;
+    state.obl1000.uiState = "DISABLED";
+    if (!leaseId) return;
+    try {
+      await sendJson("/api/research/ob1000/lease", "POST", { op: "release", lease_id: leaseId }, { sourceAction: "ob1000-release" });
+    } catch (e) {}
+  }
+
+  async function ensureOb1000Lease(symbol) {
+    if (!isOb1000Mode() || !symbol) return false;
+    const gen = ++state.obl1000.leaseGen;
+    const leaseId = getOb1000LeaseId();
+    if (state.obl1000.leaseId === leaseId && state.obl1000.leaseSymbol === symbol) return true;
+    if (state.obl1000.leaseId && state.obl1000.leaseSymbol !== symbol) {
+      await stopOb1000Lease();
+      if (gen !== state.obl1000.leaseGen) return false;
+    }
+    try {
+      const resp = await sendJson("/api/research/ob1000/lease", "POST", {
+        op: "acquire",
+        symbol: symbol,
+        lease_id: leaseId,
+      }, { sourceAction: "ob1000-acquire" });
+      if (gen !== state.obl1000.leaseGen) return false;
+      state.obl1000.leaseId = leaseId;
+      state.obl1000.leaseSymbol = symbol;
+      state.obl1000.uiState = computeOb1000UiState(resp, null);
+      return true;
+    } catch (err) {
+      if (gen !== state.obl1000.leaseGen) return false;
+      state.obl1000.uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+      return false;
+    }
+  }
+
+  function startOb1000Heartbeat() {
+    stopOb1000Heartbeat();
+    if (!isOb1000Mode()) return;
+    state.obl1000.heartbeatTimer = setInterval(function () {
+      if (!isOb1000Mode() || document.hidden || !state.symbol) return;
+      const leaseId = state.obl1000.leaseId;
+      if (!leaseId) return;
+      sendJson("/api/research/ob1000/lease", "POST", {
+        op: "heartbeat",
+        lease_id: leaseId,
+        symbol: state.symbol,
+      }, { sourceAction: "ob1000-heartbeat" }).catch(function () {});
+    }, OBL1000_HEARTBEAT_MS);
   }
 
   function readStoredOrderbookLevels() {
@@ -1408,6 +1560,8 @@
     const obl = state.obl || defaultOrderbookLevels();
     const en = $("researchOblEnabled");
     if (en) en.checked = !!obl.enabled;
+    const depth = $("researchOblDepth");
+    if (depth) depth.value = oblDataDepth() === 1000 ? "1000" : "200";
     const mode = $("researchOblMode");
     if (mode) mode.value = obl.mode === "raw" ? "raw" : "aggregated";
     const scale = $("researchOblScale");
@@ -1417,16 +1571,30 @@
   }
 
   function applyOrderbookLevelsSettings(raw, skipPersist) {
+    const prevDepth = oblDataDepth();
     state.obl = Object.assign(defaultOrderbookLevels(), raw || {});
     if (state.obl.width_px != null) {
       state.obl.width_px = Math.max(100, Math.min(220, Number(state.obl.width_px) || 140));
+    }
+    if (state.obl.depth != null) {
+      const d = Number(state.obl.depth);
+      state.obl.depth = d === 1000 ? 1000 : 200;
     }
     fillOrderbookLevelsControls();
     if (!skipPersist) persistOrderbookLevels();
     if (!state.obl.enabled) {
       stopOrderbookLevelsRefresh();
+      stopOb1000Lease();
       visibleIds().forEach(function (pid) { clearPaneOrderbookLevels(state.panes[pid]); });
       return;
+    }
+    if (prevDepth === 1000 && oblDataDepth() !== 1000) {
+      stopOb1000Lease();
+    }
+    if (isOb1000Mode()) {
+      ensureOb1000Lease(state.symbol).then(function () { startOb1000Heartbeat(); });
+    } else {
+      stopOb1000Lease();
     }
     startOrderbookLevelsRefresh();
     visibleIds().forEach(function (pid) { scheduleOrderbookLevels(state.panes[pid]); });
@@ -1436,6 +1604,7 @@
     const obl = state.obl || defaultOrderbookLevels();
     return {
       enabled: !!obl.enabled,
+      depth: oblDataDepth(),
       mode: obl.mode === "raw" ? "raw" : "aggregated",
       scale: ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt",
       width_px: Math.max(100, Math.min(220, Number(obl.width_px) || 140)),
@@ -1445,6 +1614,7 @@
   function clearPaneOrderbookLevels(pane) {
     if (!pane) return;
     pane.oblGen += 1;
+    pane.oblInflight = false;
     if (pane.oblTimer) {
       clearTimeout(pane.oblTimer);
       pane.oblTimer = null;
@@ -1481,16 +1651,35 @@
       clearInterval(state.oblRefreshTimer);
       state.oblRefreshTimer = null;
     }
+    stopOb1000Heartbeat();
   }
 
   function startOrderbookLevelsRefresh() {
     stopOrderbookLevelsRefresh();
     if (!state.obl || !state.obl.enabled) return;
+    if (isOb1000Mode()) startOb1000Heartbeat();
+    const interval = isOb1000Mode() ? OBL1000_REFRESH_MS : OBL_REFRESH_MS;
     state.oblRefreshTimer = setInterval(function () {
       if (!state.obl || !state.obl.enabled || !state.initialLoadDone) return;
       if (document.hidden) return;
       refreshOrderbookLevelsVisible();
-    }, OBL_REFRESH_MS);
+    }, interval);
+  }
+
+  function oblEmptyPayload(reqSymbol, depth, uiState) {
+    return {
+      symbol: reqSymbol,
+      bids: [],
+      asks: [],
+      freshness_state: "unknown",
+      freshness_ms: null,
+      timestamp_utc: null,
+      source: depth === 1000 ? "orderbook_v3_live_on_demand" : null,
+      depth: depth,
+      sequence: null,
+      ui_state: uiState || null,
+      subscription_state: uiState === "OFFLINE" ? "error" : "stopped",
+    };
   }
 
   async function refreshPaneOrderbookLevels(pane) {
@@ -1498,14 +1687,60 @@
       clearPaneOrderbookLevels(pane);
       return;
     }
+    if (pane.oblInflight) return;
     const chart = api(pane);
     if (!chart) return;
     const gen = ++pane.oblGen;
     const reqSymbol = state.symbol;
+    const reqDepth = oblDataDepth();
     if (pane.oblAbort) {
       try { pane.oblAbort.abort(); } catch (e) {}
     }
     pane.oblAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    pane.oblInflight = true;
+    try {
+    if (reqDepth === 1000) {
+      if (isHistoricalReplay()) {
+        if (gen !== pane.oblGen || reqSymbol !== state.symbol) return;
+        const live = api(pane);
+        if (live && live.setOrderbookLevels) {
+          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 1000, "DISABLED"), oblSettingsPayload());
+        }
+        return;
+      }
+      const leased = await ensureOb1000Lease(reqSymbol);
+      if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
+      let url = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol);
+      if (state.obl1000.leaseId) {
+        url += "&lease_id=" + encodeURIComponent(state.obl1000.leaseId);
+      }
+      try {
+        const body = await getJson(url, {
+          signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
+          sourceAction: "ob1000-levels",
+        });
+        if (gen !== pane.oblGen) return;
+        if (reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
+        body.depth = 1000;
+        body.ui_state = computeOb1000UiState(body, null);
+        state.obl1000.uiState = body.ui_state;
+        const live = api(pane);
+        if (live && live.setOrderbookLevels) {
+          live.setOrderbookLevels(body, oblSettingsPayload());
+        }
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
+        if (gen !== pane.oblGen) return;
+        if (reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
+        const uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+        state.obl1000.uiState = uiState;
+        const live = api(pane);
+        if (live && live.setOrderbookLevels) {
+          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 1000, uiState), oblSettingsPayload());
+        }
+      }
+      return;
+    }
     let url = "/api/research/ob200-levels?symbol=" + encodeURIComponent(reqSymbol);
     if (isHistoricalReplay() && state.gotoTsUtc != null) {
       url += "&at=" + encodeURIComponent(String(Math.floor(Number(state.gotoTsUtc))));
@@ -1516,7 +1751,8 @@
         sourceAction: "ob-levels",
       });
       if (gen !== pane.oblGen) return;
-      if (reqSymbol !== state.symbol) return;
+      if (reqSymbol !== state.symbol || oblDataDepth() !== 200) return;
+      body.depth = 200;
       const live = api(pane);
       if (live && live.setOrderbookLevels) {
         live.setOrderbookLevels(body, oblSettingsPayload());
@@ -1524,24 +1760,15 @@
     } catch (err) {
       if (err && err.name === "AbortError") return;
       if (gen !== pane.oblGen) return;
-      if (reqSymbol !== state.symbol) return;
+      if (reqSymbol !== state.symbol || oblDataDepth() !== 200) return;
       const live = api(pane);
       if (live && live.setOrderbookLevels) {
-        live.setOrderbookLevels(
-          {
-            symbol: reqSymbol,
-            bids: [],
-            asks: [],
-            freshness_state: "unknown",
-            freshness_ms: null,
-            timestamp_utc: null,
-            source: null,
-            depth: 200,
-            sequence: null,
-          },
-          oblSettingsPayload()
-        );
+        live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 200, null), oblSettingsPayload());
       }
+    }
+    } finally {
+      if (gen === pane.oblGen) pane.oblInflight = false;
+      else pane.oblInflight = false;
     }
   }
 
@@ -2783,6 +3010,13 @@
       clearPaneOrderbookProfile(pane);
       clearPaneOrderbookLevels(pane);
     });
+    if (state.obl && state.obl.enabled && isOb1000Mode()) {
+      stopOb1000Lease().then(function () {
+        if (state.symbol === next && isOb1000Mode()) {
+          ensureOb1000Lease(next).then(function () { startOb1000Heartbeat(); });
+        }
+      });
+    }
     if (state.overlayTest) {
       applyWorkspace(await sendJson("/api/research/overlay-test", "POST", { enabled: true, symbol: next }, {
         sourceAction: "overlay-test",
@@ -3085,23 +3319,20 @@
         applyOrderbookLevelsSettings(state.obl, true);
       });
     }
-    ["researchOblMode", "researchOblScale"].forEach(function (id) {
+    ["researchOblMode", "researchOblScale", "researchOblDepth"].forEach(function (id) {
       const el = $(id);
       if (!el) return;
       el.addEventListener("change", function () {
         if (!state.obl) state.obl = defaultOrderbookLevels();
-        state.obl.mode = ($("researchOblMode") && $("researchOblMode").value) || "aggregated";
-        state.obl.scale = ($("researchOblScale") && $("researchOblScale").value) || "sqrt";
+        if (id === "researchOblDepth") {
+          state.obl.depth = ($("researchOblDepth") && $("researchOblDepth").value === "1000") ? 1000 : 200;
+        } else {
+          state.obl.mode = ($("researchOblMode") && $("researchOblMode").value) || "aggregated";
+          state.obl.scale = ($("researchOblScale") && $("researchOblScale").value) || "sqrt";
+        }
         persistOrderbookLevels();
         sendJson("/api/research/settings", "PUT", { orderbook_levels: state.obl }, { sourceAction: "obl-settings" }).catch(function () {});
-        visibleIds().forEach(function (pid) {
-          const pane = state.panes[pid];
-          const chart = api(pane);
-          if (chart && chart.setOrderbookLevels && pane) {
-            // Re-apply settings immediately; data refresh follows.
-            scheduleOrderbookLevels(pane);
-          }
-        });
+        applyOrderbookLevelsSettings(state.obl, true);
       });
     });
     const ptbEn = $("researchPtbEnabled");
@@ -4401,6 +4632,21 @@
           if (chart && chart.resize) chart.resize();
         });
       });
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) {
+        stopOb1000Heartbeat();
+        return;
+      }
+      if (isOb1000Mode() && state.symbol) {
+        ensureOb1000Lease(state.symbol).then(function () {
+          startOb1000Heartbeat();
+          refreshOrderbookLevelsVisible();
+        });
+      }
+    });
+    window.addEventListener("beforeunload", function () {
+      releaseOb1000LeaseBestEffort();
     });
   }
 

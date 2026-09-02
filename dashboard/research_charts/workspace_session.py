@@ -51,6 +51,7 @@ DEFAULT_ORDERBOOK_PROFILE = {
 
 DEFAULT_ORDERBOOK_LEVELS = {
     "enabled": False,
+    "depth": 200,
     "mode": "aggregated",
     "scale": "sqrt",
     "width_px": 140,
@@ -106,6 +107,12 @@ def normalize_orderbook_levels(raw: dict | None) -> dict[str, Any]:
     if isinstance(raw, dict):
         if "enabled" in raw:
             src["enabled"] = bool(raw["enabled"])
+        try:
+            depth = int(raw.get("depth", src["depth"]))
+        except (TypeError, ValueError):
+            depth = int(src["depth"])
+        if depth in {200, 1000}:
+            src["depth"] = depth
         mode = str(raw.get("mode") or src["mode"]).strip().lower()
         if mode in {"raw", "aggregated"}:
             src["mode"] = mode

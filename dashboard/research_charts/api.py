@@ -36,6 +36,17 @@ from .orderbook_profile import (
     load_orderbook_profile,
 )
 from .ob200_levels import load_ob200_levels
+from .ob1000_on_demand import (
+    Ob1000CapacityError,
+    Ob1000CollectorUnavailableError,
+    Ob1000DisabledError,
+    Ob1000RequestError,
+    lease_acquire,
+    lease_heartbeat,
+    lease_release,
+    load_ob1000_levels,
+    freshness_from_payload,
+)
 from .live_diag import clear_live_diag, record_live_diag, snapshot_live_diag
 from .public_trades_profile import (
     VolumeProfileQueryError,
@@ -344,6 +355,70 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(400, code, str(exc))
         except Exception as exc:
             return _error(500, "ob200_levels_failed", str(exc))
+        return payload
+
+    @router.post("/api/research/ob1000/lease")
+    async def api_research_ob1000_lease(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        op = str(body.get("op") or "acquire")
+        try:
+            if op == "acquire":
+                payload = await asyncio.to_thread(
+                    lease_acquire,
+                    symbol=str(body.get("symbol") or ""),
+                    session_id=str(body.get("session_id") or user.get("username") or "dashboard"),
+                    lease_id=body.get("lease_id"),
+                )
+            elif op == "heartbeat":
+                payload = await asyncio.to_thread(
+                    lease_heartbeat,
+                    lease_id=str(body.get("lease_id") or ""),
+                    symbol=str(body.get("symbol") or "") or None,
+                )
+            elif op == "release":
+                payload = await asyncio.to_thread(lease_release, lease_id=str(body.get("lease_id") or ""))
+            else:
+                return _error(400, "invalid_op", f"unknown op {op}")
+        except Ob1000DisabledError:
+            return _error(503, "disabled", "on-demand OB1000 disabled")
+        except Ob1000CollectorUnavailableError:
+            return _error(503, "collector_unavailable", "collector socket unavailable")
+        except Ob1000CapacityError:
+            return _error(429, "capacity_reached", "on-demand OB1000 capacity reached")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Ob1000RequestError as exc:
+            return _error(409, exc.code, str(exc))
+        except Exception as exc:
+            return _error(500, "ob1000_lease_failed", str(exc))
+        return payload
+
+    @router.get("/api/research/ob1000-levels")
+    async def api_research_ob1000_levels(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        lease_id: str | None = Query(default=None),
+    ):
+        sym = str(symbol or "").strip().upper()
+        try:
+            payload = await asyncio.to_thread(load_ob1000_levels, sym, lease_id=lease_id)
+            payload = freshness_from_payload(payload)
+        except Ob1000DisabledError:
+            return _error(503, "disabled", "on-demand OB1000 disabled")
+        except Ob1000CollectorUnavailableError:
+            return _error(503, "collector_unavailable", "collector socket unavailable")
+        except Ob1000CapacityError:
+            return _error(429, "capacity_reached", "on-demand OB1000 capacity reached")
+        except KeyError:
+            return _error(404, "unknown_symbol", f"unknown symbol {sym}")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Ob1000RequestError as exc:
+            return _error(409, exc.code, str(exc))
+        except Exception as exc:
+            return _error(500, "ob1000_levels_failed", str(exc))
         return payload
 
     @router.post("/api/research/pane")
