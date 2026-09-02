@@ -313,11 +313,11 @@ def test_collector_strings_regression():
     assert "ensure=false" in host
     assert "ensure=true" in host
     html = (DASHBOARD_ROOT / "templates" / "research_charts.html").read_text()
-    assert "research_charts.js?v=vp-1" in html
+    assert "research_charts.js?v=ob-levels-1" in html
     assert "researchHeightHandle" in html
     assert "researchChartDock" in html
     assert "researchDockBar" in html
-    assert "research.css?v=vp-1" in html
+    assert "research.css?v=history-3" in html
     assert "researchIndStoch" in html
     assert "researchIndLld" in html
     dock = html[html.index("researchDockBar") : html.index("researchWorkspace")]

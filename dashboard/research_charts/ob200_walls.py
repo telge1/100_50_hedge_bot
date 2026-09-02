@@ -173,34 +173,20 @@ def _zstd_open(path: Path):
 
 
 def iter_decompressed_objects(path: Path) -> Iterator[dict[str, Any]]:
-    """Yield complete NDJSON objects; tolerate truncated open zstd streams."""
+    """Yield complete NDJSON objects; tolerate truncated open zstd streams.
+
+    Always use chunked ``read()``. Some zstd stream readers expose ``readline()``
+    but raise ``io.UnsupportedOperation`` (e.g. ``ZstdDecompressionReader``),
+    which previously aborted iteration with zero events.
+    """
     reader = _zstd_open(path)
     try:
-        if hasattr(reader, "readline"):
-            while True:
-                try:
-                    line = reader.readline()
-                except (EOFError, OSError, ValueError):
-                    # Open .tmp: frame incomplete until writer flushes/closes.
-                    break
-                if not line:
-                    break
-                if not line.strip():
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    # Partial trailing line while writer is mid-flush.
-                    continue
-                if isinstance(obj, dict):
-                    yield obj
-            return
-
         buf = b""
         while True:
             try:
                 chunk = reader.read(1 << 20)
             except (EOFError, OSError, ValueError):
+                # Open .tmp: frame incomplete until writer flushes/closes.
                 break
             if not chunk:
                 break
@@ -216,6 +202,7 @@ def iter_decompressed_objects(path: Path) -> Iterator[dict[str, Any]]:
                 try:
                     obj = json.loads(line)
                 except json.JSONDecodeError:
+                    # Partial trailing line while writer is mid-flush.
                     continue
                 if isinstance(obj, dict):
                     yield obj

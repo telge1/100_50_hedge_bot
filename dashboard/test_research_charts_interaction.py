@@ -169,7 +169,7 @@ def test_host_iframe_ready_handshake():
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
     assert 'pane.html?v=" + ASSET_V' in host
-    assert 'const ASSET_V = "live-17"' in host
+    assert 'const ASSET_V = "ob-levels-1"' in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -244,7 +244,7 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=live-17" in pane
+    assert "chart.js?v=ob-levels-1" in pane
     assert "Do not stickToLiveEdge here" in js
     assert "getVisibleRange()" in js
     assert "if (!force && !autoScaleOn) return false" in js

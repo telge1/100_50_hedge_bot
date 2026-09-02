@@ -17,14 +17,16 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "goto-replay-lock-1";
+  const ASSET_V = "ob-levels-1";
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
   const OBP_KEY = "research.orderbook_profile";
+  const OBL_KEY = "research.orderbook_levels";
   const PTB_KEY = "research.trade_bubbles";
   const VP_DEBOUNCE_MS = 400;
   const OBP_REFRESH_MS = 60 * 1000;
+  const OBL_REFRESH_MS = 5 * 1000;
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
   const STOCH_SYMBOL_KEY = "stoch.last_symbol";
   const STOCH_JOB_KEY = "stoch.research_job_id";
@@ -58,6 +60,7 @@
     pollTimer: null,
     formingTimer: null,
     obpRefreshTimer: null,
+    oblRefreshTimer: null,
     loadGen: 0,
     loadAbort: null,
     initialLoadDone: false,
@@ -76,6 +79,7 @@
     hostShift: false,
     vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
     obp: { enabled: false, width: "normal", mode: "snapshot_at" },
+    obl: { enabled: false, mode: "aggregated", scale: "sqrt", width_px: 140 },
     history: {
       preset: "30d",
       customStart: "",
@@ -862,6 +866,7 @@
       on_visible_range: function (from, to) {
         scheduleVolumeProfile(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
+        scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
@@ -1002,6 +1007,9 @@
         obpGen: 0,
         obpTimer: null,
         obpAbort: null,
+        oblGen: 0,
+        oblTimer: null,
+        oblAbort: null,
         ptbGen: 0,
         ptbTimer: null,
         ptbAbort: null,
@@ -1376,6 +1384,165 @@
       if (!state.obp || !state.obp.enabled || !state.initialLoadDone) return;
       refreshOrderbookProfileVisible();
     }, OBP_REFRESH_MS);
+  }
+
+  function defaultOrderbookLevels() {
+    return { enabled: false, mode: "aggregated", scale: "sqrt", width_px: 140 };
+  }
+
+  function readStoredOrderbookLevels() {
+    try {
+      const raw = localStorage.getItem(OBL_KEY);
+      if (!raw) return defaultOrderbookLevels();
+      return Object.assign(defaultOrderbookLevels(), JSON.parse(raw));
+    } catch (e) {
+      return defaultOrderbookLevels();
+    }
+  }
+
+  function persistOrderbookLevels() {
+    try { localStorage.setItem(OBL_KEY, JSON.stringify(state.obl)); } catch (e) {}
+  }
+
+  function fillOrderbookLevelsControls() {
+    const obl = state.obl || defaultOrderbookLevels();
+    const en = $("researchOblEnabled");
+    if (en) en.checked = !!obl.enabled;
+    const mode = $("researchOblMode");
+    if (mode) mode.value = obl.mode === "raw" ? "raw" : "aggregated";
+    const scale = $("researchOblScale");
+    if (scale) scale.value = ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt";
+    const wrap = $("researchOblControls");
+    if (wrap) wrap.hidden = !obl.enabled;
+  }
+
+  function applyOrderbookLevelsSettings(raw, skipPersist) {
+    state.obl = Object.assign(defaultOrderbookLevels(), raw || {});
+    if (state.obl.width_px != null) {
+      state.obl.width_px = Math.max(100, Math.min(220, Number(state.obl.width_px) || 140));
+    }
+    fillOrderbookLevelsControls();
+    if (!skipPersist) persistOrderbookLevels();
+    if (!state.obl.enabled) {
+      stopOrderbookLevelsRefresh();
+      visibleIds().forEach(function (pid) { clearPaneOrderbookLevels(state.panes[pid]); });
+      return;
+    }
+    startOrderbookLevelsRefresh();
+    visibleIds().forEach(function (pid) { scheduleOrderbookLevels(state.panes[pid]); });
+  }
+
+  function oblSettingsPayload() {
+    const obl = state.obl || defaultOrderbookLevels();
+    return {
+      enabled: !!obl.enabled,
+      mode: obl.mode === "raw" ? "raw" : "aggregated",
+      scale: ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt",
+      width_px: Math.max(100, Math.min(220, Number(obl.width_px) || 140)),
+    };
+  }
+
+  function clearPaneOrderbookLevels(pane) {
+    if (!pane) return;
+    pane.oblGen += 1;
+    if (pane.oblTimer) {
+      clearTimeout(pane.oblTimer);
+      pane.oblTimer = null;
+    }
+    if (pane.oblAbort) {
+      try { pane.oblAbort.abort(); } catch (e) {}
+      pane.oblAbort = null;
+    }
+    const chart = api(pane);
+    if (chart && chart.clearOrderbookLevels) chart.clearOrderbookLevels();
+    if (chart && chart.setOrderbookLevels) {
+      chart.setOrderbookLevels(null, { enabled: false, width_px: oblSettingsPayload().width_px });
+    }
+  }
+
+  function scheduleOrderbookLevels(pane) {
+    if (!pane) return;
+    if (pane.oblTimer) clearTimeout(pane.oblTimer);
+    pane.oblTimer = setTimeout(function () {
+      pane.oblTimer = null;
+      refreshPaneOrderbookLevels(pane);
+    }, 200);
+  }
+
+  function refreshOrderbookLevelsVisible() {
+    if (!state.obl || !state.obl.enabled) return;
+    visibleIds().forEach(function (pid) {
+      scheduleOrderbookLevels(state.panes[pid]);
+    });
+  }
+
+  function stopOrderbookLevelsRefresh() {
+    if (state.oblRefreshTimer) {
+      clearInterval(state.oblRefreshTimer);
+      state.oblRefreshTimer = null;
+    }
+  }
+
+  function startOrderbookLevelsRefresh() {
+    stopOrderbookLevelsRefresh();
+    if (!state.obl || !state.obl.enabled) return;
+    state.oblRefreshTimer = setInterval(function () {
+      if (!state.obl || !state.obl.enabled || !state.initialLoadDone) return;
+      if (document.hidden) return;
+      refreshOrderbookLevelsVisible();
+    }, OBL_REFRESH_MS);
+  }
+
+  async function refreshPaneOrderbookLevels(pane) {
+    if (!pane || !state.obl || !state.obl.enabled || !state.symbol) {
+      clearPaneOrderbookLevels(pane);
+      return;
+    }
+    const chart = api(pane);
+    if (!chart) return;
+    const gen = ++pane.oblGen;
+    const reqSymbol = state.symbol;
+    if (pane.oblAbort) {
+      try { pane.oblAbort.abort(); } catch (e) {}
+    }
+    pane.oblAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    let url = "/api/research/ob200-levels?symbol=" + encodeURIComponent(reqSymbol);
+    if (isHistoricalReplay() && state.gotoTsUtc != null) {
+      url += "&at=" + encodeURIComponent(String(Math.floor(Number(state.gotoTsUtc))));
+    }
+    try {
+      const body = await getJson(url, {
+        signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
+        sourceAction: "ob-levels",
+      });
+      if (gen !== pane.oblGen) return;
+      if (reqSymbol !== state.symbol) return;
+      const live = api(pane);
+      if (live && live.setOrderbookLevels) {
+        live.setOrderbookLevels(body, oblSettingsPayload());
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      if (gen !== pane.oblGen) return;
+      if (reqSymbol !== state.symbol) return;
+      const live = api(pane);
+      if (live && live.setOrderbookLevels) {
+        live.setOrderbookLevels(
+          {
+            symbol: reqSymbol,
+            bids: [],
+            asks: [],
+            freshness_state: "unknown",
+            freshness_ms: null,
+            timestamp_utc: null,
+            source: null,
+            depth: 200,
+            sequence: null,
+          },
+          oblSettingsPayload()
+        );
+      }
+    }
   }
 
   async function refreshPaneOrderbookProfile(pane) {
@@ -2154,6 +2321,7 @@
     }
     scheduleVolumeProfile(pane);
     scheduleOrderbookProfile(pane);
+    scheduleOrderbookLevels(pane);
     scheduleTradeBubbles(pane);
   }
 
@@ -2247,6 +2415,7 @@
     // Immediate first tick so price moves without waiting for the interval.
     pollForming(gen);
     if (state.obp && state.obp.enabled) startOrderbookProfileRefresh();
+    if (state.obl && state.obl.enabled) startOrderbookLevelsRefresh();
   }
 
   function formingBarForTf(forming, tfSec, lastCandle) {
@@ -2612,6 +2781,7 @@
       if (chart && chart.clearOverlays) chart.clearOverlays();
       clearPaneVolumeProfile(pane);
       clearPaneOrderbookProfile(pane);
+      clearPaneOrderbookLevels(pane);
     });
     if (state.overlayTest) {
       applyWorkspace(await sendJson("/api/research/overlay-test", "POST", { enabled: true, symbol: next }, {
@@ -2905,6 +3075,35 @@
         }
       });
     }
+    const oblEn = $("researchOblEnabled");
+    if (oblEn) {
+      oblEn.addEventListener("change", function () {
+        state.obl.enabled = oblEn.checked;
+        persistOrderbookLevels();
+        fillOrderbookLevelsControls();
+        sendJson("/api/research/settings", "PUT", { orderbook_levels: state.obl }, { sourceAction: "obl-settings" }).catch(function () {});
+        applyOrderbookLevelsSettings(state.obl, true);
+      });
+    }
+    ["researchOblMode", "researchOblScale"].forEach(function (id) {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", function () {
+        if (!state.obl) state.obl = defaultOrderbookLevels();
+        state.obl.mode = ($("researchOblMode") && $("researchOblMode").value) || "aggregated";
+        state.obl.scale = ($("researchOblScale") && $("researchOblScale").value) || "sqrt";
+        persistOrderbookLevels();
+        sendJson("/api/research/settings", "PUT", { orderbook_levels: state.obl }, { sourceAction: "obl-settings" }).catch(function () {});
+        visibleIds().forEach(function (pid) {
+          const pane = state.panes[pid];
+          const chart = api(pane);
+          if (chart && chart.setOrderbookLevels && pane) {
+            // Re-apply settings immediately; data refresh follows.
+            scheduleOrderbookLevels(pane);
+          }
+        });
+      });
+    });
     const ptbEn = $("researchPtbEnabled");
     if (ptbEn) {
       ptbEn.addEventListener("change", function () {
@@ -4238,6 +4437,13 @@
       readStoredOrderbookProfile()
     );
     fillOrderbookProfileControls();
+    state.obl = Object.assign(
+      defaultOrderbookLevels(),
+      (state.workspace && state.workspace.orderbook_levels) || {},
+      readStoredOrderbookLevels()
+    );
+    fillOrderbookLevelsControls();
+    if (state.obl.enabled) startOrderbookLevelsRefresh();
     state.ptb = normalizeTradeBubbles(readStoredTradeBubbles());
     fillTradeBubblesControls();
     const start = pickDefaultSymbol(names);

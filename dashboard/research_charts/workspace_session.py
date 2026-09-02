@@ -49,6 +49,13 @@ DEFAULT_ORDERBOOK_PROFILE = {
     "mode": "snapshot_at",
 }
 
+DEFAULT_ORDERBOOK_LEVELS = {
+    "enabled": False,
+    "mode": "aggregated",
+    "scale": "sqrt",
+    "width_px": 140,
+}
+
 
 def normalize_volume_profile(raw: dict | None) -> dict[str, Any]:
     src = dict(DEFAULT_VOLUME_PROFILE)
@@ -91,6 +98,25 @@ def normalize_orderbook_profile(raw: dict | None) -> dict[str, Any]:
             src["mode"] = "history"
         else:
             src["mode"] = "snapshot_at"
+    return src
+
+
+def normalize_orderbook_levels(raw: dict | None) -> dict[str, Any]:
+    src = dict(DEFAULT_ORDERBOOK_LEVELS)
+    if isinstance(raw, dict):
+        if "enabled" in raw:
+            src["enabled"] = bool(raw["enabled"])
+        mode = str(raw.get("mode") or src["mode"]).strip().lower()
+        if mode in {"raw", "aggregated"}:
+            src["mode"] = mode
+        scale = str(raw.get("scale") or src["scale"]).strip().lower()
+        if scale in {"sqrt", "linear", "log"}:
+            src["scale"] = scale
+        try:
+            w = int(raw.get("width_px", src["width_px"]))
+        except (TypeError, ValueError):
+            w = int(src["width_px"])
+        src["width_px"] = max(100, min(220, w))
     return src
 
 
@@ -148,6 +174,7 @@ class ResearchWorkspace:
         self.lld_config = self.indicator_store.get_config(trp["LIQUIDITY_LOCATION"])
         self.volume_profile = dict(DEFAULT_VOLUME_PROFILE)
         self.orderbook_profile = dict(DEFAULT_ORDERBOOK_PROFILE)
+        self.orderbook_levels = dict(DEFAULT_ORDERBOOK_LEVELS)
         self._cluster_sweep_run: dict[str, Any] | None = None
         self._cluster_sweep_visible: bool = False
         self._cluster_sweep_event_index: int = 0
@@ -224,6 +251,7 @@ class ResearchWorkspace:
             "liquidity": self.lld_config.to_dict(),
             "volume_profile": dict(self.volume_profile),
             "orderbook_profile": dict(self.orderbook_profile),
+            "orderbook_levels": dict(self.orderbook_levels),
             "license_notice": trp["LICENSE_NOTICE"],
             "tools": list(TOOLS),
             "layouts": list(SUPPORTED_LAYOUTS),
@@ -364,6 +392,7 @@ class ResearchWorkspace:
             "liquidity": trp["LiquidityLocationConfig"].defaults().to_dict(),
             "volume_profile": dict(DEFAULT_VOLUME_PROFILE),
             "orderbook_profile": dict(DEFAULT_ORDERBOOK_PROFILE),
+            "orderbook_levels": dict(DEFAULT_ORDERBOOK_LEVELS),
         }
 
     def apply_settings(
@@ -374,6 +403,7 @@ class ResearchWorkspace:
         liquidity: dict | None = None,
         volume_profile: dict | None = None,
         orderbook_profile: dict | None = None,
+        orderbook_levels: dict | None = None,
     ) -> dict[str, Any]:
         trp = self._trp
         if ema is not None:
@@ -394,6 +424,8 @@ class ResearchWorkspace:
             self.volume_profile = normalize_volume_profile(volume_profile)
         if orderbook_profile is not None:
             self.orderbook_profile = normalize_orderbook_profile(orderbook_profile)
+        if orderbook_levels is not None:
+            self.orderbook_levels = normalize_orderbook_levels(orderbook_levels)
         self.persist_settings()
         return self.snapshot()
 

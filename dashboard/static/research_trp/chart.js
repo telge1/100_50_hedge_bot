@@ -111,6 +111,16 @@
     width: "normal",
   };
   let obpHoverIndex = -1;
+  let oblPayload = null;
+  let oblSettings = {
+    enabled: false,
+    mode: "aggregated",
+    scale: "sqrt",
+    width_px: 140,
+  };
+  let oblHitBars = [];
+  let oblHover = null;
+  let oblListenersBound = false;
 
   function beginProgrammaticNav() {
     programmaticNavDepth += 1;
@@ -2744,6 +2754,291 @@
     return true;
   }
 
+  function oblBarLength(notional, maxNotional, scale, panelWidth) {
+    if (!(notional > 0) || !(maxNotional > 0) || !(panelWidth > 0)) return 0;
+    const ratio = notional / maxNotional;
+    let frac;
+    const mode = String(scale || "sqrt").toLowerCase();
+    if (mode === "linear") frac = ratio;
+    else if (mode === "log") frac = Math.log1p(ratio * 9) / Math.log1p(9);
+    else frac = Math.sqrt(ratio);
+    if (!Number.isFinite(frac) || frac < 0) frac = 0;
+    if (frac > 1) frac = 1;
+    return frac * panelWidth * 0.95;
+  }
+
+  function oblAggregate(levels, bucketSize, side) {
+    const sideL = String(side || "").toLowerCase();
+    if (!(bucketSize > 0) || !Number.isFinite(bucketSize)) {
+      return (levels || []).filter(function (l) { return l && l.side === sideL; }).map(function (l) {
+        return Object.assign({}, l);
+      });
+    }
+    const buckets = {};
+    (levels || []).forEach(function (lvl) {
+      if (!lvl || lvl.side !== sideL) return;
+      const p = Number(lvl.price);
+      const s = Number(lvl.size);
+      if (!Number.isFinite(p) || !Number.isFinite(s) || s < 0) return;
+      const idx = Math.floor(p / bucketSize + 1e-12);
+      const low = idx * bucketSize;
+      const high = low + bucketSize;
+      const midP = low + bucketSize * 0.5;
+      if (!buckets[idx]) {
+        buckets[idx] = {
+          price: midP,
+          size: s,
+          side: sideL,
+          bucket_low: low,
+          bucket_high: high,
+          raw_level_count: 1,
+        };
+      } else {
+        buckets[idx].size += s;
+        buckets[idx].raw_level_count += 1;
+      }
+    });
+    const out = Object.keys(buckets).map(function (k) { return buckets[k]; });
+    out.sort(function (a, b) {
+      return sideL === "bid" ? b.price - a.price : a.price - b.price;
+    });
+    return out;
+  }
+
+  function oblAutoBucket(tick, low, high) {
+    const t = tick > 0 && Number.isFinite(tick) ? tick : 1e-4;
+    if (!(high > low) || !Number.isFinite(low) || !Number.isFinite(high)) return t * 10;
+    const span = high - low;
+    const raw = span / 80;
+    const n = Math.max(1, Math.ceil(raw / t));
+    return n * t;
+  }
+
+  function applyObLevelsPanelLayout() {
+    const panel = $("ob-levels-panel");
+    if (!panel) return;
+    const enabled = !!(oblSettings && oblSettings.enabled);
+    panel.hidden = !enabled;
+    const w = Math.max(100, Math.min(220, Number(oblSettings.width_px) || 140));
+    panel.style.flexBasis = w + "px";
+    panel.style.width = w + "px";
+    // Chart ResizeObserver on #chart will fire after layout.
+    if (typeof resize === "function") {
+      try { resize(); } catch (e) {}
+    }
+  }
+
+  function setOrderbookLevels(payload, settings) {
+    if (settings) {
+      oblSettings = Object.assign({}, oblSettings, settings);
+    }
+    oblPayload = payload || null;
+    applyObLevelsPanelLayout();
+    drawOrderbookLevels();
+    return true;
+  }
+
+  function clearOrderbookLevels() {
+    oblPayload = null;
+    oblHitBars = [];
+    oblHover = null;
+    const tip = $("ob-levels-tooltip");
+    if (tip) {
+      tip.hidden = true;
+      tip.textContent = "";
+    }
+    drawOrderbookLevels();
+    return true;
+  }
+
+  function ensureObLevelsListeners() {
+    if (oblListenersBound) return;
+    const canvas = $("ob-levels-canvas");
+    if (!canvas) return;
+    oblListenersBound = true;
+    canvas.addEventListener("mousemove", function (ev) {
+      const rect = canvas.getBoundingClientRect();
+      const y = ev.clientY - rect.top;
+      let hit = null;
+      for (let i = 0; i < oblHitBars.length; i++) {
+        const b = oblHitBars[i];
+        if (Math.abs(y - b.y) <= Math.max(3, b.h * 0.5 + 1)) {
+          hit = b;
+          break;
+        }
+      }
+      oblHover = hit;
+      const tip = $("ob-levels-tooltip");
+      if (!tip) return;
+      if (!hit) {
+        tip.hidden = true;
+        tip.textContent = "";
+        return;
+      }
+      const mid = oblPayload && oblPayload.mid != null ? Number(oblPayload.mid) : null;
+      const distBps = mid && mid > 0 ? ((hit.price - mid) / mid) * 10000 : null;
+      let text =
+        "Side " + String(hit.side).toUpperCase() +
+        "\nPrice " + hit.price +
+        "\nSize " + hit.size +
+        "\nNotional " + hit.notional.toFixed(2) +
+        (distBps != null && Number.isFinite(distBps) ? ("\nDist mid " + distBps.toFixed(2) + " bps") : "") +
+        (oblPayload && oblPayload.timestamp_utc ? ("\nBook " + oblPayload.timestamp_utc) : "");
+      if (hit.raw_level_count != null) {
+        text +=
+          "\nBucket " + hit.bucket_low + " – " + hit.bucket_high +
+          "\nRaw levels " + hit.raw_level_count;
+      }
+      tip.textContent = text;
+      tip.hidden = false;
+      const tx = Math.min(rect.width - 8, Math.max(4, ev.clientX - rect.left + 10));
+      const ty = Math.min(rect.height - 8, Math.max(4, y + 12));
+      tip.style.left = tx + "px";
+      tip.style.top = ty + "px";
+    });
+    canvas.addEventListener("mouseleave", function () {
+      oblHover = null;
+      const tip = $("ob-levels-tooltip");
+      if (tip) {
+        tip.hidden = true;
+        tip.textContent = "";
+      }
+    });
+  }
+
+  function drawOrderbookLevels() {
+    ensureObLevelsListeners();
+    const panel = $("ob-levels-panel");
+    const canvas = $("ob-levels-canvas");
+    const headerMeta = $("ob-levels-meta");
+    const headerFresh = $("ob-levels-fresh");
+    if (!panel || !canvas) return;
+    if (!oblSettings.enabled) {
+      panel.hidden = true;
+      oblHitBars = [];
+      return;
+    }
+    panel.hidden = false;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(w * dpr));
+    canvas.height = Math.max(1, Math.floor(h * dpr));
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const stale = !!(oblPayload && (oblPayload.freshness_state === "stale" || oblPayload.freshness_state === "unknown"));
+    panel.classList.toggle("stale-book", stale);
+
+    if (headerMeta) {
+      const mode = String(oblSettings.mode || "aggregated");
+      const sym = (oblPayload && oblPayload.symbol) || "";
+      headerMeta.textContent = [sym, mode === "raw" ? "Raw" : "Agg", oblSettings.scale || "sqrt"].filter(Boolean).join(" · ");
+    }
+    if (headerFresh) {
+      const st = (oblPayload && oblPayload.freshness_state) || "unknown";
+      const ms = oblPayload && oblPayload.freshness_ms != null ? Number(oblPayload.freshness_ms) : null;
+      headerFresh.className = "ob-levels-fresh " + st;
+      if (st === "stale") headerFresh.textContent = "STALE" + (ms != null ? (" " + Math.round(ms / 1000) + "s") : "");
+      else if (st === "delayed") headerFresh.textContent = "delayed " + (ms != null ? Math.round(ms / 1000) + "s" : "");
+      else if (st === "fresh") headerFresh.textContent = ms != null ? (Math.round(ms / 1000) + "s") : "fresh";
+      else headerFresh.textContent = "no data";
+    }
+
+    if (!oblPayload || !candleSeries) {
+      oblHitBars = [];
+      return;
+    }
+
+    const tick = Number(oblPayload.tick_size) || 0.0001;
+    let visLow = null;
+    let visHigh = null;
+    try {
+      const visible = candleSeries.priceScale && candleSeries.priceScale().getVisibleRange
+        ? candleSeries.priceScale().getVisibleRange()
+        : (chart && chart.priceScale("right").getVisibleRange && chart.priceScale("right").getVisibleRange());
+      if (visible && visible.from != null && visible.to != null) {
+        visLow = Math.min(Number(visible.from), Number(visible.to));
+        visHigh = Math.max(Number(visible.from), Number(visible.to));
+      }
+    } catch (e) {}
+
+    let bids = oblPayload.bids || [];
+    let asks = oblPayload.asks || [];
+    let bucketSize = null;
+    if (String(oblSettings.mode) === "aggregated") {
+      bucketSize = oblAutoBucket(tick, visLow, visHigh);
+      bids = oblAggregate(bids, bucketSize, "bid");
+      asks = oblAggregate(asks, bucketSize, "ask");
+    }
+
+    const levels = bids.concat(asks);
+    const notionals = [];
+    levels.forEach(function (lvl) {
+      const n = Number(lvl.price) * Number(lvl.size);
+      if (Number.isFinite(n) && n > 0) notionals.push(n);
+    });
+    let maxN = 0;
+    notionals.forEach(function (n) { if (n > maxN) maxN = n; });
+
+    oblHitBars = [];
+    const barH = Math.max(1.5, Math.min(4, h / 220));
+    function paintSide(sideLevels, color, bestPrice) {
+      sideLevels.forEach(function (lvl) {
+        const y = yOf(lvl.price);
+        if (y == null || !Number.isFinite(y) || y < 0 || y > h) return;
+        const notional = Number(lvl.price) * Number(lvl.size);
+        const len = oblBarLength(notional, maxN, oblSettings.scale, w);
+        const isBest = bestPrice != null && Math.abs(Number(lvl.price) - Number(bestPrice)) < tick * 0.51;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = isBest ? 0.95 : 0.55;
+        ctx.fillRect(0, y - barH / 2, len, barH);
+        if (isBest) {
+          ctx.globalAlpha = 1;
+          ctx.fillRect(0, y - 0.5, Math.max(len, 8), 1.5);
+        }
+        oblHitBars.push({
+          y: y,
+          h: barH,
+          price: lvl.price,
+          size: lvl.size,
+          side: lvl.side,
+          notional: notional,
+          bucket_low: lvl.bucket_low,
+          bucket_high: lvl.bucket_high,
+          raw_level_count: lvl.raw_level_count,
+        });
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    paintSide(asks, "rgba(240, 97, 109, 0.9)", oblPayload.best_ask);
+    paintSide(bids, "rgba(61, 204, 145, 0.9)", oblPayload.best_bid);
+
+    // Spread gap marker (mid line)
+    if (oblPayload.mid != null) {
+      const ym = yOf(oblPayload.mid);
+      if (ym != null && ym >= 0 && ym <= h) {
+        ctx.strokeStyle = "rgba(139, 147, 167, 0.55)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, ym);
+        ctx.lineTo(w, ym);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    if (headerMeta && bucketSize != null && String(oblSettings.mode) === "aggregated") {
+      headerMeta.textContent += " · Δ" + bucketSize;
+    }
+  }
+
   function drawOrderbookProfile() {
     const canvas = $("obp-overlay");
     if (!canvas) return;
@@ -3178,6 +3473,7 @@
     layoutShiftMeasure();
     drawVolumeProfile();
     drawOrderbookProfile();
+    drawOrderbookLevels();
   }
 
   function overlayDebugSamples() {
@@ -5065,6 +5361,8 @@
     clearVolumeProfile: clearVolumeProfile,
     setOrderbookProfile: setOrderbookProfile,
     clearOrderbookProfile: clearOrderbookProfile,
+    setOrderbookLevels: setOrderbookLevels,
+    clearOrderbookLevels: clearOrderbookLevels,
     setTradeBubbles: setTradeBubbles,
     clearTradeBubbles: clearTradeBubbles,
     tradeBubbleAtUnix: tradeBubbleAtUnix,

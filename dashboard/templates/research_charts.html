@@ -191,6 +191,18 @@
                     </select>
                     <label class="trp-check trp-dock-ind" title="OB200 Multi-Walls wenn Raw-Archive vorhanden (z.B. DOGE/BTC), sonst dominante Features-Walls"><input type="checkbox" id="researchObpEnabled"> Orderbook Walls</label>
                     <span class="trp-muted research-obp-legend" id="researchObpLegend" hidden>Bid · Ask Walls</span>
+                    <label class="trp-check trp-dock-ind" title="Reale OB200 Preislevel als Side-Panel rechts der Preisskala"><input type="checkbox" id="researchOblEnabled"> Orderbook Levels</label>
+                    <span id="researchOblControls" class="research-obl-controls" hidden>
+                      <select id="researchOblMode" class="trp-select trp-width" title="Raw vs Aggregated" aria-label="OB Levels Mode">
+                        <option value="aggregated" selected>Aggregated</option>
+                        <option value="raw">Raw</option>
+                      </select>
+                      <select id="researchOblScale" class="trp-select trp-width" title="Balken-Skalierung" aria-label="OB Levels Scale">
+                        <option value="sqrt" selected>Sqrt</option>
+                        <option value="linear">Linear</option>
+                        <option value="log">Log</option>
+                      </select>
+                    </span>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
                     <label class="trp-check trp-dock-ind" title="Kausale Public-Trade-Bubbles (Research only). Grün=Buy, Rot=Sell."><input type="checkbox" id="researchPtbEnabled"> Trade Bubbles</label>
                     <label class="trp-muted trp-dock-ind" for="researchPtbMin" title="Nur Bubbles mit total_notional ≥ diesem Wert (Quote USDT)">Min</label>
@@ -441,7 +453,7 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_charts.js?v=goto-replay-lock-1"></script>
+    <script src="/static/js/research/research_charts.js?v=ob-levels-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

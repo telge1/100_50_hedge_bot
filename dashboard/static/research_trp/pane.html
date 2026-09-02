@@ -4,28 +4,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Research Chart Pane</title>
-  <link rel="stylesheet" href="/static/research_trp/style.css?v=vp-9" />
+  <link rel="stylesheet" href="/static/research_trp/style.css?v=ob-levels-1" />
 </head>
 <body>
   <div id="app">
     <div id="price-pane">
-      <div id="overlay">
-        <div id="demo-badge">DEMO · synthetic data</div>
-        <div id="legend"></div>
+      <div id="price-main">
+        <div id="overlay">
+          <div id="demo-badge">DEMO · synthetic data</div>
+          <div id="legend"></div>
+        </div>
+        <div id="empty">No candles to display</div>
+        <div id="chart"></div>
+        <div id="overlay-layer"></div>
+        <canvas id="research-markers" aria-hidden="true" style="pointer-events:none"></canvas>
+        <canvas id="ptb-overlay" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5"></canvas>
+        <canvas id="vp-overlay" aria-hidden="true"></canvas>
+        <div id="vp-tooltip" hidden></div>
+        <div id="vp-badge" hidden></div>
+        <canvas id="obp-overlay" aria-hidden="true"></canvas>
+        <div id="obp-tooltip" hidden></div>
+        <div id="obp-badge" hidden></div>
+        <div id="ptb-tooltip" hidden></div>
+        <div id="selected-line"></div>
       </div>
-      <div id="empty">No candles to display</div>
-      <div id="chart"></div>
-      <div id="overlay-layer"></div>
-      <canvas id="research-markers" aria-hidden="true" style="pointer-events:none"></canvas>
-      <canvas id="ptb-overlay" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5"></canvas>
-      <canvas id="vp-overlay" aria-hidden="true"></canvas>
-      <div id="vp-tooltip" hidden></div>
-      <div id="vp-badge" hidden></div>
-      <canvas id="obp-overlay" aria-hidden="true"></canvas>
-      <div id="obp-tooltip" hidden></div>
-      <div id="obp-badge" hidden></div>
-      <div id="ptb-tooltip" hidden></div>
-      <div id="selected-line"></div>
+      <aside id="ob-levels-panel" class="ob-levels-panel" hidden aria-label="Orderbook levels">
+        <div id="ob-levels-header" class="ob-levels-header">
+          <span id="ob-levels-title">OB200</span>
+          <span id="ob-levels-meta" class="ob-levels-meta"></span>
+          <span id="ob-levels-fresh" class="ob-levels-fresh"></span>
+        </div>
+        <canvas id="ob-levels-canvas" aria-hidden="true"></canvas>
+        <div id="ob-levels-tooltip" class="ob-levels-tooltip" hidden></div>
+      </aside>
     </div>
     <div id="lower-split" title="Resize oscillator"></div>
     <div id="lower-pane">
@@ -34,6 +45,6 @@
     </div>
   </div>
   <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
-  <script src="/static/research_trp/chart.js?v=aps-markers-24"></script>
+  <script src="/static/research_trp/chart.js?v=ob-levels-1"></script>
 </body>
 </html>

@@ -35,6 +35,7 @@ from .orderbook_profile import (
     OrderbookProfileQueryError,
     load_orderbook_profile,
 )
+from .ob200_levels import load_ob200_levels
 from .live_diag import clear_live_diag, record_live_diag, snapshot_live_diag
 from .public_trades_profile import (
     VolumeProfileQueryError,
@@ -294,6 +295,57 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "orderbook_profile_failed", str(exc))
         return payload
 
+    @router.get("/api/research/ob200-levels")
+    async def api_research_ob200_levels(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        at: Optional[int] = Query(
+            None,
+            description="Causal as-of UTC unix seconds. Default: now (live tip / open segment).",
+        ),
+    ):
+        """Full real OB200 book levels for the depth side-panel (read-only).
+
+        Uses reconstructed raw archive state — never features, volume profile,
+        or synthetic levels.
+        """
+        sym = str(symbol or "").strip().upper()
+        at_dt = None
+        if at is not None:
+            try:
+                at_dt = datetime.fromtimestamp(int(at), tz=timezone.utc)
+            except (TypeError, ValueError, OSError, OverflowError):
+                return _error(400, "invalid_at", "at must be UTC unix seconds")
+        known = True
+        if sym != "XAUUSDT":
+            try:
+                known = sym in known_symbols()
+            except Exception:
+                known = True
+        try:
+            payload = await asyncio.to_thread(
+                load_ob200_levels,
+                sym,
+                at=at_dt,
+                known_symbol=known,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", f"unknown symbol {sym}")
+        except ValueError as exc:
+            code = str(exc)
+            if code in {
+                "ob200_missing",
+                "ob200_invalid_book",
+                "ob200_crossed_book",
+                "empty_symbol",
+            }:
+                status = 404 if code == "ob200_missing" else 409
+                return _error(status, code, str(exc))
+            return _error(400, code, str(exc))
+        except Exception as exc:
+            return _error(500, "ob200_levels_failed", str(exc))
+        return payload
+
     @router.post("/api/research/pane")
     async def api_research_pane(
         user: dict = Depends(require_auth),
@@ -504,6 +556,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 liquidity=body.get("liquidity"),
                 volume_profile=body.get("volume_profile"),
                 orderbook_profile=body.get("orderbook_profile"),
+                orderbook_levels=body.get("orderbook_levels"),
             )
         except ValueError as exc:
             return _error(400, "invalid_settings", str(exc))
