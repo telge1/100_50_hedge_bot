@@ -28,6 +28,42 @@ class InsertError(RuntimeError):
     pass
 
 
+class NullFeatureWriter:
+    """No-op writer for raw-archive-only mode (no ClickHouse, no feature queue)."""
+
+    def __init__(self) -> None:
+        self.queue: asyncio.Queue[list[dict[str, Any]]] = asyncio.Queue(maxsize=1)
+        self.queue_capacity = 0
+        self.queue_high_watermark = 0
+        self.state = "DISABLED"
+        self.rows_written = 0
+        self.batches_flushed = 0
+        self.batch_sizes: list[int] = []
+        self.insert_latencies_ms: list[float] = []
+        self.insert_failures = 0
+        self.last_error = ""
+
+    def enqueue(self, rows: list[dict[str, Any]]) -> None:
+        if rows:
+            raise RuntimeError("NullFeatureWriter must not receive feature rows")
+
+    def request_stop(self) -> None:
+        pass
+
+    async def run(self) -> None:
+        while True:
+            await asyncio.sleep(3600)
+
+    async def join(self, task: asyncio.Task, timeout: float | None = None) -> bool:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        self.state = "STOPPED"
+        return True
+
+
 class FeatureWriter:
     def __init__(
         self,

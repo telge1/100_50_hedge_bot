@@ -57,7 +57,7 @@ SYMBOLS_48: tuple[str, ...] = (
 SYMBOLS_51: tuple[str, ...] = SHADOW3_SYMBOLS + SYMBOLS_48
 FORBIDDEN_SYMBOLS: frozenset[str] = frozenset({"XAUUSDT"})
 
-MODES = ("ada", "shadow3", "universe51")
+MODES = ("ada", "shadow3", "universe51", "raw-archive-only")
 
 
 class UniverseError(ValueError):

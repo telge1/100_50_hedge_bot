@@ -6,6 +6,12 @@ Uses the same V3 builders as the historical parser. Differences vs batch
 - Does not invent seconds before the first valid snapshot.
 - Does not emit ``is_valid=0`` rows (archive backfill covers gaps).
 - Does not carry forward across an invalid book / reconnect.
+
+Dedupe: Bybit ``u`` is strictly monotonic (+1). Duplicate WS redeliveries are
+filtered via a bounded recent-``u`` window (see ``dedupe.BoundedRecentU``).
+``apply_delta`` remains the source of truth for gap vs duplicate vs apply.
+Completed bucket idempotency uses a watermark (``last_emitted_bucket_ms``) plus
+a small ``in_flight_buckets`` set — not an unbounded ``written_buckets`` set.
 """
 from __future__ import annotations
 
@@ -18,6 +24,10 @@ from orderbook_analyse.orderbook_v2.dynamics import (
     build_event_feature_row,
     mid_of,
     snapshot_is_usable,
+)
+from orderbook_analyse.orderbook_v2_live.dedupe import (
+    DEFAULT_DEDUPE_CAPACITY,
+    BoundedRecentU,
 )
 
 
@@ -39,6 +49,7 @@ class ClockStats:
     rows_emitted: int = 0
     duplicate_buckets_skipped: int = 0
     invalid_book: int = 0
+    dedupe_evictions: int = 0
 
 
 @dataclass
@@ -48,7 +59,8 @@ class LiveSecondClock:
     exchange: str = "bybit"
     market: str = "linear"
     skip_before_ms: int | None = None
-    seen_us: set[int] = field(default_factory=set)
+    dedupe_capacity: int = DEFAULT_DEDUPE_CAPACITY
+    recent_us: BoundedRecentU = field(init=False)
     stats: ClockStats = field(default_factory=ClockStats)
 
     book: BookState = field(
@@ -66,10 +78,22 @@ class LiveSecondClock:
     prev_mid_for_change: Any = None
     last_emitted_bucket_ms: int | None = None
     first_valid_live_bucket_ms: int | None = None
-    written_buckets: set[int] = field(default_factory=set)
     in_flight_buckets: set[int] = field(default_factory=set)
     generation: int = 0
     stale_generation_dropped: int = 0
+
+    def __post_init__(self) -> None:
+        self.recent_us = BoundedRecentU(self.dedupe_capacity)
+
+    # Back-compat alias used by older tests / introspection.
+    @property
+    def seen_us(self) -> BoundedRecentU:
+        return self.recent_us
+
+    @property
+    def written_buckets(self) -> set[int]:
+        """Deprecated unbounded set removed; empty stub for introspection."""
+        return set()
 
     def invalidate(self, reason: str) -> None:
         if "gap" in reason or reason == "seq_gap":
@@ -78,6 +102,7 @@ class LiveSecondClock:
         self.book = BookState(bids={}, asks={}, last_u=0, last_seq=0, is_valid=False)
         self.last_valid_book = None
         self.waiting_for_snapshot = True
+        self.recent_us.clear()
         self._discard_open_bucket()
 
     def begin_resync(self) -> int:
@@ -86,8 +111,16 @@ class LiveSecondClock:
         self.book = BookState(bids={}, asks={}, last_u=0, last_seq=0, is_valid=False)
         self.last_valid_book = None
         self.waiting_for_snapshot = True
+        self.recent_us.clear()
+        self.in_flight_buckets.clear()
         self._discard_open_bucket()
         return self.generation
+
+    def _note_u(self, u_val: int | None) -> None:
+        if u_val is None:
+            return
+        self.recent_us.add(int(u_val))
+        self.stats.dedupe_evictions = self.recent_us.evictions
 
     def ingest(
         self,
@@ -102,9 +135,21 @@ class LiveSecondClock:
             self.stats.dropped_events += 1
             return []
         u_val = data.get("u")
-        if u_val is not None and u_val in self.seen_us:
-            self.stats.duplicate_u += 1
-            return []
+        if u_val is not None:
+            u_int = int(u_val)
+            if u_int in self.recent_us:
+                self.stats.duplicate_u += 1
+                self.recent_us.hits += 1
+                return []
+            # Same u as applied book tip: duplicate even if evicted from window.
+            if (
+                not self.waiting_for_snapshot
+                and self.book.is_valid
+                and u_int == self.book.last_u
+            ):
+                self.stats.duplicate_u += 1
+                self._note_u(u_int)
+                return []
 
         if self.waiting_for_snapshot:
             if msg_type != "snapshot":
@@ -115,8 +160,7 @@ class LiveSecondClock:
                 self.stats.dropped_events += 1
                 self.invalidate("bad_snapshot")
                 return []
-            if u_val is not None:
-                self.seen_us.add(u_val)
+            self._note_u(u_val)
             self.stats.snapshots += 1
             self.waiting_for_snapshot = False
             # Open the bucket before publishing last_valid so book_at_start
@@ -135,8 +179,7 @@ class LiveSecondClock:
                 self.stats.dropped_events += 1
                 self.invalidate("bad_snapshot")
                 raise SequenceBreak("unusable_snapshot")
-            if u_val is not None:
-                self.seen_us.add(u_val)
+            self._note_u(u_val)
             self.stats.snapshots += 1
             self.book = snap
             self.last_valid_book = snap
@@ -151,20 +194,21 @@ class LiveSecondClock:
         emitted = self._advance_to_bucket(floor_second_ms(ts_ms), ts_ms)
         self.stats.deltas += 1
         new_book, warnings = apply_delta(self.book, data)
+        if any(w.startswith("seq_dup") for w in warnings):
+            # Same u as last_u: duplicate redelivery (apply_delta no-op).
+            self.stats.duplicate_u += 1
+            self._note_u(u_val)
+            return emitted
         gap = any(w.startswith("seq_gap") for w in warnings)
         if gap or not new_book.is_valid:
-            if u_val is not None:
-                self.seen_us.add(u_val)
+            self._note_u(u_val)
             self.invalidate("seq_gap")
             raise SequenceBreak(",".join(warnings) or "invalid_book")
-        if u_val is not None:
-            self.seen_us.add(u_val)
+        self._note_u(u_val)
         self.book = new_book
         self.last_valid_book = new_book
         self.last_valid_ts_ms = ts_ms
         self._count_update(msg_type, data)
-        if any(w.startswith("seq_dup") for w in warnings):
-            self.stats.duplicate_u += 1
         return emitted
 
     def close_through(self, now_ms: int) -> list[dict[str, Any]]:
@@ -294,7 +338,10 @@ class LiveSecondClock:
         bucket_ms = int(bs.timestamp() * 1000)
         if self.skip_before_ms is not None and bucket_ms < self.skip_before_ms:
             return None
-        if bucket_ms in self.written_buckets or bucket_ms in self.in_flight_buckets:
+        if (
+            self.last_emitted_bucket_ms is not None
+            and bucket_ms <= self.last_emitted_bucket_ms
+        ) or bucket_ms in self.in_flight_buckets:
             self.stats.duplicate_buckets_skipped += 1
             return None
         self.in_flight_buckets.add(bucket_ms)
@@ -306,7 +353,27 @@ class LiveSecondClock:
 
     def note_enqueued(self, bucket_ms: int) -> None:
         self.in_flight_buckets.discard(bucket_ms)
-        self.written_buckets.add(bucket_ms)
+        # Drop stale in-flight marks below the watermark (safety for long gaps).
+        if self.last_emitted_bucket_ms is not None and len(self.in_flight_buckets) > 64:
+            floor = self.last_emitted_bucket_ms - 60_000
+            self.in_flight_buckets = {b for b in self.in_flight_buckets if b >= floor}
 
     def note_enqueue_failed(self, bucket_ms: int) -> None:
         self.in_flight_buckets.discard(bucket_ms)
+        # Allow retry of the same second after a failed enqueue.
+        if self.last_emitted_bucket_ms == bucket_ms:
+            self.last_emitted_bucket_ms = bucket_ms - 1000 if bucket_ms >= 1000 else None
+
+    def memory_stats(self) -> dict[str, Any]:
+        book = self.last_valid_book or self.book
+        return {
+            "dedupe_entries": len(self.recent_us),
+            "dedupe_capacity": self.recent_us.capacity,
+            "dedupe_evictions": self.recent_us.evictions,
+            "dedupe_hits": self.recent_us.hits,
+            "book_bid_levels": len(book.bids),
+            "book_ask_levels": len(book.asks),
+            "in_flight_buckets": len(self.in_flight_buckets),
+            "delta_data_in_bucket": len(self.delta_data_in_bucket),
+            "generation": self.generation,
+        }
