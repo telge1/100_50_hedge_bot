@@ -4,10 +4,15 @@ Compute lives in ``orderbook_analyse.market_profile`` and is reused as-is
 rather than reimplemented, so the page and the offline validation run cannot
 drift apart. This module only adapts it: request validation, the ClickHouse
 client, a small result cache, and JSON shaping.
+
+Candle timeframe (``timeframe``) and market-profile window type
+(``mp_timeframe`` / ``anchor``) are independent settings. Profiles are never
+recomputed from the candle TF; cache keys therefore omit the candle TF.
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import threading
 import time
@@ -28,11 +33,26 @@ CACHE_MAX_ENTRIES = 24
 
 # Each window is one ClickHouse aggregation, so the window count is the real
 # cost driver. A day view over three months is fine; a year of sessions is not.
-MAX_WINDOWS = 96
+MAX_WINDOWS = 288
 MAX_RANGE_DAYS = 180
 
+# Candle chart resolution only — never drives profile window boundaries.
 SUPPORTED_TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h", "4h")
-SUPPORTED_ANCHORS = ("day", "session", "composite")
+
+# Profile window type: fixed UTC periods + classic day/session/composite.
+SUPPORTED_MP_TIMEFRAMES = (
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "4h",
+    "day",
+    "session",
+    "composite",
+)
+# Back-compat alias used by older callers / tests.
+SUPPORTED_ANCHORS = SUPPORTED_MP_TIMEFRAMES
+PERIOD_MP_TIMEFRAMES = ("5m", "15m", "30m", "1h", "4h")
 
 DEFAULT_VALUE_AREA_PCT = 0.70
 DEFAULT_TARGET_BINS = 160
@@ -111,7 +131,8 @@ def _normalize_request(
     symbol: str,
     start: int,
     end: int,
-    anchor: str,
+    anchor: str | None = None,
+    mp_timeframe: str | None = None,
     sessions: str | None,
     timeframe: str,
     value_area_pct: float,
@@ -136,10 +157,14 @@ def _normalize_request(
             f"range spans {span_days:.1f} days, limit is {MAX_RANGE_DAYS}",
         )
 
-    mode = str(anchor or "day").strip().lower()
-    if mode not in SUPPORTED_ANCHORS:
+    # mp_timeframe is the canonical profile-window control; ``anchor`` remains
+    # as a legacy alias so older clients keep working.
+    raw_mp = mp_timeframe if mp_timeframe not in (None, "") else anchor
+    mode = str(raw_mp or "day").strip().lower()
+    if mode not in SUPPORTED_MP_TIMEFRAMES:
         raise ProfileRequestError(
-            "bad_anchor", f"anchor must be one of {', '.join(SUPPORTED_ANCHORS)}"
+            "bad_anchor",
+            f"mp_timeframe must be one of {', '.join(SUPPORTED_MP_TIMEFRAMES)}",
         )
 
     available = session_names()
@@ -184,6 +209,7 @@ def _normalize_request(
         "end": _utc(e_unix),
         "start_unix": s_unix,
         "end_unix": e_unix,
+        "mp_timeframe": mode,
         "anchor_mode": mode,
         "sessions": tuple(wanted),
         "timeframe": tf,
@@ -194,14 +220,18 @@ def _normalize_request(
 
 
 def _cache_key(req: dict[str, Any], include_bins: bool) -> str:
+    """Profile cache key — candle timeframe intentionally omitted.
+
+    Changing KERZEN must not collide with or invalidate a different MP window
+    type; profile computation is independent of candle resolution.
+    """
     return "|".join(
         [
             req["symbol"],
             str(req["start_unix"]),
             str(req["end_unix"]),
-            req["anchor_mode"],
-            ",".join(req["sessions"]),
-            req["timeframe"],
+            req["mp_timeframe"],
+            ",".join(req["sessions"]) if req["mp_timeframe"] == "session" else "",
             f"{req['value_area_pct']:.4f}",
             str(req["target_bins"]),
             "final" if req["use_final"] else "plain",
@@ -251,6 +281,18 @@ def _candles_payload(df) -> list[dict[str, Any]]:
     return out
 
 
+def _load_candles(req: dict[str, Any], mp: dict[str, Any]) -> tuple[Any, list[dict[str, Any]]]:
+    client = _client()
+    df_1m = mp["fetch_candles_1m"](client, req["symbol"], req["start"], req["end"])
+    if df_1m is None or df_1m.empty:
+        raise ProfileRequestError(
+            "no_candles", f"no 1m candles for {req['symbol']} in that range"
+        )
+    tf = req["timeframe"]
+    df_tf = df_1m.copy() if tf in ("1m", "1min") else mp["aggregate_timeframe"](df_1m, tf)
+    return df_1m, _candles_payload(df_tf)
+
+
 def _build_one_window(
     *,
     symbol: str,
@@ -281,7 +323,8 @@ def load_profiles(
     symbol: str,
     start: int,
     end: int,
-    anchor: str = "day",
+    anchor: str | None = None,
+    mp_timeframe: str | None = None,
     sessions: str | None = None,
     timeframe: str = "15m",
     value_area_pct: float = DEFAULT_VALUE_AREA_PCT,
@@ -294,12 +337,16 @@ def load_profiles(
     `use_final` defaults to off: FINAL deduplication costs roughly 60x on the
     trade scan, and parity on this range was checked in the offline validation
     run. The toggle stays exposed so a suspicious window can be re-checked.
+
+    ``timeframe`` only aggregates chart candles. ``mp_timeframe`` / ``anchor``
+    selects the profile windows (period / day / session / composite).
     """
     req = _normalize_request(
         symbol=symbol,
         start=start,
         end=end,
         anchor=anchor,
+        mp_timeframe=mp_timeframe,
         sessions=sessions,
         timeframe=timeframe,
         value_area_pct=value_area_pct,
@@ -309,10 +356,20 @@ def load_profiles(
 
     key = _cache_key(req, include_bins)
     cached = _cache_get(key)
-    if cached is not None:
-        return {**cached, "cached": True}
-
     mp = load_market_profile()
+
+    if cached is not None:
+        # Re-aggregate candles for the requested candle TF without touching
+        # the cached profile windows.
+        payload = copy.deepcopy(cached)
+        _df_1m, candles = _load_candles(req, mp)
+        payload["candles"] = candles
+        payload["timeframe"] = req["timeframe"]
+        payload["mp_timeframe"] = req["mp_timeframe"]
+        payload["anchor_mode"] = req["anchor_mode"]
+        payload["cached"] = True
+        return payload
+
     windows = mp["build_windows"](
         anchor_mode=req["anchor_mode"],
         start=req["start"],
@@ -321,24 +378,24 @@ def load_profiles(
     )
     if not windows:
         raise ProfileRequestError("no_windows", "no profile windows in that range")
-    if len(windows) > MAX_WINDOWS:
-        raise ProfileRequestError(
-            "too_many_windows",
-            f"{len(windows)} windows requested, limit is {MAX_WINDOWS}. "
-            "Narrow the range or switch anchor to day/composite.",
-        )
 
-    client = _client()
-    df_1m = mp["fetch_candles_1m"](client, req["symbol"], req["start"], req["end"])
-    if df_1m is None or df_1m.empty:
-        raise ProfileRequestError(
-            "no_candles", f"no 1m candles for {req['symbol']} in that range"
-        )
-    tf = req["timeframe"]
-    df_tf = df_1m.copy() if tf in ("1m", "1min") else mp["aggregate_timeframe"](df_1m, tf)
+    windows_truncated = 0
+    if len(windows) > MAX_WINDOWS:
+        if req["mp_timeframe"] in PERIOD_MP_TIMEFRAMES:
+            # Keep the most recent blocks (includes the forming last window).
+            windows_truncated = len(windows) - MAX_WINDOWS
+            windows = windows[-MAX_WINDOWS:]
+        else:
+            raise ProfileRequestError(
+                "too_many_windows",
+                f"{len(windows)} windows requested, limit is {MAX_WINDOWS}. "
+                "Narrow the range or switch mp_timeframe to day/composite.",
+            )
+
+    df_1m, candles = _load_candles(req, mp)
 
     thresholds = mp["ShapeThresholds"]()
-    max_workers = min(4, max(1, len(windows)))
+    max_workers = min(8, max(1, len(windows)))
     build_kwargs = [
         {
             "symbol": req["symbol"],
@@ -372,15 +429,17 @@ def load_profiles(
     payload = {
         "success": True,
         "symbol": req["symbol"],
+        "mp_timeframe": req["mp_timeframe"],
         "anchor_mode": req["anchor_mode"],
         "sessions": list(req["sessions"]),
-        "timeframe": tf,
+        "timeframe": req["timeframe"],
         "requested_start": req["start_unix"],
         "requested_end": req["end_unix"],
-        "candles": _candles_payload(df_tf),
+        "candles": candles,
         "profiles": profiles,
         "meta": {
             "windows": len(windows),
+            "windows_truncated": windows_truncated,
             "profiles_built": len(profiles),
             "skipped_windows": skipped,
             "value_area_pct": req["value_area_pct"],
@@ -393,8 +452,12 @@ def load_profiles(
             "tpo_contract": "tpo_profile_facts_v1",
             "volume_contract": "volume_profile_facts_v1",
             "profile_timeframe_independent": True,
+            "compute_path": "clickhouse_agg",
         },
         "cached": False,
     }
-    _cache_put(key, payload)
+    # Store without binding to a candle TF; candles are refreshed on hit.
+    to_store = copy.deepcopy(payload)
+    to_store["candles"] = []
+    _cache_put(key, to_store)
     return payload

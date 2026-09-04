@@ -26,6 +26,8 @@ from market_profile_v1.service import (  # noqa: E402
     MAX_RANGE_DAYS,
     MAX_WINDOWS,
     ProfileRequestError,
+    SUPPORTED_MP_TIMEFRAMES,
+    _cache_key,
     _normalize_request,
     clear_cache_for_tests,
 )
@@ -93,8 +95,43 @@ def test_a_valid_request_normalizes_to_utc_datetimes():
     assert out["start"].tzinfo is timezone.utc
     assert out["end"] > out["start"]
     assert out["anchor_mode"] == "day"
+    assert out["mp_timeframe"] == "day"
+    assert out["timeframe"] == "15m"
     assert out["use_final"] is False
 
+
+def test_mp_timeframe_overrides_legacy_anchor_alias():
+    out = _normalize_request(**_req(anchor="day", mp_timeframe="4h"))
+    assert out["mp_timeframe"] == "4h"
+    assert out["anchor_mode"] == "4h"
+    assert out["timeframe"] == "15m"
+
+
+def test_candle_and_mp_timeframes_normalize_independently():
+    out = _normalize_request(**_req(timeframe="1h", mp_timeframe="15m", anchor=None))
+    assert out["timeframe"] == "1h"
+    assert out["mp_timeframe"] == "15m"
+    out2 = _normalize_request(**_req(timeframe="5m", mp_timeframe="4h", anchor=None))
+    assert out2["timeframe"] == "5m"
+    assert out2["mp_timeframe"] == "4h"
+
+
+@pytest.mark.parametrize("mp_tf", list(SUPPORTED_MP_TIMEFRAMES))
+def test_all_mp_timeframes_are_accepted(mp_tf):
+    out = _normalize_request(**_req(mp_timeframe=mp_tf, anchor=None))
+    assert out["mp_timeframe"] == mp_tf
+    assert out["anchor_mode"] == mp_tf
+
+
+def test_cache_key_uses_mp_window_not_candle_tf():
+    a = _normalize_request(**_req(timeframe="5m", mp_timeframe="4h", anchor=None))
+    b = _normalize_request(**_req(timeframe="1h", mp_timeframe="4h", anchor=None))
+    c = _normalize_request(**_req(timeframe="5m", mp_timeframe="15m", anchor=None))
+    assert _cache_key(a, True) == _cache_key(b, True)
+    assert _cache_key(a, True) != _cache_key(c, True)
+    assert "4h" in _cache_key(a, True)
+    assert a["symbol"] in _cache_key(a, True)
+    assert str(a["start_unix"]) in _cache_key(a, True)
 
 @pytest.mark.parametrize("symbol", ["", "   ", "BTC-USDT", "BTC USDT", "BTC/USDT"])
 def test_malformed_symbols_are_rejected(symbol):
@@ -171,13 +208,15 @@ def test_meta_exposes_choices_limits_and_the_shape_caveat():
     body = res.json()
     assert body["success"] is True
     assert "day" in body["anchors"] and "composite" in body["anchors"]
+    assert "4h" in body["mp_timeframes"]
     assert "15m" in body["timeframes"]
+    assert "1m" in body["timeframes"]
     assert body["limits"]["max_windows"] == MAX_WINDOWS
+    assert body.get("profile_timeframe_independent") is True
     # The verdict is drawn on the chart, so the API must admit its status.
     assert body["shape_unvalidated"] is True
     assert "unvalidiert" in body["shape_notice"]
     assert body.get("dual_contract_version") == "market_profile_v1_dual_tpo_volume_v1"
-
 
 def test_bad_requests_return_a_coded_error_not_a_crash():
     res = _mini().get(
@@ -415,8 +454,47 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-2"
+    assert ASSET_V == "mp-6"
 
+
+def test_kerzen_and_market_profile_controls_are_separate():
+    from market_profile_v1.service import SUPPORTED_TIMEFRAMES
+
+    html = PAGE_HTML.read_text(encoding="utf-8")
+    js = APP_JS.read_text(encoding="utf-8")
+    assert 'for="mpTimeframe">KERZEN</' in html
+    assert 'for="mpAnchor">MARKET PROFILE</' in html
+    assert "{% for tf in timeframes %}" in html
+    assert "1m" in SUPPORTED_TIMEFRAMES
+    for tf in ("5m", "15m", "30m", "1h", "4h"):
+        assert f'value="{tf}"' in html  # MP period options (hardcoded)
+    assert 'value="day"' in html and 'value="session"' in html and 'value="composite"' in html
+    assert "mp_timeframe" in js
+    assert "s.mpTimeframe || s.anchor" in js
+    assert '["mpSymbol", "mpTimeframe", "mpAnchor", "mpDays"]' in js
+    # Candle TF must not be copied into the MP control on restore.
+    assert "Never copy candle" in js
+
+
+def test_the_page_bridge_stubs_crosshair_handlers():
+    """Regression: missing on_crosshair_move crashed load as Netzwerkfehler."""
+    html = PAGE_HTML.read_text(encoding="utf-8")
+    assert "window.bridge = {" in html
+    assert "on_crosshair_move:" in html
+    assert "on_crosshair_leave:" in html
+    assert "on_chart_click:" in html
+    js = APP_JS.read_text(encoding="utf-8")
+    assert "scheduleDrawDebounced" in js
+    assert "Promise.all([" in js
+    assert "startLivePoll" in js
+    assert "pollForming" in js
+    assert "/api/research/forming-bar" in js
+    assert "updateFormingBar" in js
+    assert "FORMING_MS = 250" in js
+    chart = (DASHBOARD_DIR / "static" / "research_trp" / "chart.js").read_text(encoding="utf-8")
+    assert 'typeof window.bridge.on_crosshair_move === "function"' in chart
+    assert 'typeof window.bridge.on_crosshair_leave === "function"' in chart
+    assert "updateFormingBar._stickAt" in chart
 
 # ----------------------------------------------------------- live smoke test
 
@@ -474,3 +552,54 @@ def test_a_real_day_anchored_request_returns_usable_profiles():
         timeframe="15m",
     )
     assert again["cached"] is True
+
+
+@pytest.mark.skipif(not _clickhouse_available(), reason="ClickHouse not reachable")
+def test_candle_tf_change_reuses_mp_cache_and_period_windows_align():
+    from market_profile_v1.service import load_profiles
+
+    clear_cache_for_tests()
+    start = int(datetime(2026, 8, 27, 0, 0, tzinfo=timezone.utc).timestamp())
+    end = int(datetime(2026, 8, 27, 12, 0, tzinfo=timezone.utc).timestamp())
+
+    first = load_profiles(
+        symbol="BTCUSDT",
+        start=start,
+        end=end,
+        mp_timeframe="4h",
+        timeframe="5m",
+    )
+    assert first["success"] is True
+    assert first["mp_timeframe"] == "4h"
+    assert first["timeframe"] == "5m"
+    assert first["meta"]["profile_timeframe_independent"] is True
+    assert first["profiles"]
+    assert first["meta"]["windows"] == 3
+    for p in first["profiles"]:
+        assert p["window"]["anchor_mode"] == "4h"
+
+    # Different candle TF, same MP windows → cache hit; candles refreshed.
+    second = load_profiles(
+        symbol="BTCUSDT",
+        start=start,
+        end=end,
+        mp_timeframe="4h",
+        timeframe="1h",
+    )
+    assert second["cached"] is True
+    assert second["timeframe"] == "1h"
+    assert second["mp_timeframe"] == "4h"
+    assert len(second["profiles"]) == len(first["profiles"])
+    assert len(second["candles"]) < len(first["candles"])
+
+    third = load_profiles(
+        symbol="BTCUSDT",
+        start=start,
+        end=end,
+        mp_timeframe="15m",
+        timeframe="1h",
+    )
+    assert third["cached"] is False
+    assert third["mp_timeframe"] == "15m"
+    assert third["timeframe"] == "1h"
+    assert third["meta"]["windows"] == 48  # 12h / 15m

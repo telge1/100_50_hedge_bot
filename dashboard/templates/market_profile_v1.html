@@ -35,8 +35,22 @@
                 </div>
 
                 <div class="mp-group">
-                    <label class="mp-label" for="mpAnchor">ANKER</label>
-                    <select id="mpAnchor" class="mp-select">
+                    <label class="mp-label" for="mpTimeframe">KERZEN</label>
+                    <select id="mpTimeframe" class="mp-select" title="Nur Candle-Auflösung — ändert das Market Profile nicht" aria-label="Kerzen-Timeframe">
+                        {% for tf in timeframes %}
+                        <option value="{{ tf }}"{% if tf == '15m' %} selected{% endif %}>{{ tf }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mp-group">
+                    <label class="mp-label" for="mpAnchor">MARKET PROFILE</label>
+                    <select id="mpAnchor" class="mp-select" title="Profil-Fenster (unabhängig von Kerzen): Perioden, Tag, Session, Composite" aria-label="Market-Profile-Timeframe">
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="30m">30m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
                         <option value="day" selected>Tag (UTC)</option>
                         <option value="session">Session</option>
                         <option value="composite">Composite</option>
@@ -66,15 +80,6 @@
                     <input type="date" id="mpStart" class="mp-input">
                     <label class="mp-label" for="mpEnd">BIS</label>
                     <input type="date" id="mpEnd" class="mp-input">
-                </div>
-
-                <div class="mp-group">
-                    <label class="mp-label" for="mpTimeframe">KERZEN</label>
-                    <select id="mpTimeframe" class="mp-select">
-                        {% for tf in timeframes %}
-                        <option value="{{ tf }}"{% if tf == '15m' %} selected{% endif %}>{{ tf }}</option>
-                        {% endfor %}
-                    </select>
                 </div>
 
                 <button type="button" class="mp-btn mp-primary" id="mpLoad">Laden</button>
@@ -256,6 +261,11 @@
       on_visible_range: function () {
         if (window.__mpOnVisibleRange) window.__mpOnVisibleRange();
       },
+      // chart.js always registers crosshair/click handlers; stubs must exist
+      // or setData/mousemove throws and the load path surfaces it as Netzwerkfehler.
+      on_crosshair_move: function () {},
+      on_crosshair_leave: function () {},
+      on_chart_click: function () {},
       on_drawing_event: function (blob) {
         if (window.__mpOnDrawingEvent) window.__mpOnDrawingEvent(blob);
       },

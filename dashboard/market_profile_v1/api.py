@@ -16,6 +16,7 @@ from .service import (
     MAX_WINDOWS,
     SHAPE_NOTICE,
     SUPPORTED_ANCHORS,
+    SUPPORTED_MP_TIMEFRAMES,
     SUPPORTED_TIMEFRAMES,
     ProfileRequestError,
     known_symbols,
@@ -51,6 +52,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                     "symbols": known_symbols(),
                     "sessions": session_names(),
                     "timeframes": list(SUPPORTED_TIMEFRAMES),
+                    "mp_timeframes": list(SUPPORTED_MP_TIMEFRAMES),
                     "anchors": list(SUPPORTED_ANCHORS),
                     "max_windows": MAX_WINDOWS,
                     "max_range_days": MAX_RANGE_DAYS,
@@ -65,10 +67,13 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "symbols": known_symbols(),
             "sessions": session_names(),
             "timeframes": list(SUPPORTED_TIMEFRAMES),
+            "mp_timeframes": list(SUPPORTED_MP_TIMEFRAMES),
             "anchors": list(SUPPORTED_ANCHORS),
             "defaults": {
                 "value_area_pct": DEFAULT_VALUE_AREA_PCT,
                 "target_bins": DEFAULT_TARGET_BINS,
+                "timeframe": "15m",
+                "mp_timeframe": "day",
             },
             "limits": {"max_windows": MAX_WINDOWS, "max_range_days": MAX_RANGE_DAYS},
             "shape_unvalidated": True,
@@ -76,6 +81,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "dual_contract_version": DUAL_CONTRACT_VERSION,
             "tpo_contract": "tpo_profile_facts_v1",
             "volume_contract": "volume_profile_facts_v1",
+            "profile_timeframe_independent": True,
         }
 
     @router.get("/api/market-profile/profiles")
@@ -84,9 +90,19 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         symbol: str = Query(...),
         start: int = Query(..., description="UTC unix seconds, inclusive"),
         end: int = Query(..., description="UTC unix seconds, exclusive"),
-        anchor: str = Query("day"),
-        sessions: str | None = Query(None, description="csv, session anchor only"),
-        timeframe: str = Query("15m", description="candle timeframe for the chart"),
+        mp_timeframe: str | None = Query(
+            None,
+            description=(
+                "Profile window type: 5m/15m/30m/1h/4h/day/session/composite. "
+                "Independent of candle timeframe."
+            ),
+        ),
+        anchor: str | None = Query(
+            None,
+            description="Legacy alias for mp_timeframe (day/session/composite/periods)",
+        ),
+        sessions: str | None = Query(None, description="csv, session mp_timeframe only"),
+        timeframe: str = Query("15m", description="candle timeframe for the chart only"),
         value_area_pct: float = Query(DEFAULT_VALUE_AREA_PCT),
         target_bins: int = Query(DEFAULT_TARGET_BINS),
         final: int = Query(0, description="1 = FINAL dedupe on the trade scan"),
@@ -98,7 +114,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 symbol=symbol,
                 start=start,
                 end=end,
-                anchor=anchor,
+                mp_timeframe=mp_timeframe,
+                anchor=anchor or "day",
                 sessions=sessions,
                 timeframe=timeframe,
                 value_area_pct=value_area_pct,

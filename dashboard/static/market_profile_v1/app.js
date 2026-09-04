@@ -44,6 +44,7 @@
   var candleTimes = [];
   var inflight = null;
   var rafPending = false;
+  var drawDebounceTimer = null;
   var chartReady = false;
   var workspace = null;
   var emaDraft = null;
@@ -52,6 +53,14 @@
   var appliedOverlayPayloads = {};
   var lastEmaPayload = null;
   var lastLoadRange = null;
+  var livePollGen = 0;
+  var formingTimer = null;
+  var formingInflight = false;
+  var FORMING_MS = 250;
+  var TF_SEC = {
+    "1m": 60, "3m": 180, "5m": 300, "15m": 900,
+    "30m": 1800, "1h": 3600, "2h": 7200, "4h": 14400, "1d": 86400
+  };
 
   var TOOLS = [
     ["select", "Auswählen"],
@@ -95,13 +104,17 @@
   function readSettings() {
     return {
       symbol: $("mpSymbol").value,
+      // Market-profile window type (periods / day / session / composite).
+      // Kept as `anchor` in localStorage for back-compat; also mirrored as mpTimeframe.
       anchor: $("mpAnchor").value,
+      mpTimeframe: $("mpAnchor").value,
       sessions: Array.prototype.slice
         .call(document.querySelectorAll(".mp-session:checked"))
         .map(function (el) { return el.value; }),
       days: $("mpDays").value,
       start: $("mpStart").value,
       end: $("mpEnd").value,
+      // Candle resolution only — never written into MP controls.
       timeframe: $("mpTimeframe").value,
       showHistogram: $("mpShowHistogram").checked,
       showVolumeLine: $("mpShowVolumeLine") ? $("mpShowVolumeLine").checked : false,
@@ -148,7 +161,10 @@
     }
 
     setVal("mpSymbol", s.symbol);
-    setVal("mpAnchor", s.anchor);
+    // Prefer explicit mpTimeframe; fall back to legacy `anchor` only.
+    // Never copy candle `timeframe` into the MP control.
+    var mpTf = s.mpTimeframe || s.anchor;
+    if (mpTf) setVal("mpAnchor", mpTf);
     setVal("mpDays", s.days);
     setVal("mpStart", s.start);
     setVal("mpEnd", s.end);
@@ -255,7 +271,121 @@
       candles: payload.candles || []
     });
     api.setInteractionMode(toolMode());
+    if (api.setFollowLive) api.setFollowLive(true);
     return true;
+  }
+
+  function stopLivePoll() {
+    livePollGen += 1;
+    if (formingTimer) {
+      clearInterval(formingTimer);
+      formingTimer = null;
+    }
+    formingInflight = false;
+  }
+
+  function formingBarForTf(forming, tfSec, lastCandle) {
+    var t1 = Number(forming && forming.time);
+    var px = Number(forming && forming.close);
+    if (!isFinite(t1) || !isFinite(px) || !tfSec) return null;
+    var bucket = Math.floor(t1 / tfSec) * tfSec;
+    var fHigh = Number(forming.high);
+    var fLow = Number(forming.low);
+    var hi = isFinite(fHigh) ? fHigh : px;
+    var lo = isFinite(fLow) ? fLow : px;
+    if (!lastCandle) {
+      var o0 = Number(forming.open);
+      return {
+        time: bucket,
+        open: isFinite(o0) ? o0 : px,
+        high: Math.max(px, hi),
+        low: Math.min(px, lo),
+        close: px
+      };
+    }
+    var lastT = Number(lastCandle.time);
+    if (!isFinite(lastT)) return null;
+    if (lastT === bucket) {
+      return {
+        time: bucket,
+        open: Number(lastCandle.open),
+        high: Math.max(Number(lastCandle.high), hi, px),
+        low: Math.min(Number(lastCandle.low), lo, px),
+        close: px
+      };
+    }
+    if (lastT < bucket) {
+      var o = Number(lastCandle.close);
+      return {
+        time: bucket,
+        open: isFinite(o) ? o : px,
+        high: Math.max(o, hi, px),
+        low: Math.min(o, lo, px),
+        close: px
+      };
+    }
+    return {
+      time: lastT,
+      open: Number(lastCandle.open),
+      high: Math.max(Number(lastCandle.high), hi, px),
+      low: Math.min(Number(lastCandle.low), lo, px),
+      close: px
+    };
+  }
+
+  function applyLiveForming(forming) {
+    var api = chartApi();
+    if (!api || !api.updateFormingBar || !payload || !payload.candles || !payload.candles.length) {
+      return false;
+    }
+    var s = readSettings();
+    var tfSec = TF_SEC[s.timeframe] || 60;
+    var candles = payload.candles;
+    var last = candles[candles.length - 1];
+    var bar = formingBarForTf(forming, tfSec, last);
+    if (!bar) return false;
+    var ok = !!api.updateFormingBar(bar);
+    if (ok) {
+      if (Number(candles[candles.length - 1].time) === Number(bar.time)) {
+        candles[candles.length - 1] = Object.assign({}, candles[candles.length - 1], bar);
+      } else if (Number(bar.time) > Number(last.time)) {
+        candles.push(bar);
+      }
+      payload.candles = candles;
+      if (api.setFollowLive) api.setFollowLive(true);
+    }
+    return ok;
+  }
+
+  function pollForming(gen) {
+    if (gen !== livePollGen || document.hidden) return;
+    if (!payload || !payload.candles || !payload.candles.length) return;
+    if (formingInflight) return;
+    formingInflight = true;
+    var sym = readSettings().symbol;
+    fetch("/api/research/forming-bar?symbol=" + encodeURIComponent(sym), {
+      credentials: "same-origin"
+    })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (body) {
+        if (gen !== livePollGen) return;
+        if (body && body.forming) applyLiveForming(body.forming);
+      })
+      .catch(function () { /* live tip is best-effort */ })
+      .then(function () { formingInflight = false; });
+  }
+
+  function startLivePoll() {
+    stopLivePoll();
+    if (!payload || !payload.candles || !payload.candles.length) return;
+    var gen = livePollGen;
+    var api = chartApi();
+    if (api && api.setFollowLive) api.setFollowLive(true);
+    formingTimer = setInterval(function () {
+      if (gen !== livePollGen || document.hidden) return;
+      pollForming(gen);
+    }, FORMING_MS);
+    pollForming(gen);
   }
 
   function bindChartSurface() {
@@ -266,9 +396,11 @@
       pane.addEventListener("mousemove", onHover);
       pane.addEventListener("mouseleave", function () { $("mpTooltip").hidden = true; });
     }
-    window.__mpOnVisibleRange = scheduleDraw;
+    window.__mpOnVisibleRange = function () { scheduleDrawDebounced(90); };
     try {
-      chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleDraw);
+      chart.timeScale().subscribeVisibleLogicalRangeChange(function () {
+        scheduleDrawDebounced(90);
+      });
     } catch (err) { /* chart may already notify via bridge */ }
     var wrap = $("price-pane") || $("mpChart");
     if (wrap && !wrap.__mpResizeBound) {
@@ -985,6 +1117,14 @@
     });
   }
 
+  function scheduleDrawDebounced(ms) {
+    if (drawDebounceTimer) clearTimeout(drawDebounceTimer);
+    drawDebounceTimer = setTimeout(function () {
+      drawDebounceTimer = null;
+      scheduleDraw();
+    }, ms || 80);
+  }
+
   function sizeCanvas(region) {
     var canvas = $("mpOverlay");
     var dpr = window.devicePixelRatio || 1;
@@ -1028,6 +1168,8 @@
     if (!bins.length) return;
 
     var slotWidth = Math.max(2, span.x1 - span.x0);
+    // Very narrow day slots: skip dense fills — levels still render.
+    if (slotWidth < 4) return;
     var barsWidth = slotWidth * s.width;
     var maxCount = 0;
     for (var i = 0; i < bins.length; i += 1) {
@@ -1041,6 +1183,7 @@
       var yTop = priceToY(bin.price_high);
       var yBot = priceToY(bin.price_low);
       if (yTop === null || yBot === null) continue;
+      if (yBot < -2 || yTop > region.y1 + 2) continue;
       var h = Math.max(1, yBot - yTop);
       var full = (bin.tpo_count / maxCount) * barsWidth;
       ctx.fillStyle = COLORS.total;
@@ -1054,6 +1197,7 @@
     if (!bins.length) return;
 
     var slotWidth = Math.max(2, span.x1 - span.x0);
+    if (slotWidth < 6) return;
     var barsWidth = slotWidth * s.width;
     var maxVol = 0;
     for (var i = 0; i < bins.length; i += 1) {
@@ -1068,6 +1212,7 @@
       var yTop = priceToY(bin.price_high);
       var yBot = priceToY(bin.price_low);
       if (yTop === null || yBot === null) continue;
+      if (yBot < -2 || yTop > region.y1 + 2) continue;
       var h = Math.max(1, yBot - yTop);
       var buyW = ((bin.buy_volume || 0) / maxVol) * barsWidth;
       var sellW = ((bin.sell_volume || 0) / maxVol) * barsWidth;
@@ -1113,6 +1258,7 @@
       var yTop = priceToY(bin.price_high);
       var yBot = priceToY(bin.price_low);
       if (yTop === null || yBot === null) continue;
+      if (yBot < -2 || yTop > region.y1 + 2) continue;
       var y = (yTop + yBot) / 2;
       var x = span.x0 + ((bin.base_volume || 0) / maxVol) * curveWidth;
       points.push({ x: x, y: y });
@@ -1484,6 +1630,7 @@
     }
 
     if (inflight) inflight.abort();
+    stopLivePoll();
     var ctrl = new AbortController();
     inflight = ctrl;
 
@@ -1491,13 +1638,13 @@
       symbol: s.symbol,
       start: String(range.start),
       end: String(range.end),
-      anchor: s.anchor,
+      mp_timeframe: s.mpTimeframe || s.anchor,
       timeframe: s.timeframe,
       value_area_pct: String(s.valueAreaPct / 100),
       target_bins: String(s.targetBins),
       final: s.final ? "1" : "0"
     });
-    if (s.anchor === "session") params.set("sessions", s.sessions.join(","));
+    if ((s.mpTimeframe || s.anchor) === "session") params.set("sessions", s.sessions.join(","));
 
     $("mpLoad").disabled = true;
     setStatus("lädt …", "busy");
@@ -1527,27 +1674,43 @@
         payload = out.body;
         lastLoadRange = range;
         candleTimes = (payload.candles || []).map(function (c) { return c.time; });
-        applyPayloadToChart(s);
-        $("mpEmpty").hidden = true;
-        renderLegend();
-        scheduleDraw();
+        // Paint candles + profiles first; overlays are best-effort and must not
+        // turn a successful profile response into a fake Netzwerkfehler.
+        try {
+          applyPayloadToChart(s);
+          $("mpEmpty").hidden = true;
+          renderLegend();
+          scheduleDraw();
+          startLivePoll();
+        } catch (paintErr) {
+          setStatus("Chart-Render: " + (paintErr && paintErr.message ? paintErr.message : paintErr), "error");
+        }
 
-        return fetchEmaOverlays(s.symbol, s.timeframe, range).then(function (emaPayload) {
-          applyEmaOverlays(emaPayload);
-          return refreshDrawings();
-        }).then(function () {
-          return refreshLiquidityLocation();
-        }).then(function () {
-          var m = payload.meta || {};
-          var skipped = (m.skipped_windows || []).length;
+        var m = payload.meta || {};
+        var skipped = (m.skipped_windows || []).length;
+        setStatus(
+          m.profiles_built + "/" + m.windows + " Fenster" +
+            (skipped ? ", " + skipped + " ohne Daten" : "") +
+            " · " + (payload.candles || []).length + " Kerzen" +
+            (payload.cached ? " · cached" : "") +
+            " · Overlays …"
+        );
+
+        return Promise.all([
+          fetchEmaOverlays(s.symbol, s.timeframe, range).then(applyEmaOverlays).catch(function () {}),
+          refreshDrawings(),
+          refreshLiquidityLocation()
+        ]).then(function () {
           setStatus(
             m.profiles_built + "/" + m.windows + " Fenster" +
               (skipped ? ", " + skipped + " ohne Daten" : "") +
               " · " + (payload.candles || []).length + " Kerzen" +
               (payload.cached ? " · cached" : "")
           );
-          // Chart may have become ready after the payload arrived.
-          if (applyPayloadToChart(s)) scheduleDraw();
+          try {
+            if (applyPayloadToChart(s)) scheduleDraw();
+            startLivePoll();
+          } catch (err2) { /* already painted */ }
         });
       })
       .catch(function (err) {
@@ -1578,13 +1741,29 @@
       load();
     });
 
-    $("mpAnchor").addEventListener("change", function () {
+    function reloadFromControls(ev) {
       syncConditionalControls();
       persistSettings();
+      // Switching to "benutzerdefiniert" only reveals the date fields —
+      // wait until Von/Bis are filled before fetching.
+      if (ev && ev.target && ev.target.id === "mpDays" && $("mpDays").value === "custom") {
+        return;
+      }
+      load();
+    }
+
+    // Symbol / KERZEN / MARKET PROFILE / Zeitraum: independent controls;
+    // each change reloads, but values are never copied across.
+    ["mpSymbol", "mpTimeframe", "mpAnchor", "mpDays"].forEach(function (id) {
+      $(id).addEventListener("change", reloadFromControls);
     });
-    $("mpDays").addEventListener("change", function () {
-      syncConditionalControls();
-      persistSettings();
+    ["mpStart", "mpEnd"].forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.addEventListener("change", function () {
+        persistSettings();
+        if ($("mpDays").value === "custom") load();
+      });
     });
 
     // Drawing-only toggles never refetch: the payload already carries every
@@ -1607,8 +1786,9 @@
       refreshLiquidityLocation();
     });
 
-    // These change what gets computed, so they need a reload to take effect.
-    ["mpSymbol", "mpTimeframe", "mpValueAreaPct", "mpTargetBins", "mpFinal"].forEach(function (id) {
+    // These change what gets computed, so they need a reload to take effect
+    // (FINAL is expensive — keep as explicit Laden / advanced only).
+    ["mpValueAreaPct", "mpTargetBins", "mpFinal"].forEach(function (id) {
       $(id).addEventListener("change", persistSettings);
     });
     Array.prototype.forEach.call(document.querySelectorAll(".mp-session"), function (el) {
@@ -1620,11 +1800,24 @@
     restoreSettings();
     // First visit / stale localStorage: keep 30d as the working default.
     if (!$("mpDays").value) $("mpDays").value = "30";
+    // Defaults if empty — do not couple KERZEN and MARKET PROFILE.
+    var candleEl = $("mpTimeframe");
+    if (candleEl && !candleEl.value) candleEl.value = "15m";
+    var mpEl = $("mpAnchor");
+    if (mpEl && !mpEl.value) mpEl.value = "day";
     syncConditionalControls();
     bindChartChrome();
     bind();
     restoreChartHeight();
     renderLegend();
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) return;
+      if (!payload || !payload.candles || !payload.candles.length) return;
+      if (!formingTimer) startLivePoll();
+      else pollForming(livePollGen);
+      var api = chartApi();
+      if (api && api.setFollowLive) api.setFollowLive(true);
+    });
     sendJson("/api/research/workspace").then(function (snap) {
       applyWorkspace(snap);
     }).catch(function () { /* workspace optional */ });
@@ -1632,6 +1825,7 @@
       if (payload) {
         applyPayloadToChart(readSettings());
         scheduleDraw();
+        startLivePoll();
       }
     });
     // Auto-load immediately with the default/persisted range (do not wait for

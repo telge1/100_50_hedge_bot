@@ -17,7 +17,7 @@ FORMAT_VERSION = "dashboard/market_profile_v1"
 
 # Bumped when the page's JS/CSS changes, so browsers do not serve a stale
 # bundle against a changed API shape.
-ASSET_V = "mp-2"
+ASSET_V = "mp-6"
 
 PAGE_PATH = "/live-charts/market-profile"
 NAV_ACTIVE = "live-charts-market-profile"
