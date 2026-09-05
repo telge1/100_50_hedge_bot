@@ -14,7 +14,28 @@ from .templates_de import render_all_german, render_report_sections
 
 
 def write_json(path: Path, obj: Any) -> None:
-    path.write_text(json.dumps(json_safe(obj), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    """Write JSON. Large payloads use compact form (same content, no indent)."""
+    payload = json_safe(obj)
+    # Indenting multi-MB trees (summary embeds fight/sequence) dominates runtime.
+    size_hint = 0
+    if isinstance(payload, dict):
+        size_hint = len(payload)
+        for key in ("fight_facts", "sequence_validation", "level_events", "wall_facts", "factual_reason_codes"):
+            val = payload.get(key)
+            if isinstance(val, (list, dict)):
+                size_hint = max(size_hint, len(val) if not isinstance(val, dict) else len(val) * 8)
+    compact = size_hint >= 50 or path.name in {
+        "summary.json",
+        "fight_episodes.json",
+        "factual_reasons.json",
+        "edge_observability_summary.json",
+        "fight_sequence_summary.json",
+    }
+    if compact:
+        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+    else:
+        text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
@@ -25,8 +46,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | No
     with path.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
-        for r in rows:
-            w.writerow({k: r.get(k) for k in fields})
+        w.writerows(rows)
 
 
 def build_summary_payload(
@@ -155,24 +175,54 @@ def write_all_outputs(
     fight_facts: dict[str, Any] | None = None,
     sequence_validation: dict[str, Any] | None = None,
     liquidation_flow: dict[str, Any] | None = None,
+    heavy_detail_csv: bool = True,
 ) -> None:
     write_json(run_dir / "summary.json", summary)
     write_json(run_dir / "analysis_manifest.json", manifest)
     write_json(run_dir / "coverage_audit.json", coverage)
     write_json(run_dir / "profile_levels.json", profiles)
     write_json(run_dir / "oi_liquidation_facts.json", oi_liq)
-    write_json(run_dir / "factual_reasons.json", {"reasons": reasons, "templates_de": german})
+    if heavy_detail_csv:
+        write_json(run_dir / "factual_reasons.json", {"reasons": reasons, "templates_de": german})
+    else:
+        # Lean: codes only — full DE templates are multi-MB and unused by golden parity.
+        write_json(
+            run_dir / "factual_reasons.json",
+            {
+                "reasons": [{"code": r.get("code"), "severity": r.get("severity")} for r in reasons],
+                "templates_de_omitted": True,
+                "template_count": len(german),
+                "note": "full templates_de omitted for research-db performance; REPORT.md still rendered",
+            },
+        )
     transitions, episodes, summaries = _flatten_level_contract(level_events)
     write_csv(run_dir / "level_transitions.csv", transitions)
     write_csv(run_dir / "level_episodes.csv", episodes)
     write_csv(run_dir / "level_events.csv", summaries)
     write_csv(run_dir / "public_trade_buckets.csv", trade_buckets)
     if wall_bundle:
-        write_csv(run_dir / "wall_observations.csv", _strip_observations(wall_bundle.get("observations") or []))
-        write_csv(run_dir / "wall_tracks.csv", _strip_tracks(wall_bundle.get("tracks") or []))
-        write_csv(run_dir / "wall_transitions.csv", wall_bundle.get("transitions") or [])
-        write_csv(run_dir / "wall_trade_matches.csv", wall_bundle.get("trade_matches") or [])
+        if heavy_detail_csv:
+            write_csv(run_dir / "wall_observations.csv", _strip_observations(wall_bundle.get("observations") or []))
+            write_csv(run_dir / "wall_tracks.csv", _strip_tracks(wall_bundle.get("tracks") or []))
+            write_csv(run_dir / "wall_transitions.csv", wall_bundle.get("transitions") or [])
+            write_csv(run_dir / "wall_trade_matches.csv", wall_bundle.get("trade_matches") or [])
+            write_csv(run_dir / "wall_events.csv", _flatten_wall_facts(wall_facts))
+        else:
+            write_json(
+                run_dir / "wall_detail_io.json",
+                {
+                    "heavy_detail_csv": False,
+                    "observation_count": len(wall_bundle.get("observations") or []),
+                    "track_count": len(wall_bundle.get("tracks") or []),
+                    "transition_count": len(wall_bundle.get("transitions") or []),
+                    "trade_match_count": len(wall_bundle.get("trade_matches") or []),
+                    "legacy_wall_fact_count": len(wall_facts or []),
+                    "note": "per-sample wall CSVs omitted for research-db performance; wall_summary retained",
+                },
+            )
         write_json(run_dir / "wall_summary.json", wall_bundle.get("summary") or {})
+    elif wall_facts and heavy_detail_csv:
+        write_csv(run_dir / "wall_events.csv", _flatten_wall_facts(wall_facts))
     if tpo_profile:
         write_json(run_dir / "tpo_profile_summary.json", _tpo_profile_summary_file(tpo_profile))
         write_json(run_dir / "tpo_profile_integrity.json", tpo_profile.get("integrity") or {})
@@ -186,11 +236,12 @@ def write_all_outputs(
         write_csv(run_dir / "volume_profile_rows.csv", volume_profile.get("rows") or [])
         nodes = (volume_profile.get("hvn_candidates") or []) + (volume_profile.get("lvn_candidates") or [])
         write_csv(run_dir / "volume_profile_nodes.csv", nodes)
-    write_csv(run_dir / "wall_events.csv", _flatten_wall_facts(wall_facts))
     if fight_facts:
         _write_fight_fact_outputs(run_dir, fight_facts)
     if sequence_validation:
-        _write_sequence_validation_outputs(run_dir, sequence_validation)
+        _write_sequence_validation_outputs(
+            run_dir, sequence_validation, heavy_detail_csv=heavy_detail_csv
+        )
     if liquidation_flow:
         _write_liquidation_flow_outputs(run_dir, liquidation_flow)
     (run_dir / "REPORT.md").write_text(
@@ -243,7 +294,9 @@ def _write_liquidation_flow_outputs(run_dir: Path, flow: dict[str, Any]) -> None
     write_csv(run_dir / "liquidation_phase_summary.csv", flow.get("phases") or [])
 
 
-def _write_sequence_validation_outputs(run_dir: Path, seq: dict[str, Any]) -> None:
+def _write_sequence_validation_outputs(
+    run_dir: Path, seq: dict[str, Any], *, heavy_detail_csv: bool = True
+) -> None:
     write_json(run_dir / "phase_2a3_preflight_audit.json", seq.get("phase_2a3_preflight_audit") or {})
     write_json(run_dir / "canonical_eligibility_summary.json", seq.get("canonical_eligibility_summary") or {})
     write_csv(run_dir / "ambiguous_reclaim_candidates.csv", seq.get("ambiguous_reclaim_candidates") or [])
@@ -260,16 +313,29 @@ def _write_sequence_validation_outputs(run_dir: Path, seq: dict[str, Any]) -> No
     write_json(run_dir / "fight_clusters_by_gap.json", seq.get("fight_clusters_by_gap") or {})
     write_csv(run_dir / "edge_visit_cluster_join_audit.csv", seq.get("edge_visit_cluster_join_audit") or [])
     write_json(run_dir / "same_timestamp_ordering_audit.json", seq.get("same_timestamp_ordering_audit") or {})
-    write_csv(run_dir / "same_timestamp_multistate_groups.csv", seq.get("same_timestamp_multistate_groups") or [])
-    write_csv(run_dir / "edge_book_coverage.csv", seq.get("edge_book_coverage") or [])
-    write_csv(run_dir / "edge_region_depth_samples.csv", seq.get("edge_region_depth_samples") or [])
+    if heavy_detail_csv:
+        write_csv(run_dir / "same_timestamp_multistate_groups.csv", seq.get("same_timestamp_multistate_groups") or [])
+        write_csv(run_dir / "edge_book_coverage.csv", seq.get("edge_book_coverage") or [])
+        write_csv(run_dir / "edge_region_depth_samples.csv", seq.get("edge_region_depth_samples") or [])
+    else:
+        write_json(
+            run_dir / "edge_detail_io.json",
+            {
+                "heavy_detail_csv": False,
+                "edge_book_coverage_rows": len(seq.get("edge_book_coverage") or []),
+                "depth_sample_rows": len(seq.get("edge_region_depth_samples") or []),
+                "same_timestamp_groups": len(seq.get("same_timestamp_multistate_groups") or []),
+                "note": "per-sample edge/book CSVs omitted for research-db performance; summaries retained",
+            },
+        )
     write_json(run_dir / "edge_book_coverage_summary.json", seq.get("edge_book_coverage_summary") or {})
     write_json(run_dir / "ob_coverage_metrics.json", seq.get("ob_coverage_metrics") or {})
-    write_csv(run_dir / "edge_region_consumption_events.csv", seq.get("edge_region_consumption_events") or [])
+    if heavy_detail_csv:
+        write_csv(run_dir / "edge_region_consumption_events.csv", seq.get("edge_region_consumption_events") or [])
+        write_csv(run_dir / "exact_refill_events.csv", seq.get("exact_refill_events") or [])
+        write_csv(run_dir / "nearby_liquidity_increase_events.csv", seq.get("nearby_liquidity_increase_events") or [])
     write_json(run_dir / "edge_region_consumption_summary.json", seq.get("edge_region_consumption_summary") or {})
     write_json(run_dir / "consumption_metrics_detail.json", seq.get("consumption_metrics_detail") or {})
-    write_csv(run_dir / "exact_refill_events.csv", seq.get("exact_refill_events") or [])
-    write_csv(run_dir / "nearby_liquidity_increase_events.csv", seq.get("nearby_liquidity_increase_events") or [])
     write_json(run_dir / "refill_metrics_detail.json", seq.get("refill_metrics_detail") or {})
     write_json(run_dir / "outside_reclaim_invariant_audit.json", seq.get("outside_reclaim_invariant_audit") or {})
     write_json(run_dir / "fight_sequence_summary.json", seq.get("fight_sequence_summary") or {})
@@ -575,7 +641,86 @@ def build_report_md(
     return "\n".join(lines) + "\n"
 
 
-def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) -> None:
+def _fmt_count(value: Any, *, computed: bool = True) -> str:
+    """Render counts: 0 stays 0; missing computed field is NOT_AVAILABLE; never silent 0."""
+    if not computed:
+        return "NOT_AVAILABLE"
+    if value is None:
+        return "NOT_AVAILABLE"
+    if isinstance(value, (list, tuple, set, dict)):
+        return str(len(value))
+    return str(value)
+
+
+def _seq_summary(sequence_validation: dict[str, Any] | None) -> dict[str, Any]:
+    if not sequence_validation:
+        return {}
+    if sequence_validation.get("fight_sequence_summary"):
+        return sequence_validation["fight_sequence_summary"]
+    # lean summary already flattened to fight_sequence_summary fields
+    if "canonical_outside_count" in sequence_validation or "verdict" in sequence_validation:
+        return sequence_validation
+    return {}
+
+
+def _fight_manifest(fight_facts: dict[str, Any] | None) -> dict[str, Any]:
+    if not fight_facts:
+        return {}
+    if fight_facts.get("manifest"):
+        return fight_facts["manifest"]
+    return fight_facts
+
+
+def _observability_console_block(sq: dict[str, Any]) -> list[str]:
+    lines: list[str] = ["", "FIGHT-TIME OBSERVABILITY"]
+    eos = sq.get("edge_observability_summary") or {}
+    by = eos.get("by_edge_time_scope") or {}
+    # Prefer UPPER FULL_WINDOW PROFILE_EDGE_ZONE / EXACT_LEVEL_TICK
+    chosen = None
+    for key, rows in by.items():
+        if not isinstance(rows, list) or not rows:
+            continue
+        if key.startswith("UPPER|FULL_WINDOW"):
+            chosen = rows[0]
+            if "PROFILE_EDGE_ZONE" in key or "EXACT_LEVEL_TICK" in key:
+                break
+    if chosen is None and by:
+        first_rows = next(iter(by.values()))
+        chosen = first_rows[0] if first_rows else None
+    if not chosen:
+        lines.append("- Coverage: NOT_AVAILABLE")
+        return lines
+    status = chosen.get("status") or chosen.get("full_region_coverage") or "NOT_AVAILABLE"
+    outside_pct = chosen.get("outside_book_pct")
+    lines.append(f"- Relevant edge: {chosen.get('edge') or 'NOT_AVAILABLE'}")
+    lines.append(f"- Scope: {chosen.get('scope') or 'NOT_AVAILABLE'}")
+    lines.append(f"- Coverage-Status: {status}")
+    lines.append(
+        f"- Full/Partial/Outside-book/Missing: "
+        f"{chosen.get('full_coverage_pct')}% / {chosen.get('partial_coverage_pct')}% / "
+        f"{chosen.get('outside_book_pct')}% / {chosen.get('missing_pct')}%"
+    )
+    mostly_outside = (
+        outside_pct is not None and float(outside_pct) >= 50.0
+    ) or "OUTSIDE_BOOK" in str(status)
+    if mostly_outside:
+        lines.append("PASSIVE EDGE CONTROL: NOT_EVALUATED")
+        lines.append("REASON: EDGE_REGION_MOSTLY_OUTSIDE_OB200_RANGE")
+        lines.append("- Note: not observable ≠ 0 observed; no absorption/refill/control inferred.")
+    return lines
+
+
+def print_console_summary(
+    summary: dict[str, Any],
+    run_dir: Path,
+    manifest: dict[str, Any],
+    *,
+    fight_facts: dict[str, Any] | None = None,
+    sequence_validation: dict[str, Any] | None = None,
+    level_events: list[dict[str, Any]] | None = None,
+    anchor_profile_context: dict[str, Any] | None = None,
+) -> None:
+    """Render the final console from a complete result bundle (never a mid-pipeline stub)."""
     pf = summary.get("profile_facts") or {}
     oi = summary.get("oi_liquidation_facts") or {}
     ws = summary.get("wall_summary") or {}
@@ -583,6 +728,13 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
     vp = summary.get("volume_profile") or {}
     nearest_tpo = (pf.get("nearest_tpo_levels") or pf.get("nearest_profile_levels") or [{}])[0]
     nearest_vol = (pf.get("nearest_volume_levels") or [{}])[0]
+    ff = fight_facts if fight_facts is not None else summary.get("fight_facts")
+    sv = sequence_validation if sequence_validation is not None else summary.get("sequence_validation")
+    levs = level_events if level_events is not None else (summary.get("level_events") or [])
+    ctx = anchor_profile_context if anchor_profile_context is not None else summary.get("anchor_profile_context")
+    fm = _fight_manifest(ff if isinstance(ff, dict) else {})
+    sq = _seq_summary(sv if isinstance(sv, dict) else {})
+
     print("BTC OB FIGHT FACT ANALYSIS")
     print("─" * 40)
     print(f"ANCHOR:                   {summary.get('anchor_timestamp_utc')}")
@@ -593,12 +745,22 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
     print(f"DATA QUALITY:             {summary.get('data_quality')}")
     print(f"RULES FROZEN:             {summary.get('rules_frozen')}")
     print(f"TRADE VERDICT EVALUATED:  {summary.get('trade_verdict_evaluated')}")
+    cov_rt = manifest.get("input_coverage_runtime_s")
+    full_rt = manifest.get("full_analysis_runtime_s") or manifest.get("total_runtime_s")
+    if cov_rt is not None:
+        print(f"INPUT/COVERAGE RUNTIME:   {cov_rt:.3f} s")
+    if full_rt is not None:
+        print(f"FULL ANALYSIS RUNTIME:    {float(full_rt):.3f} s")
     print("")
     print(f"ANCHOR PRICE:             {fmt_price(pf.get('price_at_anchor'))}")
     print("")
+    def _na(v: Any) -> str:
+        return str(v) if v is not None else "NOT_AVAILABLE"
+
     print("TPO PROFILE — 30m BRACKET PRESENCE")
     print(f"- Status: {tpo.get('status') or pf.get('tpo_profile_status')}")
-    print(f"- Session: {pf.get('profile_start_utc')} → cutoff {pf.get('profile_cutoff_utc')}")
+    if pf.get("profile_start_utc") or pf.get("profile_cutoff_utc"):
+        print(f"- Session: {pf.get('profile_start_utc')} → cutoff {pf.get('profile_cutoff_utc')}")
     print(f"- Bracket duration: {tpo.get('bracket_minutes') or manifest.get('profile_settings', {}).get('tpo_bracket_minutes')}m")
     print(
         f"- Brackets: {tpo.get('full_brackets')} full / {tpo.get('partial_brackets')} partial "
@@ -614,17 +776,22 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
         print(f"- Anchor inside TPO VA: {pf.get('inside_tpo_value_area')}")
     if nearest_tpo:
         print(f"- Nächstes TPO-Level: {nearest_tpo.get('kind')} {fmt_price(nearest_tpo.get('price'))}")
-    print(
-        f"- Integrity: {tpo.get('integrity')}; Trade-Size-Invarianz: {tpo.get('trade_size_invariance')}; "
-        f"Prefix-Parität: {tpo.get('prefix_parity')}"
-    )
+    integ = tpo.get("integrity")
+    inv = tpo.get("trade_size_invariance")
+    pre = tpo.get("prefix_parity")
+    if integ is not None or inv is not None or pre is not None:
+        print(
+            f"- Integrity: {_na(integ)}; Trade-Size-Invarianz: {_na(inv)}; "
+            f"Prefix-Parität: {_na(pre)}"
+        )
     conf_status = pf.get("tpo_volume_confluence_status")
     if conf_status:
         print(f"- TPO↔Volume Konfluenz: {conf_status}")
     print("")
     print("VOLUME PROFILE — BASE VOLUME")
     print(f"- Status: {vp.get('status')}")
-    print(f"- Basis: {vp.get('primary_volume_basis')}")
+    if vp.get("primary_volume_basis") is not None:
+        print(f"- Basis: {vp.get('primary_volume_basis')}")
     print(f"- VPOC/VVAH/VVAL: {fmt_price(vp.get('vpoc'))} / {fmt_price(vp.get('vvah'))} / {fmt_price(vp.get('vval'))}")
     if vp.get("value_area_share") is not None:
         print(f"- Value-Area-Anteil: {fmt_fraction_as_pct(vp.get('value_area_share'))}")
@@ -633,7 +800,11 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
         print(f"- Anchor inside Volume VA: {inside}")
     if nearest_vol:
         print(f"- Nächstes Volume-Level: {nearest_vol.get('kind')} {fmt_price(nearest_vol.get('price'))}")
-    print(f"- Integrity: {vp.get('integrity')}; Prefix-Parität: {vp.get('prefix_parity')}; OA-Parität: {vp.get('oa_parity')}")
+    vi = vp.get("integrity")
+    vp_ = vp.get("prefix_parity")
+    vo = vp.get("oa_parity")
+    if vi is not None or vp_ is not None or vo is not None:
+        print(f"- Integrity: {_na(vi)}; Prefix-Parität: {_na(vp_)}; OA-Parität: {_na(vo)}")
     conf = pf.get("tpo_volume_level_confluence") or []
     if conf and conf_status == "VALID_INDEPENDENT_MEASURES":
         poc_conf = next((c for c in conf if c.get("tpo_kind") == "poc"), {})
@@ -644,10 +815,8 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
             )
     print("")
     print("LEVEL EPISODE SUMMARY")
-    vah = next((e for e in (summary.get("level_events") or []) if e.get("level_id") == "TPO_VAH"), None)
-    if vah is None:
-        vah = next((e for e in (summary.get("level_events") or []) if e.get("level_id") == "tpo_vah"), None)
-    if vah:
+    vah = next((e for e in levs if e.get("level_id") in {"TPO_VAH", "tpo_vah"}), None)
+    if vah and (vah.get("episodes") or vah.get("first_complete_above_episode")):
         ep = vah.get("first_complete_above_episode")
         if ep:
             print(f"- TPO-VAH erste ABOVE-Episode: {fmt_duration_seconds(ep.get('duration_seconds'))}")
@@ -655,23 +824,37 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
         if above:
             longest = max(above, key=lambda e: e.get("duration_seconds") or 0)
             print(f"- TPO-VAH längste ABOVE: {fmt_duration_seconds(longest.get('duration_seconds'))}")
+    else:
+        print("- TPO-VAH episodes: see REPORT.md / level_episodes.csv")
     print("")
     print("PUBLIC TRADE SUMMARY")
     rel = {x.get("label"): x for x in ((summary.get("trade_facts") or {}).get("relative_windows") or [])}
     w10 = rel.get("anchor_0_10m")
     if w10:
         print(f"- 0–10m Delta: {fmt_mio_usd(w10.get('delta_notional'))}; Preis: {fmt_bps(w10.get('price_change_bps'))}")
+    w30 = rel.get("anchor_0_30m")
+    if w30:
+        print(f"- 0–30m Delta: {fmt_mio_usd(w30.get('delta_notional'))}; Preis: {fmt_bps(w30.get('price_change_bps'))}")
     print("")
     print("ORDERBOOK FACT SUMMARY")
-    print(f"- Book-Samples: {ws.get('book_samples_total')}")
-    print(f"- Wall-Beobachtungen: Ask {ws.get('ask_wall_observations')} / Bid {ws.get('bid_wall_observations')}")
-    print(f"- Eindeutige Tracks: Ask {ws.get('ask_wall_tracks')} / Bid {ws.get('bid_wall_tracks')}")
+    print(f"- Book-Samples: {_fmt_count(ws.get('book_samples_total'))}")
+    ask_obs = ws.get("ask_wall_observations")
+    bid_obs = ws.get("bid_wall_observations")
+    if ask_obs is not None or bid_obs is not None:
+        print(f"- Wall-Beobachtungen: Ask {_na(ask_obs)} / Bid {_na(bid_obs)}")
+    ask_tr = ws.get("ask_wall_tracks")
+    bid_tr = ws.get("bid_wall_tracks")
+    if ask_tr is not None or bid_tr is not None:
+        print(f"- Eindeutige Tracks: Ask {_na(ask_tr)} / Bid {_na(bid_tr)}")
     td = ws.get("trade_associated_decreases") or {}
     ud = ws.get("unmatched_decreases") or {}
-    print(f"- Trade-associated Decreases: Ask {td.get('ask')} / Bid {td.get('bid')}")
-    print(f"- Unmatched Decreases: Ask {ud.get('ask')} / Bid {ud.get('bid')}")
+    if td:
+        print(f"- Trade-associated Decreases: Ask {_na(td.get('ask'))} / Bid {_na(td.get('bid'))}")
+    if ud:
+        print(f"- Unmatched Decreases: Ask {_na(ud.get('ask'))} / Bid {_na(ud.get('bid'))}")
     rf = ws.get("refill_sequences_heuristic") or {}
-    print(f"- Refill-Sequenzen (UNFROZEN): Ask {rf.get('ask')} / Bid {rf.get('bid')}")
+    if rf:
+        print(f"- Refill-Sequenzen (UNFROZEN): Ask {_na(rf.get('ask'))} / Bid {_na(rf.get('bid'))}")
     print("")
     print("OI/LIQ SUMMARY")
     unit = (oi.get("oi_unit") or {}).get("display_label") or "Source-Einheiten"
@@ -682,57 +865,83 @@ def print_console_summary(summary: dict[str, Any], run_dir: Path, manifest: dict
     if lf:
         for line in _liquidation_flow_console_lines({"summary": lf}):
             print(line)
-    ff = summary.get("fight_facts") or {}
-    if ff:
-        fm = ff.get("manifest") or {}
+
+    if ctx:
         print("")
-        print("FIGHT FACTS — INTERPRETATION NOT EVALUATED")
-        print(f"- Profile-state episodes: {fm.get('profile_state_episode_count')}")
-        print(f"- Outside episodes: {fm.get('outside_episode_count')}")
-        print(f"- Edge consumption: {fm.get('edge_consumption_count')}")
-        print(f"- Post-trade refills: {fm.get('post_trade_refill_count')}")
-        print(f"- Reclaim events: {fm.get('reclaim_count')}")
-        print("BREAKOUT CONFIRMATION:       NOT_EVALUATED")
-        print("FAILED BREAKOUT:             NOT_EVALUATED")
-        print("BUYER/SELLER CONTROL:        NOT_EVALUATED")
-        print("ABSORPTION:                  NOT_EVALUATED")
-        print("TRADE DIRECTION:             null")
-    sv = summary.get("sequence_validation") or {}
-    if sv:
-        sq = sv.get("fight_sequence_summary") or {}
-        print("")
-        print("FIGHT SEQUENCE VALIDATION (Phase 2A.3) — RULES UNFROZEN")
-        print(f"- Verdict: {sv.get('verdict')}")
-        print(f"- RAW outside: {sq.get('raw_outside_observation_count')}")
-        print(f"- Ambiguous candidates: {sq.get('ambiguous_reclaim_candidate_count')}")
-        print(f"- Canonical outside: {sq.get('canonical_outside_count')}")
-        print(f"- Canonical reclaims: {sq.get('canonical_reclaim_count')}")
-        print(f"- Edge visits U/L: {sq.get('edge_visits_upper')}/{sq.get('edge_visits_lower')} (total={sq.get('edge_visit_count')})")
-        print(f"- Cluster gap=0: {sq.get('cluster_count_gap_0')} (invariant_ok={sq.get('gap0_invariant_ok')})")
+        print("ANCHOR PROFILE CONTEXT")
+        print(f"- Contract: {ctx.get('contract_version')}")
+        print(f"- Anchor context: {ctx.get('anchor_context')}")
+        print(f"- Observation context: {ctx.get('observation_context')}")
+        edges_c = ctx.get("edges") or {}
         print(
-            f"- Nearby Ask/Bid/Unknown: {sq.get('nearby_ask_count')}/"
-            f"{sq.get('nearby_bid_count')}/{sq.get('nearby_unknown_count')}"
+            f"- Outer upper/lower: {fmt_price(edges_c.get('outer_upper_edge'))} / "
+            f"{fmt_price(edges_c.get('outer_lower_edge'))}"
         )
-        obm = sq.get("ob_coverage_metrics") or {}
-        if obm.get("overall"):
-            o = obm["overall"]
+        prior = ctx.get("prior_edge_cross") or {}
+        print(f"- Prior outer-cross status: {prior.get('status') or 'NOT_AVAILABLE'}")
+        if prior.get("last_outer_cross"):
+            loc = prior["last_outer_cross"]
+            print(f"- Last outer cross: {loc.get('cross_ts')} @ {fmt_price(loc.get('cross_price'))}")
+            s2a = prior.get("seconds_from_last_outer_cross_to_anchor")
             print(
-                f"- OB200 coverage: full={o.get('full_coverage_pct')}% "
-                f"partial={o.get('partial_coverage_pct')}% missing={o.get('missing_sample_pct')}%"
+                f"- Seconds last outer-cross → anchor: {s2a if s2a is not None else 'NOT_AVAILABLE'}"
             )
-        print("BREAKOUT CONFIRMATION:       NOT_EVALUATED")
-        print("FAILED BREAKOUT:             NOT_EVALUATED")
-        print("ABSORPTION:                  NOT_EVALUATED")
-        print("BUYER/SELLER CONTROL:        NOT_EVALUATED")
-        print("TRADE DIRECTION:             null")
-        print("RULES FROZEN:                false")
-        print("")
-        print("ANALYSIS STATUS")
-        print(str(sv.get("verdict") or "BTC_OB_FIGHT_CANONICAL_ELIGIBILITY_READY"))
-    else:
-        print("")
-        print("ANALYSIS STATUS")
-        print("BTC_OB_FIGHT_CAUSAL_FACT_ENGINE_READY")
+            rem = prior.get("remained_outside_until_anchor")
+            print(f"- Remained outside until anchor: {rem if rem is not None else 'NOT_AVAILABLE'}")
+        print("ANCHOR OBSERVATION CONTEXT")
+        print(f"- {ctx.get('observation_context')}")
+
+    print("")
+    print("FIGHT FACTS")
+    print(f"- Profile-state episodes: {_fmt_count(fm.get('profile_state_episode_count'))}")
+    print(f"- Outside episodes: {_fmt_count(fm.get('outside_episode_count'))}")
+    print(f"- Exact frozen-edge events: {_fmt_count(fm.get('edge_consumption_count'))}")
+    cons = sq.get("consumption_by_scope") or {}
+    print(f"- TPO edge-bin events: {_fmt_count((cons.get('TPO_EDGE_BIN') or {}).get('total'), computed=bool(cons))}")
+    print(f"- Volume edge-bin events: {_fmt_count((cons.get('VOLUME_EDGE_BIN') or {}).get('total'), computed=bool(cons))}")
+    print(f"- Profile-edge-zone events: {_fmt_count((cons.get('PROFILE_EDGE_ZONE') or {}).get('total'), computed=bool(cons))}")
+    print(f"- Post-trade refills: {_fmt_count(fm.get('post_trade_refill_count'))}")
+    print(f"- Canonical reclaims: {_fmt_count(fm.get('reclaim_count') if fm.get('reclaim_count') is not None else sq.get('canonical_reclaim_count'))}")
+    print("BREAKOUT CONFIRMATION:       NOT_EVALUATED")
+    print("FAILED BREAKOUT:             NOT_EVALUATED")
+    print("BUYER/SELLER CONTROL:        NOT_EVALUATED")
+    print("ABSORPTION:                  NOT_EVALUATED")
+    print("TRADE DIRECTION:             null")
+
+    print("")
+    print("CANONICAL SEQUENCE")
+    print(f"- Verdict: {sq.get('verdict') or (sv or {}).get('verdict') or 'NOT_AVAILABLE'}")
+    print(f"- Raw outside: {_fmt_count(sq.get('raw_outside_observation_count'))}")
+    print(f"- Canonical outside: {_fmt_count(sq.get('canonical_outside_count'))}")
+    print(f"- Ambiguous outside: {_fmt_count(sq.get('outside_excursion_count_ambiguous'))}")
+    print(f"- Canonical reclaims: {_fmt_count(sq.get('canonical_reclaim_count'))}")
+    print(f"- Ambiguous reclaim candidates: {_fmt_count(sq.get('ambiguous_reclaim_candidate_count'))}")
+    print(
+        f"- Edge visits Upper/Lower: {_fmt_count(sq.get('edge_visits_upper'))}/"
+        f"{_fmt_count(sq.get('edge_visits_lower'))}"
+    )
+    print(f"- Open outside excursions: {_fmt_count(sq.get('open_excursion_count'))}")
+    print(
+        f"- Cluster gap=0: {_fmt_count(sq.get('cluster_count_gap_0'))} "
+        f"(invariant_ok={sq.get('gap0_invariant_ok') if sq.get('gap0_invariant_ok') is not None else 'NOT_AVAILABLE'})"
+    )
+    print(
+        f"- Nearby liquidity increases Ask/Bid/Unknown: "
+        f"{_fmt_count(sq.get('nearby_ask_count'))}/"
+        f"{_fmt_count(sq.get('nearby_bid_count'))}/"
+        f"{_fmt_count(sq.get('nearby_unknown_count'))}"
+    )
+    for line in _observability_console_block(sq):
+        print(line)
+    print("BREAKOUT CONFIRMATION:       NOT_EVALUATED")
+    print("FAILED BREAKOUT:             NOT_EVALUATED")
+    print("ABSORPTION:                  NOT_EVALUATED")
+    print("BUYER/SELLER CONTROL:        NOT_EVALUATED")
+    print("TRADE DIRECTION:             null")
+    print("RULES FROZEN:                false")
+    print("")
+    print("ANALYSIS STATUS")
+    print(str(sq.get("verdict") or (sv or {}).get("verdict") or "BTC_OB_FIGHT_CANONICAL_ELIGIBILITY_READY"))
     print("")
     print("OUTPUT PATH")
     print(str(run_dir))

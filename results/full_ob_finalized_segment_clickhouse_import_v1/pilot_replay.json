@@ -1,0 +1,76 @@
+{
+  "source_replay_summary": {
+    "error": null,
+    "keys": [
+      "applied_deltas",
+      "ask_levels",
+      "best_ask",
+      "best_bid",
+      "bid_levels",
+      "continuity_epoch_count",
+      "continuous_capture",
+      "crossed",
+      "delta_files",
+      "epochs",
+      "final_seq",
+      "final_u",
+      "ok",
+      "replayable_by_epochs",
+      "research_eligible",
+      "status",
+      "unobserved_intervals"
+    ],
+    "continuous_capture": false,
+    "epoch_count": 8
+  },
+  "db_checkpoints": [
+    {
+      "kind": "INITIAL_CHECKPOINT",
+      "epoch": 0,
+      "book_hash": "13f44aa495c4df1f999e6e48468b0d7c5242aa6d470eb9758508b15ed9de19e8"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 1,
+      "book_hash": "6207a4c013f67f1dcbe053a23e95d2338b3a5c8320c2b3c9eb667aaed2168b33"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 2,
+      "book_hash": "2cb739e8539651084b889e7be520a983a7f24a237b4d743ae23ef3b814324003"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 3,
+      "book_hash": "4a53f1cf43c7dac368d3de28b2025057d86e9f8e255fa8af7108ddbff1bdcde1"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 4,
+      "book_hash": "9dcb08fb5d442020af8b74fbdf64ef05e19aca252c1caa435436e389413902d7"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 5,
+      "book_hash": "34fc9ed716e9bafc031e79d6136211d2cff01588ae2a524787743ee2641fea96"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 6,
+      "book_hash": "39dfe6ac04895e37cf188a6a7d09d3e89d44145c7e677d80af5f0b72fc762eeb"
+    },
+    {
+      "kind": "RESYNC_CHECKPOINT",
+      "epoch": 7,
+      "book_hash": "8d94453676a41a041ef79384db5bd430624130fe19fd06591f5bb899101854c5"
+    }
+  ],
+  "db_logical_total": 35589,
+  "db_physical_total": 48797,
+  "segments_verified": 4,
+  "parity_gate": {
+    "source_logical_records_eq_db": true,
+    "parse_rejects": 0,
+    "source_book_hash_eq_db": true
+  }
+}

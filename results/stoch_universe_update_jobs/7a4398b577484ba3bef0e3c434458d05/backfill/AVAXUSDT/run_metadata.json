@@ -1,0 +1,25 @@
+{
+  "db_bytes": 748140200,
+  "expected_full_coverage_per_symbol": 356262,
+  "generated_at": "2026-08-15T09:43:53.015850+00:00",
+  "physical_total": 356262,
+  "requested_end": "2026-08-15T09:42:00+00:00",
+  "requested_start": "2025-12-11T00:00:00+00:00",
+  "status_counts": {
+    "COMPLETE_CLEAN": 1,
+    "COMPLETE_WITH_INTERNAL_GAPS": 0,
+    "FAILED": 0,
+    "NO_HISTORY": 0,
+    "PARTIAL": 0
+  },
+  "symbols": [
+    "AVAXUSDT"
+  ],
+  "unique_final_total": 356262,
+  "universe": {
+    "generated_at": "2026-08-11T14:20:05.664602+00:00",
+    "selection_method": "coin_scanner_crypto_tradeability_pass",
+    "symbol_count": 51,
+    "target_size": 51
+  }
+}

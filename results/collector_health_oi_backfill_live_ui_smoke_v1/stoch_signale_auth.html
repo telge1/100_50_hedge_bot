@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stoch-Signale - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/stoch.css?v=10">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 telge</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        
+                <div class="dashboard-navigation">
+            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            <a href="/live-orderbook" class="nav-link">📡 Live Orderbook</a>
+            <a href="/position-calculator" class="nav-link nav-link-position-calculator">🧮 Position Calculator</a>
+            <div class="nav-dropdown">
+                <a href="/profit-verlauf" class="nav-link">📈 Profit-Verlauf</a>
+                <div class="nav-dropdown-menu" role="menu" aria-label="Profit-Verlauf">
+                    <a href="/profit-verlauf" class="nav-dropdown-link" role="menuitem">Profit-Verlauf</a>
+                    <a href="/profit-verlauf/gold-shadow" class="nav-dropdown-link" role="menuitem">Gold Shadow</a>
+                </div>
+            </div>
+            <div class="nav-dropdown">
+                <a href="/live-charts/hedge" class="nav-link">📈 Live Charts</a>
+                <div class="nav-dropdown-menu" role="menu" aria-label="Live Charts">
+                    <a href="/live-charts/hedge" class="nav-dropdown-link" role="menuitem">Hedge Bot Charts</a>
+                    <a href="/live-charts/research" class="nav-dropdown-link" role="menuitem">Research Charts</a>
+                    <a href="/live-charts/market-profile" class="nav-dropdown-link" role="menuitem">Market Profile</a>
+                </div>
+            </div>
+            <a href="/price-alert" class="nav-link">🔔 Price Alert</a>
+            <a href="/stoch-signale" class="nav-link active">📉 Stoch-Signale</a>
+            <a href="/stoch-profite" class="nav-link">💰 Stoch-Profite</a>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="stoch-page-header">
+                <div>
+                    
+                    <div class="stoch-baseline-banner" id="stochBaselineBanner">
+                        <div class="stoch-baseline-banner-title">FROZEN BASELINE — 15M TIER-A</div>
+                        <div class="stoch-baseline-banner-sub">BASELINE_IMMEDIATE · SL_FIRST · NO_BE50</div>
+                        <div class="stoch-baseline-banner-flag">GLOBAL_FROZEN_TIER_A · wave_fade_no_be50_v1</div>
+                    </div>
+                    <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-live">FROZEN</span></h1>
+                    <p>Aktive Anzeige: <strong>FROZEN_BASELINE</strong> (<code>DASHBOARD_SIGNAL_SOURCE=FROZEN_BASELINE</code>). Exit-Policy <strong>NO_BE50</strong>. Keine Research-1m-Entries. PnL = gross.</p>
+                    <div class="stoch-research-banner" id="stochPoolResearchBanner" style="display:none;" hidden>
+                        <div class="stoch-research-banner-title">RESEARCH / BACKTEST ONLY</div>
+                        <div class="stoch-research-banner-sub">Source: ClickHouse 1m</div>
+                        <div class="stoch-research-banner-sub">Pool calculation: closed 5m candles</div>
+                        <div class="stoch-research-banner-sub">Historische, am Entry eingefrorene Pool-Snapshots. Keine Live-Strategie und keine Orderausführung.</div>
+                        <div class="stoch-research-banner-flag" id="stochPoolResearchWindow">ACEUSDT<br>2026-08-12 15:03:43 UTC – 2026-08-14 15:03:43 UTC</div>
+                    </div>
+                    
+                </div>
+            </div>
+
+            <div class="stoch-perf" id="stochPerfSummary" aria-live="polite">
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Signals</div><div class="stoch-perf-value" id="perfSignals">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Wins</div><div class="stoch-perf-value stoch-perf-win" id="perfWins">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Losses</div><div class="stoch-perf-value stoch-perf-loss" id="perfLosses">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Open</div><div class="stoch-perf-value" id="perfOpen">–</div></div>
+                </div>
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Win Rate</div><div class="stoch-perf-value" id="perfWinRate">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Profit</div><div class="stoch-perf-value stoch-perf-win" id="perfProfit">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross Loss</div><div class="stoch-perf-value stoch-perf-loss" id="perfLoss">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Total PnL</div><div class="stoch-perf-value" id="perfTotal">–</div></div>
+                </div>
+                <div class="stoch-perf-row" id="stochPoolPerfExtra" style="display:none;">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">READY</div><div class="stoch-perf-value" id="perfReady">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">NO_PLAN</div><div class="stoch-perf-value" id="perfNoPlan">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Gross PnL</div><div class="stoch-perf-value" id="perfGrossPnl">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Fees</div><div class="stoch-perf-value" id="perfFees">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Net PnL</div><div class="stoch-perf-value" id="perfNet">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Profit Factor</div><div class="stoch-perf-value" id="perfPf">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Max Drawdown</div><div class="stoch-perf-value" id="perfMdd">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">SL TOO WIDE</div><div class="stoch-perf-value" id="perfSlWide">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Ein Ziel</div><div class="stoch-perf-value" id="perfOneTarget">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Zwei Ziele</div><div class="stoch-perf-value" id="perfTwoTargets">–</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Ignorierte Duplikate</div><div class="stoch-perf-value" id="perfIgnored">–</div></div>
+                </div>
+                <div class="stoch-perf-meta" id="perfMeta">PnL basis: gross · Filter = Tabelle</div>
+            </div>
+
+            <details class="stoch-card" id="collectorControlCard" open>
+                <summary class="stoch-card-summary">Collector Steuerung</summary>
+                <div class="stoch-card-body">
+                    <div class="stoch-collector-error" id="collectorControlError" style="display:none;"></div>
+                    <p class="stoch-universe51-note">
+                        Candles starten immer mit Auto-Recovery (keine Lücken bis „jetzt“).
+                        Public aktivieren = Stoch-Neustart mit Live-WS <strong>plus</strong> Archiv-Gap-Backfill
+                        für die letzten Tage. OB V3 / OI/Liq: Start/Stop der Live-Prozesse
+                        (nicht der einmalige OB-30d-Import).
+                    </p>
+                    <div class="stoch-collector-kv">
+                        <div><span class="stoch-kv-label">Collector</span> <span class="stoch-chip" id="collectorStateChip">–</span></div>
+                        <div><span class="stoch-kv-label">Desired State</span> <span class="stoch-chip" id="collectorDesiredChip">–</span></div>
+                        <div><span class="stoch-kv-label">Shadow Mode</span> <span class="stoch-chip" id="collectorShadowChip">–</span></div>
+                        <div><span class="stoch-kv-label">Public Gap</span> <span class="stoch-chip" id="collectorPublicGapChip">–</span></div>
+                    </div>
+                    <div class="stoch-table-wrap">
+                        <table class="stoch-table" id="collectorServicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Dienst</th>
+                                    <th>Status</th>
+                                    <th>Backfill</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="collectorServicesBody">
+                                <tr><td colspan="4" class="stoch-empty">Lade Dienste…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="stoch-collector-actions" style="margin-top:10px;">
+                        <button type="button" class="btn-service-start" id="collectorStartBtn">Candles starten</button>
+                        <button type="button" class="btn-service-stop" id="collectorStopBtn">Candles stoppen</button>
+                    </div>
+                </div>
+            </details>
+
+            <details class="stoch-card" id="collectorStatusCard" open>
+                <summary class="stoch-card-summary">Collector Status</summary>
+                <div class="stoch-card-body">
+                    <div class="stoch-collector-error" id="collectorStatusError" style="display:none;"></div>
+                    <div class="stoch-collector-summary" id="collectorStatusSummary">
+                        <span>WebSocket: –</span>
+                        <span>Candles: –</span>
+                        <span>Public: –</span>
+                        <span>Signals: –</span>
+                        <span>OB Live: –</span>
+                        <span>OI/Liq: –</span>
+                    </div>
+                    <div class="stoch-collector-meta" id="collectorStatusMeta"></div>
+                    <div class="stoch-table-wrap stoch-collector-table-wrap">
+                        <table class="stoch-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>State</th>
+                                    <th>Candles</th>
+                                    <th>Public</th>
+                                    <th>Signals</th>
+                                    <th>OB</th>
+                                    <th>OI/Liq</th>
+                                    <th>Last Candle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="collectorSymbolsBody">
+                                <tr><td colspan="8" class="stoch-empty">Lade Collector-Status…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+
+            <details class="stoch-card" id="dataCollectorHealthCard" open>
+                <summary class="stoch-card-summary">Daten-Collector Status</summary>
+                <div class="stoch-card-body">
+                    <p class="stoch-universe51-note">
+                        Evidenzbasiert (Prozess + Quelle/Heartbeat + Writer + DB-Freshness).
+                        Grüner Status nie nur aus PID. Full-OB bleibt STOPPED (kein Restart hier).
+                        OI-SoT: ClickHouse <code>open_interest_5m_history</code> (REST 5m) —
+                        nicht MySQL <code>research_open_interest_5m</code>; 5s wird nicht aus 5m vorgetäuscht.
+                        Public Trades: <strong>DEGRADED — LIVE CURRENT BUT DATA LOSS POSSIBLE</strong>
+                        (Backfill-Button deaktiviert bis Re-Audit).
+                    </p>
+                    <div class="stoch-collector-error" id="dataCollectorHealthError" style="display:none;"></div>
+                    <div class="stoch-collector-meta" id="dataCollectorHealthMeta">Prüfung: –</div>
+                    <div class="stoch-table-wrap">
+                        <table class="stoch-table" id="dataCollectorHealthTable">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Collector</th>
+                                    <th>Datenart</th>
+                                    <th>Prozess</th>
+                                    <th>DB-Alter</th>
+                                    <th>Letzter Write</th>
+                                    <th>Coverage</th>
+                                    <th>Lag</th>
+                                    <th>Drops/Queue</th>
+                                    <th>Backfill</th>
+                                    <th>Hinweis</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataCollectorHealthBody">
+                                <tr><td colspan="11" class="stoch-empty">Lade Evidenz…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="stoch-universe51-actions" style="margin-top:12px; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="stoch-btn" id="oiGapDetectBtn">OI 5m: Lücken prüfen</button>
+                        <button type="button" class="stoch-btn" id="oiBackfillDryRunBtn">OI 5m: Fehlende (Dry-Run)</button>
+                        <button type="button" class="stoch-btn" id="ptBackfillBtn" disabled title="Gate: PUBLIC_TRADES_BACKFILL_PARTIALLY_READY">
+                            Public Trades Backfill (deaktiviert)
+                        </button>
+                    </div>
+                    <div class="stoch-collector-meta" id="oiBackfillJobMeta"></div>
+                    <pre class="stoch-universe51-note" id="oiBackfillJobLog" style="max-height:180px; overflow:auto; white-space:pre-wrap;"></pre>
+                </div>
+            </details>
+
+            <details class="stoch-card" id="universe51CoverageCard" open>
+                <summary class="stoch-card-summary">Historisches 51-Coin-Universe (read-only)</summary>
+                <div class="stoch-card-body">
+                    <p class="stoch-universe51-note">
+                        Candle-Coverage aus ClickHouse <code>signal_generator.candles_1m</code> (FINAL, 1m, geschlossen, UTC).
+                        Inkrementelle Updates schreiben nur historische 1m-Candles. Kein Backtest, keine Signalgenerierung.
+                        Freshness gilt als aktuell bei Lag bis 10 Minuten.
+                        Collector-Steuerung bleibt unverändert.
+                    </p>
+                    <div class="stoch-collector-error" id="universe51Error" style="display:none;"></div>
+                    <div class="stoch-universe51-progress" id="universe51Progress" style="display:none;"></div>
+                    <div class="stoch-universe51-summary" id="universe51Summary">
+                        51 Coins vorhanden · – testbar · – ausgewählt
+                    </div>
+                    <div class="stoch-universe51-meta" id="universe51Meta"></div>
+                    <div class="stoch-universe51-actions">
+                        <label class="stoch-universe51-selectall">
+                            <input type="checkbox" id="universe51SelectAll" />
+                            Alle auswählen
+                        </label>
+                        <button type="button" class="stoch-btn" id="universe51UpdateSelected" disabled>
+                            Ausgewählte aktualisieren
+                        </button>
+                    </div>
+                    <div class="stoch-table-wrap stoch-universe51-table-wrap">
+                        <table class="stoch-table" id="universe51Table">
+                            <thead>
+                                <tr>
+                                    <th>Auswahl</th>
+                                    <th>Symbol</th>
+                                    <th>Daten von</th>
+                                    <th>Daten bis</th>
+                                    <th>Tage</th>
+                                    <th>Candles</th>
+                                    <th>Erwartet</th>
+                                    <th>Missing</th>
+                                    <th>Status</th>
+                                    <th>Aktualität</th>
+                                    <th>Lag (min)</th>
+                                    <th>Update ab</th>
+                                    <th>Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="universe51Body">
+                                <tr><td colspan="13" class="stoch-empty">Lade Coverage…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+
+            <div class="stoch-card" id="frozenFadeJobCard">
+                <div class="stoch-card-body">
+                    <h2 class="stoch-frozen-title">Frozen Stochastic Fade – Signale berechnen</h2>
+                    <p class="stoch-universe51-note">
+                        Strategy-Auswahl steuert den Research-Job:
+                        <strong>Canonical Causal Frozen Tier-A</strong> (Signalerzeugung) oder
+                        <strong>EMA Zone Microstructure Confirmation V1</strong> (Candidate Discovery, keine Trades/PnL).
+                        Coin-Auswahl über die Tabelle oben (testbar: FULL / LISTING_LIMITED).
+                        Zeiten in UTC. Signalende ist exklusiv.
+                    </p>
+                    <div class="stoch-collector-error" id="frozenFadeError" style="display:none;"></div>
+                    <div class="stoch-frozen-fields">
+                        <label for="frozenFadeStart">Signalstart (UTC, inclusive)</label>
+                        <input type="datetime-local" id="frozenFadeStart" step="60" />
+                        <label for="frozenFadeEnd">Signalende (UTC, exclusive)</label>
+                        <input type="datetime-local" id="frozenFadeEnd" step="60" />
+                    </div>
+                    <div class="stoch-universe51-summary" id="frozenFadeSelectionSummary">0 Coins ausgewählt</div>
+                    <p class="stoch-universe51-note" id="frozenFadeEstimates">
+                        Geschätzte Laufzeit: ungefähr 1 Minute pro Coin; 51 Coins ungefähr 45–60 Minuten.
+                        Geschätzter Artefaktspeicher: ungefähr 20 MB pro Coin; 51 Coins ungefähr 1 GB.
+                    </p>
+                    <div class="stoch-universe51-actions">
+                        <button type="button" class="stoch-btn" id="frozenFadeStartBtn" disabled>
+                            Kausalen Backtest starten
+                        </button>
+                        <button type="button" class="stoch-btn" id="frozenFadeResumeBtn" style="display:none;">
+                            Job fortsetzen
+                        </button>
+                    </div>
+                    <div class="stoch-universe51-progress" id="frozenFadeProgress" style="display:none;"></div>
+                    <div class="stoch-frozen-bar-wrap" id="frozenFadeBarWrap" style="display:none;">
+                        <div class="stoch-frozen-bar" id="frozenFadeBar"></div>
+                    </div>
+                    <div class="stoch-universe51-meta" id="frozenFadeTotals"></div>
+                    <details class="stoch-card stoch-nested-card" id="frozenFadeResultCard" style="display:none;">
+                        <summary class="stoch-card-summary">Kausaler Backtest Ergebnis</summary>
+                        <div class="stoch-card-body">
+                            <div class="stoch-table-wrap" id="frozenFadeResultWrap">
+                                <table class="stoch-table" id="frozenFadeResultTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Symbol</th>
+                                            <th>Status</th>
+                                            <th>Raw</th>
+                                            <th>Tier-A</th>
+                                            <th>15m</th>
+                                            <th>30m</th>
+                                            <th>1h</th>
+                                            <th>4h</th>
+                                            <th>Warm-up</th>
+                                            <th>Multi-TF</th>
+                                            <th>Dauer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="frozenFadeResultBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                    <p class="stoch-universe51-note" id="frozenFadeDisclaimers">
+                        Keine Execution-Dedup-Policy angewendet.
+                        Keine Outcomes berechnet.
+                        Keine ClickHouse-Signale geschrieben.
+                    </p>
+                </div>
+            </div>
+
+            <div class="stoch-card" id="frozenEvalJobCard">
+                <div class="stoch-card-body">
+                    <h2 class="stoch-frozen-title">Frozen-NO_BE50-Outcomes berechnen</h2>
+                    <p class="stoch-universe51-note">
+                        Wählt zuerst einen kausalen Research-Job. Signale: <code>wave_fade_frozen_f16ae32_causal_entry_v1</code>.
+                        Exit-Policy: <code>NO_BE50</code> über <code>evaluate_signal_no_be50</code> / SL_FIRST.
+                        Nur Tier-A, unabhängig je Signal. Ergebnisse: WIN / LOSS / OPEN. PnL-Karten: gross.
+                    </p>
+                    <div class="stoch-collector-error" id="frozenEvalError" style="display:none;"></div>
+                    <div class="stoch-universe51-actions">
+                        <button type="button" class="stoch-btn" id="frozenEvalStartBtn" disabled>
+                            Frozen-NO_BE50-Outcomes berechnen
+                        </button>
+                        <button type="button" class="stoch-btn" id="frozenEvalResumeBtn" style="display:none;">
+                            Evaluation fortsetzen
+                        </button>
+                    </div>
+                    <div class="stoch-universe51-progress" id="frozenEvalProgress" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="stoch-feed-banner" id="stochFeedBanner" style="display:none;"></div>
+
+            <div class="stoch-toolbar">
+                <label for="stochFilterSymbol">Symbol</label>
+                <select id="stochFilterSymbol"></select>
+                <label for="stochFilterDirection">Direction</label>
+                <select id="stochFilterDirection">
+                    <option value="">Alle</option>
+                    <option value="LONG">LONG</option>
+                    <option value="SHORT">SHORT</option>
+                </select>
+                <label for="stochFilterTimeframe">Timeframe</label>
+                <select id="stochFilterTimeframe">
+                    <option value="">Alle</option>
+                    <option value="15m">15m</option>
+                    <option value="30m">30m</option>
+                    <option value="1h">1h</option>
+                    <option value="4h">4h</option>
+                </select>
+                
+                <label for="stochFilterTierA">Signal Scope</label>
+                <select id="stochFilterTierA">
+                    <option value="true" selected>Tier-A (real)</option>
+                    <option value="all">Alle inkl. Candidates</option>
+                    <option value="false">Candidates only</option>
+                </select>
+                <label for="stochFilterSelected">Selected</label>
+                <select id="stochFilterSelected">
+                    <option value="">Alle</option>
+                    <option value="true">Selected</option>
+                    <option value="false">Not Selected</option>
+                </select>
+                <label for="stochFilterStrategy" id="stochFilterStrategyLabel">Strategy</label>
+                <select id="stochFilterStrategy">
+                    <option value="wave_fade_no_be50_v1" selected>NO_BE50 (aktiv)</option>
+                    <option value="wave_fade_frozen_f16ae32_causal_entry_v1">Canonical Causal Frozen Tier-A</option>
+                    <option value="ema_zone_microstructure_confirmation_v1">EMA Zone Microstructure Confirmation V1</option>
+                    
+                    <option value="POOL_ORDER_PLAN_V1">Pool Order Plan V1 · Research</option>
+                    
+                    
+                    <option value="EMA_POOL_TREND_FLIP_V1">EMA Pool Trend Flip V1 · Research</option>
+                    
+                </select>
+                <span id="stochStrategyJobNote" class="stoch-job-filter-note" hidden>Nicht anwendbar – Outcomes fehlen</span>
+                <label for="stochFilterResearchJob">Frozen-Research-Job</label>
+                <select id="stochFilterResearchJob">
+                    <option value="">Live-Baseline (Collector)</option>
+                </select>
+                <span id="stochEvalFilterWrap" hidden>
+                    <label for="stochFilterResearchEval">Frozen-NO_BE50-Evaluation</label>
+                    <select id="stochFilterResearchEval">
+                        <option value="">Keine Evaluation (nur Plan)</option>
+                    </select>
+                </span>
+                <input type="hidden" id="stochDashboardSource" value="FROZEN_BASELINE" />
+                
+                <label for="stochFilterHours" id="stochFilterHoursLabel">Zeitraum</label>
+                <select id="stochFilterHours">
+                    <option value="48" selected>48h</option>
+                    <option value="168">168h</option>
+                    <option value="24">24h</option>
+                </select>
+                <span id="stochJobWindowNote" class="stoch-job-filter-note" hidden></span>
+                <button type="button" class="stoch-btn" id="stochRefreshBtn">Refresh</button>
+                <span class="stoch-meta" id="stochMeta">–</span>
+            </div>
+            <div class="stoch-toolbar" id="stochPoolFilters" style="display:none;">
+                <label for="stochFilterOutcome">Outcome</label>
+                <select id="stochFilterOutcome">
+                    <option value="">Alle</option>
+                    <option value="WIN">WIN</option>
+                    <option value="LOSS">LOSS</option>
+                    <option value="OPEN">OPEN</option>
+                    <option value="NO_PLAN">NO_PLAN</option>
+                </select>
+                <label for="stochFilterSlWide">SL TOO WIDE</label>
+                <select id="stochFilterSlWide">
+                    <option value="">Alle</option>
+                    <option value="true">Ja</option>
+                    <option value="false">Nein</option>
+                </select>
+                <label for="stochFilterTargets">Ziele</label>
+                <select id="stochFilterTargets">
+                    <option value="">Alle</option>
+                    <option value="one">Ein Ziel</option>
+                    <option value="two">Zwei Ziele</option>
+                </select>
+            </div>
+
+            <div class="stoch-table-wrap">
+                <table class="stoch-table" id="stochSignalsTable">
+                    <thead>
+                        
+                        <tr>
+                            <th></th>
+                            <th><button type="button" data-sort="symbol">Symbol</button></th>
+                            <th><button type="button" data-sort="timeframe">TF</button></th>
+                            <th><button type="button" data-sort="trade_direction">Direction</button></th>
+                            <th><button type="button" data-sort="entry_price">Entry</button></th>
+                            <th>TP</th>
+                            <th>SL</th>
+                            <th>Stoch K</th>
+                            <th><button type="button" data-sort="candle_close_time">Signal Time</button></th>
+                            <th><button type="button" data-sort="result">Result</button></th>
+                            <th><button type="button" data-sort="pnl_pct">PnL</button></th>
+                            <th><button type="button" data-sort="duration_seconds">Duration</button></th>
+                            <th class="stoch-eval-col" hidden>Exit reason</th>
+                            <th class="stoch-eval-col" hidden>BE50</th>
+                            <th class="stoch-eval-col" hidden>Exit time</th>
+                        </tr>
+                        
+                    </thead>
+                    <tbody id="stochSignalsBody">
+                        <tr><td colspan="14" class="stoch-empty">Lade…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="stoch-pagination">
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochPrevBtn">Zurück</button>
+                <span id="stochPageLabel">Seite 1</span>
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochNextBtn">Weiter</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stoch-modal-backdrop" id="stochChartModal" role="dialog" aria-modal="true">
+        <div class="stoch-modal">
+            <div class="stoch-modal-header">
+                <div>
+                    <h2 id="stochChartTitle">Chart</h2>
+                    <p class="stoch-modal-sub" id="stochChartSub"></p>
+                </div>
+                <button type="button" class="stoch-modal-close" id="stochChartClose" aria-label="Schließen">×</button>
+            </div>
+            <div class="stoch-modal-body">
+                <div class="stoch-chart-host" id="stochChartHost"></div>
+                <div class="stoch-chart-legend">
+                    <span class="stoch-leg-entry">Entry</span>
+                    <span class="stoch-leg-tp">TP1 / TP2</span>
+                    <span class="stoch-leg-sl">SL</span>
+                    <span class="stoch-leg-exit">Exit</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="/static/js/stoch_chart_modal.js?v=7"></script>
+    <script src="/static/js/stoch_signale.js?v=22"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

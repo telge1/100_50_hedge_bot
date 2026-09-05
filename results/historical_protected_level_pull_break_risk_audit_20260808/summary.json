@@ -1,0 +1,173 @@
+{
+  "primary_decision": "PULL_IS_DISTANCE_PROXY",
+  "counts": {
+    "total": 136,
+    "LEVEL_BREAK": 106,
+    "LEVEL_HOLD_REJECT": 21,
+    "AMBIGUOUS": 9,
+    "by_symbol": {
+      "APTUSDT": {
+        "LEVEL_HOLD_REJECT": 9,
+        "LEVEL_BREAK": 60,
+        "AMBIGUOUS": 8
+      },
+      "DOGEUSDT": {
+        "LEVEL_HOLD_REJECT": 12,
+        "LEVEL_BREAK": 46,
+        "AMBIGUOUS": 1
+      }
+    },
+    "by_direction": {
+      "bearish": {
+        "LEVEL_HOLD_REJECT": 11,
+        "LEVEL_BREAK": 64,
+        "AMBIGUOUS": 4
+      },
+      "bullish": {
+        "LEVEL_BREAK": 42,
+        "LEVEL_HOLD_REJECT": 10,
+        "AMBIGUOUS": 5
+      }
+    },
+    "by_timeframe": {
+      "1h": {
+        "LEVEL_HOLD_REJECT": 11,
+        "LEVEL_BREAK": 65,
+        "AMBIGUOUS": 5
+      },
+      "4h": {
+        "LEVEL_BREAK": 41,
+        "LEVEL_HOLD_REJECT": 10,
+        "AMBIGUOUS": 4
+      }
+    }
+  },
+  "best_pull_feature": "passive_removal_excess_pct_60s",
+  "aucs": {
+    "pull_feature": "passive_removal_excess_pct_60s",
+    "n": 127,
+    "auc_pull_only": 0.6156783468104223,
+    "auc_distance_only": 0.7704402515723271,
+    "auc_distance_plus_pull": 0.7803234501347709
+  },
+  "matched_summary": {
+    "n_breaks": 106,
+    "n_matched": 13,
+    "median_pull_diff_break_minus_hold": 0.0
+  },
+  "earliest_separation": "NO_EARLY_SEPARATION",
+  "median_seconds_anchor_to_break": 120.0,
+  "strongest_subgroup": "bearish",
+  "bootstrap": {
+    "feature": "passive_removal_excess_pct_60s",
+    "ci_low": -0.11905468390579685,
+    "ci_high": 0.2476915399859204,
+    "n_boot": 400
+  },
+  "jackknife": {
+    "feature": "passive_removal_excess_pct_60s",
+    "auc_full": 0.6156783468104223,
+    "auc_min": 0.6070754716981132,
+    "auc_max": 0.6304245283018868,
+    "fragile": false
+  },
+  "pull_start_rates": {
+    "n_break": 106,
+    "n_hold": 21,
+    "n_break_with_pull": 84,
+    "n_hold_with_pull": 13,
+    "break_rate": 0.7924528301886793,
+    "hold_rate": 0.6190476190476191
+  },
+  "examples": [
+    {
+      "example_tag": "BREAK_STRONG_PULL",
+      "approach_id": "APTUSDT_1h_low_20260512_192700_1p0801",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "timeframe": "1h",
+      "outcome": "LEVEL_BREAK",
+      "pull": 0.9816088395670782,
+      "distance_to_level_bps": 3.240440699933806,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "BREAK_WEAK_PULL",
+      "approach_id": "DOGEUSDT_4h_high_20260220_160200_0p10117",
+      "symbol": "DOGEUSDT",
+      "direction": "bullish",
+      "timeframe": "4h",
+      "outcome": "LEVEL_BREAK",
+      "pull": 0.0,
+      "distance_to_level_bps": -9.390135415636836,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "HOLD_STRONG_PULL",
+      "approach_id": "DOGEUSDT_4h_high_20260220_191500_0p10117",
+      "symbol": "DOGEUSDT",
+      "direction": "bullish",
+      "timeframe": "4h",
+      "outcome": "LEVEL_HOLD_REJECT",
+      "pull": 0.4624378737864146,
+      "distance_to_level_bps": 10.378570722546986,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "HOLD_WEAK_PULL",
+      "approach_id": "DOGEUSDT_1h_high_20260228_061800_0p09164",
+      "symbol": "DOGEUSDT",
+      "direction": "bullish",
+      "timeframe": "1h",
+      "outcome": "LEVEL_HOLD_REJECT",
+      "pull": 0.0,
+      "distance_to_level_bps": 7.092972501092263,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "BREAK_EXTRA",
+      "approach_id": "APTUSDT_4h_low_20260512_192700_1p0801",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "timeframe": "4h",
+      "outcome": "LEVEL_BREAK",
+      "pull": 0.9816088395670782,
+      "distance_to_level_bps": 3.240440699933806,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "BREAK_EXTRA",
+      "approach_id": "APTUSDT_1h_low_20251230_085900_1p712",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "timeframe": "1h",
+      "outcome": "LEVEL_BREAK",
+      "pull": 0.9623959630101027,
+      "distance_to_level_bps": 8.761682242990988,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "BREAK_EXTRA",
+      "approach_id": "APTUSDT_4h_low_20260118_234600_1p7639",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "timeframe": "4h",
+      "outcome": "LEVEL_BREAK",
+      "pull": 0.928489943468387,
+      "distance_to_level_bps": -1.9842394693580843,
+      "anchor_type": "approach_10bps"
+    },
+    {
+      "example_tag": "HOLD_EXTRA",
+      "approach_id": "APTUSDT_1h_high_20251230_193700_1p72",
+      "symbol": "APTUSDT",
+      "direction": "bullish",
+      "timeframe": "1h",
+      "outcome": "LEVEL_HOLD_REJECT",
+      "pull": 0.4409666836271238,
+      "distance_to_level_bps": 8.720930232557178,
+      "anchor_type": "approach_10bps"
+    }
+  ],
+  "artifact_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/historical_protected_level_pull_break_risk_audit_20260808"
+}

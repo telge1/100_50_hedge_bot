@@ -1,0 +1,89 @@
+{
+  "n": 1158,
+  "wins": 527,
+  "losses": 629,
+  "open": 2,
+  "gross_sum": -16.49999999999857,
+  "signal_ids_match": true,
+  "setup_ids_unique": true,
+  "split_counts": {
+    "development": 694,
+    "test": 233,
+    "validation": 231
+  },
+  "split_source": "zec_trade_context.parquet",
+  "issues": [],
+  "ok": true,
+  "coins": {
+    "ZECUSDT": {
+      "n": 1158,
+      "wins": 527,
+      "losses": 629,
+      "open": 2,
+      "gross_sum": -16.49999999999857
+    },
+    "SOLUSDT": {
+      "n": 625,
+      "wins": 285,
+      "losses": 337,
+      "open": 3,
+      "gross_sum": -13.999999999999213
+    },
+    "HYPEUSDT": {
+      "n": 990,
+      "wins": 414,
+      "losses": 574,
+      "open": 2,
+      "gross_sum": -144.99999999999866
+    },
+    "XAUTUSDT": {
+      "n": 228,
+      "wins": 111,
+      "losses": 113,
+      "open": 4,
+      "gross_sum": 14.500000000000252
+    },
+    "LINKUSDT": {
+      "n": 650,
+      "wins": 307,
+      "losses": 341,
+      "open": 2,
+      "gross_sum": 28.50000000000092
+    },
+    "DOGEUSDT": {
+      "n": 611,
+      "wins": 286,
+      "losses": 321,
+      "open": 4,
+      "gross_sum": 15.50000000000075
+    },
+    "BNBUSDT": {
+      "n": 375,
+      "wins": 184,
+      "losses": 190,
+      "open": 1,
+      "gross_sum": 16.00000000000064
+    },
+    "SUIUSDT": {
+      "n": 808,
+      "wins": 370,
+      "losses": 435,
+      "open": 3,
+      "gross_sum": -12.499999999999133
+    },
+    "ADAUSDT": {
+      "n": 740,
+      "wins": 326,
+      "losses": 411,
+      "open": 3,
+      "gross_sum": -49.9999999999994
+    },
+    "AVAXUSDT": {
+      "n": 717,
+      "wins": 358,
+      "losses": 356,
+      "open": 3,
+      "gross_sum": 85.50000000000108
+    }
+  }
+}

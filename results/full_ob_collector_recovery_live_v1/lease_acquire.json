@@ -1,0 +1,22 @@
+{
+  "BTCUSDT": {
+    "request_id": "acq-BTCUSDT",
+    "ok": true,
+    "error": null,
+    "symbol": "BTCUSDT",
+    "depth": 0,
+    "book_mode": "full",
+    "subscription_state": "live",
+    "expires_at": "2026-09-04T19:43:17.112Z"
+  },
+  "DOGEUSDT": {
+    "request_id": "acq-DOGEUSDT",
+    "ok": true,
+    "error": null,
+    "symbol": "DOGEUSDT",
+    "depth": 0,
+    "book_mode": "full",
+    "subscription_state": "starting",
+    "expires_at": "2026-09-04T19:43:17.113Z"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "dedup_key_schema": "symbol|profile_id|edge_kind|arm_cycle_id",
+  "tick_storm_10000": {
+    "observations": 10000,
+    "nested_signals": 1,
+    "dedup_key": "BTCUSDT|BTCUSDT_20260904T080000_20260904T083000_v1_c902a7f873c4|TPO_VAH|1"
+  },
+  "duplicate_secondary_trigger_suppressed_count": 0,
+  "profile_arm_count": 1,
+  "profile_rearm_count": 0,
+  "historical_four_candidates": {
+    "profiles": 4,
+    "total_signals": 4,
+    "expected": 4,
+    "all_edges_match_audit": true
+  }
+}

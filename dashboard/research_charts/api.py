@@ -370,15 +370,21 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                     symbol=str(body.get("symbol") or ""),
                     session_id=str(body.get("session_id") or user.get("username") or "dashboard"),
                     lease_id=body.get("lease_id"),
+                    depth=body.get("depth"),
                 )
             elif op == "heartbeat":
                 payload = await asyncio.to_thread(
                     lease_heartbeat,
                     lease_id=str(body.get("lease_id") or ""),
                     symbol=str(body.get("symbol") or "") or None,
+                    depth=body.get("depth"),
                 )
             elif op == "release":
-                payload = await asyncio.to_thread(lease_release, lease_id=str(body.get("lease_id") or ""))
+                payload = await asyncio.to_thread(
+                    lease_release,
+                    lease_id=str(body.get("lease_id") or ""),
+                    depth=body.get("depth"),
+                )
             else:
                 return _error(400, "invalid_op", f"unknown op {op}")
         except Ob1000DisabledError:
@@ -400,10 +406,11 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         user: dict = Depends(require_auth),
         symbol: str = Query(...),
         lease_id: str | None = Query(default=None),
+        depth: int | None = Query(default=None),
     ):
         sym = str(symbol or "").strip().upper()
         try:
-            payload = await asyncio.to_thread(load_ob1000_levels, sym, lease_id=lease_id)
+            payload = await asyncio.to_thread(load_ob1000_levels, sym, lease_id=lease_id, depth=depth)
             payload = freshness_from_payload(payload)
         except Ob1000DisabledError:
             return _error(503, "disabled", "on-demand OB1000 disabled")

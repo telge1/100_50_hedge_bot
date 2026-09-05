@@ -1,0 +1,13 @@
+{
+  "flight_recorder_env": "false",
+  "flight_recorder_active": false,
+  "BOOTSTRAP_FILE_CREATED": false,
+  "new_fr_files_since_restart": [],
+  "BOOTSTRAP_ALREADY_IN_EDGE_ZONE": "not_observable_fr_disabled",
+  "ringbuffer_growth": "not_observable_fr_disabled",
+  "watcher_status": "inactive_fr_disabled",
+  "signal_registry": "inactive_fr_disabled",
+  "genuine_cross_in_observed": false,
+  "synthetic_signal_created": false,
+  "note": "Start script exports OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE=${...:-false} before python; dotenv does not override existing env. No second restart allowed in this task."
+}

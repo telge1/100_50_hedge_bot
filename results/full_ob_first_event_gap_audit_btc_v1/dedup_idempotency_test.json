@@ -1,0 +1,19 @@
+{
+  "table": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+  "expected_unique": 203,
+  "physical_rows_after_2nd_import_no_optimize": 406,
+  "logical_rows_GROUP_BY": 203,
+  "logical_rows_FINAL": 203,
+  "logical_rows_VIEW": 203,
+  "naive_sum_bid_n": 24954,
+  "dedup_argmax_sum_bid_n": 12477,
+  "naive_over_dedup_ratio": 2.0,
+  "timings_sec": {
+    "group_by": 0.0578,
+    "final": 0.0579
+  },
+  "no_logical_duplication": true,
+  "physical_duplication_observed": true,
+  "analysis_must_not_use_raw_sum_without_dedup": true,
+  "passed": true
+}

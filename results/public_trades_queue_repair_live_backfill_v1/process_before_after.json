@@ -1,0 +1,17 @@
+{
+  "before": {
+    "old_pid": 1661773,
+    "exceptional_sigkill": true,
+    "reason": "STOPPED idle-loop + SIGTERM handler overwrite on old binary"
+  },
+  "after": {
+    "new_pid": 1827882,
+    "cmd": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades --public-trade-queue-maxsize 100000 --public-trade-batch-size 2000 --public-trade-spool-dir results/live_collector/public_trade_spool ",
+    "protected": {
+      "1817696": true,
+      "1780509": true,
+      "1795773": true
+    }
+  },
+  "destructive_actions_executed": false
+}

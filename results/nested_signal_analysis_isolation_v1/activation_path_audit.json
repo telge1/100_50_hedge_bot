@@ -1,0 +1,50 @@
+{
+  "full_ob_resync_checkpoint_v1": {
+    "contract": "full_ob_resync_checkpoint_v1",
+    "config_default": "always_on_when_FR_enabled",
+    "env_variable": null,
+    "cli_passthrough": false,
+    "collector_constructor": "load_flight_recorder_settings \u2192 FullObEdgeFlightRecorder when enabled",
+    "manager_constructor": "resync handlers always registered",
+    "health_output_keys": [
+      "resync_checkpoint_success_count",
+      "resync_checkpoint_failure_count",
+      "continuity_epoch_count"
+    ],
+    "manifest_output": "resync_checkpoint_contract in event_manifest",
+    "WOULD_BE_ACTIVE_AFTER_RESTART": true
+  },
+  "nested_profile_edge_signal_v1": {
+    "contract": "nested_profile_edge_signal_v1",
+    "config_default": true,
+    "env_variable": "OB_V3_FULL_OB_FR_NESTED_SIGNALS_ENABLE",
+    "env_default_when_unset": true,
+    "cli_passthrough": false,
+    "collector_constructor": "via FlightRecorderSettings.nested_profile_signals_enabled",
+    "manager_constructor": "ProfileSignalRegistry always; gated by settings.nested_profile_signals_enabled",
+    "health_output_keys": [
+      "nested_profile_signals_enabled",
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT"
+    ],
+    "manifest_output": "nested signals in nested_profile_signals.jsonl + markers",
+    "live_env_nested_set": false,
+    "WOULD_BE_ACTIVE_AFTER_RESTART": true
+  },
+  "nested_signal_analysis_isolation_v1": {
+    "contract": "nested_signal_analysis_isolation_v1",
+    "tied_to_nested_emit": true
+  },
+  "live_process_env_OB_V3_FULL_OB": {
+    "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "OB_V3_FULL_OB_FR_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder"
+  },
+  "recommended_restart_env": {
+    "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "OB_V3_FULL_OB_FR_NESTED_SIGNALS_ENABLE": "true",
+    "note": "Explicit nested enable recommended for auditability; default already true if unset"
+  },
+  "WOULD_RESYNC_CHECKPOINT_BE_ACTIVE_AFTER_RESTART": true,
+  "WOULD_NESTED_SIGNALS_BE_ACTIVE_AFTER_RESTART": true
+}

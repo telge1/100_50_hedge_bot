@@ -1,0 +1,23 @@
+{
+  "verdict": "BTC_DOGE_FIGHT_RESEARCH_DB_CLI_PARTIAL",
+  "eligibility_contract": "fight_data_eligibility_contract_v1",
+  "branch": "feature/btc-doge-research-db",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "golden_run": "results/btc_ob_fight_cases/20260831T190000Z/run_029",
+  "doge_run": "results/btc_ob_fight_cases/20260831T130000Z/run_004",
+  "partial_run": "results/btc_ob_fight_cases/20260827T070000Z/run_002",
+  "not_available_run": "results/btc_ob_fight_cases/20260820T120000Z/run_002",
+  "btc_golden_runtime_s": 33.701,
+  "btc_golden_peak_rss_kb": 1518800,
+  "unit_tests_passed": 14,
+  "raw_archive_replay_used": false,
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "blocking_reasons": [
+    "full_facts_runtime_above_10s",
+    "coverage_only_above_1s",
+    "public_trades_lineage_companion_often_required",
+    "residual_btc_tick_hardcoding_in_some_edge_metadata_paths"
+  ]
+}

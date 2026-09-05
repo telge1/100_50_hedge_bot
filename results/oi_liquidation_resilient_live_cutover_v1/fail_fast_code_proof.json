@@ -1,0 +1,12 @@
+{
+  "WriterDeadError_defined": true,
+  "autogenerate_session_id_false": true,
+  "DurableSpool_used": true,
+  "health_atomic_writer": true,
+  "is_alive_on_writer": true,
+  "SESSION_IS_LOCKED_handled": true,
+  "systemd_Restart": true,
+  "spool_ack_never_delete_unacked": true,
+  "tests_passed": 33,
+  "live_fault_injection": false
+}

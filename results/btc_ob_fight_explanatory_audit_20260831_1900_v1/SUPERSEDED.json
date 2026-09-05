@@ -1,0 +1,14 @@
+{
+  "do_not_use_for_research": true,
+  "superseded_by": "liquidation_flow_facts_v1",
+  "reason": "overlapping-window double counting and denominator mismatch",
+  "superseded_contract": "btc_ob_fight_explanatory_audit_v1",
+  "historical_outputs_preserved": true,
+  "canonical_pipeline_must_not_load_this_directory": true,
+  "replacement_outputs": [
+    "liquidation_flow_summary.json",
+    "liquidation_flow_manifest.json",
+    "liquidation_matching_sensitivity.csv"
+  ],
+  "bybit_side_mapping_authoritative_url": "https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation"
+}

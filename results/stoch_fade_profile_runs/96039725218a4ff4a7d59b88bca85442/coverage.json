@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 158400,
+      "error": null,
+      "raw_count": 889,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "1000PEPEUSDT",
+      "tier_a_count": 128,
+      "warmup_complete": true
+    }
+  ]
+}

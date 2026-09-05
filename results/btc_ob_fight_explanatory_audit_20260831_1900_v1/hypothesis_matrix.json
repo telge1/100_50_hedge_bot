@@ -1,0 +1,116 @@
+{
+  "hypotheses": [
+    {
+      "hypothesis": "PURE_NEW_BUYER_BREAKOUT",
+      "status": "CONTRADICTED",
+      "supporting_facts": [
+        "Taker buy delta attack window +6648677"
+      ],
+      "contradicting_facts": [
+        "Short liquidation quote ~490939 USD in core window"
+      ],
+      "coverage_limits": [
+        "Cannot separate organic buyers from forced covers without trade IDs"
+      ],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "SHORT_LIQUIDATION_DOMINANT_UP_MOVE",
+      "status": "PARTIALLY_SUPPORTED",
+      "supporting_facts": [
+        "59 short-liq events, ~490939 USD notional",
+        "Price rose into peak with heavy short liq cluster pre-peak"
+      ],
+      "contradicting_facts": [
+        "Large positive taker buy delta (+6648677) exceeds liq notional alone"
+      ],
+      "coverage_limits": [
+        "Temporal association only; no direct liq→trade ID"
+      ],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "MIXED_SHORT_SQUEEZE_AND_NEW_LONGS",
+      "status": "SUPPORTED",
+      "supporting_facts": [
+        "Short liq + positive buy delta in attack",
+        "OI attack-window delta -4.72899999999936 (short covering during breakout)",
+        "Full-window OI +114.33 suggests later long building"
+      ],
+      "contradicting_facts": [],
+      "coverage_limits": [
+        "OI unit not physically confirmed as contracts"
+      ],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "PASSIVE_SELLER_ABSORPTION",
+      "status": "INCONCLUSIVE",
+      "supporting_facts": [
+        "542 nearby ask increases",
+        "60 trade-associated ask decreases"
+      ],
+      "contradicting_facts": [
+        "Profile edge zone OB coverage mostly partial/outside book"
+      ],
+      "coverage_limits": [
+        "Insufficient observability at edge during attack — cannot confirm absorption"
+      ],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "BUYER_EXHAUSTION_WITHOUT_PROVEN_ABSORPTION",
+      "status": "PARTIALLY_SUPPORTED",
+      "supporting_facts": [
+        "19:10–19:30 delta strongly negative while price failed to hold peak",
+        "Buy delta collapsed post-peak"
+      ],
+      "contradicting_facts": [
+        "Cannot rule out absorption due weak OB coverage"
+      ],
+      "coverage_limits": [],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "FAILED_BREAKOUT_AFTER_RECLAIM",
+      "status": "PARTIALLY_SUPPORTED",
+      "supporting_facts": [
+        "4 canonical reclaims below outer edge",
+        "Price returned below VVAH after peak"
+      ],
+      "contradicting_facts": [
+        "Trading rules not frozen — research assessment only"
+      ],
+      "coverage_limits": [],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "FAILED_RETEST_LOWER_HIGH",
+      "status": "SUPPORTED",
+      "supporting_facts": [
+        "Retest classification: LOWER_HIGH",
+        "Extended retest below first peak 79280.8"
+      ],
+      "contradicting_facts": [
+        "Retest outside standard 19:30 decision window"
+      ],
+      "coverage_limits": [
+        "Extended window hindsight"
+      ],
+      "missing_for_confirmation": []
+    },
+    {
+      "hypothesis": "SUSTAINED_BREAKOUT_ACCEPTANCE",
+      "status": "CONTRADICTED",
+      "supporting_facts": [],
+      "contradicting_facts": [
+        "Reclaim below outer edge",
+        "19:00–19:30 net negative delta",
+        "LOWER_HIGH"
+      ],
+      "coverage_limits": [],
+      "missing_for_confirmation": []
+    }
+  ],
+  "evaluation_policy": "No hypothesis confirmed by hindsight price alone"
+}

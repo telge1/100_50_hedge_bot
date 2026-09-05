@@ -1,0 +1,9 @@
+{
+  "verdict": "BTC_DOGE_FIGHT_RESEARCH_DB_CLI_PARTIAL",
+  "hard_gate": "RESEARCH_TRADE_EVENTS_MISSING",
+  "coverage_only_warm_s": 0.09,
+  "source_pure_full_facts": "BLOCKED",
+  "unit_tests_passed": 19,
+  "companion_default": false,
+  "ready_blocked_reason": "research_public_trades lacks correctly timestamped events for fight windows; rematerialization import required"
+}

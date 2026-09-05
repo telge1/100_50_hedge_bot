@@ -1,0 +1,96 @@
+{
+  "gates": {
+    "source_packet_count == clickhouse_packet_count": true,
+    "rejected_packet_count == 0": true,
+    "duplicate_packet_count == 0": true,
+    "source_feed_u_gap_count == 0": true,
+    "persisted_capture_u_gap_count == 0": true,
+    "database_replay_u_gap_count == 0": true,
+    "source_final_u == database_final_u": true,
+    "source_final_seq == database_final_seq": true,
+    "source_book_hash == database_book_hash": true,
+    "source_best_bid == database_best_bid": true,
+    "source_best_ask == database_best_ask": true,
+    "source_bid_level_count == database_bid_level_count": true,
+    "source_ask_level_count == database_ask_level_count": true,
+    "database_book_crossed == false": true,
+    "checkpoint_exact": true,
+    "ob_packet_counts_match": true
+  },
+  "all_passed": true,
+  "source_meta": {
+    "applied": 1501,
+    "gaps": 0,
+    "rejects": 0,
+    "persisted_u_gap_in_applied_stream": 0,
+    "final_u": 4349047,
+    "final_seq": 805049768223,
+    "last_seen_u": 4349047
+  },
+  "database_meta": {
+    "applied": 1501,
+    "gaps": 0,
+    "rejects": 0,
+    "persisted_u_gap_in_applied_stream": 0,
+    "final_u": 4349047,
+    "final_seq": 805049768223,
+    "last_seen_u": 4349047
+  },
+  "source_final": {
+    "label": "source_final",
+    "applied_delta_count": 1501,
+    "u": 4349047,
+    "seq": 805049768223,
+    "best_bid": 80662.7,
+    "best_ask": 80662.8,
+    "spread": 0.10000000000582077,
+    "bid_level_count": 39477,
+    "ask_level_count": 24393,
+    "book_hash": "14f793b85f98caedee435b0f86bc5c6a44bb795852e83cfde571b87440bc2175",
+    "crossed": false,
+    "probes": {
+      "best_bid_qty": 2.257,
+      "best_ask_qty": 1.014
+    }
+  },
+  "database_final": {
+    "label": "database_final",
+    "applied_delta_count": 1501,
+    "u": 4349047,
+    "seq": 805049768223,
+    "best_bid": 80662.7,
+    "best_ask": 80662.8,
+    "spread": 0.10000000000582077,
+    "bid_level_count": 39477,
+    "ask_level_count": 24393,
+    "book_hash": "14f793b85f98caedee435b0f86bc5c6a44bb795852e83cfde571b87440bc2175",
+    "crossed": false,
+    "probes": {
+      "best_bid_qty": 2.257,
+      "best_ask_qty": 1.014
+    }
+  },
+  "source_packet_count": 1514,
+  "clickhouse_packet_count": 1514,
+  "checkpoint_compare": {
+    "matched_labels": [
+      "after_snapshot",
+      "final",
+      "applied_1000",
+      "applied_1250",
+      "applied_1500",
+      "applied_250",
+      "applied_500",
+      "applied_750"
+    ],
+    "mismatches": [],
+    "exact": true
+  },
+  "counts": {
+    "source_feed_u_gap_count": 0,
+    "persisted_capture_u_gap_count": 0,
+    "database_replay_u_gap_count": 0,
+    "rejected_packet_count": 0,
+    "duplicate_packet_count": 0
+  }
+}

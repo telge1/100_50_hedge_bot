@@ -1,0 +1,8 @@
+{
+  "reference_bracket_poc_differs_from_volume_poc": "test_reference_and_volume_poc_can_differ",
+  "trade_size_changes_volume_not_bracket_reference": "test_bracket_reference_invariant_trade_size_scaling",
+  "production_paths_use_volume_not_brackets": "test_production_weight_is_base_volume",
+  "identical_levels_not_identical_distribution_class": "test_hashes_equal_does_not_imply_independent_semantics",
+  "anchor_exclusive": "test_anchor_exclusive_both_paths",
+  "dashboard_timeframe_independent": "test_dashboard_timeframe_contract_documented"
+}

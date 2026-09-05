@@ -1,0 +1,66 @@
+{
+  "backfill_script": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/scripts/backfill_bybit_universe.py",
+  "created_at": "2026-08-15T09:24:38Z",
+  "job_id": "9f94da162ec64e74a0ba4e5579dbf33a",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_universe_update_jobs",
+  "plans": [
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:24:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:24:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "AAVEUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:24:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:24:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:24:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "1000BONKUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:24:00Z"
+    }
+  ],
+  "repair_missing": true,
+  "requested_from": "2025-12-11T00:00:00Z",
+  "sg_python": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+  "sg_root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+  "symbols": [
+    "AAVEUSDT",
+    "1000BONKUSDT"
+  ],
+  "universe_file": "universe_selected.json",
+  "update_to": "2026-08-15T09:24:00Z"
+}

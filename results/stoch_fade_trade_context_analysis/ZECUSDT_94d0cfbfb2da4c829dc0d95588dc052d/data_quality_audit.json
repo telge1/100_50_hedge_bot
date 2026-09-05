@@ -1,0 +1,143 @@
+{
+  "symbol": "ZECUSDT",
+  "n_trades": 1158,
+  "wins": 527,
+  "losses": 629,
+  "open": 2,
+  "lookahead_failures": 0,
+  "missing_snapshots": 0,
+  "all_snapshots_available_at_le_entry": true,
+  "gap_count_1m": 0,
+  "n_1m": 358561,
+  "incomplete_htf_buckets": {
+    "1m": 0,
+    "5m": 1,
+    "15m": 1,
+    "30m": 1,
+    "1h": 1,
+    "4h": 1,
+    "1d": 1
+  },
+  "incomplete_htf_note": "Exactly one incomplete bucket per HTF is the still-open pin bucket after last 1m 2026-08-17T00:00. Not a mid-history gap.",
+  "htf_audits": [
+    {
+      "timeframe": "1m",
+      "expected_1m": 1,
+      "complete_buckets": 358561,
+      "incomplete_or_gapped_discarded": 0,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-17T00:00:00Z",
+      "last_close": "2026-08-17T00:01:00Z",
+      "ohlc_rule": "native 1m",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "5m",
+      "expected_1m": 5,
+      "complete_buckets": 71712,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T23:55:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "15m",
+      "expected_1m": 15,
+      "complete_buckets": 23904,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T23:45:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "30m",
+      "expected_1m": 30,
+      "complete_buckets": 11952,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T23:30:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "1h",
+      "expected_1m": 60,
+      "complete_buckets": 5976,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T23:00:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "4h",
+      "expected_1m": 240,
+      "complete_buckets": 1494,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T20:00:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    },
+    {
+      "timeframe": "1d",
+      "expected_1m": 1440,
+      "complete_buckets": 249,
+      "incomplete_or_gapped_discarded": 1,
+      "not_closed_as_of_discarded": 0,
+      "first_open": "2025-12-11T00:00:00Z",
+      "last_open": "2026-08-16T00:00:00Z",
+      "last_close": "2026-08-17T00:00:00Z",
+      "ohlc_rule": "first_open, max_high, min_low, last_close, volume_sum",
+      "utc_boundaries": true
+    }
+  ],
+  "ema200_missing_share_4h": 0.0,
+  "manual_0946_bar_times_ok": true,
+  "clickhouse_writes": 0,
+  "clickhouse_read_only": true,
+  "candle_meta": {
+    "config_source_path": "/home/telgenbuescher/projects/wave_fade_gold_live_bot/.env",
+    "loader_name": "dotenv(live_bot/.env)+signal_generator.db.candles.CandleRepository.get_candles",
+    "connect_ok": true,
+    "select_1_ok": true,
+    "query_types": [
+      "SELECT"
+    ],
+    "tables": [
+      "signal_generator.candles_1m"
+    ],
+    "writes": 0,
+    "read_only": true,
+    "symbol": "ZECUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "last_close": "2026-08-17T00:01:00Z",
+    "gap_count": 0,
+    "n_raw_rows": 358561
+  },
+  "split_counts": {
+    "development": 694,
+    "test": 233,
+    "validation": 231
+  },
+  "started_utc": "2026-08-18T11:47:41Z",
+  "finished_utc": "2026-08-18T11:47:56Z",
+  "no_trade_removed": true,
+  "outcome_not_used_as_entry_feature": true,
+  "final_label": "ZEC_CAUSAL_CONTEXT_ANALYSIS_COMPLETE"
+}

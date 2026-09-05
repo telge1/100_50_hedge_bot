@@ -95,16 +95,25 @@ def build_trade_facts(
     window_end: datetime,
 ) -> dict[str, Any]:
     anchor = utc(anchor)
+    window_start = utc(window_start)
+    window_end = utc(window_end)
+    # Single filter of the fight window; sub-windows slice the already-sorted subset.
+    window_trades = [t for t in trades if window_start <= t["ts"] < window_end]
     return {
-        "before_window": window_trade_facts(trades, window_start, anchor, label="before_anchor"),
-        "after_window": window_trade_facts(trades, anchor, window_end, label="after_anchor"),
-        "full_window": window_trade_facts(trades, window_start, window_end, label="full"),
-        "relative_windows": _relative_windows(trades, anchor),
-        "time_series_buckets": _time_series_buckets(trades, window_start, window_end, bucket_seconds=60),
+        "before_window": window_trade_facts(window_trades, window_start, anchor, label="before_anchor"),
+        "after_window": window_trade_facts(window_trades, anchor, window_end, label="after_anchor"),
+        "full_window": window_trade_facts(window_trades, window_start, window_end, label="full"),
+        "relative_windows": _relative_windows(window_trades, anchor, window_start, window_end),
+        "time_series_buckets": _time_series_buckets(window_trades, window_start, window_end, bucket_seconds=60),
     }
 
 
-def _relative_windows(trades: list[dict[str, Any]], anchor: datetime) -> list[dict[str, Any]]:
+def _relative_windows(
+    trades: list[dict[str, Any]],
+    anchor: datetime,
+    window_start: datetime | None = None,
+    window_end: datetime | None = None,
+) -> list[dict[str, Any]]:
     specs = [
         ("anchor_0_10m", anchor, anchor + timedelta(minutes=10)),
         ("anchor_0_30m", anchor, anchor + timedelta(minutes=30)),

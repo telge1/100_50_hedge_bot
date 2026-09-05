@@ -1,0 +1,117 @@
+{
+  "captured_at": "2026-09-04T08:58:08.408083+00:00",
+  "files": [
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/REPORT.md",
+      "relative": "REPORT.md",
+      "open_tmp": false,
+      "size": 521,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "9b671474945d5aa46e6c735367037767dabe8d7f54758d06c25bab14e7893574"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/cont_001/full_ob_raw_deltas.jsonl.zst.tmp",
+      "relative": "cont_001/full_ob_raw_deltas.jsonl.zst.tmp",
+      "open_tmp": true,
+      "size": 7153403,
+      "sha256": null,
+      "note": "NOT_HASHED_OPEN_TMP"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/cont_001/public_trades_raw.jsonl.zst.tmp",
+      "relative": "cont_001/public_trades_raw.jsonl.zst.tmp",
+      "open_tmp": true,
+      "size": 0,
+      "sha256": null,
+      "note": "NOT_HASHED_OPEN_TMP"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/coverage_audit.json",
+      "relative": "coverage_audit.json",
+      "open_tmp": false,
+      "size": 285,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "2de9fcf878b327fbbc0fd19ee00e87ccef534c87686c2315dc876ab231d86cdf"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/event_manifest.json",
+      "relative": "event_manifest.json",
+      "open_tmp": false,
+      "size": 3040,
+      "mtime": "2026-09-04T08:35:34.838667+00:00",
+      "sha256": "f6e2ec3376637c6f5111ed9f59ceaa08d85c2c032dfadc0bc4fefe65025b14bc"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/event_summary.json",
+      "relative": "event_summary.json",
+      "open_tmp": false,
+      "size": 221,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "46cf6d45ee39af4405e8212ebca3c54df0ed93f74b7ecae145d778a4a4d153e4"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst",
+      "relative": "full_ob_raw_deltas.jsonl.zst",
+      "open_tmp": false,
+      "size": 7970337,
+      "mtime": "2026-09-04T08:35:34.823667+00:00",
+      "sha256": "664b4e97e3e299612da0fa74b35158d2a692038332bb20c0f3ab598a013a5dfd"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/health_summary.json",
+      "relative": "health_summary.json",
+      "open_tmp": false,
+      "size": 3,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/lifecycle.json",
+      "relative": "lifecycle.json",
+      "open_tmp": false,
+      "size": 876,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "770fbb5aca545b4d9c05ef996abac8120eb09dfd1d3a72127a717b7674744df5"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/manifest.json",
+      "relative": "manifest.json",
+      "open_tmp": false,
+      "size": 5014,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "df127715a942c4e86097234d3a31fc1c6a8ec28712fd86b50954f33da3e68667"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/profile_context.json",
+      "relative": "profile_context.json",
+      "open_tmp": false,
+      "size": 374,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "f74e2ce7091eb62e1e07229c7e4ee05fa6a8000e9153cc1d5403dedbe1373558"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/public_trades_raw.jsonl.zst",
+      "relative": "public_trades_raw.jsonl.zst",
+      "open_tmp": false,
+      "size": 18,
+      "mtime": "2026-09-04T08:35:34.826667+00:00",
+      "sha256": "fd83add57ce2305355d13f38e47b5b860fff48a937a4c4911766ba93ac0d895c"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/rest_full_snapshot.json.zst",
+      "relative": "rest_full_snapshot.json.zst",
+      "open_tmp": false,
+      "size": 276829,
+      "mtime": "2026-09-04T08:05:34.766047+00:00",
+      "sha256": "7a1816943c7094fdba5bbc4c7547b085d26257976db54f1d4cf7662c559cee0e"
+    },
+    {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/sequence_integrity.json",
+      "relative": "sequence_integrity.json",
+      "open_tmp": false,
+      "size": 3,
+      "mtime": "2026-09-04T08:35:34.837667+00:00",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "blockers": [
+    {
+      "count": 1,
+      "severity": "METADATA",
+      "summary": "DOGE OB200 2026-08-31T23:00Z: argMax(status) leaves orphan RUNNING row; terminal PARTIAL row with 3567 rows exists",
+      "type": "RUNNING_batch_metadata_orphan"
+    },
+    {
+      "count": 2,
+      "severity": "DATA_QUALITY",
+      "summary": "Two OB200 build_ids contain 2x rows per second (re-import during audit smoke without PARTIAL idempotency gate)",
+      "type": "OB200_duplicate_snapshots"
+    }
+  ],
+  "boundary_audit_summary": {
+    "COMPLETE_3600": 402,
+    "PARTIAL_TRUE_GAP": 24,
+    "ZERO_DURATION_AUXILIARY": 432
+  },
+  "ch_latest_status_argmax": {
+    "FAILED": 2,
+    "PARTIAL": 36,
+    "READY": 625,
+    "RUNNING": 1
+  },
+  "contract_version": "btc_doge_research_full_history_v1",
+  "effective_plan_status": {
+    "PARTIAL": 37,
+    "READY": 625
+  },
+  "generated_at": "2026-09-03T06:55:00.000000Z",
+  "heartbeat": {
+    "completed": 662,
+    "failed_segments": 0,
+    "importable_segments": 662,
+    "ready_segments": 472,
+    "remaining_segments": 0,
+    "runner_pid": 1248597,
+    "skipped_segments": 190,
+    "status": "COMPLETED",
+    "updated_at": "2026-09-02T23:08:14.252810Z"
+  },
+  "heartbeat_invariants_ok": true,
+  "importable_plan_segments": 662,
+  "known_ob200_partial_case": {
+    "batch_id": "fh:BTCUSDT:OB200:20260827T060000Z:20260827T070000Z:BYBIT_OB200_",
+    "duplicate_rows_same_build_id": 3599,
+    "expected_missing_second": "2026-08-27T06:42:23Z",
+    "has_060000": true,
+    "note": "7198 total rows / 3599 unique seconds due to double import; gap at 06:42:23 remains",
+    "status": "PARTIAL",
+    "unique_seconds": 3599
+  },
+  "ob200_duplicate_segments": [
+    {
+      "build_id_prefix": "a1d4e666513df0ef",
+      "duplicate_rows": 3599,
+      "symbol": "BTCUSDT",
+      "window": "2026-08-27T06:00:00Z"
+    },
+    {
+      "build_id_prefix": "137e352f56179931",
+      "duplicate_rows": 726,
+      "symbol": "BTCUSDT",
+      "window": "2026-08-24T22:47:54Z"
+    }
+  ],
+  "plan_status_mapped": {
+    "PARTIAL": 36,
+    "READY": 625,
+    "RUNNING": 1
+  },
+  "preflight": {
+    "branch": "feature/btc-doge-research-db",
+    "collectors_unchanged": true,
+    "dirty_files_count": 67,
+    "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+    "runner_alive": false,
+    "runner_note": "runner_pid 1248597 stale after COMPLETED; process correctly exited",
+    "runner_pid": 1248597
+  },
+  "verdict": "BTC_DOGE_RESEARCH_DB_FINAL_PARTIAL",
+  "verdict_rationale": "All 662 importable plan segments processed; 625 READY + 37 effective PARTIAL (36 CH + 1 metadata orphan). Documented source gaps remain (24 OB200 mid-hour, 18 OI days/symbol). Two OB200 hours have explainable duplicate snapshots from re-import smoke. Performance targets met. Fight-ready for COMPLETE windows with PARTIAL/SOURCE gates."
+}

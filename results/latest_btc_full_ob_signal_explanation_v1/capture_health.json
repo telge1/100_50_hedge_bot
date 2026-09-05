@@ -1,0 +1,50 @@
+{
+  "full_topic": "orderbook.full.BTCUSDT",
+  "parent_capture_count_for_this_event": 1,
+  "duplicate_full_ob_parent_file": false,
+  "files": {
+    "segment0_finalized": "full_ob_raw_deltas.jsonl.zst",
+    "segment1_open_tmp": "cont_001/full_ob_raw_deltas.jsonl.zst.tmp",
+    "rest_snapshot": "rest_full_snapshot.json.zst",
+    "initial_checkpoint_present": true,
+    "initial_checkpoint_before_deltas": true,
+    "continuity_epoch_id": 0
+  },
+  "pre_trigger_seconds_actual": 82.091963,
+  "prebuffer_at_least_600s": false,
+  "queue_drop_count": 0,
+  "writer_queue_drop_count": 0,
+  "writer_error_count_live": 0,
+  "transport_reconnect_count": 0,
+  "resync_checkpoint_success_count": 0,
+  "resync_checkpoint_failure_count": 0,
+  "continuous_capture": true,
+  "replayable_by_epochs": true,
+  "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+  "overlap_cluster_id": "overlap_cluster_e920fc7b701b6dc0",
+  "overlapping_signal_ids": [
+    "BTCUSDT_20260904T112735Z_eb6191222e_ns_33d13adee113_1_U",
+    "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+    "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U"
+  ],
+  "post_capture_seconds_so_far": 2965.269602,
+  "analysis_post_end_ts": "2026-09-04T12:27:35.764963Z",
+  "normal_end_ts": "2026-09-04T12:27:35.764963Z",
+  "hard_capture_end_ts": "2026-09-04T14:27:35.764963Z",
+  "lifecycle_now": "FIGHT_ACTIVE",
+  "manifest_research_eligible_flag": true,
+  "data_quality": "INCOMPLETE",
+  "incomplete_reasons": [
+    "NESTED_SIGNAL_QUEUE_DROP"
+  ],
+  "incomplete_reason_note": "NESTED_SIGNAL_QUEUE_DROP = nested marker enqueue miss; not listed as hard research blocker, but data_quality=INCOMPLETE",
+  "status_triad": {
+    "CURRENTLY_TECHNICALLY_HEALTHY": true,
+    "FINAL_RESEARCH_ELIGIBILITY_PENDING": true,
+    "RESEARCH_INELIGIBLE": false
+  },
+  "eligibility_note": "Event noch offen (FIGHT_ACTIVE). Prebuffer nur ~82s (<600). Endgueltige Eligibility erst nach Post-Fenster/Finalize.",
+  "collector_pid": 1692334,
+  "oi_pid": 147111,
+  "pids_unchanged": true
+}

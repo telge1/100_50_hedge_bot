@@ -1,0 +1,97 @@
+{
+  "verdict": "RAW_MECHANISM_ANALYSIS_COMPLETED",
+  "raw_files_present": true,
+  "files": {
+    "hour15": {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/30/BTCUSDT_20260830T150000Z_20260830T160000Z_ob200_v3.zst",
+      "manifest_replayable_flag": false,
+      "manifest_native_snapshot_count": 0,
+      "manifest_delta_count": 35997,
+      "manifest_seq_gap_pairs": 35997,
+      "manifest_note": "sequence_gaps are Bybit cross-stream seq pairs, NOT update_id(u) gaps",
+      "events": 35998,
+      "types": {
+        "rotation_checkpoint": 1,
+        "delta": 35997
+      },
+      "u_consecutive_ok": 35997,
+      "u_gap_fail_closed": 0,
+      "u_duplicate_skip": 0,
+      "book_valid_at_eof": true,
+      "last_u": 32945091,
+      "first_event_ts": "2026-08-30T14:59:59.929000Z",
+      "last_event_ts": "2026-08-30T15:59:59.829000Z",
+      "continuity_ok": true,
+      "gap_event_samples": []
+    },
+    "hour16": {
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/30/BTCUSDT_20260830T160000Z_20260830T170000Z_ob200_v3.zst",
+      "manifest_replayable_flag": false,
+      "manifest_native_snapshot_count": 0,
+      "manifest_delta_count": 35997,
+      "manifest_seq_gap_pairs": 35997,
+      "manifest_note": "sequence_gaps are Bybit cross-stream seq pairs, NOT update_id(u) gaps",
+      "events": 35998,
+      "types": {
+        "rotation_checkpoint": 1,
+        "delta": 35997
+      },
+      "u_consecutive_ok": 35997,
+      "u_gap_fail_closed": 0,
+      "u_duplicate_skip": 0,
+      "book_valid_at_eof": true,
+      "last_u": 32981089,
+      "first_event_ts": "2026-08-30T15:59:59.929000Z",
+      "last_event_ts": "2026-08-30T16:59:59.829000Z",
+      "continuity_ok": true,
+      "gap_event_samples": []
+    }
+  },
+  "continuity_policy": "fail-closed on update_id(u) gaps; Bybit seq gaps in manifest are NOT u-gaps",
+  "manifest_replayable_false_meaning": "flag reflects seq-gap accounting / no native snapshot; rotation_checkpoint + contiguous u allows reconstruction",
+  "windows": {
+    "A_FAILED": {
+      "window": "A_FAILED",
+      "start": "2026-08-30T16:04:07Z",
+      "end": "2026-08-30T16:06:16Z",
+      "seed": {
+        "seed_type": "rotation_checkpoint",
+        "seed_exchange_ts": "2026-08-30T15:59:59.929000Z",
+        "seed_cts": "",
+        "seed_local_receive_ts": "2026-08-30T16:00:00.018638Z",
+        "seed_u": 32945092,
+        "seed_seq": 801443420012
+      },
+      "seeded": true,
+      "u_gaps_in_preroll_or_window": 0,
+      "events_in_window": 1290,
+      "deltas_touching_watch_levels": 603,
+      "timeline_rows": 4645,
+      "book_valid": true,
+      "fail_closed": true
+    },
+    "B_HELD": {
+      "window": "B_HELD",
+      "start": "2026-08-30T16:13:03Z",
+      "end": "2026-08-30T16:15:00Z",
+      "seed": {
+        "seed_type": "rotation_checkpoint",
+        "seed_exchange_ts": "2026-08-30T15:59:59.929000Z",
+        "seed_cts": "",
+        "seed_local_receive_ts": "2026-08-30T16:00:00.018638Z",
+        "seed_u": 32945092,
+        "seed_seq": 801443420012
+      },
+      "seeded": true,
+      "u_gaps_in_preroll_or_window": 0,
+      "events_in_window": 1170,
+      "deltas_touching_watch_levels": 42,
+      "timeline_rows": 631,
+      "book_valid": true,
+      "fail_closed": true
+    }
+  },
+  "association_policy": "L2 and public trades have no shared ID; consumption never marked PROVEN_EXCHANGE_LINKED; best case TEMPORALLY_ASSOCIATED_SIZE_COMPATIBLE",
+  "rules_frozen": false,
+  "db_writes": false
+}

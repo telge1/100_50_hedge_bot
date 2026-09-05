@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-09-04T19:37:52.396464+00:00",
+  "mem_total_gb": 18.41,
+  "mem_available_gb": 14.6,
+  "swap_free_gb": 0.77,
+  "disk_free_gb": 377.63,
+  "disk_total_gb": 982.82,
+  "loadavg": [
+    1.130859375,
+    0.92626953125,
+    0.71875
+  ],
+  "fr_root_writable": true,
+  "fr_write_ok_sentinel": true,
+  "socket_path": "/run/user/1000/orderbook_ob1000.sock",
+  "socket_exists_prestart": false,
+  "health_path": "/home/telgenbuescher/projects/orderbook_analyse/logs/orderbook_v3_raw_archive_btc_doge.health.ndjson",
+  "estimated_daily_full_ob_gb_note": "prior run RSS~540MB; FR captures event-driven; monitor disk",
+  "oom_risk_acute": false,
+  "disk_full_risk": false,
+  "PASS": true
+}

@@ -1,0 +1,53 @@
+{
+  "event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+  "segments": [
+    {
+      "continuation_index": 0,
+      "status": "VERIFIED",
+      "source_records": 9504,
+      "db_logical": 9504,
+      "db_physical": 22712,
+      "replay_status": "PASS",
+      "source_eq_db": true
+    },
+    {
+      "continuation_index": 1,
+      "status": "VERIFIED",
+      "source_records": 7882,
+      "db_logical": 7882,
+      "db_physical": 7882,
+      "replay_status": "PASS",
+      "source_eq_db": true
+    },
+    {
+      "continuation_index": 2,
+      "status": "VERIFIED",
+      "source_records": 9101,
+      "db_logical": 9101,
+      "db_physical": 9101,
+      "replay_status": "PASS",
+      "source_eq_db": true
+    },
+    {
+      "continuation_index": 3,
+      "status": "VERIFIED",
+      "source_records": 9102,
+      "db_logical": 9102,
+      "db_physical": 9102,
+      "replay_status": "PASS",
+      "source_eq_db": true
+    }
+  ],
+  "open_skipped": [
+    {
+      "idx": 4,
+      "reasons": [
+        "only_tmp_present"
+      ]
+    }
+  ],
+  "all_verified": true,
+  "source_logical_records": 35589,
+  "db_logical_records": 35589,
+  "db_physical_records": 48797
+}

@@ -1,0 +1,22 @@
+{
+  "tests_passed": 24,
+  "spool_writable": true,
+  "disk_free_gb": 377.13,
+  "mem_avail_gb": 14.91,
+  "protected": {
+    "1817696": true,
+    "1780509": true,
+    "1795773": true
+  },
+  "single_pt_instance": true,
+  "new_code_paths": [
+    "trade_buffer.py",
+    "public_trade_spool.py",
+    "collector.py",
+    "health.py",
+    "client.py",
+    "run_live_collector_service.py",
+    "stoch_collector_control.py"
+  ],
+  "PASS": true
+}

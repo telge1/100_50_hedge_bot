@@ -10,10 +10,12 @@ from pathlib import Path
 from . import HEURISTIC_CONTRACT_VERSION
 
 DEFAULT_SYMBOL = "BTCUSDT"
+ALLOWED_SYMBOLS = frozenset({"BTCUSDT", "DOGEUSDT"})
 DEFAULT_BEFORE_MINUTES = 30
 DEFAULT_AFTER_MINUTES = 30
 DEFAULT_VA_PCT = 0.70
 DEFAULT_TARGET_BINS = 160
+DEFAULT_DATA_SOURCE = "research-db"
 
 # Documented UNFROZEN heuristics (from legacy case study).
 WALL_MAX_BPS = 800
@@ -22,6 +24,7 @@ WALL_TRADE_MATCH_FRAC = 0.30
 WALL_SAMPLE_INTERVAL_SECONDS = 1
 LEVEL_TOUCH_BAND_BPS = 5.0
 BTCUSDT_TICK_SIZE = 0.1
+DOGEUSDT_TICK_SIZE = 0.00001
 REPORT_MICRO_EPISODE_SECONDS = 1.0
 
 LEGACY_OB_FALLBACK = Path(
@@ -30,14 +33,26 @@ LEGACY_OB_FALLBACK = Path(
 OA_SRC = Path("/home/telgenbuescher/projects/orderbook_analyse/src")
 
 
+def tick_size_for_symbol(symbol: str) -> float:
+    from .instrument_contract import instrument_for
+
+    return instrument_for(symbol).tick_size_f()
+
+
 @dataclass(frozen=True)
 class RunConfig:
     symbol: str
     anchor: datetime
     before_minutes: int
     after_minutes: int
-    ob_root: Path
     out_root: Path
+    data_source: str = DEFAULT_DATA_SOURCE
+    ob_root: Path | None = None
+    require_complete: bool = False
+    coverage_only: bool = False
+    allow_legacy_trade_companion: bool = False
+    benchmark: bool = False
+    heavy_detail_csv: bool = False
     read_only: bool = True
     no_overwrite: bool = True
 
@@ -58,6 +73,7 @@ class RunConfig:
             "wall_trade_match_frac": WALL_TRADE_MATCH_FRAC,
             "wall_sample_interval_seconds": WALL_SAMPLE_INTERVAL_SECONDS,
             "level_touch_band_bps": LEVEL_TOUCH_BAND_BPS,
+            "tick_size": tick_size_for_symbol(self.symbol),
             "btcusdt_tick_size": BTCUSDT_TICK_SIZE,
             "report_micro_episode_seconds": REPORT_MICRO_EPISODE_SECONDS,
         }

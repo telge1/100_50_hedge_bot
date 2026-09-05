@@ -1,0 +1,22 @@
+{
+  "already_current_count": 0,
+  "coins": [
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "1000PEPEUSDT"
+    }
+  ],
+  "completed_symbols": 1,
+  "current_symbol": null,
+  "failed_count": 0,
+  "finished_at": "2026-08-15T09:08:28Z",
+  "job_id": "fe799531c9444e978da87f12e94838af",
+  "message": "Aktualisierung abgeschlossen",
+  "pid": 988878,
+  "return_code": 0,
+  "started_at": "2026-08-15T09:08:25Z",
+  "state": "COMPLETED",
+  "success_count": 1,
+  "total_symbols": 1
+}

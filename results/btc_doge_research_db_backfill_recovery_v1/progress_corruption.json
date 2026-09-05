@@ -1,0 +1,9 @@
+{
+  "bytes": 1296,
+  "copy": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_research_db_backfill_recovery_v1/progress.json.corrupted",
+  "corrupted": true,
+  "parsed_completed": 43,
+  "secured": true,
+  "sha256": "34f2d0879613207b99ecf403357813454555dabc87cc4cca35055f823d99d37e",
+  "source": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/run/btc_doge_research_full_history/progress.json"
+}

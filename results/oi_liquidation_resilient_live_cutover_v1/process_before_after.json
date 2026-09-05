@@ -1,0 +1,37 @@
+{
+  "before": {
+    "pid": 147111,
+    "started": "2026-08-18T16:02:02Z",
+    "code": "pre-resilience-in-memory"
+  },
+  "after": {
+    "pid": 1786328,
+    "started": "2026-09-04T18:04:43Z",
+    "code": "worktree-resilience-v1",
+    "unit": "Restart=on-failure",
+    "cmdline": "/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0",
+    "cwd": "/home/telgenbuescher/projects/orderbook_analyse",
+    "health": {
+      "health_status": "GREEN",
+      "writer_alive": true,
+      "websocket_alive": true,
+      "writer_error_count": 9,
+      "queue_drop_count": 0,
+      "persistence_lag_seconds": 0.7580459117889404,
+      "spool_unacked_records": 8,
+      "websocket_reconnect_count": 38,
+      "clickhouse_reconnect_count": 1
+    }
+  },
+  "method": "systemctl --user stop/start after installing prepared unit; SIGTERM only",
+  "protected": {
+    "dashboard": 1780509,
+    "public_trades": 1661773,
+    "full_ob": "STOPPED"
+  },
+  "verdict": "OI_LIQ_LIVE_VALIDATION_FAILED",
+  "failed_gates": [
+    "WRITER_ERRORS",
+    "SPOOL_HEALTHY"
+  ]
+}

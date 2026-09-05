@@ -1,0 +1,99 @@
+{
+  "evaluated_at": "2026-09-04T20:28:13.255609+00:00",
+  "gates": {
+    "SINGLE_COLLECTOR_INSTANCE": "true",
+    "FLIGHT_RECORDER_RUNTIME_ENABLED": "true",
+    "BTC_FULL_TOPIC_ACTIVE": "true",
+    "DOGE_FULL_TOPIC_ACTIVE": "true",
+    "BTC_BOOK_READY": "true",
+    "DOGE_BOOK_READY": "true",
+    "U_PROGRESS": "true",
+    "SEQ_MONOTONIC": "true",
+    "SOURCE_GAPS": "0",
+    "QUEUE_DROPS": "0",
+    "WRITER_ERRORS": "0",
+    "OBSERVER_ERRORS": "0",
+    "RINGBUFFER_GROWING": "true",
+    "WATCHER_ACTIVE": "true",
+    "SIGNAL_REGISTRY_ACTIVE": "true",
+    "BOOTSTRAP_FILE_CREATED": "false",
+    "SOCKET_DEPTH0_UNCAPPED": "true",
+    "SOCKET_TIMEOUTS": "0",
+    "BOOK_NOT_CROSSED": "true",
+    "PROFILE_EVICTION_CRASH": "0"
+  },
+  "gates_bool": {
+    "SINGLE_COLLECTOR_INSTANCE": true,
+    "FLIGHT_RECORDER_RUNTIME_ENABLED": true,
+    "BTC_FULL_TOPIC_ACTIVE": true,
+    "DOGE_FULL_TOPIC_ACTIVE": true,
+    "BTC_BOOK_READY": true,
+    "DOGE_BOOK_READY": true,
+    "U_PROGRESS": true,
+    "SEQ_MONOTONIC": true,
+    "SOURCE_GAPS": true,
+    "QUEUE_DROPS": true,
+    "WRITER_ERRORS": true,
+    "OBSERVER_ERRORS": true,
+    "RINGBUFFER_GROWING": true,
+    "WATCHER_ACTIVE": true,
+    "SIGNAL_REGISTRY_ACTIVE": true,
+    "BOOTSTRAP_FILE_CREATED": true,
+    "SOCKET_DEPTH0_UNCAPPED": true,
+    "SOCKET_TIMEOUTS": true,
+    "BOOK_NOT_CROSSED": true,
+    "PROFILE_EVICTION_CRASH": true
+  },
+  "proofs": {
+    "FULL_TOPIC_PROVEN": "true",
+    "NOT_OB200_PROVEN": "true",
+    "NOT_OB1000_PROVEN": "true",
+    "DEPTH0_UNCAPPED": "true",
+    "SOCKET_TIMEOUTS": "0",
+    "BOOK_NOT_CROSSED": "true",
+    "OB1000_REGRESSION_PASS": "true",
+    "OB200_REGRESSION_PASS": "true",
+    "FLIGHT_RECORDER_ENV_TRUE": "true",
+    "FLIGHT_RECORDER_RUNTIME_ENABLED": "true",
+    "FLIGHT_RECORDER_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "BTC_PREBUFFER_COVERAGE_SECONDS": 599.957141694,
+    "DOGE_PREBUFFER_COVERAGE_SECONDS": 600.095360233
+  },
+  "prebuffer_at_t10": {
+    "BTCUSDT": 599.957141694,
+    "DOGEUSDT": 600.095360233,
+    "ok": true
+  },
+  "hard_pass": true,
+  "verdict": "FULL_OB_COLLECTOR_LIVE_HEALTHY_CAPTURE_READY",
+  "failures": [],
+  "metrics": {
+    "old_pid": 1810262,
+    "new_pid": 1817696,
+    "btc_u": [
+      4566695,
+      4570299
+    ],
+    "doge_u": [
+      4566381,
+      4569986
+    ],
+    "btc_seq": [
+      805412217999,
+      805415008625
+    ],
+    "doge_seq": [
+      346161087067,
+      346163143303
+    ],
+    "rss_mb": "255.79",
+    "protected": {
+      "1661773": true,
+      "1780509": true,
+      "1795773": true
+    },
+    "importer": "NONE",
+    "mem_avail_gb": 13.58,
+    "disk_free_gb": 377.05
+  }
+}

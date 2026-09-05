@@ -1,0 +1,22 @@
+{
+  "SYMBOL_MAPPING_OK": true,
+  "SCHEMA_MAPPING_OK_for_canonical": true,
+  "SCHEMA_MAPPING_OK_in_prior_analysis": false,
+  "evidence": {
+    "canonical_uses": [
+      "trade_ts",
+      "ingest_timestamp",
+      "side",
+      "size",
+      "notional",
+      "trade_id"
+    ],
+    "prior_analysis_used": [
+      "btc_doge_research.research_public_trades.event_time"
+    ],
+    "prior_analysis_oi_used": [
+      "btc_doge_research.research_open_interest_observations"
+    ],
+    "symbol_BTCUSDT_case": "exact BTCUSDT matches; lower(symbol)=btcusdt same count"
+  }
+}

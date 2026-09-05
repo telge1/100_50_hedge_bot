@@ -1,0 +1,65 @@
+{
+  "tpo_labeled_path": {
+    "label_in_btc_ob_fight": "tpo_poc / tpo_vah / tpo_val",
+    "entry": "research.btc_ob_fight.profiles.build_causal_profiles",
+    "engine": "orderbook_analyse.market_profile.build.build_profile",
+    "raw_source": "orderbook_analysis.public_trades_canonical",
+    "aggregation": "ClickHouse sum(size) per price bin via fetch_volume_at_price",
+    "weighting_measure": "base_trade_volume (size)",
+    "unit_per_bin": "BTC base volume (not TPO bracket count)",
+    "time_window": "us_developing_to_anchor: session_start <= trade_ts < anchor",
+    "anchor_exclusive": true,
+    "bin_size_rule": "resolve_price_step(low, high, target_bins=160)",
+    "poc_rule": "max bin volume; tie-break center bin index",
+    "value_area_rule": "expand from POC toward larger neighbor until 70% total volume",
+    "tie_break": "expand toward larger neighbor bin volume",
+    "chart_timeframe_dependent": false,
+    "tpo_bracket_dependent": false,
+    "uses_time_bracket_presence": false,
+    "note": "OA module docstring: volume-based market profile, not classic TPO"
+  },
+  "volume_profile_path": {
+    "label_in_btc_ob_fight": "volume_poc / volume_vah / volume_val",
+    "entry": "research.btc_ob_fight.volume_profile.build_volume_profile_from_trades",
+    "engine": "research.btc_ob_fight.volume_profile (+ OA compute_value_area/find_nodes)",
+    "raw_source": "orderbook_analysis.public_trades_canonical",
+    "aggregation": "Python dedup trade_id then sum(size) per price bin",
+    "weighting_measure": "base_trade_volume (size)",
+    "unit_per_bin": "BTC base volume",
+    "time_window": "session_start <= trade_ts < anchor",
+    "anchor_exclusive": true,
+    "bin_size_rule": "resolve_price_step from session OHLC/trades",
+    "poc_rule": "max bin volume; tie-break center bin index (shared OA function)",
+    "value_area_rule": "shared orderbook_analyse.market_profile.profile.compute_value_area",
+    "tie_break": "shared OA expansion rule",
+    "chart_timeframe_dependent": false,
+    "tpo_bracket_dependent": false,
+    "uses_time_bracket_presence": false,
+    "note": "Separate provenance and dedup path; same weighting measure as TPO-labeled path"
+  },
+  "reference_bracket_tpo": {
+    "purpose": "Audit-only reference for true time/bracket presence (not production TPO path)",
+    "raw_source": "signal_generator.candles_1m",
+    "weighting_measure": "bracket_presence_count",
+    "unit_per_bin": "number of 30m brackets whose [low,high] touches bin",
+    "bracket_minutes": 30
+  },
+  "shared_vs_independent": {
+    "shared": [
+      "trade source table (public_trades_canonical)",
+      "weighting measure (base volume, not bracket time)",
+      "POC/VA algorithms (compute_value_area)",
+      "session window and anchor cutoff",
+      "price step resolver"
+    ],
+    "independent": [
+      "aggregation location (CH server vs Python dedup)",
+      "output field names (tpo_* vs volume_*)",
+      "integrity/prefix checks on volume side only"
+    ],
+    "not_independent": [
+      "underlying price-volume distribution when dedup yields identical bins",
+      "semantic measure (both are volume-at-price, not time TPO vs volume)"
+    ]
+  }
+}

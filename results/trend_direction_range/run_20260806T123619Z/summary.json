@@ -1,0 +1,31 @@
+{
+  "total_rows": 289,
+  "bullish_rows": 45,
+  "bearish_rows": 180,
+  "unclear_rows": 64,
+  "bullish_pct": 15.5709,
+  "bearish_pct": 62.2837,
+  "unclear_pct": 22.1453,
+  "direction_transitions": 40,
+  "state_field_transitions": 55,
+  "average_state_duration_minutes": 33.0,
+  "median_state_duration_minutes": 12.5,
+  "short_states_le_15m": 25,
+  "whipsaw_transitions_le_30m": 28,
+  "direct_bull_bear_flips": 0,
+  "direct_flips_note": "BULLISH<->BEARISH without UNCLEAR is unexpected under current mapping",
+  "transition_matrix": {
+    "BULLISH->UNCLEAR": 4,
+    "UNCLEAR->BEARISH": 17,
+    "BEARISH->UNCLEAR": 16,
+    "UNCLEAR->BULLISH": 3,
+    "BULLISH->BEARISH": 0,
+    "BEARISH->BULLISH": 0
+  },
+  "causality_failures": 0,
+  "runtime_seconds": 18.9154,
+  "decision_inclusive": "start <= decision_time <= end",
+  "forward_returns": "not_implemented_v1",
+  "transitions_only": true,
+  "output_rows": 56
+}

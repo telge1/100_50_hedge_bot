@@ -1,0 +1,373 @@
+{
+  "primary_decision": "MYSQL_CANDLE_DATA_READY",
+  "reason": "schema clear; focus symbols present; causality pass; no critical gaps",
+  "connection": {
+    "config_file": "research/regime_scanner/.env.regime_db (gitignored) + REGIME_DB_*",
+    "connector": "research.regime_scanner.mysql_candle_store.store_mysql.MySQLCandleStore",
+    "repository": "research.regime_scanner.mysql_candle_store.repository.load_candles",
+    "database": "regime_scanner_research",
+    "host_set": true,
+    "port": 3306,
+    "user_set": true
+  },
+  "n_series": 17,
+  "symbols": [
+    "ADAUSDT",
+    "APTUSDT",
+    "ARBUSDT",
+    "AVAXUSDT",
+    "BNBUSDT",
+    "BTCUSDT",
+    "DOGEUSDT",
+    "ENAUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "OPUSDT",
+    "SEIUSDT",
+    "SOLUSDT",
+    "SUIUSDT",
+    "XRPUSDT"
+  ],
+  "timeframes": [
+    "15m",
+    "30m",
+    "5m"
+  ],
+  "exchanges": [
+    "bybit"
+  ],
+  "focus_symbol_mapping": [
+    {
+      "requested": "APTUSDT",
+      "mapped_symbol": "APTUSDT",
+      "aliases_tried": [
+        "APTUSDT",
+        "APT/USDT",
+        "APT/USDT:USDT",
+        "APT_USDT",
+        "APT_USDT_USDT"
+      ],
+      "found": true
+    },
+    {
+      "requested": "DOGEUSDT",
+      "mapped_symbol": "DOGEUSDT",
+      "aliases_tried": [
+        "DOGEUSDT",
+        "DOGE/USDT",
+        "DOGE/USDT:USDT",
+        "DOGE_USDT",
+        "DOGE_USDT_USDT"
+      ],
+      "found": true
+    },
+    {
+      "requested": "BTCUSDT",
+      "mapped_symbol": "BTCUSDT",
+      "aliases_tried": [
+        "BTCUSDT",
+        "BTC/USDT",
+        "BTC/USDT:USDT",
+        "BTC_USDT",
+        "BTC_USDT_USDT"
+      ],
+      "found": true
+    }
+  ],
+  "focus_coverage": [
+    {
+      "exchange": "bybit",
+      "market_type": null,
+      "symbol": "APTUSDT",
+      "timeframe": "15m",
+      "first_candle_open_utc": "2025-12-27T00:00:00+00:00",
+      "first_candle_close_utc": "2025-12-27T00:15:00+00:00",
+      "last_candle_open_utc": "2026-07-02T11:30:00+00:00",
+      "last_candle_close_utc": "2026-07-02T11:45:00+00:00",
+      "row_count": 17999,
+      "distinct_days": 188,
+      "expected_row_count": 17999,
+      "coverage_pct": 100.0,
+      "missing_intervals": 0,
+      "largest_gap_seconds": null,
+      "duplicate_count": 0,
+      "invalid_ohlcv_count": 0,
+      "open_is_closed_mismatch": 0,
+      "null_row_count": 0,
+      "sources": {
+        "freqtrade_direct": 17999
+      }
+    },
+    {
+      "exchange": "bybit",
+      "market_type": null,
+      "symbol": "APTUSDT",
+      "timeframe": "30m",
+      "first_candle_open_utc": "2025-12-27T00:00:00+00:00",
+      "first_candle_close_utc": "2025-12-27T00:30:00+00:00",
+      "last_candle_open_utc": "2026-07-02T11:00:00+00:00",
+      "last_candle_close_utc": "2026-07-02T11:30:00+00:00",
+      "row_count": 8999,
+      "distinct_days": 188,
+      "expected_row_count": 8999,
+      "coverage_pct": 100.0,
+      "missing_intervals": 0,
+      "largest_gap_seconds": null,
+      "duplicate_count": 0,
+      "invalid_ohlcv_count": 0,
+      "open_is_closed_mismatch": 0,
+      "null_row_count": 0,
+      "sources": {
+        "freqtrade_direct": 8999
+      }
+    },
+    {
+      "exchange": "bybit",
+      "market_type": null,
+      "symbol": "APTUSDT",
+      "timeframe": "5m",
+      "first_candle_open_utc": "2025-12-27T00:00:00+00:00",
+      "first_candle_close_utc": "2025-12-27T00:05:00+00:00",
+      "last_candle_open_utc": "2026-07-26T17:00:00+00:00",
+      "last_candle_close_utc": "2026-07-26T17:05:00+00:00",
+      "row_count": 60973,
+      "distinct_days": 212,
+      "expected_row_count": 60973,
+      "coverage_pct": 100.0,
+      "missing_intervals": 0,
+      "largest_gap_seconds": null,
+      "duplicate_count": 0,
+      "invalid_ohlcv_count": 0,
+      "open_is_closed_mismatch": 0,
+      "null_row_count": 0,
+      "sources": {
+        "freqtrade_direct": 60973
+      }
+    },
+    {
+      "exchange": "bybit",
+      "market_type": null,
+      "symbol": "DOGEUSDT",
+      "timeframe": "5m",
+      "first_candle_open_utc": "2025-12-27T00:00:00+00:00",
+      "first_candle_close_utc": "2025-12-27T00:05:00+00:00",
+      "last_candle_open_utc": "2026-06-27T12:55:00+00:00",
+      "last_candle_close_utc": "2026-06-27T13:00:00+00:00",
+      "row_count": 52572,
+      "distinct_days": 183,
+      "expected_row_count": 52572,
+      "coverage_pct": 100.0,
+      "missing_intervals": 0,
+      "largest_gap_seconds": null,
+      "duplicate_count": 0,
+      "invalid_ohlcv_count": 0,
+      "open_is_closed_mismatch": 0,
+      "null_row_count": 0,
+      "sources": {
+        "freqtrade_direct": 52572
+      }
+    },
+    {
+      "exchange": "bybit",
+      "market_type": null,
+      "symbol": "BTCUSDT",
+      "timeframe": "5m",
+      "first_candle_open_utc": "2025-01-01T00:00:00+00:00",
+      "first_candle_close_utc": "2025-01-01T00:05:00+00:00",
+      "last_candle_open_utc": "2026-06-27T12:00:00+00:00",
+      "last_candle_close_utc": "2026-06-27T12:05:00+00:00",
+      "row_count": 156241,
+      "distinct_days": 543,
+      "expected_row_count": 156241,
+      "coverage_pct": 100.0,
+      "missing_intervals": 0,
+      "largest_gap_seconds": null,
+      "duplicate_count": 0,
+      "invalid_ohlcv_count": 0,
+      "open_is_closed_mismatch": 0,
+      "null_row_count": 0,
+      "sources": {
+        "freqtrade_direct": 156241
+      }
+    }
+  ],
+  "causality_checks": 85,
+  "causality_failures": 0,
+  "duplicate_rows_logged": 0,
+  "invalid_ohlcv_logged": 0,
+  "gap_events_logged": 0,
+  "warmup": [
+    {
+      "exchange": "bybit",
+      "symbol": "ADAUSDT",
+      "timeframe": "5m",
+      "span_days": 182.53125,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "APTUSDT",
+      "timeframe": "15m",
+      "span_days": 187.48958333333334,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "APTUSDT",
+      "timeframe": "30m",
+      "span_days": 187.47916666666666,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "APTUSDT",
+      "timeframe": "5m",
+      "span_days": 211.71180555555554,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "ARBUSDT",
+      "timeframe": "5m",
+      "span_days": 182.53125,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "AVAXUSDT",
+      "timeframe": "5m",
+      "span_days": 182.53472222222223,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "BNBUSDT",
+      "timeframe": "5m",
+      "span_days": 182.53819444444446,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "BTCUSDT",
+      "timeframe": "5m",
+      "span_days": 542.5034722222222,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "DOGEUSDT",
+      "timeframe": "5m",
+      "span_days": 182.54166666666666,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "ENAUSDT",
+      "timeframe": "5m",
+      "span_days": 182.54166666666666,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "ETHUSDT",
+      "timeframe": "5m",
+      "span_days": 542.5034722222222,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "LINKUSDT",
+      "timeframe": "5m",
+      "span_days": 182.55208333333334,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "OPUSDT",
+      "timeframe": "5m",
+      "span_days": 182.55902777777777,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "SEIUSDT",
+      "timeframe": "5m",
+      "span_days": 182.5625,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "SOLUSDT",
+      "timeframe": "5m",
+      "span_days": 542.5034722222222,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "SUIUSDT",
+      "timeframe": "5m",
+      "span_days": 182.56597222222223,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    },
+    {
+      "exchange": "bybit",
+      "symbol": "XRPUSDT",
+      "timeframe": "5m",
+      "span_days": 182.57291666666666,
+      "warmup_7d": true,
+      "warmup_30d": true,
+      "warmup_60d": true,
+      "warmup_90d": true
+    }
+  ],
+  "market_type_note": "No market_type column in market_candles; exchange+symbol encode identity. Docs/bootstrap describe Bybit futures feathers.",
+  "next_step": "Build timestamp direction runner using MySQLCandleStore.fetch_candles/repository.load_candles with decision_time (close_time <= T) on market_candles."
+}

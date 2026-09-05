@@ -1,0 +1,114 @@
+{
+  "verdict_component": "PROFILE_CONTRACT_PROVEN",
+  "LIVE_PROCESS_LOGIC": {
+    "collector_pid": 1565672,
+    "process_start_utc": "2026-09-04T08:03:01.270000+00:00",
+    "fr_env_explicit": {
+      "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+      "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+      "OB_V3_FULL_OB_FR_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder"
+    },
+    "fr_env_defaults_in_effect_because_unset": {
+      "OB_V3_FULL_OB_FR_PROFILE_WINDOW_MIN": 30,
+      "OB_V3_FULL_OB_FR_PROFILE_POLL_SEC": 20,
+      "OB_V3_FULL_OB_FR_ARM_BPS": 50,
+      "OB_V3_FULL_OB_FR_CAPTURE_BPS": 20,
+      "OB_V3_FULL_OB_FR_DISARM_BPS": 75
+    },
+    "modules_loaded_at_start_still_governing_signals": [
+      "profiles.py (mtime before process start)",
+      "watcher.py (mtime before process start)",
+      "config.py (mtime before process start)"
+    ],
+    "modules_on_disk_newer_than_process_NOT_in_live_memory": [
+      "continuity_contract.py",
+      "manager.py",
+      "event_writer.py",
+      "capture_plan.py",
+      "on_demand_full.py",
+      "collector.py (resync wiring)"
+    ],
+    "note": "Live process does NOT run resync-checkpoint code. Profile/watcher signal path modules were NOT modified after process start \u2192 live signal profile contract matches those files on disk at start."
+  },
+  "CURRENT_WORKTREE_LOGIC": {
+    "repo": "/home/telgenbuescher/projects/orderbook_analyse",
+    "branch": "feature/strategy-lab-phase1",
+    "head": "bcf13edb8613570ed3c5addab6af08f93d99f45e",
+    "profile_provider_identical_to_live_for_edges": true,
+    "resync_checkpoint_present_on_disk": true,
+    "resync_checkpoint_active_in_live": false
+  },
+  "profile_kind": {
+    "primary": "Volume Profile value area (ClickHouse build_profile) on last completed UTC window",
+    "tpo": "Optional TPO presence profile from public trades with 1-minute marks; falls back to volume VAH/VAL",
+    "live_events_tpo_source": "volume_proxy_fallback (all 7 event profile_context.json files)",
+    "edge_set_emitted": [
+      "TPO_VAH",
+      "TPO_VAL",
+      "VOL_VAH",
+      "VOL_VAL",
+      "OUTER_UPPER",
+      "OUTER_LOWER",
+      "INNER_UPPER",
+      "INNER_LOWER"
+    ],
+    "outer_definition": "OUTER_UPPER=max(tpo_vah,vol_vah); OUTER_LOWER=min(tpo_val,vol_val)",
+    "watcher_selection": "nearest edge by |mid-edge|/mid*10000 among ALL edges; UPPER if kind endswith VAH else LOWER if VAL",
+    "signal_relevant_edge_observed": "TPO_VAH or TPO_VAL (equal to VOL when volume_proxy_fallback)",
+    "outer_not_special_cased_for_trigger": true,
+    "frozen_on_capture": true,
+    "live_update_during_event": "PROFILE_UPDATE_DURING_CAPTURE deferred; frozen_edges used until event end"
+  },
+  "profile_window": {
+    "type": "Rolling last-completed UTC-aligned window (NOT classic RTH session, NOT daily composite)",
+    "anchor_mode_in_ProfileWindow": "composite",
+    "window_minutes": 30,
+    "function": "last_completed_window(now, window_minutes=30)",
+    "timezone": "UTC",
+    "example": "At 08:05Z uses [07:30Z, 08:00Z)",
+    "causal_cutoff": "window end; trades with ts >= end excluded; completeness=completed_window_only",
+    "uses_only_info_before_signal": true
+  },
+  "what_30m_means": {
+    "profile_window_minutes": "YES \u2014 completed lookback window for VAH/VAL (env OB_V3_FULL_OB_FR_PROFILE_WINDOW_MIN default 30)",
+    "tpo_bracket_duration": "NO \u2014 when TPO succeeds, marks are 1-minute presence (tpo_bracket_presence_1m_causal), not 30m brackets",
+    "candle_timeframe": "NO \u2014 not a kline interval; public trades densified into price bins",
+    "also_unrelated_30m_defaults": {
+      "extension_minutes": 30,
+      "segment_minutes": 30
+    },
+    "meta_field_bracket_minutes": "stores profile_window_minutes (naming is window length, not TPO bracket)"
+  },
+  "tpo_bracket": {
+    "intended_when_trades_available": "1m presence marks inside the 30m completed window",
+    "config_source": "hardcoded int(ts.timestamp())//60 in profiles.py; window from profile_window_minutes",
+    "live_value_for_signals": "volume_proxy_fallback \u2014 TPO edges cloned from volume VA",
+    "independent_of_candle_tf": true
+  },
+  "update_frequency": {
+    "profile_poll_sec": 20,
+    "edge_recalc": "on successful poll when not capturing; deferred during capture",
+    "edge_price_frozen_in_event": "edge_price_at_trigger + frozen_edges at begin_capture"
+  },
+  "trigger_zone": {
+    "arm_distance_bps": 50,
+    "arm_meaning": "dist<=50 and not IN \u2192 ARMED / Full-OB keep-alive path; NOT the CROSS_IN threshold",
+    "capture_distance_bps_entry": 20,
+    "entry_meaning": "zone IN when dist<=20; CROSS_IN = transition into IN from outside IN",
+    "disarm_distance_bps_rearm": 75,
+    "rearm_meaning": "zone OUT when dist>=75; after cooldown, REARMED only from OUT",
+    "hysteresis": "IN<=20, OUT>=75, APPROACH in between; arm uses 50 inside APPROACH band",
+    "bootstrap": "start already IN without saw_outside \u2192 BOOTSTRAP_ALREADY_IN_EDGE_ZONE; current manager refuses persistent capture",
+    "note_arm_unused_in_classify_zone_state_body": "classify_zone_state accepts arm_bps but only uses capture_bps and disarm_bps for zone labels"
+  },
+  "phase_e_answer": {
+    "Profilart": "Volume Profile VA (+ TPO marks when available; live signals used volume_proxy_fallback so TPO_* == VOL_*)",
+    "Profilfenster": "Last completed 30-minute UTC-aligned rolling window (ProfileWindow anchor_mode=composite)",
+    "TPO-Bracket": "1-minute presence when TPO path succeeds; live events fell back to volume VA (no separate 30m TPO bracket)",
+    "Kerzen-Timeframe-Abh\u00e4ngigkeit": "None \u2014 not driven by candle TF",
+    "Session": "UTC clock windows e.g. 07:30\u201308:00; not exchange RTH session",
+    "Kausaler Cutoff": "Yes \u2014 cutoff=window end; trades_strictly_before_cutoff; completed_window_only",
+    "Aktualisierung": "Poll every 20s; freeze edges at CROSS_IN / event start",
+    "Signalrelevante Kante": "Nearest *VAH/*VAL (observed TPO_VAH or TPO_VAL) at <=20 bps entry"
+  }
+}

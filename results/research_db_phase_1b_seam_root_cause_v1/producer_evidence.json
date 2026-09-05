@@ -1,0 +1,158 @@
+{
+  "clock_diff_3f2f18f_to_current": "none",
+  "collector_manifest_git_head": "3f2f18f",
+  "current_orderbook_analyse_head": "e2cd4e434cd7e81fadc7df2906997e777dec60a9",
+  "daily_created_and_source_ranges": [
+    [
+      "BTCUSDT",
+      "2026-08-24",
+      "2026-08-24T00:00:01.363000Z",
+      "2026-08-25T00:00:00.002000Z",
+      "2026-08-24T00:00:00Z",
+      "2026-08-24T23:59:59.829000Z",
+      536772,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-25",
+      "2026-08-25T00:00:01.003000Z",
+      "2026-08-26T00:00:00.004000Z",
+      "2026-08-25T00:00:00.028000Z",
+      "2026-08-25T23:59:59.829000Z",
+      777480,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-26",
+      "2026-08-26T00:00:01.002000Z",
+      "2026-08-27T00:00:00.002000Z",
+      "2026-08-26T00:00:00.028000Z",
+      "2026-08-26T23:59:59.828000Z",
+      775987,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-27",
+      "2026-08-27T00:00:01.002000Z",
+      "2026-08-28T00:00:00.007000Z",
+      "2026-08-27T00:00:00.029000Z",
+      "2026-08-27T23:59:59.829000Z",
+      776370,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "BTCUSDT",
+      "2026-08-28",
+      "2026-08-28T00:00:01.003000Z",
+      "2026-08-28T16:26:24.010000Z",
+      "2026-08-28T00:00:00.029000Z",
+      "2026-08-28T16:26:23Z",
+      530955,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-24",
+      "2026-08-24T00:00:01.368000Z",
+      "2026-08-25T00:00:00.004000Z",
+      "2026-08-24T00:00:00Z",
+      "2026-08-24T23:59:59.880000Z",
+      511965,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-25",
+      "2026-08-25T00:00:01.007000Z",
+      "2026-08-26T00:00:00.006000Z",
+      "2026-08-25T00:00:00.080000Z",
+      "2026-08-25T23:59:59.880000Z",
+      720431,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-26",
+      "2026-08-26T00:00:01.005000Z",
+      "2026-08-27T00:00:00.003000Z",
+      "2026-08-26T00:00:00.080000Z",
+      "2026-08-26T23:59:59.880000Z",
+      697702,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-27",
+      "2026-08-27T00:00:01.006000Z",
+      "2026-08-28T00:00:00.009000Z",
+      "2026-08-27T00:00:00.081000Z",
+      "2026-08-27T23:59:59.881000Z",
+      701871,
+      [
+        "",
+        "carried_forward"
+      ]
+    ],
+    [
+      "DOGEUSDT",
+      "2026-08-28",
+      "2026-08-28T00:00:01.008000Z",
+      "2026-08-28T16:26:24.011000Z",
+      "2026-08-28T00:00:00.080000Z",
+      "2026-08-28T16:26:23Z",
+      471729,
+      [
+        "",
+        "carried_forward"
+      ]
+    ]
+  ],
+  "historical_importer_known_window": "2026-07-19 through 2026-08-17",
+  "historical_importer_path": [
+    "orderbook_v2/pilot.py::run_pilot",
+    "orderbook_v2/downloader.py",
+    "orderbook_v2/parser.py::parse_day_zip",
+    "orderbook_v2/ch_writer.py::insert_features"
+  ],
+  "import_manifest_row_count": 0,
+  "import_manifest_rows_for_overlap": [],
+  "live_writer_end": "2026-08-28T16:26:23Z",
+  "live_writer_stop_evidence": "queue_full fail-closed in local collector log",
+  "overlap_attribution": "LIVE_COLLECTOR: zero import-manifest rows for 2026-08-24 through 2026-08-28 and created_at follows bucket close by about one second",
+  "producer_path": [
+    "orderbook_v2_live/collector.py::_ingest_ready",
+    "orderbook_v2_live/clock.py::LiveSecondClock",
+    "orderbook_v2/dynamics.py::build_event_feature_row",
+    "orderbook_v2/features.py::compute_features",
+    "orderbook_v2_live/writer.py::FeatureWriter",
+    "orderbook_v2/ch_writer.py::insert_features"
+  ],
+  "producer_table": "orderbook_analysis.orderbook_features_1s_v2"
+}

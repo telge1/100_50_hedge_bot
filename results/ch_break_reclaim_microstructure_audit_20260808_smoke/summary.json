@@ -1,0 +1,19 @@
+{
+  "primary_decision": "DATA_INSUFFICIENT",
+  "n_events": 2,
+  "data_quality_counts": {
+    "DATA_VALID": 2
+  },
+  "outcome_counts": {
+    "BREAK_ACCEPTED": 2
+  },
+  "n_feature_rows": 28,
+  "n_timeline_rows": 28,
+  "top_features": [],
+  "earliest_useful_for_top": [],
+  "deep_dive_event_ids": [
+    "ev_1h_protected_low_0.6052_20260726T050000",
+    "ev_1h_protected_low_0.6008_20260725T170000"
+  ],
+  "artifact_dir": "results/ch_break_reclaim_microstructure_audit_20260808_smoke"
+}

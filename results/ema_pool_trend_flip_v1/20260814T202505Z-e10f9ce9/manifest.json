@@ -1,0 +1,96 @@
+{
+  "run_id": "20260814T202505Z-e10f9ce9",
+  "strategy_id": "EMA_POOL_TREND_FLIP_V1",
+  "complete": true,
+  "productive": true,
+  "research_only": true,
+  "live_trading": false,
+  "test_fixture_only": false,
+  "pool_candle_source": "clickhouse",
+  "clickhouse": {
+    "pool_candle_source": "clickhouse",
+    "database": "signal_generator",
+    "table": "candles_1m",
+    "exchange": "bybit",
+    "interval": "1m",
+    "final": true,
+    "is_closed": 1,
+    "timezone": "UTC",
+    "host": "127.0.0.1",
+    "port": 8123,
+    "env_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.env"
+  },
+  "window": {
+    "start": "2026-08-12T15:03:43Z",
+    "end": "2026-08-14T15:03:43Z",
+    "symbols": [
+      "ACEUSDT"
+    ],
+    "end_exclusive": true
+  },
+  "ema": {
+    "fast": 9,
+    "slow": 20,
+    "cross_confirmation_bars": 2,
+    "cross_min_separation_atr": 0.05
+  },
+  "pool": {
+    "lookback": 8,
+    "interval": "5m",
+    "engine_runs": 1
+  },
+  "planner": {
+    "root": "/home/telgenbuescher/projects/pool_order_planer",
+    "commit": "c6c960a82e9a0c538dbe24b03f481893e722072f",
+    "is_git": true,
+    "dirty": false,
+    "dirty_files": [],
+    "file_hashes": {
+      "research/liquidity/__init__.py": "a3c070f43ddde313f6e6e65898d77db276aa639b7d973b7c5ea56237289defa3",
+      "research/liquidity/bigbeluga_pools.py": "d81059ffbe578e62108de28de4bf022e65f63a4477ff77e727853f4774d2a379",
+      "research/liquidity/hold_vs_break.py": "037a208df58f74470ce9f2d952de1bfeac4723335caf3265869dea1947e0ba4a",
+      "research/liquidity/micro_confirmation.py": "95c13a212b27d4caa45a228f93b1e43fd6c656c6e35e589f452fcad9f6871780",
+      "research/liquidity/minute1_features.py": "f2a5d8d5fd9ee99b7bb64744a2a384af29910e566d83788072e1ded05f5f3a96",
+      "research/liquidity/mtf_entry.py": "94e3d166846a7e412527575860f620d2401585fbc711f9cc8313c0fe76d01855",
+      "research/liquidity/one_bar_confirmation.py": "53731af35f64a505e482bdd095c1549d6d7b1bee5a91d325b7310178d018f09e",
+      "research/liquidity/order_planner.py": "40bb215829c9851f1df4c5b91ada343d62c9b7348e1c4f5a0b2157b647dcb1c1",
+      "research/liquidity/pool_cluster_strategy.py": "532b9c5d7867c96619617b95057c95e575d050da168c0b3437edcc721e598e0b",
+      "research/liquidity/rebound_audit.py": "db67b66780ff5aa4e2e60ab757d60f7c7061c2ff211f21a8b7c428497f71ccf5",
+      "research/liquidity/tp_front_run.py": "ab29d19da1800ba059c7a5770ebe8bddf488a7663dcdbab37dc8d5369bc6c2e2",
+      "tests/test_order_planner.py": "d73fa9fbf0a7c0ace24d1888edfd49be3f1f8ca78ba3f184117bffecf6f0fbdf"
+    },
+    "expected_commit": "c6c960a82e9a0c538dbe24b03f481893e722072f",
+    "lookback": 8,
+    "replay": false,
+    "constants": {
+      "LOOKBACK": 8,
+      "TP1_BUFFER": 0.0005,
+      "TP2_BUFFER": 0.002,
+      "SL_BUFFER": 0.002,
+      "EMPTY_GAP_MAX_PCT": 1.0,
+      "SL_MAX_ABS_PCT": 1.5,
+      "DEFAULT_LOOKBACK": 8
+    },
+    "pin_ok": true,
+    "pin_override": false
+  },
+  "fees_pct": 0.11,
+  "signal_generator": {
+    "root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+    "commit": null,
+    "is_git": false,
+    "dirty": false,
+    "dirty_files": [],
+    "file_hashes": {
+      "src/signal_generator/timeframes.py": "f909c3738418998d69e0be64cebb3d7496082784590d7c7386e81165fe7d0830"
+    }
+  },
+  "variants": [
+    "EMA_POOL_TREND_FLIP_V1_STATIC",
+    "EMA_POOL_TREND_FLIP_V1_RATCHET",
+    "EMA_POOL_DIRECTION_FILTER_V1",
+    "BASELINE"
+  ],
+  "tp1": "disabled",
+  "tp2": "disabled"
+}

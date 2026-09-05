@@ -1,0 +1,48 @@
+{
+  "verdict": "FULL_OB_CLICKHOUSE_SMOKE_EXACT_PARITY",
+  "FULL_TOPIC_PROVEN": true,
+  "NOT_OB200_PROVEN": true,
+  "NOT_OB1000_PROVEN": true,
+  "source_file": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst",
+  "event": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+  "topic": "orderbook.full.BTCUSDT",
+  "source_packet_count": 1514,
+  "clickhouse_packet_count": 1514,
+  "parsing_rejects": 0,
+  "duplicates": 0,
+  "u_gaps": {
+    "source_feed_u_gap_count": 0,
+    "persisted_capture_u_gap_count": 0,
+    "database_replay_u_gap_count": 0,
+    "rejected_packet_count": 0,
+    "duplicate_packet_count": 0
+  },
+  "final_u_seq": {
+    "source": [
+      4349047,
+      805049768223
+    ],
+    "db": [
+      4349047,
+      805049768223
+    ]
+  },
+  "book_hash": {
+    "source": "14f793b85f98caedee435b0f86bc5c6a44bb795852e83cfde571b87440bc2175",
+    "db": "14f793b85f98caedee435b0f86bc5c6a44bb795852e83cfde571b87440bc2175"
+  },
+  "levels": {
+    "source": [
+      39477,
+      24393
+    ],
+    "db": [
+      39477,
+      24393
+    ]
+  },
+  "idempotency": true,
+  "analysis": true,
+  "collector_unchanged": true,
+  "oi_unchanged": true
+}

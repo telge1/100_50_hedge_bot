@@ -1,0 +1,25 @@
+{
+  "primary_decision": "HISTORICAL_TRADE_EVENT_DATA_READY",
+  "endpoint": "https://www.bybit.com/x-api/quote/public/support/download/list-files",
+  "params": {
+    "bizType": "contract",
+    "productId": "trade",
+    "interval": "daily"
+  },
+  "n_inventory_days": 10,
+  "download_actions": {
+    "DOWNLOADED": 8,
+    "SKIPPED_EXISTING": 2
+  },
+  "coverage_counts": {
+    "TRADE_COVERAGE_FULL": 15
+  },
+  "total_gz_bytes": 141523463,
+  "total_csv_bytes": 454245333,
+  "total_bytes_approx": 595768796,
+  "disk_free_bytes_before_approx": 566696800256,
+  "disk_free_bytes_after": 566231891968,
+  "data_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/data/bybit_historical_trades",
+  "artifact_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/historical_trade_event_data_20260808",
+  "n_events": 15
+}

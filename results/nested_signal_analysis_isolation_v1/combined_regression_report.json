@@ -1,0 +1,26 @@
+{
+  "verdict": "NESTED_SIGNAL_ISOLATION_READY_COMBINED_RESTART_REQUIRED",
+  "SIGNAL_LEVEL_ANALYSIS_ISOLATION": true,
+  "CROSS_SIGNAL_METRIC_CONTAMINATION": 1,
+  "OVERLAP_CLUSTERING_IMPLEMENTED": true,
+  "WOULD_RESYNC_CHECKPOINT_BE_ACTIVE_AFTER_RESTART": true,
+  "WOULD_NESTED_SIGNALS_BE_ACTIVE_AFTER_RESTART": true,
+  "combined_tests_passed": 116,
+  "combined_tests_failed": 0,
+  "suites": [
+    "test_nested_signal_analysis_isolation_v1.py",
+    "test_nested_profile_edge_signal_v1.py",
+    "test_full_ob_resync_checkpoint_v1.py",
+    "test_full_ob_edge_flight_recorder_v1.py",
+    "test_full_ob_edge_capture_timing_v1.py",
+    "test_full_ob_writer_throughput_bootstrap_v1.py",
+    "test_full_ob_socket_lock_offload.py",
+    "test_full_ob_sync_contract.py",
+    "test_orderbook_v3_on_demand_ob1000.py",
+    "test_ob200_v3_raw_discovery_v3.py"
+  ],
+  "overlap_cluster_id_example": "overlap_cluster_cfb6e8834699f973",
+  "collector_pid_unchanged": 1565672,
+  "oi_pid_unchanged": 147111,
+  "restart_performed": false
+}

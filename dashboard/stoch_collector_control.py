@@ -226,6 +226,16 @@ def build_stoch_argv(*, public_trades: bool) -> list[str]:
     ]
     if public_trades:
         argv.append("--enable-public-trades")
+        argv.extend(
+            [
+                "--public-trade-queue-maxsize",
+                "100000",
+                "--public-trade-batch-size",
+                "2000",
+                "--public-trade-spool-dir",
+                "results/live_collector/public_trade_spool",
+            ]
+        )
     return argv
 
 

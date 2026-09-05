@@ -1,0 +1,11 @@
+{
+  "audit_output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_research_db_final_audit_v1",
+  "clickhouse_writes": false,
+  "collector_touched": false,
+  "commit_created": false,
+  "contract_version": "btc_doge_research_full_history_v1",
+  "dashboard_touched": false,
+  "existing_results_overwritten": false,
+  "fight_engine_touched": false,
+  "push_performed": false
+}

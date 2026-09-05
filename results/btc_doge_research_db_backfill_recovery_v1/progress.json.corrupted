@@ -1,0 +1,39 @@
+{
+  "completed": 43,
+  "elapsed_seconds": 7.221891683060676,
+  "last_result": {
+    "batch_id": "fh:BTCUSDT:TPO_PROFILE:20260729T000000Z:20260730T000000Z:DERIVED_FROM",
+    "build_id": "2855de9892fc68f710e971a9d8391225486d4e065325d7963607658d47398c50",
+    "modality": "TPO_PROFILE",
+    "output_fingerprint": "1db2353874b58dea2fa89fa15f78273ef5d1992b622a51cdfeb730b6a4384ec2",
+    "result": {
+      "rows": 341
+    },
+    "segment_start": "2026-07-29T00:00:00Z",
+    "status": "READY",
+    "symbol": "BTCUSDT"
+  },
+  "last_segment": {
+    "contract_version": "btc_doge_research_full_history_v1",
+    "dependency_status": "SATISFIED",
+    "eligibility": "ELIGIBLE",
+    "exclusion_reason": "",
+    "expected_bytes": 0,
+    "expected_rows": 1,
+    "modality": "TPO_PROFILE",
+    "producer_id": "DERIVED_FROM_TRADES",
+    "segment_end": "2026-07-30T00:00:00Z",
+    "segment_start": "2026-07-29T00:00:00Z",
+    "segment_status": "READY",
+    "source": "derived_tpo_volume",
+    "source_fingerprint": "21b2f57034b3a60bb7aa352a1227b71e5b74836a445cbf83c254a6238aabd866",
+    "symbol": "BTCUSDT",
+    "target_table": "research_tpo_profile_bins_session"
+  },
+  "status": "RUNNING",
+  "total_segments": 662,
+  "updated_at": "2026-09-02T19:38:45.200254Z"
+}
+
+  "updated_at": "2026-09-02T19:38:45.200243Z"
+}

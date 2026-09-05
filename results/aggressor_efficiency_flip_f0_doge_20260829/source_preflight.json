@@ -1,0 +1,18 @@
+{
+  "rows": 41523,
+  "uniq_trade_id": 41523,
+  "duplicate_surplus": 0,
+  "bad_side": 0,
+  "min_ts": "2026-08-29 08:00:00.256000",
+  "max_ts": "2026-08-29 15:29:55.118000",
+  "table": "orderbook_analysis.public_trades_canonical",
+  "symbol": "DOGEUSDT",
+  "start": "2026-08-29T08:00:00Z",
+  "end": "2026-08-29T15:30:00Z",
+  "rows_loaded": 41523,
+  "rows_after_dedupe": 41523,
+  "sides": [
+    "Buy",
+    "Sell"
+  ]
+}

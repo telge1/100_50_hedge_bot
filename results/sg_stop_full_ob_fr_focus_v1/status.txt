@@ -1,0 +1,7 @@
+timestamp_utc=2026-09-05T09:56:58Z
+sg_stopped_disabled=1
+ActiveState=inactive
+UnitFileState=disabled
+MainPID=1888177
+ActiveState=active
+UnitFileState=enabled

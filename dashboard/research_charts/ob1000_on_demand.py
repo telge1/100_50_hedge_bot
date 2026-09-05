@@ -12,12 +12,65 @@ from typing import Any
 
 PILOT_SYMBOLS = frozenset({"BTCUSDT", "DOGEUSDT"})
 ON_DEMAND_DEPTH = 1000
+FULL_DEPTH = 0
 SOURCE_NAME = "orderbook_v3_live_on_demand"
 
 CONNECT_TIMEOUT_SEC = 2.0
 READ_TIMEOUT_SEC = 3.0
 WRITE_TIMEOUT_SEC = 3.0
 MAX_RESPONSE_BYTES = 8_388_608
+
+_ON_DEMAND_ENV_KEYS = (
+    "OB_V3_ON_DEMAND_ENABLE",
+    "OB_V3_ON_DEMAND_SOCKET_PATH",
+    "OB_V3_ON_DEMAND_MAX_ACTIVE",
+    "OB_V3_ON_DEMAND_HEARTBEAT_SEC",
+    "OB_V3_ON_DEMAND_LEASE_TTL_SEC",
+)
+
+
+def _orderbook_analyse_root() -> Path:
+    raw = (os.environ.get("ORDERBOOK_ANALYSE_ROOT") or "").strip()
+    if raw:
+        return Path(raw)
+    # Sibling of spread_recovery_hedge_short_dev on this host.
+    here = Path(__file__).resolve()
+    # .../projects/spread_recovery_hedge_short_dev/dashboard/research_charts/this.py
+    projects = here.parents[3]
+    sibling = projects / "orderbook_analyse"
+    if sibling.is_dir():
+        return sibling
+    return Path("/home/telgenbuescher/projects/orderbook_analyse")
+
+
+def _bootstrap_on_demand_env() -> None:
+    """Inherit OB1000 pilot flags from orderbook_analyse/.env when unset.
+
+    Allows dashboard.service to pick up the shared pilot enablement without a
+    systemd drop-in. Does not override keys already present in the process env.
+    """
+    env_path = _orderbook_analyse_root() / ".env"
+    if not env_path.is_file():
+        return
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    wanted = set(_ON_DEMAND_ENV_KEYS)
+    for line in lines:
+        text = line.strip()
+        if not text or text.startswith("#") or "=" not in text:
+            continue
+        key, _, value = text.partition("=")
+        key = key.strip()
+        if key not in wanted:
+            continue
+        if key in os.environ:
+            continue
+        os.environ[key] = value.strip().strip('"').strip("'")
+
+
+_bootstrap_on_demand_env()
 
 
 class Ob1000DisabledError(RuntimeError):
@@ -109,8 +162,25 @@ def _map_collector_error(resp: dict[str, Any]) -> None:
         raise Ob1000RequestError(err, err)
 
 
-def lease_acquire(*, symbol: str, session_id: str, lease_id: str | None = None) -> dict[str, Any]:
+def _normalize_depth(depth: int | None) -> int:
+    try:
+        d = int(depth) if depth is not None else ON_DEMAND_DEPTH
+    except (TypeError, ValueError):
+        d = ON_DEMAND_DEPTH
+    if d == FULL_DEPTH:
+        return FULL_DEPTH
+    return ON_DEMAND_DEPTH
+
+
+def lease_acquire(
+    *,
+    symbol: str,
+    session_id: str,
+    lease_id: str | None = None,
+    depth: int | None = None,
+) -> dict[str, Any]:
     sym = _normalize_symbol(symbol)
+    d = _normalize_depth(depth)
     lid = lease_id or str(uuid.uuid4())
     resp = _call_collector(
         {
@@ -118,7 +188,7 @@ def lease_acquire(*, symbol: str, session_id: str, lease_id: str | None = None) 
             "operation": "acquire",
             "lease_id": lid,
             "symbol": sym,
-            "depth": ON_DEMAND_DEPTH,
+            "depth": d,
         }
     )
     if not resp.get("ok"):
@@ -126,19 +196,26 @@ def lease_acquire(*, symbol: str, session_id: str, lease_id: str | None = None) 
     return {
         "lease_id": lid,
         "symbol": resp.get("symbol") or sym,
-        "depth": ON_DEMAND_DEPTH,
+        "depth": d,
+        "book_mode": "full" if d == FULL_DEPTH else "ob1000",
         "subscription_state": resp.get("subscription_state") or "starting",
         "expires_at": resp.get("expires_at"),
         "status": resp.get("subscription_state") or "starting",
     }
 
 
-def lease_heartbeat(*, lease_id: str, symbol: str | None = None) -> dict[str, Any]:
+def lease_heartbeat(
+    *,
+    lease_id: str,
+    symbol: str | None = None,
+    depth: int | None = None,
+) -> dict[str, Any]:
+    d = _normalize_depth(depth)
     req: dict[str, Any] = {
         "request_id": str(uuid.uuid4()),
         "operation": "heartbeat",
         "lease_id": str(lease_id),
-        "depth": ON_DEMAND_DEPTH,
+        "depth": d,
     }
     if symbol:
         req["symbol"] = _normalize_symbol(symbol)
@@ -148,20 +225,21 @@ def lease_heartbeat(*, lease_id: str, symbol: str | None = None) -> dict[str, An
     return {
         "lease_id": lease_id,
         "symbol": resp.get("symbol"),
-        "depth": ON_DEMAND_DEPTH,
+        "depth": d,
         "subscription_state": resp.get("subscription_state"),
         "expires_at": resp.get("expires_at"),
         "status": resp.get("subscription_state") or "heartbeat_ok",
     }
 
 
-def lease_release(*, lease_id: str) -> dict[str, Any]:
+def lease_release(*, lease_id: str, depth: int | None = None) -> dict[str, Any]:
+    d = _normalize_depth(depth)
     resp = _call_collector(
         {
             "request_id": str(uuid.uuid4()),
             "operation": "release",
             "lease_id": str(lease_id),
-            "depth": ON_DEMAND_DEPTH,
+            "depth": d,
         }
     )
     if not resp.get("ok"):
@@ -170,16 +248,23 @@ def lease_release(*, lease_id: str) -> dict[str, Any]:
         "lease_id": lease_id,
         "status": "released",
         "subscription_state": resp.get("subscription_state") or "stopped",
+        "depth": d,
     }
 
 
-def load_ob1000_levels(symbol: str, *, lease_id: str | None = None) -> dict[str, Any]:
+def load_ob1000_levels(
+    symbol: str,
+    *,
+    lease_id: str | None = None,
+    depth: int | None = None,
+) -> dict[str, Any]:
     sym = _normalize_symbol(symbol)
+    d = _normalize_depth(depth)
     req: dict[str, Any] = {
         "request_id": str(uuid.uuid4()),
         "operation": "snapshot",
         "symbol": sym,
-        "depth": ON_DEMAND_DEPTH,
+        "depth": d,
     }
     if lease_id:
         req["lease_id"] = str(lease_id)
@@ -189,8 +274,9 @@ def load_ob1000_levels(symbol: str, *, lease_id: str | None = None) -> dict[str,
         if err in {"no_active_lease", "unknown_lease"}:
             return {
                 "symbol": sym,
-                "depth": ON_DEMAND_DEPTH,
-                "source": SOURCE_NAME,
+                "depth": d,
+                "book_mode": "full" if d == FULL_DEPTH else "ob1000",
+                "source": SOURCE_NAME if d == ON_DEMAND_DEPTH else "orderbook_v3_live_full_on_demand",
                 "subscription_state": resp.get("subscription_state") or "stopped",
                 "freshness_state": "unknown",
                 "freshness_ms": None,
@@ -199,14 +285,18 @@ def load_ob1000_levels(symbol: str, *, lease_id: str | None = None) -> dict[str,
                 "bids": [],
                 "asks": [],
                 "data_status": "no_data",
-                "coverage": "on_demand",
+                "coverage": "on_demand_full" if d == FULL_DEPTH else "on_demand",
             }
         _map_collector_error(resp)
     payload = dict(resp)
     payload.setdefault("symbol", sym)
-    payload.setdefault("depth", ON_DEMAND_DEPTH)
-    payload.setdefault("source", SOURCE_NAME)
-    payload.setdefault("coverage", "on_demand")
+    payload.setdefault("depth", d)
+    payload.setdefault("book_mode", "full" if d == FULL_DEPTH else "ob1000")
+    payload.setdefault(
+        "source",
+        SOURCE_NAME if d == ON_DEMAND_DEPTH else "orderbook_v3_live_full_on_demand",
+    )
+    payload.setdefault("coverage", "on_demand_full" if d == FULL_DEPTH else "on_demand")
     return payload
 
 

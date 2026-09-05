@@ -1,0 +1,22 @@
+2026-09-04T20:59:03Z t+0.0m gate=False state=LIVE recv=3330 ins=3329 drops=0 lag=0.09037 q=1/100000
+2026-09-04T21:00:03Z t+1.0m gate=True state=LIVE recv=7957 ins=7433 drops=0 lag=0.123355 q=3/100000
+2026-09-04T21:01:03Z t+2.0m gate=False state=LIVE recv=16548 ins=16493 drops=0 lag=0.090968 q=7/100000
+2026-09-04T21:02:03Z t+3.0m gate=False state=LIVE recv=29920 ins=29240 drops=0 lag=0.090289 q=1/100000
+2026-09-04T21:03:03Z t+4.0m gate=False state=LIVE recv=34959 ins=34835 drops=0 lag=0.091503 q=35/100000
+2026-09-04T21:04:03Z t+5.0m gate=True state=LIVE recv=41186 ins=41113 drops=0 lag=0.090387 q=4/100000
+2026-09-04T21:05:03Z t+6.0m gate=False state=LIVE recv=45457 ins=45248 drops=0 lag=0.090745 q=2/100000
+2026-09-04T21:06:03Z t+7.0m gate=False state=LIVE recv=49735 ins=49733 drops=0 lag=0.090383 q=2/100000
+2026-09-04T21:07:03Z t+8.0m gate=False state=LIVE recv=55519 ins=55500 drops=0 lag=0.089969 q=3/100000
+2026-09-04T21:08:03Z t+9.0m gate=False state=LIVE recv=60253 ins=59973 drops=0 lag=0.090172 q=3/100000
+2026-09-04T21:09:03Z t+10.0m gate=True state=LIVE recv=65055 ins=64389 drops=0 lag=0.091372 q=15/100000
+2026-09-04T21:10:03Z t+11.0m gate=False state=LIVE recv=71585 ins=71568 drops=0 lag=0.090892 q=1/100000
+2026-09-04T21:11:03Z t+12.0m gate=False state=LIVE recv=75446 ins=75401 drops=0 lag=0.089864 q=2/100000
+2026-09-04T21:12:03Z t+13.0m gate=False state=LIVE recv=78181 ins=78173 drops=0 lag=0.091149 q=2/100000
+2026-09-04T21:13:03Z t+14.0m gate=False state=LIVE recv=81952 ins=81921 drops=0 lag=0.090963 q=1/100000
+2026-09-04T21:14:03Z t+15.0m gate=True state=LIVE recv=87569 ins=87541 drops=0 lag=0.089806 q=1/100000
+2026-09-04T21:15:03Z t+16.0m gate=False state=LIVE recv=90895 ins=90834 drops=0 lag=0.125366 q=1/100000
+2026-09-04T21:16:03Z t+17.0m gate=False state=LIVE recv=95086 ins=95081 drops=0 lag=0.090561 q=3/100000
+2026-09-04T21:17:03Z t+18.0m gate=False state=LIVE recv=97820 ins=97783 drops=0 lag=0.090154 q=2/100000
+2026-09-04T21:18:03Z t+19.0m gate=False state=LIVE recv=99968 ins=99955 drops=0 lag=0.090244 q=1/100000
+2026-09-04T21:19:03Z t+20.0m gate=True state=LIVE recv=104205 ins=104195 drops=0 lag=0.091038 q=1/100000
+SMOKE_DONE

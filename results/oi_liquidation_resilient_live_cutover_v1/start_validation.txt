@@ -1,0 +1,106 @@
+=== health file ===
+-rw-r--r-- 1 telgenbuescher telgenbuescher 757 Sep  4 20:05 logs/oi_liquidation_collector.health.json
+{"clickhouse_reachable":true,"clickhouse_reconnect_count":1,"collector_instance_id":"server-telgenbuescher-1786328-526adc3c","health_reasons":["websocket_down"],"health_status":"YELLOW","last_liquidation_persisted_ts":null,"last_liquidation_received_ts":null,"last_oi_persisted_ts":1788545104.0130363,"last_oi_received_ts":1788545104.016786,"last_successful_insert_ts":1788545105.03396,"last_ws_message_ts":1788545104.016786,"persistence_lag_seconds":0.0,"pid":1786328,"process_alive":true,"queue_capacity":50000,"queue_depth":0,"queue_drop_count":0,"spool_unacked_bytes":0,"spool_unacked_records":0,"updated_unix":1788545105.3037145,"websocket_alive":false,"websocket_reconnect_count":1,"writer_alive":true,"writer_error_count":0,"writer_restart_count":1}
+
+=== spool ===
+data/oi_liquidation_collector/spool/:
+total 16
+drwxrwxr-x 3 telgenbuescher telgenbuescher 4096 Sep  4 20:05 .
+drwxrwxr-x 4 telgenbuescher telgenbuescher 4096 Sep  4 20:04 ..
+-rw-r--r-- 1 telgenbuescher telgenbuescher   72 Sep  4 20:05 meta.json
+drwxrwxr-x 2 telgenbuescher telgenbuescher 4096 Sep  4 20:04 segments
+
+data/oi_liquidation_collector/spool/segments/:
+total 584
+drwxrwxr-x 2 telgenbuescher telgenbuescher   4096 Sep  4 20:04 .
+drwxrwxr-x 3 telgenbuescher telgenbuescher   4096 Sep  4 20:05 ..
+-rw-rw-r-- 1 telgenbuescher telgenbuescher 582973 Sep  4 20:05 000000001.jsonl
+=== pid/lock ===
+1786328
+-rw-r--r-- 1 telgenbuescher telgenbuescher 7 Sep  4 20:04 logs/oi_liquidation_collector.lock
+=== CLOSE_WAIT new pid ===
+ESTAB      0      0               192.168.40.66:46310            13.32.121.7:443   users:(("python",pid=1786328,fd=10))         
+ESTAB      0      577                 127.0.0.1:36404              127.0.0.1:8123  users:(("python",pid=1786328,fd=8))          
+0
+0
+=== log tail ===
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/orchestration.py", line 226, in run_sync
+    operation = sequence.throw(execution_error)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/orchestration.py", line 182, in insert_context_sequence
+    describe_result = yield QueryOp(f"DESCRIBE TABLE {full_table}", settings=settings or {})
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/orchestration.py", line 230, in run_sync
+    response = execute(operation)
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/client.py", line 226, in _execute_operation
+    return self.query(operation.text, settings=settings, query_formats=dict(_INTERNAL_QUERY_FORMATS))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/client.py", line 414, in query
+    return self._query_with_context(query_context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backendclient.py", line 49, in _query_with_context
+    execution = self._backend.execute_query(context, runtime, self._prep_query(context))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/http_sync.py", line 152, in execute_query
+    response = self.request(
+               ^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/http_sync.py", line 375, in request
+    self.error_handler(response)
+  File "/home/telgenbuescher/projects/orderbook_analyse/.venv/lib/python3.12/site-packages/clickhouse_connect/driver/_backend/http_sync.py", line 122, in error_handler
+    raise build_http_error(
+clickhouse_connect.driver.exceptions.DatabaseError: Received ClickHouse exception, code: 373, server response: Code: 373. DB::Exception: Session ac31384e-eae5-406e-ba7e-065e82e204ea is locked by a concurrent client. (SESSION_IS_LOCKED) (for url http://127.0.0.1:8123)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/writer.py", line 247, in _run
+    for table, group in by_table.items():
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/writer.py", line 237, in _flush_all
+    return len(rows)
+        ^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/writer.py", line 229, in _flush_table
+    written = self.spool.append_many(table, recs)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/miniconda3/lib/python3.12/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/miniconda3/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/writer.py", line 221, in _insert_sync
+    self.writer_restart_count += 1
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+orderbook_analyse.oi_liquidation_collector.writer.InsertError: insert failed for open_interest_events: Received ClickHouse exception, code: 373, server response: Code: 373. DB::Exception: Session ac31384e-eae5-406e-ba7e-065e82e204ea is locked by a concurrent client. (SESSION_IS_LOCKED) (for url http://127.0.0.1:8123)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/__main__.py", line 4, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/collector.py", line 654, in main
+    logger.exception("final health enqueue failed")
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/miniconda3/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/miniconda3/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/miniconda3/lib/python3.12/asyncio/base_events.py", line 685, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/collector.py", line 644, in async_main
+    cap=self.settings.reconnect_max_sec,
+^^^^^^^
+  File "/home/telgenbuescher/projects/orderbook_analyse/src/orderbook_analyse/oi_liquidation_collector/writer.py", line 200, in stop
+    self.clickhouse_reachable = False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+orderbook_analyse.oi_liquidation_collector.writer.InsertError: insert failed for open_interest_events: Received ClickHouse exception, code: 373, server response: Code: 373. DB::Exception: Session ac31384e-eae5-406e-ba7e-065e82e204ea is locked by a concurrent client. (SESSION_IS_LOCKED) (for url http://127.0.0.1:8123)
+2026-09-04 20:04:44,067 INFO orderbook_analyse.oi_liquidation_collector.collector: settings {'bybit_ws_url': 'wss://stream.bybit.com/v5/public/linear', 'bybit_rest_url': 'https://api.bybit.com', 'clickhouse_host': '127.0.0.1', 'clickhouse_http_port': 8123, 'clickhouse_database': 'orderbook_analysis', 'clickhouse_user': 'orderbook_writer', 'clickhouse_password': '***', 'universe_path': '/home/telgenbuescher/projects/wave_fade_gold_f16ae32/config/universe_tradeable_51.json'}
+2026-09-04 20:05:04,200 WARNING orderbook_analyse.oi_liquidation_collector.collector: disconnect [Errno 2] No such file or directory: '/home/telgenbuescher/projects/orderbook_analyse/data/oi_liquidation_collector/spool/meta.json.tmp' -> '/home/telgenbuescher/projects/orderbook_analyse/data/oi_liquidation_collector/spool/meta.json'
+2026-09-04 20:05:04,200 WARNING orderbook_analyse.oi_liquidation_collector.collector: reconnect after [Errno 2] No such file or directory: '/home/telgenbuescher/projects/orderbook_analyse/data/oi_liquidation_collector/spool/meta.json.tmp' -> '/home/telgenbuescher/projects/orderbook_analyse/data/oi_liquidation_collector/spool/meta.json'

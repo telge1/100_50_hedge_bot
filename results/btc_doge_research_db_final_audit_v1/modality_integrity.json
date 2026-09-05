@@ -1,0 +1,85 @@
+{
+  "BTCUSDT": {
+    "CANDLES": {
+      "classification": "COVERAGE_ONLY",
+      "note": "not imported via fh backfill"
+    },
+    "LIQUIDATIONS": {
+      "dedup_ok": true,
+      "events": 33504,
+      "max_ts": "2026-08-31 21:03:27.362000",
+      "min_ts": "2026-08-18 13:03:37.910000",
+      "null_bankruptcy_price": 0,
+      "uniq_event_key": 33504
+    },
+    "OPEN_INTEREST": {
+      "max_ts": "2026-08-31 23:59:55",
+      "min_ts": "2026-08-18 14:57:15",
+      "partial_rows": 295788,
+      "rows": 364908,
+      "uniq_obs": 213785
+    },
+    "PUBLIC_TRADES": {
+      "bucket_rows": 2596745,
+      "dedup_sum": 83352954,
+      "max_ts": "2026-08-31 23:59:59",
+      "min_ts": "2026-07-19 00:00:00",
+      "source_sum": 83352954
+    },
+    "TPO_PROFILE": {
+      "rows": 5773,
+      "semantics": "DISTINCT_BRACKET_PRESENCE via tpo_count",
+      "sessions": 1,
+      "tpo_count_max": 18,
+      "tpo_count_min": 1
+    },
+    "VOLUME_PROFILE": {
+      "base_volume_sum": 1443158.8709998562,
+      "rows": 5773,
+      "semantics": "base_volume-weighted",
+      "sessions": 1
+    }
+  },
+  "DOGEUSDT": {
+    "CANDLES": {
+      "classification": "COVERAGE_ONLY",
+      "note": "not imported via fh backfill"
+    },
+    "LIQUIDATIONS": {
+      "dedup_ok": true,
+      "events": 3300,
+      "max_ts": "2026-08-31 21:02:43.241000",
+      "min_ts": "2026-08-18 14:38:48.563000",
+      "null_bankruptcy_price": 0,
+      "uniq_event_key": 3300
+    },
+    "OPEN_INTEREST": {
+      "max_ts": "2026-08-31 23:59:55",
+      "min_ts": "2026-08-18 16:02:05",
+      "partial_rows": 143933,
+      "rows": 213053,
+      "uniq_obs": 213053
+    },
+    "PUBLIC_TRADES": {
+      "bucket_rows": 1059504,
+      "dedup_sum": 12685385,
+      "max_ts": "2026-08-31 23:59:27",
+      "min_ts": "2026-07-19 00:00:00",
+      "source_sum": 12685385
+    },
+    "TPO_PROFILE": {
+      "rows": 5111,
+      "semantics": "DISTINCT_BRACKET_PRESENCE via tpo_count",
+      "sessions": 1,
+      "tpo_count_max": 17,
+      "tpo_count_min": 1
+    },
+    "VOLUME_PROFILE": {
+      "base_volume_sum": 31136162723.0,
+      "rows": 5111,
+      "semantics": "base_volume-weighted",
+      "sessions": 1
+    }
+  },
+  "contract_version": "btc_doge_research_full_history_v1"
+}

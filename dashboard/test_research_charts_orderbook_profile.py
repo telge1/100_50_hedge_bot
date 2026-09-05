@@ -372,7 +372,7 @@ def test_visible_range_sql_covers_price_edges():
     assert "ORDER BY price DESC" in src
     assert "OBP_REFRESH_MS" not in src  # frontend-only
     host = (ROOT / "static" / "js" / "research" / "research_charts.js").read_text(encoding="utf-8")
-    assert "OBP_REFRESH_MS = 60 * 1000" in host
+    assert "OBP_REFRESH_MS = 2 * 1000" in host
     assert "startOrderbookProfileRefresh" in host
 
 

@@ -1,0 +1,166 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "rest_http": 200,
+    "rest_sample_n": 50,
+    "rest_first_keys": [
+      "openInterest",
+      "singleOpenInterest",
+      "timestamp"
+    ],
+    "rest_samples": [
+      {
+        "timestamp_ms": 1788541800000,
+        "timestamp_utc": "2026-09-04T17:10:00+00:00",
+        "openInterest": "56183.71300000",
+        "openInterestValue": "28091.857",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788541500000,
+        "timestamp_utc": "2026-09-04T17:05:00+00:00",
+        "openInterest": "56191.78300000",
+        "openInterestValue": "28095.892",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788541200000,
+        "timestamp_utc": "2026-09-04T17:00:00+00:00",
+        "openInterest": "56167.87800000",
+        "openInterestValue": "28083.939",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788540900000,
+        "timestamp_utc": "2026-09-04T16:55:00+00:00",
+        "openInterest": "56179.20900000",
+        "openInterestValue": "28089.605",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788540600000,
+        "timestamp_utc": "2026-09-04T16:50:00+00:00",
+        "openInterest": "56166.15600000",
+        "openInterestValue": "28083.078",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      }
+    ],
+    "ch_hist_samples": [
+      {
+        "bucket": "2026-08-18 15:05:00",
+        "oi": "62835.85900000",
+        "oiv": "None"
+      },
+      {
+        "bucket": "2026-08-18 15:00:00",
+        "oi": "62655.12200000",
+        "oiv": "None"
+      },
+      {
+        "bucket": "2026-08-18 14:55:00",
+        "oi": "62505.48400000",
+        "oiv": "None"
+      },
+      {
+        "bucket": "2026-08-18 14:50:00",
+        "oi": "62363.80300000",
+        "oiv": "None"
+      },
+      {
+        "bucket": "2026-08-18 14:45:00",
+        "oi": "62351.58700000",
+        "oiv": "None"
+      }
+    ],
+    "matches": []
+  },
+  {
+    "symbol": "DOGEUSDT",
+    "rest_http": 200,
+    "rest_sample_n": 50,
+    "rest_first_keys": [
+      "openInterest",
+      "singleOpenInterest",
+      "timestamp"
+    ],
+    "rest_samples": [
+      {
+        "timestamp_ms": 1788541800000,
+        "timestamp_utc": "2026-09-04T17:10:00+00:00",
+        "openInterest": "1570827558.00000000",
+        "openInterestValue": "785413779",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788541500000,
+        "timestamp_utc": "2026-09-04T17:05:00+00:00",
+        "openInterest": "1570660522.00000000",
+        "openInterestValue": "785330261",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788541200000,
+        "timestamp_utc": "2026-09-04T17:00:00+00:00",
+        "openInterest": "1570752596.00000000",
+        "openInterestValue": "785376298",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788540900000,
+        "timestamp_utc": "2026-09-04T16:55:00+00:00",
+        "openInterest": "1571617372.00000000",
+        "openInterestValue": "785808686",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      },
+      {
+        "timestamp_ms": 1788540600000,
+        "timestamp_utc": "2026-09-04T16:50:00+00:00",
+        "openInterest": "1568381882.00000000",
+        "openInterestValue": "784190941",
+        "keys": [
+          "openInterest",
+          "singleOpenInterest",
+          "timestamp"
+        ]
+      }
+    ],
+    "ch_hist_samples": [],
+    "matches": []
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "pid": 1795773,
+  "health_pid": 1795773,
+  "health_status": "GREEN",
+  "writer_alive": true,
+  "websocket_alive": true,
+  "writer_error_count": 0,
+  "queue_drop_count": 0,
+  "spool_unacked_records": 8,
+  "meta": {
+    "generation": 2060,
+    "last_acked_seq": 34445,
+    "next_seq": 34509,
+    "updated_unix": 1788547605.2100344
+  },
+  "meta_has_generation": true,
+  "meta_prev_exists": true,
+  "meta_prev": {
+    "generation": 2060,
+    "last_acked_seq": 34445,
+    "next_seq": 34509,
+    "updated_unix": 1788547605.2100344
+  },
+  "orphan_tmp_files": [],
+  "post_start_meta_enoent": 0,
+  "post_start_meta_tmp_any": 0,
+  "post_start_session_locked": 0,
+  "post_start_ack_attempt": 0,
+  "post_start_insert_attempt": 0,
+  "post_start_replaying": false,
+  "log_tail": [
+    "2026-09-04 20:45:19,251 INFO orderbook_analyse.oi_liquidation_collector.collector: settings {'bybit_ws_url': 'wss://stream.bybit.com/v5/public/linear', 'bybit_rest_url': 'https://api.bybit.com', 'clickhouse_host': '127.0.0.1', 'clickhouse_http_port': 8123, 'clickhouse_database': 'orderbook_analysis', 'clickhouse_user': 'orderbook_writer', 'clickhouse_password': '***', 'universe_path': '/home/telgenbuescher/projects/wave_fade_gold_f16ae32/config/universe_tradeable_51.json'}"
+  ],
+  "oi5s_max": "2026-09-04 18:46:40",
+  "oie_max": "2026-09-04 18:46:44.633000"
+}

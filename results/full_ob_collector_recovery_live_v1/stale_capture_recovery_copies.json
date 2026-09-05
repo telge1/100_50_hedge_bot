@@ -1,0 +1,56 @@
+[
+  {
+    "event_id": "BTCUSDT_20260903T184212Z_4a22a89fe6",
+    "file": "public_trades_raw.jsonl.zst.tmp",
+    "orig_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  },
+  {
+    "event_id": "BTCUSDT_20260903T184212Z_4a22a89fe6",
+    "file": "full_ob_raw_deltas.jsonl.zst.tmp",
+    "orig_sha256": "54a931a4224187325e6cbea6d3350976df19c54fc62d884ac042de15c38e6bb0",
+    "copy_sha256": "54a931a4224187325e6cbea6d3350976df19c54fc62d884ac042de15c38e6bb0",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  },
+  {
+    "event_id": "BTCUSDT_20260903T184212Z_4a22a89fe6",
+    "file": "rest_full_snapshot.json.zst.tmp",
+    "orig_sha256": "bebefd726abb07b99938b98527a432593c6ac2e27179328367399fcc12c19617",
+    "copy_sha256": "bebefd726abb07b99938b98527a432593c6ac2e27179328367399fcc12c19617",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  },
+  {
+    "event_id": "DOGEUSDT_20260903T184212Z_f5d68293cd",
+    "file": "public_trades_raw.jsonl.zst.tmp",
+    "orig_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  },
+  {
+    "event_id": "DOGEUSDT_20260903T184212Z_f5d68293cd",
+    "file": "full_ob_raw_deltas.jsonl.zst.tmp",
+    "orig_sha256": "def94e1cf4b14a07c2382b69da2d99d3478d101d696b287e523297c72ac9a95a",
+    "copy_sha256": "def94e1cf4b14a07c2382b69da2d99d3478d101d696b287e523297c72ac9a95a",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  },
+  {
+    "event_id": "DOGEUSDT_20260903T184212Z_f5d68293cd",
+    "file": "rest_full_snapshot.json.zst.tmp",
+    "orig_sha256": "123ff0a1e67b70856c04cea5eb1c93a6acaa5abfea86270e965a5d82e0b0c8ab",
+    "copy_sha256": "123ff0a1e67b70856c04cea5eb1c93a6acaa5abfea86270e965a5d82e0b0c8ab",
+    "bit_identical": true,
+    "research_eligible": false,
+    "status": "INCOMPLETE_AT_PROCESS_STOP"
+  }
+]

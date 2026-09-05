@@ -1,0 +1,69 @@
+{
+  "database": "research_full_ob_smoke",
+  "decision": "KEEP_FOR_REGRESSION",
+  "alternate_if_disk_pressure": "SAFE_TO_REMOVE_AFTER_BACKUP",
+  "tables": [
+    {
+      "name": "full_ob_gap_audit_packets_v1",
+      "physical_rows": "206",
+      "logical_rows_final": "203",
+      "storage_bytes": "209643",
+      "engine": "ReplacingMergeTree"
+    },
+    {
+      "name": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "physical_rows": "203",
+      "logical_rows_final": "203",
+      "storage_bytes": "205536",
+      "engine": "ReplacingMergeTree"
+    },
+    {
+      "name": "full_ob_level_changes_smoke_v1",
+      "physical_rows": "376553",
+      "logical_rows_final": "376553",
+      "storage_bytes": "3518481",
+      "engine": "ReplacingMergeTree"
+    },
+    {
+      "name": "full_ob_multi_epoch_packets_v1",
+      "physical_rows": "5",
+      "logical_rows_final": "5",
+      "storage_bytes": "3598",
+      "engine": "ReplacingMergeTree"
+    },
+    {
+      "name": "full_ob_packets_smoke_v1",
+      "physical_rows": "1514",
+      "logical_rows_final": "1514",
+      "storage_bytes": "6316812",
+      "engine": "ReplacingMergeTree"
+    },
+    {
+      "name": "v_full_ob_gap_audit_packets_dedup",
+      "physical_rows": "",
+      "logical_rows_final": "",
+      "storage_bytes": "0",
+      "engine": "View"
+    }
+  ],
+  "views": [
+    "v_full_ob_gap_audit_packets_dedup"
+  ],
+  "total_storage_bytes": 10254070,
+  "total_storage_mb": 9.779,
+  "events": [
+    "BTCUSDT_20260904T080534Z_1fd9a66d36"
+  ],
+  "valid_test_results": [
+    "FULL_OB_CLICKHOUSE_SMOKE_EXACT_PARITY (packets+levels)",
+    "Gap audit packets + dedup view",
+    "Resync multi-epoch parity (5 logical rows)"
+  ],
+  "needed_for_later_regression": true,
+  "fully_reproducible_from_source": true,
+  "source_of_truth": "FR event dir JSONL.zst for BTCUSDT_20260904T080534Z_1fd9a66d36",
+  "export_before_drop_recommended": true,
+  "export_suggestion": "clickhouse-client SELECT ... INTO OUTFILE or existing results/full_ob_* manifests already document parity",
+  "nested_signal_tables_present": false,
+  "isolation_tables_present": false
+}

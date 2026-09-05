@@ -1,0 +1,11 @@
+{
+  "PUBLIC_TRADES": "PUBLIC_TRADES_PRESENT_ANALYSIS_QUERY_BUG",
+  "OPEN_INTEREST": "OI_COLLECTOR_GAP",
+  "LIQUIDATIONS": "LIQUIDATIONS_COLLECTOR_GAP",
+  "overall": "BTC_FLOW_DATA_PARTIALLY_AVAILABLE",
+  "details": {
+    "public_trades": "Present in canonical CH; prior analysis queried wrong DB/table/column and skipped canonical due to orderbook_deltas fear.",
+    "oi": "Collector process alive but no CH rows after 2026-09-01; insert failures + reconnects; not an analysis timezone bug.",
+    "liquidations": "Same as OI \u2014 collector gap after 2026-09-01."
+  }
+}

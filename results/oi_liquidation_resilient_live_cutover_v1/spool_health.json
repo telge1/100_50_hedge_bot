@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/oi_liquidation_collector/spool",
+  "unacked_records": 8,
+  "unacked_bytes": 7696,
+  "listing": [
+    "meta.json",
+    "segments"
+  ],
+  "segments_sample": [
+    "000000001.jsonl",
+    "000000002.jsonl",
+    "000000003.jsonl"
+  ],
+  "meta_race_log_hits_post_restart": 85,
+  "healthy_gate": false,
+  "root_cause": "os.replace(meta.json.tmp -> meta.json) races under concurrent ack/append; FileNotFoundError; triggers WS reconnect and writer_error_count increments",
+  "health_status": "GREEN"
+}

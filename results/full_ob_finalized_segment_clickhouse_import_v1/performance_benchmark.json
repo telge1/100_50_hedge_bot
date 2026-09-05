@@ -1,0 +1,12 @@
+{
+  "segment0_import_seconds_approx": 16.6,
+  "segments_1_to_3_wall_seconds_approx": 72.8,
+  "records_imported_logical": 35589,
+  "records_per_second_approx": 398.0872483221476,
+  "idempotent_reimport_segment0_seconds": 18.360122680664062,
+  "rss_max_kb_this_process": 2610076,
+  "batch_size": 40,
+  "nice_priority": 10,
+  "collector_latency_impact": "none_separate_process",
+  "query_speed_note": "canonical view count/segment id list <3s for 9.5k rows"
+}

@@ -1,0 +1,37 @@
+{
+  "symbols": {
+    "BTCUSDT": {
+      "event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+      "pre_trigger_seconds_actual": 82.091963,
+      "max_prebuffer_observed_before_or_during_smoke": 0.0,
+      "research_eligible": true,
+      "continuous_capture": true,
+      "bootstrap_did_not_open_capture": true,
+      "open_tmp_count": 3,
+      "writers_expected": 1,
+      "data_quality": "OK",
+      "resync_checkpoint_contract": "full_ob_resync_checkpoint_v1",
+      "resync_checkpoint_failure_count": 0,
+      "trigger_ts": "2026-09-04T11:27:35.764963Z",
+      "trigger_quality": "REAL_CROSS_IN",
+      "note": "pre_trigger < 600s because natural GENUINE_CROSS_IN occurred before ringbuffer filled after restart; bootstrap correctly did not open capture"
+    },
+    "DOGEUSDT": {
+      "event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+      "pre_trigger_seconds_actual": 230.487416,
+      "max_prebuffer_observed_before_or_during_smoke": 209.637701082,
+      "research_eligible": true,
+      "continuous_capture": true,
+      "bootstrap_did_not_open_capture": true,
+      "open_tmp_count": 3,
+      "writers_expected": 1,
+      "data_quality": "OK",
+      "resync_checkpoint_contract": "full_ob_resync_checkpoint_v1",
+      "resync_checkpoint_failure_count": 0,
+      "trigger_ts": "2026-09-04T11:30:03.021416Z",
+      "trigger_quality": "REAL_CROSS_IN",
+      "note": "pre_trigger < 600s because natural GENUINE_CROSS_IN occurred before ringbuffer filled after restart; bootstrap correctly did not open capture"
+    }
+  },
+  "requirement_prebuffer_seconds": 600
+}

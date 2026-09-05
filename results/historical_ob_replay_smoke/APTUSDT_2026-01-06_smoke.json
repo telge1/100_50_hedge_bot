@@ -1,0 +1,70 @@
+{
+  "decision": "HISTORICAL_OB_REPLAY_VALID",
+  "cutoff_field": "ts",
+  "symbol": "APTUSDT",
+  "date": "2026-01-06",
+  "targets": [
+    {
+      "label": "A_after_snapshot",
+      "target_ts_ms": 1767657602183,
+      "target_iso": "2026-01-06T00:00:02.183000+00:00",
+      "snapshot_ts_ms": 1767657601786,
+      "last_applied_ts_ms": 1767657602183,
+      "deltas_applied": 4,
+      "u": 10315334,
+      "seq": 236403545669,
+      "bid_level_count": 200,
+      "ask_level_count": 200,
+      "best_bid": "1.9630",
+      "best_ask": "1.9640",
+      "spread": "0.0010",
+      "sequence_status": "CLEAN",
+      "invariants_ok": true,
+      "determinism_ok": true
+    },
+    {
+      "label": "B_mid_day",
+      "target_ts_ms": 1767664618983,
+      "target_iso": "2026-01-06T01:56:58.983000+00:00",
+      "snapshot_ts_ms": 1767657601786,
+      "last_applied_ts_ms": 1767664618983,
+      "deltas_applied": 49999,
+      "u": 10365329,
+      "seq": 236414815892,
+      "bid_level_count": 200,
+      "ask_level_count": 200,
+      "best_bid": "1.9510",
+      "best_ask": "1.9520",
+      "spread": "0.0010",
+      "sequence_status": "CLEAN",
+      "invariants_ok": true,
+      "determinism_ok": true
+    },
+    {
+      "label": "C_late_day",
+      "target_ts_ms": 1767723622883,
+      "target_iso": "2026-01-06T18:20:22.883000+00:00",
+      "snapshot_ts_ms": 1767657601786,
+      "last_applied_ts_ms": 1767723622883,
+      "deltas_applied": 499999,
+      "u": 10815329,
+      "seq": 236536109626,
+      "bid_level_count": 200,
+      "ask_level_count": 200,
+      "best_bid": "1.8927",
+      "best_ask": "1.8928",
+      "spread": "0.0001",
+      "sequence_status": "CLEAN",
+      "invariants_ok": true,
+      "determinism_ok": true
+    }
+  ],
+  "warnings": [],
+  "reference_summary": {
+    "snapshot_u": 10315330,
+    "final_best_bid": "1.9640",
+    "final_best_ask": "1.9650",
+    "bid_levels": 200,
+    "ask_levels": 200
+  }
+}

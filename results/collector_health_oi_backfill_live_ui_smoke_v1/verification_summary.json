@@ -1,0 +1,52 @@
+{
+  "html_checks": {
+    "section_present": true,
+    "pt_btn_disabled": true,
+    "banner_text": true,
+    "oi_detect_btn": true,
+    "oi_dry_btn": true
+  },
+  "health_summary": {
+    "full_ob_raw_archive": {
+      "status": "STOPPED",
+      "pid": null,
+      "evidence": "STOPPED health_state='STOPPED'",
+      "backfill_status": "DISABLED",
+      "dropped_events": null
+    },
+    "oi_liquidation_live": {
+      "status": "STALE",
+      "pid": 147111,
+      "evidence": "process alive but health/DB frozen; oi5s_max=2026-09-01 16:46:50; health_max=2026-09-01 16:46:05.998000; liq_max=2026-09-01 16:41:23.392000; lag_s=262411.081552",
+      "backfill_status": "N/A_LIVE_STREAM",
+      "dropped_events": null
+    },
+    "oi_5m_history": {
+      "status": "DEGRADED",
+      "pid": null,
+      "evidence": "SoT orderbook_analysis.open_interest_5m_history rows=8640 symbols=1 max=2026-08-18 15:05:00 missing_closed\u22484925; 5s history must not be inferred",
+      "backfill_status": "READY_DETECT_DRY_RUN",
+      "dropped_events": null
+    },
+    "public_trades_live": {
+      "status": "DEGRADED",
+      "pid": 1661773,
+      "evidence": "DEGRADED \u2014 LIVE CURRENT BUT DATA LOSS POSSIBLE; dropped_events=493019; lag=0.088785; max_ts alone is not completeness",
+      "backfill_status": "DISABLED_GATE=PUBLIC_TRADES_BACKFILL_PARTIALLY_READY",
+      "dropped_events": 493019
+    },
+    "candles_1m_live": {
+      "status": "HEALTHY",
+      "pid": 1661773,
+      "evidence": "LIVE; candle recovery separate from public trades",
+      "backfill_status": "STARTUP_CANDLE_RECOVERY_ONLY",
+      "dropped_events": null
+    }
+  },
+  "gates": {
+    "public_trades_backfill": "PUBLIC_TRADES_BACKFILL_PARTIALLY_READY",
+    "public_trades_ui": "DEGRADED \u2014 LIVE CURRENT BUT DATA LOSS POSSIBLE",
+    "oi_backfill_execute_default": "dry_run_only_until_activation",
+    "full_ob_restart": "FORBIDDEN_THIS_PHASE"
+  }
+}

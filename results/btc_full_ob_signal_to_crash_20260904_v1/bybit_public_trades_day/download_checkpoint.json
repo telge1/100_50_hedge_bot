@@ -1,0 +1,16 @@
+{
+  "files": {
+    "BTCUSDT2026-09-04.csv.gz": {
+      "bytes_written": 0,
+      "day": "2026-09-04",
+      "dest": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_full_ob_signal_to_crash_20260904_v1/bybit_public_trades_day/BTCUSDT2026-09-04.csv.gz",
+      "error": "HEAD HTTP 404 for https://public.bybit.com/trading/BTCUSDT/BTCUSDT2026-09-04.csv.gz",
+      "meta": {},
+      "skipped": false,
+      "status": "SOURCE_FILE_MISSING",
+      "symbol": "BTCUSDT",
+      "updated_at": "2026-09-04T13:14:37Z",
+      "url": "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2026-09-04.csv.gz"
+    }
+  }
+}

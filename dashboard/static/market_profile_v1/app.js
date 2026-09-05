@@ -9,12 +9,15 @@
 (function () {
   "use strict";
 
+  // Cache-bust: mp-10 shift-measure harden (TF change / empty padding).
+  try { console.info("[mp] asset mp-10"); } catch (e) { /* ignore */ }
+
   var STORAGE_KEY = "mp_v1_settings";
 
   var COLORS = {
     buy: "rgba(38, 166, 154, 0.50)",
     sell: "rgba(239, 83, 80, 0.50)",
-    total: "rgba(120, 144, 176, 0.46)",
+    total: "rgba(120, 144, 176, 0.20)",
     poc: "#ef4444",
     valueArea: "#3b82f6",
     nakedPoc: "#f0b90b",
@@ -22,8 +25,8 @@
     hvn: "#a855f7",
     lvn: "#64748b",
     singlePrint: "rgba(239, 83, 80, 0.10)",
-    windowEdge: "rgba(120, 130, 150, 0.22)",
-    vaFill: "rgba(59, 130, 246, 0.055)"
+    windowEdge: "rgba(120, 130, 150, 0.14)",
+    vaFill: "rgba(59, 130, 246, 0.0)"
   };
 
   var SHAPE_COLORS = {
@@ -260,7 +263,7 @@
     }, 800);
   }
 
-  function applyPayloadToChart(s) {
+  function applyPayloadToChart(s, opts) {
     if (!payload) return false;
     var api = chartApi();
     if (!api || !api.setData) return false;
@@ -269,9 +272,16 @@
       timeframe: s.timeframe,
       is_demo: false,
       candles: payload.candles || []
-    });
+    }, opts || null);
     api.setInteractionMode(toolMode());
-    if (api.setFollowLive) api.setFollowLive(true);
+    // After TF / reload, re-assert Shift so measure works if the key is still held
+    // (host key handlers can go stale while focus was on the TF select).
+    if (api.setHostShift) {
+      try {
+        api.setHostShift(!!window.__mpHostShift);
+      } catch (err) { /* ignore */ }
+    }
+    // Do not force followLive — only Zentrieren (resetView) recenters.
     return true;
   }
 
@@ -352,7 +362,6 @@
         candles.push(bar);
       }
       payload.candles = candles;
-      if (api.setFollowLive) api.setFollowLive(true);
     }
     return ok;
   }
@@ -379,8 +388,6 @@
     stopLivePoll();
     if (!payload || !payload.candles || !payload.candles.length) return;
     var gen = livePollGen;
-    var api = chartApi();
-    if (api && api.setFollowLive) api.setFollowLive(true);
     formingTimer = setInterval(function () {
       if (gen !== livePollGen || document.hidden) return;
       pollForming(gen);
@@ -952,6 +959,7 @@
 
     window.addEventListener("keydown", function (ev) {
       if (ev.key === "Shift") {
+        window.__mpHostShift = true;
         var api = chartApi();
         if (api && api.setHostShift) api.setHostShift(true);
       }
@@ -963,11 +971,13 @@
     });
     window.addEventListener("keyup", function (ev) {
       if (ev.key === "Shift") {
+        window.__mpHostShift = false;
         var api = chartApi();
         if (api && api.setHostShift) api.setHostShift(false);
       }
     });
     window.addEventListener("blur", function () {
+      window.__mpHostShift = false;
       var api = chartApi();
       if (api && api.setHostShift) api.setHostShift(false);
     });
@@ -1168,15 +1178,16 @@
     if (!bins.length) return;
 
     var slotWidth = Math.max(2, span.x1 - span.x0);
-    // Very narrow day slots: skip dense fills — levels still render.
     if (slotWidth < 4) return;
-    var barsWidth = slotWidth * s.width;
+    // Soft silhouette only — filled bars read as a bright "box" on dark charts.
+    var curveWidth = slotWidth * Math.min(0.45, s.width || 0.3);
     var maxCount = 0;
     for (var i = 0; i < bins.length; i += 1) {
       if (bins[i].tpo_count > maxCount) maxCount = bins[i].tpo_count;
     }
     if (maxCount <= 0) return;
 
+    var points = [];
     for (var j = 0; j < bins.length; j += 1) {
       var bin = bins[j];
       if (!bin.tpo_count) continue;
@@ -1184,11 +1195,25 @@
       var yBot = priceToY(bin.price_low);
       if (yTop === null || yBot === null) continue;
       if (yBot < -2 || yTop > region.y1 + 2) continue;
-      var h = Math.max(1, yBot - yTop);
-      var full = (bin.tpo_count / maxCount) * barsWidth;
-      ctx.fillStyle = COLORS.total;
-      ctx.fillRect(span.x0, yTop, full, h);
+      points.push({
+        x: span.x0 + (bin.tpo_count / maxCount) * curveWidth,
+        y: (yTop + yBot) / 2
+      });
     }
+    if (points.length < 2) return;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(160, 180, 210, 0.55)";
+    ctx.lineWidth = 1.25;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (var k = 1; k < points.length; k += 1) {
+      ctx.lineTo(points[k].x, points[k].y);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawVolumeBuySellBars(ctx, profile, span, s, region) {
@@ -1279,34 +1304,20 @@
     ctx.restore();
   }
 
-  /* Shaded areas belong strictly inside their own window. Extending a
-   * translucent fill to the right edge means every window repaints over its
-   * neighbours, and with a week on screen the candles disappear under the
-   * stack. Only the level lines reach forward, and only faintly. */
+  /* Value-area fill used to paint a translucent box over every window —
+   * with short MP periods that reads as a bright "box view". Levels stay as
+   * lines in drawWindowLevels; only optional single-print bands may fill. */
   function drawWindowBackground(ctx, profile, span, s) {
-    var tpo = profileTpo(profile);
-    var va = (tpo && tpo.value_area) || profile.value_area || {};
-
-    if (s.showValueArea && va.vah != null && va.val != null) {
-      var yH = priceToY(va.vah);
-      var yL = priceToY(va.val);
-      if (yH !== null && yL !== null) {
-        ctx.fillStyle = COLORS.vaFill;
-        ctx.fillRect(span.x0, yH, span.x1 - span.x0, Math.max(1, yL - yH));
-      }
-    }
-
-    if (s.showSinglePrints) {
-      var vol = profileVolume(profile);
-      var ranges = (vol && vol.nodes && vol.nodes.single_print_ranges) ||
-        (profile.nodes && profile.nodes.single_print_ranges) || [];
-      for (var i = 0; i < ranges.length; i += 1) {
-        var yA = priceToY(ranges[i][1]);
-        var yB = priceToY(ranges[i][0]);
-        if (yA === null || yB === null) continue;
-        ctx.fillStyle = COLORS.singlePrint;
-        ctx.fillRect(span.x0, yA, span.x1 - span.x0, Math.max(1, yB - yA));
-      }
+    if (!s.showSinglePrints) return;
+    var vol = profileVolume(profile);
+    var ranges = (vol && vol.nodes && vol.nodes.single_print_ranges) ||
+      (profile.nodes && profile.nodes.single_print_ranges) || [];
+    for (var i = 0; i < ranges.length; i += 1) {
+      var yA = priceToY(ranges[i][1]);
+      var yB = priceToY(ranges[i][0]);
+      if (yA === null || yB === null) continue;
+      ctx.fillStyle = COLORS.singlePrint;
+      ctx.fillRect(span.x0, yA, span.x1 - span.x0, Math.max(1, yB - yA));
     }
   }
 
@@ -1439,19 +1450,7 @@
       drawWindowBackground(ctx, visible[v].profile, visible[v].span, s);
     }
 
-    if (visible.length > 1) {
-      ctx.save();
-      ctx.strokeStyle = COLORS.windowEdge;
-      ctx.lineWidth = 1;
-      for (v = 0; v < visible.length; v += 1) {
-        ctx.beginPath();
-        ctx.moveTo(Math.round(visible[v].span.x0) + 0.5, 0);
-        ctx.lineTo(Math.round(visible[v].span.x0) + 0.5, region.y1);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
+    // No vertical window dividers — they read as box borders around each profile.
     if (s.showHistogram) {
       for (v = 0; v < visible.length; v += 1) {
         drawProfileHistogram(ctx, visible[v].profile, visible[v].span, s, region);
@@ -1708,7 +1707,8 @@
               (payload.cached ? " · cached" : "")
           );
           try {
-            if (applyPayloadToChart(s)) scheduleDraw();
+            // Preserve pan/zoom after overlay refresh — first paint already set the view.
+            if (applyPayloadToChart(s, { preserveView: true })) scheduleDraw();
             startLivePoll();
           } catch (err2) { /* already painted */ }
         });
@@ -1815,8 +1815,6 @@
       if (!payload || !payload.candles || !payload.candles.length) return;
       if (!formingTimer) startLivePoll();
       else pollForming(livePollGen);
-      var api = chartApi();
-      if (api && api.setFollowLive) api.setFollowLive(true);
     });
     sendJson("/api/research/workspace").then(function (snap) {
       applyWorkspace(snap);

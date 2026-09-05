@@ -1,0 +1,27 @@
+{
+  "already_current_count": 0,
+  "coins": [
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT"
+    }
+  ],
+  "completed_symbols": 2,
+  "current_symbol": null,
+  "failed_count": 0,
+  "finished_at": "2026-08-15T09:24:48Z",
+  "job_id": "9f94da162ec64e74a0ba4e5579dbf33a",
+  "message": "Aktualisierung abgeschlossen",
+  "pid": 996474,
+  "return_code": 0,
+  "started_at": "2026-08-15T09:24:38Z",
+  "state": "COMPLETED",
+  "success_count": 2,
+  "total_symbols": 2
+}

@@ -1,0 +1,63 @@
+{
+  "primary_decision": "PULL_DOMINATES_ACCEPTED_BREAKS",
+  "n_events": 15,
+  "mechanism_counts": {
+    "PULL_DOMINANT": 11,
+    "NO_CLEAR_MECHANISM": 3,
+    "REFILL_ABSORPTION": 1
+  },
+  "confidence_counts": {
+    "MEDIUM": 11,
+    "LOW": 4
+  },
+  "n_mechanism_determined": 12,
+  "n_medium_or_better_clear": 11,
+  "quality_counts": {
+    "DATA_VALID": 14,
+    "DATA_WARNING": 1
+  },
+  "accepted_vs_reclaim": [
+    {
+      "outcome": "BREAK_ACCEPTED",
+      "n": 10,
+      "mechanism_counts": "{\"PULL_DOMINANT\": 6, \"NO_CLEAR_MECHANISM\": 3, \"REFILL_ABSORPTION\": 1}",
+      "pull_dominant_n": 6,
+      "consumption_dominant_n": 0,
+      "mixed_n": 0,
+      "refill_absorption_n": 1,
+      "no_clear_n": 3,
+      "median_pull_start_s_before": 53.64,
+      "median_consumption_start_s_before": 3.117
+    },
+    {
+      "outcome": "RECLAIM_OR_HOLD",
+      "n": 5,
+      "mechanism_counts": "{\"PULL_DOMINANT\": 5}",
+      "pull_dominant_n": 5,
+      "consumption_dominant_n": 0,
+      "mixed_n": 0,
+      "refill_absorption_n": 0,
+      "no_clear_n": 0,
+      "median_pull_start_s_before": 47.94,
+      "median_consumption_start_s_before": 2.87
+    }
+  ],
+  "clearest_events": [
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260228_0p09106_1h \u2192 PULL_DOMINANT (MEDIUM)",
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260228_0p09133_4h \u2192 PULL_DOMINANT (MEDIUM)",
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h \u2192 PULL_DOMINANT (MEDIUM)",
+    "DOGEUSDT_PROTECTED_HIGH_BREAK_bullish_20260228_0p09259_1h \u2192 PULL_DOMINANT (MEDIUM)",
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260220_0p09777_1h \u2192 PULL_DOMINANT (MEDIUM)"
+  ],
+  "counterexamples": [
+    "DOGEUSDT_PROTECTED_HIGH_BREAK_bullish_20260220_0p09882_1h outcome=BREAK_ACCEPTED mech=REFILL_ABSORPTION",
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h outcome=RECLAIM_OR_HOLD mech=PULL_DOMINANT",
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h outcome=RECLAIM_OR_HOLD mech=PULL_DOMINANT",
+    "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h outcome=RECLAIM_OR_HOLD mech=PULL_DOMINANT",
+    "DOGEUSDT_PROTECTED_HIGH_BREAK_bullish_20260228_0p09259_1h outcome=RECLAIM_OR_HOLD mech=PULL_DOMINANT",
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260115_0p14449_1h outcome=RECLAIM_OR_HOLD mech=PULL_DOMINANT"
+  ],
+  "match_tolerance_ms": 750,
+  "note_feed_alignment": "OB deltas and public trades are separate feeds; \u00b1750ms match window is descriptive sync tolerance, not microsecond causality.",
+  "artifact_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/historical_break_pull_consumption_deep_dive_20260808"
+}

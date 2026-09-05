@@ -1,0 +1,41 @@
+{
+  "backfill_script": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/scripts/backfill_bybit_universe.py",
+  "created_at": "2026-08-20T12:25:39Z",
+  "job_id": "781d0095990a4fa2a678e59824ab30c4",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_universe_update_jobs",
+  "plans": [
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-20T12:25:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-18T10:15:00Z"
+        },
+        {
+          "end": "2026-08-20T12:25:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ADAUSDT",
+      "update_from": "2026-08-18T10:15:00Z",
+      "update_to_exclusive": "2026-08-20T12:25:00Z"
+    }
+  ],
+  "repair_missing": true,
+  "requested_from": "2025-12-11T00:00:00Z",
+  "sg_python": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+  "sg_root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+  "symbols": [
+    "ADAUSDT"
+  ],
+  "universe_file": "universe_selected.json",
+  "update_to": "2026-08-20T12:25:00Z"
+}

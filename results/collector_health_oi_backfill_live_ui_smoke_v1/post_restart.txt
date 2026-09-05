@@ -1,0 +1,21 @@
+● dashboard.service - Spread Recovery Hedge Dashboard
+     Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/dashboard.service.d
+             └─override.conf
+     Active: active (running) since Fri 2026-09-04 19:38:39 CEST; 765ms ago
+   Main PID: 1780509 (python)
+      Tasks: 7 (limit: 21419)
+     Memory: 137.0M (peak: 142.7M)
+        CPU: 505ms
+     CGroup: /system.slice/dashboard.service
+             └─1780509 /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py
+
+Sep 04 19:38:39 server-telgenbuescher python[1780509]: 2026-09-04 19:38:39,889 - __main__ - INFO - 🌐 Host: 0.0.0.0, Port: 3000
+Sep 04 19:38:39 server-telgenbuescher python[1780509]: 2026-09-04 19:38:39,889 - __main__ - INFO - 🔄 Reload: False
+Sep 04 19:38:39 server-telgenbuescher python[1780509]: 2026-09-04 19:38:39,889 - __main__ - INFO - ================================================================================
+Sep 04 19:38:39 server-telgenbuescher python[1780509]: 2026-09-04 19:38:39,889 - __main__ - INFO - 🐕 Watchdog-Autostart deaktiviert, um Fremd-Dashboard-Reaktivierung zu vermeiden
+Sep 04 19:38:40 server-telgenbuescher python[1780509]: INFO:     Started server process [1780509]
+Sep 04 19:38:40 server-telgenbuescher python[1780509]: INFO:     Waiting for application startup.
+    PID                  STARTED CMD
+ 147111 Tue Aug 18 18:02:02 2026 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+1661773 Fri Aug 21 10:27:35 2026 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades

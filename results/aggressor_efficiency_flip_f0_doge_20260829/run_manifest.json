@@ -1,0 +1,22 @@
+{
+  "symbol": "DOGEUSDT",
+  "start": "2026-08-29T08:00:00Z",
+  "end_exclusive": "2026-08-29T15:30:00Z",
+  "profile": "unfitted_f0_diagnostic",
+  "feature_version": "aef_discovery_features/v1",
+  "causal_contract_version": "aef_causal_contract/v1.1-dual-impact",
+  "funnel": {
+    "one_second_buckets": 5010,
+    "raw_bursts": 5926,
+    "compression_evaluated": 5707,
+    "compression_allowed": 141,
+    "same_side_veto": 9,
+    "delayed_continuation_veto": 1,
+    "counter_events": 2614,
+    "counter_confirmed": 24,
+    "diagnostic_candidates": 5
+  },
+  "prefix_parity_ok": true,
+  "status_label": "DIAGNOSTIC_CANDIDATE",
+  "unfitted": true
+}

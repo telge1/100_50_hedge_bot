@@ -1,0 +1,15 @@
+{
+  "contract": "btc_ob_fight_explanatory_audit_v1",
+  "anchor": "2026-08-31T19:00:00Z",
+  "symbol": "BTCUSDT",
+  "source_run": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/20260831T190000Z/run_017",
+  "verdict": "BTC_OB_FIGHT_EXPLANATORY_AUDIT_COMPLETE",
+  "runtime_seconds": 36.59,
+  "peak_rss_kb": 463312,
+  "peak_traced_memory_bytes": 175351754,
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "interpretation_status": "NOT_EVALUATED",
+  "optional_plot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_explanatory_audit_20260831_1900_v1/fight_timeline.png"
+}

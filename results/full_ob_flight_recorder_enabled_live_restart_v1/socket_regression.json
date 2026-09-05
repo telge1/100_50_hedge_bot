@@ -1,0 +1,90 @@
+{
+  "samples": [
+    {
+      "i": 1,
+      "btc_levels": 65382,
+      "doge_levels": 19257,
+      "btc_capped": false,
+      "doge_capped": false,
+      "crossed": false,
+      "snap_ok": true
+    },
+    {
+      "i": 5,
+      "btc_levels": 65336,
+      "doge_levels": 19256,
+      "btc_capped": false,
+      "doge_capped": false,
+      "crossed": false,
+      "snap_ok": true
+    },
+    {
+      "i": 10,
+      "btc_levels": 65359,
+      "doge_levels": 19257,
+      "btc_capped": false,
+      "doge_capped": false,
+      "crossed": false,
+      "snap_ok": true
+    },
+    {
+      "i": 12,
+      "btc_levels": 65407,
+      "doge_levels": 19256,
+      "btc_capped": false,
+      "doge_capped": false,
+      "crossed": false,
+      "snap_ok": true
+    }
+  ],
+  "ob1000": [
+    {
+      "ok": true,
+      "state": "starting"
+    },
+    {
+      "ok": true,
+      "state": "starting"
+    },
+    {
+      "ok": true,
+      "state": "starting"
+    },
+    {
+      "ok": true,
+      "state": "starting"
+    }
+  ],
+  "ob200": [
+    {
+      "ok": false,
+      "state": "error"
+    },
+    {
+      "ok": false,
+      "state": "error"
+    },
+    {
+      "ok": false,
+      "state": "error"
+    },
+    {
+      "ok": false,
+      "state": "error"
+    }
+  ],
+  "timeouts": 0,
+  "DEPTH0_UNCAPPED": true,
+  "levels_gt_1000": true,
+  "OB1000_REGRESSION_PASS": true,
+  "OB200_REGRESSION_PASS": true,
+  "BOOK_NOT_CROSSED": true,
+  "btc_levels_last": {
+    "bids": 38176,
+    "asks": 27231
+  },
+  "doge_levels_last": {
+    "bids": 5047,
+    "asks": 14209
+  }
+}

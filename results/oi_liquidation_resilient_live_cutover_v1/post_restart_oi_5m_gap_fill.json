@@ -1,0 +1,25 @@
+{
+  "phase_f_executed": false,
+  "reason": "Live smoke hard gates failed (WRITER_ERRORS, SPOOL_HEALTHY); OI-5m catch-up deferred fail-closed.",
+  "old_hist_cutoff": "2026-09-04T17:35:00Z",
+  "last_closed_5m_bucket_at_report": "2026-09-04T18:20:00Z",
+  "hist_btc_max": "2026-09-04 17:35:00",
+  "hist_doge_max": "2026-09-04 17:35:00",
+  "estimated_missing_closed_buckets_per_symbol": 9,
+  "estimated_missing_bucket_list": [
+    "2026-09-04T17:40:00Z",
+    "2026-09-04T17:45:00Z",
+    "2026-09-04T17:50:00Z",
+    "2026-09-04T17:55:00Z",
+    "2026-09-04T18:00:00Z",
+    "2026-09-04T18:05:00Z",
+    "2026-09-04T18:10:00Z",
+    "2026-09-04T18:15:00Z",
+    "2026-09-04T18:20:00Z"
+  ],
+  "dry_run": null,
+  "inserts": 0,
+  "BTC_MISSING": null,
+  "DOGE_MISSING": null,
+  "WOULD_INSERT": null
+}

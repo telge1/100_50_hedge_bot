@@ -1,0 +1,19 @@
+{
+  "day_zip_period_no_ob200_raw_files": {
+    "actual_cause": "Old inventory skipped filesystem scan for days before LIVE_RAW_FROM and assumed Day-ZIP producer without verifying FS paths. Shadow archive under /home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3 begins 2026-08-24T22:47:54+00:00; earlier days have no FS OB200 but may still have trades/OI/candles in ClickHouse.",
+    "previous_exclusion_reason": "NO_OB200_RAW_FILES"
+  },
+  "golden_case_btc_20260831": {
+    "actual_cause": "full_history_inventory._producer_for_day() invalidated entire UTC days after 2026-08-28T16:26:23+00:00 for LIVE_PRODUCER_ID even when BYBIT_OB200_SHADOW_ARCHIVE_V3 hourly zst files exist under /home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3. The raw-archive-only collector (PID 3946369) continued writing shadow files after queue_full; queue_full must only invalidate the live producer stream, not shadow archive segments.",
+    "files_on_disk": 48,
+    "ob200_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3",
+    "previous_exclusion_reason": "AFTER_QUEUE_FULL",
+    "reference": "results/btc_ob_fight_cases/20260831T190000Z/run_018"
+  },
+  "previously_missed_symbol_days": 14,
+  "queue_full_scope": {
+    "rule": "queue_full invalidates LIVE_COLLECTOR only from terminal onward",
+    "terminal": "2026-08-28T16:26:23Z",
+    "terminal_reason": "queue_full"
+  }
+}

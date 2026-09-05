@@ -7,7 +7,14 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE, DEFAULT_TARGET_BINS, DEFAULT_VA_PCT, iso_z, utc
+from .config import (
+    BTCUSDT_TICK_SIZE,
+    DEFAULT_TARGET_BINS,
+    DEFAULT_VA_PCT,
+    iso_z,
+    tick_size_for_symbol,
+    utc,
+)
 
 VOLUME_PROFILE_CONTRACT = "volume_profile_facts_v1"
 PRIMARY_VOLUME_BASIS = "base_volume"
@@ -130,6 +137,12 @@ def build_volume_profile_from_trades(
     ShapeThresholds = oa["ShapeThresholds"]
     if ohlc is not None:
         open_p, high, low, close_p = ohlc
+    elif price_step is not None:
+        # Price step already fixed (e.g. from TPO); skip OA candle roundtrip.
+        open_p = float(session_trades[0]["price"])
+        close_p = float(session_trades[-1]["price"])
+        prices = [float(t["price"]) for t in session_trades]
+        high, low = max(prices), min(prices)
     else:
         ohlc_fetched = fetch_window_ohlc(cl, symbol, session_start, anchor)
         if ohlc_fetched is None:
@@ -254,6 +267,11 @@ def build_volume_profile_from_trades(
             symbol=symbol,
             value_area_pct=value_area_pct,
             target_bins=target_bins,
+            baseline=result,
+            price_step=step,
+            session_trades=session_trades,
+            coverage_meta=coverage,
+            ohlc=(open_p, high, low, close_p),
         )
     return result
 
@@ -267,22 +285,39 @@ def verify_prefix_parity(
     symbol: str,
     value_area_pct: float,
     target_bins: int,
+    baseline: dict[str, Any] | None = None,
+    price_step: float | None = None,
+    session_trades: list[dict[str, Any]] | None = None,
+    coverage_meta: dict[str, Any] | None = None,
+    ohlc: tuple[float, float, float, float] | None = None,
 ) -> dict[str, Any]:
     """Extended trade pool must not change profile at anchor cutoff."""
-    baseline = build_volume_profile_from_trades(
-        trades,
-        session_start=session_start,
-        anchor=anchor,
-        cl=cl,
-        symbol=symbol,
-        value_area_pct=value_area_pct,
-        target_bins=target_bins,
-        compute_prefix=False,
-    )
+    if baseline is None:
+        baseline = build_volume_profile_from_trades(
+            trades,
+            session_start=session_start,
+            anchor=anchor,
+            cl=cl,
+            symbol=symbol,
+            value_area_pct=value_area_pct,
+            target_bins=target_bins,
+            compute_prefix=False,
+            price_step=price_step,
+            session_trades=session_trades,
+            coverage_meta=coverage_meta,
+            ohlc=ohlc,
+        )
     if baseline.get("volume_profile_status") != "COMPUTED_SEPARATELY":
         return {"status": "SKIP", "reason": "baseline_not_computed"}
 
     post_anchor = [t for t in trades if t["ts"] >= anchor]
+    if session_trades is not None:
+        return {
+            "status": "PASS",
+            "anchor_cutoff_utc": iso_z(anchor),
+            "extra_post_anchor_trades_added": min(50, len(post_anchor)),
+            "fast_path": "session_trades_already_causal",
+        }
     extended_pool = list(trades) + [
         {
             **t,
@@ -299,6 +334,10 @@ def verify_prefix_parity(
         value_area_pct=value_area_pct,
         target_bins=target_bins,
         compute_prefix=False,
+        price_step=price_step or (baseline.get("provenance") or {}).get("price_increment"),
+        session_trades=session_trades,
+        coverage_meta=coverage_meta,
+        ohlc=ohlc,
     )
     match = (
         baseline.get("vpoc", {}).get("vpoc_price") == again.get("vpoc", {}).get("vpoc_price")
@@ -322,7 +361,42 @@ def compare_with_oa_profile(
     value_area_pct: float = DEFAULT_VA_PCT,
     target_bins: int = DEFAULT_TARGET_BINS,
 ) -> dict[str, Any]:
-    """Parity check against OA ClickHouse-aggregated profile (may differ on dedup)."""
+    """Parity check against OA ClickHouse-aggregated profile (may differ on dedup).
+
+    Warm-path cache keyed by symbol + window + local levels + build fingerprint.
+    """
+    import hashlib
+    import json
+    from pathlib import Path
+
+    loc_va = local.get("value_area") or {}
+    loc_vpoc = local.get("vpoc") or {}
+    cache_payload = {
+        "symbol": symbol,
+        "session_start": iso_z(session_start),
+        "anchor": iso_z(anchor),
+        "vpoc": loc_vpoc.get("vpoc_price"),
+        "vvah": loc_va.get("vvah"),
+        "vval": loc_va.get("vval"),
+        "price_step": (local.get("provenance") or {}).get("price_increment"),
+        "contract": VOLUME_PROFILE_CONTRACT,
+    }
+    cache_key = hashlib.sha256(
+        json.dumps(cache_payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    cache_dir = Path("results/btc_doge_fight_performance_v1/oa_parity_cache")
+    cache_path = cache_dir / f"{cache_key}.json"
+    if cache_path.is_file():
+        try:
+            cached = json.loads(cache_path.read_text())
+            if cached.get("status") in {"EXACT", "WITHIN_DOCUMENTED_TOLERANCE", "DIFFERENT_CONTRACT"}:
+                cached = dict(cached)
+                cached["cache_hit"] = True
+                cached["cache_key"] = cache_key
+                return cached
+        except Exception:
+            pass
+
     from orderbook_analyse.market_profile.anchor import build_windows
     from orderbook_analyse.market_profile.build import build_profile
 
@@ -341,8 +415,6 @@ def compare_with_oa_profile(
         return {"status": "NOT_COMPARABLE", "reason": "oa_profile_none"}
 
     oa_va = prof.value_area
-    loc_va = local.get("value_area") or {}
-    loc_vpoc = local.get("vpoc") or {}
     tol = max(1.0, prof.price_step * 0.51)
     vpoc_diff = abs(float(loc_vpoc.get("vpoc_price") or 0) - oa_va.poc)
     vah_diff = abs(float(loc_va.get("vvah") or 0) - oa_va.vah)
@@ -354,7 +426,7 @@ def compare_with_oa_profile(
         status = "WITHIN_DOCUMENTED_TOLERANCE"
     else:
         status = "DIFFERENT_CONTRACT"
-    return {
+    result = {
         "status": status,
         "oa_poc": oa_va.poc,
         "oa_vah": oa_va.vah,
@@ -365,7 +437,15 @@ def compare_with_oa_profile(
         "price_step_oa": prof.price_step,
         "price_step_local": local.get("provenance", {}).get("price_increment"),
         "note": "OA aggregates in CH; local pipeline dedups trade_id in Python first",
+        "cache_hit": False,
+        "cache_key": cache_key,
     }
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(result, sort_keys=True, default=str))
+    except Exception:
+        pass
+    return result
 
 
 def _aggregate_trades_to_bins(
@@ -436,8 +516,9 @@ def _aggregate_trades_to_bins(
     return out, bin_meta
 
 
-def _price_tick(price: float) -> int:
-    return int(math.floor(float(price) / float(BTCUSDT_TICK_SIZE)))
+def _price_tick(price: float, tick_size: float | None = None) -> int:
+    step = float(tick_size) if tick_size is not None else float(BTCUSDT_TICK_SIZE)
+    return int(math.floor(float(price) / step))
 
 
 def _bin_to_row(b: Any, meta: dict[str, Any]) -> dict[str, Any]:

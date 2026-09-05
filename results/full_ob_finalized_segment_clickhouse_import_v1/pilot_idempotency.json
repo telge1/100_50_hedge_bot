@@ -1,0 +1,10 @@
+{
+  "before_physical": 35589,
+  "before_logical": 35589,
+  "after_physical": 45093,
+  "after_logical": 35589,
+  "physical_increased": true,
+  "logical_unchanged": true,
+  "parity_ok_after_reimport": true,
+  "seconds": 18.360122680664062
+}

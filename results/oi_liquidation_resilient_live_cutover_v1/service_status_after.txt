@@ -1,0 +1,11 @@
+● bybit-oi-liquidation-collector.service - Bybit linear OI + allLiquidation collector (no orderbook, no trading)
+     Loaded: loaded (/home/telgenbuescher/.config/systemd/user/bybit-oi-liquidation-collector.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-09-04 20:04:44 CEST; 3s ago
+   Main PID: 1786328 (python)
+      Tasks: 8 (limit: 21419)
+     Memory: 107.8M (peak: 108.3M)
+        CPU: 616ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/bybit-oi-liquidation-collector.service
+             └─1786328 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+
+Sep 04 20:04:44 server-telgenbuescher systemd[1531]: Started bybit-oi-liquidation-collector.service - Bybit linear OI + allLiquidation collector (no orderbook, no trading).

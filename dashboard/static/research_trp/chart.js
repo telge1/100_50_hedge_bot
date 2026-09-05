@@ -29,7 +29,10 @@
   let lldEmaSlowSeries = null;
   let lastPayload = null;
   /** Keep the live tip in view unless the user scrolls away from the right edge. */
-  let followLive = true;
+  let followLive = false;
+  // After the user pans/zooms (or after the initial view is applied), never
+  // programmatically yank time/price — only resetView / Zentrieren may recenter.
+  let viewManual = false;
   let replayViewLock = null;
   let livePriceLine = null;
   let lastCrosshairTime = null;
@@ -121,6 +124,11 @@
   let oblHitBars = [];
   let oblHover = null;
   let oblListenersBound = false;
+  let oblCanvasCssW = 0;
+  let oblCanvasCssH = 0;
+  let oblCanvasDpr = 0;
+  let oblLayoutDrawTimer = null;
+  let oblLayoutDrawPending = false;
 
   function beginProgrammaticNav() {
     programmaticNavDepth += 1;
@@ -407,7 +415,9 @@
       if (!param || param.time == null) {
         if (lastCrosshairTime != null) {
           lastCrosshairTime = null;
-          window.bridge.on_crosshair_leave();
+          if (typeof window.bridge.on_crosshair_leave === "function") {
+            window.bridge.on_crosshair_leave();
+          }
         }
         return;
       }
@@ -417,7 +427,9 @@
       }
       lastCrosshairTime = param.time;
       applyLocalOscCrosshair(Number(param.time));
-      window.bridge.on_crosshair_move(Number(param.time));
+      if (typeof window.bridge.on_crosshair_move === "function") {
+        window.bridge.on_crosshair_move(Number(param.time));
+      }
     });
 
     if (typeof chart.subscribeDblClick === "function") {
@@ -459,7 +471,9 @@
         return;
       }
       if (pt.time == null) return;
-      window.bridge.on_chart_click(Number(pt.time));
+      if (typeof window.bridge.on_chart_click === "function") {
+        window.bridge.on_chart_click(Number(pt.time));
+      }
     });
 
     let rangeTimer = null;
@@ -490,10 +504,8 @@
     chart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
       if (programmaticNavDepth > 0) return;
       syncOscLogicalFromMain(range);
-      const n = ((lastPayload && lastPayload.candles) || []).length;
-      followLive = isNearLiveLogicalRange(range, n);
-      // Keep candlesticks in view after horizontal pan (EMA/walls can pin a bad scale).
-      scheduleFitPriceScaleToCandles(false);
+      // Any user-driven range change locks the view — no auto re-center.
+      markViewManual();
     });
 
     const ro = new ResizeObserver(function () {
@@ -685,9 +697,25 @@
     livePriceLine = null;
   }
 
+  function lockManualPriceScale() {
+    if (!chart) return;
+    try {
+      chart.priceScale("right").applyOptions({ autoScale: false });
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function markViewManual() {
+    viewManual = true;
+    followLive = false;
+    lockManualPriceScale();
+  }
+
   function stickToLiveEdge() {
-    if (!chart || !followLive || replayViewLock) return;
-    // Never fight an in-progress user pan/zoom on the time/price scale.
+    // Live-stick is opt-in via followLive and disabled once the user pans
+    // (viewManual). Zentrieren/resetView clears viewManual briefly to center.
+    if (!chart || viewManual || !followLive || replayViewLock) return;
     if (pointerScaleWatch || performance.now() < scaleWatchUntil) return;
     try {
       programmaticNavDepth += 1;
@@ -768,7 +796,15 @@
     lastPayload.candles = candles;
     candleByTime.set(point.time, candles[candles.length - 1]);
     ensureLivePriceLine(point.close);
-    // Do not stickToLiveEdge here — live ticks were yanking horizontal pans back.
+    // Keep the live tip in view when the user has not panned away — throttled so
+    // we do not yank mid-gesture pans on every 250ms tick.
+    if (followLive && !replayViewLock) {
+      const nowStick = performance.now();
+      if (nowStick - (updateFormingBar._stickAt || 0) > 900) {
+        updateFormingBar._stickAt = nowStick;
+        stickToLiveEdge();
+      }
+    }
     const now = performance.now();
     if (now - (updateFormingBar._legendAt || 0) > 250) {
       updateFormingBar._legendAt = now;
@@ -788,7 +824,10 @@
         savedRange = null;
       }
     }
+    // TF / reload: drop measure so pan is never stuck disabled. Re-bind is
+    // idempotent and covers destroy→recreate races.
     clearShiftMeasure();
+    bindShiftMeasureHandlers();
     lastPayload = payload || { candles: [] };
     const candles = lastPayload.candles || [];
     const empty = $("empty");
@@ -823,7 +862,11 @@
     if (tip && tip.close != null) ensureLivePriceLine(Number(tip.close));
     updateOscTimeBase();
     if (!preserveView && !skipDefaultView) {
-      applyDefaultView();
+      // Fresh load: center once. If the user already panned this session on
+      // this chart instance, keep their view (Laden with preserveView handles overlays).
+      if (!viewManual) {
+        applyDefaultView();
+      }
       resize();
     } else if (preserveView && savedRange) {
       try {
@@ -832,15 +875,11 @@
         /* keep current view */
       }
       syncOscLogicalFromMain(savedRange);
-      if (followLive && !replayViewLock) stickToLiveEdge();
       resize();
     } else {
-      // skipDefaultView (jumpToUnix pending): never yank to live tip — that hides
-      // historical research markers that the host is about to focus.
       if (replayViewLock) enforceReplayViewLock();
       resize();
     }
-    scheduleFitPriceScaleToCandles(true);
     if (lastSelectedUnix != null) {
       applySelectedMarker(lastSelectedUnix);
     }
@@ -984,7 +1023,7 @@
     });
     if (replayViewLock) {
       enforceReplayViewLock();
-    } else if (followLive && !skipRangeRestore) {
+    } else if (followLive && !viewManual && !skipRangeRestore) {
       applyDefaultView();
     } else if (savedTimeRange && savedTimeRange.from != null && savedTimeRange.to != null) {
       runProgrammaticNav(function () {
@@ -999,7 +1038,7 @@
         syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
       });
     }
-    scheduleFitPriceScaleToCandles(true);
+    // EMA refresh must never re-fit price / recenter.
   }
 
   function setLldEma(payload) {
@@ -1602,6 +1641,7 @@
   function onScalePointerDown() {
     pointerScaleWatch = true;
     noteScaleInteraction(80);
+    markViewManual();
   }
 
   function onScalePointerUp() {
@@ -1615,6 +1655,7 @@
 
   function onScaleWheel() {
     noteScaleInteraction(180);
+    markViewManual();
   }
 
   function applyPriceScaleMargins(top, bottom) {
@@ -1866,19 +1907,19 @@
   function applyDefaultView() {
     if (!chart) return false;
     if (replayViewLock) return enforceReplayViewLock();
-    followLive = true;
+    // Center once; do not keep chasing the live tip afterwards.
+    viewManual = false;
+    followLive = false;
     resetPriceScales();
     const candles = (lastPayload && lastPayload.candles) || [];
     if (!candles.length) return false;
-    // Use unix time range from the candle series — never logical indices.
-    // Overlay EMA warmup can expand the timescale far beyond candles; logical
-    // ranges based on candle count then land in an empty (EMA-only) window.
     const barSec = estimateBarSec(candles);
     const lastT = Number(candles[candles.length - 1].time);
     const fromIdx = Math.max(0, candles.length - DEFAULT_VISIBLE_BARS);
     const fromT = Number(candles[fromIdx].time);
     let ok = false;
     try {
+      programmaticNavDepth += 1;
       chart.timeScale().setVisibleRange({
         from: fromT,
         to: lastT + barSec * DEFAULT_RIGHT_OFFSET,
@@ -1888,10 +1929,12 @@
       const range = computeDefaultLogicalRange(candles.length);
       if (range) {
         try {
+          programmaticNavDepth += 1;
           chart.timeScale().setVisibleLogicalRange(range);
           ok = true;
         } catch (err2) {
           try {
+            programmaticNavDepth += 1;
             chart.timeScale().scrollToRealTime();
             ok = true;
           } catch (err3) {
@@ -1899,11 +1942,19 @@
           }
         }
       }
+    } finally {
+      programmaticNavDepth = Math.max(0, programmaticNavDepth - 1);
     }
     syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
     layoutOverlays();
     updateSelectedLine();
     scheduleFitPriceScaleToCandles(true);
+    // After fit, freeze price scale so forming ticks cannot yank vertically.
+    setTimeout(function () {
+      lockManualPriceScale();
+      viewManual = true;
+    }, 80);
+    setTimeout(lockManualPriceScale, 250);
     return ok;
   }
 
@@ -3035,24 +3086,33 @@
     }
     panel.hidden = false;
     const chartEl = $("chart");
-    const rect = canvas.getBoundingClientRect();
+    // Prefer panel size — never lock canvas via style.height px (that froze the
+    // first undersized layout and left empty space below the OB diagram).
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    const panelRect = panel.getBoundingClientRect();
     const chartRect = chartEl ? chartEl.getBoundingClientRect() : null;
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
+    const w = Math.max(1, Math.floor(panel.clientWidth || panelRect.width || 1));
+    const h = Math.max(1, Math.floor(panel.clientHeight || panelRect.height || 1));
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(w * dpr));
-    canvas.height = Math.max(1, Math.floor(h * dpr));
-    canvas.style.width = w + "px";
-    canvas.style.height = h + "px";
+    // Only reset backing store when size changes — assigning canvas.width clears
+    // the bitmap and causes visible flicker on every forming/layout tick.
+    if (w !== oblCanvasCssW || h !== oblCanvasCssH || dpr !== oblCanvasDpr) {
+      canvas.width = Math.max(1, Math.floor(w * dpr));
+      canvas.height = Math.max(1, Math.floor(h * dpr));
+      oblCanvasCssW = w;
+      oblCanvasCssH = h;
+      oblCanvasDpr = dpr;
+    }
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    // Canvas fills the full panel (header overlays). Chart and panel share height,
+    // Canvas fills the full panel (header hidden). Chart and panel share height,
     // so priceToCoordinate maps 1:1 without a synthetic pixel offset.
-    const headerOffsetPx = chartRect ? Math.round(rect.top - chartRect.top) : 0;
-    const heightDeltaPx = chartRect ? Math.round(rect.height - chartRect.height) : 0;
+    const headerOffsetPx = chartRect ? Math.round(panelRect.top - chartRect.top) : 0;
+    const heightDeltaPx = chartRect ? Math.round(h - chartRect.height) : 0;
 
     if (!oblPayload || !candleSeries) {
       oblHitBars = [];
@@ -3061,7 +3121,8 @@
     }
 
     const depth = oblPayload.depth != null ? Number(oblPayload.depth) : 200;
-    const depthLabel = depth === 1000 ? "OB1000" : "OB200";
+    const depthLabel = depth === 0 ? "FULL" : (depth === 1000 ? "OB1000" : "OB200");
+    const onDemandBook = depth === 0 || depth === 1000;
     if (headerTitle) headerTitle.textContent = depthLabel;
 
     const rawBids = (oblPayload.bids || []).slice();
@@ -3094,8 +3155,13 @@
     };
 
     const desync = !!sync.misleading_as_live;
-    panel.classList.toggle("stale-book", sync.sync_state === "STALE");
-    panel.classList.toggle("desync-book", desync && sync.sync_state !== "STALE");
+    const priceDesync = sync.sync_state === "DESYNC_UP" || sync.sync_state === "DESYNC_DOWN";
+    const staleBook = sync.sync_state === "STALE";
+    // On-demand live (OB1000 / FULL): candle close vs book top-of-book flickers across
+    // the spread every forming tick. Keep painting bars on mild price-desync; only blank on STALE.
+    const blankBars = staleBook || (desync && !onDemandBook);
+    panel.classList.toggle("stale-book", staleBook);
+    panel.classList.toggle("desync-book", priceDesync && !staleBook);
 
     let visLow = null;
     let visHigh = null;
@@ -3145,25 +3211,36 @@
       if (covBelowPct != null && covAbovePct != null) {
         parts.push((-covBelowPct).toFixed(2) + "% / +" + covAbovePct.toFixed(2) + "%");
       }
+      if (oblPayload.raw_bid_count != null || oblPayload.raw_ask_count != null) {
+        parts.push("raw " + String(oblPayload.raw_bid_count || 0) + "/" + String(oblPayload.raw_ask_count || 0));
+      }
       if (bookMid != null) parts.push("mid " + bookMid.toFixed(2));
       if (sync.delta != null) parts.push("Δ " + (sync.delta >= 0 ? "+" : "") + sync.delta.toFixed(2));
       if (bucketSize != null) parts.push("Δpx " + bucketSize);
       headerMeta.textContent = parts.join(" · ");
+      // Header is hidden; keep a compact title for hover / a11y.
+      canvas.title = headerMeta.textContent;
     }
     if (headerFresh) {
-      if (oblPayload.ui_state && depth === 1000 && !desync) {
+      if (oblPayload.ui_state && onDemandBook && !staleBook) {
         const labels = {
-          DISABLED: "OB1000 DISABLED",
-          STARTING: "OB1000 STARTING",
-          LIVE: "OB1000 LIVE",
-          DELAYED: "OB1000 DELAYED",
-          STALE: "OB1000 STALE",
-          CAPACITY: "OB1000 CAPACITY",
-          OFFLINE: "OB1000 COLLECTOR OFFLINE",
-          NO_DATA: "OB1000 NO DATA",
+          DISABLED: depthLabel + " DISABLED",
+          STARTING: depthLabel + " STARTING",
+          LIVE: depthLabel + " LIVE",
+          DELAYED: depthLabel + " DELAYED",
+          STALE: depthLabel + " STALE",
+          CAPACITY: depthLabel + " CAPACITY",
+          OFFLINE: depthLabel + " COLLECTOR OFFLINE",
+          NO_DATA: depthLabel + " NO DATA",
+          NOT_PILOT: depthLabel + " nur BTC/DOGE",
         };
         headerFresh.className = "ob-levels-fresh " + String(oblPayload.ui_state).toLowerCase();
-        headerFresh.textContent = labels[oblPayload.ui_state] || String(oblPayload.ui_state);
+        if (priceDesync) {
+          headerFresh.textContent = (labels[oblPayload.ui_state] || String(oblPayload.ui_state)) +
+            (sync.sync_state === "DESYNC_UP" ? " · Δ↑" : " · Δ↓");
+        } else {
+          headerFresh.textContent = labels[oblPayload.ui_state] || String(oblPayload.ui_state);
+        }
       } else {
         const st = sync.sync_state;
         headerFresh.className = "ob-levels-fresh " + String(st).toLowerCase();
@@ -3183,10 +3260,9 @@
       }
     }
 
-    // Desync/stale: do not paint as a normal live book (no recolor, no move).
-    if (desync) {
+    // Stale (or OB200 hard-desync): coverage chevrons only — no live bars.
+    if (blankBars) {
       oblHitBars = [];
-      // Coverage indicators only — no misleading live bars.
       if (bidVis.above + askVis.above > 0) {
         ctx.fillStyle = "rgba(240, 97, 109, 0.55)";
         ctx.beginPath();
@@ -3720,6 +3796,17 @@
       "<div>" + (b.is_poc ? "POC · " : "") + (b.in_value_area ? "Value Area" : "Outside VA") + "</div>";
   }
 
+  function scheduleDrawOrderbookLevels() {
+    oblLayoutDrawPending = true;
+    if (oblLayoutDrawTimer != null) return;
+    oblLayoutDrawTimer = setTimeout(function () {
+      oblLayoutDrawTimer = null;
+      if (!oblLayoutDrawPending) return;
+      oblLayoutDrawPending = false;
+      drawOrderbookLevels();
+    }, 120);
+  }
+
   function layoutOverlays() {
     overlayLayoutCount += 1;
     clipOverlayLayerToPlot();
@@ -3731,7 +3818,9 @@
     layoutShiftMeasure();
     drawVolumeProfile();
     drawOrderbookProfile();
-    drawOrderbookLevels();
+    // Throttle: forming ticks call layoutOverlays ~4Hz; full OB canvas wipe each
+    // time reads as flicker even when the book is stable.
+    scheduleDrawOrderbookLevels();
   }
 
   function overlayDebugSamples() {
@@ -4133,9 +4222,63 @@
 
   function marketPointFromXY(xy) {
     if (!chart || !candleSeries || !xy) return null;
-    const time = chart.timeScale().coordinateToTime(xy.x);
-    const price = candleSeries.coordinateToPrice(xy.y);
-    if (time == null || price == null || Number.isNaN(price)) return null;
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length) return null;
+
+    let price = null;
+    try {
+      price = candleSeries.coordinateToPrice(xy.y);
+    } catch (errPrice) {
+      price = null;
+    }
+    // Y on the time axis (or tiny slack past the plot) → clamp into the plot.
+    if (price == null || Number.isNaN(Number(price))) {
+      const yMax = plotBottomY();
+      const yClamped = Math.max(0, Math.min(yMax > 0 ? yMax - 1 : xy.y, xy.y));
+      try {
+        price = candleSeries.coordinateToPrice(yClamped);
+      } catch (errPrice2) {
+        price = null;
+      }
+    }
+    if (price == null || Number.isNaN(Number(price))) return null;
+
+    let time = null;
+    try {
+      time = chart.timeScale().coordinateToTime(xy.x);
+    } catch (err) {
+      time = null;
+    }
+
+    // Empty right/left padding (common after TF change / Zentrieren) returns
+    // null from coordinateToTime — clamp to the nearest candle instead so
+    // Shift+measure still starts.
+    if (time == null) {
+      let logical = null;
+      try {
+        if (chart.timeScale().coordinateToLogical) {
+          logical = chart.timeScale().coordinateToLogical(xy.x);
+        }
+      } catch (err2) {
+        logical = null;
+      }
+      if (logical != null && Number.isFinite(Number(logical))) {
+        const idx = Math.max(0, Math.min(candles.length - 1, Math.round(Number(logical))));
+        time = candles[idx].time;
+      } else {
+        // Past the live tip → last bar; before history → first bar.
+        try {
+          const lastX = chart.timeScale().timeToCoordinate(candles[candles.length - 1].time);
+          const firstX = chart.timeScale().timeToCoordinate(candles[0].time);
+          if (lastX != null && xy.x >= lastX) time = candles[candles.length - 1].time;
+          else if (firstX != null && xy.x <= firstX) time = candles[0].time;
+          else time = candles[candles.length - 1].time;
+        } catch (err3) {
+          time = candles[candles.length - 1].time;
+        }
+      }
+    }
+    if (time == null || !Number.isFinite(Number(time))) return null;
     return { time: Number(time), price: Number(price) };
   }
 
@@ -4600,9 +4743,25 @@
     return !!(hostShift || window.__hostShift);
   }
 
+  function syncShiftFromPointer(ev) {
+    // After TF clicks / focus changes, hostShift can go stale while the key
+    // is still physically held — trust the pointer event modifiers.
+    if (!ev) return;
+    const on = !!(ev.shiftKey || (ev.getModifierState && ev.getModifierState("Shift")));
+    if (on || hostShift || window.__hostShift) setHostShift(on);
+  }
+
   function setHostShift(on) {
-    hostShift = !!on;
-    window.__hostShift = !!on;
+    const next = !!on;
+    const prev = hostShift;
+    hostShift = next;
+    window.__hostShift = next;
+    // While Shift is held, block LWC pan so a near-miss measure click does not
+    // start a chart drag instead (felt like "measure broken after TF change").
+    if (next !== prev && !(shiftMeasure && shiftMeasure.dragging)) {
+      if (next) setPanEnabled(false);
+      else restorePanAfterMeasure();
+    }
     return hostShift;
   }
 
@@ -4685,12 +4844,19 @@
     if (shiftMeasure && shiftMeasure.dragging) return false;
     if (ev.button != null && ev.button !== 0) return false;
     if (ev.buttons != null && ev.buttons !== 0 && ev.buttons !== 1) return false;
+    syncShiftFromPointer(ev);
     if (!shiftHeld(ev)) return false;
     if (!chart || !candleSeries) return false;
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length) return false;
     const xy = xyFromEvent(ev);
     if (!xy) return false;
     const size = chartSize();
-    if (xy.x < 0 || xy.y < 0 || xy.x > size.w || xy.y > size.h) return false;
+    // Allow a few px of slack; reject only clear misses (e.g. outside pane).
+    if (xy.x < -4 || xy.y < -4 || xy.x > size.w + 4 || xy.y > size.h + 4) return false;
+    // Clicks on the price axis have no reliable mapping — skip quietly.
+    const plotW = plotRightX();
+    if (plotW > 0 && xy.x > plotW + 2) return false;
     const anchor = measureAnchorFromXY(xy);
     if (!anchor) return false;
     if (ev.preventDefault) ev.preventDefault();
@@ -5202,12 +5368,16 @@
       applyLocalPriceCrosshair(unix);
       if (unix === lastCrosshairTime) return;
       lastCrosshairTime = unix;
-      window.bridge.on_crosshair_move(unix);
+      if (typeof window.bridge.on_crosshair_move === "function") {
+        window.bridge.on_crosshair_move(unix);
+      }
     });
 
     oscChart.subscribeClick(function (param) {
       if (!window.bridge || !param || param.time == null) return;
-      window.bridge.on_chart_click(Number(param.time));
+      if (typeof window.bridge.on_chart_click === "function") {
+        window.bridge.on_chart_click(Number(param.time));
+      }
     });
 
     return oscChart;

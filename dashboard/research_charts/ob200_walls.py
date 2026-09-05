@@ -266,7 +266,11 @@ def list_closed_segments(
 
 
 def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
-    """Currently-writing hour files (``*_open_ob200_v3.zst.tmp``)."""
+    """Currently-writing hour files (``*_open_ob200_v3.zst.tmp``).
+
+    Skips empty orphan ``.tmp`` files left behind by abrupt process stops —
+    they have no NDJSON and would otherwise pollute live segment selection.
+    """
     sym = symbol.upper()
     out: list[SegmentRef] = []
     seen: set[Path] = set()
@@ -277,6 +281,11 @@ def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
             continue
         for path in sorted(sym_root.rglob("*_open_ob200_v3.zst.tmp")):
             if path in seen or not path.is_file():
+                continue
+            try:
+                if path.stat().st_size <= 0:
+                    continue
+            except OSError:
                 continue
             m = _OPEN_RE.match(path.name)
             if not m or m.group("symbol") != sym:
@@ -414,8 +423,14 @@ def _replay_path(
     ref: SegmentRef,
     *,
     cutoff_ms: int | None,
+    book: MutableBook | None = None,
 ) -> tuple[MutableBook, int | None, int]:
-    book = MutableBook()
+    """Apply segment events onto ``book`` (or a fresh book).
+
+    Returns ``(book, last_ts, events_applied)``. On a ``u`` gap the book becomes
+    invalid (Bybit contract); callers may reseed from REST for live tips.
+    """
+    book = book if book is not None else MutableBook()
     last_ts: int | None = None
     events = 0
     for obj in iter_decompressed_objects(ref.path):
@@ -437,20 +452,232 @@ def _replay_path(
     return book, last_ts, events
 
 
+def _fetch_rest_orderbook(
+    symbol: str,
+    *,
+    limit: int = 200,
+    timeout_s: float = 8.0,
+) -> dict[str, Any]:
+    """Live Bybit REST snapshot (linear). Used when open-archive replay has a u-gap."""
+    from urllib.error import HTTPError, URLError
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+
+    sym = symbol.upper()
+    params = urlencode(
+        {"category": "linear", "symbol": sym, "limit": str(int(limit))}
+    )
+    url = f"https://api.bybit.com/v5/market/orderbook?{params}"
+    req = Request(url, headers={"User-Agent": "research-ob200-walls/1"})
+    try:
+        with urlopen(req, timeout=timeout_s) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        raise Ob200WallsError(
+            "ob200_rest_failed", f"REST orderbook failed for {sym}: {exc}"
+        ) from exc
+    if payload.get("retCode") not in (0, None):
+        raise Ob200WallsError(
+            "ob200_rest_failed",
+            str(payload.get("retMsg") or "REST orderbook rejected"),
+        )
+    result = payload.get("result") or {}
+    book = MutableBook()
+    book.apply_snapshot(
+        {
+            "b": result.get("b") or [],
+            "a": result.get("a") or [],
+            "u": result.get("u") or 0,
+            "seq": result.get("seq") or 0,
+        }
+    )
+    if not book.is_valid or not book.bids or not book.asks:
+        raise Ob200WallsError("ob200_rest_empty", f"REST orderbook empty for {sym}")
+    ts_ms = result.get("ts")
+    book_ts = (
+        datetime.fromtimestamp(int(ts_ms) / 1000.0, tz=timezone.utc)
+        if ts_ms is not None
+        else datetime.now(timezone.utc)
+    )
+    return {
+        "book": book,
+        "book_ts": book_ts,
+        "segment": f"bybit_rest_orderbook_limit_{int(limit)}",
+        "events_applied": 1,
+    }
+
+
+def _book_to_snap(
+    *,
+    symbol: str,
+    book: MutableBook,
+    at_u: datetime,
+    book_ts: datetime,
+    clamped: bool,
+    live_open: bool,
+    cov_start: datetime,
+    cov_end: datetime,
+    segment: str,
+    events_applied: int,
+    source: str,
+) -> dict[str, Any]:
+    if not book.is_valid or not book.bids or not book.asks:
+        raise Ob200WallsError("ob200_invalid_book", "reconstructed book invalid or empty")
+    bids = book.sorted_bids()
+    asks = book.sorted_asks()
+    bb, ba = bids[0][0], asks[0][0]
+    if bb >= ba:
+        raise Ob200WallsError("ob200_crossed_book", "reconstructed book is crossed")
+    mid = (bb + ba) / 2
+    lag_s = max(0.0, (datetime.now(timezone.utc) - book_ts).total_seconds())
+    return {
+        "symbol": symbol.upper(),
+        "as_of_requested": at_u,
+        "as_of": book_ts,
+        "clamped": clamped,
+        "live_open": live_open,
+        "lag_seconds": round(lag_s, 1),
+        "coverage_start": cov_start,
+        "coverage_end": cov_end,
+        "segment": segment,
+        "events_applied": events_applied,
+        "mid": mid,
+        "best_bid": bb,
+        "best_ask": ba,
+        "bid_levels": len(bids),
+        "ask_levels": len(asks),
+        "bids": bids,
+        "asks": asks,
+        "source": source,
+    }
+
+
+def _snap_from_on_demand_ob1000(symbol: str, at_u: datetime) -> dict[str, Any] | None:
+    """Build a walls-compatible book snap from the live OB1000 on-demand WS book."""
+    try:
+        from research_charts.ob1000_on_demand import PILOT_SYMBOLS, load_ob1000_levels
+    except ImportError:
+        return None
+    sym = str(symbol or "").strip().upper()
+    if sym not in PILOT_SYMBOLS:
+        return None
+    try:
+        payload = load_ob1000_levels(sym)
+    except Exception:
+        return None
+    if str(payload.get("data_status") or "") == "no_data":
+        return None
+    raw_bids = payload.get("bids") or []
+    raw_asks = payload.get("asks") or []
+    if not raw_bids or not raw_asks:
+        return None
+    book = MutableBook()
+    for lvl in raw_bids:
+        try:
+            price = Decimal(str(lvl.get("price")))
+            qty = Decimal(str(lvl.get("size")))
+        except Exception:
+            continue
+        if qty > ZERO:
+            book.bids[price] = qty
+    for lvl in raw_asks:
+        try:
+            price = Decimal(str(lvl.get("price")))
+            qty = Decimal(str(lvl.get("size")))
+        except Exception:
+            continue
+        if qty > ZERO:
+            book.asks[price] = qty
+    if not book.bids or not book.asks:
+        return None
+    book.is_valid = True
+    book_ts = at_u
+    ts_raw = payload.get("timestamp_utc")
+    if ts_raw:
+        try:
+            s = str(ts_raw)
+            if s.endswith("Z"):
+                s = s[:-1] + "+00:00"
+            book_ts = datetime.fromisoformat(s).astimezone(timezone.utc)
+        except ValueError:
+            book_ts = at_u
+    cov_start = cov_end = book_ts
+    try:
+        cov = coverage_bounds(sym)
+        if cov is not None:
+            cov_start, cov_end = cov
+    except Exception:
+        pass
+    return _book_to_snap(
+        symbol=sym,
+        book=book,
+        at_u=at_u,
+        book_ts=book_ts,
+        clamped=False,
+        live_open=True,
+        cov_start=cov_start,
+        cov_end=cov_end,
+        segment="orderbook_v3_live_on_demand_ob1000",
+        events_applied=int(payload.get("bid_levels") or 0)
+        + int(payload.get("ask_levels") or 0),
+        source="orderbook_v3_live_on_demand_ob1000",
+    )
+
+
 def replay_book_as_of(
     symbol: str,
     at: datetime,
     *,
     roots: list[Path] | None = None,
+    allow_rest_live_fallback: bool = True,
 ) -> dict[str, Any]:
-    """Replay closed or open segment to ``at`` (open = near-realtime)."""
+    """Replay closed or open segment to ``at`` (open = near-realtime).
+
+    Live tip priority:
+      1) continuous OB1000 on-demand WS book (keeper / lease)
+      2) Bybit REST ``limit=1000`` snapshot
+      3) local OB200 archive replay
+    """
     roots = roots or [DEFAULT_SHADOW_ROOT, DEFAULT_LIVE_ROOT]
+    at_u = _utc(at)
+    live_tip = abs((datetime.now(timezone.utc) - at_u).total_seconds()) < 180
+
+    if live_tip:
+        od = _snap_from_on_demand_ob1000(symbol, at_u)
+        if od is not None:
+            return od
+
+    # Live tip fallback: REST OB1000 if on-demand book not ready yet.
+    if live_tip and allow_rest_live_fallback:
+        try:
+            cov = coverage_bounds(symbol, roots=roots)
+            if cov is None:
+                cov_start = cov_end = at_u
+            else:
+                cov_start, cov_end = cov
+            rest = _fetch_rest_orderbook(symbol, limit=1000)
+            return _book_to_snap(
+                symbol=symbol,
+                book=rest["book"],
+                at_u=at_u,
+                book_ts=rest["book_ts"],
+                clamped=False,
+                live_open=True,
+                cov_start=cov_start,
+                cov_end=cov_end,
+                segment="bybit_rest_orderbook_1000",
+                events_applied=int(rest["events_applied"]),
+                source="bybit_rest_orderbook_1000",
+            )
+        except Ob200WallsError:
+            # Fall through to local OB200 archive replay.
+            pass
+
     closed = list_closed_segments(roots, symbol)
     opens = list_open_segments(roots, symbol)
     if not closed and not opens:
         raise Ob200WallsError("ob200_missing", f"no OB200 archive for {symbol}")
 
-    at_u = _utc(at)
     ref, effective, clamped = _pick_replay_target(closed, opens, at_u)
     cov = coverage_bounds(symbol, roots=roots)
     assert cov is not None
@@ -463,42 +690,75 @@ def replay_book_as_of(
         end_ms = int(ref.end_utc.timestamp() * 1000)
         cutoff_ms = at_ms if at_ms < end_ms else end_ms + 1
 
-    book, last_ts, events = _replay_path(ref, cutoff_ms=cutoff_ms)
+    book = MutableBook()
+    events = 0
+    last_ts: int | None = None
+    # Seed open-hour replay from the preceding closed segment when possible so
+    # rotation_checkpoint continues a contiguous u sequence.
+    if ref.is_open and closed:
+        prior = [s for s in closed if s.end_utc <= ref.start_utc]
+        if not prior:
+            prior = [s for s in closed if s.start_utc < ref.start_utc]
+        if prior:
+            seed_ref_prior = prior[-1]
+            book, last_ts, n_seed = _replay_path(
+                seed_ref_prior, cutoff_ms=None, book=book
+            )
+            events += n_seed
+
+    book, last_ts2, n_main = _replay_path(ref, cutoff_ms=cutoff_ms, book=book)
+    events += n_main
+    if last_ts2 is not None:
+        last_ts = last_ts2
+
+    source = "ob200_raw_shadow_v3"
+    seed_ref: SegmentRef | None = None
 
     if not book.is_valid or not book.bids or not book.asks:
-        raise Ob200WallsError("ob200_invalid_book", "reconstructed book invalid or empty")
+        if closed:
+            # Historical / offline: last closed end is better than hard fail.
+            if ref.is_open:
+                prior = [s for s in closed if s.end_utc <= ref.start_utc] or closed
+                seed_ref = prior[-1]
+            else:
+                seed_ref = closed[-1]
+            book, last_ts, events = _replay_path(seed_ref, cutoff_ms=None)
+            clamped = True
+            source = "ob200_raw_shadow_v3_closed_fallback"
+            if not book.is_valid or not book.bids or not book.asks:
+                raise Ob200WallsError(
+                    "ob200_invalid_book", "reconstructed book invalid or empty"
+                )
+        else:
+            raise Ob200WallsError(
+                "ob200_invalid_book", "reconstructed book invalid or empty"
+            )
 
-    bids = book.sorted_bids()
-    asks = book.sorted_asks()
-    bb, ba = bids[0][0], asks[0][0]
-    if bb >= ba:
-        raise Ob200WallsError("ob200_crossed_book", "reconstructed book is crossed")
-    mid = (bb + ba) / 2
     book_ts = (
         datetime.fromtimestamp(last_ts / 1000.0, tz=timezone.utc)
         if last_ts is not None
         else effective
     )
-    lag_s = max(0.0, (datetime.now(timezone.utc) - book_ts).total_seconds())
-    return {
-        "symbol": symbol.upper(),
-        "as_of_requested": at_u,
-        "as_of": book_ts,
-        "clamped": clamped,
-        "live_open": bool(ref.is_open),
-        "lag_seconds": round(lag_s, 1),
-        "coverage_start": cov_start,
-        "coverage_end": cov_end,
-        "segment": str(ref.path),
-        "events_applied": events,
-        "mid": mid,
-        "best_bid": bb,
-        "best_ask": ba,
-        "bid_levels": len(bids),
-        "ask_levels": len(asks),
-        "bids": bids,
-        "asks": asks,
-    }
+    if source == "ob200_raw_shadow_v3_closed_fallback":
+        segment = str(seed_ref.path) if seed_ref is not None else str(ref.path)
+        live_open_flag = False
+    else:
+        segment = str(ref.path)
+        live_open_flag = bool(ref.is_open)
+
+    return _book_to_snap(
+        symbol=symbol,
+        book=book,
+        at_u=at_u,
+        book_ts=book_ts,
+        clamped=clamped,
+        live_open=live_open_flag,
+        cov_start=cov_start,
+        cov_end=cov_end,
+        segment=segment,
+        events_applied=events,
+        source=source,
+    )
 
 
 def walls_from_book(
@@ -540,8 +800,9 @@ def load_ob200_walls(
     at_u = _utc(at)
     now_utc = datetime.now(timezone.utc)
     live = abs((now_utc - at_u).total_seconds()) < 180
-    bucket = 15 if live else 60
-    ttl = _LIVE_CACHE_TTL if live else _CACHE_TTL
+    # Live walls poll ~2s from continuous OB1000 WS; keep cache finer than REST/archive.
+    bucket = 2 if live else 60
+    ttl = 1.5 if live else _CACHE_TTL
     open_sig = 0
     if live:
         for o in list_open_segments(roots or [DEFAULT_SHADOW_ROOT, DEFAULT_LIVE_ROOT], sym):
@@ -549,7 +810,14 @@ def load_ob200_walls(
                 open_sig = max(open_sig, int(o.path.stat().st_size))
             except OSError:
                 pass
-    cache_key = (sym, int(at_u.timestamp()) // bucket, max_walls_per_side, open_sig // 65536)
+    live_tick = int(time.time()) // bucket if live else 0
+    cache_key = (
+        sym,
+        int(at_u.timestamp()) // bucket,
+        max_walls_per_side,
+        open_sig // 65536,
+        live_tick,
+    )
     now = time.monotonic()
     with _cache_lock:
         hit = _book_cache.get(cache_key)
@@ -578,6 +846,7 @@ def load_ob200_walls(
         "bid_levels": snap["bid_levels"],
         "ask_levels": snap["ask_levels"],
         "walls": walls,
+        "source": snap.get("source") or "ob200_raw_shadow_v3",
         "cached": False,
     }
     with _cache_lock:

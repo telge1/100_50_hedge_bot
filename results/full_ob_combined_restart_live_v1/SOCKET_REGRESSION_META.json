@@ -1,0 +1,30 @@
+{
+  "ob200_via_raw_archive": {
+    "confirmed_topics": [
+      "orderbook.200.BTCUSDT",
+      "orderbook.200.DOGEUSDT",
+      "orderbook.full.DOGEUSDT",
+      "orderbook.full.BTCUSDT",
+      "orderbook.1000.BTCUSDT",
+      "orderbook.1000.DOGEUSDT"
+    ],
+    "raw_archive_enabled": true,
+    "per_symbol_book_levels": [
+      {
+        "symbol": "BTCUSDT",
+        "book_bid_levels": 200,
+        "book_ask_levels": 200,
+        "book_valid": true,
+        "state": "LIVE"
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "book_bid_levels": 200,
+        "book_ask_levels": 200,
+        "book_valid": true,
+        "state": "LIVE"
+      }
+    ]
+  },
+  "rows": 18
+}

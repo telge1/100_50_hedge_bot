@@ -1,0 +1,26 @@
+{
+  "archive": [
+    [
+      "4251001",
+      "2025-12-29 00:00:03.709000",
+      "2026-07-30 23:59:53.541000",
+      "2"
+    ]
+  ],
+  "live_ttl": [
+    [
+      "3291060",
+      "2026-08-05 14:05:09.122000",
+      "2026-08-11 17:18:27.079000",
+      "3"
+    ]
+  ],
+  "stale_mirror_btc": [
+    "ERR",
+    "Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `trade_ts` in scope SELECT count(), min(trade_ts), max(trade_ts) FROM btc_d"
+  ],
+  "parts": [
+    "ERR",
+    "Received ClickHouse exception, code: 722, server response: Code: 722. DB::Exception: Waited job failed: Code: 696. DB::Exception: Load job 'startup table orderbook_analysis.orderbook_deltas' -> Code: "
+  ]
+}

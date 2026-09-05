@@ -121,6 +121,11 @@ def test_normalize_orderbook_levels():
     assert n["mode"] == "raw"
     assert n["scale"] == "log"
     assert n["width_px"] == 220
+    assert n["depth"] == 1000
+    assert normalize_orderbook_levels({"depth": 1000})["depth"] == 1000
+    assert normalize_orderbook_levels({"depth": 0})["depth"] == 0
+    assert normalize_orderbook_levels({"depth": 200})["depth"] == 200
+    assert normalize_orderbook_levels({"depth": 50})["depth"] == 1000  # invalid → default
 
 
 def test_api_route_registered():
@@ -586,18 +591,24 @@ def test_frontend_ob1000_wiring_and_desync_helpers():
     css = (root / "static/research_trp/style.css").read_text(encoding="utf-8")
     pane = (root / "static/research_trp/pane.html").read_text(encoding="utf-8")
     html = (root / "templates/research_charts.html").read_text(encoding="utf-8")
-    assert 'value="200"' in html and 'value="1000"' in html
-    assert "OBL1000_REFRESH_MS = 1 * 1000" in host
+    assert 'value="200"' in html and 'value="1000"' in html and 'value="0"' in html
+    assert ">FULL<" in html
+    assert "OBL1000_REFRESH_MS = 2 * 1000" in host
+    assert "OBL_FULL_REFRESH_MS = 2 * 1000" in host
     assert "OBL_REFRESH_MS = 5 * 1000" in host
     assert "pane.oblInflight" in host
     assert "isOb1000Mode" in host
+    assert "isOnDemandBookMode" in host
     assert "oblBookChartSyncStatus" in chart
     assert "DESYNC_UP" in chart and "DESYNC_DOWN" in chart
     assert "misleading_as_live" in chart
+    assert "blankBars" in chart
+    assert "scheduleDrawOrderbookLevels" in chart
     assert "oblFilterVisible" in chart
     assert "position: absolute" in css
-    assert "ob-levels-2" in pane
+    assert "ob-levels-15" in pane
     assert "debugOrderbookLevels" in chart
+    assert "raw_bid_count" in chart
 
 
 def test_price_to_coordinate_ordering_contract():

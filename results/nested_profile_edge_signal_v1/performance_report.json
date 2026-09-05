@@ -1,0 +1,5 @@
+{
+  "evaluate_1000_ticks_ms": 1.34,
+  "dedup_10000_ticks_signals": 1,
+  "max_active_profiles": 8
+}

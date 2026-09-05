@@ -58,10 +58,21 @@ def fmt_oi_delta(value: float | None, *, decimals: int = 2) -> str:
     return f"{sign}{v:.{decimals}f}"
 
 
-def fmt_price(value: float | None, *, decimals: int = 1) -> str:
+def fmt_price(value: float | None, *, decimals: int | None = None) -> str:
     if value is None:
         return "n/a"
-    return f"{float(value):.{decimals}f}"
+    v = float(value)
+    if decimals is None:
+        av = abs(v)
+        if av >= 1000:
+            decimals = 1
+        elif av >= 1:
+            decimals = 2
+        elif av >= 0.01:
+            decimals = 5
+        else:
+            decimals = 8
+    return f"{v:.{decimals}f}"
 
 
 def fmt_mio_usd(value: float | None, *, decimals: int = 2) -> str:

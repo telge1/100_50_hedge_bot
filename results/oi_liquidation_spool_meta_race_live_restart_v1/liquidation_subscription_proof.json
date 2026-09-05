@@ -1,0 +1,14 @@
+{
+  "subscription_active": true,
+  "websocket_alive": true,
+  "writer_alive": true,
+  "health_status": "GREEN",
+  "last_liquidation_received_ts": 1788549830.957,
+  "last_liquidation_persisted_ts": 1788549832.7733727,
+  "liq_status": "LIVE_EVENTS_OBSERVED",
+  "all_liquidations_max": "2026-09-04 19:24:41.865000",
+  "post_restart_session_locked": 0,
+  "post_restart_meta_enoent": 0,
+  "post_restart_insert_attempts": 0,
+  "post_restart_ack_attempts": 0
+}

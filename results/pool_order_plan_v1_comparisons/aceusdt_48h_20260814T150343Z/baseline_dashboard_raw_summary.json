@@ -1,0 +1,71 @@
+{
+  "frozen": {
+    "snapshot_as_of_utc": "2026-08-14T15:03:43Z",
+    "window_start_utc": "2026-08-12T15:03:43Z",
+    "window_end_utc": "2026-08-14T15:03:43Z",
+    "start_inclusive": true,
+    "end_inclusive": false,
+    "time_field": "candle_close_time",
+    "filter_basis": "candle_close_time",
+    "api_timezone": "UTC",
+    "database_timezone": "UTC",
+    "frontend_display_timezone": "UTC",
+    "request_url": "http://127.0.0.1:8787/api/signals?start=2026-08-12T15%3A03%3A43Z&end=2026-08-14T15%3A03%3A43Z&time_field=candle_close_time&limit=500&offset=0&tier_a=true&strategy_version=wave_fade_no_be50_v1",
+    "hours": 48,
+    "symbol_filter": null
+  },
+  "observed_target": {
+    "signals": 22,
+    "wins": 15,
+    "losses": 7,
+    "open": 0,
+    "win_rate_pct": 68.2,
+    "gross_profit_pct": 25.0,
+    "gross_loss_pct": -8.0,
+    "total_pnl_pct": 17.0
+  },
+  "reproduced_all_symbols": {
+    "signals": 22,
+    "wins": 15,
+    "losses": 7,
+    "open": 0,
+    "win_rate_pct": 68.18181818181819,
+    "gross_profit_pct": 25.0,
+    "gross_loss_pct": -8.0,
+    "total_pnl_pct": 17.0,
+    "pnl_basis": "gross"
+  },
+  "reproduced_display": {
+    "signals": 22,
+    "wins": 15,
+    "losses": 7,
+    "open": 0,
+    "win_rate_pct_1dp": 68.2,
+    "gross_profit_pct_1dp": 25.0,
+    "gross_loss_pct_1dp": -8.0,
+    "total_pnl_pct_1dp": 17.0
+  },
+  "matches_observed_kpis": true,
+  "kpi_source": "ALL_SYMBOLS_48H_UNFILTERED",
+  "aceusdt_direct_n": 18,
+  "aceusdt_direct_summary": {
+    "signals": 18,
+    "wins": 12,
+    "losses": 6,
+    "open": 0,
+    "win_rate_pct": 66.66666666666667,
+    "gross_profit_pct": 20.0,
+    "gross_loss_pct": -7.0,
+    "total_pnl_pct": 13.0,
+    "pnl_basis": "gross"
+  },
+  "symbol_counts": {
+    "ACEUSDT": 18,
+    "APTUSDT": 4
+  },
+  "note": "Dashboard KPIs 22/15/7 reproduce with NO symbol filter. ACEUSDT-only in the same frozen window is a subset.",
+  "pnl_basis": "gross",
+  "fees_in_dashboard": false,
+  "rounding": "sum then toFixed(1) in UI",
+  "window": "half-open [start, end) on candle_close_time UTC"
+}

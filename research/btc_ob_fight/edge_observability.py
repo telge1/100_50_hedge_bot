@@ -11,6 +11,7 @@ from .edge_book_coverage import (
     COVERAGE_MISSING,
     COVERAGE_OUTSIDE,
     COVERAGE_PARTIAL,
+    _level_qty_by_tick,
     _qty_at_price,
     _sample_region,
 )
@@ -70,6 +71,7 @@ def build_edge_observability(
         if e in visit_count_by_edge:
             visit_count_by_edge[e] += 1
 
+    prepared = _prepare_ob_rows(ob_rows)
     detail_rows: list[dict[str, Any]] = []
     scopes = (
         SCOPE_EXACT_LEVEL_TICK,
@@ -93,13 +95,35 @@ def build_edge_observability(
                     detail_rows.append(_no_relevant_row(edge, time_ctx, reg))
                 continue
 
-            filtered_ob = _filter_ob_rows(ob_rows, span_list, time_ctx == TIME_FULL_WINDOW)
+            filtered_ob = _filter_prepared_ob(prepared, span_list, time_ctx == TIME_FULL_WINDOW)
             for reg in regions:
                 row = _aggregate_region_observability(filtered_ob, reg, edge, time_ctx, span_list, visits, excursions)
                 detail_rows.append(row)
 
     summary = _summarize_observability(detail_rows, visit_count_by_edge)
     return detail_rows, summary
+
+
+def _prepare_ob_rows(ob_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Parse timestamps once and prebuild tick maps for each snapshot."""
+    prepared: list[dict[str, Any]] = []
+    for row in ob_rows:
+        ts_raw = row.get("ts") or row.get("as_of")
+        ts_dt = None
+        if ts_raw is not None:
+            if isinstance(ts_raw, datetime):
+                ts_dt = ts_raw
+            else:
+                ts_dt = _parse_ts(str(ts_raw))
+        bid_map = ask_map = None
+        if row.get("ok"):
+            bid_map = row.get("_bid_map") or _level_qty_by_tick(row.get("bids") or [])
+            ask_map = row.get("_ask_map") or _level_qty_by_tick(row.get("asks") or [])
+            # Persist for downstream coverage reuse within same process.
+            row["_bid_map"] = bid_map
+            row["_ask_map"] = ask_map
+        prepared.append({**row, "_ts_dt": ts_dt, "_bid_map": bid_map, "_ask_map": ask_map})
+    return prepared
 
 
 def _no_relevant_row(edge: str, time_ctx: str, reg: dict[str, Any]) -> dict[str, Any]:
@@ -197,16 +221,24 @@ def _filter_ob_rows(
     spans: list[tuple[datetime, datetime]],
     is_full_window: bool,
 ) -> list[dict[str, Any]]:
+    prepared = _prepare_ob_rows(ob_rows)
+    return _filter_prepared_ob(prepared, spans, is_full_window)
+
+
+def _filter_prepared_ob(
+    prepared: list[dict[str, Any]],
+    spans: list[tuple[datetime, datetime]],
+    is_full_window: bool,
+) -> list[dict[str, Any]]:
     if is_full_window:
-        return ob_rows
+        return prepared
     if not spans:
         return []
     out = []
-    for row in ob_rows:
-        ts_str = row.get("ts") or row.get("as_of")
-        if not ts_str:
+    for row in prepared:
+        ts = row.get("_ts_dt")
+        if ts is None:
             continue
-        ts = _parse_ts(str(ts_str).replace("+00:00", "Z") if "Z" not in str(ts_str) else str(ts_str))
         for start, end in spans:
             if start <= ts <= end:
                 out.append(row)
@@ -246,7 +278,18 @@ def _aggregate_region_observability(
             "sample_count": 0,
         }
 
-    samples = [_sample_region(row, reg, lo, hi) for row in ob_rows]
+    samples = []
+    for row in ob_rows:
+        samples.append(
+            _sample_region(
+                row,
+                reg,
+                lo,
+                hi,
+                bid_map=row.get("_bid_map"),
+                ask_map=row.get("_ask_map"),
+            )
+        )
     n = len(samples)
     counts = {st: sum(1 for s in samples if s.get("coverage_status") == st) for st in (
         COVERAGE_FULL, COVERAGE_PARTIAL, COVERAGE_OUTSIDE, COVERAGE_MISSING

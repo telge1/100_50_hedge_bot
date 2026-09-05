@@ -1194,6 +1194,7 @@
     startAutoRefresh();
     wireCollector();
     wireUniverse51();
+    wireDataCollectorHealth();
   });
 
   /* ------------------------------------------------------------------ */
@@ -2507,5 +2508,251 @@
       });
     }
     loadFrozenEvalStatus();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Daten-Collector Status (evidence API; fail-closed backfill)         */
+  /* ------------------------------------------------------------------ */
+
+  const dataHealthUi = {
+    csrf: null,
+    pollMs: 12000,
+    timer: null,
+    jobTimer: null,
+  };
+
+  function statusDotClass(status) {
+    const s = String(status || "UNKNOWN").toUpperCase();
+    if (s === "HEALTHY") return "stoch-chip stoch-chip-live";
+    if (s === "DEGRADED" || s === "BACKFILLING") return "stoch-chip stoch-chip-warn";
+    if (s === "STALE" || s === "STOPPED") return "stoch-chip stoch-chip-warn";
+    return "stoch-chip";
+  }
+
+  function fmtLag(v) {
+    if (v == null || v === "") return "–";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "–";
+    if (n < 120) return n.toFixed(1) + "s";
+    if (n < 3600) return (n / 60).toFixed(1) + "m";
+    return (n / 3600).toFixed(1) + "h";
+  }
+
+  async function ensureDataHealthCsrf() {
+    const res = await fetch("/api/collector-health/csrf", { credentials: "include" });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.error || "csrf failed");
+    dataHealthUi.csrf = data.csrf_token;
+    return dataHealthUi.csrf;
+  }
+
+  function renderDataCollectorHealth(report) {
+    const body = $("dataCollectorHealthBody");
+    const meta = $("dataCollectorHealthMeta");
+    if (meta) {
+      meta.textContent =
+        "Prüfung: " +
+        (report.checked_at || "–") +
+        " · OI-SoT: " +
+        ((report.oi_sot && report.oi_sot.table) || "open_interest_5m_history") +
+        " · contract " +
+        (report.contract_version || "");
+    }
+    if (!body) return;
+    const rows = report.collectors || [];
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="11" class="stoch-empty">Keine Collector</td></tr>';
+      return;
+    }
+    body.innerHTML = rows
+      .map(function (c) {
+        const pid = c.process_running ? "PID " + (c.pid || "?") : "stopped";
+        const cov =
+          c.fresh_symbol_count != null && c.expected_symbol_count != null
+            ? c.fresh_symbol_count + "/" + c.expected_symbol_count
+            : c.coverage_status || "–";
+        const drops =
+          (c.dropped_events != null ? "drops=" + c.dropped_events : "") +
+          (c.queue_depth != null ? " q=" + c.queue_depth : "");
+        return (
+          "<tr>" +
+          '<td><span class="' +
+          statusDotClass(c.status) +
+          '">' +
+          (c.status || "UNKNOWN") +
+          "</span></td>" +
+          "<td>" +
+          (c.display_name || c.collector_id) +
+          "</td>" +
+          "<td>" +
+          (c.granularity || "–") +
+          "</td>" +
+          "<td>" +
+          pid +
+          "</td>" +
+          "<td>" +
+          fmtLag(c.lag_seconds) +
+          "</td>" +
+          "<td>" +
+          (c.last_successful_write_at || "–") +
+          "</td>" +
+          "<td>" +
+          cov +
+          "</td>" +
+          "<td>" +
+          fmtLag(c.lag_seconds) +
+          "</td>" +
+          "<td>" +
+          (drops || "–") +
+          "</td>" +
+          "<td>" +
+          (c.backfill_status || "–") +
+          "</td>" +
+          "<td>" +
+          (c.evidence || c.reason || c.last_error || "–") +
+          "</td>" +
+          "</tr>"
+        );
+      })
+      .join("");
+  }
+
+  async function loadDataCollectorHealth() {
+    try {
+      const res = await fetch("/api/collector-health", { credentials: "include" });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        setErr("dataCollectorHealthError", data.error || data.detail || "HTTP " + res.status);
+        return;
+      }
+      setErr("dataCollectorHealthError", "");
+      renderDataCollectorHealth(data);
+    } catch (err) {
+      setErr("dataCollectorHealthError", "Health-API: " + err);
+    }
+  }
+
+  async function postOiBackfill(path, body) {
+    const token = dataHealthUi.csrf || (await ensureDataHealthCsrf());
+    const res = await fetch(path, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(function () { return {}; });
+    return { res: res, data: data };
+  }
+
+  function defaultOiWindow() {
+    const end = new Date();
+    const start = new Date(end.getTime() - 3 * 86400000);
+    return {
+      start: start.toISOString().replace(/\.\d{3}Z$/, "Z"),
+      end: end.toISOString().replace(/\.\d{3}Z$/, "Z"),
+    };
+  }
+
+  function pollOiJob(jobId) {
+    if (dataHealthUi.jobTimer) clearInterval(dataHealthUi.jobTimer);
+    dataHealthUi.jobTimer = setInterval(async function () {
+      try {
+        const res = await fetch("/api/collector-backfill/jobs/" + encodeURIComponent(jobId), {
+          credentials: "include",
+        });
+        const job = await res.json().catch(function () { return {}; });
+        const meta = $("oiBackfillJobMeta");
+        const log = $("oiBackfillJobLog");
+        if (meta) {
+          meta.textContent =
+            "Job " +
+            (job.job_id || jobId) +
+            " · " +
+            (job.status || "") +
+            " · " +
+            (job.job_kind || "");
+        }
+        if (log) {
+          log.textContent = JSON.stringify(job.result || job.error || job, null, 2);
+        }
+        if (job.status === "COMPLETED" || job.status === "FAILED") {
+          clearInterval(dataHealthUi.jobTimer);
+          dataHealthUi.jobTimer = null;
+          loadDataCollectorHealth();
+        }
+      } catch (_e) {
+        /* ignore transient */
+      }
+    }, 2000);
+  }
+
+  async function startOiDetect() {
+    const w = defaultOiWindow();
+    const confirmed = window.confirm(
+      "OI 5m Lücken prüfen?\nSymbole: BTCUSDT, DOGEUSDT\n" + w.start + " → " + w.end + "\nNur Detect (kein Write)."
+    );
+    if (!confirmed) return;
+    try {
+      await ensureDataHealthCsrf();
+      const out = await postOiBackfill("/api/collector-backfill/detect", {
+        collector_id: "oi_5m_history",
+        job_kind: "oi_5m_detect",
+        symbols: ["BTCUSDT", "DOGEUSDT"],
+        start: w.start,
+        end: w.end,
+      });
+      if (!out.res.ok || out.data.success === false) {
+        setErr("dataCollectorHealthError", out.data.error || "Detect fehlgeschlagen");
+        return;
+      }
+      setErr("dataCollectorHealthError", "");
+      pollOiJob(out.data.job_id);
+    } catch (err) {
+      setErr("dataCollectorHealthError", String(err));
+    }
+  }
+
+  async function startOiDryRun() {
+    const w = defaultOiWindow();
+    const confirmed = window.confirm(
+      "OI 5m Dry-Run Backfill (keine Inserts)?\nBTCUSDT, DOGEUSDT\n" + w.start + " → " + w.end
+    );
+    if (!confirmed) return;
+    try {
+      await ensureDataHealthCsrf();
+      const out = await postOiBackfill("/api/collector-backfill/start", {
+        collector_id: "oi_5m_history",
+        job_kind: "oi_5m_backfill_dry_run",
+        symbols: ["BTCUSDT", "DOGEUSDT"],
+        start: w.start,
+        end: w.end,
+      });
+      if (!out.res.ok || out.data.success === false) {
+        setErr("dataCollectorHealthError", out.data.error || "Dry-Run fehlgeschlagen");
+        return;
+      }
+      setErr("dataCollectorHealthError", "");
+      pollOiJob(out.data.job_id);
+    } catch (err) {
+      setErr("dataCollectorHealthError", String(err));
+    }
+  }
+
+  function wireDataCollectorHealth() {
+    const detect = $("oiGapDetectBtn");
+    const dry = $("oiBackfillDryRunBtn");
+    const pt = $("ptBackfillBtn");
+    if (detect) detect.addEventListener("click", startOiDetect);
+    if (dry) dry.addEventListener("click", startOiDryRun);
+    if (pt) {
+      pt.disabled = true;
+      pt.title = "DEGRADED — LIVE CURRENT BUT DATA LOSS POSSIBLE";
+    }
+    loadDataCollectorHealth();
+    if (dataHealthUi.timer) clearInterval(dataHealthUi.timer);
+    dataHealthUi.timer = setInterval(loadDataCollectorHealth, dataHealthUi.pollMs);
   }
 })();

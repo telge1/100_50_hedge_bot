@@ -477,7 +477,7 @@ def _load_ob200_profile(
 ) -> dict[str, Any]:
     notes = [
         "Multi-level walls from local OB200 raw archive (median×3 qty within ~800 bps).",
-        "Live tip uses the open hour file (*_open_ob200_v3.zst.tmp) for ~1-minute updates.",
+        "Live tip prefers continuous OB1000 on-demand WS (collector keeper), else REST limit=1000.",
         "History uses closed hour segments; incomplete zstd frames are tolerated.",
     ]
     payload = empty_profile(
@@ -502,6 +502,15 @@ def _load_ob200_profile(
     mid = raw["mid"] if isinstance(raw["mid"], Decimal) else Decimal(str(raw["mid"]))
     as_of = raw["as_of"]
     bars = _ob200_walls_to_bars(symbol, raw["walls"], as_of=as_of, mid=mid)
+    src = str(raw.get("source") or OB200_SOURCE)
+    if "on_demand_ob1000" in src:
+        payload["source_table"] = src
+        payload["label"] = "OB1000 Orderbook Walls (live WS)"
+        payload["profile_kind"] = "ob1000_on_demand_multi_walls"
+    elif src.startswith("bybit_rest"):
+        payload["source_table"] = src
+        payload["label"] = "OB1000 Orderbook Walls (REST live)"
+        payload["profile_kind"] = "ob1000_rest_multi_walls"
     payload["bars"] = bars
     payload["bar_count"] = len(bars)
     payload["bid_count"] = sum(1 for b in bars if b["side"] == "BID")
@@ -520,8 +529,11 @@ def _load_ob200_profile(
         "bid_levels": raw.get("bid_levels"),
         "ask_levels": raw.get("ask_levels"),
         "mid": float(mid),
+        "source": src,
     }
-    if raw.get("clamped"):
+    if src.startswith("bybit_rest"):
+        payload["warning"] = "ob200_rest_live_fallback"
+    elif raw.get("clamped"):
         payload["warning"] = "ob200_clamped_to_coverage_end"
     elif not bars:
         payload["warning"] = "no_wall_data"
@@ -619,7 +631,14 @@ def load_orderbook_profile(
     payload["bid_count"] = sum(1 for b in bars if b["side"] == "BID")
     payload["ask_count"] = sum(1 for b in bars if b["side"] == "ASK")
     payload["as_of"] = unix_utc(at_u) if mode_s != "history" else None
-    if not bars:
+    if not bars and not has_ob200_archive(sym):
+        payload["warning"] = "no_ob200_archive"
+        payload["notes"] = [
+            f"No local OB200 raw archive for {sym}.",
+            "OB200 multi-walls are available for archived symbols (e.g. BTCUSDT, DOGEUSDT).",
+            "Feature-table walls were empty for this as-of.",
+        ]
+    elif not bars:
         payload["warning"] = "no_wall_data"
 
     now = datetime.now(timezone.utc)

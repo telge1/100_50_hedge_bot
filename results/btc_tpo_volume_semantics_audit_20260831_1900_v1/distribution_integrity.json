@@ -1,0 +1,27 @@
+{
+  "verdict": "BTC_TPO_VOLUME_SEMANTICS_NOT_INDEPENDENT_BLOCKED",
+  "confluence_valid_for_fight_engine": false,
+  "tpo_volume_confluence_status": "INVALID_SAME_SEMANTICS",
+  "distribution_hashes_equal_oa_vs_local": false,
+  "max_normalized_share_diff": 8.357897707256257e-15,
+  "bins_with_different_weights": 0,
+  "causality": {
+    "session_start_utc": "2026-08-31T13:30:00Z",
+    "anchor_cutoff_utc": "2026-08-31T19:00:00Z",
+    "anchor_exclusive": true,
+    "outcome_used_for_profile_definition": false
+  },
+  "synthetic_tests": {
+    "reference_bracket_poc_bin": 780,
+    "reference_volume_poc_bin": 790,
+    "reference_poc_differs_from_volume_poc": true,
+    "bracket_poc_invariant_to_volume_scaling": true,
+    "volume_poc_changes_when_trade_sizes_change": true,
+    "production_oa_weight_matches_local_volume_weight": true,
+    "expected_for_independent_semantics": {
+      "reference_bracket_poc_at_A": true,
+      "volume_poc_at_B": true
+    },
+    "production_tpo_labeled_path_is_volume_weighted": true
+  }
+}

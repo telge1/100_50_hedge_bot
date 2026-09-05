@@ -1,0 +1,264 @@
+{
+  "exact_price_changes": {
+    "price": "80653.6",
+    "sample_rows": [
+      {
+        "update_id": 4348462,
+        "seq": 805049087164,
+        "action": "DELETE",
+        "quantity": "0",
+        "exchange_ts_ms": 1788509174872
+      },
+      {
+        "update_id": 4348469,
+        "seq": 805049099169,
+        "action": "UPSERT",
+        "quantity": "0.002",
+        "exchange_ts_ms": 1788509176273
+      },
+      {
+        "update_id": 4348476,
+        "seq": 805049108151,
+        "action": "DELETE",
+        "quantity": "0",
+        "exchange_ts_ms": 1788509177673
+      },
+      {
+        "update_id": 4348478,
+        "seq": 805049110940,
+        "action": "DELETE",
+        "quantity": "0",
+        "exchange_ts_ms": 1788509178073
+      },
+      {
+        "update_id": 4348479,
+        "seq": 805049112064,
+        "action": "UPSERT",
+        "quantity": "0.001",
+        "exchange_ts_ms": 1788509178273
+      },
+      {
+        "update_id": 4348480,
+        "seq": 805049112614,
+        "action": "UPSERT",
+        "quantity": "1.612",
+        "exchange_ts_ms": 1788509178472
+      },
+      {
+        "update_id": 4348481,
+        "seq": 805049113130,
+        "action": "UPSERT",
+        "quantity": "1.618",
+        "exchange_ts_ms": 1788509178673
+      },
+      {
+        "update_id": 4348483,
+        "seq": 805049119302,
+        "action": "UPSERT",
+        "quantity": "0.001",
+        "exchange_ts_ms": 1788509179072
+      },
+      {
+        "update_id": 4348484,
+        "seq": 805049123414,
+        "action": "UPSERT",
+        "quantity": "0.065",
+        "exchange_ts_ms": 1788509179272
+      },
+      {
+        "update_id": 4348485,
+        "seq": 805049123748,
+        "action": "UPSERT",
+        "quantity": "0.067",
+        "exchange_ts_ms": 1788509179473
+      }
+    ],
+    "count": 89
+  },
+  "price_range_over_time": [
+    {
+      "bucket_10s": 178850899,
+      "changes": 5363,
+      "deletes": 1573,
+      "upserts": 3790
+    },
+    {
+      "bucket_10s": 178850900,
+      "changes": 3066,
+      "deletes": 749,
+      "upserts": 2317
+    },
+    {
+      "bucket_10s": 178850901,
+      "changes": 5336,
+      "deletes": 1354,
+      "upserts": 3982
+    },
+    {
+      "bucket_10s": 178850902,
+      "changes": 2568,
+      "deletes": 640,
+      "upserts": 1928
+    },
+    {
+      "bucket_10s": 178850903,
+      "changes": 5035,
+      "deletes": 1267,
+      "upserts": 3768
+    },
+    {
+      "bucket_10s": 178850904,
+      "changes": 2822,
+      "deletes": 557,
+      "upserts": 2265
+    },
+    {
+      "bucket_10s": 178850905,
+      "changes": 3670,
+      "deletes": 785,
+      "upserts": 2885
+    },
+    {
+      "bucket_10s": 178850906,
+      "changes": 4491,
+      "deletes": 888,
+      "upserts": 3603
+    },
+    {
+      "bucket_10s": 178850907,
+      "changes": 3526,
+      "deletes": 734,
+      "upserts": 2792
+    },
+    {
+      "bucket_10s": 178850908,
+      "changes": 2997,
+      "deletes": 602,
+      "upserts": 2395
+    }
+  ],
+  "deletes_qty0": 102417,
+  "refill_candidates": [
+    {
+      "price": "80632.8",
+      "dels": 5,
+      "ups": 183
+    },
+    {
+      "price": "80688",
+      "dels": 2,
+      "ups": 159
+    },
+    {
+      "price": "80699.9",
+      "dels": 20,
+      "ups": 158
+    },
+    {
+      "price": "80708",
+      "dels": 7,
+      "ups": 135
+    },
+    {
+      "price": "80676.1",
+      "dels": 9,
+      "ups": 131
+    }
+  ],
+  "largest_qty_changes": [
+    {
+      "update_id": 4348133,
+      "side": "ask",
+      "price": "83000",
+      "quantity": "180.023",
+      "action": "UPSERT",
+      "aq": 180.023
+    },
+    {
+      "update_id": 4348241,
+      "side": "ask",
+      "price": "83000",
+      "quantity": "179.932",
+      "action": "UPSERT",
+      "aq": 179.932
+    },
+    {
+      "update_id": 4348342,
+      "side": "bid",
+      "price": "80245.5",
+      "quantity": "114.743",
+      "action": "UPSERT",
+      "aq": 114.743
+    },
+    {
+      "update_id": 4348299,
+      "side": "bid",
+      "price": "78907.9",
+      "quantity": "100.234",
+      "action": "UPSERT",
+      "aq": 100.234
+    },
+    {
+      "update_id": 4348516,
+      "side": "ask",
+      "price": "82291.4",
+      "quantity": "99.295",
+      "action": "UPSERT",
+      "aq": 99.295
+    },
+    {
+      "update_id": 4348312,
+      "side": "bid",
+      "price": "78939.5",
+      "quantity": "99.157",
+      "action": "UPSERT",
+      "aq": 99.157
+    },
+    {
+      "update_id": 4348439,
+      "side": "ask",
+      "price": "80971.8",
+      "quantity": "98.925",
+      "action": "UPSERT",
+      "aq": 98.925
+    },
+    {
+      "update_id": 4348448,
+      "side": "bid",
+      "price": "80326",
+      "quantity": "98.669",
+      "action": "UPSERT",
+      "aq": 98.669
+    },
+    {
+      "update_id": 4348707,
+      "side": "ask",
+      "price": "80971.8",
+      "quantity": "97.922",
+      "action": "UPSERT",
+      "aq": 97.922
+    },
+    {
+      "update_id": 4348828,
+      "side": "bid",
+      "price": "79082.3",
+      "quantity": "97.908",
+      "action": "UPSERT",
+      "aq": 97.908
+    }
+  ],
+  "around_u": {
+    "selected_u": 4348296,
+    "packets_le": 752,
+    "packets_gt": 751
+  },
+  "end_packet_stats": {
+    "delta_packets": 1503,
+    "marker_packets": 10,
+    "snapshot_packets": 1,
+    "min_u": 4347545,
+    "max_u": 4349047,
+    "min_seq": 805048006408,
+    "max_seq": 805049768223
+  }
+}

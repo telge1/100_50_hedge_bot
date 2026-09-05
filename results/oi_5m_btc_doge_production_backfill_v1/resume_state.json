@@ -1,0 +1,52 @@
+{
+  "run_id": "f780caff-15b5-46f1-a43e-1be02b8d06e1",
+  "cutoff": "2026-09-04T17:38:05Z",
+  "symbols": {
+    "BTCUSDT": {
+      "inserted": 4926,
+      "retries": 0
+    },
+    "DOGEUSDT": {
+      "inserted": 4926,
+      "retries": 0
+    }
+  },
+  "chunks_done": [
+    "BTCUSDT-000",
+    "BTCUSDT-001",
+    "BTCUSDT-002",
+    "BTCUSDT-003",
+    "BTCUSDT-004",
+    "BTCUSDT-005",
+    "BTCUSDT-006",
+    "BTCUSDT-007",
+    "BTCUSDT-008",
+    "BTCUSDT-009",
+    "BTCUSDT-010",
+    "BTCUSDT-011",
+    "BTCUSDT-012",
+    "BTCUSDT-013",
+    "BTCUSDT-014",
+    "BTCUSDT-015",
+    "BTCUSDT-016",
+    "BTCUSDT-017",
+    "DOGEUSDT-000",
+    "DOGEUSDT-001",
+    "DOGEUSDT-002",
+    "DOGEUSDT-003",
+    "DOGEUSDT-004",
+    "DOGEUSDT-005",
+    "DOGEUSDT-006",
+    "DOGEUSDT-007",
+    "DOGEUSDT-008",
+    "DOGEUSDT-009",
+    "DOGEUSDT-010",
+    "DOGEUSDT-011",
+    "DOGEUSDT-012",
+    "DOGEUSDT-013",
+    "DOGEUSDT-014",
+    "DOGEUSDT-015",
+    "DOGEUSDT-016",
+    "DOGEUSDT-017"
+  ]
+}

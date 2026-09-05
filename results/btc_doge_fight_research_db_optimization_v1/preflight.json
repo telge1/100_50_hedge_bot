@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-09-03T08:35:00Z",
+  "branch": "feature/btc-doge-research-db",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "dirty_file_count": 83,
+  "clickhouse_version": "26.7.1.1315",
+  "target_database": "btc_doge_research",
+  "research_table_count": 27,
+  "reconciliation_verdict": "BTC_DOGE_RESEARCH_DB_READY_WITH_DOCUMENTED_SOURCE_GAPS",
+  "run_029_present": true,
+  "run_029_file_count": 85,
+  "active_fight_processes": [],
+  "collector_pids": [
+    {"pid": 147111, "cmd": "oi_liquidation_collector --mode live"},
+    {"pid": 1661773, "cmd": "run_live_collector_service (stoch)"},
+    {"pid": 3946369, "cmd": "orderbook_v2_live raw-archive-only BTCUSDT,DOGEUSDT"}
+  ],
+  "contracts": {
+    "eligibility": "fight_data_eligibility_contract_v1",
+    "fight_facts": "fight_fact_contract_v1",
+    "schema": "btc_ob_fight_facts_v2_0",
+    "optimization_phase": "btc_doge_fight_research_db_optimization_v1"
+  },
+  "research_public_trades_audit": {
+    "BTCUSDT_event_min": "2026-08-31T16:30:00.465Z",
+    "BTCUSDT_event_max": "2026-08-31T17:29:56.684Z",
+    "BTCUSDT_event_count": 80738,
+    "BTCUSDT_fight_window_18_30_19_30_count": 0,
+    "DOGEUSDT_event_count": 4275,
+    "note": "Sparse event rows only; full-history PUBLIC_TRADES modality wrote buckets_1s, not events. Existing BTC event hour matches OA 18:30-19:30 trade_ids with -2h timestamp shift."
+  },
+  "ddl_tables_documented": [
+    "research_public_trades",
+    "research_public_trade_buckets_1s",
+    "research_ob200_snapshots_1s",
+    "research_open_interest_observations",
+    "research_liquidation_events",
+    "research_batch_runs",
+    "research_coverage"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "start": "2026-09-04T17:40:00Z",
+  "end": "2026-09-04T19:20:00Z",
+  "dry_run_1_missing_total": 42,
+  "rest_parity_btc": 21,
+  "rest_parity_doge": 21,
+  "would_insert_preview": 42,
+  "inserted_total": 42,
+  "BTC_inserted": 21,
+  "DOGE_inserted": 21,
+  "final_dry_run": {
+    "BTC_MISSING": 0,
+    "DOGE_MISSING": 0,
+    "WOULD_INSERT": 0,
+    "total_missing_buckets": 0
+  },
+  "hist_after": {
+    "btc_max": "2026-09-04 19:20:00",
+    "doge_max": "2026-09-04 19:20:00",
+    "count": 18534
+  },
+  "source": "BYBIT_REST_5M_HISTORY",
+  "granularity": "5m",
+  "note": "Not written as 5s history; live 5s/events untouched"
+}

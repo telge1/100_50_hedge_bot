@@ -1,0 +1,45 @@
+{
+  "audit_time_utc": "2026-09-04T13:23:27.678801Z",
+  "processes": [
+    {
+      "pid": 1692334,
+      "role": "orderbook_full_ob_collector",
+      "alive": true,
+      "ps": "1692334 Fri Sep  4 13:26:03 2026    01:57:23 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+    },
+    {
+      "pid": 147111,
+      "role": "oi_liquidation_collector",
+      "alive": true,
+      "ps": "147111 Tue Aug 18 18:02:02 2026 16-21:21:24 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0"
+    },
+    {
+      "pid": 1661773,
+      "role": "signal_generator_live_public_trades",
+      "alive": true,
+      "ps": "1661773 Fri Aug 21 10:27:35 2026 14-04:55:51 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades"
+    }
+  ],
+  "oi_pid_147111": {
+    "alive": true,
+    "writes_to": "orderbook_analysis.{all_liquidations,open_interest_events,open_interest_5s,oi_liquidation_health}",
+    "last_oi_event_time": "2026-09-01 16:46:23.084000",
+    "oi_rows_total_btc": 1039225,
+    "last_liquidation_event_time": "2026-09-01 16:36:59.752000",
+    "liq_rows_total_btc": 34900,
+    "last_health_event_ts": "2026-09-01 16:42:02.444000",
+    "health_rows_total_btc": 40378,
+    "sep4_oi_rows": 0,
+    "sep4_liq_rows": 0,
+    "log_evidence": "InsertError SESSION_IS_LOCKED around 2026-09-01; reconnects on 2026-09-04 but no CH rows after 2026-09-01T16:46Z"
+  },
+  "public_trades_producer": {
+    "pid": 1661773,
+    "cmd_flag": "--enable-public-trades",
+    "canonical_table": "orderbook_analysis.public_trades_canonical",
+    "last_trade_ts_btc": "2026-09-04 13:23:26.029000",
+    "rows_total_btc": 76774594
+  },
+  "orderbook_collector_pid": 1692334,
+  "db_writes_this_audit": 0
+}

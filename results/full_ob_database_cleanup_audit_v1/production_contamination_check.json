@@ -1,0 +1,29 @@
+{
+  "PRODUCTION_FULL_OB_TEST_CONTAMINATION": false,
+  "audit_time_utc": "2026-09-04T11:13:31.399553Z",
+  "event_id_searched": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+  "needles": [
+    "BTCUSDT_20260904T080534Z_1fd9a66d36",
+    "research_full_ob_smoke",
+    "full_ob_packets_smoke",
+    "full_ob_multi_epoch",
+    "full_ob_gap_audit",
+    "nested_profile_edge_signal",
+    "nested_signal_analysis_isolation"
+  ],
+  "databases_probed": {
+    "research_full_ob_smoke": "CONTAINS_SMOKE_ONLY (expected)",
+    "btc_doge_research": "NO_HITS_IN_METADATA_TABLES",
+    "signal_generator": "NO_HITS_IN_ALL_TABLES",
+    "orderbook_analysis": "CATALOG_UNLOADABLE; query_log shows 0 Inserts with needles; SHOW TABLES blocked by broken orderbook_deltas",
+    "default": "EMPTY"
+  },
+  "query_log_orderbook_analysis_inserts_with_needles": 0,
+  "query_log_btc_doge_research_inserts_with_needles": 0,
+  "evidence": [
+    "All Insert/Create targets for full_ob needles resolve to research_full_ob_smoke.*",
+    "Zero content hits for EVENT/full_ob smoke strings in btc_doge_research metadata tables and signal_generator",
+    "Nested/isolation tests did not create ClickHouse tables"
+  ],
+  "caveat": "Direct SELECT against orderbook_analysis.* not possible while orderbook_deltas async attach fails; contamination conclusion rests on query_log + other DBs + smoke isolation design."
+}

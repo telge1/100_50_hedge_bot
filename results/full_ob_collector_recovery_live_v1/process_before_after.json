@@ -1,0 +1,55 @@
+{
+  "captured_at": "2026-09-04T19:44:37.583634+00:00",
+  "before": {
+    "full_ob_old_pid": 1692334,
+    "full_ob_old_alive": false,
+    "oi_liq": {
+      "pid": 1795773,
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0 "
+    },
+    "public_trades": {
+      "pid": 1661773,
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe conf"
+    },
+    "dashboard": {
+      "pid": 1780509,
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py "
+    },
+    "lock_pid_before": "1810262"
+  },
+  "after": {
+    "full_ob_new_pid": 1810262,
+    "full_ob_alive": true,
+    "cmd": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndj",
+    "lock_pid": "1810262",
+    "oi_liq": {
+      "pid": 1795773,
+      "alive": true
+    },
+    "public_trades": {
+      "pid": 1661773,
+      "alive": true
+    },
+    "dashboard": {
+      "pid": 1780509,
+      "alive": true
+    },
+    "fr_env": "false"
+  },
+  "note": "before block reconstructed from Phase A; after is live",
+  "after_smoke": {
+    "pid": 1810262,
+    "alive": true,
+    "fr_env": "false",
+    "protected": {
+      "oi_liq_1795773": true,
+      "pt_1661773": true,
+      "dash_1780509": true
+    },
+    "instances": 1
+  },
+  "destructive_actions_executed": false
+}

@@ -1,0 +1,9 @@
+{
+  "levels_per_side": 30000,
+  "copy_under_conceptual_lock_ms": 23.203,
+  "serialize_outside_lock_ms": 65.926,
+  "serialized_bytes": 1151081,
+  "zstd_bytes": 57429,
+  "crossed": false,
+  "note": "copy/apply measured in-process; no JSON/zstd under _book_lock by contract"
+}

@@ -1,0 +1,27 @@
+{
+  "phase": "started",
+  "old_pid": 1565672,
+  "old_cmd": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO",
+  "old_start": "Fri Sep  4 10:03:01 2026",
+  "stop_signal": "SIGTERM",
+  "stop_time_utc": "2026-09-04T11:26:03.748494Z",
+  "old_process_exited": true,
+  "collectors_after_stop": [],
+  "oi_pid_147111_alive": true,
+  "today_tmp_after_stop": 0,
+  "sep3_tmp_untouched": true,
+  "new_pid": 1692334,
+  "start_time_utc": "2026-09-04T11:26:05.790822Z",
+  "start_script": "scripts/start_orderbook_v3_raw_archive_btc_doge.sh",
+  "start_args": "--mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols",
+  "env_set": {
+    "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "OB_V3_FULL_OB_FR_NESTED_SIGNALS_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_MAX_PROFILE_WATCHES": "8",
+    "OB_V3_FULL_BOOK_ENABLE": "true"
+  },
+  "old_pid_gone": true,
+  "exactly_one_new_collector": true,
+  "oi_pid_unchanged": 147111
+}

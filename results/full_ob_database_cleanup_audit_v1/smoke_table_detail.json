@@ -1,0 +1,678 @@
+{
+  "full_ob_gap_audit_packets_v1": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "source_line_number",
+        "type": "UInt64"
+      },
+      {
+        "name": "message_type",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "marker_type",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "topic",
+        "type": "String"
+      },
+      {
+        "name": "flight_phase",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "apply_outcome",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "exchange_ts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "cts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "receive_time_ns",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "update_id",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "seq",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "bid_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "ask_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "bids",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "asks",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "ingestion_ts",
+        "type": "DateTime64(3, 'UTC')"
+      }
+    ],
+    "distinct": {
+      "source_line_number": [
+        "3872",
+        "3874",
+        "3873",
+        "3679",
+        "3754",
+        "3708",
+        "3696",
+        "3871",
+        "3728",
+        "3773",
+        "3868",
+        "3839",
+        "3781",
+        "3853",
+        "3846",
+        "3810",
+        "3745",
+        "3690",
+        "3718",
+        "3841",
+        "3861",
+        "3735",
+        "3830",
+        "3838",
+        "3832",
+        "3799",
+        "3771",
+        "3741",
+        "3805",
+        "3712"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'006a9549e66babf67b276d6f6ae9a59e5cde8efda965ccf26807dfde874ee3c6'",
+        "source_line_number": "3679",
+        "message_type": "delta",
+        "marker_type": "None",
+        "topic": "orderbook.full.BTCUSDT",
+        "flight_phase": "live",
+        "apply_outcome": "applied",
+        "exchange_ts_ms": "1788509504672",
+        "cts_ms": "1788509504670",
+        "receive_time_ns": "1788509518530169164",
+        "update_id": "4350111",
+        "seq": "805051028337"
+      },
+      {
+        "packet_sha256": "b'00caa6d5bb5e3530ee123d0243c9d6c2fe29674672d234e82e739908e36e4e25'",
+        "source_line_number": "3754",
+        "message_type": "delta",
+        "marker_type": "None",
+        "topic": "orderbook.full.BTCUSDT",
+        "flight_phase": "live",
+        "apply_outcome": "applied",
+        "exchange_ts_ms": "1788509519673",
+        "cts_ms": "1788509519667",
+        "receive_time_ns": "1788509519760397242",
+        "update_id": "4350186",
+        "seq": "805051057966"
+      }
+    ]
+  },
+  "full_ob_gap_audit_packets_v1_dedupdemo": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "source_line_number",
+        "type": "UInt64"
+      },
+      {
+        "name": "message_type",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "marker_type",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "topic",
+        "type": "String"
+      },
+      {
+        "name": "flight_phase",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "apply_outcome",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "exchange_ts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "cts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "receive_time_ns",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "update_id",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "seq",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "bid_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "ask_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "bids",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "asks",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "ingestion_ts",
+        "type": "DateTime64(3, 'UTC')"
+      }
+    ],
+    "distinct": {
+      "source_line_number": [
+        "3679",
+        "3754",
+        "3708",
+        "3696",
+        "3871",
+        "3728",
+        "3773",
+        "3868",
+        "3839",
+        "3781",
+        "3853",
+        "3872",
+        "3846",
+        "3810",
+        "3745",
+        "3690",
+        "3718",
+        "3841",
+        "3861",
+        "3735",
+        "3830",
+        "3838",
+        "3832",
+        "3799",
+        "3771",
+        "3741",
+        "3805",
+        "3712",
+        "3676",
+        "3767"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'006a9549e66babf67b276d6f6ae9a59e5cde8efda965ccf26807dfde874ee3c6'",
+        "source_line_number": "3679",
+        "message_type": "delta",
+        "marker_type": "None",
+        "topic": "orderbook.full.BTCUSDT",
+        "flight_phase": "live",
+        "apply_outcome": "applied",
+        "exchange_ts_ms": "1788509504672",
+        "cts_ms": "1788509504670",
+        "receive_time_ns": "1788509518530169164",
+        "update_id": "4350111",
+        "seq": "805051028337"
+      },
+      {
+        "packet_sha256": "b'00caa6d5bb5e3530ee123d0243c9d6c2fe29674672d234e82e739908e36e4e25'",
+        "source_line_number": "3754",
+        "message_type": "delta",
+        "marker_type": "None",
+        "topic": "orderbook.full.BTCUSDT",
+        "flight_phase": "live",
+        "apply_outcome": "applied",
+        "exchange_ts_ms": "1788509519673",
+        "cts_ms": "1788509519667",
+        "receive_time_ns": "1788509519760397242",
+        "update_id": "4350186",
+        "seq": "805051057966"
+      }
+    ]
+  },
+  "full_ob_level_changes_smoke_v1": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "symbol",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "side",
+        "type": "Enum8('bid' = 1, 'ask' = 2)"
+      },
+      {
+        "name": "price",
+        "type": "String"
+      },
+      {
+        "name": "quantity",
+        "type": "String"
+      },
+      {
+        "name": "action",
+        "type": "Enum8('UPSERT' = 1, 'DELETE' = 2)"
+      },
+      {
+        "name": "update_id",
+        "type": "Int64"
+      },
+      {
+        "name": "seq",
+        "type": "Int64"
+      },
+      {
+        "name": "exchange_ts_ms",
+        "type": "Int64"
+      },
+      {
+        "name": "ingestion_ts",
+        "type": "DateTime64(3, 'UTC')"
+      }
+    ],
+    "distinct": {
+      "symbol": [
+        "BTCUSDT"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'00127d3f9babcf3bf955e16e8853ccaca163ad11866174d66bcf82c2b867a717'",
+        "symbol": "BTCUSDT",
+        "side": "bid",
+        "price": "10000",
+        "quantity": "1.211",
+        "action": "UPSERT",
+        "update_id": "4347550",
+        "seq": "805048009132",
+        "exchange_ts_ms": "1788508992473",
+        "ingestion_ts": "2026-09-04 08:51:43.218000"
+      },
+      {
+        "packet_sha256": "b'00127d3f9babcf3bf955e16e8853ccaca163ad11866174d66bcf82c2b867a717'",
+        "symbol": "BTCUSDT",
+        "side": "bid",
+        "price": "15000",
+        "quantity": "0.01",
+        "action": "UPSERT",
+        "update_id": "4347550",
+        "seq": "805048009132",
+        "exchange_ts_ms": "1788508992473",
+        "ingestion_ts": "2026-09-04 08:51:43.218000"
+      }
+    ]
+  },
+  "full_ob_multi_epoch_packets_v1": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "continuity_epoch_id",
+        "type": "UInt32"
+      },
+      {
+        "name": "record_kind",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "record_ordinal",
+        "type": "UInt64"
+      },
+      {
+        "name": "update_id",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "seq",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "resync_reason",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "book_hash",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "bid_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "ask_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "bids",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "asks",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "ingestion_ts",
+        "type": "DateTime64(3, 'UTC')"
+      }
+    ],
+    "distinct": {
+      "continuity_epoch_id": [
+        "0",
+        "1"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'2beabd0c571b13a7f5975ebc2bdc06d14cf34032f1142e5d397c1da82c18e3b3'",
+        "continuity_epoch_id": "0",
+        "record_kind": "BOOK_DELTA",
+        "record_ordinal": "2",
+        "update_id": "4350204",
+        "seq": "1",
+        "resync_reason": "None",
+        "book_hash": "None",
+        "bid_n": "1",
+        "ask_n": "1",
+        "ingestion_ts": "2026-09-04 09:38:46.372000"
+      },
+      {
+        "packet_sha256": "b'361b596e6cf58efec68dbdb686e2a7cf9f5669db35d4c6403503bb6f8ba3053a'",
+        "continuity_epoch_id": "1",
+        "record_kind": "BOOK_DELTA",
+        "record_ordinal": "5",
+        "update_id": "4350354",
+        "seq": "3",
+        "resync_reason": "None",
+        "book_hash": "None",
+        "bid_n": "1",
+        "ask_n": "1",
+        "ingestion_ts": "2026-09-04 09:38:46.372000"
+      }
+    ]
+  },
+  "full_ob_packets_smoke_v1": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "fight_event_id",
+        "type": "String"
+      },
+      {
+        "name": "segment_index",
+        "type": "UInt32"
+      },
+      {
+        "name": "source_file",
+        "type": "String"
+      },
+      {
+        "name": "source_line_number",
+        "type": "UInt64"
+      },
+      {
+        "name": "symbol",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "topic",
+        "type": "String"
+      },
+      {
+        "name": "message_type",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "marker_type",
+        "type": "Nullable(String)"
+      },
+      {
+        "name": "exchange_ts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "cts_ms",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "receive_time_ns",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "update_id",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "seq",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "bids",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "asks",
+        "type": "Array(Tuple(String, String))"
+      },
+      {
+        "name": "raw_payload",
+        "type": "String"
+      },
+      {
+        "name": "ingestion_ts",
+        "type": "DateTime64(3, 'UTC')"
+      }
+    ],
+    "distinct": {
+      "fight_event_id": [
+        "BTCUSDT_20260904T080534Z_1fd9a66d36"
+      ],
+      "segment_index": [
+        "0"
+      ],
+      "source_file": [
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst",
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/rest_full_snapshot.json.zst"
+      ],
+      "source_line_number": [
+        "6",
+        "1000",
+        "1108",
+        "847",
+        "1490",
+        "385",
+        "412",
+        "1031",
+        "1355",
+        "475",
+        "451",
+        "1513",
+        "1050",
+        "1470",
+        "850",
+        "101",
+        "755",
+        "688",
+        "607",
+        "467",
+        "70",
+        "1441",
+        "900",
+        "1104",
+        "180",
+        "1315",
+        "906",
+        "328",
+        "427",
+        "1484"
+      ],
+      "symbol": [
+        "BTCUSDT"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'00127d3f9babcf3bf955e16e8853ccaca163ad11866174d66bcf82c2b867a717'",
+        "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+        "segment_index": "0",
+        "source_file": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-0",
+        "source_line_number": "6",
+        "symbol": "BTCUSDT",
+        "topic": "orderbook.full.BTCUSDT",
+        "message_type": "delta",
+        "marker_type": "None",
+        "exchange_ts_ms": "1788508992473",
+        "cts_ms": "1788508992458",
+        "receive_time_ns": "1788508993025533545"
+      },
+      {
+        "packet_sha256": "b'003e05d8bfce2d8e6ab66d2510ff92e10e929722829d225d21cc8e40bd7c76c9'",
+        "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+        "segment_index": "0",
+        "source_file": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-0",
+        "source_line_number": "1000",
+        "symbol": "BTCUSDT",
+        "topic": "orderbook.full.BTCUSDT",
+        "message_type": "delta",
+        "marker_type": "None",
+        "exchange_ts_ms": "1788509190272",
+        "cts_ms": "1788509190271",
+        "receive_time_ns": "1788509190960050210"
+      }
+    ]
+  },
+  "v_full_ob_gap_audit_packets_dedup": {
+    "columns": [
+      {
+        "name": "packet_sha256",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "source_line_number",
+        "type": "UInt64"
+      },
+      {
+        "name": "message_type",
+        "type": "String"
+      },
+      {
+        "name": "update_id",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "seq",
+        "type": "Nullable(Int64)"
+      },
+      {
+        "name": "bid_n",
+        "type": "UInt32"
+      },
+      {
+        "name": "ask_n",
+        "type": "UInt32"
+      }
+    ],
+    "distinct": {
+      "source_line_number": [
+        "3776",
+        "3703",
+        "3766",
+        "3813",
+        "3684",
+        "3842",
+        "3680",
+        "3704",
+        "3808",
+        "3677",
+        "3734",
+        "3840",
+        "3762",
+        "3803",
+        "3764",
+        "3812",
+        "3864",
+        "3733",
+        "3857",
+        "3723",
+        "3736",
+        "3711",
+        "3681",
+        "3718",
+        "3770",
+        "3843",
+        "3751",
+        "3800",
+        "3708",
+        "3744"
+      ]
+    },
+    "sample_rows": [
+      {
+        "packet_sha256": "b'65b89322ee1e0d4896b4eef3734fec7cbe0e789a5ab3823f79456decc46f0d70'",
+        "source_line_number": "3776",
+        "message_type": "marker",
+        "update_id": "None",
+        "seq": "None",
+        "bid_n": "0",
+        "ask_n": "0"
+      },
+      {
+        "packet_sha256": "b'c69081d1fca46f3cc2f91465bad4ebdf6ba4adb169d81ae57b8ee33d0bc3c999'",
+        "source_line_number": "3703",
+        "message_type": "delta",
+        "update_id": "4350135",
+        "seq": "805051039680",
+        "bid_n": "35",
+        "ask_n": "23"
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "collector_pid": 1692334,
+  "nested_profile_signals_enabled": true,
+  "max_active_profile_watches": 8,
+  "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+  "SIGNAL_LEVEL_ANALYSIS_ISOLATION": true,
+  "OVERLAP_CLUSTERING_IMPLEMENTED": true,
+  "nested_signal_contract": "nested_profile_edge_signal_v1",
+  "resync_checkpoint_contract": "full_ob_resync_checkpoint_v1",
+  "resync_metrics_present": true,
+  "natural_parent_captures": 2,
+  "natural_nested_signals": 3,
+  "full_book": {
+    "DOGEUSDT": {
+      "symbol": "DOGEUSDT",
+      "subscription_state": "live",
+      "raw_bids": 5329,
+      "raw_asks": 13811,
+      "snapshot_loaded": true,
+      "book_ready": true,
+      "update_id": 4414103,
+      "seq": 346028137256,
+      "cts_ms": 1788522365727,
+      "gap_count": 0,
+      "reconnect_count": 0,
+      "last_error": ""
+    },
+    "BTCUSDT": {
+      "symbol": "BTCUSDT",
+      "subscription_state": "live",
+      "raw_bids": 40673,
+      "raw_asks": 23664,
+      "snapshot_loaded": true,
+      "book_ready": true,
+      "update_id": 4414417,
+      "seq": 805148290495,
+      "cts_ms": 1788522365871,
+      "gap_count": 0,
+      "reconnect_count": 0,
+      "last_error": ""
+    }
+  },
+  "resync_checkpoint_contract_loaded": true,
+  "natural_signals_observed": true,
+  "parent_captures": 2,
+  "nested_signals": 3
+}

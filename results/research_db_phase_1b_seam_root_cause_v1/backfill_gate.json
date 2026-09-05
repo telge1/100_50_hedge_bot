@@ -1,0 +1,16 @@
+{
+  "ch_prefix_allowed": true,
+  "conditions": [
+    "persist source_semantics_version on every row",
+    "persist source_id, coverage and full_levels_available",
+    "use raw for the entire overlap",
+    "segment or normalize cross-boundary backtests"
+  ],
+  "full_levels_before_raw_start": false,
+  "gate": "PASS_WITH_TRANSITION_CONTRACT",
+  "historical_ch_aggregate_end": "2026-08-28T16:26:23Z",
+  "overlap_rebuilt_from_raw": true,
+  "phase2_full_history_backfill_approved": true,
+  "raw_canonical_from": "2026-08-24T22:47:54Z",
+  "silent_semantics_mixing_forbidden": true
+}

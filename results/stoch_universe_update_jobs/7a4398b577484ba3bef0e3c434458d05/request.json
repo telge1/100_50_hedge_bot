@@ -1,0 +1,1273 @@
+{
+  "backfill_script": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/scripts/backfill_bybit_universe.py",
+  "created_at": "2026-08-15T09:42:54Z",
+  "job_id": "7a4398b577484ba3bef0e3c434458d05",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_universe_update_jobs",
+  "plans": [
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ETHUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "BTCUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T17:18:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "XRPUSDT",
+      "update_from": "2026-08-11T17:18:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T17:17:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "SOLUSDT",
+      "update_from": "2026-08-11T17:17:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T17:18:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "HYPEUSDT",
+      "update_from": "2026-08-11T17:18:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "XAUTUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T17:18:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ZECUSDT",
+      "update_from": "2026-08-11T17:18:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "LINKUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "ALREADY_CURRENT",
+      "calls": [],
+      "message": "bereits aktuell",
+      "symbol": "DOGEUSDT"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "BNBUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "SUIUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ADAUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T17:17:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "AVAXUSDT",
+      "update_from": "2026-08-11T17:17:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "PUMPFUNUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ONDOUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-15T09:08:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "1000PEPEUSDT",
+      "update_from": "2026-08-15T09:08:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-15T09:24:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "AAVEUSDT",
+      "update_from": "2026-08-15T09:24:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "LTCUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "TAOUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "DOTUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "WLDUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "TRXUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ENAUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "NEARUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "SHIB1000USDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "HBARUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ARBUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "PAXGUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-14T10:07:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "APTUSDT",
+      "update_from": "2026-08-14T10:07:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "PENGUUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "UNIUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "OPUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "FARTCOINUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "KAITOUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ALGOUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "XMRUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "XLMUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "MNTUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "WLFIUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "CRVUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "INJUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "JTOUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "XPLUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ICPUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-30T13:48:00Z"
+        }
+      ],
+      "listing_limited": true,
+      "message": "wird aktualisiert",
+      "symbol": "LITUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "TIAUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-15T09:24:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "1000BONKUSDT",
+      "update_from": "2026-08-15T09:24:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "TRUMPUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "WIFUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "ATOMUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    },
+    {
+      "action": "NEEDS_UPDATE",
+      "calls": [
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "incremental",
+          "repair_missing": true,
+          "resume": false,
+          "start": "2026-08-11T00:00:00Z"
+        },
+        {
+          "end": "2026-08-15T09:42:00Z",
+          "kind": "repair_missing",
+          "repair_missing": true,
+          "resume": true,
+          "start": "2025-12-11T00:00:00Z"
+        }
+      ],
+      "listing_limited": false,
+      "message": "wird aktualisiert",
+      "symbol": "RENDERUSDT",
+      "update_from": "2026-08-11T00:00:00Z",
+      "update_to_exclusive": "2026-08-15T09:42:00Z"
+    }
+  ],
+  "repair_missing": true,
+  "requested_from": "2025-12-11T00:00:00Z",
+  "sg_python": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+  "sg_root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+  "symbols": [
+    "ETHUSDT",
+    "BTCUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT",
+    "AVAXUSDT",
+    "PUMPFUNUSDT",
+    "ONDOUSDT",
+    "1000PEPEUSDT",
+    "AAVEUSDT",
+    "LTCUSDT",
+    "TAOUSDT",
+    "DOTUSDT",
+    "WLDUSDT",
+    "TRXUSDT",
+    "ENAUSDT",
+    "NEARUSDT",
+    "SHIB1000USDT",
+    "HBARUSDT",
+    "ARBUSDT",
+    "PAXGUSDT",
+    "APTUSDT",
+    "PENGUUSDT",
+    "UNIUSDT",
+    "OPUSDT",
+    "FARTCOINUSDT",
+    "KAITOUSDT",
+    "ALGOUSDT",
+    "XMRUSDT",
+    "XLMUSDT",
+    "MNTUSDT",
+    "WLFIUSDT",
+    "CRVUSDT",
+    "INJUSDT",
+    "JTOUSDT",
+    "XPLUSDT",
+    "ICPUSDT",
+    "LITUSDT",
+    "TIAUSDT",
+    "1000BONKUSDT",
+    "TRUMPUSDT",
+    "WIFUSDT",
+    "ATOMUSDT",
+    "RENDERUSDT"
+  ],
+  "universe_file": "universe_selected.json",
+  "update_to": "2026-08-15T09:42:00Z"
+}

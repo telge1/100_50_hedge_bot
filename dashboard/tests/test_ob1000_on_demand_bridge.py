@@ -77,13 +77,25 @@ def test_ob1000_depth_selector_and_poll_constants():
     html = (root / "templates/research_charts.html").read_text(encoding="utf-8")
     js = (root / "static/js/research/research_charts.js").read_text(encoding="utf-8")
     assert 'id="researchOblDepth"' in html
-    assert ">OB200<" in html and ">OB1000<" in html
-    assert "OBL1000_REFRESH_MS = 1 * 1000" in js
+    assert ">OB200<" in html and ">OB1000<" in html and ">FULL<" in html
+    assert 'value="1000" selected' in html or "value='1000' selected" in html
+    assert "depth: 1000" in js
+    assert "OBL1000_REFRESH_MS = 2 * 1000" in js
+    assert "OBL_FULL_REFRESH_MS = 2 * 1000" in js
     assert "OBL1000_HEARTBEAT_MS = 15 * 1000" in js
+    assert "isOnDemandBookMode" in js
     assert "oblInflight" in js
     assert "document.hidden" in js
     assert "beforeunload" in js
     assert "ensureOb1000Lease" in js
+    assert "symbol_not_in_pilot" in js
+    assert "NOT_PILOT" in js
+    assert "invalidateOb1000LeaseLocal" in js
+    chart = (root / "static/research_trp/chart.js").read_text(encoding="utf-8")
+    assert "scheduleDrawOrderbookLevels" in chart
+    assert "blankBars" in chart
+    assert 'depth === 0 ? "FULL"' in chart or 'depth === 0 ? "FULL"' in chart.replace("'", '"')
+    assert "unknown_lease" in js
     assert "stopOb1000Lease" in js
 
 

@@ -1,0 +1,81 @@
+{
+  "audit_at_utc": "2026-09-04T10:30:50Z",
+  "collector_pid": 1565672,
+  "hypotheses": {
+    "ACTIVE_CAPTURE_BLOCKS_NEW_SIGNAL_CONFIRMED": {
+      "status": "PRIMARY",
+      "evidence": [
+        "watcher.py FIGHT_ACTIVE branch returns action=extend only, never action=trigger",
+        "manager._start_or_merge_event merges into open writer; CROSS_IN path unreachable",
+        "No new event_manifest.json since 08:05 UTC triggers",
+        "Later profile windows would meet entry rules but no GENUINE_CROSS_IN stored"
+      ]
+    },
+    "ACTIVE_CAPTURE_BLOCKS_ONLY_SECOND_CAPTURE": {
+      "status": "PARTIAL_TRUE_NOT_PRIMARY",
+      "evidence": [
+        "Second Full-OB file blocked via sym in _writers",
+        "But signal-class markers ARE persisted: PROFILE_UPDATE_DURING_CAPTURE, SECONDARY_EDGE_TRIGGER, EXTENSION, EDGE_RETOUCH"
+      ]
+    },
+    "NO_NEW_SIGNAL_RULES_NOT_MET": {
+      "status": "REJECTED_AS_PRIMARY",
+      "evidence": [
+        "All four post-trigger 30m BTC profiles show price within 20 bps of new VAH/VAL after cutoff",
+        "Hypothetical CROSS_IN candidates exist if evaluated against new edges with REARMED lifecycle"
+      ]
+    },
+    "EVENT_LIFECYCLE_STUCK": {
+      "status": "REJECTED",
+      "evidence": [
+        "normal_end_ts=10:35:34Z at audit time 10:30:50Z — not yet past normal end",
+        "3 extensions at 09:05, 09:35, 10:05 UTC (BREAKOUT_ACCEPTANCE_PENDING) — monotonic normal_end",
+        "hard_cap 11:05:34Z still ~35 min away",
+        "Writer alive, queue_backlog=0, queue_drops=0"
+      ]
+    },
+    "SIGNAL_SUPPRESSION_UNRESOLVED": {
+      "status": "REJECTED"
+    }
+  },
+  "verdict": "ACTIVE_CAPTURE_BLOCKS_NEW_SIGNAL_CONFIRMED",
+  "matrix": {
+    "during_FIGHT_ACTIVE": {
+      "watcher_tick_runs": true,
+      "new_30m_profile_loaded": true,
+      "profile_applied_to_watcher_edges": false,
+      "frozen_trigger_edges_used_for_zones": true,
+      "pending_profile_persisted_as_marker": true,
+      "GENUINE_CROSS_IN_possible": false,
+      "second_capture_file_possible": false,
+      "SECONDARY_EDGE_TRIGGER_possible": true,
+      "EDGE_RETOUCH_possible": true,
+      "EXTENSION_possible": true,
+      "PROFILE_UPDATE_DURING_CAPTURE_possible": true
+    },
+    "after_event_end_COOLDOWN_REARMED": {
+      "GENUINE_CROSS_IN_possible": true,
+      "requires": ["event finalized", "cooldown elapsed", "zone OUT then re-enter IN"]
+    }
+  },
+  "live_events": {
+    "BTCUSDT": {
+      "lifecycle": "FIGHT_ACTIVE",
+      "event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+      "regular_per_contract": true,
+      "stuck": false,
+      "extension_count": 3,
+      "normal_end_ts": "2026-09-04T10:35:34.762483Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:34.762483Z"
+    },
+    "DOGEUSDT": {
+      "lifecycle": "FIGHT_ACTIVE",
+      "event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+      "regular_per_contract": true,
+      "stuck": false,
+      "extension_count": 3,
+      "normal_end_ts": "2026-09-04T10:35:51.864878Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:51.864878Z"
+    }
+  }
+}

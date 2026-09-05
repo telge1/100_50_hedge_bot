@@ -1,0 +1,9 @@
+{
+  "resync_checkpoint_regression": "PASS",
+  "tests_passed": 9,
+  "test_file": "tests/test_full_ob_resync_checkpoint_v1.py",
+  "nested_marker_after_checkpoint": true,
+  "signal_capture_continuous_on_gap": false,
+  "signal_research_eligible_on_gap": false,
+  "parent_research_eligible_unchanged_on_nested": true
+}

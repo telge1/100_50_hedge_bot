@@ -147,7 +147,7 @@ def insert_liquidations(client: Any, ctx: DayContext, now: datetime) -> int:
     return len(transformed)
 
 
-def insert_oi(client: Any, ctx: DayContext, now: datetime) -> None:
+def insert_oi(client: Any, ctx: DayContext, now: datetime, *, coverage_status: str = "COMPLETE") -> None:
     sql = f"""
     INSERT INTO {TARGET_DATABASE}.research_open_interest_observations
     SELECT symbol,bucket_time,argMax(open_interest,inserted_at),
@@ -155,7 +155,7 @@ def insert_oi(client: Any, ctx: DayContext, now: datetime) -> None:
            argMax(source_event_time,inserted_at),argMax(state_age_ms,inserted_at),
            argMax(state_valid,inserted_at),5000,'BYBIT_BASE_AND_QUOTE',
            '{ctx.contract_version}','open_interest_5s_v1','{ctx.build_id}',
-           'COMPLETE',toDateTime64('{now.isoformat()}',6,'UTC')
+           '{coverage_status}',toDateTime64('{now.isoformat()}',6,'UTC')
     FROM orderbook_analysis.open_interest_5s
     WHERE symbol='{ctx.symbol}'
       AND bucket_time>=toDateTime64('{_literal_time(ctx.day_start)}',3,'UTC')

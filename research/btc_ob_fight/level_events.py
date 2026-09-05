@@ -36,28 +36,35 @@ def compute_level_events(
     window_start = utc(window_start)
     window_end = utc(window_end)
     anchor = utc(anchor) if anchor is not None else window_start
-    full = sorted(
-        [t for t in trades if window_start <= t["ts"] < window_end],
-        key=lambda t: (t["ts"], t["trade_id"]),
-    )
-    post = sorted(
-        [t for t in trades if anchor <= t["ts"] < window_end],
-        key=lambda t: (t["ts"], t["trade_id"]),
-    )
-    pre = sorted(
-        [t for t in trades if t["ts"] < anchor],
-        key=lambda t: (t["ts"], t["trade_id"]),
-    )
-    anchor_price = pre[-1]["price"] if pre else (post[0]["price"] if post else None)
+    # Loader output is already ordered by (ts, trade_id); avoid re-sorting 800k+ rows.
+    full = [t for t in trades if window_start <= t["ts"] < window_end]
+    post = [t for t in full if t["ts"] >= anchor]
+    anchor_price = None
+    for t in reversed(trades):
+        if t["ts"] < anchor:
+            anchor_price = t["price"]
+            break
+    if anchor_price is None and post:
+        anchor_price = post[0]["price"]
     out: list[dict[str, Any]] = []
     for lvl in levels:
+        level = float(lvl["price"])
+        # Same semantics as full pre-scan: walk backward until a non-AT side appears.
+        pre_for_level: list[dict[str, Any]] = []
+        for t in reversed(trades):
+            if t["ts"] >= anchor:
+                continue
+            pre_for_level.append(t)
+            if _price_side(t["price"], level) != SIDE_AT:
+                break
+        pre_for_level.reverse()
         out.append(
             _analyze_level(
                 lvl,
-                float(lvl["price"]),
+                level,
                 full,
                 post,
-                pre,
+                pre_for_level,
                 anchor,
                 anchor_price,
                 price_source=price_source,

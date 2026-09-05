@@ -1,0 +1,104 @@
+{
+  "captured_at": "2026-09-04T20:10:37.555412+00:00",
+  "instance_count": 1,
+  "procs": [
+    "1810262 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "pidfile": "1810262",
+  "lock": "1810262",
+  "pid_1810262_alive": true,
+  "cmdline": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO ",
+  "current_process_fr_env": "false",
+  "bash_n_ok": true,
+  "bash_n_stderr": "",
+  "simulated_effective_fr": "EFFECTIVE=true",
+  "effective_fr_true": true,
+  "script_lines_with_false": [],
+  "env_fr_lines": [
+    [
+      22,
+      "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE=true"
+    ]
+  ],
+  "symbols_config_lines": [
+    "OB_V3_FULL_OB_FR_SYMBOLS=BTCUSDT,DOGEUSDT"
+  ],
+  "fr_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+  "fr_root_writable": true,
+  "disk_free_gb": 377.4,
+  "disk_ok_300gb": true,
+  "mem_available_gb": 14.83,
+  "ram_ok": true,
+  "stale_tmp_sha_checks": [],
+  "stale_tmp_all_match": true,
+  "concurrent_start_procs": "NONE",
+  "protected": {
+    "1795773": {
+      "role": "oi_liq",
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode li"
+    },
+    "1661773": {
+      "role": "public_trades",
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_colle"
+    },
+    "1780509": {
+      "role": "dashboard",
+      "alive": true,
+      "cmd": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py "
+    }
+  },
+  "single_instance_ok": true,
+  "script_false_assignments": [],
+  "PASS": true,
+  "block_reason": null,
+  "tests_passed": 84,
+  "post_restart": {
+    "captured_at": "2026-09-04T20:12:42.849815+00:00",
+    "pid": 1817696,
+    "alive": true,
+    "proc_environ_fr_related": {
+      "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+      "OB_V3_ON_DEMAND_SOCKET_PATH": "/run/user/1000/orderbook_ob1000.sock",
+      "OB_V3_FULL_BOOK_ENABLE": "true",
+      "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+      "OB_V3_FULL_OB_FR_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+      "OB_V3_RAW_ARCHIVE_SYMBOLS": "BTCUSDT,DOGEUSDT",
+      "OB_V3_ON_DEMAND_ENABLE": "true"
+    },
+    "FLIGHT_RECORDER_ENV_TRUE": true,
+    "FLIGHT_RECORDER_RUNTIME_ENABLED": true,
+    "FLIGHT_RECORDER_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "health_fr_keys": {
+      "full_ob_flight_recorder_enabled": true,
+      "symbols": [
+        "BTCUSDT",
+        "DOGEUSDT"
+      ],
+      "capture_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+      "prebuffer_coverage_seconds": {
+        "DOGEUSDT": 4.030448589,
+        "BTCUSDT": 4.826588562
+      },
+      "signal_count": 0,
+      "bootstrap_observation_count": 2,
+      "writer_error_count": 0,
+      "writer_queue_drops": 0,
+      "PARENT_CAPTURE_COUNT": 0,
+      "GENUINE_PARENT_SIGNAL_COUNT": 0,
+      "full_book_active_topics": 2,
+      "confirmed_topics": [
+        "orderbook.200.BTCUSDT",
+        "orderbook.200.DOGEUSDT",
+        "orderbook.full.BTCUSDT",
+        "orderbook.full.DOGEUSDT"
+      ],
+      "collector_state": "LIVE",
+      "rss_mb": 157.28
+    },
+    "startup_log_fr_lines": [
+      "948303222656,\"event_lag_p50\":2153.215087890625,\"event_lag_p95\":9841.498046875,\"event_lag_p99\":10437.695068359375,\"messages_received\":171,\"snapshots\":1,\"deltas\":170,\"rows_enqueued\":0,\"rows_written\":0,\"sequence_gaps\":0,\"symbol_resyncs\":0,\"invalid_book_count\":0,\"stale_generation_dropped\":0,\"unwritten_seconds\":0,\"last_error\":\"\",\"generation\":1,\"dedupe_entries\":171,\"dedupe_capacity\":8192,\"dedupe_evictions\":0,\"dedupe_hits\":0,\"book_bid_levels\":200,\"book_ask_levels\":200,\"in_flight_buckets\":0,\"delta_data_in_bucket\":3},{\"symbol\":\"DOGEUSDT\",\"state\":\"LIVE\",\"subscribed\":true,\"subscription_confirmed\":true,\"snapshot_received\":true,\"book_valid\":true,\"last_event_timestamp\":\"2026-09-04T20:12:41.280Z\",\"last_received_at\":\"2026-09-04T20:12:41.369Z\",\"last_bucket_written\":null,\"first_valid_live_bucket\":\"2026-09-04T20:12:23.000Z\",\"skip_before_ms\":null,\"last_db_bucket\":null,\"detected_gap_seconds\":null,\"catchup_required\":false,\"skip_error\":null,\"event_lag_ms\":89.227783203125,\"receive_lag_ms\":0.05602836608886719,\"event_lag_p50\":2301.7958984375,\"event_lag_p95\":9889.472900390625,\"event_lag_p99\":10464.661865234375,\"messages_received\":154,\"snapshots\":1,\"deltas\":153,\"rows_enqueued\":0,\"rows_written\":0,\"sequence_gaps\":0,\"symbol_resyncs\":0,\"invalid_book_count\":0,\"stale_generation_dropped\":0,\"unwritten_seconds\":0,\"last_error\":\"\",\"generation\":1,\"dedupe_entries\":154,\"dedupe_capacity\":8192,\"dedupe_evictions\":0,\"dedupe_hits\":0,\"book_bid_levels\":200,\"book_ask_levels\":200,\"in_flight_buckets\":0,\"delta_data_in_bucket\":2}],\"collector_identity\":\"raw_archive_only\",\"feature_writer_enabled\":false,\"raw_archive_enabled\":true,\"raw_archive_symbols\":[\"BTCUSDT\",\"DOGEUSDT\"],\"raw_queue_size\":8192,\"raw_queue_current\":1,\"raw_queue_high_watermark\":203,\"raw_events_received\":325,\"raw_events_written\":326,\"raw_snapshots\":2,\"raw_deltas\":323,\"raw_gap_count\":0,\"raw_overflow_count\":0,\"raw_writer_errors\":0,\"raw_last_write_at\":\"2026-09-04T20:12:41.318829Z\",\"raw_current_segment\":\"/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/09/04/BTCUSDT_20260904T201225Z_open_ob200_v3.zst.tmp\",\"raw_segment_replayable\":true,\"raw_bytes_written\":0,\"raw_free_disk_gb\":351.473,\"raw_archive_paused\":false,\"raw_events_dropped_overflow\":0,\"on_demand_enabled\":true,\"on_demand_socket_path\":\"/run/user/1000/orderbook_ob1000.sock\",\"on_demand_active_topics\":0,\"on_demand_leases\":[],\"on_demand_runtimes\":[],\"full_book_enabled\":true,\"full_book_active_topics\":2,\"full_book_rpi_included\":false,\"full_book_lock_hold_ns_last\":53100,\"full_book_lock_hold_ns_max\":105810,\"full_book_runtimes\":[{\"symbol\":\"BTCUSDT\",\"subscription_state\":\"live\",\"raw_bids\":38193,\"raw_asks\":27168,\"snapshot_loaded\":true,\"book_ready\":true,\"update_id\":4566394,\"seq\":805412013980,\"cts_ms\":1788552761271,\"gap_count\":0,\"reconnect_count\":0,\"last_error\":\"\"},{\"symbol\":\"DOGEUSDT\",\"subscription_state\":\"live\",\"raw_bids\":5049,\"raw_asks\":14207,\"snapshot_loaded\":true,\"book_ready\":true,\"update_id\":4566080,\"seq\":346160905028,\"cts_ms\":1788552761126,\"gap_count\":0,\"reconnect_count\":0,\"last_error\":\"\"}],\"full_ob_flight_recorder_enabled\":true,\"contract_version\":\"full_ob_edge_capture_timing_v1\",\"timing_contract\":\"full_ob_edge_capture_timing_v1\",\"pre_seconds\":600.0,\"min_post_seconds\":3600.0,\"segment_seconds\":1800.0,\"hard_cap_seconds\":10800.0,\"symbols\":[\"BTCUSDT\",\"DOGEUSDT\"],\"capture_root\":\"/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder\",\"rpi_included\":false,\"bootstrap_persistent_capture\":false,\"signal_count\":0,\"bootstrap_observation_count\":2,\"writer_mode\":\"BATCH_STREAMING_ZSTD\",\"queue_item_contract\":\"ONE_ITEM_PER_BYBIT_DELTA\",\"writer_batch_max_messages\":64,\"writer_flush_interval_sec\":1.0,\"writer_backlog\":0,\"queue_backlog_items\":0,\"queue_backlog_bytes\":0,\"queue_oldest_age_ms\":null,\"writer_queue_drops\":0,\"queue_drop_count\":0,\"current_event_queue_drops\":0,\"process_lifetime_queue_drops\":0,\"symbol_lifetime_queue_drops\":{\"DOGEUSDT\":0,\"BTCUSDT\":0},\"last_event_queue_drops\":{\"DOGEUSDT\":0,\"BTCUSDT\":0},\"total_research_ineligible_events\":0,\"current_queue_backlog\":0,\"current_writer_alive\":true,\"dropped_messages\":0,\"dropped_price_level_updates\":0,\"dropped_bytes_estimate\":0,\"writer_batch_size\":0,\"writer_flush_count\":0,\"writer_error_count\":0,\"writer_messages_total\":0,\"writer_bytes_total\":0,\"ingress_messages_total\":47,\"ingress_level_updates_total\":3125,\"ingress_messages_per_second\":9.394838475741427,\"ingress_level_updates_per_second\":624.6568135466374,\"writer_messages_per_second\":0.0,\"writer_bytes_per_second\":0.0,\"prebuffer_coverage_seconds\":{\"DOGEUSDT\":4.030448589,\"BTCUSDT\":4.826588562},\"open_tmp_bytes\":0,\"disk_free_gb\":351.473,\"disk_below_warn\":false,\"disk_below_min\":false,\"projected_daily_bytes\":0,\"projected_daily_warn\":false,\"nested_signal_contract\":\"nested_profile_edge_signal_v1\",\"nested_profile_signals_enabled\":true,\"analysis_isolation_contract\":\"nested_signal_analysis_isolation_v1\",\"PARENT_CAPTURE_COUNT\":0,\"GENUINE_PARENT_SIGNAL_COUNT\":0,\"NESTED_PROFILE_EDGE_SIGNAL_COUNT\":0,\"SECONDARY_OBSERVATIONS_SUPPRESSED\":0,\"secondary_edge_observation_count\":0,\"nested_signal_count\":0,\"duplicate_secondary_trigger_suppressed_count\":0,\"profile_arm_count\":0,\"profile_rearm_count\":0,\"profile_expiry_count\":0,\"ACTIVE_PROFILE_WATCH_COUNT\":0,\"runtimes\":{\"DOGEUSDT\":{\"lifecycle\":\"IDLE\",\"event_id\":null,\"fight_event_id\":null,\"continuation_index\":null,\"buffer_messages\":21,\"buffer_bytes\":8204,\"buffer_span_seconds\":3.884401564,\"prebuffer_coverage_seconds\":4.030477649,\"buffer_overflow\":0,\"capturing\":false,\"bootstrap_status\":\"BOOTSTRAP_ALREADY_IN_EDGE_ZONE\",\"bootstrap_observation_count\":1,\"bootstrap_persistent_capture\":false,\"writer_backlog\":0,\"queue_drops\":0,\"current_event_queue_drops\":0,\"symbol_lifetime_queue_drops\":0,\"last_event_queue_drops\":0,\"writer_alive\":true,\"writer_error_count\":0,\"dropped_price_level_updates\":0,\"minimum_capture_end_ts\":null,\"normal_end_ts\":null,\"extension_count\":null,\"pre_trigger_seconds_actual\":null,\"trigger_source\":null,\"trigger_quality\":null,\"research_eligible\":null,\"data_quality\":null,\"source_feed_u_gap_count\":null,\"apply_epoch_u_gap_count\":null,\"persisted_capture_u_gap_count\":null,\"transport_reconnect_count\":null,\"resync_boundary_count\":null,\"continuity_epoch_count\":null,\"continuous_capture\":null,\"replayable_by_epochs\":null,\"resync_checkpoint_success_count\":null,\"resync_checkpoint_failure_count\":null,\"nested_signal_count\":0,\"secondary_edge_observation_count\":0,\"duplicate_secondary_trigger_suppressed_count\":0,\"profile_arm_count\":0,\"profile_rearm_count\":0,\"profile_expiry_count\":0,\"active_profile_watch_count\":0},\"BTCUSDT\":{\"lifecycle\":\"IDLE\",\"event_id\":null,\"fight_event_id\":null,\"continuation_index\":null,\"buffer_messages\":26,\"buffer_bytes\":86816,\"buffer_span_seconds\":4.819412496,\"prebuffer_coverage_seconds\":4.826630542,\"buffer_overflow\":0,\"capturing\":false,\"bootstrap_status\":\"BOOTSTRAP_ALREADY_IN_EDGE_ZONE\",\"bootstrap_observation_count\":1,\"bootstrap_persistent_capture\":false,\"writer_backlog\":0,\"queue_drops\":0,\"current_event_queue_drops\":0,\"symbol_lifetime_queue_drops\":0,\"last_event_queue_drops\":0,\"writer_alive\":true,\"writer_error_count\":0,\"dropped_price_level_updates\":0,\"minimum_capture_end_ts\":null,\"normal_end_ts\":null,\"extension_count\":null,\"pre_trigger_seconds_actual\":null,\"trigger_source\":null,\"trigger_quality\":null,\"research_eligible\":null,\"data_quality\":null,\"source_feed_u_gap_count\":null,\"apply_epoch_u_gap_count\":null,\"persisted_capture_u_gap_count\":null,\"transport_reconnect_count\":null,\"resync_boundary_count\":null,\"continuity_epoch_count\":null,\"continuous_capture\":null,\"replayable_by_epochs\":null,\"resync_checkpoint_success_count\":null,\"resync_checkpoint_failure_count\":null,\"nested_signal_count\":0,\"secondary_edge_observation_count\":0,\"duplicate_secondary_trigger_suppressed_count\":0,\"profile_arm_count\":0,\"profile_rearm_count\":0,\"profile_expiry_count\":0,\"active_profile_watch_count\":0}},\"fr_process_transport_reconnect_count\":0,\"fr_process_resync_checkpoint_success_count\":0,\"fr_process_resync_checkpoint_failure_count\":0}"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "new_fr_files_during_smoke": [],
+  "BOOTSTRAP_FILE_CREATED": false,
+  "genuine_signal_observed": false,
+  "note": "bootstrap must not create persistent capture; ringbuffer growth tracked in CSV",
+  "bootstrap_status": {
+    "BTCUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE",
+    "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+  },
+  "lifecycle": {
+    "BTCUSDT": "IDLE",
+    "DOGEUSDT": "IDLE"
+  },
+  "capturing": {
+    "BTCUSDT": false,
+    "DOGEUSDT": false
+  },
+  "PARENT_CAPTURE_COUNT": 0,
+  "GENUINE_PARENT_SIGNAL_COUNT": 0,
+  "new_capture_dirs_since_restart": []
+}

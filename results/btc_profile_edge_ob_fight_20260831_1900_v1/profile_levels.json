@@ -1,0 +1,471 @@
+{
+  "settings": {
+    "value_area_pct": 0.7,
+    "target_bins": 160,
+    "anchor_note": "volume-at-price (NOT classic TPO letters); sessions asia/eu/us/late as in market_profile package",
+    "causal_cutoff": "2026-08-31T19:00:00Z"
+  },
+  "profiles": {
+    "prior_day_20260830": {
+      "window_label": "2026-08-30",
+      "window_start": "2026-08-30T00:00:00Z",
+      "window_end": "2026-08-31T00:00:00Z",
+      "price_step": 20.0,
+      "price_low": 76900.0,
+      "price_high": 79367.5,
+      "open": 78196.6,
+      "close": 77639.1,
+      "total_volume": 41057.55400000053,
+      "buy_volume": 19436.70899999998,
+      "sell_volume": 21620.845,
+      "trades": 1358152,
+      "poc": 78830.0,
+      "vah": 79200.0,
+      "val": 78120.0,
+      "va_volume_share": 0.7095432426393459,
+      "hvn": [
+        78030.0,
+        78130.0,
+        78430.0,
+        78570.0,
+        78670.0,
+        78830.0,
+        78990.0
+      ],
+      "lvn": [
+        76970.0,
+        77130.0,
+        77250.0,
+        77390.0,
+        77510.0,
+        77590.0,
+        77710.0,
+        77810.0,
+        77890.0,
+        79250.0
+      ],
+      "single_print_ranges": [
+        {
+          "low": 76920.0,
+          "high": 77000.0
+        },
+        {
+          "low": 77020.0,
+          "high": 77040.0
+        },
+        {
+          "low": 77880.0,
+          "high": 77900.0
+        },
+        {
+          "low": 79360.0,
+          "high": 79380.0
+        }
+      ],
+      "shape": {
+        "kind": "UNCLEAR",
+        "letter": "P",
+        "reason": [
+          "va_range_share=0.438",
+          "directional_share=-0.226",
+          "poc_position=0.782",
+          "poc_concentration=2.86x mean bin",
+          "metrics fall between the balance and trend cut-offs -> no verdict; thresholds are centred on observed BTCUSDT distributions but are not validated against outcomes"
+        ]
+      }
+    },
+    "asia_eu_completed_to_1330": {
+      "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+      "window_start": "2026-08-31T00:00:00Z",
+      "window_end": "2026-08-31T13:30:00Z",
+      "price_step": 10.0,
+      "price_low": 77336.8,
+      "price_high": 78783.0,
+      "open": 77639.1,
+      "close": 78017.1,
+      "total_volume": 34772.45700000002,
+      "buy_volume": 17221.583000000013,
+      "sell_volume": 17550.874000000025,
+      "trades": 1161560,
+      "poc": 77965.0,
+      "vah": 78220.0,
+      "val": 77460.0,
+      "va_volume_share": 0.7003627900093454,
+      "hvn": [
+        77595.0,
+        77745.0,
+        77825.0,
+        77905.0,
+        77965.0,
+        78045.0
+      ],
+      "lvn": [
+        77415.0,
+        78235.0,
+        78525.0,
+        78695.0,
+        78735.0
+      ],
+      "single_print_ranges": [
+        {
+          "low": 77330.0,
+          "high": 77360.0
+        },
+        {
+          "low": 77370.0,
+          "high": 77380.0
+        },
+        {
+          "low": 78780.0,
+          "high": 78790.0
+        }
+      ],
+      "shape": {
+        "kind": "UNCLEAR",
+        "letter": "D",
+        "reason": [
+          "va_range_share=0.526",
+          "directional_share=+0.261",
+          "poc_position=0.434",
+          "poc_concentration=3.97x mean bin",
+          "metrics fall between the balance and trend cut-offs -> no verdict; thresholds are centred on observed BTCUSDT distributions but are not validated against outcomes"
+        ]
+      }
+    },
+    "us_developing_to_T0": {
+      "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+      "window_start": "2026-08-31T13:30:00Z",
+      "window_end": "2026-08-31T19:00:00Z",
+      "price_step": 10.0,
+      "price_low": 77680.0,
+      "price_high": 79193.1,
+      "open": 78017.1,
+      "close": 78984.4,
+      "total_volume": 21512.315000000013,
+      "buy_volume": 11065.839,
+      "sell_volume": 10446.476000000006,
+      "trades": 813062,
+      "poc": 78565.0,
+      "vah": 79140.0,
+      "val": 78190.0,
+      "va_volume_share": 0.7013816504639311,
+      "hvn": [
+        77835.0,
+        77955.0,
+        78355.0,
+        78455.0,
+        78515.0,
+        78575.0,
+        78645.0,
+        78805.0,
+        78865.0
+      ],
+      "lvn": [
+        78045.0,
+        78225.0,
+        78275.0,
+        78935.0,
+        78985.0,
+        79035.0,
+        79145.0
+      ],
+      "single_print_ranges": [
+        {
+          "low": 77680.0,
+          "high": 77700.0
+        },
+        {
+          "low": 79140.0,
+          "high": 79150.0
+        },
+        {
+          "low": 79180.0,
+          "high": 79200.0
+        }
+      ],
+      "shape": {
+        "kind": "DOUBLE_DISTRIBUTION",
+        "letter": "B",
+        "reason": [
+          "va_range_share=0.628",
+          "directional_share=+0.639",
+          "poc_position=0.585",
+          "poc_concentration=3.84x mean bin",
+          "a second strong volume cluster is separated from the POC by a contiguous rejection gap -> double distribution; treat each cluster as its own balance and the gap between them as fast territory"
+        ]
+      }
+    },
+    "day_developing_to_T0": {
+      "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+      "window_start": "2026-08-31T00:00:00Z",
+      "window_end": "2026-08-31T19:00:00Z",
+      "price_step": 20.0,
+      "price_low": 77336.8,
+      "price_high": 79193.1,
+      "open": 77639.1,
+      "close": 78984.4,
+      "total_volume": 56284.77200000186,
+      "buy_volume": 28287.422000000173,
+      "sell_volume": 27997.350000000184,
+      "trades": 1974622,
+      "poc": 77970.0,
+      "vah": 78520.0,
+      "val": 77520.0,
+      "va_volume_share": 0.71656520168546,
+      "hvn": [
+        77810.0,
+        77970.0,
+        78370.0,
+        78510.0,
+        78590.0
+      ],
+      "lvn": [
+        78870.0,
+        79010.0,
+        79170.0
+      ],
+      "single_print_ranges": [
+        {
+          "low": 77320.0,
+          "high": 77360.0
+        },
+        {
+          "low": 79140.0,
+          "high": 79160.0
+        },
+        {
+          "low": 79180.0,
+          "high": 79200.0
+        }
+      ],
+      "shape": {
+        "kind": "TREND_UP",
+        "letter": "b",
+        "reason": [
+          "va_range_share=0.539",
+          "directional_share=+0.725",
+          "poc_position=0.341",
+          "poc_concentration=3.01x mean bin",
+          "closed >=0.50 of the range away from the open with volume spread over >=0.50 of it -> trend; POC is a way station, not a reversal level"
+        ]
+      }
+    },
+    "vp_block_1830_1900": {
+      "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+      "window_start": "2026-08-31T18:30:00Z",
+      "window_end": "2026-08-31T19:00:00Z",
+      "price_step": 2.5,
+      "price_low": 78847.0,
+      "price_high": 79193.1,
+      "open": 78866.3,
+      "close": 78984.4,
+      "total_volume": 1125.1899999999991,
+      "buy_volume": 535.7069999999999,
+      "sell_volume": 589.4829999999998,
+      "trades": 43239,
+      "poc": 79166.25,
+      "vah": 79195.0,
+      "val": 79005.0,
+      "va_volume_share": 0.7054710759960541,
+      "hvn": [
+        78986.25,
+        79001.25,
+        79021.25,
+        79058.75,
+        79076.25,
+        79088.75,
+        79098.75,
+        79111.25,
+        79121.25,
+        79128.75,
+        79168.75
+      ],
+      "lvn": [
+        78856.25,
+        78871.25,
+        78888.75,
+        78896.25,
+        78923.75,
+        78936.25,
+        78946.25,
+        78963.75,
+        79036.25,
+        79141.25,
+        79188.75
+      ],
+      "single_print_ranges": [
+        {
+          "low": 78867.5,
+          "high": 78875.0
+        },
+        {
+          "low": 78887.5,
+          "high": 78890.0
+        },
+        {
+          "low": 78897.5,
+          "high": 78900.0
+        },
+        {
+          "low": 78925.0,
+          "high": 78927.5
+        },
+        {
+          "low": 78977.5,
+          "high": 78980.0
+        },
+        {
+          "low": 79137.5,
+          "high": 79145.0
+        },
+        {
+          "low": 79185.0,
+          "high": 79187.5
+        },
+        {
+          "low": 79190.0,
+          "high": 79195.0
+        }
+      ],
+      "shape": {
+        "kind": "DOUBLE_DISTRIBUTION",
+        "letter": "B",
+        "reason": [
+          "va_range_share=0.549",
+          "directional_share=+0.341",
+          "poc_position=0.922",
+          "poc_concentration=3.80x mean bin",
+          "a second strong volume cluster is separated from the POC by a contiguous rejection gap -> double distribution; treat each cluster as its own balance and the gap between them as fast territory"
+        ]
+      }
+    },
+    "vp_block_1800_1830": {
+      "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+      "window_start": "2026-08-31T18:00:00Z",
+      "window_end": "2026-08-31T18:30:00Z",
+      "price_step": 2.5,
+      "price_low": 78746.1,
+      "price_high": 79076.4,
+      "open": 78863.0,
+      "close": 78866.3,
+      "total_volume": 1393.783999999999,
+      "buy_volume": 772.6779999999998,
+      "sell_volume": 621.1059999999998,
+      "trades": 45770,
+      "poc": 78813.75,
+      "vah": 78970.0,
+      "val": 78745.0,
+      "va_volume_share": 0.7006465851236633,
+      "hvn": [
+        78783.75,
+        78793.75,
+        78803.75,
+        78811.25,
+        78868.75,
+        79001.25,
+        79056.25,
+        79071.25
+      ],
+      "lvn": [
+        78768.75,
+        78826.25,
+        78846.25,
+        78861.25,
+        78876.25,
+        78886.25,
+        78923.75,
+        78948.75,
+        78981.25
+      ],
+      "single_print_ranges": [
+        {
+          "low": 78765.0,
+          "high": 78767.5
+        },
+        {
+          "low": 78827.5,
+          "high": 78830.0
+        },
+        {
+          "low": 78847.5,
+          "high": 78850.0
+        },
+        {
+          "low": 78857.5,
+          "high": 78860.0
+        },
+        {
+          "low": 78862.5,
+          "high": 78865.0
+        },
+        {
+          "low": 78872.5,
+          "high": 78877.5
+        },
+        {
+          "low": 78880.0,
+          "high": 78890.0
+        },
+        {
+          "low": 78892.5,
+          "high": 78895.0
+        },
+        {
+          "low": 78910.0,
+          "high": 78912.5
+        },
+        {
+          "low": 78920.0,
+          "high": 78922.5
+        },
+        {
+          "low": 78925.0,
+          "high": 78927.5
+        },
+        {
+          "low": 78937.5,
+          "high": 78942.5
+        },
+        {
+          "low": 78945.0,
+          "high": 78952.5
+        },
+        {
+          "low": 78955.0,
+          "high": 78957.5
+        },
+        {
+          "low": 78972.5,
+          "high": 78975.0
+        },
+        {
+          "low": 78977.5,
+          "high": 78990.0
+        },
+        {
+          "low": 78992.5,
+          "high": 78995.0
+        },
+        {
+          "low": 79042.5,
+          "high": 79045.0
+        },
+        {
+          "low": 79075.0,
+          "high": 79077.5
+        }
+      ],
+      "shape": {
+        "kind": "UNCLEAR",
+        "letter": "b",
+        "reason": [
+          "va_range_share=0.681",
+          "directional_share=+0.010",
+          "poc_position=0.205",
+          "poc_concentration=9.81x mean bin",
+          "metrics fall between the balance and trend cut-offs -> no verdict; thresholds are centred on observed BTCUSDT distributions but are not validated against outcomes"
+        ]
+      }
+    }
+  }
+}

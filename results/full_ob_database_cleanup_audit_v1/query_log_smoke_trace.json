@@ -1,0 +1,1380 @@
+{
+  "available": true,
+  "matching_queries": [
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "\n        SELECT count() FROM (\n          SELECT packet_sha256, count() c FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n          GROUP BY packet_sha256 HAVING c > 1\n        )\n    \n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT name FROM system.tables WHERE database = 'research_full_ob_smoke' ORDER BY name ",
+      "databases": [],
+      "tables": [],
+      "result_rows": 6
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='full_ob_gap_audit_packets_v1'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 17
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT min(exchange_ts_ms), max(exchange_ts_ms) FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT message_type, count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1` GROUP BY message_type ORDER BY count() DESC\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 2
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='full_ob_gap_audit_packets_v1' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='full_ob_gap_audit_packets_v1_dedupdemo'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 17
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT min(exchange_ts_ms), max(exchange_ts_ms) FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT message_type, count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo` GROUP BY message_type ORDER BY count() DESC\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 2
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='full_ob_gap_audit_packets_v1_dedupdemo' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='full_ob_level_changes_smoke_v1'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 10
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT DISTINCT symbol FROM research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT min(exchange_ts_ms), max(exchange_ts_ms) FROM research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='full_ob_level_changes_smoke_v1' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='full_ob_multi_epoch_packets_v1'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 13
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT min(ingestion_ts), max(ingestion_ts) FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='full_ob_multi_epoch_packets_v1' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='full_ob_packets_smoke_v1'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 18
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_packets_smoke_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT DISTINCT fight_event_id FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT DISTINCT symbol FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT DISTINCT source_file FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 2
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT min(exchange_ts_ms), max(exchange_ts_ms) FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT message_type, count() FROM research_full_ob_smoke.`full_ob_packets_smoke_v1` GROUP BY message_type ORDER BY count() DESC\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 3
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='full_ob_packets_smoke_v1' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine FROM system.tables WHERE database='research_full_ob_smoke' AND name='v_full_ob_gap_audit_packets_dedup'\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`v_full_ob_gap_audit_packets_dedup`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Describe",
+      "query_preview": "DESCRIBE TABLE research_full_ob_smoke.`v_full_ob_gap_audit_packets_dedup`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 7
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk) FROM system.parts\n                 WHERE database='research_full_ob_smoke' AND table='v_full_ob_gap_audit_packets_dedup' AND active\n FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_packets_smoke_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "\n        SELECT count() FROM (\n          SELECT packet_sha256, count() c FROM research_full_ob_smoke.`full_ob_packets_smoke_v1`\n          GROUP BY packet_sha256 HAVING c > 1\n        )\n    \n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "\n        SELECT count() FROM (\n          SELECT packet_sha256, count() c FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n          GROUP BY packet_sha256 HAVING c > 1\n        )\n    \n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "\n        SELECT count() FROM (\n          SELECT packet_sha256, count() c FROM research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n          GROUP BY packet_sha256 HAVING c > 1\n        )\n    \n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_multi_epoch_packets_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM research_full_ob_smoke.`full_ob_level_changes_smoke_v1` FINAL\n FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Show",
+      "query_preview": "SHOW TABLES FROM `research_full_ob_smoke`\n FORMAT Native",
+      "databases": [],
+      "tables": [],
+      "result_rows": 6
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1_dedupdemo') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'full_ob_gap_audit_packets_v1_dedupdemo') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_level_changes_smoke_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_level_changes_smoke_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'full_ob_level_changes_smoke_v1') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_multi_epoch_packets_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_multi_epoch_packets_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'full_ob_multi_epoch_packets_v1') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_packets_smoke_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_packets_smoke_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'full_ob_packets_smoke_v1') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'v_full_ob_gap_audit_packets_dedup') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'v_full_ob_gap_audit_packets_dedup') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'v_full_ob_gap_audit_packets_dedup') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, partition_key, sorting_key, primary_key, total_rows, total_bytes, metadata_modification_time FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count(), sum(rows), sum(bytes_on_disk), min(min_time), max(max_time) FROM system.parts WHERE (database = 'research_full_ob_smoke') AND (`table` = 'full_ob_gap_audit_packets_v1') AND active FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.parts"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1_dedupdemo') FORMAT Native",
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT name FROM system.tables WHERE database = 'research_full_ob_smoke' ORDER BY name ",
+      "databases": [],
+      "tables": [],
+      "result_rows": 6
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Create",
+      "query_preview": "CREATE TABLE IF NOT EXISTS full_ob_multi_epoch_packets_v1 (\n  packet_sha256 FixedString(64),\n  continuity_epoch_id UInt32,\n  record_kind LowCardinality(String),\n  record_ordinal UInt64,\n  update_id Nullable(Int64),\n  seq Nullable(Int64),\n  resync_reason Nullable(String),\n  book_hash Nullable(String)",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Drop",
+      "query_preview": "TRUNCATE TABLE full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "AsyncInsertFlush",
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_multi_epoch_packets_v1 (packet_sha256, continuity_epoch_id, record_kind, record_ordinal, update_id, seq, resync_reason, book_hash, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 5
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Insert",
+      "query_preview": "INSERT INTO full_ob_multi_epoch_packets_v1 FORMAT JSONEachRow",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 5
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "AsyncInsertFlush",
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_multi_epoch_packets_v1 (packet_sha256, continuity_epoch_id, record_kind, record_ordinal, update_id, seq, resync_reason, book_hash, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 5
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Insert",
+      "query_preview": "INSERT INTO full_ob_multi_epoch_packets_v1 FORMAT JSONEachRow",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 5
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM (SELECT packet_sha256 FROM full_ob_multi_epoch_packets_v1 GROUP BY packet_sha256)",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT uniqExact(continuity_epoch_id) FROM full_ob_multi_epoch_packets_v1 FINAL WHERE record_kind IN ('INITIAL_CHECKPOINT','RESYNC_CHECKPOINT','BOOK_DELTA')",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM full_ob_multi_epoch_packets_v1 FINAL ARRAY JOIN bids WHERE record_kind='BOOK_DELTA'",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM full_ob_multi_epoch_packets_v1 FINAL ARRAY JOIN bids WHERE record_kind IN ('INITIAL_CHECKPOINT','RESYNC_CHECKPOINT')",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:06:56",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM (SELECT packet_sha256 FROM full_ob_gap_audit_packets_v1_dedupdemo GROUP BY packet_sha256)",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:06:56",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM full_ob_gap_audit_packets_v1_dedupdemo FINAL",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:06:56",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Create",
+      "query_preview": "CREATE VIEW v_full_ob_gap_audit_packets_dedup AS\nSELECT packet_sha256,\n  argMax(source_line_number, ingestion_ts) AS source_line_number,\n  argMax(message_type, ingestion_ts) AS message_type,\n  argMax(update_id, ingestion_ts) AS update_id,\n  argMax(seq, ingestion_ts) AS seq,\n  argMax(bid_n, ingestion",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:06:56",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM v_full_ob_gap_audit_packets_dedup",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Select",
+      "query_preview": "SELECT count() FROM full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 1
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Drop",
+      "query_preview": "DROP TABLE IF EXISTS full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Create",
+      "query_preview": "CREATE TABLE full_ob_gap_audit_packets_v1_dedupdemo AS full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Drop",
+      "query_preview": "TRUNCATE TABLE full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 0
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "AsyncInsertFlush",
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 203
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "type": "QueryFinish",
+      "query_kind": "Insert",
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "result_rows": 203
+    }
+  ],
+  "insert_targets_seen": [
+    "full_ob_gap_audit_packets_v1_dedupdemo",
+    "full_ob_multi_epoch_packets_v1",
+    "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+    "research_full_ob_smoke.full_ob_multi_epoch_packets_v1",
+    "research_full_ob_smoke.research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+    "research_full_ob_smoke.research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+  ],
+  "match_count": 100
+}

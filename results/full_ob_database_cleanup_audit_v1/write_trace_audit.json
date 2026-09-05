@@ -1,0 +1,863 @@
+{
+  "query_log_mutating_related_count": 500,
+  "query_kinds": {
+    "Show": 6,
+    "Select": 6,
+    "Create": 9,
+    "Drop": 17,
+    "AsyncInsertFlush": 229,
+    "Insert": 233
+  },
+  "insert_create_targets": {
+    "research_full_ob_smoke.full_ob_gap_audit_packets_v1": 13,
+    "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo": 7,
+    "research_full_ob_smoke.full_ob_level_changes_smoke_v1": 177,
+    "research_full_ob_smoke.full_ob_multi_epoch_packets_v1": 3,
+    "research_full_ob_smoke.full_ob_packets_smoke_v1": 36,
+    "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup": 1,
+    "full_ob_multi_epoch_packets_v1": 4,
+    "full_ob_gap_audit_packets_v1_dedupdemo": 15,
+    "full_ob_gap_audit_packets_v1": 14,
+    "full_ob_level_changes_smoke_v1": 181,
+    "full_ob_packets_smoke_v1": 34,
+    "IF": 4
+  },
+  "production_orderbook_analysis_mutating_hits": [],
+  "smoke_db_mutating_hits_sample": [
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_gap_audit_packets_v1_dedupdemo`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.full_ob_level_changes_smoke_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_level_changes_smoke_v1`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_multi_epoch_packets_v1`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.full_ob_packets_smoke_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`full_ob_packets_smoke_v1`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:10:28",
+      "user": "orderbook_writer",
+      "query_kind": "Show",
+      "target": "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "written_rows": 0,
+      "query_preview": "SHOW CREATE TABLE research_full_ob_smoke.`v_full_ob_gap_audit_packets_dedup`\n FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "Create",
+      "target": "full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "CREATE TABLE IF NOT EXISTS full_ob_multi_epoch_packets_v1 (\n  packet_sha256 FixedString(64),\n  continuity_epoch_id UInt32,\n  record_kind LowCardinality(String),\n  record_ordinal UInt64,\n  update_id Nullable(Int64),\n  seq Nullable(Int64),\n  resync_reason Nullable(String),\n  book_hash Nullable(String)"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 0,
+      "query_preview": "TRUNCATE TABLE full_ob_multi_epoch_packets_v1"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 5,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_multi_epoch_packets_v1 (packet_sha256, continuity_epoch_id, record_kind, record_ordinal, update_id, seq, resync_reason, book_hash, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 5,
+      "query_preview": "INSERT INTO full_ob_multi_epoch_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 5,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_multi_epoch_packets_v1 (packet_sha256, continuity_epoch_id, record_kind, record_ordinal, update_id, seq, resync_reason, book_hash, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:38:46",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_multi_epoch_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "written_rows": 5,
+      "query_preview": "INSERT INTO full_ob_multi_epoch_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:06:56",
+      "user": "orderbook_writer",
+      "query_kind": "Create",
+      "target": null,
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "written_rows": 0,
+      "query_preview": "CREATE VIEW v_full_ob_gap_audit_packets_dedup AS\nSELECT packet_sha256,\n  argMax(source_line_number, ingestion_ts) AS source_line_number,\n  argMax(message_type, ingestion_ts) AS message_type,\n  argMax(update_id, ingestion_ts) AS update_id,\n  argMax(seq, ingestion_ts) AS seq,\n  argMax(bid_n, ingestion"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": null,
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP VIEW IF EXISTS v_full_ob_gap_audit_packets_dedup"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "TRUNCATE TABLE full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP TABLE IF EXISTS full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "Create",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "CREATE TABLE full_ob_gap_audit_packets_v1_dedupdemo AS full_ob_gap_audit_packets_v1"
+    },
+    {
+      "event_time": "2026-09-04 09:06:55",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP TABLE IF EXISTS full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Create",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "CREATE TABLE full_ob_gap_audit_packets_v1_dedupdemo AS full_ob_gap_audit_packets_v1"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "TRUNCATE TABLE full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": null,
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP VIEW IF EXISTS v_full_ob_gap_audit_packets_dedup"
+    },
+    {
+      "event_time": "2026-09-04 09:06:18",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:05:20",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": null,
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP VIEW IF EXISTS v_full_ob_gap_audit_packets_dedup"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "DROP TABLE IF EXISTS full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "Drop",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "TRUNCATE TABLE full_ob_gap_audit_packets_v1_dedupdemo"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "Create",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 0,
+      "query_preview": "CREATE TABLE full_ob_gap_audit_packets_v1_dedupdemo AS full_ob_gap_audit_packets_v1"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1_dedupdemo FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:05:19",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo"
+      ],
+      "written_rows": 203,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 3,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:21",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 3,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:20",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:20",
+      "user": "orderbook_writer",
+      "query_kind": "Insert",
+      "target": "full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO full_ob_gap_audit_packets_v1 FORMAT JSONEachRow"
+    },
+    {
+      "event_time": "2026-09-04 09:04:20",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:20",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 09:04:20",
+      "user": "orderbook_writer",
+      "query_kind": "AsyncInsertFlush",
+      "target": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+      "databases": [
+        "research_full_ob_smoke"
+      ],
+      "tables": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1"
+      ],
+      "written_rows": 40,
+      "query_preview": "INSERT INTO research_full_ob_smoke.full_ob_gap_audit_packets_v1 (packet_sha256, source_line_number, message_type, marker_type, topic, flight_phase, apply_outcome, exchange_ts_ms, cts_ms, receive_time_ns, update_id, seq, bid_n, ask_n, bids, asks, ingestion_ts) FORMAT Native"
+    }
+  ],
+  "smoke_db_mutating_hit_count": 494,
+  "other_mutating_hits": [
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1') FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_gap_audit_packets_v1_dedupdemo') FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_level_changes_smoke_v1') FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_multi_epoch_packets_v1') FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'full_ob_packets_smoke_v1') FORMAT Native"
+    },
+    {
+      "event_time": "2026-09-04 11:09:42",
+      "user": "orderbook_writer",
+      "query_kind": "Select",
+      "target": null,
+      "databases": [
+        "system"
+      ],
+      "tables": [
+        "system.tables"
+      ],
+      "written_rows": 0,
+      "query_preview": "SELECT engine, create_table_query FROM system.tables WHERE (database = 'research_full_ob_smoke') AND (name = 'v_full_ob_gap_audit_packets_dedup') FORMAT Native"
+    }
+  ],
+  "other_mutating_hit_count": 6,
+  "PRODUCTION_FULL_OB_TEST_CONTAMINATION": false,
+  "note": "Based on system.query_log Insert/Create/Drop/Truncate/Alter with full_ob needles. orderbook_analysis catalog currently unloadable due to broken orderbook_deltas parts (pre-existing).",
+  "orderbook_analysis_inserts_with_needles": 0,
+  "btc_doge_research_inserts_with_needles": {
+    "count": 0,
+    "tables": []
+  },
+  "feature_write_verdicts": {
+    "full_ob_clickhouse_smoke_btc_v1": {
+      "verdict": "WRITTEN_TO_ISOLATED_SMOKE_ONLY",
+      "targets": [
+        "research_full_ob_smoke.full_ob_packets_smoke_v1",
+        "research_full_ob_smoke.full_ob_level_changes_smoke_v1"
+      ],
+      "event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36"
+    },
+    "full_ob_first_event_gap_audit_btc_v1": {
+      "verdict": "WRITTEN_TO_ISOLATED_SMOKE_ONLY",
+      "targets": [
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+        "research_full_ob_smoke.full_ob_gap_audit_packets_v1_dedupdemo",
+        "research_full_ob_smoke.v_full_ob_gap_audit_packets_dedup"
+      ]
+    },
+    "full_ob_resync_checkpoint_v1": {
+      "verdict": "WRITTEN_TO_ISOLATED_SMOKE_ONLY",
+      "targets": [
+        "research_full_ob_smoke.full_ob_multi_epoch_packets_v1"
+      ],
+      "note": "Also largely offline unit tests with NO_DATABASE_WRITE"
+    },
+    "nested_profile_edge_signal_v1": {
+      "verdict": "NO_DATABASE_WRITE",
+      "targets": [],
+      "note": "Filesystem ledger/markers only; ClickHouse roundtrip helper is in-memory in tests"
+    },
+    "nested_signal_analysis_isolation_v1": {
+      "verdict": "NO_DATABASE_WRITE",
+      "targets": [],
+      "note": "clickhouse_roundtrip_rows() is pure Python idempotent merge in unit tests"
+    }
+  },
+  "orderbook_analysis_catalog_status": "UNLOADABLE_BROKEN_orderbook_deltas_PREEXISTING",
+  "audit_time_utc": "2026-09-04T11:13:31.399553Z"
+}

@@ -1,0 +1,3 @@
+restart old=1887870 new=1888139 state=active
+PT SIGKILL auto-restart ok after 2s old=1887912 new=1888336
+Full-OB SIGKILL auto-restart ok (NRestarts observed; pid recovered)

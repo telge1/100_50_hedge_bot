@@ -117,7 +117,11 @@ def build_sequence_validation(
     gap0_count = next((r["cluster_count"] for r in sensitivity_rows if r["max_inside_gap_seconds"] == 0), 0)
     gap0_invariant_ok = gap0_count == len(visits)
 
-    book_coverage, depth_samples, book_summary = build_edge_book_coverage(ob_rows, region_catalog)
+    # Precompute OB tick maps once for coverage + observability.
+    from .edge_observability import _prepare_ob_rows
+
+    prepared_ob = _prepare_ob_rows(ob_rows)
+    book_coverage, depth_samples, book_summary = build_edge_book_coverage(prepared_ob, region_catalog)
     consumption, consumption_summary = build_edge_region_consumption(
         wall_bundle,
         region_catalog,
@@ -171,7 +175,7 @@ def build_sequence_validation(
     )
 
     obs_detail, obs_summary = build_edge_observability(
-        ob_rows,
+        prepared_ob,
         region_catalog,
         visits,
         excursions,

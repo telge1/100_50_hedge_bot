@@ -1,0 +1,42 @@
+{
+  "source_files": [
+    "dashboard/static/market_profile_v1/app.js",
+    "dashboard/templates/market_profile_v1.html",
+    "dashboard/market_profile_v1/api.py",
+    "dashboard/market_profile_v1/service.py",
+    "orderbook_analyse/market_profile/build.py"
+  ],
+  "chart_timeframe_changes_tpo_profile_computation": false,
+  "chart_timeframe_changes_volume_profile_computation": false,
+  "timeframe_affects": [
+    "candle aggregation for chart display",
+    "cache key",
+    "indicator/overlay requests"
+  ],
+  "timeframe_does_not_affect": [
+    "profile bin aggregation (fetch_volume_at_price window bounds only)",
+    "value_area_pct",
+    "target_bins",
+    "anchor/window selection"
+  ],
+  "profile_window_modes": [
+    "day (UTC calendar)",
+    "session (asia/eu/us/late)",
+    "composite (full range)"
+  ],
+  "profile_window_is_rolling_24h": false,
+  "tpo_bracket_duration_parameter_exists": false,
+  "tpo_bracket_independent_of_chart_timeframe": "N/A — no TPO bracket in production path",
+  "request_params_on_reload": [
+    "symbol",
+    "start",
+    "end",
+    "anchor",
+    "sessions (if anchor=session)",
+    "timeframe",
+    "value_area_pct",
+    "target_bins",
+    "final"
+  ],
+  "target_contract_gap": "Chart TF should only change candles; production profile is already volume-at-price and TF-independent for bins"
+}

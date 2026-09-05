@@ -1,0 +1,114 @@
+{
+  "hard_fail": false,
+  "oos_caveat": "EXPLORATORY_NOT_PRISTINE_OOS",
+  "writes": 0,
+  "tests_passed": true,
+  "pytest": {
+    "returncode": 0,
+    "passed": true,
+    "stdout": ".............                                                            [100%]\n13 passed in 0.14s\n"
+  },
+  "clickhouse": {
+    "connect_ok": true,
+    "select_1_ok": true,
+    "writes": 0,
+    "read_only": true,
+    "query_types": [
+      "SELECT"
+    ],
+    "tables": [
+      "signal_generator.candles_1m"
+    ]
+  },
+  "split_source": "zec_trade_context.parquet",
+  "zec_w1_true": 584,
+  "w1_vs_prev_5m_mismatches": 0,
+  "candle_ZECUSDT": {
+    "symbol": "ZECUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_SOLUSDT": {
+    "symbol": "SOLUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_HYPEUSDT": {
+    "symbol": "HYPEUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_XAUTUSDT": {
+    "symbol": "XAUTUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_LINKUSDT": {
+    "symbol": "LINKUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_DOGEUSDT": {
+    "symbol": "DOGEUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_BNBUSDT": {
+    "symbol": "BNBUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_SUIUSDT": {
+    "symbol": "SUIUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_ADAUSDT": {
+    "symbol": "ADAUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "candle_AVAXUSDT": {
+    "symbol": "AVAXUSDT",
+    "n_1m": 358561,
+    "first_open": "2025-12-11T00:00:00Z",
+    "last_open": "2026-08-17T00:00:00Z",
+    "gap_count": 0,
+    "writes": 0
+  },
+  "started_utc": "2026-08-18T12:42:43Z",
+  "finished_utc": "2026-08-18T12:43:35Z",
+  "final_label": "COMBINED_ENTRY_WARNING_FILTER_INCONCLUSIVE",
+  "strategy_unchanged": true,
+  "clickhouse_writes": 0,
+  "live_actions": 0,
+  "commit": false,
+  "push": false
+}

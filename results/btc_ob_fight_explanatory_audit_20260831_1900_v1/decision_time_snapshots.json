@@ -1,0 +1,63 @@
+{
+  "A_outer_edge_cross": {
+    "label": "Snapshot A: first outer-edge cross",
+    "ts": "2026-08-31T19:08:13.573Z",
+    "known_at_snapshot": [
+      "Price crossed Volume VVAH / outer edge",
+      "Edge-zone attack underway"
+    ],
+    "missing_confirmation": [
+      "Whether move is short-squeeze vs new longs",
+      "Absorption evidence",
+      "Reclaim outcome"
+    ],
+    "allowable_action": "WAIT",
+    "hindsight_only": false
+  },
+  "B_price_peak": {
+    "label": "Snapshot B: price peak",
+    "ts": "2026-08-31T19:10:42.6Z",
+    "known_at_snapshot": [
+      "Peak price 79280.8",
+      "Short liquidations in window: 51 events",
+      "OI change to peak: -4.72899999999936"
+    ],
+    "missing_confirmation": [
+      "Reclaim timing",
+      "Retest structure"
+    ],
+    "allowable_action": "WAIT",
+    "hindsight_only": false
+  },
+  "C_reclaim": {
+    "label": "Snapshot C: canonical reclaim",
+    "ts": "2026-08-31T19:10:58.515Z",
+    "known_at_snapshot": [
+      "Price reclaimed below outer edge at 79136.0",
+      "Failed breakout candidate IF acceptance rules were frozen"
+    ],
+    "missing_confirmation": [
+      "Retest outcome",
+      "Later downward resolution (hindsight only)"
+    ],
+    "allowable_action": "PARTIAL — reclaim is necessary but not sufficient for failed-breakout short",
+    "hindsight_only": false
+  },
+  "D_retest": {
+    "label": "Snapshot D: extended retest wick",
+    "ts": "2026-08-31T20:20:44.76Z",
+    "known_at_snapshot": [
+      "Retest high 79166.7",
+      "LOWER_HIGH vs first peak"
+    ],
+    "missing_confirmation": [],
+    "allowable_action": "PARTIAL if lower-high confirmed at decision time",
+    "hindsight_only": false
+  },
+  "E_post_resolution": {
+    "label": "Snapshot E: hindsight only",
+    "ts": null,
+    "hindsight_only": true,
+    "note": "Later price decline must not be attributed to reclaim-time knowledge"
+  }
+}

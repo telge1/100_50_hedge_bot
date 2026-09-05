@@ -1,0 +1,275 @@
+=== PID ===
+ 147111 Tue Aug 18 18:02:02 2026 16-17:53:08 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+1565672 Fri Sep  4 10:03:01 2026    01:52:10 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO
+=== cwd/exe ===
+/home/telgenbuescher/projects/orderbook_analyse
+.venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO 
+=== git ===
+feature/strategy-lab-phase1
+bcf13edb8613570ed3c5addab6af08f93d99f45e
+## feature/strategy-lab-phase1
+ M .env.example
+ M docs/orderbook_v3_raw_archive.md
+ M src/orderbook_analyse/liquidity_pool_signal/__init__.py
+ M src/orderbook_analyse/liquidity_pool_signal/chart_pool_adapter.py
+ M src/orderbook_analyse/orderbook_v2_live/collector.py
+ M src/orderbook_analyse/orderbook_v2_live/on_demand_manager.py
+ M src/orderbook_analyse/orderbook_v2_live/on_demand_socket.py
+ M src/orderbook_analyse/strategy_lab/catalogs/v2/models.py
+ M src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+ M src/orderbook_analyse/strategy_lab/catalogs/v2/registry.py
+ M src/orderbook_analyse/strategy_lab/compiler_v2.py
+ M src/orderbook_analyse/strategy_lab/decoder_v2.py
+ M src/orderbook_analyse/strategy_lab/models/contracts_v2/__init__.py
+ M src/orderbook_analyse/strategy_lab/models/contracts_v2/enums.py
+ M src/orderbook_analyse/strategy_lab/models/strategy_v2.py
+ M src/orderbook_analyse/strategy_lab/schema/generator.py
+ M src/orderbook_analyse/strategy_lab/schema/strategy_spec_v2.schema.json
+ M src/orderbook_analyse/strategy_lab/validation/__init__.py
+ M src/orderbook_analyse/strategy_lab/validation/p4c.py
+ M strategies/strategy_lab/compiled/cluster_sweep_v2.canonical.json
+ M strategies/strategy_lab/compiled/cluster_sweep_v2.sha256
+ M strategies/strategy_lab/compiled/edc_m0_strict_sync_v2.canonical.json
+ M strategies/strategy_lab/compiled/edc_m0_strict_sync_v2.sha256
+ M tests/strategy_lab/test_adapter_edc_io_parity.py
+ M tests/strategy_lab/test_adapter_edc_m0.py
+ M tests/strategy_lab/test_adapter_edc_parity.py
+ M tests/strategy_lab/test_catalog_v2.py
+ M tests/strategy_lab/test_edc_multicoin_export_smoke.py
+ M tests/strategy_lab/test_edc_multicoin_export_v2.py
+ M tests/strategy_lab/test_edc_multicoin_local.py
+ M tests/strategy_lab/test_edc_multicoin_v2.py
+ M tests/strategy_lab/test_results_v2.py
+ M tests/strategy_lab/test_strategy_v2_schema.py
+ M tests/strategy_lab/v2_fixtures.py
+?? Tod_do.md
+?? data/orderbook_raw_shadow/
+?? docs/strategy_lab/ema_zone_microstructure_confirmation_v1_schema_extension.md
+?? docs/strategy_lab/oi_liq_impact_l2_discovery.md
+?? docs/strategy_research/
+?? results_test_et.txt
+?? scripts/audit_ezm_ema_only_doge_20260826.py
+?? scripts/audit_out/
+?? scripts/build_liquidity_pool_case_sequence_freeze_v1.py
+?? scripts/build_liquidity_pool_entry_contract_freeze_v1.py
+?? scripts/canonical_pool_structural_class_analysis_v1/
+?? scripts/canonical_pool_visual_atlas_v1/
+?? scripts/canonical_pool_wall_trade_reaction_v1/run_stage_b_spotcheck.py
+?? scripts/canonical_pool_wall_trade_reaction_v1/run_stage_b_zone_spotcheck.py
+?? scripts/canonical_pool_wall_trade_reaction_v1/run_stage_b_zone_v2.py
+?? scripts/five_signal_causal_explanation_v1.py
+?? scripts/run_a_plus_liquidity_pool_signal_scanner_v1.py
+?? scripts/run_aggressor_efficiency_flip_discovery.py
+?? scripts/run_aggressor_efficiency_trapped_vwap_acceptance_v1.py
+?? scripts/run_btc_doge_current_recheck_v1.py
+?? scripts/run_btc_raw_aggregate_parity_audit_v1.py
+?? scripts/run_case_02_control_shift_timestamp_review_v1.py
+?? scripts/run_case_02_pool_edge_aggressor_efficiency_timeline_v1.py
+?? scripts/run_case_03_05_entry_contract_comparative_synthesis_v1.py
+?? scripts/run_case_03_frozen_bid_pool_causal_reaction_audit_v1.py
+?? scripts/run_case_04_frozen_bid_pool_causal_reaction_audit_v1.py
+?? scripts/run_case_05_frozen_bid_pool_entry_contract_v1_audit.py
+?? scripts/run_causal_pool_edge_ambiguity_resolution_v1.py
+?? scripts/run_causal_pool_edge_join_for_aggressor_trap_acceptance_v1.py
+?? scripts/run_causal_raw_replay_contract_v1.py
+?? scripts/run_coin_regime_scanner.py
+?? scripts/run_doge_live_shadow_once.py
+?? scripts/run_doge_reference_replay.py
+?? scripts/run_doge_reference_replay_v2.py
+?? scripts/run_ema_zone_continuous_discovery.py
+?? scripts/run_ema_zone_microstructure_confirmation.py
+?? scripts/run_frozen_high_accepted_sample_expansion_v1.py
+?? scripts/run_frozen_high_edge_forward_outcome_evaluation_v1.py
+?? scripts/run_l2_wall_attack_discovery.py
+?? scripts/run_l2_wall_to_wall_discovery.py
+?? scripts/run_liquidity_pool_arrival_wall_monitor.py
+?? scripts/run_liquidity_pool_arrival_wall_semantics_integrity_audit.py
+?? scripts/run_liquidity_pool_edge_wall_overlap_audit.py
+?? scripts/run_liquidity_pool_entry_contract_batch_v1.py
+?? scripts/run_liquidity_pool_entry_contract_batch_v2.py
+?? scripts/run_liquidity_pool_entry_contract_expansion_freeze_v1.py
+?? scripts/run_liquidity_pool_entry_contract_expansion_freeze_v1_integrity_audit.py
+?? scripts/run_liquidity_pool_entry_contract_expansion_freeze_v3.py
+?? scripts/run_liquidity_pool_entry_contract_v2.py
+?? scripts/run_liquidity_pool_min_target_distance_config_v1.py
+?? scripts/run_liquidity_pool_six_case_wall_trade_reaction_sample_v1.py
+?? scripts/run_lld_pool_edge_validation_v2.py
+?? scripts/run_lld_pool_lifecycle_smoke.py
+?? scripts/run_lld_r6_causal_and_raw_audit_v2.py
+?? scripts/run_lld_r6_orderflow_confirmation_v1.py
+?? scripts/run_lld_r6_phase3_audit.py
+?? scripts/run_major_wall_defended_reclaim.py
+?? scripts/run_manual_ema_wall_windows.py
+?? scripts/run_market_profile_v1.py
+?? scripts/run_market_profile_validation_v1.py
+?? scripts/run_multisource_data_inventory_v1.py
+?? scripts/run_ob200_v3_raw_discovery.py
+?? scripts/run_oi_liq_impact_l2_aggregate_proxy.py
+?? scripts/run_oi_liq_impact_l2_discovery.py
+?? scripts/run_oi_liq_impact_l2_event_chain.py
+?? scripts/run_oi_liq_impact_l2_wall_absorption.py
+?? scripts/run_oi_liq_impact_public_trade_audit.py
+?? scripts/run_post_case_02_next_pool_causal_reaction_audit_v1.py
+?? scripts/start_orderbook_v3_raw_archive_btc_doge.sh
+?? scripts/verify_liquidity_pool_case_sequence_freeze_v1.py
+?? scripts/verify_liquidity_pool_entry_contract_expansion_freeze_v1.py
+?? scripts/verify_liquidity_pool_entry_contract_expansion_freeze_v2.py
+?? scripts/verify_liquidity_pool_entry_contract_expansion_freeze_v3.py
+?? scripts/verify_liquidity_pool_entry_contract_freeze_v1.py
+?? scripts/verify_liquidity_pool_entry_contract_v2.py
+?? src/orderbook_analyse/a_plus_liquidity_pool_signal_scanner_v1/
+?? src/orderbook_analyse/a_plus_nested_ask_pool_edge_short_v1/
+?? src/orderbook_analyse/aggressor_efficiency_flip/acceptance.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/buckets.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/cli.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/compression.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/episodes.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/impact.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/initiative.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/integrity.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/labels.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/outcomes.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/reporting.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/runner.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/state_machine.py
+?? src/orderbook_analyse/aggressor_efficiency_flip/structure.py
+?? src/orderbook_analyse/aggressor_efficiency_trapped_vwap_acceptance/
+?? src/orderbook_analyse/btc_doge_current_recheck_v1/
+?? src/orderbook_analyse/btc_raw_aggregate_parity_audit_v1/
+?? src/orderbook_analyse/canonical_pool_wall_trade_reaction_v1/stage_b_zone_depth.py
+?? src/orderbook_analyse/case_02_pool_edge_aggressor_efficiency_timeline_v1/
+?? src/orderbook_analyse/case_03_05_entry_contract_comparative_synthesis_v1/
+?? src/orderbook_analyse/case_03_frozen_bid_pool_causal_reaction_audit_v1/
+?? src/orderbook_analyse/case_04_frozen_bid_pool_causal_reaction_audit_v1/
+?? src/orderbook_analyse/causal_raw_replay_contract_v1/
+?? src/orderbook_analyse/coin_regime_scanner/
+?? src/orderbook_analyse/ema_zone_microstructure_confirmation/
+?? src/orderbook_analyse/l2_wall_attack_discovery/
+?? src/orderbook_analyse/l2_wall_to_wall_discovery/
+?? src/orderbook_analyse/liquidity_location_causal/
+?? src/orderbook_analyse/liquidity_location_pool_causality_audit_v1/
+?? src/orderbook_analyse/liquidity_location_pool_causality_fix_v2/
+?? src/orderbook_analyse/liquidity_location_pool_edge_validation_v2/
+?? src/orderbook_analyse/liquidity_location_pool_lifecycle/
+?? src/orderbook_analyse/liquidity_location_r6_causal_and_raw_audit_v2/
+?? src/orderbook_analyse/liquidity_location_r6_orderflow_confirmation_v1/
+?? src/orderbook_analyse/liquidity_location_r6_phase3_audit/
+?? src/orderbook_analyse/liquidity_pool_case_sequence_freeze_v1/
+?? src/orderbook_analyse/liquidity_pool_entry_contract_batch_v1/
+?? src/orderbook_analyse/liquidity_pool_entry_contract_batch_v2/
+?? src/orderbook_analyse/liquidity_pool_entry_contract_expansion_freeze_v1/
+?? src/orderbook_analyse/liquidity_pool_entry_contract_freeze_v1/
+?? src/orderbook_analyse/liquidity_pool_entry_contract_v2/
+?? src/orderbook_analyse/liquidity_pool_min_target_distance_config_v1/
+?? src/orderbook_analyse/liquidity_pool_signal/canonical.py
+?? src/orderbook_analyse/liquidity_pool_six_case_wall_trade_reaction_sample_v1/
+?? src/orderbook_analyse/market_profile_validation/
+?? src/orderbook_analyse/multisource_data_inventory_v1/
+?? src/orderbook_analyse/ob200_v3_raw_discovery/analysis.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/lifecycles_v2.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/market_join.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/runner.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/runner_v2.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/source_coverage.py
+?? src/orderbook_analyse/ob200_v3_raw_discovery/v3/
+?? src/orderbook_analyse/ob200_v3_raw_discovery/walls.py
+?? src/orderbook_analyse/oi_liq_impact_l2/
+?? src/orderbook_analyse/orderbook_v2_live/full_book_state.py
+?? src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/
+?? src/orderbook_analyse/orderbook_v2_live/full_ob_sync.py
+?? src/orderbook_analyse/orderbook_v2_live/on_demand_full.py
+?? src/orderbook_analyse/post_case_02_next_pool_causal_reaction_audit_v1/
+?? src/orderbook_analyse/public_trade_bubbles/
+?? strategies/strategy_lab/compiled/ema_zone_microstructure_confirmation_v1.canonical.json
+?? strategies/strategy_lab/compiled/ema_zone_microstructure_confirmation_v1.sha256
+?? strategies/strategy_lab/ema_zone_microstructure_confirmation_v1.yaml
+?? strategies/strategy_lab/liquidity_pool_market_response_strategy_v0.yaml
+?? tests/post_case_02_next_pool_causal_reaction_audit_v1/
+?? tests/strategy_lab/test_ema_zone_microstructure_confirmation_v1.py
+?? tests/test_a_plus_liquidity_pool_signal_scanner_v1.py
+?? tests/test_a_plus_nested_ask_pool_dashboard_entry.py
+?? tests/test_a_plus_nested_ask_pool_edge_short_v1.py
+?? tests/test_a_plus_v2_causal_intent.py
+?? tests/test_a_plus_v2_contract.py
+?? tests/test_a_plus_v2_pending_plan_lifecycle.py
+?? tests/test_a_plus_v2_target_causality.py
+?? tests/test_aggressor_efficiency_flip_f0.py
+?? tests/test_aggressor_efficiency_trapped_vwap_acceptance_v1.py
+?? tests/test_btc_doge_current_recheck_v1.py
+?? tests/test_btc_raw_aggregate_parity_audit_v1.py
+?? tests/test_canonical_chart_pool_asof_restore_v1.py
+?? tests/test_case_02_control_shift_timestamp_review_v1.py
+?? tests/test_case_02_pool_edge_aggressor_efficiency_timeline_v1.py
+?? tests/test_case_03_frozen_bid_pool_causal_reaction_audit_v1.py
+?? tests/test_case_04_frozen_bid_pool_causal_reaction_audit_v1.py
+?? tests/test_case_05_frozen_bid_pool_entry_contract_v1_audit.py
+?? tests/test_causal_pool_edge_ambiguity_resolution_v1.py
+?? tests/test_causal_pool_edge_join_v1.py
+?? tests/test_causal_raw_replay_contract_v1.py
+?? tests/test_coin_regime_scanner.py
+?? tests/test_doge_ema200_pool_rejection_short_0650.py
+?? tests/test_doge_reference_replay.py
+?? tests/test_doge_short_0630_decision_reconstruction.py
+?? tests/test_ema_only_data_path_audit.py
+?? tests/test_ema_only_ohlc_touch.py
+?? tests/test_ema_zone_continuous_discovery.py
+?? tests/test_ema_zone_microstructure_confirmation.py
+?? tests/test_ezm_research_layers.py
+?? tests/test_ezm_stacked_zone_rearm.py
+?? tests/test_ezm_zone_geometry_xrp_tick.py
+?? tests/test_frozen_high_accepted_contract_fix_refreeze_v2.py
+?? tests/test_frozen_high_accepted_entry_timing_v1.py
+?? tests/test_frozen_high_accepted_large_move_separability_v1.py
+?? tests/test_frozen_high_accepted_prefix_parity_audit_v1.py
+?? tests/test_frozen_high_accepted_sample_expansion_v1.py
+?? tests/test_frozen_high_edge_forward_outcomes_v1.py
+?? tests/test_frozen_large_move_candidate_forward_confirmation_v1.py
+?? tests/test_full_ob_edge_capture_timing_v1.py
+?? tests/test_full_ob_edge_flight_recorder_v1.py
+?? tests/test_full_ob_resync_checkpoint_v1.py
+?? tests/test_full_ob_socket_lock_offload.py
+?? tests/test_full_ob_sync_contract.py
+?? tests/test_full_ob_writer_throughput_bootstrap_v1.py
+?? tests/test_l2_wall_attack_discovery.py
+?? tests/test_l2_wall_to_wall_discovery.py
+?? tests/test_legacy_tmp_recovery.py
+?? tests/test_liquidity_location_pool_causality_audit_v1.py
+?? tests/test_liquidity_location_pool_causality_fix_v2.py
+?? tests/test_liquidity_pool_arrival_wall_monitor_v1.py
+?? tests/test_liquidity_pool_arrival_wall_semantics_integrity_audit_v1.py
+?? tests/test_liquidity_pool_case_sequence_freeze_v1.py
+?? tests/test_liquidity_pool_edge_wall_overlap_audit_v1.py
+?? tests/test_liquidity_pool_entry_contract_batch_v1.py
+?? tests/test_liquidity_pool_entry_contract_batch_v2.py
+?? tests/test_liquidity_pool_entry_contract_batch_v2_partial.py
+?? tests/test_liquidity_pool_entry_contract_expansion_freeze_v1.py
+?? tests/test_liquidity_pool_entry_contract_expansion_freeze_v1_integrity_audit.py
+?? tests/test_liquidity_pool_entry_contract_expansion_freeze_v3.py
+?? tests/test_liquidity_pool_entry_contract_v1_integration.py
+?? tests/test_liquidity_pool_entry_contract_v2.py
+?? tests/test_liquidity_pool_min_target_distance_config_v1.py
+?? tests/test_liquidity_pool_six_case_wall_trade_reaction_sample_v1.py
+?? tests/test_lld_r6_causal_and_raw_audit_v2.py
+?? tests/test_lld_r6_phase3_audit.py
+?? tests/test_major_wall_defended_reclaim.py
+?? tests/test_manual_ema_wall_windows.py
+?? tests/test_market_profile_validation_v1.py
+?? tests/test_multisource_data_inventory_v1.py
+?? tests/test_night_drop_root_cause_v1.py
+?? tests/test_ob200_v3_raw_discovery.py
+?? tests/test_ob200_v3_raw_discovery_v3.py
+?? tests/test_oi_liq_impact_l2_aggregate_proxy.py
+?? tests/test_oi_liq_impact_l2_discovery.py
+?? tests/test_oi_liq_impact_l2_event_chain.py
+?? tests/test_oi_liq_impact_l2_wall_absorption.py
+?? tests/test_oi_liq_impact_public_trade_audit.py
+?? tests/test_orderbook_v3_full_book_on_demand.py
+?? tests/test_public_trade_bubbles.py
+=== module mtimes vs process start ===
+proc_start_epoch=1788508981
+src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/manager.py mtime=2026-09-04T09:31:14Z newer_than_process=yes
+src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/continuity_contract.py mtime=2026-09-04T09:35:16Z newer_than_process=yes
+src/orderbook_analyse/orderbook_v2_live/on_demand_full.py mtime=2026-09-04T09:25:50Z newer_than_process=yes
+src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/profiles.py mtime=2026-09-03T17:52:34Z newer_than_process=no
+src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/watcher.py mtime=2026-09-04T07:38:50Z newer_than_process=no
+src/orderbook_analyse/orderbook_v2_live/collector.py mtime=2026-09-04T09:26:04Z newer_than_process=yes

@@ -18,11 +18,60 @@ FULL_HISTORY_BUILD_ID = stable_hash(
 )
 
 LIVE_PRODUCER_ID = "BYBIT_OB200_LIVE_COLLECTOR_V3"
+SHADOW_ARCHIVE_PRODUCER_ID = "BYBIT_OB200_SHADOW_ARCHIVE_V3"
 LIVE_RAW_FROM = datetime(2026, 8, 24, 22, 47, 54, tzinfo=timezone.utc)
 LIVE_TERMINAL = datetime(2026, 8, 28, 16, 26, 23, tzinfo=timezone.utc)
 LIVE_TERMINAL_REASON = "queue_full"
 DAY_ZIP_PRODUCER_ID = "BYBIT_OB200_DAY_ZIP_IMPORTER_V3"
 DAY_ZIP_END = datetime(2026, 8, 18, tzinfo=timezone.utc)
+
+MODALITIES = (
+    "PUBLIC_TRADES",
+    "LIQUIDATIONS",
+    "OPEN_INTEREST",
+    "CANDLES",
+    "OB200",
+    "TPO_PROFILE",
+    "VOLUME_PROFILE",
+)
+
+IMPORTABLE_MODALITIES = frozenset(
+    {
+        "PUBLIC_TRADES",
+        "LIQUIDATIONS",
+        "OPEN_INTEREST",
+        "OB200",
+        "TPO_PROFILE",
+        "VOLUME_PROFILE",
+    }
+)
+
+COVERAGE_ONLY_MODALITIES = frozenset({"CANDLES"})
+
+SEGMENT_READY = "READY"
+SEGMENT_PARTIAL = "PARTIAL"
+SEGMENT_MISSING = "MISSING"
+SEGMENT_ORDERING_AMBIGUOUS = "ORDERING_AMBIGUOUS"
+SEGMENT_SOURCE_GAP = "SOURCE_GAP"
+SEGMENT_AFTER_QUEUE_FULL = "AFTER_QUEUE_FULL"
+SEGMENT_CONFLICTING_PRODUCERS = "CONFLICTING_PRODUCERS"
+
+
+class ModalityContractError(ValueError):
+    """Raised when a non-importable modality reaches the import pipeline."""
+
+PILOT_DAY = datetime(2026, 8, 26, tzinfo=timezone.utc)
+PILOT_DAY_STR = "2026-08-26"
+
+RESULT_ROOT_SOURCE_RECOVERY = (
+    __import__("pathlib").Path(__file__).resolve().parents[2]
+    / "results"
+    / "btc_doge_research_db_source_recovery_v1"
+)
+RUN_STATE_DIR = (
+    __import__("pathlib").Path(__file__).resolve().parents[2] / "run" / "btc_doge_research_full_history"
+)
+LOG_DIR = __import__("pathlib").Path(__file__).resolve().parents[2] / "logs"
 
 OB_SEMANTICS = "raw_ob200_event_time_eos_v1"
 OB_RECONSTRUCTION_CLOCK = "EVENT_TIME_END_OF_SECOND"
@@ -48,6 +97,54 @@ def day_build_id(symbol: str, day: datetime) -> str:
 
 def day_batch_id(symbol: str, day: datetime) -> str:
     return f"full_history:{symbol}:{day:%Y%m%d}:{FULL_HISTORY_BUILD_ID[:16]}"
+
+
+def segment_batch_id(
+    symbol: str,
+    modality: str,
+    segment_start: datetime,
+    segment_end: datetime,
+    producer_id: str,
+) -> str:
+    return (
+        f"fh:{symbol}:{modality}:{segment_start:%Y%m%dT%H%M%SZ}:"
+        f"{segment_end:%Y%m%dT%H%M%SZ}:{producer_id[:12]}"
+    )
+
+
+def segment_build_id(
+    symbol: str,
+    modality: str,
+    segment_start: datetime,
+    segment_end: datetime,
+    producer_id: str,
+    source_fingerprint: str,
+    *,
+    source_path: str = "",
+) -> str:
+    payload: dict[str, Any] = {
+        "contract": FULL_HISTORY_CONTRACT_VERSION,
+        "symbol": symbol,
+        "modality": modality,
+        "segment_start": segment_start.isoformat(),
+        "segment_end": segment_end.isoformat(),
+        "producer_id": producer_id,
+        "source_fingerprint": source_fingerprint,
+        "build": FULL_HISTORY_BUILD_ID,
+    }
+    if source_path:
+        payload["source_path"] = source_path
+    return stable_hash(payload)
+
+
+def ob_producer_for_hour(hour_start: datetime, *, file_exists: bool) -> tuple[str, str] | None:
+    if not file_exists:
+        return None
+    if hour_start >= LIVE_TERMINAL:
+        return SHADOW_ARCHIVE_PRODUCER_ID, OB_SEMANTICS
+    if hour_start >= LIVE_RAW_FROM:
+        return LIVE_PRODUCER_ID, OB_SEMANTICS
+    return SHADOW_ARCHIVE_PRODUCER_ID, OB_SEMANTICS
 
 
 def pilot_batch_id() -> str:

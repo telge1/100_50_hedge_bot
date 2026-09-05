@@ -1,0 +1,89 @@
+{
+  "contract_version": "btc_doge_research_full_history_v1",
+  "failed_batches": [],
+  "heartbeat_invariants_ok": true,
+  "importable_plan_segments": 662,
+  "latest_status_counts": {
+    "FAILED": 2,
+    "PARTIAL": 36,
+    "READY": 625,
+    "RUNNING": 1
+  },
+  "missing_in_ch": [],
+  "modality_latest_status": {
+    "BTCUSDT:CANDLES": {
+      "FAILED": 1
+    },
+    "BTCUSDT:LIQUIDATIONS": {
+      "READY": 43
+    },
+    "BTCUSDT:OB200": {
+      "FAILED": 1,
+      "PARTIAL": 8,
+      "READY": 138
+    },
+    "BTCUSDT:OPEN_INTEREST": {
+      "PARTIAL": 9,
+      "READY": 4
+    },
+    "BTCUSDT:PUBLIC_TRADES": {
+      "READY": 43
+    },
+    "BTCUSDT:TPO_PROFILE": {
+      "READY": 43
+    },
+    "BTCUSDT:VOLUME_PROFILE": {
+      "READY": 43
+    },
+    "DOGEUSDT:LIQUIDATIONS": {
+      "READY": 43
+    },
+    "DOGEUSDT:OB200": {
+      "PARTIAL": 10,
+      "READY": 135,
+      "RUNNING": 1
+    },
+    "DOGEUSDT:OPEN_INTEREST": {
+      "PARTIAL": 9,
+      "READY": 4
+    },
+    "DOGEUSDT:PUBLIC_TRADES": {
+      "READY": 43
+    },
+    "DOGEUSDT:TPO_PROFILE": {
+      "READY": 43
+    },
+    "DOGEUSDT:VOLUME_PROFILE": {
+      "READY": 43
+    }
+  },
+  "multi_build_id_batches": [
+    {
+      "batch_id": "fh:BTCUSDT:OB200:20260831T180000Z:20260831T190000Z:BYBIT_OB200_",
+      "build_count": 2
+    }
+  ],
+  "plan_mapped_status_counts": {
+    "PARTIAL": 36,
+    "READY": 625,
+    "RUNNING": 1
+  },
+  "running_batches": [
+    {
+      "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+      "build_id_match": false,
+      "ch_build_id": "9ea5ce47b2a73b0f08d0bbf20296fe7fc7c6a4371e5b7930d1686f6b55ca30cc",
+      "ch_rows_written": 0,
+      "ch_status": "RUNNING",
+      "error": "",
+      "expected_build_id": "9ea5ce47b2a73b0f08d0bbf20296fe7fc7c6a4371e5b7930d1686f6b55ca30cc",
+      "expected_rows": 3600,
+      "modality": "OB200",
+      "segment_end": "2026-09-01T00:00:00Z",
+      "segment_start": "2026-08-31T23:00:00Z",
+      "source_path": "DOGEUSDT/2026/08/31/DOGEUSDT_20260831T230000Z_20260901T000000Z_ob200_v3.zst",
+      "symbol": "DOGEUSDT"
+    }
+  ],
+  "unique_batch_ids_latest": 664
+}

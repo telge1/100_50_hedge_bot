@@ -1,0 +1,103 @@
+{
+  "generated_at_utc": "2026-09-04T09:58:20.485469+00:00",
+  "safety": {
+    "collector_pid": 1565672,
+    "collector_alive": true,
+    "oi_pid": 147111,
+    "oi_alive": true,
+    "no_restarts": true,
+    "no_db_writes": true,
+    "no_code_changes": true,
+    "no_tmp_mutation": true,
+    "no_full_ob_replay": true
+  },
+  "live_process": {
+    "pid": 1565672,
+    "start_utc": "2026-09-04T08:03:01.270000+00:00",
+    "start_local": "2026-09-04T10:03:01+03:00",
+    "cmdline": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO",
+    "symbols": [
+      "BTCUSDT",
+      "DOGEUSDT"
+    ],
+    "wanted_topics": [
+      "orderbook.200.BTCUSDT",
+      "orderbook.200.DOGEUSDT"
+    ],
+    "confirmed_full_ob_topics": [
+      "orderbook.full.BTCUSDT",
+      "orderbook.full.DOGEUSDT"
+    ],
+    "health_file": "logs/orderbook_v3_raw_archive_btc_doge.health.ndjson",
+    "worktree": "/home/telgenbuescher/projects/orderbook_analyse",
+    "branch": "feature/strategy-lab-phase1",
+    "head": "bcf13edb8613570ed3c5addab6af08f93d99f45e",
+    "LIVE_PROCESS_LOGIC_vs_CURRENT_WORKTREE_LOGIC": "DIVERGENT_FOR_RESYNC_PATH_IDENTICAL_FOR_PROFILE_WATCHER",
+    "module_mtimes_vs_process": {
+      "collector.py": [
+        "2026-09-04T09:26:04Z",
+        true
+      ],
+      "on_demand_full.py": [
+        "2026-09-04T09:25:50Z",
+        true
+      ],
+      "manager.py": [
+        "2026-09-04T09:31:14Z",
+        true
+      ],
+      "event_writer.py": [
+        "2026-09-04T09:29:50Z",
+        true
+      ],
+      "capture_plan.py": [
+        "2026-09-04T09:35:40Z",
+        true
+      ],
+      "continuity_contract.py": [
+        "2026-09-04T09:35:16Z",
+        true
+      ],
+      "watcher.py": [
+        "2026-09-04T07:38:50Z",
+        false
+      ],
+      "profiles.py": [
+        "2026-09-03T17:52:34Z",
+        false
+      ],
+      "config.py": [
+        "2026-09-03T20:25:37Z",
+        false
+      ]
+    }
+  },
+  "flight_recorder_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+  "event_manifests_used": [
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T195209Z_e8cb0f6198/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T004200Z_0c13abdcf9/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T195209Z_dc0458f57a/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/event_manifest.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-04/DOGEUSDT_20260904T080551Z_2c38905508/event_manifest.json"
+  ],
+  "profile_contexts_used": [
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T195209Z_e8cb0f6198/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T004200Z_0c13abdcf9/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T195209Z_dc0458f57a/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/profile_context.json",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-04/DOGEUSDT_20260904T080551Z_2c38905508/profile_context.json"
+  ],
+  "code_paths": [
+    "orderbook_v2_live/full_ob_edge_flight_recorder/profiles.py",
+    "orderbook_v2_live/full_ob_edge_flight_recorder/watcher.py",
+    "orderbook_v2_live/full_ob_edge_flight_recorder/manager.py",
+    "orderbook_v2_live/full_ob_edge_flight_recorder/config.py",
+    "orderbook_v2_live/full_ob_edge_flight_recorder/capture_plan.py",
+    "orderbook_v2_live/collector.py",
+    "market_profile/build.py (via build_profile)"
+  ]
+}

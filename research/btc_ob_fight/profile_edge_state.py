@@ -7,12 +7,24 @@ Contract: ``profile_edge_state_v1``. Profiles are computed with
 from __future__ import annotations
 
 import math
+from contextvars import ContextVar
 from decimal import Decimal
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE
+from .instrument_contract import instrument_for, price_to_tick as _inst_price_to_tick, tick_to_price as _inst_tick_to_price
 
 PROFILE_EDGE_STATE_CONTRACT = "profile_edge_state_v1"
+
+_active_symbol: ContextVar[str] = ContextVar("fight_active_symbol", default="BTCUSDT")
+
+
+def set_active_symbol(symbol: str) -> None:
+    _active_symbol.set(symbol.upper())
+
+
+def get_active_symbol() -> str:
+    return _active_symbol.get()
+
 
 STATE_INSIDE_BOTH = "INSIDE_BOTH_PROFILES"
 STATE_BETWEEN_UPPER = "BETWEEN_UPPER_PROFILE_EDGES"
@@ -30,12 +42,16 @@ DIRECTION_LOWER = "LOWER"
 DIRECTION_NEUTRAL = "NEUTRAL"
 
 
-def price_to_tick(price: float | Decimal) -> int:
-    return int((Decimal(str(price)) / Decimal(str(BTCUSDT_TICK_SIZE))).to_integral_value())
+def price_to_tick(price: float | Decimal, tick_size: float | Decimal | None = None) -> int:
+    if tick_size is not None:
+        return _inst_price_to_tick(price, tick_size)
+    return _inst_price_to_tick(price, get_active_symbol())
 
 
-def tick_to_price(tick: int) -> float:
-    return float(Decimal(tick) * Decimal(str(BTCUSDT_TICK_SIZE)))
+def tick_to_price(tick: int, tick_size: float | Decimal | None = None) -> float:
+    if tick_size is not None:
+        return _inst_tick_to_price(tick, tick_size)
+    return _inst_tick_to_price(tick, get_active_symbol())
 
 
 def _level_from_profile(tpo_profile: dict[str, Any], volume_profile: dict[str, Any]) -> dict[str, float | None]:
@@ -119,7 +135,7 @@ def build_frozen_profile_edges(
         "upper_edge_zone": {"low": upper_inner, "high": upper_outer},
         "lower_edge_zone": {"low": lower_outer, "high": lower_inner},
         "fair_zone": {"low": lower_inner, "high": upper_inner},
-        "tick_size": BTCUSDT_TICK_SIZE,
+        "tick_size": float(instrument_for(get_active_symbol()).tick_size),
         "upper_inner_edge_tick": price_to_tick(upper_inner),
         "upper_outer_edge_tick": price_to_tick(upper_outer),
         "lower_inner_edge_tick": price_to_tick(lower_inner),

@@ -1,0 +1,21 @@
+{
+  "carried_forward": "only when no accepted event/update in completed second",
+  "ch_source": "orderbook_analysis.orderbook_features_1s_v2 depth=200 parser=ob200_v3",
+  "ch_timestamp": "bucket_start DateTime64(3,'UTC')",
+  "historical_ch_selection": "last reconstructed state processed before local wall-clock bucket finalization",
+  "historical_ch_source_metadata": "first/last_source_ts remain exchange event timestamps",
+  "identical_timestamp_order": "source record order, then update_id",
+  "interval": "[bucket_start,bucket_start+1s)",
+  "phase1_selection": "last event by event_time in second, else carry prior",
+  "raw_receive_timestamp": "top-level local_receive_ts UTC",
+  "raw_source": "FS raw OB200 v3 zstd NDJSON",
+  "raw_timestamp": "top-level ts: exchange event milliseconds UTC",
+  "snapshot_delta_order": "source record order; checkpoint/snapshot replaces, delta applies",
+  "timestamp_alignment_after_fix": "correct",
+  "versions": {
+    "historical_semantics": "ch_live_receive_asof_v1 (assigned by this audit)",
+    "parser": "ob200_v3",
+    "phase1_contract": "btc_doge_research_phase_1_v1",
+    "raw_contract": "raw_ob200_v3"
+  }
+}

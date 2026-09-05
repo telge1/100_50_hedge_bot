@@ -396,7 +396,7 @@ def _payload_from_snap(
         "depth": DEPTH,
         "bids": bids,
         "asks": asks,
-        "source": SOURCE_NAME,
+        "source": snap.get("source") or SOURCE_NAME,
         "mid": mid,
         "best_bid": _finite(snap.get("best_bid")),
         "best_ask": _finite(snap.get("best_ask")),

@@ -1,0 +1,74 @@
+{
+  "depth0_uncapped": true,
+  "levels_gt_1000": true,
+  "btc_raw_levels_last": {
+    "bids": 38232,
+    "asks": 27082
+  },
+  "doge_raw_levels_last": {
+    "bids": 5056,
+    "asks": 14201
+  },
+  "levels_capped_at_1000": false,
+  "ob1000_acquire_samples": [
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    }
+  ],
+  "ob200_acquire_samples": [
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    }
+  ],
+  "ob200_permanent_levels_ok": true,
+  "ob1000_pass": true,
+  "ob200_pass": true,
+  "timeouts": 0,
+  "book_crossed": false,
+  "socket_path": "/run/user/1000/orderbook_ob1000.sock",
+  "full_book_active_during_smoke": true
+}

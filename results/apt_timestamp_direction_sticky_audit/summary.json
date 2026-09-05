@@ -1,0 +1,100 @@
+{
+  "primary_decision": "STALE_BULLISH_STATE_NEEDS_NEUTRAL_INVALIDATION",
+  "decision_time_utc": "2026-04-11 20:31:00+00:00",
+  "fix_applied": true,
+  "changed_files": [
+    "research/regime_scanner/trend_direction_at.py",
+    "research/regime_scanner/tests/test_trend_direction_at.py"
+  ],
+  "post_fix_cli": {
+    "symbol": "APTUSDT",
+    "exchange": "bybit",
+    "requested_at_utc": "2026-04-11T20:31:00Z",
+    "timestamp_assumed_utc": false,
+    "last_available_5m_open_utc": "2026-04-11T20:25:00Z",
+    "last_available_5m_close_utc": "2026-04-11T20:30:00Z",
+    "direction": "UNCLEAR",
+    "direction_since_utc": "2026-04-11T18:45:00Z",
+    "source_timeframe": "5m",
+    "structure_event": "bearish_internal_break",
+    "causality_pass": true,
+    "reason": "MAJOR_CHALLENGED:bearish_internal_break",
+    "warmup_bars_required": 72,
+    "warmup_bars_available": 30486,
+    "protected_high": null,
+    "protected_low": 0.8714,
+    "major_direction": 1,
+    "protected_structure_state": "bearish_internal_break",
+    "scanner_variant": "protected_medium",
+    "htf_context": null
+  },
+  "causal_at_20_30": {
+    "last_candle_open_utc": "2026-04-11 20:25:00+00:00",
+    "last_candle_close_utc": "2026-04-11 20:30:00+00:00",
+    "close": 0.8736,
+    "protected_high": null,
+    "protected_low": 0.8714,
+    "major_direction": 1,
+    "protected_structure_state": "bearish_internal_break",
+    "structure_strength": "pullback",
+    "internal_bos_down": true,
+    "close_break_protected_down": false,
+    "direction_old": "BULLISH",
+    "direction_new": "UNCLEAR",
+    "invalidation_note": "Protected Low not close-broken by 20:30; bearish_internal_break since 20:15"
+  },
+  "ex_post": [
+    {
+      "label": "first_bearish_choch",
+      "EX_POST_ONLY": true,
+      "candle_open_utc": "2026-04-11 20:30:00+00:00",
+      "candle_close_utc": "2026-04-11 20:35:00+00:00",
+      "close": 0.8692,
+      "major_direction": 1,
+      "protected_structure_state": "bearish_choch",
+      "minutes_after_decision": 4.0,
+      "price_change_from_20_30_pct": -0.503663003663013
+    },
+    {
+      "label": "first_external_bos_down",
+      "EX_POST_ONLY": true,
+      "candle_open_utc": "2026-04-11 20:30:00+00:00",
+      "candle_close_utc": "2026-04-11 20:35:00+00:00",
+      "close": 0.8692,
+      "major_direction": 1,
+      "protected_structure_state": "bearish_choch",
+      "minutes_after_decision": 4.0,
+      "price_change_from_20_30_pct": -0.503663003663013
+    },
+    {
+      "label": "first_major_bearish",
+      "EX_POST_ONLY": true,
+      "candle_open_utc": "2026-04-11 20:40:00+00:00",
+      "candle_close_utc": "2026-04-11 20:45:00+00:00",
+      "close": 0.8704,
+      "major_direction": -1,
+      "protected_structure_state": "bearish_structure",
+      "minutes_after_decision": 14.0,
+      "price_change_from_20_30_pct": -0.3663003663003761
+    }
+  ],
+  "mapping_change_bar_share": 0.18711560854804585,
+  "comparison_case_counts": {
+    "bullish_normal_pullback_keep": 10,
+    "bullish_to_unclear_internal_break": 10,
+    "bullish_to_bearish_major_flip": 10,
+    "bearish_normal_pullback_keep": 10,
+    "bearish_to_unclear_internal_break": 10,
+    "bearish_to_bullish_major_flip": 10
+  },
+  "tests": {
+    "test_trend_direction_at.py": "20 passed; CLI APT smoke UNCLEAR"
+  },
+  "root_cause": {
+    "cli": "scripts/query_trend_direction_at.py",
+    "core": "research/regime_scanner/trend_direction_at.py::decide_from_structure/map_structure_to_direction",
+    "scanner": "market_structure_c3_4b.apply_protected_structure",
+    "bug": "Runner mapped only sticky major_direction; ignored protected_structure_state=bearish_internal_break",
+    "correct_causal_direction": "UNCLEAR"
+  }
+}

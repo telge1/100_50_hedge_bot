@@ -1,0 +1,81 @@
+{
+  "symbol": "ZECUSDT",
+  "n_trades": 1158,
+  "wins": 527,
+  "losses": 629,
+  "open": 2,
+  "win_rate_closed_pct": 45.588235294117645,
+  "period_start": "2026-03-01T02:46:00Z",
+  "period_end_entry": "2026-08-16T21:31:00Z",
+  "last_exit": "2026-08-16T14:04:00Z",
+  "timeframes": [
+    "15m",
+    "1h",
+    "30m",
+    "4h"
+  ],
+  "counts_by_timeframe": {
+    "15m": 646,
+    "1h": 165,
+    "30m": 309,
+    "4h": 38
+  },
+  "counts_by_direction": {
+    "LONG": 561,
+    "SHORT": 597
+  },
+  "counts_by_tf_direction": [
+    {
+      "timeframe": "15m",
+      "direction": "LONG",
+      "n": 320
+    },
+    {
+      "timeframe": "15m",
+      "direction": "SHORT",
+      "n": 326
+    },
+    {
+      "timeframe": "1h",
+      "direction": "LONG",
+      "n": 76
+    },
+    {
+      "timeframe": "1h",
+      "direction": "SHORT",
+      "n": 89
+    },
+    {
+      "timeframe": "30m",
+      "direction": "LONG",
+      "n": 152
+    },
+    {
+      "timeframe": "30m",
+      "direction": "SHORT",
+      "n": 157
+    },
+    {
+      "timeframe": "4h",
+      "direction": "LONG",
+      "n": 13
+    },
+    {
+      "timeframe": "4h",
+      "direction": "SHORT",
+      "n": 25
+    }
+  ],
+  "n_raw_source_signals": 5050,
+  "n_outcomes_missing_source_signal": 0,
+  "duplicate_signal_ids": 0,
+  "duplicate_setup_ids": 0,
+  "duplicate_generation_keys": 0,
+  "trades_sharing_an_entry_time": 56,
+  "distinct_entry_times_with_multiple_tfs": 28,
+  "trades_with_at_least_one_open_overlap": 314,
+  "overlap_same_direction_trades": 208,
+  "overlap_opposite_direction_trades": 106,
+  "no_trade_removed": true,
+  "signal_view": "all ZEC evaluation outcomes kept unchanged"
+}

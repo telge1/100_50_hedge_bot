@@ -1,0 +1,31 @@
+{
+  "cross_boundary_backtests": "ONLY_WITH_EXPLICIT_SEGMENTATION_OR_NORMALIZATION",
+  "overlap_policy": "REBUILD_ALL_FROM_RAW",
+  "segments": [
+    {
+      "bucket_rule": "UTC wall-clock [start,end), finalized at end",
+      "carried_forward_rule": "zero accepted updates in completed live second",
+      "full_levels_available": false,
+      "quality_status": "AGGREGATE_ONLY",
+      "sampling_rule": "last full book state processed before local wall-clock second finalization",
+      "source_id": "CH_ORDERBOOK_FEATURES_1S_V2",
+      "source_semantics_version": "ch_live_receive_asof_v1",
+      "transition_timestamp": "2026-08-24T22:47:54Z",
+      "valid_from": null,
+      "valid_to": "2026-08-24T22:47:54Z"
+    },
+    {
+      "bucket_rule": "UTC event-time [start,end)",
+      "carried_forward_rule": "no event-time event in bucket",
+      "full_levels_available": true,
+      "quality_status": "FULL_LEVEL_REPLAY",
+      "sampling_rule": "last event by exchange event_time before bucket end",
+      "source_id": "FS_RAW_OB200_V3",
+      "source_semantics_version": "raw_ob200_event_time_eos_v1",
+      "transition_timestamp": "2026-08-24T22:47:54Z",
+      "valid_from": "2026-08-24T22:47:54Z",
+      "valid_to": null
+    }
+  ],
+  "source_semantics_version_field": "LowCardinality(String) NOT NULL"
+}

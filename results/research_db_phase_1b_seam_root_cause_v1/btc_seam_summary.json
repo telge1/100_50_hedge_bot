@@ -1,0 +1,51 @@
+{
+  "current": {
+    "exact_matches": 35,
+    "exact_rate_pct": 3.888888888888889,
+    "genuine_cf_matches": 900,
+    "mid_abs_error_max": 85.75,
+    "mid_abs_error_mean": 0.788222222222222,
+    "missing_ch_seconds": 0,
+    "missing_raw_seconds": 0,
+    "paired_seconds": 900,
+    "tolerance_matches": 35,
+    "tolerance_rate_pct": 3.888888888888889,
+    "variant": "CURRENT_PHASE1_IMPLEMENTATION",
+    "windows": 3
+  },
+  "receive": {
+    "exact_matches": 899,
+    "exact_rate_pct": 99.88888888888889,
+    "genuine_cf_matches": 900,
+    "mid_abs_error_max": 0.0,
+    "mid_abs_error_mean": 0.0,
+    "missing_ch_seconds": 0,
+    "missing_raw_seconds": 0,
+    "paired_seconds": 900,
+    "tolerance_matches": 899,
+    "tolerance_rate_pct": 99.88888888888889,
+    "variant": "RECEIVE_TIME_LAST",
+    "windows": 3
+  },
+  "source_files": [
+    "BTCUSDT/2026/08/25/BTCUSDT_20260825T110000Z_20260825T120000Z_ob200_v3.zst",
+    "BTCUSDT/2026/08/25/BTCUSDT_20260825T120000Z_20260825T130000Z_ob200_v3.zst",
+    "BTCUSDT/2026/08/26/BTCUSDT_20260826T060000Z_20260826T070000Z_ob200_v3.zst",
+    "BTCUSDT/2026/08/28/BTCUSDT_20260828T140000Z_20260828T150000Z_ob200_v3.zst",
+    "BTCUSDT/2026/08/28/BTCUSDT_20260828T150000Z_20260828T160000Z_ob200_v3.zst"
+  ],
+  "windows": [
+    {
+      "end": "2026-08-25T12:05:00Z",
+      "start": "2026-08-25T12:00:00Z"
+    },
+    {
+      "end": "2026-08-26T06:35:00Z",
+      "start": "2026-08-26T06:30:00Z"
+    },
+    {
+      "end": "2026-08-28T15:05:00Z",
+      "start": "2026-08-28T15:00:00Z"
+    }
+  ]
+}

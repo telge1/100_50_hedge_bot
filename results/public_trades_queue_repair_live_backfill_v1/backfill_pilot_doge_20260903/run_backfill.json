@@ -1,0 +1,44 @@
+{
+  "mode": "backfill",
+  "started_at": "2026-09-04T21:21:27.433254+00:00",
+  "symbols": [
+    "DOGEUSDT"
+  ],
+  "symbol_count": 1,
+  "expected_files": 1,
+  "days": [
+    "2026-09-03"
+  ],
+  "start_date": "2026-09-03",
+  "end_date_exclusive": "2026-09-04",
+  "legacy_7d": false,
+  "smoke": false,
+  "resume": false,
+  "workers": 1,
+  "universe_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/config/universe_tradeable_51.json",
+  "run_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/public_trades_queue_repair_live_backfill_v1/backfill_pilot_doge_20260903",
+  "backfill": {
+    "completed": 1,
+    "errors": [],
+    "inserted_rows": 1823,
+    "skipped_existing_rows": 450621,
+    "elapsed_s": 25.611,
+    "manifest_summary": {
+      "AUDITED": 1
+    }
+  },
+  "collector_after": {
+    "pids": [],
+    "alive": true,
+    "pgrep": [
+      "1827882 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades --public-trade-queue-maxsize 100000 --public-trade-batch-size 2000 --public-trade-spool-dir results/live_collector/public_trade_spool"
+    ],
+    "collector_state": "LIVE",
+    "desired_state": "RUNNING",
+    "last_error": null
+  },
+  "manifest_summary": {
+    "AUDITED": 1
+  },
+  "finished_at": "2026-09-04T21:21:53.057817+00:00"
+}

@@ -1,0 +1,13 @@
+{
+  "database": "research_full_ob_import_pilot_v1",
+  "logical_records": 35589,
+  "physical_records": 48797,
+  "bytes_on_disk": 254348183,
+  "data_uncompressed_bytes": 774816564,
+  "bytes_per_logical_record_on_disk": 7146.82016915339,
+  "bytes_per_million_packets_on_disk": 7146820169.153391,
+  "estimated_per_symbol_day_note": "Full-OB ~1Hz*86400 plus checkpoints; scale from bytes_per_million",
+  "estimated_GB_per_symbol_day_at_1e5_packets": 0.6655994960249765,
+  "level_strategy": "raw_packet_rows_plus_arrayJoin_views",
+  "persistent_level_change_table": false
+}

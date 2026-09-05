@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE
-from .profile_edge_state import price_to_tick
+from .instrument_contract import instrument_for
+from .profile_edge_state import get_active_symbol, price_to_tick
 
 PROFILE_PRICE_BIN_CONTRACT = "profile_price_bin_contract_v1"
 
@@ -91,7 +91,7 @@ def build_profile_price_bin_contract(
     return {
         "contract_version": PROFILE_PRICE_BIN_CONTRACT,
         "price_step": step,
-        "orderbook_tick_size": BTCUSDT_TICK_SIZE,
+        "orderbook_tick_size": float(instrument_for(get_active_symbol()).tick_size),
         "bin_index_rule": "floor(price / price_step)",
         "interval_semantics": INTERVAL_SEMANTICS,
         "level_representation": {
@@ -162,7 +162,7 @@ def _first_outside_bin(zone: dict[str, Any], step: float, *, direction: str) -> 
 
 
 def tick_in_bin(tick: int, bin_lo: float, bin_hi: float) -> bool:
-    price = tick * BTCUSDT_TICK_SIZE
+    price = tick * float(instrument_for(get_active_symbol()).tick_size)
     return bin_lo <= price < bin_hi
 
 

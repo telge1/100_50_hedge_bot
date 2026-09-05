@@ -1,0 +1,5 @@
+    PID                  STARTED CMD
+1786328 Fri Sep  4 20:04:43 2026 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+    PID 
+1661773 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades
+1780509 /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py

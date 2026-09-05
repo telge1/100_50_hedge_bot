@@ -1,0 +1,102 @@
+{
+  "primary_decision": "OB_FLOW_SIGNAL_SYMBOL_OR_DIRECTION_DEPENDENT",
+  "n_events": 54,
+  "data_quality_counts": {
+    "DATA_VALID": 53,
+    "DATA_INVALID": 1
+  },
+  "outcome_counts": {
+    "BREAK_ACCEPTED": 31,
+    "RECLAIM_FAST": 11,
+    "RECLAIM_SLOW": 2,
+    "EXCLUDED": 1,
+    "HOLD_NO_BREAK": 9
+  },
+  "n_feature_rows": 740,
+  "n_timeline_rows": 740,
+  "top_features": [
+    {
+      "feature": "signed_distance_beyond_bps",
+      "timepoint": "PRE_TOUCH_5M",
+      "auc": 0.8666666666666667,
+      "orientation": "higher\u2192RECLAIM_FAST",
+      "median_a": -17.363513381244083,
+      "median_b": -6.209684637749707
+    },
+    {
+      "feature": "ask_depth_bps_0_5",
+      "timepoint": "PRE_TOUCH_30S",
+      "auc": 0.832258064516129,
+      "orientation": "higher\u2192RECLAIM_FAST",
+      "median_a": 0.0,
+      "median_b": 281082.08822000003
+    },
+    {
+      "feature": "support_depth_change_10s",
+      "timepoint": "BREAK_PLUS_20S",
+      "auc": 0.8225806451612904,
+      "orientation": "higher\u2192RECLAIM_FAST",
+      "median_a": -35652.36890000105,
+      "median_b": 35631.30426550015
+    },
+    {
+      "feature": "support_pull_10s",
+      "timepoint": "BREAK_PLUS_20S",
+      "auc": 0.8064516129032258,
+      "orientation": "higher\u2192RECLAIM_FAST",
+      "median_a": -35652.36890000105,
+      "median_b": 0.0
+    },
+    {
+      "feature": "support_refill_10s",
+      "timepoint": "BREAK_PLUS_20S",
+      "auc": 0.8048387096774193,
+      "orientation": "higher\u2192RECLAIM_FAST",
+      "median_a": 0.0,
+      "median_b": 35631.30426550015
+    }
+  ],
+  "earliest_useful_for_top": [
+    {
+      "feature": "signed_distance_beyond_bps",
+      "earliest_useful_time": "PRE_TOUCH_5M",
+      "best_auc_at_earliest": 0.8666666666666667,
+      "comparison": "BREAK_ACCEPTED_vs_RECLAIM_FAST"
+    },
+    {
+      "feature": "ask_depth_bps_0_5",
+      "earliest_useful_time": "PRE_TOUCH_2M",
+      "best_auc_at_earliest": 0.72,
+      "comparison": "BREAK_ACCEPTED_vs_RECLAIM_FAST"
+    },
+    {
+      "feature": "support_depth_change_10s",
+      "earliest_useful_time": "BREAK_PLUS_20S",
+      "best_auc_at_earliest": 0.8225806451612904,
+      "comparison": "BREAK_ACCEPTED_vs_RECLAIM_FAST"
+    },
+    {
+      "feature": "support_pull_10s",
+      "earliest_useful_time": "BREAK_PLUS_20S",
+      "best_auc_at_earliest": 0.8064516129032258,
+      "comparison": "BREAK_ACCEPTED_vs_RECLAIM_FAST"
+    },
+    {
+      "feature": "support_refill_10s",
+      "earliest_useful_time": "BREAK_PLUS_20S",
+      "best_auc_at_earliest": 0.8048387096774193,
+      "comparison": "BREAK_ACCEPTED_vs_RECLAIM_FAST"
+    }
+  ],
+  "deep_dive_event_ids": [
+    "ev_1h_protected_low_0.6052_20260726T050000",
+    "ev_1h_protected_low_0.6008_20260725T170000",
+    "APTUSDT_PL_20260726T115000_0p6298",
+    "APTUSDT_PL_20260802T035500_0p5613",
+    "DOGEUSDT_PL_20260727T055000_0p07273",
+    "DOGEUSDT_PL_20260727T081500_0p07264",
+    "APTUSDT_PL_20260731T120500_0p561",
+    "DOGEUSDT_PL_20260730T133500_0p06995"
+  ],
+  "artifact_dir": "results/ch_break_reclaim_microstructure_audit_20260808"
+}

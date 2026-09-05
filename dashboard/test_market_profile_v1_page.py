@@ -454,7 +454,7 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-6"
+    assert ASSET_V == "mp-10"
 
 
 def test_kerzen_and_market_profile_controls_are_separate():
@@ -474,6 +474,22 @@ def test_kerzen_and_market_profile_controls_are_separate():
     assert '["mpSymbol", "mpTimeframe", "mpAnchor", "mpDays"]' in js
     # Candle TF must not be copied into the MP control on restore.
     assert "Never copy candle" in js
+
+
+def test_mp_background_has_no_value_area_box_fill():
+    js = APP_JS.read_text(encoding="utf-8")
+    assert "function drawWindowBackground" in js
+    # VA is lines only — no translucent box fill over each window.
+    assert "Value-area fill used to paint" in js or "bright \"box view\"" in js
+    assert "ctx.fillStyle = COLORS.vaFill" not in js
+
+
+def test_mp_does_not_force_follow_live_on_poll():
+    js = APP_JS.read_text(encoding="utf-8")
+    assert "Do not force followLive" in js
+    assert "preserveView: true" in js
+    # Forming / visibility must not yank the view; Zentrieren uses resetView.
+    assert "api.resetView" in js
 
 
 def test_the_page_bridge_stubs_crosshair_handlers():

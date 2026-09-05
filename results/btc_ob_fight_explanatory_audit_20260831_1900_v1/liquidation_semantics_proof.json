@@ -1,0 +1,64 @@
+{
+  "contract_version": "liquidation_semantics_audit_v1",
+  "table": "orderbook_analysis.all_liquidations",
+  "schema_columns": {
+    "exchange": "LowCardinality(String)",
+    "category": "LowCardinality(String)",
+    "symbol": "LowCardinality(String)",
+    "event_time": "DateTime64(3, 'UTC')",
+    "system_generated_at": "DateTime64(3, 'UTC')",
+    "received_at": "DateTime64(3, 'UTC')",
+    "position_side_raw": "LowCardinality(String)",
+    "liquidated_position_side": "LowCardinality(String)",
+    "size": "Decimal(38, 8)",
+    "bankruptcy_price": "Decimal(38, 8)",
+    "notional_estimate": "Decimal(38, 8)",
+    "source_topic": "String",
+    "event_key": "String",
+    "raw_payload_hash": "FixedString(64)",
+    "collector_instance_id": "String",
+    "inserted_at": "DateTime64(3, 'UTC')"
+  },
+  "side_field": "liquidated_position_side",
+  "side_semantics": {
+    "meaning": "Liquidated POSITION side, NOT taker aggressor field",
+    "LIQUIDATED_SHORT": "Short position forcibly closed → economically a FORCED BUY against Ask",
+    "LIQUIDATED_LONG": "Long position forcibly closed → economically a FORCED SELL against Bid",
+    "collector_evidence": "orderbook_analyse/oi_liquidation_collector/logic.py interpret_liquidated_position_side",
+    "bybit_raw_S_field": "S=Buy → LIQUIDATED_LONG; S=Sell → LIQUIDATED_SHORT",
+    "forced_trade_direction_map": {
+      "LIQUIDATED_SHORT": "FORCED_BUY",
+      "LIQUIDATED_LONG": "FORCED_SELL"
+    },
+    "expected_aggressive_public_trade_side": {
+      "LIQUIDATED_SHORT": "Buy",
+      "LIQUIDATED_LONG": "Sell"
+    }
+  },
+  "bankruptcy_price_semantics": {
+    "field": "bankruptcy_price",
+    "meaning": "Reference bankruptcy/liquidation price from exchange feed, NOT proven exact execution print",
+    "use_for_association": "HEURISTIC_TEMPORAL_PRICE_PROXIMITY_ONLY"
+  },
+  "row_granularity": {
+    "each_row_represents": "one liquidation event message from Bybit allLiquidation stream",
+    "not_guaranteed": "one unique closed position (size may be partial fill aggregate)",
+    "dedup_key": "event_key = exchange|symbol|event_ms|position_side_raw|size|bankruptcy_price",
+    "core_window_row_count": 60,
+    "core_window_unique_event_keys": 60,
+    "dedup_status": "UNIQUE"
+  },
+  "public_trade_linkage": {
+    "shared_id_exists": false,
+    "association_method_allowed": "HEURISTIC_TEMPORAL_PRICE_ASSOCIATION only",
+    "direct_identification_allowed": false
+  },
+  "position_count_claim": {
+    "allowed_wording": "N liquidation events (deduplicated by event_key)",
+    "disallowed_wording": "N positions unless position-level ID proven"
+  },
+  "test_evidence": [
+    "orderbook_analyse/tests/test_ob200_v3_raw_discovery_v3.py interpret_liquidated_position_side",
+    "orderbook_analyse/oi_liq_impact_l2/contracts.py LIQUIDATION_SIDE_BY_DIRECTION + AGGRESSOR_SIDE_BY_DIRECTION"
+  ]
+}

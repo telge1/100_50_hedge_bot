@@ -414,7 +414,7 @@ def test_frontend_overlay_and_tooltip_contract():
     assert "updateVolumeProfileHover" in trp
     assert "subscribeVisibleTimeRangeChange" in trp
     assert "drawVolumeProfile();" in trp
-    assert 'style.css?v=ob-levels-2' in pane
+    assert 'style.css?v=ob-levels-15' in pane
     assert 'id="researchVpPoc"' in html
     assert 'id="researchVpVa"' in html
     assert "gen !== pane.vpGen" in host

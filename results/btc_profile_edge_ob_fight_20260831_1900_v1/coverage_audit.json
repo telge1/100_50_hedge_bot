@@ -1,0 +1,127 @@
+{
+  "symbol": "BTCUSDT",
+  "window_utc": {
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T21:00:00Z"
+  },
+  "timestamps_interpreted_as": "UTC",
+  "public_trades": {
+    "table": "orderbook_analysis.public_trades_canonical",
+    "count": 171142,
+    "min_ts": "2026-08-31T18:30:00.465000Z",
+    "max_ts": "2026-08-31T20:59:57.021000Z",
+    "uniq_trade_id": 171142,
+    "buy_count": 83963,
+    "sell_count": 87179,
+    "sum_notional": 434965801.9438,
+    "dedup_ok": true,
+    "aggressor_semantics": "side=Buy/Sell is Bybit taker/aggressor"
+  },
+  "candles_1m": {
+    "table": "signal_generator.candles_1m",
+    "count": 150,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T20:59:00Z",
+    "expected_minutes": 150,
+    "complete": true
+  },
+  "open_interest_5s": {
+    "table": "orderbook_analysis.open_interest_5s",
+    "count": 1800,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T20:59:55Z",
+    "resolution": "5s"
+  },
+  "liquidations": {
+    "table": "orderbook_analysis.all_liquidations",
+    "by_side": [
+      {
+        "side": "LIQUIDATED_LONG",
+        "count": 8,
+        "notional": 28193.1602
+      },
+      {
+        "side": "LIQUIDATED_SHORT",
+        "count": 67,
+        "notional": 507674.9045
+      }
+    ],
+    "note": "liquidated_position_side is position side, not aggressor"
+  },
+  "ob200": {
+    "source": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT",
+    "engine": "filesystem ob200_v3.zst hour archives via research/ob_replay.py (chunked zstd)",
+    "hours_needed": [
+      {
+        "hour": "2026-08-31T17:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T170000Z_20260831T180000Z_ob200_v3.zst",
+        "bytes": 11060393,
+        "ok": true
+      },
+      {
+        "hour": "2026-08-31T18:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T180000Z_20260831T190000Z_ob200_v3.zst",
+        "bytes": 10200356,
+        "ok": true
+      },
+      {
+        "hour": "2026-08-31T19:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst",
+        "bytes": 9431995,
+        "ok": true
+      },
+      {
+        "hour": "2026-08-31T20:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T200000Z_20260831T210000Z_ob200_v3.zst",
+        "bytes": 7652430,
+        "ok": true
+      }
+    ],
+    "all_hours_ok": true,
+    "depth": 200,
+    "continuity": "per-hour rotation_checkpoint + consecutive u deltas",
+    "note": "dashboard ob200_walls.readline path fails on these archives; case uses chunked reader"
+  },
+  "ob200_replay_probes": {
+    "before_core": {
+      "ok": true,
+      "as_of": "2026-08-31T18:29:58.929000Z",
+      "best_bid": 78866.3,
+      "best_ask": 78866.4,
+      "mid": 78866.35,
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "events_applied": 17990,
+      "u_gaps": 0,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T180000Z_20260831T190000Z_ob200_v3.zst",
+      "genuine_200": true
+    },
+    "T0": {
+      "ok": true,
+      "as_of": "2026-08-31T18:59:59.929000Z",
+      "best_bid": 78984.4,
+      "best_ask": 78984.5,
+      "mid": 78984.45,
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "events_applied": 1,
+      "u_gaps": 0,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst",
+      "genuine_200": true
+    },
+    "core_end": {
+      "ok": true,
+      "as_of": "2026-08-31T19:29:59.929000Z",
+      "best_bid": 79056.0,
+      "best_ask": 79056.1,
+      "mid": 79056.05,
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "events_applied": 18000,
+      "u_gaps": 0,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst",
+      "genuine_200": true
+    }
+  },
+  "ob200_reconstructable": true
+}

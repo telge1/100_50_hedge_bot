@@ -1,0 +1,36 @@
+{
+  "before": {
+    "pid": 1786328,
+    "code": "resilience-v1-with-meta-race",
+    "started": "2026-09-04T18:04:43Z"
+  },
+  "after": {
+    "pid": 1795773,
+    "cmdline": "/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python\u0000-m\u0000orderbook_analyse.oi_liquidation_collector\u0000--mode\u0000live\u0000--duration\u00000\u0000",
+    "cwd": "/home/telgenbuescher/projects/orderbook_analyse",
+    "started": "2026-09-04T18:45:19Z",
+    "code": "spool-meta-race-fix-v1",
+    "health": {
+      "health_status": "GREEN",
+      "writer_alive": true,
+      "websocket_alive": true,
+      "writer_error_count": 0,
+      "queue_drop_count": 0,
+      "spool_unacked_records": 7,
+      "websocket_reconnect_count": 0
+    },
+    "meta": {
+      "generation": 63510,
+      "last_acked_seq": 93761,
+      "next_seq": 93762,
+      "updated_unix": 1788549949.4487607
+    }
+  },
+  "method": "systemctl --user stop/start; SIGTERM only",
+  "protected": {
+    "dashboard": 1780509,
+    "public_trades": 1661773,
+    "full_ob": "STOPPED"
+  },
+  "verdict": "OI_LIQ_RESILIENT_COLLECTOR_LIVE_HEALTHY_EXACTLY_ONCE"
+}

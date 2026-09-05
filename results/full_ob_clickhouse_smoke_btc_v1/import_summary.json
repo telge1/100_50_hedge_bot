@@ -1,0 +1,19 @@
+{
+  "rows_prepared": 1514,
+  "rows_inserted_packets": 1514,
+  "rows_inserted_level_changes": 376553,
+  "level_changes_derivation": "ARRAY JOIN from packets FINAL",
+  "physical_packet_rows": 1514,
+  "logical_packet_rows_final": 1514,
+  "duplicate_packet_sha_groups_physical": 0,
+  "rejected_packet_count": 0,
+  "invalid_price_qty": 0,
+  "marker_rows": 10,
+  "delta_rows": 1503,
+  "bid_level_change_rows": 197347,
+  "ask_level_change_rows": 179206,
+  "min_u": 4347545,
+  "max_u": 4349047,
+  "min_seq": 805048006408,
+  "max_seq": 805049768223
+}

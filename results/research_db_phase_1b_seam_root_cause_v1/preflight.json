@@ -1,0 +1,8 @@
+{
+  "audit_mode": "READ_ONLY",
+  "branch": "feature/btc-doge-research-db",
+  "head": "48bf56fbff1e82abee0c8ff09a95a1701df10965",
+  "timestamp_alignment_after_fix": "correct",
+  "tracked_worktree_at_start": "clean",
+  "untracked_preserved": true
+}

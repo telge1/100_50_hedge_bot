@@ -1,0 +1,63 @@
+{
+  "verdict": "BTC_GENUINE_PARENT_SIGNAL_CAUSALLY_CONFIRMED",
+  "signal_found": true,
+  "signal_kind": "PARENT",
+  "event_type": "GENUINE_CROSS_IN",
+  "trigger_source": "CROSS_IN",
+  "trigger_quality": "REAL_CROSS_IN",
+  "bootstrap_status": "N/A",
+  "bootstrap_persistent_capture": false,
+  "classification": {
+    "GENUINE_CROSS_IN": true,
+    "NESTED_PROFILE_EDGE_SIGNAL": false,
+    "BOOTSTRAP_ALREADY_IN_EDGE_ZONE_as_capture": false,
+    "EDGE_RETOUCH": false,
+    "SECONDARY_EDGE_TRIGGER_as_parent": false
+  },
+  "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_parent",
+  "parent_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+  "symbol": "BTCUSDT",
+  "trigger_ts_utc": "2026-09-04T11:27:35.764963Z",
+  "trigger_ts_local_eeest": "2026-09-04T14:27:35.764963+03:00",
+  "edge_type": "UPPER",
+  "edge": "TPO_VAH",
+  "edge_price": 81135.0,
+  "market_price_at_trigger": 81292.75,
+  "distance_to_edge_bps": 19.40517450818185,
+  "prior_zone_state": "APPROACH",
+  "trigger_zone_state": "IN",
+  "edge_entry_crossed": true,
+  "trigger_u": 4408866,
+  "trigger_seq": 805140627861,
+  "continuity_epoch_id": 0,
+  "continuity_epoch_count": 1,
+  "collector_pid_at_signal": 1692334,
+  "collector_start_utc": "2026-09-04T11:26:05.790822Z",
+  "also_later_nested_btc_signals": [
+    {
+      "nested_signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+      "edge": "TPO_VAL",
+      "edge_side": "LOWER",
+      "signal_ts": "2026-09-04T11:30:32.654722Z",
+      "trigger_price": 81230.15,
+      "edge_price": 81070.0
+    },
+    {
+      "nested_signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U",
+      "edge": "TPO_VAH",
+      "edge_side": "UPPER",
+      "signal_ts": "2026-09-04T12:06:34.825323Z",
+      "trigger_price": 81113.45,
+      "edge_price": 81275.0
+    },
+    {
+      "nested_signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_33d13adee113_1_U",
+      "edge": "TPO_VAH",
+      "edge_side": "UPPER",
+      "signal_ts": "2026-09-04T12:16:46.769720Z",
+      "trigger_price": 81106.65,
+      "edge_price": 81258.0
+    }
+  ],
+  "note_arm_lifecycle_ts": "2026-09-04T11:27:32.479523Z"
+}

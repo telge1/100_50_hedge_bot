@@ -1,0 +1,13 @@
+{
+  "files_completed": 96,
+  "files_total": 96,
+  "current_file": "DOGEUSDT2026-09-02",
+  "inserted_rows": 3556759,
+  "skipped_existing_rows": 39234826,
+  "errors": 0,
+  "last_file_s": 13.575,
+  "elapsed_s": 4855.268,
+  "eta_s": 0.0,
+  "free_bytes": 365432233984,
+  "throughput_files_per_h": 21.5
+}

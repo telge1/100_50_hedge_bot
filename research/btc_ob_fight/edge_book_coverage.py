@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE
 from .profile_edge_state import price_to_tick
 
 COVERAGE_FULL = "FULL_EDGE_REGION_COVERAGE"
@@ -21,18 +20,29 @@ def build_edge_book_coverage(
     coverage_rows: list[dict[str, Any]] = []
     depth_samples: list[dict[str, Any]] = []
 
+    region_list: list[tuple[str, dict[str, Any], float, float]] = []
     for side_key in ("upper", "lower"):
-        regions = region_catalog.get(side_key) or []
-        for reg in regions:
-            scope = reg.get("scope")
+        for reg in region_catalog.get(side_key) or []:
             lo, hi = reg.get("price_low"), reg.get("price_high")
             if lo is None or hi is None:
                 continue
-            for row in ob_rows:
-                sample = _sample_region(row, reg, lo, hi)
-                coverage_rows.append(sample)
-                if sample.get("coverage_status") in (COVERAGE_FULL, COVERAGE_PARTIAL):
-                    depth_samples.append(sample)
+            region_list.append((side_key, reg, float(lo), float(hi)))
+
+    for row in ob_rows:
+        bid_map = ask_map = None
+        if row.get("ok"):
+            # Reuse precomputed maps when observability prepared the row.
+            bid_map = row.get("_bid_map")
+            ask_map = row.get("_ask_map")
+            if bid_map is None:
+                bid_map = _level_qty_by_tick(row.get("bids") or [])
+            if ask_map is None:
+                ask_map = _level_qty_by_tick(row.get("asks") or [])
+        for _side_key, reg, lo, hi in region_list:
+            sample = _sample_region(row, reg, lo, hi, bid_map=bid_map, ask_map=ask_map)
+            coverage_rows.append(sample)
+            if sample.get("coverage_status") in (COVERAGE_FULL, COVERAGE_PARTIAL):
+                depth_samples.append(sample)
 
     summary = _summarize_coverage(coverage_rows, region_catalog)
     return coverage_rows, depth_samples, summary
@@ -43,6 +53,9 @@ def _sample_region(
     reg: dict[str, Any],
     lo: float,
     hi: float,
+    *,
+    bid_map: dict[int, float] | None = None,
+    ask_map: dict[int, float] | None = None,
 ) -> dict[str, Any]:
     if not row.get("ok"):
         return {
@@ -64,18 +77,27 @@ def _sample_region(
     lowest_bid = float(bids[-1][0]) if bids else bb
     highest_ask = float(asks[-1][0]) if asks else ba
 
-    ticks_in_region = _ticks_in_range(lo, hi)
+    t0 = price_to_tick(lo)
+    t1 = price_to_tick(hi - 1e-9)
+    n_ticks = max(0, t1 - t0 + 1)
+    if bid_map is None:
+        bid_map = _level_qty_by_tick(bids)
+    if ask_map is None:
+        ask_map = _level_qty_by_tick(asks)
+
+    # Iterate book levels (≤200/side) instead of every region tick — same counts.
     bid_qty = 0.0
     ask_qty = 0.0
-    ticks_observed = 0
-    for tick in ticks_in_region:
-        price = tick * BTCUSDT_TICK_SIZE
-        bq = _qty_at_price(bids, price)
-        aq = _qty_at_price(asks, price)
-        if bq > 0 or aq > 0:
-            ticks_observed += 1
-        bid_qty += bq
-        ask_qty += aq
+    observed: set[int] = set()
+    for tick, bq in bid_map.items():
+        if t0 <= tick <= t1 and bq > 0:
+            bid_qty += bq
+            observed.add(tick)
+    for tick, aq in ask_map.items():
+        if t0 <= tick <= t1 and aq > 0:
+            ask_qty += aq
+            observed.add(tick)
+    ticks_observed = len(observed)
 
     region_below_book = hi <= lowest_bid or lo >= highest_ask
     if region_below_book and not bids and not asks:
@@ -85,7 +107,7 @@ def _sample_region(
             status = COVERAGE_OUTSIDE
         else:
             status = COVERAGE_PARTIAL
-    elif ticks_observed >= len(ticks_in_region) * 0.99 and ticks_in_region:
+    elif ticks_observed >= n_ticks * 0.99 and n_ticks:
         status = COVERAGE_FULL
     elif ticks_observed > 0:
         status = COVERAGE_PARTIAL
@@ -109,7 +131,7 @@ def _sample_region(
         "region_price_low": lo,
         "region_price_high": hi,
         "region_inside_book_span": not (lo >= highest_ask or hi <= lowest_bid),
-        "ticks_in_region": len(ticks_in_region),
+        "ticks_in_region": n_ticks,
         "ticks_observed": ticks_observed,
         "visible_bid_qty_in_region": bid_qty,
         "visible_ask_qty_in_region": ask_qty,
@@ -125,9 +147,17 @@ def _ticks_in_range(lo: float, hi: float) -> list[int]:
     return list(range(t0, t1 + 1))
 
 
-def _qty_at_price(levels: list, price: float) -> float:
+def _level_qty_by_tick(levels: list) -> dict[int, float]:
+    out: dict[int, float] = {}
     for p, q in levels:
-        if abs(float(p) - price) < 1e-6:
+        out[price_to_tick(p)] = float(q)
+    return out
+
+
+def _qty_at_price(levels: list, price: float) -> float:
+    target = price_to_tick(price)
+    for p, q in levels:
+        if price_to_tick(p) == target:
             return float(q)
     return 0.0
 

@@ -1,0 +1,1 @@
+started pid=1817696 log=logs/orderbook_v3_raw_archive_btc_doge.nohup.log health=logs/orderbook_v3_raw_archive_btc_doge.health.ndjson fr_enable=true fr_root=/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder

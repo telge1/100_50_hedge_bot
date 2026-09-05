@@ -1,0 +1,6 @@
+SR_BRANCH=feature/btc-doge-research-db
+SR_HEAD=f7125a7ec9e3e455390234fb496ee40db3be15cd
+SR_DIRTY=170
+OA_BRANCH=feature/strategy-lab-phase1
+OA_HEAD=bcf13edb8613570ed3c5addab6af08f93d99f45e
+OA_DIRTY=273

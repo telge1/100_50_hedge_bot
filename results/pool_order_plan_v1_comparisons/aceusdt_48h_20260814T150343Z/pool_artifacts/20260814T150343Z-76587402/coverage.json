@@ -1,0 +1,21 @@
+{
+  "symbols": [
+    {
+      "symbol": "ACEUSDT",
+      "query_start": "2026-07-29T15:16:00Z",
+      "query_end": "2026-08-14T15:03:43Z",
+      "database_history_start": "2026-01-01T00:00:00Z",
+      "database_history_end": "2026-08-14T15:02:00Z",
+      "history_start": "2026-07-29T15:16:00Z",
+      "history_end": "2026-08-14T15:02:00Z",
+      "entry_count": 16,
+      "one_minute_rows": 23027,
+      "missing_one_minute_rows": 0,
+      "duplicate_one_minute_rows": 0,
+      "complete_five_minute_buckets": 4604,
+      "dropped_incomplete_five_minute_buckets": 2,
+      "listing_limited": true,
+      "coverage_status": "LISTING_LIMITED"
+    }
+  ]
+}

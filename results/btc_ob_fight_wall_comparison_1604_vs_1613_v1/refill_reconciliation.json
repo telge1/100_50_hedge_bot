@@ -1,0 +1,11 @@
+{
+  "console_value_5": "fight_facts.manifest.post_trade_refill_count",
+  "post_trade_refill_events_csv_rows": 5,
+  "post_trade_recovery_rows": 4,
+  "post_trade_no_refill_sentinel": 1,
+  "exact_refill_events_csv_rows": 4,
+  "fss_exact_refill_count": 4,
+  "timestamps": "2026-08-30T17:28:27Z .. 2026-08-30T17:29:51Z only",
+  "in_failed_or_held_windows": false,
+  "math": "5 = 4 recovery + 1 NO_POST_TRADE sentinel in post_trade_refill_events.csv; exact_refill_events.csv = 4 = fss.exact_refill_count"
+}

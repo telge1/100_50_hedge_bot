@@ -1,0 +1,14 @@
+{
+  "planner_pin_ok": true,
+  "clickhouse": {
+    "host": "127.0.0.1",
+    "port": 8123,
+    "database": "signal_generator",
+    "table": "candles_1m",
+    "exchange": "bybit",
+    "final": true,
+    "is_closed": 1,
+    "env_file": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.env"
+  },
+  "raw_signals": 18
+}

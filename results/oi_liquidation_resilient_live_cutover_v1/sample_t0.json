@@ -1,0 +1,73 @@
+{
+  "utc": "2026-09-04T18:05:25Z",
+  "health": {
+    "clickhouse_reachable": true,
+    "clickhouse_reconnect_count": 1,
+    "collector_instance_id": "server-telgenbuescher-1786328-526adc3c",
+    "health_reasons": [
+      "websocket_down"
+    ],
+    "health_status": "YELLOW",
+    "last_liquidation_persisted_ts": null,
+    "last_liquidation_received_ts": null,
+    "last_oi_persisted_ts": 1788545115.1516118,
+    "last_oi_received_ts": 1788545115.001339,
+    "last_successful_insert_ts": 1788545115.1516118,
+    "last_ws_message_ts": 1788545107.113616,
+    "persistence_lag_seconds": 0.0,
+    "pid": 1786328,
+    "process_alive": true,
+    "queue_capacity": 50000,
+    "queue_depth": 0,
+    "queue_drop_count": 0,
+    "spool_unacked_bytes": 0,
+    "spool_unacked_records": 0,
+    "updated_unix": 1788545115.312823,
+    "websocket_alive": false,
+    "websocket_reconnect_count": 1,
+    "writer_alive": true,
+    "writer_error_count": 0,
+    "writer_restart_count": 1
+  },
+  "oi5s": [
+    "12360900",
+    "2026-09-04 18:05:15",
+    "2026-09-04 18:05:15.001000"
+  ],
+  "oie": [
+    "22180651",
+    "2026-09-04 18:05:23.857000",
+    "2026-09-04 18:05:23.957000"
+  ],
+  "liq": [
+    "144002",
+    "2026-09-01 16:41:23.392000"
+  ],
+  "syms": [
+    [
+      "BTCUSDT",
+      "2026-09-04 18:05:15",
+      5
+    ],
+    [
+      "DOGEUSDT",
+      "2026-09-04 18:05:15",
+      5
+    ],
+    [
+      "ETHUSDT",
+      "2026-09-04 18:05:15",
+      5
+    ],
+    [
+      "SOLUSDT",
+      "2026-09-04 18:05:15",
+      5
+    ],
+    [
+      "XRPUSDT",
+      "2026-09-04 18:05:15",
+      5
+    ]
+  ]
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "scenario": "clean_continuous",
+    "research_eligible": true,
+    "continuous_capture": true,
+    "replayable_by_epochs": true
+  },
+  {
+    "scenario": "after_resync_checkpoint",
+    "research_eligible": false,
+    "continuous_capture": false,
+    "replayable_by_epochs": true
+  },
+  {
+    "scenario": "queue_drop",
+    "research_eligible": false,
+    "continuous_capture": false,
+    "replayable_by_epochs": true
+  },
+  {
+    "scenario": "checkpoint_fail",
+    "research_eligible": false,
+    "continuous_capture": false,
+    "replayable_by_epochs": false
+  },
+  {
+    "scenario": "apply_epoch_gap",
+    "research_eligible": false,
+    "continuous_capture": false,
+    "replayable_by_epochs": true
+  }
+]

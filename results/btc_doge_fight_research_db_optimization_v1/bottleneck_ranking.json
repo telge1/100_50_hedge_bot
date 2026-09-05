@@ -1,0 +1,26 @@
+{
+  "bottlenecks": [
+    {
+      "rank": 1,
+      "phase": "sequence_validation",
+      "share_pct": 42,
+      "cause": "edge_book_coverage region\u00d7samples\u00d7ticks"
+    },
+    {
+      "rank": 2,
+      "phase": "public_trade_load_companion",
+      "share_pct": 8,
+      "cause": "850k companion rows"
+    },
+    {
+      "rank": 3,
+      "phase": "ob_adapt",
+      "share_pct": 11,
+      "cause": "python wall-row conversion"
+    }
+  ],
+  "source_purity_blocker": "RESEARCH_TRADE_EVENTS_MISSING",
+  "coverage_only_after_ms": 88,
+  "full_facts_after_blocked_s": 1.15,
+  "note": "Full source-pure facts cannot complete until research_public_trades rematerialized"
+}

@@ -1,0 +1,12 @@
+{
+  "BTCUSDT_20260903T184212Z_4a22a89fe6": {
+    "public_trades_raw.jsonl.zst.tmp": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "full_ob_raw_deltas.jsonl.zst.tmp": "54a931a4224187325e6cbea6d3350976df19c54fc62d884ac042de15c38e6bb0",
+    "rest_full_snapshot.json.zst.tmp": "bebefd726abb07b99938b98527a432593c6ac2e27179328367399fcc12c19617"
+  },
+  "DOGEUSDT_20260903T184212Z_f5d68293cd": {
+    "public_trades_raw.jsonl.zst.tmp": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "full_ob_raw_deltas.jsonl.zst.tmp": "def94e1cf4b14a07c2382b69da2d99d3478d101d696b287e523297c72ac9a95a",
+    "rest_full_snapshot.json.zst.tmp": "123ff0a1e67b70856c04cea5eb1c93a6acaa5abfea86270e965a5d82e0b0c8ab"
+  }
+}

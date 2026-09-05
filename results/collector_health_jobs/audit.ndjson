@@ -1,0 +1,5 @@
+{"ts": "2026-09-04T17:33:19.371570Z", "user": "tester", "action": "reject", "error": "PUBLIC_TRADES_BLOCKED:PUBLIC_TRADES_BACKFILL_PARTIALLY_READY", "body_keys": ["collector_id", "symbols", "start", "end", "job_kind"]}
+{"ts": "2026-09-04T17:33:38.803626Z", "user": "tester", "action": "reject", "error": "PUBLIC_TRADES_BLOCKED:PUBLIC_TRADES_BACKFILL_PARTIALLY_READY", "body_keys": ["collector_id", "symbols", "start", "end", "job_kind"]}
+{"ts": "2026-09-04T17:33:58.666392Z", "user": "tester", "action": "reject", "error": "PUBLIC_TRADES_BLOCKED:PUBLIC_TRADES_BACKFILL_PARTIALLY_READY", "body_keys": ["collector_id", "symbols", "start", "end", "job_kind"]}
+{"ts": "2026-09-04T17:40:00.845368Z", "user": "telge", "action": "reject", "error": "PUBLIC_TRADES_BLOCKED:PUBLIC_TRADES_BACKFILL_PARTIALLY_READY", "body_keys": ["collector_id", "symbols", "start", "end", "job_kind"]}
+{"ts": "2026-09-04T17:40:00.849092Z", "user": "telge", "action": "reject", "error": "OI_EXECUTE_FAIL_CLOSED", "body_keys": ["job_kind", "symbols", "start", "end"]}

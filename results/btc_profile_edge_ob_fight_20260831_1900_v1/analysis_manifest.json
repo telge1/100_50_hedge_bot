@@ -1,0 +1,363 @@
+{
+  "case": {
+    "symbol": "BTCUSDT",
+    "T0": "2026-08-31T19:00:00Z",
+    "core": [
+      "2026-08-31T18:30:00Z",
+      "2026-08-31T19:30:00Z"
+    ],
+    "max_end": "2026-08-31T21:00:00Z"
+  },
+  "git": {
+    "repo": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev",
+    "branch": "feature/dashboard-research-charts",
+    "head": "5fb7495f0a7ace4c3654d65db8cf3a3ecae01cc6",
+    "note": "dirty worktree preserved; this script only writes results/"
+  },
+  "data_sources": {
+    "ob200": "orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT (hour zst)",
+    "trades": "orderbook_analysis.public_trades_canonical",
+    "candles": "signal_generator.candles_1m",
+    "oi": "orderbook_analysis.open_interest_5s",
+    "liq": "orderbook_analysis.all_liquidations",
+    "market_profile": "orderbook_analyse.market_profile (volume-at-price, VA 70%, ~160 bins)"
+  },
+  "verdict": "BTC_OB_FIGHT_CONTESTED_WAIT_NO_TRADE",
+  "decision_ts": "2026-08-31T21:00:00Z",
+  "ACTIVE_AGGRESSOR": "MIXED_THEN_SELLERS",
+  "PASSIVE_CONTROLLER": "NONE_CLEAR",
+  "NET_CONTROLLER": "CONTESTED",
+  "resolution": "CONTESTED",
+  "trade_ready": "NO_TRADE",
+  "decision_level": 79140.0,
+  "decision_kind": "us_developing:VAH:upper_edge",
+  "level_ctx": {
+    "price_at_T0": 78984.4,
+    "vs_us_developing": {
+      "level_kind": "lvn",
+      "level_price": 78985.0,
+      "distance": -0.6000000000058208,
+      "distance_bps": -0.07596436764801921,
+      "zone": "inside_va",
+      "vah": 79140.0,
+      "val": 78190.0,
+      "poc": 78565.0
+    },
+    "vs_day_developing": {
+      "level_kind": "lvn",
+      "level_price": 79010.0,
+      "distance": -25.60000000000582,
+      "distance_bps": -3.2411463529514464,
+      "zone": "at_or_above_vah",
+      "vah": 78520.0,
+      "val": 77520.0,
+      "poc": 77970.0
+    },
+    "vs_prior_day": {
+      "level_kind": "hvn",
+      "level_price": 78990.0,
+      "distance": -5.600000000005821,
+      "distance_bps": -0.7090007647087047,
+      "zone": "inside_va",
+      "vah": 79200.0,
+      "val": 78120.0,
+      "poc": 78830.0
+    },
+    "vs_30m_block": {
+      "level_kind": "hvn",
+      "level_price": 78986.25,
+      "distance": -1.8500000000058208,
+      "distance_bps": -0.23422346691319054,
+      "zone": "at_or_below_val",
+      "vah": 79195.0,
+      "val": 79005.0,
+      "poc": 79166.25
+    }
+  },
+  "key_windows": {
+    "pre_2m": {
+      "start": "2026-08-31T18:58:00Z",
+      "end": "2026-08-31T19:00:00Z",
+      "n": 1471,
+      "buy_notional": 847450.0443,
+      "sell_notional": 391323.0254,
+      "delta_notional": 456127.01889999997,
+      "buy_size": 10.725999999999999,
+      "sell_size": 4.953,
+      "first_price": 78986.9,
+      "last_price": 78984.4,
+      "high": 79024.9,
+      "low": 78978.7,
+      "price_change": -2.5,
+      "price_change_bps": -0.3165081804704325,
+      "efficiency_bps_per_m_buy": -0.3734829947786133,
+      "efficiency_bps_per_m_sell": 0.808815632933703,
+      "large_trades_ge_50k": 3
+    },
+    "t0_1m": {
+      "start": "2026-08-31T19:00:00Z",
+      "end": "2026-08-31T19:01:00Z",
+      "n": 1354,
+      "buy_notional": 1139530.0254,
+      "sell_notional": 1116532.0382,
+      "delta_notional": 22997.987199999858,
+      "buy_size": 14.42,
+      "sell_size": 14.128,
+      "first_price": 78984.5,
+      "last_price": 79030.3,
+      "high": 79033.0,
+      "low": 78984.5,
+      "price_change": 45.80000000000291,
+      "price_change_bps": 5.798606055618876,
+      "efficiency_bps_per_m_buy": 5.088594355891095,
+      "efficiency_bps_per_m_sell": -5.193407674147004,
+      "large_trades_ge_50k": 5
+    },
+    "1_3m": {
+      "start": "2026-08-31T19:01:00Z",
+      "end": "2026-08-31T19:03:00Z",
+      "n": 1700,
+      "buy_notional": 2068707.5403,
+      "sell_notional": 918663.3998,
+      "delta_notional": 1150044.1405,
+      "buy_size": 26.175,
+      "sell_size": 11.624,
+      "first_price": 79030.2,
+      "last_price": 79041.8,
+      "high": 79041.8,
+      "low": 79023.1,
+      "price_change": 11.60000000000582,
+      "price_change_bps": 1.4677933245779236,
+      "efficiency_bps_per_m_buy": 0.7095219096871793,
+      "efficiency_bps_per_m_sell": -1.5977487781677961,
+      "large_trades_ge_50k": 6
+    },
+    "3_10m": {
+      "start": "2026-08-31T19:03:00Z",
+      "end": "2026-08-31T19:10:00Z",
+      "n": 8054,
+      "buy_notional": 8480694.8152,
+      "sell_notional": 6897495.334,
+      "delta_notional": 1583199.4811999993,
+      "buy_size": 107.197,
+      "sell_size": 87.175,
+      "first_price": 79041.7,
+      "last_price": 79188.9,
+      "high": 79200.0,
+      "low": 79005.8,
+      "price_change": 147.1999999999971,
+      "price_change_bps": 18.62308123433543,
+      "efficiency_bps_per_m_buy": 2.1959381442375654,
+      "efficiency_bps_per_m_sell": -2.6999773588154823,
+      "large_trades_ge_50k": 38
+    },
+    "10_20m": {
+      "start": "2026-08-31T19:10:00Z",
+      "end": "2026-08-31T19:20:00Z",
+      "n": 16990,
+      "buy_notional": 19560222.0812,
+      "sell_notional": 20919453.3401,
+      "delta_notional": -1359231.2589000016,
+      "buy_size": 247.068,
+      "sell_size": 264.42,
+      "first_price": 79188.9,
+      "last_price": 79024.1,
+      "high": 79280.8,
+      "low": 79011.1,
+      "price_change": -164.79999999998836,
+      "price_change_bps": -20.810997500910908,
+      "efficiency_bps_per_m_buy": -1.0639448475849909,
+      "efficiency_bps_per_m_sell": 0.9948155509885529,
+      "large_trades_ge_50k": 109
+    },
+    "20_30m": {
+      "start": "2026-08-31T19:20:00Z",
+      "end": "2026-08-31T19:30:00Z",
+      "n": 9401,
+      "buy_notional": 8352604.3777,
+      "sell_notional": 10622892.3116,
+      "delta_notional": -2270287.9338999996,
+      "buy_size": 105.684,
+      "sell_size": 134.443,
+      "first_price": 79024.1,
+      "last_price": 79056.1,
+      "high": 79082.9,
+      "low": 78971.4,
+      "price_change": 32.0,
+      "price_change_bps": 4.049397588836823,
+      "efficiency_bps_per_m_buy": 0.48480658315962016,
+      "efficiency_bps_per_m_sell": -0.3811953910532404,
+      "large_trades_ge_50k": 56
+    },
+    "30_60m": {
+      "start": "2026-08-31T19:30:00Z",
+      "end": "2026-08-31T20:00:00Z",
+      "n": 39050,
+      "buy_notional": 39935835.074,
+      "sell_notional": 76711204.6662,
+      "delta_notional": -36775369.592199996,
+      "buy_size": 505.925,
+      "sell_size": 971.859,
+      "first_price": 79056.0,
+      "last_price": 78863.6,
+      "high": 79112.9,
+      "low": 78799.9,
+      "price_change": -192.39999999999418,
+      "price_change_bps": -24.33717870876267,
+      "efficiency_bps_per_m_buy": -0.6094070316463034,
+      "efficiency_bps_per_m_sell": 0.3172571570823729,
+      "large_trades_ge_50k": 392
+    },
+    "60_120m": {
+      "start": "2026-08-31T20:00:00Z",
+      "end": "2026-08-31T21:00:00Z",
+      "n": 51354,
+      "buy_notional": 68134754.7551,
+      "sell_notional": 81161019.1756,
+      "delta_notional": -13026264.42050001,
+      "buy_size": 863.246,
+      "sell_size": 1028.743,
+      "first_price": 78864.0,
+      "last_price": 78824.6,
+      "high": 79166.7,
+      "low": 78727.3,
+      "price_change": -39.39999999999418,
+      "price_change_bps": -4.995942381821132,
+      "efficiency_bps_per_m_buy": -0.07332443478777148,
+      "efficiency_bps_per_m_sell": 0.061555934518415914,
+      "large_trades_ge_50k": 572
+    }
+  },
+  "cls_0_10": {
+    "ACTIVE_AGGRESSOR": "BUYERS",
+    "PASSIVE_CONTROLLER": "NONE",
+    "NET_CONTROLLER": "BUYERS",
+    "delta_notional": 2756241.6088999994,
+    "price_change_bps": 25.878495147781422,
+    "buy_notional": 11688932.3809,
+    "sell_notional": 8932690.772
+  },
+  "wall_summary": "ask_consumed_with_trades=0, ask_refilled=7, ask_pulled=6 (samples ~19:00-19:09)",
+  "room": {
+    "note": "no trade signal; if one forced a short after reclaim, nearest prior HVN 78990 offered <<0.5% from reclaim zone ~79140",
+    "room_0_5_to_prior_poc_78830_from_79140": 0.3917108920899671,
+    "room_0_5_to_prior_val_78120_from_79140": 1.288855193328279
+  },
+  "invalidation": null,
+  "oi_ctx": {
+    "oi_T0": {
+      "ts": "2026-08-31 19:00:00+00:00",
+      "oi": 52539.636,
+      "oi_value": 4149816879.64
+    },
+    "oi_T0_10m": {
+      "ts": "2026-08-31 19:10:00+00:00",
+      "oi": 52541.235,
+      "oi_value": 4160677350.17
+    },
+    "oi_core_end": {
+      "ts": "2026-08-31 19:30:00+00:00",
+      "oi": 52662.405,
+      "oi_value": 4163301207.89
+    },
+    "doi_10m": 1.599000000001979,
+    "doi_30m": 122.76900000000023
+  },
+  "liq_ctx": {
+    "count_core": 10,
+    "long_liq_notional": 0,
+    "short_liq_notional": 126184.0748
+  },
+  "prices": {
+    "T0": 78984.4,
+    "19:10": 79188.9,
+    "19:30": 79056.1,
+    "20:00": 78863.6,
+    "21:00": 78824.6
+  },
+  "us_levels": {
+    "window_label": "COMPOSITE 2026-08-31..2026-08-31",
+    "window_start": "2026-08-31T13:30:00Z",
+    "window_end": "2026-08-31T19:00:00Z",
+    "price_step": 10.0,
+    "price_low": 77680.0,
+    "price_high": 79193.1,
+    "open": 78017.1,
+    "close": 78984.4,
+    "total_volume": 21512.315000000013,
+    "buy_volume": 11065.839,
+    "sell_volume": 10446.476000000006,
+    "trades": 813062,
+    "poc": 78565.0,
+    "vah": 79140.0,
+    "val": 78190.0,
+    "va_volume_share": 0.7013816504639311,
+    "hvn": [
+      77835.0,
+      77955.0,
+      78355.0,
+      78455.0,
+      78515.0,
+      78575.0,
+      78645.0,
+      78805.0,
+      78865.0
+    ],
+    "lvn": [
+      78045.0,
+      78225.0,
+      78275.0,
+      78935.0,
+      78985.0,
+      79035.0,
+      79145.0
+    ],
+    "single_print_ranges": [
+      {
+        "low": 77680.0,
+        "high": 77700.0
+      },
+      {
+        "low": 79140.0,
+        "high": 79150.0
+      },
+      {
+        "low": 79180.0,
+        "high": 79200.0
+      }
+    ],
+    "shape": {
+      "kind": "DOUBLE_DISTRIBUTION",
+      "letter": "B",
+      "reason": [
+        "va_range_share=0.628",
+        "directional_share=+0.639",
+        "poc_position=0.585",
+        "poc_concentration=3.84x mean bin",
+        "a second strong volume cluster is separated from the POC by a contiguous rejection gap -> double distribution; treat each cluster as its own balance and the gap between them as fast territory"
+      ]
+    }
+  },
+  "breakout_accepted": false,
+  "rejection_confirmed": false,
+  "counters": [],
+  "safety": {
+    "clickhouse_readonly": true,
+    "no_collector_changes": true,
+    "no_dashboard_code_changes_in_this_run": true,
+    "no_commit_push": true,
+    "outputs_only_under": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_profile_edge_ob_fight_20260831_1900_v1"
+  },
+  "refined_reasoning": {
+    "t0_actual_location": "inside US VA near LVN 78985, ~19.7 bps BELOW US VAH 79140 \u2014 not an edge fight at T0 itself",
+    "script_mislabel": "automated path labeled us_developing:VAH because |px-VAH|<=25bps, but price was still below VAH",
+    "push": "19:00-19:10 BUYERS_NET with efficient +25.9 bps through VAH to prior-day VAH/round 79200; peak 79280.8",
+    "first_above_vah": "2026-08-31 19:08:13.577000",
+    "first_reclaim_below_vah": "2026-08-31 19:10:58.515000",
+    "why_not_breakout_accepted": "reclaim below VAH within minutes; no hold/acceptance build above",
+    "why_not_seller_absorption": "during buy attack (0-10m) price advanced efficiently; ask walls mostly PULLED/REFILLED with consumed_with_trades=0 \u2014 not absorb-while-attacked",
+    "why_not_force_short": "failed breakout is visible by ~19:15-19:20 but joint absorption criteria unmet; room to nearest prior HVN tiny; do not force SHORT_READY",
+    "core_end_state": "price 79056 still inside US VA; seller delta after 19:10 but contested mid-profile",
+    "extension": "19:30-21:00 continued seller notional dominance and drift lower \u2014 confirmatory trend, not a causal T0 edge decision"
+  }
+}

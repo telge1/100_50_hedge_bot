@@ -1,0 +1,17 @@
+{
+  "BTC_MISSING": 0,
+  "DOGE_MISSING": 0,
+  "WOULD_INSERT": 0,
+  "inserted_total": 0,
+  "dry_run": true,
+  "per_symbol": {
+    "BTCUSDT": {
+      "missing": 0,
+      "candidate": 0
+    },
+    "DOGEUSDT": {
+      "missing": 0,
+      "candidate": 0
+    }
+  }
+}

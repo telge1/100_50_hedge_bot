@@ -1,0 +1,21 @@
+{
+  "database": "research_full_ob_btc_20260904_signal_analysis",
+  "source_packet_count": 26487,
+  "database_packet_count": 26487,
+  "database_packet_count_final": 26487,
+  "parse_rejects": 0,
+  "logical_duplicates": 0,
+  "unique_sha_count": 26487,
+  "checkpoint_hash_records": [],
+  "checkpoint_hash_ok": true,
+  "source_packet_count_eq_database": true,
+  "reused_existing_import": true,
+  "replay_ok": true,
+  "book_not_crossed": false,
+  "book_crossed_count": 1,
+  "gaps": {
+    "source_u_gaps_within_epoch": [],
+    "persistence_gaps": "not_separately_measured_beyond_manifest",
+    "db_gaps": "none_expected_if_parity"
+  }
+}

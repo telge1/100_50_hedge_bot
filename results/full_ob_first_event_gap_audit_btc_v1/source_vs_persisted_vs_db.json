@@ -1,0 +1,45 @@
+{
+  "source_feed_u_gap_count": {
+    "value": 0,
+    "canonical": "FullBookRuntime.gap_count / plan.u_gap_count",
+    "evidence": "event_manifest + health gap_count=0; reconnect clears without GAP outcome"
+  },
+  "persisted_capture_u_gap_count": {
+    "value": 4,
+    "canonical": "writer._note_continuity forward u gaps on persisted deltas",
+    "evidence": "4 forward gaps in finalized jsonl.zst; event_manifest=4"
+  },
+  "database_replay_u_gap_count": {
+    "value": 2,
+    "canonical": "CH FINAL delta stream lagInFrame u discontinuities in audit window",
+    "evidence": [
+      {
+        "prev_u": 4350204,
+        "actual_u": 4350353,
+        "missing": 148,
+        "prev_line": 3772,
+        "line": 3774,
+        "prev_seq": 805051079937,
+        "seq": 805051320556,
+        "prev_ts": 1788509523272,
+        "exchange_ts_ms": 1788509553073
+      },
+      {
+        "prev_u": 4350353,
+        "actual_u": 4350507,
+        "missing": 153,
+        "prev_line": 3774,
+        "line": 3777,
+        "prev_seq": 805051320556,
+        "seq": 805051398884,
+        "prev_ts": 1788509553073,
+        "exchange_ts_ms": 1788509583873
+      }
+    ]
+  },
+  "queue_or_writer_drops": {
+    "value": 0,
+    "evidence": "event_manifest.queue_drop_count=0; health backlog=0"
+  },
+  "markers_excluded": true
+}

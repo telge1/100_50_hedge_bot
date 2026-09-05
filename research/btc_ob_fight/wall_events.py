@@ -10,16 +10,18 @@ from typing import Any
 
 from . import HEURISTIC_CONTRACT_VERSION
 from .config import (
+    BTCUSDT_TICK_SIZE as CONFIG_BTCUSDT_TICK_SIZE,
     WALL_QTY_MEDIAN_MULT,
     WALL_SAMPLE_INTERVAL_SECONDS,
     WALL_TRADE_MATCH_FRAC,
     iso_z,
+    tick_size_for_symbol,
     utc,
 )
 from .ob_replay import extract_walls, replay_hour_at_cutoffs
 
 WALL_FACTS_CONTRACT = "wall_facts_v1"
-BTCUSDT_TICK_SIZE = Decimal("0.1")
+BTCUSDT_TICK_SIZE = Decimal(str(CONFIG_BTCUSDT_TICK_SIZE))
 
 
 def _dec(x: Any) -> float:
@@ -28,12 +30,43 @@ def _dec(x: Any) -> float:
     return float(x)
 
 
-def price_to_tick(price: float | Decimal) -> int:
-    return int((Decimal(str(price)) / BTCUSDT_TICK_SIZE).quantize(Decimal("1")))
+def price_to_tick(price: float | Decimal, tick_size: float | Decimal | None = None) -> int:
+    if tick_size is None:
+        tick_size = BTCUSDT_TICK_SIZE
+    # Prefer exact inverse multiply for known power-of-ten ticks (avoids Decimal in hot loops).
+    step_f = float(tick_size)
+    if abs(step_f - 0.1) < 1e-15:
+        return int(round(float(price) * 10.0))
+    if abs(step_f - 0.00001) < 1e-15:
+        return int(round(float(price) * 100_000.0))
+    step = Decimal(str(tick_size))
+    return int((Decimal(str(price)) / step).quantize(Decimal("1")))
 
 
-def tick_to_price(tick: int) -> float:
-    return float(Decimal(tick) * BTCUSDT_TICK_SIZE)
+def tick_to_price(tick: int, tick_size: float | Decimal | None = None) -> float:
+    if tick_size is None:
+        tick_size = BTCUSDT_TICK_SIZE
+    step_f = float(tick_size)
+    if abs(step_f - 0.1) < 1e-15 or abs(step_f - 0.00001) < 1e-15:
+        return float(tick) * step_f
+    step = Decimal(str(tick_size))
+    return float(Decimal(tick) * step)
+
+
+def _build_trade_level_index(
+    trades: list[dict[str, Any]],
+    *,
+    tick_size: Decimal,
+) -> dict[tuple[str, int], list[dict[str, Any]]]:
+    """Index sorted trades by (aggressor_side, price_tick) for O(log n) window scans."""
+    index: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for t in trades:
+        side = t.get("side")
+        if side not in ("Buy", "Sell"):
+            continue
+        key = (side, price_to_tick(t["price"], tick_size))
+        index.setdefault(key, []).append(t)
+    return index
 
 
 def sample_ob_snapshots(
@@ -141,8 +174,12 @@ def build_wall_fact_pipeline(
     heuristic_contract_version: str = HEURISTIC_CONTRACT_VERSION,
 ) -> dict[str, Any]:
     """Full wall fact pipeline: observations → tracks → transitions → trade matches."""
+    tick_size = Decimal(str(tick_size_for_symbol(symbol)))
     sorted_trades = sorted(trades, key=lambda t: (t["ts"], t["trade_id"]))
-    observations = _build_observations(ob_rows, symbol, heuristic_contract_version)
+    trade_index = _build_trade_level_index(sorted_trades, tick_size=tick_size)
+    observations = _build_observations(
+        ob_rows, symbol, heuristic_contract_version, tick_size=tick_size
+    )
     gap_stats = compute_sample_gap_stats(ob_rows)
     tracks, disappearance_events = _build_tracks(
         observations, ob_rows, symbol, utc(window_end), heuristic_contract_version
@@ -155,12 +192,16 @@ def build_wall_fact_pipeline(
         trade_match_frac=trade_match_frac,
         heuristic_contract_version=heuristic_contract_version,
         used_trades=used_trades,
+        trade_index=trade_index,
+        tick_size=tick_size,
     )
     disappearance_events, disappearance_matches = _classify_disappearances(
         disappearance_events,
         sorted_trades,
         trade_match_frac=trade_match_frac,
         used_trades=used_trades,
+        trade_index=trade_index,
+        tick_size=tick_size,
     )
     trade_matches.extend(disappearance_matches)
     transitions.extend(disappearance_events)
@@ -179,7 +220,7 @@ def build_wall_fact_pipeline(
     return {
         "contract_version": WALL_FACTS_CONTRACT,
         "heuristic_contract_version": heuristic_contract_version,
-        "tick_size": float(BTCUSDT_TICK_SIZE),
+        "tick_size": float(tick_size),
         "observations": observations,
         "tracks": tracks,
         "transitions": transitions,
@@ -233,7 +274,10 @@ def _build_observations(
     ob_rows: list[dict[str, Any]],
     symbol: str,
     heuristic_contract_version: str,
+    *,
+    tick_size: Decimal | None = None,
 ) -> list[dict[str, Any]]:
+    step = tick_size if tick_size is not None else Decimal(str(tick_size_for_symbol(symbol)))
     out: list[dict[str, Any]] = []
     for row in ob_rows:
         if not row.get("ok"):
@@ -242,7 +286,7 @@ def _build_observations(
         for side_key, side_name in (("top_ask_walls", "ASK"), ("top_bid_walls", "BID")):
             for w in row.get(side_key) or []:
                 price = w["price"]
-                tick = price_to_tick(price)
+                tick = price_to_tick(price, step)
                 median = w.get("local_depth_median")
                 if median is None and w.get("ratio"):
                     median = w["qty"] / w["ratio"]
@@ -297,6 +341,11 @@ def _build_tracks(
     )
     mid_by_sample = {
         int(r["sample_index"]): r["mid"]
+        for r in ob_rows
+        if r.get("ok") and r.get("sample_index") is not None
+    }
+    ts_by_sample = {
+        int(r["sample_index"]): r["ts"]
         for r in ob_rows
         if r.get("ok") and r.get("sample_index") is not None
     }
@@ -375,7 +424,7 @@ def _build_tracks(
         present = obs_by_sample.get(sample_index, [])
         current_keys = {(symbol, o["side"], o["price_tick"]) for o in present}
         end_mid = mid_by_sample.get(sample_index)
-        end_ts = next(r["ts"] for r in ob_rows if r.get("sample_index") == sample_index and r.get("ok"))
+        end_ts = ts_by_sample[sample_index]
 
         if prev_sample is not None and sample_index - prev_sample > 1:
             for key, state in list(active.items()):
@@ -418,18 +467,33 @@ def _trades_for_level(
     start_ts: datetime,
     end_ts: datetime,
     used: set[str],
+    trade_index: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+    tick_size: Decimal | None = None,
 ) -> list[dict[str, Any]]:
-    target_price = tick_to_price(price_tick)
+    import bisect
+
     want_side = "Buy" if side == "ASK" else "Sell"
+    if trade_index is not None:
+        bucket = trade_index.get((want_side, price_tick), [])
+        if not bucket:
+            return []
+        ts_list = [t["ts"] for t in bucket]
+        lo = bisect.bisect_right(ts_list, start_ts)
+        hi = bisect.bisect_right(ts_list, end_ts)
+        return [bucket[idx] for idx in range(lo, hi) if bucket[idx]["trade_id"] not in used]
+
+    # Fallback: full sorted trade list with side/tick filter.
+    ts_list = [t["ts"] for t in trades]
+    lo = bisect.bisect_right(ts_list, start_ts)
+    hi = bisect.bisect_right(ts_list, end_ts)
     out = []
-    for t in trades:
+    for idx in range(lo, hi):
+        t = trades[idx]
         if t["trade_id"] in used:
-            continue
-        if t["ts"] <= start_ts or t["ts"] > end_ts:
             continue
         if t["side"] != want_side:
             continue
-        if price_to_tick(t["price"]) != price_tick:
+        if price_to_tick(t["price"], tick_size) != price_tick:
             continue
         out.append(t)
     return out
@@ -443,6 +507,8 @@ def _build_transitions_and_matches(
     trade_match_frac: float,
     heuristic_contract_version: str,
     used_trades: set[str],
+    trade_index: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+    tick_size: Decimal | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     transitions: list[dict[str, Any]] = []
     trade_matches: list[dict[str, Any]] = []
@@ -466,6 +532,8 @@ def _build_transitions_and_matches(
                 start_ts=prev_ts,
                 end_ts=cur_ts,
                 used=used_trades,
+                trade_index=trade_index,
+                tick_size=tick_size,
             )
             agg_qty = sum(t["size"] for t in matched)
             agg_notional = sum(t["notional"] for t in matched)
@@ -479,7 +547,7 @@ def _build_transitions_and_matches(
                         "side": track["side"],
                         "aggressor_side": t["side"],
                         "price": t["price"],
-                        "price_tick": price_to_tick(t["price"]),
+                        "price_tick": price_to_tick(t["price"], tick_size),
                         "size": t["size"],
                         "notional": t["notional"],
                         "previous_ts": prev_o["observation_ts"],
@@ -527,6 +595,8 @@ def _classify_disappearances(
     *,
     trade_match_frac: float,
     used_trades: set[str],
+    trade_index: dict[tuple[str, int], list[dict[str, Any]]] | None = None,
+    tick_size: Decimal | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     matches: list[dict[str, Any]] = []
     out: list[dict[str, Any]] = []
@@ -540,6 +610,8 @@ def _classify_disappearances(
             start_ts=prev_ts,
             end_ts=cur_ts,
             used=used_trades,
+            trade_index=trade_index,
+            tick_size=tick_size,
         )
         agg_qty = sum(t["size"] for t in matched)
         agg_notional = sum(t["notional"] for t in matched)
@@ -553,7 +625,7 @@ def _classify_disappearances(
                     "side": ev["side"],
                     "aggressor_side": t["side"],
                     "price": t["price"],
-                    "price_tick": price_to_tick(t["price"]),
+                    "price_tick": price_to_tick(t["price"], tick_size),
                     "size": t["size"],
                     "notional": t["notional"],
                     "previous_ts": ev["previous_ts"],

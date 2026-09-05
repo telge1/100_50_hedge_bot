@@ -1,0 +1,62 @@
+{
+  "collector_pid": 1565672,
+  "collector_alive": true,
+  "oi_pid": 147111,
+  "oi_alive": true,
+  "wanted_topics": [
+    "orderbook.200.BTCUSDT",
+    "orderbook.200.DOGEUSDT"
+  ],
+  "confirmed_topics": [
+    "orderbook.200.BTCUSDT",
+    "orderbook.200.DOGEUSDT",
+    "orderbook.full.DOGEUSDT",
+    "orderbook.full.BTCUSDT"
+  ],
+  "full_book_active_topics": 2,
+  "btc_runtime": {
+    "subscription_state": "live",
+    "book_ready": true,
+    "raw_bids": 40333,
+    "raw_asks": 23508,
+    "snapshot_loaded": true
+  },
+  "contract": {
+    "depth": 0,
+    "levels_capped_at_1000": false,
+    "topic": "orderbook.full.BTCUSDT",
+    "message_type_semantics": "delta changes only; full depth via reconstructed book"
+  },
+  "sample_stored_packet": {
+    "topic": "orderbook.full.BTCUSDT",
+    "type": "delta",
+    "symbol": "BTCUSDT",
+    "u": 4347545,
+    "seq": 805048006408,
+    "ts": 1788508991472,
+    "cts": 1788508991471,
+    "b0": [
+      "80644.4",
+      "7.865"
+    ],
+    "a0": [
+      "80629.9",
+      "0"
+    ],
+    "keys_data": [
+      "a",
+      "b",
+      "s",
+      "seq",
+      "u"
+    ]
+  },
+  "rest_snapshot_levels": {
+    "bids": 39557,
+    "asks": 24214,
+    "u": 4347546
+  },
+  "FULL_TOPIC_PROVEN": true,
+  "NOT_OB200_PROVEN": true,
+  "NOT_OB1000_PROVEN": true
+}

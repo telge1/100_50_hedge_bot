@@ -1,0 +1,9 @@
+...............                                                          [100%]
+15 passed in 0.06s
+
+--- DOGE F0 CLI ---
+AEF_F0_OK 5 candidates funnel= {'one_second_buckets': 5010, 'raw_bursts': 5926, 'compression_evaluated': 5707, 'compression_allowed': 141, 'same_side_veto': 9, 'delayed_continuation_veto': 1, 'counter_events': 2614, 'counter_confirmed': 24, 'diagnostic_candidates': 5}
+
+Commands:
+cd /home/telgenbuescher/projects/orderbook_analyse && PYTHONPATH=src .venv/bin/python -m pytest tests/test_aggressor_efficiency_flip_f0.py -q
+PYTHONPATH=src .venv/bin/python scripts/run_aggressor_efficiency_flip_discovery.py --symbol DOGEUSDT --start 2026-08-29T08:00:00Z --end 2026-08-29T15:30:00Z --profile unfitted_f0_diagnostic --output-dir /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/aggressor_efficiency_flip_f0_doge_20260829

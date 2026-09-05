@@ -1,0 +1,107 @@
+{
+  "run_id": "bfddd886-daed-4091-b27f-ab76997aff37",
+  "dry_run": false,
+  "detect_only": false,
+  "verify_only": false,
+  "table": "orderbook_analysis.open_interest_5m_history",
+  "source": "BYBIT_REST_5M_HISTORY",
+  "granularity": "5m",
+  "gap_report": {
+    "table": "orderbook_analysis.open_interest_5m_history",
+    "source": "BYBIT_REST_5M_HISTORY",
+    "granularity": "5m",
+    "start": "2026-09-04T17:40:00Z",
+    "end": "2026-09-04T19:20:00Z",
+    "last_closed_5m": "2026-09-04T19:20:00Z",
+    "expected_buckets_per_symbol": 21,
+    "total_missing_buckets": 42,
+    "symbols": {
+      "BTCUSDT": {
+        "expected_buckets": 21,
+        "present_buckets": 0,
+        "missing_buckets": 21,
+        "missing_starts": [
+          "2026-09-04T17:40:00Z",
+          "2026-09-04T17:45:00Z",
+          "2026-09-04T17:50:00Z",
+          "2026-09-04T17:55:00Z",
+          "2026-09-04T18:00:00Z",
+          "2026-09-04T18:05:00Z",
+          "2026-09-04T18:10:00Z",
+          "2026-09-04T18:15:00Z",
+          "2026-09-04T18:20:00Z",
+          "2026-09-04T18:25:00Z",
+          "2026-09-04T18:30:00Z",
+          "2026-09-04T18:35:00Z",
+          "2026-09-04T18:40:00Z",
+          "2026-09-04T18:45:00Z",
+          "2026-09-04T18:50:00Z",
+          "2026-09-04T18:55:00Z",
+          "2026-09-04T19:00:00Z",
+          "2026-09-04T19:05:00Z",
+          "2026-09-04T19:10:00Z",
+          "2026-09-04T19:15:00Z",
+          "2026-09-04T19:20:00Z"
+        ],
+        "missing_starts_truncated": false,
+        "coverage_status": "EMPTY",
+        "source": "BYBIT_REST_5M_HISTORY",
+        "granularity": "5m"
+      },
+      "DOGEUSDT": {
+        "expected_buckets": 21,
+        "present_buckets": 0,
+        "missing_buckets": 21,
+        "missing_starts": [
+          "2026-09-04T17:40:00Z",
+          "2026-09-04T17:45:00Z",
+          "2026-09-04T17:50:00Z",
+          "2026-09-04T17:55:00Z",
+          "2026-09-04T18:00:00Z",
+          "2026-09-04T18:05:00Z",
+          "2026-09-04T18:10:00Z",
+          "2026-09-04T18:15:00Z",
+          "2026-09-04T18:20:00Z",
+          "2026-09-04T18:25:00Z",
+          "2026-09-04T18:30:00Z",
+          "2026-09-04T18:35:00Z",
+          "2026-09-04T18:40:00Z",
+          "2026-09-04T18:45:00Z",
+          "2026-09-04T18:50:00Z",
+          "2026-09-04T18:55:00Z",
+          "2026-09-04T19:00:00Z",
+          "2026-09-04T19:05:00Z",
+          "2026-09-04T19:10:00Z",
+          "2026-09-04T19:15:00Z",
+          "2026-09-04T19:20:00Z"
+        ],
+        "missing_starts_truncated": false,
+        "coverage_status": "EMPTY",
+        "source": "BYBIT_REST_5M_HISTORY",
+        "granularity": "5m"
+      }
+    }
+  },
+  "symbols": {
+    "BTCUSDT": {
+      "rest_points": 21,
+      "missing_buckets": 21,
+      "candidate_rows": 21,
+      "inserted": 21,
+      "coverage_after": "COMPLETE",
+      "missing_after": 0
+    },
+    "DOGEUSDT": {
+      "rest_points": 21,
+      "missing_buckets": 21,
+      "candidate_rows": 21,
+      "inserted": 21,
+      "coverage_after": "COMPLETE",
+      "missing_after": 0
+    }
+  },
+  "inserted_total": 42,
+  "would_insert_total": 0,
+  "status": "OK",
+  "live_seam_note": "Only closed 5m buckets \u2264 last_closed_5m; live 5s/events untouched; MySQL research_open_interest_5m untouched"
+}

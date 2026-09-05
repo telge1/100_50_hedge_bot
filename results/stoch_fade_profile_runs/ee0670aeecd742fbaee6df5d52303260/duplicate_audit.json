@@ -1,0 +1,16 @@
+{
+  "execution_dedup_applied": false,
+  "pair_window_min": {
+    "15m|1h": 60,
+    "15m|30m": 30,
+    "15m|4h": 240,
+    "1h|4h": 240,
+    "30m|1h": 60,
+    "30m|4h": 240
+  },
+  "same_entry_mixed_direction": 0,
+  "same_entry_multi_tf_count": 0,
+  "same_entry_multi_tf_sample": {},
+  "same_entry_same_direction": 0,
+  "tier_a_n": 3
+}

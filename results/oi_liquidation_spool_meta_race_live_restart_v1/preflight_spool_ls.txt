@@ -1,0 +1,5 @@
+total 16
+drwxrwxr-x 3 telgenbuescher telgenbuescher 4096 Sep  4 20:44 .
+drwxrwxr-x 4 telgenbuescher telgenbuescher 4096 Sep  4 20:04 ..
+-rw-r--r-- 1 telgenbuescher telgenbuescher   76 Sep  4 20:44 meta.json
+drwxrwxr-x 2 telgenbuescher telgenbuescher 4096 Sep  4 20:32 segments

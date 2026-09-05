@@ -1,0 +1,38 @@
+{
+  "gates": {
+    "SINGLE_INSTANCE": true,
+    "SYMBOLS_ACTIVE": true,
+    "SOURCE_PROGRESS": true,
+    "DB_PROGRESS": true,
+    "NEW_QUEUE_DROPS": true,
+    "WRITER_ERRORS": true,
+    "LOGICAL_DUPLICATES": true,
+    "PERSISTENCE_LAG_WITHIN_CONTRACT": true,
+    "SOURCE_DB_PARITY_SAMPLES": true
+  },
+  "last": {
+    "sample_i": "20",
+    "utc": "2026-09-04T21:19:03Z",
+    "t_plus_min": "20.013",
+    "pid": "1827882",
+    "instances": "1",
+    "state": "LIVE",
+    "symbols_active": "51",
+    "queue_depth": "1",
+    "queue_maxsize": "100000",
+    "queue_hwm": "406",
+    "dropped_events": "0",
+    "insert_failures": "0",
+    "rows_received": "104205",
+    "rows_inserted": "104195",
+    "lag_seconds": "0.091038",
+    "writer_alive": "True",
+    "writer_fatal": "False",
+    "spool_written": "0",
+    "spool_replayed": "0",
+    "spool_bytes": "0",
+    "reconnect_count": "1",
+    "protected_ok": "True",
+    "is_gate": "True"
+  }
+}

@@ -1,0 +1,23 @@
+2026-09-04T18:46:56Z sample 0 t+0.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:46:55 extra=0 gen=2402 acked=34815 cw=0
+2026-09-04T18:47:56Z sample 1 t+1.0m gate=True status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:47:55 extra=0 gen=4022 acked=36397 cw=0
+2026-09-04T18:48:56Z sample 2 t+2.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:48:55 extra=0 gen=5596 acked=37912 cw=0
+2026-09-04T18:49:56Z sample 3 t+3.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:49:55 extra=0 gen=7167 acked=39420 cw=0
+2026-09-04T18:50:56Z sample 4 t+4.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:50:50 extra=0 gen=8643 acked=40770 cw=0
+2026-09-04T18:51:56Z sample 5 t+5.0m gate=True status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:51:55 extra=0 gen=10167 acked=42310 cw=0
+2026-09-04T18:52:56Z sample 6 t+6.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:52:55 extra=0 gen=11668 acked=43758 cw=0
+2026-09-04T18:53:56Z sample 7 t+7.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:53:55 extra=0 gen=13120 acked=45145 cw=0
+2026-09-04T18:54:56Z sample 8 t+8.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:54:55 extra=0 gen=14642 acked=46616 cw=0
+2026-09-04T18:55:56Z sample 9 t+9.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:55:55 extra=0 gen=16123 acked=48031 cw=0
+2026-09-04T18:56:56Z sample 10 t+10.0m gate=True status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:56:55 extra=0 gen=17678 acked=49539 cw=0
+2026-09-04T18:57:56Z sample 11 t+11.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:57:55 extra=0 gen=19153 acked=50955 cw=0
+2026-09-04T18:58:56Z sample 12 t+12.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:58:55 extra=0 gen=20636 acked=52374 cw=0
+2026-09-04T18:59:56Z sample 13 t+13.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 18:59:55 extra=0 gen=22063 acked=53747 cw=0
+2026-09-04T19:00:56Z sample 14 t+14.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:00:50 extra=0 gen=23663 acked=55213 cw=0
+2026-09-04T19:01:56Z sample 15 t+15.0m gate=True status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:01:55 extra=0 gen=25275 acked=56843 cw=0
+2026-09-04T19:02:56Z sample 16 t+16.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:02:55 extra=0 gen=26913 acked=58422 cw=0
+2026-09-04T19:03:56Z sample 17 t+17.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:03:55 extra=0 gen=28609 acked=60073 cw=0
+2026-09-04T19:04:56Z sample 18 t+18.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:04:55 extra=0 gen=30184 acked=61592 cw=0
+2026-09-04T19:05:56Z sample 19 t+19.0m gate=False status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:05:55 extra=0 gen=31661 acked=62999 cw=0
+2026-09-04T19:06:56Z sample 20 t+20.0m gate=True status=GREEN ws=True werr=0 drops=0 oi5s_max=2026-09-04 19:06:55 extra=0 gen=33221 acked=64508 cw=0
+2026-09-04T19:06:56Z SMOKE_SAMPLER_DONE
+SMOKE_SAMPLER_DONE

@@ -11,8 +11,10 @@ from typing import Any
 
 from . import PACKAGE_VERSION, SCHEMA_VERSION
 from .config import (
+    ALLOWED_SYMBOLS,
     DEFAULT_AFTER_MINUTES,
     DEFAULT_BEFORE_MINUTES,
+    DEFAULT_DATA_SOURCE,
     DEFAULT_SYMBOL,
     RunConfig,
     allocate_run_dir,
@@ -66,6 +68,8 @@ EXIT_OK = 0
 EXIT_TECH = 1
 EXIT_CLI = 2
 EXIT_DATA = 3
+EXIT_PARTIAL_REQUIRE_COMPLETE = 4
+EXIT_CONTRACT_ERROR = 5
 
 PHASES = 10
 
@@ -93,39 +97,80 @@ def parse_timestamp(raw: str) -> datetime:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="BTC OB Fight fact CLI (Phase 0–1, read-only)")
+    p = argparse.ArgumentParser(description="BTC/DOGE OB Fight fact CLI (research-db default)")
     p.add_argument("--timestamp", required=True, help="Anchor ISO-8601 timestamp with timezone")
     p.add_argument("--before-minutes", type=int, default=DEFAULT_BEFORE_MINUTES)
     p.add_argument("--after-minutes", type=int, default=DEFAULT_AFTER_MINUTES)
-    p.add_argument("--symbol", default=DEFAULT_SYMBOL)
+    p.add_argument("--symbol", default=DEFAULT_SYMBOL, choices=sorted(ALLOWED_SYMBOLS))
     p.add_argument("--out-root", type=Path, default=Path("results"))
-    p.add_argument("--ob-root", type=Path, default=None)
+    p.add_argument("--ob-root", type=Path, default=None, help="Legacy raw OB root (raw-legacy only)")
+    p.add_argument(
+        "--data-source",
+        default=DEFAULT_DATA_SOURCE,
+        choices=["research-db", "raw-legacy"],
+        help="Default research-db. raw-legacy is LEGACY_SLOW_RAW_REPLAY only.",
+    )
+    p.add_argument("--require-complete", action="store_true")
+    p.add_argument("--coverage-only", action="store_true")
+    p.add_argument(
+        "--allow-legacy-trade-companion",
+        action="store_true",
+        help="Explicit non-pure diagnostic: load trades from orderbook_analysis.public_trades_canonical",
+    )
+    p.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Same facts; BENCHMARK_OUTPUT_MINIMAL (reduced non-canonical detail writes)",
+    )
+    p.add_argument(
+        "--heavy-detail-csv",
+        action="store_true",
+        help="Write per-sample wall/edge detail CSVs (default: lean research-db outputs)",
+    )
     return p
 
 
 def validate_args(args: argparse.Namespace) -> RunConfig:
-    if args.symbol != DEFAULT_SYMBOL:
-        raise ValueError(f"only {DEFAULT_SYMBOL} supported, got {args.symbol}")
+    if args.symbol not in ALLOWED_SYMBOLS:
+        raise ValueError(f"symbol must be one of {sorted(ALLOWED_SYMBOLS)}, got {args.symbol}")
     if args.before_minutes <= 0 or args.after_minutes <= 0:
         raise ValueError("before-minutes and after-minutes must be positive")
     if args.before_minutes > 24 * 60 or args.after_minutes > 24 * 60:
         raise ValueError("window minutes exceed maximum (1440)")
     anchor = parse_timestamp(args.timestamp)
-    ob_root = resolve_ob_root(args.ob_root)
-    if ob_root is None:
-        raise FileNotFoundError("no valid OB200 shadow root found")
     out_root = args.out_root.expanduser().resolve()
+    ob_root = None
+    if args.data_source == "raw-legacy":
+        print("WARNING: LEGACY_SLOW_RAW_REPLAY enabled — not the default research-db path", flush=True)
+        ob_root = resolve_ob_root(args.ob_root)
+        if ob_root is None:
+            raise FileNotFoundError("no valid OB200 shadow root found for raw-legacy")
     return RunConfig(
         symbol=args.symbol,
         anchor=anchor,
         before_minutes=args.before_minutes,
         after_minutes=args.after_minutes,
-        ob_root=ob_root,
         out_root=out_root,
+        data_source=args.data_source,
+        ob_root=ob_root,
+        require_complete=bool(args.require_complete),
+        coverage_only=bool(args.coverage_only),
+        allow_legacy_trade_companion=bool(getattr(args, "allow_legacy_trade_companion", False)),
+        benchmark=bool(getattr(args, "benchmark", False)),
+        heavy_detail_csv=bool(getattr(args, "heavy_detail_csv", False)),
     )
 
 
 def run_analysis(cfg: RunConfig) -> int:
+    if cfg.data_source == "research-db":
+        from .research_db_cli import run_research_db_analysis
+
+        return run_research_db_analysis(cfg)
+    return _run_raw_legacy_analysis(cfg)
+
+
+def _run_raw_legacy_analysis(cfg: RunConfig) -> int:
+    assert cfg.ob_root is not None
     run_dir = allocate_run_dir(cfg.out_root, cfg.anchor)
     manifest: dict[str, Any] = {
         "package_version": PACKAGE_VERSION,

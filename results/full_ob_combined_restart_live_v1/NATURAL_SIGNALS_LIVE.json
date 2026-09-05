@@ -1,0 +1,155 @@
+[
+  {
+    "dir": "data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e",
+    "name": "BTCUSDT_20260904T112735Z_eb6191222e",
+    "open_tmp": 3,
+    "tmp_files": [
+      "public_trades_raw.jsonl.zst.tmp",
+      "full_ob_raw_deltas.jsonl.zst.tmp",
+      "rest_full_snapshot.json.zst.tmp"
+    ],
+    "manifest": {
+      "fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+      "trigger_ts": "2026-09-04T11:27:35.764963Z",
+      "actual_final_ts": null,
+      "normal_end_ts": "2026-09-04T12:27:35.764963Z",
+      "hard_capture_end_ts": "2026-09-04T14:27:35.764963Z",
+      "research_eligible": true,
+      "extension_count": 0,
+      "data_quality": "OK",
+      "incomplete_reasons": [],
+      "nested_signal_count": 0,
+      "continuous_capture": true
+    },
+    "nested_signals": [
+      {
+        "nested_signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+        "profile_id": "BTCUSDT_20260904T110000_20260904T113000_v1_3d51be69d9df",
+        "edge": "TPO_VAL",
+        "edge_side": "LOWER",
+        "signal_ts": "2026-09-04T11:30:32.654722Z",
+        "arm_cycle_id": 1,
+        "parent_fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "continuity_epoch_id": 0,
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "overlap_cluster_id": "overlap_cluster_73d6a37509fbe69a",
+        "coverage_status": "FULL",
+        "signal_research_eligible": true
+      }
+    ],
+    "analysis_contracts": [
+      {
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_parent",
+        "signal_kind": "PARENT",
+        "profile_id": "2026-09-04T10:30:00+00:00",
+        "edge": "TPO_VAH",
+        "overlap_cluster_id": "overlap_cluster_73d6a37509fbe69a",
+        "independent_observation": false,
+        "research_eligible": true,
+        "analysis_pre_start_ts": "2026-09-04T11:17:35.764963Z",
+        "analysis_post_end_ts": "2026-09-04T12:27:35.764963Z"
+      },
+      {
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+        "signal_kind": "NESTED",
+        "profile_id": "BTCUSDT_20260904T110000_20260904T113000_v1_3d51be69d9df",
+        "edge": "TPO_VAL",
+        "overlap_cluster_id": "overlap_cluster_73d6a37509fbe69a",
+        "independent_observation": false,
+        "research_eligible": true,
+        "analysis_pre_start_ts": "2026-09-04T11:20:32.654722Z",
+        "analysis_post_end_ts": "2026-09-04T12:30:32.654722Z"
+      }
+    ],
+    "segments": []
+  },
+  {
+    "dir": "data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-04/DOGEUSDT_20260904T113003Z_bb7dfca728",
+    "name": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+    "open_tmp": 3,
+    "tmp_files": [
+      "public_trades_raw.jsonl.zst.tmp",
+      "full_ob_raw_deltas.jsonl.zst.tmp",
+      "rest_full_snapshot.json.zst.tmp"
+    ],
+    "manifest": {
+      "fight_event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+      "trigger_ts": "2026-09-04T11:30:03.021416Z",
+      "actual_final_ts": null,
+      "normal_end_ts": "2026-09-04T12:30:03.021416Z",
+      "hard_capture_end_ts": "2026-09-04T14:30:03.021416Z",
+      "research_eligible": true,
+      "extension_count": 0,
+      "data_quality": "OK",
+      "incomplete_reasons": [],
+      "nested_signal_count": 0,
+      "continuous_capture": true
+    },
+    "nested_signals": [
+      {
+        "nested_signal_id": "DOGEUSDT_20260904T113003Z_bb7dfca728_ns_ed923fca5c04_1_L",
+        "profile_id": "DOGEUSDT_20260904T110000_20260904T113000_v1_ed923fca5c04",
+        "edge": "TPO_VAL",
+        "edge_side": "LOWER",
+        "signal_ts": "2026-09-04T11:38:53.383679Z",
+        "arm_cycle_id": 1,
+        "parent_fight_event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+        "continuity_epoch_id": 0,
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "overlap_cluster_id": "overlap_cluster_39a20478e5a68ba4",
+        "coverage_status": "FULL",
+        "signal_research_eligible": true
+      },
+      {
+        "nested_signal_id": "DOGEUSDT_20260904T113003Z_bb7dfca728_ns_ed923fca5c04_1_U",
+        "profile_id": "DOGEUSDT_20260904T110000_20260904T113000_v1_ed923fca5c04",
+        "edge": "TPO_VAH",
+        "edge_side": "UPPER",
+        "signal_ts": "2026-09-04T11:41:23.021897Z",
+        "arm_cycle_id": 1,
+        "parent_fight_event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+        "continuity_epoch_id": 0,
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "overlap_cluster_id": "overlap_cluster_27af5150591c9e51",
+        "coverage_status": "FULL",
+        "signal_research_eligible": true
+      }
+    ],
+    "analysis_contracts": [
+      {
+        "signal_id": "DOGEUSDT_20260904T113003Z_bb7dfca728_parent",
+        "signal_kind": "PARENT",
+        "profile_id": "2026-09-04T10:30:00+00:00",
+        "edge": "TPO_VAH",
+        "overlap_cluster_id": "overlap_cluster_27af5150591c9e51",
+        "independent_observation": false,
+        "research_eligible": true,
+        "analysis_pre_start_ts": "2026-09-04T11:20:03.021416Z",
+        "analysis_post_end_ts": "2026-09-04T12:30:03.021416Z"
+      },
+      {
+        "signal_id": "DOGEUSDT_20260904T113003Z_bb7dfca728_ns_ed923fca5c04_1_L",
+        "signal_kind": "NESTED",
+        "profile_id": "DOGEUSDT_20260904T110000_20260904T113000_v1_ed923fca5c04",
+        "edge": "TPO_VAL",
+        "overlap_cluster_id": "overlap_cluster_27af5150591c9e51",
+        "independent_observation": false,
+        "research_eligible": true,
+        "analysis_pre_start_ts": "2026-09-04T11:28:53.383679Z",
+        "analysis_post_end_ts": "2026-09-04T12:38:53.383679Z"
+      },
+      {
+        "signal_id": "DOGEUSDT_20260904T113003Z_bb7dfca728_ns_ed923fca5c04_1_U",
+        "signal_kind": "NESTED",
+        "profile_id": "DOGEUSDT_20260904T110000_20260904T113000_v1_ed923fca5c04",
+        "edge": "TPO_VAH",
+        "overlap_cluster_id": "overlap_cluster_27af5150591c9e51",
+        "independent_observation": false,
+        "research_eligible": true,
+        "analysis_pre_start_ts": "2026-09-04T11:31:23.021897Z",
+        "analysis_post_end_ts": "2026-09-04T12:41:23.021897Z"
+      }
+    ],
+    "segments": []
+  }
+]

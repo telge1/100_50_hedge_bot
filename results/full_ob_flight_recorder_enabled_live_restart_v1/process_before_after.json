@@ -1,0 +1,38 @@
+{
+  "before": {
+    "old_pid": 1810262,
+    "old_alive": true,
+    "old_cmd": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO ",
+    "protected": {
+      "1661773": true,
+      "1780509": true,
+      "1795773": true
+    },
+    "fr_env_old": "false"
+  },
+  "after": {
+    "new_pid": 1817696,
+    "new_alive": true,
+    "new_cmd": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO ",
+    "protected": {
+      "1661773": true,
+      "1780509": true,
+      "1795773": true
+    },
+    "start_stdout": "started pid=1817696 log=logs/orderbook_v3_raw_archive_btc_doge.nohup.log health=logs/orderbook_v3_raw_archive_btc_doge.health.ndjson fr_enable=true fr_root=/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+    "instances": 1
+  },
+  "destructive_actions_executed": false,
+  "after_smoke": {
+    "pid": 1817696,
+    "alive": true,
+    "fr_env": "true",
+    "fr_runtime": true,
+    "protected": {
+      "1661773": true,
+      "1780509": true,
+      "1795773": true
+    },
+    "verdict": "FULL_OB_COLLECTOR_LIVE_HEALTHY_CAPTURE_READY"
+  }
+}

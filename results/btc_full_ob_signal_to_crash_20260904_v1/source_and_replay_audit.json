@@ -1,0 +1,98 @@
+{
+  "fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+  "event_dir": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e",
+  "collector_pid": 1692334,
+  "oi_pid": 147111,
+  "segments_imported": [
+    {
+      "index": 0,
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e/full_ob_raw_deltas.jsonl.zst",
+      "finalized": true
+    },
+    {
+      "index": 1,
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e/cont_001/full_ob_raw_deltas.jsonl.zst",
+      "finalized": true
+    },
+    {
+      "index": 2,
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e/cont_002/full_ob_raw_deltas.jsonl.zst",
+      "finalized": true
+    }
+  ],
+  "segments_excluded_open_tmp": [
+    {
+      "index": 3,
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T112735Z_eb6191222e/cont_003/full_ob_raw_deltas.jsonl.zst.tmp",
+      "reason": "OPEN_TMP_NOT_TOUCHED"
+    }
+  ],
+  "manifest_incomplete_reasons": [
+    "NESTED_SIGNAL_QUEUE_DROP",
+    "RESYNC",
+    "UNOBSERVED_TRANSPORT_GAP"
+  ],
+  "continuous_capture": false,
+  "transport_reconnect_count": 7,
+  "continuity_epoch_count": 8,
+  "u_gaps_observed_in_replay": [],
+  "epoch_boundaries": [
+    {
+      "ts": "2026-09-04T12:18:16.473000Z",
+      "from_epoch": 0,
+      "to_epoch": 1,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:18:46.673000Z",
+      "from_epoch": 1,
+      "to_epoch": 2,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:19:24.072000Z",
+      "from_epoch": 2,
+      "to_epoch": 3,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:20:01.472000Z",
+      "from_epoch": 3,
+      "to_epoch": 4,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:20:39.273000Z",
+      "from_epoch": 4,
+      "to_epoch": 5,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:21:16.072000Z",
+      "from_epoch": 5,
+      "to_epoch": 6,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    },
+    {
+      "ts": "2026-09-04T12:21:53.272000Z",
+      "from_epoch": 6,
+      "to_epoch": 7,
+      "segment": 1,
+      "record_kind": "RESYNC_CHECKPOINT"
+    }
+  ],
+  "replay_ok": true,
+  "book_not_crossed": false,
+  "public_trade_download": {
+    "ok": false,
+    "code": 2,
+    "stdout": "{\n  \"symbol\": \"BTCUSDT\",\n  \"results\": [\n    {\n      \"symbol\": \"BTCUSDT\",\n      \"day\": \"2026-09-04\",\n      \"url\": \"https://public.bybit.com/trading/BTCUSDT/BTCUSDT2026-09-04.csv.gz\",\n      \"dest\": \"/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_full_ob_signal_to_crash_20260904_v1/bybit_public_trades_day/BTCUSDT2026-09-04.csv.gz\",\n      \"status\": \"SOURCE_FILE_MISSING\",\n      \"bytes_written\": 0,\n      \"meta\": {},\n      \"error\": \"HEAD HTTP 404 for https://public.bybit.com/trading/BTCUSDT/BTCUSDT2026-09-04.csv.gz\",\n      \"skipped\": false\n    }\n  ]\n}\n",
+    "stderr": ""
+  }
+}

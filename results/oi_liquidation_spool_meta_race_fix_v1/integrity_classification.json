@@ -1,0 +1,25 @@
+{
+  "oi": {
+    "class": "DUPLICATES_LOGICALLY_DEDUPED",
+    "evidence": {
+      "oie_count": 21759,
+      "oie_uniq_event_key": 21591,
+      "oie_extra_rows": 168,
+      "oi5s_count": 7020,
+      "oi5s_uniq": 7020,
+      "oi5s_extra": 0,
+      "spool_unacked": 9,
+      "engine": "MergeTree (not Replacing) \u2014 physical duplicate rows retained"
+    }
+  },
+  "liquidations": {
+    "class": "NO_DATA_LOSS_PROVEN",
+    "evidence": {
+      "count": 13,
+      "uniq_event_key": 13,
+      "extra": 0
+    }
+  },
+  "spool_replayable": true,
+  "note": "Insert-then-ack-race caused CH re-insert retries for OI events; event_key uniqueness proves logical duplicates. Unacked spool records remain replayable."
+}

@@ -1,0 +1,11 @@
+● bybit-live-1m-collector.service - Bybit Live 1m candles + public trades collector (signal_generator)
+     Loaded: loaded (/home/telgenbuescher/.config/systemd/user/bybit-live-1m-collector.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-09-05 11:30:39 CEST; 5s ago
+   Main PID: 1887912 (python)
+      Tasks: 8 (limit: 21419)
+     Memory: 85.9M (peak: 87.2M)
+        CPU: 3.621s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/bybit-live-1m-collector.service
+             └─1887912 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades --public-trade-queue-maxsize 100000 --public-trade-batch-size 2000 --public-trade-spool-dir results/live_collector/public_trade_spool
+
+Sep 05 11:30:39 server-telgenbuescher systemd[1531]: Started bybit-live-1m-collector.service - Bybit Live 1m candles + public trades collector (signal_generator).

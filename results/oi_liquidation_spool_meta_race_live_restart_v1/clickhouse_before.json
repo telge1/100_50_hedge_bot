@@ -1,0 +1,71 @@
+{
+  "captured_at": "2026-09-04T18:45:08.677785+00:00",
+  "pid": 1786328,
+  "meta": {
+    "last_acked_seq": 32531,
+    "next_seq": 32532,
+    "updated_unix": 1788547508.6088908
+  },
+  "health": {
+    "clickhouse_reachable": true,
+    "clickhouse_reconnect_count": 1,
+    "collector_instance_id": "server-telgenbuescher-1786328-526adc3c",
+    "health_reasons": [],
+    "health_status": "GREEN",
+    "last_liquidation_persisted_ts": 1788547466.3082988,
+    "last_liquidation_received_ts": 1788547465.633,
+    "last_oi_persisted_ts": 1788547503.251084,
+    "last_oi_received_ts": 1788547504.020285,
+    "last_successful_insert_ts": 1788547503.251084,
+    "last_ws_message_ts": 1788547504.041598,
+    "persistence_lag_seconds": 0.7692008018493652,
+    "pid": 1786328,
+    "process_alive": true,
+    "queue_capacity": 50000,
+    "queue_depth": 0,
+    "queue_drop_count": 0,
+    "spool_unacked_bytes": 10608,
+    "spool_unacked_records": 11,
+    "updated_unix": 1788547504.0558515,
+    "websocket_alive": true,
+    "websocket_reconnect_count": 66,
+    "writer_alive": true,
+    "writer_error_count": 16,
+    "writer_restart_count": 1
+  },
+  "open_interest_5s": {
+    "max": "2026-09-04 18:41:30",
+    "count": 12367769,
+    "symbols": {
+      "BTCUSDT": "2026-09-04 18:41:30",
+      "DOGEUSDT": "2026-09-04 18:41:30",
+      "ETHUSDT": "2026-09-04 18:41:30",
+      "SOLUSDT": "2026-09-04 18:41:30",
+      "XRPUSDT": "2026-09-04 18:41:30"
+    }
+  },
+  "open_interest_events": {
+    "max": "2026-09-04 18:45:08.435000",
+    "count": 22204147,
+    "since_first_cutover": {
+      "count": 24067,
+      "uniq": 23850
+    }
+  },
+  "all_liquidations": {
+    "max": "2026-09-04 18:44:25.633000",
+    "count": 144018,
+    "since_first_cutover": {
+      "count": 16,
+      "uniq": 16
+    }
+  },
+  "open_interest_5m_history": {
+    "btc_max": "2026-09-04 17:35:00",
+    "doge_max": "2026-09-04 17:35:00",
+    "count": 18492
+  },
+  "duplicate_baseline_cutoff_utc": "2026-09-04 18:45:08",
+  "spool_unacked_in_segments": 0,
+  "spool_max_seq": 32531
+}

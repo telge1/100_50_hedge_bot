@@ -1,0 +1,370 @@
+{
+  "endpoint": "https://www.bybit.com/x-api/quote/public/support/download/list-files",
+  "params": {
+    "bizType": "contract",
+    "productId": "trade",
+    "interval": "daily",
+    "periods": ""
+  },
+  "side_semantics": {
+    "Buy": "taker_buy_aggressor_hits_ask",
+    "Sell": "taker_sell_aggressor_hits_bid",
+    "source": "Bybit API v5 market/recent-trade: side = Side of taker Buy/Sell; same convention used in orderbook_analyse public_trade_source and CH ingest."
+  },
+  "by_symbol_date": {
+    "APTUSDT_2026-01-06": {
+      "download": {
+        "status": "OK",
+        "api_http_status": 200,
+        "api_ret_code": 0,
+        "api_ret_msg": "",
+        "list_file_count": 1,
+        "filename": "APTUSDT2026-01-06.csv.gz",
+        "download_url": "https://public.bybit.com/trading/APTUSDT/APTUSDT2026-01-06.csv.gz",
+        "reported_size": 8963883,
+        "downloaded_size": 8963883,
+        "archive_kind": "gzip",
+        "extracted_filename": "APTUSDT2026-01-06.csv",
+        "uncompressed_size": 26669479,
+        "detected_format": "csv",
+        "columns": [
+          "timestamp",
+          "symbol",
+          "side",
+          "size",
+          "price",
+          "tickDirection",
+          "trdMatchID",
+          "grossValue",
+          "homeNotional",
+          "foreignNotional",
+          "RPI"
+        ],
+        "trade_count": 213410,
+        "buy_count": 109610,
+        "sell_count": 103800,
+        "first_trade_ts_raw": "1767657602.5801",
+        "first_trade_ts_utc": "2026-01-06T00:00:02.580Z",
+        "last_trade_ts_raw": "1767743999.0483",
+        "last_trade_ts_utc": "2026-01-06T23:59:59.048Z",
+        "min_price": 1.863,
+        "max_price": 2.0095,
+        "error": null
+      },
+      "inspect": {
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/data/bybit_historical_trades/APTUSDT/2026-01-06/APTUSDT2026-01-06.csv",
+        "detected_format": "csv",
+        "columns": [
+          "timestamp",
+          "symbol",
+          "side",
+          "size",
+          "price",
+          "tickDirection",
+          "trdMatchID",
+          "grossValue",
+          "homeNotional",
+          "foreignNotional",
+          "RPI"
+        ],
+        "sample_records": [
+          {
+            "timestamp": "1767657602.5801",
+            "symbol": "APTUSDT",
+            "side": "Buy",
+            "size": "2.7",
+            "price": "1.9640",
+            "tickDirection": "PlusTick",
+            "trdMatchID": "39773a7c-4155-5889-ab0a-c9d40adcd94d",
+            "grossValue": "5.3028000000000006e+08",
+            "homeNotional": "2.7",
+            "foreignNotional": "5.3028",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657607.7658",
+            "symbol": "APTUSDT",
+            "side": "Sell",
+            "size": "0.41",
+            "price": "1.9640",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "a8c06cd2-425b-5a90-aa75-a30380a417d9",
+            "grossValue": "8.0524e+07",
+            "homeNotional": "0.41",
+            "foreignNotional": "0.80524",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657607.7658",
+            "symbol": "APTUSDT",
+            "side": "Sell",
+            "size": "5.08",
+            "price": "1.9640",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "93bbfcc8-854e-5c3a-9c9d-9cf814150a57",
+            "grossValue": "9.977119999999999e+08",
+            "homeNotional": "5.08",
+            "foreignNotional": "9.97712",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657607.7658",
+            "symbol": "APTUSDT",
+            "side": "Sell",
+            "size": "0.1",
+            "price": "1.9640",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "78aa8f6d-3ffe-579b-95d2-ff58af864d41",
+            "grossValue": "1.9640000000000004e+07",
+            "homeNotional": "0.1",
+            "foreignNotional": "0.19640000000000002",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657607.7658",
+            "symbol": "APTUSDT",
+            "side": "Sell",
+            "size": "0.78",
+            "price": "1.9640",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "26238413-e53e-52cd-b564-38bebdf715b0",
+            "grossValue": "1.53192e+08",
+            "homeNotional": "0.78",
+            "foreignNotional": "1.53192",
+            "RPI": "0"
+          }
+        ],
+        "sample_timestamp_conversions": [
+          {
+            "raw": "1767657602.5801",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:02.580Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657607.7658",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:07.765Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657607.7658",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:07.765Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657607.7658",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:07.765Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657607.7658",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:07.765Z",
+            "assumed_timezone": "UTC"
+          }
+        ],
+        "trade_count": 213410,
+        "buy_count": 109610,
+        "sell_count": 103800,
+        "other_side_count": 0,
+        "first_trade_ts_raw": "1767657602.5801",
+        "last_trade_ts_raw": "1767743999.0483",
+        "first_trade_ts_utc": "2026-01-06T00:00:02.580Z",
+        "last_trade_ts_utc": "2026-01-06T23:59:59.048Z",
+        "timestamp_unit": "s",
+        "min_price": 1.863,
+        "max_price": 2.0095,
+        "side_values_seen": [
+          "Buy",
+          "Sell"
+        ],
+        "notes": [],
+        "side_semantics": {
+          "Buy": "taker_buy_aggressor_hits_ask",
+          "Sell": "taker_sell_aggressor_hits_bid",
+          "source": "Bybit API v5 market/recent-trade: side = Side of taker Buy/Sell; same convention used in orderbook_analyse public_trade_source and CH ingest."
+        }
+      }
+    },
+    "DOGEUSDT_2026-01-06": {
+      "download": {
+        "status": "OK",
+        "api_http_status": 200,
+        "api_ret_code": 0,
+        "api_ret_msg": "",
+        "list_file_count": 1,
+        "filename": "DOGEUSDT2026-01-06.csv.gz",
+        "download_url": "https://public.bybit.com/trading/DOGEUSDT/DOGEUSDT2026-01-06.csv.gz",
+        "reported_size": 40324628,
+        "downloaded_size": 40324628,
+        "archive_kind": "gzip",
+        "extracted_filename": "DOGEUSDT2026-01-06.csv",
+        "uncompressed_size": 132038655,
+        "detected_format": "csv",
+        "columns": [
+          "timestamp",
+          "symbol",
+          "side",
+          "size",
+          "price",
+          "tickDirection",
+          "trdMatchID",
+          "grossValue",
+          "homeNotional",
+          "foreignNotional",
+          "RPI"
+        ],
+        "trade_count": 1071232,
+        "buy_count": 532012,
+        "sell_count": 539220,
+        "first_trade_ts_raw": "1767657600.5558",
+        "first_trade_ts_utc": "2026-01-06T00:00:00.555Z",
+        "last_trade_ts_raw": "1767743995.5919",
+        "last_trade_ts_utc": "2026-01-06T23:59:55.591Z",
+        "min_price": 0.14343,
+        "max_price": 0.15663,
+        "error": null
+      },
+      "inspect": {
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/data/bybit_historical_trades/DOGEUSDT/2026-01-06/DOGEUSDT2026-01-06.csv",
+        "detected_format": "csv",
+        "columns": [
+          "timestamp",
+          "symbol",
+          "side",
+          "size",
+          "price",
+          "tickDirection",
+          "trdMatchID",
+          "grossValue",
+          "homeNotional",
+          "foreignNotional",
+          "RPI"
+        ],
+        "sample_records": [
+          {
+            "timestamp": "1767657600.5558",
+            "symbol": "DOGEUSDT",
+            "side": "Buy",
+            "size": "6500",
+            "price": "0.15166",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "c24c229a-d5d4-596e-8913-d39a0b6ecd88",
+            "grossValue": "9.8579e+10",
+            "homeNotional": "6500",
+            "foreignNotional": "985.79",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657600.9889",
+            "symbol": "DOGEUSDT",
+            "side": "Sell",
+            "size": "80",
+            "price": "0.15165",
+            "tickDirection": "MinusTick",
+            "trdMatchID": "4d2d13ff-bd44-5321-ae3b-ecf7b31aa1d9",
+            "grossValue": "1.2132000000000002e+09",
+            "homeNotional": "80",
+            "foreignNotional": "12.132000000000001",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657601.7694",
+            "symbol": "DOGEUSDT",
+            "side": "Buy",
+            "size": "1275",
+            "price": "0.15166",
+            "tickDirection": "PlusTick",
+            "trdMatchID": "f8da419c-832c-541e-8c91-8623bba63b1d",
+            "grossValue": "1.9336649999999996e+10",
+            "homeNotional": "1275",
+            "foreignNotional": "193.36649999999997",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657601.7694",
+            "symbol": "DOGEUSDT",
+            "side": "Buy",
+            "size": "67",
+            "price": "0.15166",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "e1efaac1-df2b-5286-bdf4-04d1d73d4fae",
+            "grossValue": "1.016122e+09",
+            "homeNotional": "67",
+            "foreignNotional": "10.16122",
+            "RPI": "0"
+          },
+          {
+            "timestamp": "1767657601.7694",
+            "symbol": "DOGEUSDT",
+            "side": "Buy",
+            "size": "1287",
+            "price": "0.15166",
+            "tickDirection": "ZeroPlusTick",
+            "trdMatchID": "47a7ef21-e540-51bf-8fce-b450487913c0",
+            "grossValue": "1.9518642e+10",
+            "homeNotional": "1287",
+            "foreignNotional": "195.18642",
+            "RPI": "0"
+          }
+        ],
+        "sample_timestamp_conversions": [
+          {
+            "raw": "1767657600.5558",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:00.555Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657600.9889",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:00.988Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657601.7694",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:01.769Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657601.7694",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:01.769Z",
+            "assumed_timezone": "UTC"
+          },
+          {
+            "raw": "1767657601.7694",
+            "unit": "s",
+            "utc": "2026-01-06T00:00:01.769Z",
+            "assumed_timezone": "UTC"
+          }
+        ],
+        "trade_count": 1071232,
+        "buy_count": 532012,
+        "sell_count": 539220,
+        "other_side_count": 0,
+        "first_trade_ts_raw": "1767657600.5558",
+        "last_trade_ts_raw": "1767743995.5919",
+        "first_trade_ts_utc": "2026-01-06T00:00:00.555Z",
+        "last_trade_ts_utc": "2026-01-06T23:59:55.591Z",
+        "timestamp_unit": "s",
+        "min_price": 0.14343,
+        "max_price": 0.15663,
+        "side_values_seen": [
+          "Buy",
+          "Sell"
+        ],
+        "notes": [],
+        "side_semantics": {
+          "Buy": "taker_buy_aggressor_hits_ask",
+          "Sell": "taker_sell_aggressor_hits_bid",
+          "source": "Bybit API v5 market/recent-trade: side = Side of taker Buy/Sell; same convention used in orderbook_analyse public_trade_source and CH ingest."
+        }
+      }
+    }
+  }
+}

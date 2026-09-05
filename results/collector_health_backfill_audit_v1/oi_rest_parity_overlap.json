@@ -1,0 +1,286 @@
+{
+  "matches": [
+    {
+      "ch_bucket": "2026-08-18 12:00:00",
+      "ch_oi": "61028.74700000",
+      "rest_oi": "61028.74700000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30514.374",
+      "rest_ts": "2026-08-18T12:00:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:05:00",
+      "ch_oi": "60961.74600000",
+      "rest_oi": "60961.74600000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30480.873",
+      "rest_ts": "2026-08-18T12:05:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:10:00",
+      "ch_oi": "60971.48700000",
+      "rest_oi": "60971.48700000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30485.744",
+      "rest_ts": "2026-08-18T12:10:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:15:00",
+      "ch_oi": "60959.52800000",
+      "rest_oi": "60959.52800000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30479.764",
+      "rest_ts": "2026-08-18T12:15:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:20:00",
+      "ch_oi": "60969.94900000",
+      "rest_oi": "60969.94900000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30484.975",
+      "rest_ts": "2026-08-18T12:20:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:25:00",
+      "ch_oi": "60970.65300000",
+      "rest_oi": "60970.65300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30485.327",
+      "rest_ts": "2026-08-18T12:25:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:30:00",
+      "ch_oi": "60967.17100000",
+      "rest_oi": "60967.17100000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30483.586",
+      "rest_ts": "2026-08-18T12:30:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:35:00",
+      "ch_oi": "60906.47200000",
+      "rest_oi": "60906.47200000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30453.236",
+      "rest_ts": "2026-08-18T12:35:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:40:00",
+      "ch_oi": "60896.51900000",
+      "rest_oi": "60896.51900000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30448.26",
+      "rest_ts": "2026-08-18T12:40:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:45:00",
+      "ch_oi": "60888.90000000",
+      "rest_oi": "60888.90000000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30444.45",
+      "rest_ts": "2026-08-18T12:45:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:50:00",
+      "ch_oi": "60916.16100000",
+      "rest_oi": "60916.16100000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30458.081",
+      "rest_ts": "2026-08-18T12:50:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 12:55:00",
+      "ch_oi": "60899.05300000",
+      "rest_oi": "60899.05300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30449.527",
+      "rest_ts": "2026-08-18T12:55:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:00:00",
+      "ch_oi": "60872.37100000",
+      "rest_oi": "60872.37100000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30436.186",
+      "rest_ts": "2026-08-18T13:00:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:05:00",
+      "ch_oi": "60866.60900000",
+      "rest_oi": "60866.60900000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30433.305",
+      "rest_ts": "2026-08-18T13:05:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:10:00",
+      "ch_oi": "60850.50300000",
+      "rest_oi": "60850.50300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30425.252",
+      "rest_ts": "2026-08-18T13:10:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:15:00",
+      "ch_oi": "60903.24300000",
+      "rest_oi": "60903.24300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30451.622",
+      "rest_ts": "2026-08-18T13:15:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:20:00",
+      "ch_oi": "60938.64000000",
+      "rest_oi": "60938.64000000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30469.32",
+      "rest_ts": "2026-08-18T13:20:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:25:00",
+      "ch_oi": "60958.74300000",
+      "rest_oi": "60958.74300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30479.372",
+      "rest_ts": "2026-08-18T13:25:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:30:00",
+      "ch_oi": "61007.82300000",
+      "rest_oi": "61007.82300000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30503.912",
+      "rest_ts": "2026-08-18T13:30:00+00:00"
+    },
+    {
+      "ch_bucket": "2026-08-18 13:35:00",
+      "ch_oi": "61003.09500000",
+      "rest_oi": "61003.09500000",
+      "equal": true,
+      "delta_ms": null,
+      "rest_keys": [
+        "openInterest",
+        "singleOpenInterest",
+        "timestamp"
+      ],
+      "rest_single": "30501.548",
+      "rest_ts": "2026-08-18T13:35:00+00:00"
+    }
+  ],
+  "equal_count": 20,
+  "rest_n": 49
+}

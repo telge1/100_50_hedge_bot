@@ -1,0 +1,14 @@
+{
+  "command": ".venv/bin/python -m pytest tests/research/test_btc_doge_research_phase1.py tests/research/test_btc_doge_research_phase1b.py -q",
+  "phase1_and_phase1b": {
+    "passed": 20,
+    "skipped": 1,
+    "failed": 0,
+    "status": "PASS"
+  },
+  "skip_reason": "RUN_RESEARCH_DB_INTEGRATION=1 was not enabled; no ClickHouse-write integration test was permitted in read-only Phase 1B",
+  "lints": {
+    "status": "PASS",
+    "diagnostics": 0
+  }
+}

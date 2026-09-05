@@ -1,0 +1,16 @@
+{
+  "second_import_done": true,
+  "physical_rows_before_second": 1514,
+  "physical_rows_after_second_before_optimize": 3028,
+  "logical_rows_after_second_before_optimize": 1514,
+  "physical_rows_after_optimize_final": 1514,
+  "logical_rows_after_optimize_final": 1514,
+  "unique_packet_sha_expected": 1514,
+  "unique_packet_sha_actual": 1514,
+  "final_book_hash_unchanged": true,
+  "final_u_unchanged": true,
+  "final_seq_unchanged": true,
+  "level_counts_unchanged": true,
+  "no_logical_duplication": true,
+  "passed": true
+}

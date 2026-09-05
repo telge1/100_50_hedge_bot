@@ -1,0 +1,63 @@
+{
+  "run_id": "79b43674-4003-4951-95d0-026af3004c82",
+  "dry_run": true,
+  "detect_only": false,
+  "verify_only": false,
+  "table": "orderbook_analysis.open_interest_5m_history",
+  "source": "BYBIT_REST_5M_HISTORY",
+  "granularity": "5m",
+  "gap_report": {
+    "table": "orderbook_analysis.open_interest_5m_history",
+    "source": "BYBIT_REST_5M_HISTORY",
+    "granularity": "5m",
+    "start": "2026-09-04T17:40:00Z",
+    "end": "2026-09-04T19:20:00Z",
+    "last_closed_5m": "2026-09-04T19:20:00Z",
+    "expected_buckets_per_symbol": 21,
+    "total_missing_buckets": 0,
+    "symbols": {
+      "BTCUSDT": {
+        "expected_buckets": 21,
+        "present_buckets": 21,
+        "missing_buckets": 0,
+        "missing_starts": [],
+        "missing_starts_truncated": false,
+        "coverage_status": "COMPLETE",
+        "source": "BYBIT_REST_5M_HISTORY",
+        "granularity": "5m"
+      },
+      "DOGEUSDT": {
+        "expected_buckets": 21,
+        "present_buckets": 21,
+        "missing_buckets": 0,
+        "missing_starts": [],
+        "missing_starts_truncated": false,
+        "coverage_status": "COMPLETE",
+        "source": "BYBIT_REST_5M_HISTORY",
+        "granularity": "5m"
+      }
+    }
+  },
+  "symbols": {
+    "BTCUSDT": {
+      "rest_points": 21,
+      "missing_buckets": 0,
+      "candidate_rows": 0,
+      "inserted": 0,
+      "coverage_after": "COMPLETE",
+      "missing_after": 0
+    },
+    "DOGEUSDT": {
+      "rest_points": 21,
+      "missing_buckets": 0,
+      "candidate_rows": 0,
+      "inserted": 0,
+      "coverage_after": "COMPLETE",
+      "missing_after": 0
+    }
+  },
+  "inserted_total": 0,
+  "would_insert_total": 0,
+  "status": "OK",
+  "live_seam_note": "Only closed 5m buckets \u2264 last_closed_5m; live 5s/events untouched; MySQL research_open_interest_5m untouched"
+}

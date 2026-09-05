@@ -1,0 +1,4324 @@
+{
+  "connection": {
+    "config_file": "research/regime_scanner/.env.regime_db (gitignored) + REGIME_DB_*",
+    "connector": "research.regime_scanner.mysql_candle_store.store_mysql.MySQLCandleStore",
+    "repository": "research.regime_scanner.mysql_candle_store.repository.load_candles",
+    "database": "regime_scanner_research",
+    "host_set": true,
+    "port": 3306,
+    "user_set": true
+  },
+  "market_type_note": "No market_type column in market_candles; exchange+symbol encode identity. Docs/bootstrap describe Bybit futures feathers.",
+  "canonical_table": "market_candles",
+  "identity_key": [
+    "exchange",
+    "symbol",
+    "timeframe",
+    "open_time"
+  ],
+  "timestamp_semantics": {
+    "open_time": "UTC candle open (DATETIME(6), naive UTC wall-clock)",
+    "close_time": "UTC candle close = open + timeframe",
+    "created_at": "import/row create time",
+    "updated_at": "row update time"
+  },
+  "schema_inspection": {
+    "tables": {
+      "data_validation_runs": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "validation_type",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exchange",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timeframe",
+            "COLUMN_TYPE": "varchar(8)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "canonical_source",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "comparison_source",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "input_path",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "input_sha256",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "common_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "common_end",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "row_count",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "shared_buckets",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ohlc_mismatches",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "volume_mismatches",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "volume_within_tolerance",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_open_diff",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_high_diff",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_low_diff",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_close_diff",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_volume_diff",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "deterministic_output_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_data_validation_runs_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "exchange"
+          },
+          {
+            "INDEX_NAME": "idx_data_validation_runs_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_data_validation_runs_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "validation_type"
+          },
+          {
+            "INDEX_NAME": "idx_data_validation_runs_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "created_at"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "market_candles": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "exchange",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timeframe",
+            "COLUMN_TYPE": "varchar(8)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "open_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "UTC candle open",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "close_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "UTC candle close = open + timeframe",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "open",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "high",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "low",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "close",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "volume",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "is_closed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "freqtrade_direct | aggregated_from_5m",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_timeframe",
+            "COLUMN_TYPE": "varchar(8)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "for direct: same as timeframe, for aggregated HTF: 5m",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "SHA256 of input feather or aggregation batch",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "updated_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_market_candles_close",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "exchange"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_close",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_close",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "timeframe"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_close",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "close_time"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "exchange"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "timeframe"
+          },
+          {
+            "INDEX_NAME": "idx_market_candles_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "open_time"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_market_candles_identity",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "exchange"
+          },
+          {
+            "INDEX_NAME": "uq_market_candles_identity",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "uq_market_candles_identity",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "timeframe"
+          },
+          {
+            "INDEX_NAME": "uq_market_candles_identity",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "open_time"
+          }
+        ],
+        "looks_like_candle_table": true
+      },
+      "research_derivative_import_runs": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "import_label",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "import_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_database",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_table",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_min_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_max_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "target_timeframe",
+            "COLUMN_TYPE": "varchar(8)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbols_requested",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbols_completed",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "dry_run",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_query_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "config_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rows_read",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "buckets_generated",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rows_inserted",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rows_updated",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rows_unchanged",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rows_rejected",
+            "COLUMN_TYPE": "bigint",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "started_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "finished_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "error_message",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_deriv_import_version",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "import_version"
+          },
+          {
+            "INDEX_NAME": "idx_deriv_import_version",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "created_at"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_deriv_import_label",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "import_label"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_liquidations_5m": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_end",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "long_liquidation_usd",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "short_liquidation_usd",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "total_liquidation_usd",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "liquidation_event_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_first_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_last_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_row_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "expected_source_rows",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "coverage_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_available",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sequence_id",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_database",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_table",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "import_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "updated_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_liq_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_research_liq_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_liq_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "uq_research_liq_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "uq_research_liq_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "import_version"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_open_interest_5m": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_end",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "open_interest",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "open_interest_usd",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_first_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_last_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_row_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "expected_source_rows",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "coverage_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_available",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "gap_before_seconds",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sequence_id",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_database",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_table",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "import_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "updated_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_oi_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_research_oi_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_oi_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "uq_research_oi_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "uq_research_oi_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "import_version"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_orderflow_5m": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bucket_end",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "buy_volume",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sell_volume",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "total_volume",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "delta",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "delta_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "spread_mean",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "spread_max",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_first_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_last_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_row_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "expected_source_rows",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "coverage_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_available",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sequence_id",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_database",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_table",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "import_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "source_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "updated_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_of_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_research_of_5m_lookup",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_of_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "uq_research_of_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "bucket_start"
+          },
+          {
+            "INDEX_NAME": "uq_research_of_5m",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "import_version"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_parameter_sets": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "parameter_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "scanner_name",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "parameters_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_parameter_sets_hash",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "parameter_hash"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_prepared_contexts": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "prepared_context_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exchange",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_source",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "warmup_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timeline_end",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "candle_hashes_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_config_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "scanner_code_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "completed_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_prepared_contexts_hash",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "prepared_context_hash"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_run_metrics": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metric_name",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metric_value",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metric_text",
+            "COLUMN_TYPE": "varchar(255)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_run_metrics_run_name",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_run_metrics_run_name",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "metric_name"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_runs": {
+        "columns": [
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_fingerprint",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "parameter_set_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exchange",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "symbol",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_source",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "start_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "end_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "warmup_start",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "decision_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "started_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "finished_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "duration_seconds",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "git_commit",
+            "COLUMN_TYPE": "char(40)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "git_branch",
+            "COLUMN_TYPE": "varchar(255)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "working_tree_dirty",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "candle_hash_5m",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "candle_hash_15m",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "candle_hash_30m",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "trend_state_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "structure_event_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "price_action_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "momentum_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "signal_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "combined_output_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "error_type",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "error_message",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          },
+          {
+            "COLUMN_NAME": "updated_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_runs_fingerprint",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_fingerprint"
+          },
+          {
+            "INDEX_NAME": "idx_research_runs_parameter_set",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "parameter_set_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_runs_status",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "status"
+          },
+          {
+            "INDEX_NAME": "idx_research_runs_symbol_window",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "symbol"
+          },
+          {
+            "INDEX_NAME": "idx_research_runs_symbol_window",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "start_time"
+          },
+          {
+            "INDEX_NAME": "idx_research_runs_symbol_window",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "end_time"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_signal_features": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "signal_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_stage",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema20",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema50",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema59",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema200",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9_slope_3",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema20_slope_3",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema59_slope_3",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema200_slope_3",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9_20_distance_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema20_59_distance_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema59_200_distance_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "adx",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_plus",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_minus",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_spread_signed",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_spread_abs",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_spread_dir_norm",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "atr_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "dist_ema_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "move_since_arm_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "breakout_candle_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "pullback_depth_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "dist_breakout_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "dist_protected_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "major_direction",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "structure_state",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protected_high",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protected_low",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "breakout_level",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "pullback_high",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "pullback_low",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "lh_confirmed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "hl_confirmed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_candle_return_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_candle_body_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_candle_range_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_upper_wick_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_lower_wick_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_close_position",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_bullish",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "volume",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "volume_ratio",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "hour_utc",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "day_of_week",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "month",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "split",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_signal_features_adx",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "adx"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_features_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_features_stage",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "feature_stage"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_features_sig_ver_stage",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "signal_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_features_sig_ver_stage",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "feature_version"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_features_sig_ver_stage",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "feature_stage"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_signal_outcomes": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "signal_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "outcome_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exit_model",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "tp_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sl_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "horizon_bars",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "cost_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "same_bar_policy",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exit_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exit_price",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "exit_reason",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "gross_pnl_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "net_pnl_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "is_winner",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "tp_first",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "sl_first",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "same_bar_ambiguous",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "time_exit",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "data_end",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bars_held",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bars_to_tp",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bars_to_sl",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mfe_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mae_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mae_before_tp_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "reclaimed_after_adverse",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_underwater_bars",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "outcome_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_signal_outcomes_net",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "net_pnl_pct"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_outcomes_reason",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "exit_reason"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_outcomes_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "signal_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "outcome_version"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "exit_model"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "tp_pct"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 5,
+            "COLUMN_NAME": "sl_pct"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 6,
+            "COLUMN_NAME": "horizon_bars"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_outcomes_model",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 7,
+            "COLUMN_NAME": "cost_pct"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_signal_path_checkpoints": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "signal_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "path_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_bar",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_close",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "bars_since_fill",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "close_return_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "directional_close_return_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mfe_so_far_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mae_so_far_pct",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mfe_so_far_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "mae_so_far_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "max_high_so_far",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "min_low_so_far",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_reclaimed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_lost",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "breakout_level_lost",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "breakout_level_reclaimed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protected_level_broken",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema20",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9_20_aligned",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "ema9_20_lost",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "adx",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_plus",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "di_minus",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "directional_di_spread",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "micro_counter_bos",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "micro_counter_choch",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "major_structure_opposed",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_candle_direction",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_body_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "checkpoint_range_atr",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "close_location_in_range",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "adverse_candle_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "favorable_candle_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "direction_change_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "no_positive_mfe",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "small_mfe",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "deep_mae",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "availability",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "feature_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_signal_path_cp_avail",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "availability"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_path_cp_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_path_cp",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "signal_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_path_cp",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "path_version"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_path_cp",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "checkpoint_bar"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_signal_path_labels": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "signal_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "path_version",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "path_type",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "path_thresholds_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "label_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_signal_path_labels_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_signal_path_labels_type",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "path_type"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_path_labels",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "signal_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signal_path_labels",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "path_version"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_signals": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "signal_key",
+            "COLUMN_TYPE": "varchar(512)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "direction",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "signal_type",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "setup_id",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "entry_price",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "invalidation_time",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "invalidation_price",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "reason",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_signals_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_signals_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "timestamp"
+          },
+          {
+            "INDEX_NAME": "idx_research_signals_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "direction"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signals_run_signal",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_signals_run_signal",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "signal_key"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_structure_events": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "event_key",
+            "COLUMN_TYPE": "varchar(512)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "event_type",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "direction",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "price",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "swing_type",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protective_level",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "structure_state",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_structure_events_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_structure_events_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "timestamp"
+          },
+          {
+            "INDEX_NAME": "idx_research_structure_events_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "event_type"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_structure_events_run_event",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_structure_events_run_event",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "event_key"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_trend_states": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "event_key",
+            "COLUMN_TYPE": "varchar(255)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "timestamp",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "state",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "previous_state",
+            "COLUMN_TYPE": "varchar(32)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "direction",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "strength",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "transition_reason",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "confirmation_count",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protective_high",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "protective_low",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_trend_states_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_trend_states_run_ts",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "timestamp"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_trend_states_run_event",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_trend_states_run_event",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "event_key"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_variant_runs": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "variant_set_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "variant_name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "variant_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "parameter_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rank_position",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "score",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_variant_runs_hash",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_hash"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_runs_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_runs_score",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_set_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_runs_score",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "score"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_runs_set_variant",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_set_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_runs_set_variant",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "variant_name"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_variant_sets": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "variant_set_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "description",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "variants_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_sets_hash",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_set_hash"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_sets_name",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "name"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_variant_window_runs": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "variant_set_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "window_set_id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "variant_name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "window_name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "variant_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "window_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "run_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "parameter_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "status",
+            "COLUMN_TYPE": "varchar(16)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "score",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "degenerate",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metadata_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_variant_window_runs_run",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "run_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_window_runs_score",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_set_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_window_runs_score",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "window_set_id"
+          },
+          {
+            "INDEX_NAME": "idx_research_variant_window_runs_score",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "score"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_window_runs_combo",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "variant_set_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_window_runs_combo",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "window_set_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_window_runs_combo",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "variant_name"
+          },
+          {
+            "INDEX_NAME": "uq_research_variant_window_runs_combo",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "window_name"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_window_evaluations": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "timeline_id",
+            "COLUMN_TYPE": "char(36)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "MUL",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "window_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "window_name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metric_version",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "score_version",
+            "COLUMN_TYPE": "int",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "metrics_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "score",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "degenerate",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "degenerate_reason",
+            "COLUMN_TYPE": "varchar(64)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "rankable",
+            "COLUMN_TYPE": "tinyint(1)",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "character_fit",
+            "COLUMN_TYPE": "double",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "evaluation_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "idx_research_window_evaluations_timeline",
+            "NON_UNIQUE": 1,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "timeline_id"
+          },
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_evaluations_key",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "timeline_id"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_evaluations_key",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 2,
+            "COLUMN_NAME": "window_hash"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_evaluations_key",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 3,
+            "COLUMN_NAME": "metric_version"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_evaluations_key",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 4,
+            "COLUMN_NAME": "score_version"
+          }
+        ],
+        "looks_like_candle_table": false
+      },
+      "research_window_sets": {
+        "columns": [
+          {
+            "COLUMN_NAME": "id",
+            "COLUMN_TYPE": "bigint unsigned",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "PRI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "auto_increment"
+          },
+          {
+            "COLUMN_NAME": "window_set_hash",
+            "COLUMN_TYPE": "char(64)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "name",
+            "COLUMN_TYPE": "varchar(128)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "UNI",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "description",
+            "COLUMN_TYPE": "text",
+            "IS_NULLABLE": "YES",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "windows_json",
+            "COLUMN_TYPE": "json",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": ""
+          },
+          {
+            "COLUMN_NAME": "created_at",
+            "COLUMN_TYPE": "datetime(6)",
+            "IS_NULLABLE": "NO",
+            "COLUMN_KEY": "",
+            "COLUMN_COMMENT": "",
+            "EXTRA": "DEFAULT_GENERATED"
+          }
+        ],
+        "indexes": [
+          {
+            "INDEX_NAME": "PRIMARY",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "id"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_sets_hash",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "window_set_hash"
+          },
+          {
+            "INDEX_NAME": "uq_research_window_sets_name",
+            "NON_UNIQUE": 0,
+            "SEQ_IN_INDEX": 1,
+            "COLUMN_NAME": "name"
+          }
+        ],
+        "looks_like_candle_table": false
+      }
+    },
+    "candle_like_tables": [
+      "market_candles"
+    ],
+    "database": "regime_scanner_research",
+    "all_tables": [
+      "data_validation_runs",
+      "market_candles",
+      "research_derivative_import_runs",
+      "research_liquidations_5m",
+      "research_open_interest_5m",
+      "research_orderflow_5m",
+      "research_parameter_sets",
+      "research_prepared_contexts",
+      "research_run_metrics",
+      "research_runs",
+      "research_signal_features",
+      "research_signal_outcomes",
+      "research_signal_path_checkpoints",
+      "research_signal_path_labels",
+      "research_signals",
+      "research_structure_events",
+      "research_trend_states",
+      "research_variant_runs",
+      "research_variant_sets",
+      "research_variant_window_runs",
+      "research_window_evaluations",
+      "research_window_sets"
+    ]
+  },
+  "column_map": {
+    "exchange": "exchange",
+    "symbol": "symbol",
+    "timeframe": "timeframe",
+    "candle_open": "open_time",
+    "candle_close": "close_time",
+    "ohlcv": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "market_type": null,
+    "is_closed": "is_closed",
+    "source": "source"
+  }
+}

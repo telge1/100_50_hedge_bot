@@ -1,0 +1,21 @@
+{
+  "outcome_used_for_decision": false,
+  "outcome_used_for_thresholds": false,
+  "outcome_used_for_profile_definition": false,
+  "decision_ts": "2026-08-31T21:00:00Z",
+  "base_price": 79056.1,
+  "px_1m": 79100.3,
+  "px_5m": 79056.0,
+  "px_15m": 78938.1,
+  "px_30m": 78863.6,
+  "mfe_pct_30m": 0.3240736641448435,
+  "mae_pct_30m": -0.07184771320617682,
+  "note": "No LONG/SHORT decision; outcome path not used for classification",
+  "illustrative_path_after_19:15_reclaim": {
+    "approx_reclaim": "2026-08-31 19:10:58.515000",
+    "px_19:30": 79056.1,
+    "px_20:00": 78863.6,
+    "px_21:00": 78824.6,
+    "outcome_used_for_decision": false
+  }
+}

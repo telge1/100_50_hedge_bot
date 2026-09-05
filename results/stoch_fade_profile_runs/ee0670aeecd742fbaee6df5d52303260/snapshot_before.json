@@ -1,0 +1,64 @@
+{
+  "candles": {
+    "count": 356262,
+    "max_open_time": "2026-08-15T09:41:00Z",
+    "min_open_time": "2025-12-11T00:00:00Z",
+    "uniq_open_time": 356262
+  },
+  "captured_at": "2026-08-15T12:47:30.429282Z",
+  "files": {
+    "ema_research_registry.json": "30e04217472f0867431b49bb6a5e866d5121a2d7c3827d6fcb48b2c443548cbc",
+    "live_universe.json": "0b4faf44c57e48d81c25ad159563c757876ce6c5143aac60a3ca11333be9344c",
+    "pool_research_registry.json": "3979e6316c9750c086ef930f29f9721515e456eeec68db618b9a488fcf1d0b25",
+    "stoch_signale_default": "wave_fade_no_be50_v1"
+  },
+  "global_table_counts": {
+    "candles_1m": 19487743,
+    "signal_processing_state": 92,
+    "signals": 5527
+  },
+  "label": "before",
+  "outcomes": {
+    "count": null,
+    "error": "Received ClickHouse exception, code: 47, server response: Code: 47. DB::Exception: Unknown expression or function identifier `symbol` in scope SELECT count(), uniqExact(signal_id) FROM signal_generator.signal_outcomes FINAL WHERE symbol = '1000PEPEUSDT'. (UNKNOWN_IDENTIFIER) (for url http://127.0.0.1:8123)",
+    "uniq_signal_id": null
+  },
+  "sg_root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+  "signals": {
+    "count": 423,
+    "max_generated_at": "2026-08-14T17:30:00Z",
+    "min_generated_at": "2026-07-31T18:30:00Z",
+    "uniq_signal_id": 423
+  },
+  "symbol": "1000PEPEUSDT",
+  "watermarks": [
+    {
+      "last_processed_candle_open_time": "2026-08-14T17:45:00Z",
+      "strategy_version": "wave_fade_no_be50_v1",
+      "symbol": "1000PEPEUSDT",
+      "timeframe": "15m"
+    },
+    {
+      "last_processed_candle_open_time": "2026-08-14T17:00:00Z",
+      "strategy_version": "wave_fade_no_be50_v1",
+      "symbol": "1000PEPEUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "last_processed_candle_open_time": "2026-08-14T17:30:00Z",
+      "strategy_version": "wave_fade_no_be50_v1",
+      "symbol": "1000PEPEUSDT",
+      "timeframe": "30m"
+    },
+    {
+      "last_processed_candle_open_time": "2026-08-14T12:00:00Z",
+      "strategy_version": "wave_fade_no_be50_v1",
+      "symbol": "1000PEPEUSDT",
+      "timeframe": "4h"
+    }
+  ],
+  "window_candles": {
+    "count": 356262,
+    "uniq_open_time": 356262
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "swing_definition": "local extrema not optimized; first_attack_peak=max trade price in core post-anchor; retest_high=max in extended post-core",
+  "breakout_candle_30m": {
+    "bracket_start": "2026-08-31T18:30:00Z",
+    "bracket_end": "2026-08-31T19:30:00Z",
+    "open": 78866.3,
+    "high": 79280.8,
+    "low": 78847.0,
+    "close": 79056.1,
+    "body": 189.8000000000029,
+    "upper_wick": 224.6999999999971,
+    "lower_wick": 19.30000000000291,
+    "close_location_fraction": 0.4820193637621125
+  },
+  "profile_levels": {
+    "tpo_vah": 79080.0,
+    "volume_vvah": 79140.0,
+    "upper_outer_edge": 79140.0
+  },
+  "first_price_peak": {
+    "ts": "2026-08-31T19:10:42.6Z",
+    "price": 79280.8
+  },
+  "prior_swing_high_before_anchor": 79193.1,
+  "reclaim": {
+    "ts": "2026-08-31T19:10:58.515Z",
+    "price": 79136.0
+  },
+  "later_retest": {
+    "within_standard_30m_window": false,
+    "status_if_outside": "NOT_AVAILABLE_TO_STANDARD_30M_DECISION_WINDOW",
+    "retest_high_ts": "2026-08-31T20:20:44.76Z",
+    "retest_high_price": 79166.7,
+    "peak_price": 79280.8,
+    "diff_price": -114.10000000000582,
+    "diff_bps": -14.39188302842628,
+    "classification": "LOWER_HIGH",
+    "higher_high_achieved": false
+  },
+  "return_below_vah_after_reclaim": true,
+  "return_below_vvah_after_reclaim": true
+}

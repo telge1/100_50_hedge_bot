@@ -1,0 +1,36 @@
+{
+  "first_gap_location": "INSIDE_SEGMENT_0",
+  "segment_0": {
+    "continuation_index": 0,
+    "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36",
+    "next_segment_expected": true,
+    "previous_segment_sha256": null,
+    "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+    "segment_first_ts": "2026-09-04T08:03:11.472000Z",
+    "segment_first_u": 4347546,
+    "segment_last_ts": "2026-09-04T08:35:34.673000Z",
+    "segment_last_u": 4357261,
+    "segment_sha256": "664b4e97e3e299612da0fa74b35158d2a692038332bb20c0f3ab598a013a5dfd"
+  },
+  "segment_1_open_tmp": {
+    "continuation_index": 1,
+    "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/cont_001",
+    "next_segment_expected": true,
+    "previous_segment_sha256": "664b4e97e3e299612da0fa74b35158d2a692038332bb20c0f3ab598a013a5dfd",
+    "segment_finalization_reason": null,
+    "segment_first_ts": null,
+    "segment_first_u": null,
+    "segment_last_ts": null,
+    "segment_last_u": null,
+    "segment_sha256": null
+  },
+  "segment_0_last_u": 4357261,
+  "first_gap_prev_u": 4350204,
+  "first_gap_before_segment_end": true,
+  "segment_manifest_persisted_gap_fields_at_finalize": {
+    "gap_count": 0,
+    "persisted_capture_u_gap_count": 0,
+    "note": "Segment manifest shows 0; event_manifest shows 4 \u2014 writer persisted_u_gap_count rolled into event on rotate/tick, segment manifest snapshot incomplete for this field"
+  },
+  "rollover_involved_in_first_gap": false
+}

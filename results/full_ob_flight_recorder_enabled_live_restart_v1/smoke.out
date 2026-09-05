@@ -1,0 +1,15 @@
+2026-09-04T20:13:41Z sample 0 t+0.0m gate=False fr=True active=2 btc=38166/27158 doge=5046/14211 cov=62.3/61.5u=4566695/4566381
+2026-09-04T20:14:42Z sample 1 t+1.0m gate=True fr=True active=2 btc=38258/27124 doge=5046/14211 cov=122.4/121.6u=4566996/4566683
+2026-09-04T20:15:42Z sample 2 t+2.0m gate=False fr=True active=2 btc=38243/27139 doge=5047/14209 cov=182.4/181.6u=4567297/4566984
+2026-09-04T20:16:42Z sample 3 t+3.0m gate=False fr=True active=2 btc=38243/27092 doge=5048/14208 cov=242.3/241.5u=4567598/4567285
+2026-09-04T20:17:42Z sample 4 t+4.0m gate=False fr=True active=2 btc=38197/27160 doge=5044/14212 cov=302.4/301.6u=4567900/4567586
+2026-09-04T20:18:43Z sample 5 t+5.0m gate=True fr=True active=2 btc=38211/27125 doge=5044/14212 cov=362.6/361.8u=4568201/4567888
+2026-09-04T20:19:43Z sample 6 t+6.0m gate=False fr=True active=2 btc=38221/27068 doge=5048/14208 cov=422.7/421.9u=4568502/4568189
+2026-09-04T20:20:43Z sample 7 t+7.0m gate=False fr=True active=2 btc=38240/27164 doge=5053/14203 cov=482.5/481.7u=4568803/4568490
+2026-09-04T20:21:43Z sample 8 t+8.0m gate=False fr=True active=2 btc=38206/27170 doge=5047/14210 cov=542.6/541.8u=4569104/4568791
+2026-09-04T20:22:42Z sample 9 t+9.0m gate=False fr=True active=2 btc=38227/27162 doge=5048/14208 cov=599.9/600.0u=4569396/4569082
+2026-09-04T20:23:42Z sample 10 t+10.0m gate=True fr=True active=2 btc=38194/27165 doge=5046/14211 cov=600.0/600.1u=4569697/4569384
+2026-09-04T20:24:42Z sample 11 t+11.0m gate=False fr=True active=2 btc=38157/27219 doge=5044/14212 cov=599.9/599.8u=4569998/4569685
+2026-09-04T20:25:42Z sample 12 t+12.0m gate=True fr=True active=2 btc=38176/27231 doge=5047/14209 cov=600.0/600.1u=4570299/4569986
+2026-09-04T20:25:44Z SMOKE_DONE
+SMOKE_DONE

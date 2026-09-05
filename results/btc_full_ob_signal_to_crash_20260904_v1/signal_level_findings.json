@@ -1,0 +1,346 @@
+{
+  "signals": {
+    "A_parent_upper": {
+      "contract": {
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "analysis_post_end_ts": "2026-09-04T12:27:35.764963Z",
+        "analysis_pre_start_ts": "2026-09-04T11:17:35.764963Z",
+        "continuity_epoch_id": 0,
+        "continuous_capture": false,
+        "coverage_status": "INCOMPLETE",
+        "edge": "TPO_VAH",
+        "edge_price": 81135.0,
+        "independent_observation": false,
+        "min_post_seconds": 3600.0,
+        "overlap_cluster_id": "overlap_cluster_524a00a79e2a435b",
+        "overlapping_signal_ids": [
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_33d13adee113_1_U",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_69ab9167f986_1_L"
+        ],
+        "parent_fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "poc": 80997.5,
+        "pre_seconds": 600.0,
+        "profile_basis": "VOLUME",
+        "profile_end_ts": "2026-09-04T11:00:00Z",
+        "profile_id": "BTCUSDT_20260904T103000_110000",
+        "profile_start_ts": "2026-09-04T10:30:00Z",
+        "replayable": true,
+        "research_eligible": false,
+        "research_ineligible_reasons": [],
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_parent",
+        "signal_kind": "PARENT",
+        "trigger_price": 81292.75,
+        "trigger_ts": "2026-09-04T11:27:35.764963Z",
+        "vah": 81135.0,
+        "val": 80965.0,
+        "edge_side": "UPPER",
+        "gap_status_note": "parent_in_seg0_epoch0_clean; later capture has RESYNC gaps in cont_001"
+      },
+      "coverage": {
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_parent",
+        "analysis_window_start": "2026-09-04T11:17:35.764963Z",
+        "analysis_window_end": "2026-09-04T12:27:35.764963Z",
+        "finalized_data_end": "2026-09-04T12:57:35.672000Z",
+        "window_fully_in_finalized": true,
+        "u_gaps_in_window": 0,
+        "epochs_in_window": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "multi_epoch_fail_closed": true,
+        "research_eligible_contract": false,
+        "coverage_status_contract": "INCOMPLETE",
+        "outcomes": {
+          "mid_at_signal": 81292.75,
+          "ret_60s_bps": 6.310525846401174,
+          "ret_300s_bps": -5.769272167566503,
+          "ret_600s_bps": -6.593453905791822,
+          "ret_1800s_bps": -10.997290656300123,
+          "ret_until_crash_start_bps": -12.830172432351336,
+          "ret_until_local_low_bps": -266.1491953464492
+        }
+      },
+      "note": "Best clean epoch0 coverage through seg0; later post window spans resync gap region"
+    },
+    "B_nested_lower": {
+      "contract": {
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "analysis_post_end_ts": "2026-09-04T12:30:32.654722Z",
+        "analysis_pre_start_ts": "2026-09-04T11:20:32.654722Z",
+        "continuity_epoch_id": 0,
+        "continuous_capture": true,
+        "coverage_status": "FULL",
+        "edge": "TPO_VAL",
+        "edge_price": 81070.0,
+        "independent_observation": false,
+        "min_post_seconds": 3600.0,
+        "overlap_cluster_id": "overlap_cluster_524a00a79e2a435b",
+        "overlapping_signal_ids": [
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_33d13adee113_1_U",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_69ab9167f986_1_L",
+          "BTCUSDT_20260904T112735Z_eb6191222e_parent"
+        ],
+        "parent_fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "poc": 81227.5,
+        "pre_seconds": 600.0,
+        "profile_basis": "VOLUME",
+        "profile_end_ts": "2026-09-04T11:30:00Z",
+        "profile_id": "BTCUSDT_20260904T110000_20260904T113000_v1_3d51be69d9df",
+        "profile_start_ts": "2026-09-04T11:00:00Z",
+        "replayable": true,
+        "research_eligible": true,
+        "research_ineligible_reasons": [],
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+        "signal_kind": "NESTED",
+        "trigger_price": 81230.15,
+        "trigger_ts": "2026-09-04T11:30:32.654722Z",
+        "vah": 81275.0,
+        "val": 81070.0,
+        "edge_side": "LOWER",
+        "arm_ts": "2026-09-04T11:30:04.940733Z",
+        "profile_fallback_used": true,
+        "gap_status_note": "nested continuity_epoch_id claimed 0; raw stream may include later epochs"
+      },
+      "coverage": {
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+        "analysis_window_start": "2026-09-04T11:20:32.654722Z",
+        "analysis_window_end": "2026-09-04T12:30:32.654722Z",
+        "finalized_data_end": "2026-09-04T12:57:35.672000Z",
+        "window_fully_in_finalized": true,
+        "u_gaps_in_window": 0,
+        "epochs_in_window": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "multi_epoch_fail_closed": true,
+        "research_eligible_contract": true,
+        "coverage_status_contract": "FULL",
+        "outcomes": {
+          "mid_at_signal": 81244.85,
+          "ret_60s_bps": -0.24616944950972275,
+          "ret_300s_bps": -4.43105009117501,
+          "ret_600s_bps": 0.08615930732804475,
+          "ret_1800s_bps": -3.2863621509562315,
+          "ret_until_crash_start_bps": -6.941978476175256,
+          "ret_until_local_low_bps": -260.4103521638616
+        }
+      }
+    },
+    "C_nested_upper": {
+      "contract": {
+        "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+        "analysis_post_end_ts": "2026-09-04T13:06:34.825323Z",
+        "analysis_pre_start_ts": "2026-09-04T11:56:34.825323Z",
+        "continuity_epoch_id": 0,
+        "continuous_capture": true,
+        "coverage_status": "FULL",
+        "edge": "TPO_VAH",
+        "edge_price": 81275.0,
+        "independent_observation": false,
+        "min_post_seconds": 3600.0,
+        "overlap_cluster_id": "overlap_cluster_524a00a79e2a435b",
+        "overlapping_signal_ids": [
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_33d13adee113_1_U",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_L",
+          "BTCUSDT_20260904T112735Z_eb6191222e_ns_69ab9167f986_1_L",
+          "BTCUSDT_20260904T112735Z_eb6191222e_parent"
+        ],
+        "parent_fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "poc": 81227.5,
+        "pre_seconds": 600.0,
+        "profile_basis": "VOLUME",
+        "profile_end_ts": "2026-09-04T11:30:00Z",
+        "profile_id": "BTCUSDT_20260904T110000_20260904T113000_v1_3d51be69d9df",
+        "profile_start_ts": "2026-09-04T11:00:00Z",
+        "replayable": true,
+        "research_eligible": true,
+        "research_ineligible_reasons": [],
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U",
+        "signal_kind": "NESTED",
+        "trigger_price": 81113.45,
+        "trigger_ts": "2026-09-04T12:06:34.825323Z",
+        "vah": 81275.0,
+        "val": 81070.0,
+        "edge_side": "UPPER",
+        "arm_ts": "2026-09-04T12:06:34.792240Z",
+        "profile_fallback_used": true,
+        "gap_status_note": "nested continuity_epoch_id claimed 0; raw stream may include later epochs"
+      },
+      "coverage": {
+        "signal_id": "BTCUSDT_20260904T112735Z_eb6191222e_ns_3d51be69d9df_1_U",
+        "analysis_window_start": "2026-09-04T11:56:34.825323Z",
+        "analysis_window_end": "2026-09-04T13:06:34.825323Z",
+        "finalized_data_end": "2026-09-04T12:57:35.672000Z",
+        "window_fully_in_finalized": true,
+        "u_gaps_in_window": 0,
+        "epochs_in_window": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "multi_epoch_fail_closed": true,
+        "research_eligible_contract": true,
+        "coverage_status_contract": "FULL",
+        "outcomes": {
+          "mid_at_signal": 81119.95,
+          "ret_60s_bps": 0.7149905787667412,
+          "ret_300s_bps": -2.6257412634010393,
+          "ret_600s_bps": 3.118838214274406,
+          "ret_1800s_bps": -170.96904029156752,
+          "ret_until_crash_start_bps": 8.444285283706414,
+          "ret_until_local_low_bps": -245.4143524496752
+        }
+      },
+      "note": "Trigger 12:06 sits inside cont_001 multi-epoch/resync region \u2014 fail-closed for cross-epoch metrics"
+    }
+  },
+  "patterns": {
+    "BREAKOUT_CONFIRMATION": {
+      "status": "PARTIALLY_OBSERVED",
+      "reason": "Parent UPPER cross then acceptance to FIGHT_ACTIVE; price later failed to sustain above VAH region"
+    },
+    "FAILED_BREAKOUT": {
+      "status": "OBSERVED",
+      "reason": "After parent UPPER and nested UPPER attempts, price ultimately sold off through prior edge region before/into crash window"
+    },
+    "ASK_DEFENSE": {
+      "status": "PARTIALLY_OBSERVED",
+      "reason": "Large ask levels tracked within 50bps; refill events recorded as UNMATCHED_L2_CHANGE only"
+    },
+    "BUY_ABSORPTION": {
+      "status": "NOT_EVALUABLE",
+      "reason": "No Sep-4 public trades in research CH; FR public_trades placeholders empty; cannot prove aggression vs L2"
+    },
+    "BID_WITHDRAWAL": {
+      "status": "OBSERVED",
+      "reason": "7047 unmatched bid size reductions >=10 BTC half-cut within 50bps before crash_start"
+    },
+    "BID_CONSUMPTION": {
+      "status": "NOT_EVALUABLE",
+      "reason": "size=0/reduced without trade link cannot be classified as consumption vs cancel"
+    },
+    "SELLER_CONTROL": {
+      "status": "NOT_OBSERVED",
+      "reason": "Ask-heavy 50bps imbalance persistence before crash if detected; not exchange-linked aggression"
+    },
+    "EARLY_BEARISH_WARNING": {
+      "status": "PARTIALLY_OBSERVED",
+      "reason": "Pre-crash imbalance and/or bid withdrawals visible in finalized Full OB before crash_start"
+    },
+    "TRADE_DIRECTION": {
+      "status": "NOT_EVALUATED",
+      "reason": "Explicitly out of scope"
+    }
+  },
+  "first_bearish": null,
+  "crash_start": "2026-09-04T12:30:00.472000Z",
+  "local_high": {
+    "ts": "2026-09-04T12:29:57.272000Z",
+    "mid": 81325.35
+  },
+  "local_low": {
+    "ts": "2026-09-04T12:47:10.072000Z",
+    "mid": 79129.15
+  },
+  "bid_withdrawals_before": 7047,
+  "bid_withdrawals_during_or_after": 12361,
+  "ask_walls_top": [
+    {
+      "side": "ask",
+      "price": 79759.6,
+      "first_seen": "2026-09-04T12:38:40.272000Z",
+      "last_seen": "2026-09-04T12:45:26.072000Z",
+      "max_size": 107.026,
+      "sum_size": 159.934,
+      "n_obs": 3,
+      "refill_count": 2,
+      "last_size": 107.026,
+      "min_dist_bps_to_mid": 7.434095333332915,
+      "status": "OPEN"
+    },
+    {
+      "side": "ask",
+      "price": 81643.0,
+      "first_seen": "2026-09-04T12:29:47.472000Z",
+      "last_seen": "2026-09-04T12:29:47.472000Z",
+      "max_size": 104.871,
+      "sum_size": 104.871,
+      "n_obs": 1,
+      "refill_count": 0,
+      "last_size": 104.871,
+      "min_dist_bps_to_mid": 40.93584872245419,
+      "status": "OPEN"
+    },
+    {
+      "side": "ask",
+      "price": 80087.1,
+      "first_seen": "2026-09-04T12:34:12.072000Z",
+      "last_seen": "2026-09-04T12:43:26.473000Z",
+      "max_size": 101.651,
+      "sum_size": 319.32099999999997,
+      "n_obs": 4,
+      "refill_count": 0,
+      "last_size": 16.224,
+      "min_dist_bps_to_mid": 21.717218168884113,
+      "status": "OPEN"
+    },
+    {
+      "side": "ask",
+      "price": 79614.9,
+      "first_seen": "2026-09-04T12:46:09.072000Z",
+      "last_seen": "2026-09-04T12:55:07.672000Z",
+      "max_size": 101.592,
+      "sum_size": 241.351,
+      "n_obs": 4,
+      "refill_count": 1,
+      "last_size": 30.969,
+      "min_dist_bps_to_mid": 9.87598752017013,
+      "status": "OPEN"
+    },
+    {
+      "side": "ask",
+      "price": 79806.9,
+      "first_seen": "2026-09-04T12:33:07.272000Z",
+      "last_seen": "2026-09-04T12:45:48.872000Z",
+      "max_size": 101.221,
+      "sum_size": 217.447,
+      "n_obs": 3,
+      "refill_count": 1,
+      "last_size": 101.221,
+      "min_dist_bps_to_mid": 8.797699931335824,
+      "status": "OPEN"
+    }
+  ],
+  "book_crossed_events": 1,
+  "TRADE_DIRECTION": "NOT_EVALUATED",
+  "refined_pre_crash": {
+    "bid50_avg_12_00_12_10": 1139.19,
+    "bid50_avg_12_25_12_30": 963.07,
+    "ask50_avg_12_00_12_10": 1116.27,
+    "ask50_avg_12_25_12_30": 935.44,
+    "ask_walls_before_crash": 1,
+    "ask_walls_during_crash": 19,
+    "large_bid_reductions_last_5m_before_crash": 0,
+    "interpretation": "No clear minutes-ahead ask-defense or seller-control; bilateral thinning only; major ask walls concurrent with crash"
+  }
+}

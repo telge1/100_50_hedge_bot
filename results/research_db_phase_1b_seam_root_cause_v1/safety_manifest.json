@@ -1,0 +1,17 @@
+{
+  "ClickHouse writes": "none",
+  "Collector changes": "none",
+  "Collector restarts": "none",
+  "Commit": "none",
+  "DDL executed": "none",
+  "DML executed": "none",
+  "Dashboard changes": "none",
+  "Existing research DB rows changed": "none",
+  "Existing results modified": "none",
+  "Full-history backfill": "not started",
+  "Invalid-timezone tables changed": "none",
+  "Live changes": "none",
+  "Persistent watcher": "not started",
+  "Push": "none",
+  "orderbook_deltas repair attempts": "none"
+}

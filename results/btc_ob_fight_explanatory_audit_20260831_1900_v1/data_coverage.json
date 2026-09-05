@@ -1,0 +1,66 @@
+{
+  "core_window": {
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T19:30:00Z"
+  },
+  "extended_window": {
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T21:30:00Z"
+  },
+  "public_trades_core": {
+    "table": "orderbook_analysis.public_trades_canonical",
+    "count": 80738,
+    "min_ts": "2026-08-31T18:30:00.465000Z",
+    "max_ts": "2026-08-31T19:29:56.684000Z",
+    "uniq_trade_id": 80738,
+    "buy_count": 40927,
+    "sell_count": 39811,
+    "sum_notional": 169022988.2729,
+    "dedup_ok": true
+  },
+  "public_trades_extended": {
+    "table": "orderbook_analysis.public_trades_canonical",
+    "count": 190257,
+    "min_ts": "2026-08-31T18:30:00.465000Z",
+    "max_ts": "2026-08-31T21:29:59.879000Z",
+    "uniq_trade_id": 190257,
+    "buy_count": 94185,
+    "sell_count": 96072,
+    "sum_notional": 495675106.6972,
+    "dedup_ok": true
+  },
+  "open_interest": {
+    "table": "orderbook_analysis.open_interest_5s",
+    "count": 720,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T19:29:55Z",
+    "resolution": "5s"
+  },
+  "liquidations_core": {
+    "table": "orderbook_analysis.all_liquidations",
+    "by_side": [
+      {
+        "side": "LIQUIDATED_LONG",
+        "count": 1,
+        "notional": 78.7603
+      },
+      {
+        "side": "LIQUIDATED_SHORT",
+        "count": 59,
+        "notional": 490938.9752
+      }
+    ],
+    "price_column": "bankruptcy_price"
+  },
+  "liquidations_extended_count": 78,
+  "candles_1m": {
+    "table": "signal_generator.candles_1m",
+    "count": 60,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T19:29:00Z",
+    "expected_minutes": 60,
+    "complete": true
+  },
+  "run_017_reused": true,
+  "same_timestamp_trade_ambiguity": "trades ordered by trade_ts, trade_id; equal-ts ordering not exchange-proven"
+}

@@ -1,0 +1,42 @@
+{
+  "audit_time_utc": "2026-09-04T11:13:31.399553Z",
+  "collector_pid": 1565672,
+  "oi_pid": 147111,
+  "collector_verified_running": true,
+  "oi_verified_running": true,
+  "active_parent_captures": false,
+  "lifecycle": {
+    "BTCUSDT": "COOLDOWN",
+    "DOGEUSDT": "COOLDOWN"
+  },
+  "today_events_finalized": [
+    {
+      "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+      "actual_final_ts": "2026-09-04T11:05:34.766376Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:34.762483Z",
+      "research_eligible": false,
+      "incomplete_reasons": [
+        "PERSISTED_U_GAP"
+      ],
+      "open_tmp": 0
+    },
+    {
+      "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+      "actual_final_ts": "2026-09-04T11:05:51.866790Z",
+      "research_eligible": false,
+      "incomplete_reasons": [
+        "PERSISTED_U_GAP"
+      ],
+      "open_tmp": 0
+    }
+  ],
+  "queue_backlog": 0,
+  "queue_drops": 0,
+  "writer_errors": 0,
+  "open_tmp_bytes_health": 0,
+  "orphan_tmp_files_sep3_count": 6,
+  "orphan_tmp_note": "Sep 3 events still have .tmp siblings; not touched",
+  "restart_performed": false,
+  "ready_for_combined_restart_discussion": true,
+  "blocker_note": "Await explicit combined restart approval (resync+nested+isolation). Captures currently in COOLDOWN \u2014 lower live capture risk than during FIGHT_ACTIVE."
+}

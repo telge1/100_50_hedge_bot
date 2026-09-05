@@ -1,0 +1,22 @@
+{
+  "already_current_count": 0,
+  "coins": [
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ADAUSDT"
+    }
+  ],
+  "completed_symbols": 1,
+  "current_symbol": null,
+  "failed_count": 0,
+  "finished_at": "2026-08-20T12:25:43Z",
+  "job_id": "781d0095990a4fa2a678e59824ab30c4",
+  "message": "Aktualisierung abgeschlossen",
+  "pid": 1172325,
+  "return_code": 0,
+  "started_at": "2026-08-20T12:25:39Z",
+  "state": "COMPLETED",
+  "success_count": 1,
+  "total_symbols": 1
+}

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE
-from .profile_edge_state import price_to_tick
+from .profile_edge_state import get_active_symbol, price_to_tick
+from .instrument_contract import instrument_for
 from .profile_price_bin_contract import INTERVAL_SEMANTICS, build_profile_price_bin_contract
 
 FIRST_OUTSIDE_BIN_CONTRACT = "first_outside_bin_contract_v1"
@@ -23,7 +23,7 @@ def build_first_outside_bin_contract(
         "contract_version": FIRST_OUTSIDE_BIN_CONTRACT,
         "interval_semantics": INTERVAL_SEMANTICS,
         "price_step": step,
-        "orderbook_tick_size": BTCUSDT_TICK_SIZE,
+        "orderbook_tick_size": float(instrument_for(get_active_symbol()).tick_size),
         "edges": {},
     }
     if edges.get("profile_state") != "VALID" or not step:

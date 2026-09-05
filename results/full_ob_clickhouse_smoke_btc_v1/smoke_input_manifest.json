@@ -1,0 +1,40 @@
+{
+  "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+  "source_file": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst",
+  "snapshot_file": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/rest_full_snapshot.json.zst",
+  "segment_index": 0,
+  "smoke_seconds_target": 300,
+  "selection": {
+    "jsonl_lines_read": 1513,
+    "delta_rows": 1503,
+    "marker_rows": 10,
+    "other_skipped": 0,
+    "applied_deltas": 1501,
+    "ignored_stale_or_dup": 2,
+    "gap_detected_in_selection": 0,
+    "parse_errors": 0,
+    "invalid_price_qty": 0,
+    "first_applied_u": 4347547,
+    "last_applied_u": 4349047,
+    "first_ts": 1788508991873,
+    "last_ts": 1788509291873,
+    "cut_line": 1513
+  },
+  "snapshot_meta": {
+    "u": 4347546,
+    "seq": 805048007420,
+    "bid_levels": 39557,
+    "ask_levels": 24214
+  },
+  "packet_counts": {
+    "total_rows_including_snapshot": 1514,
+    "snapshot": 1,
+    "delta": 1503,
+    "marker": 10
+  },
+  "u_range_applied": [
+    4347547,
+    4349047
+  ],
+  "note": "Smoke window ends before first persisted u-gap in the parent event."
+}

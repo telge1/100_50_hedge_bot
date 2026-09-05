@@ -1,0 +1,100 @@
+{
+  "checked_at_utc": "2026-09-04T10:30:50.576801+00:00",
+  "collector_pid": 1565672,
+  "symbols": {
+    "BTCUSDT": {
+      "lifecycle": "FIGHT_ACTIVE",
+      "event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+      "trigger_ts_utc": "2026-09-04T08:05:34.762483Z",
+      "capture_duration_sec": 8715.814318,
+      "minimum_capture_end_ts": "2026-09-04T09:05:34.762483Z",
+      "normal_end_ts": "2026-09-04T10:35:34.762483Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:34.762483Z",
+      "now_utc": "2026-09-04T10:30:50.576801+00:00",
+      "seconds_until_hard_cap": 2084.185682,
+      "past_normal_end": false,
+      "past_minimum_end": true,
+      "extension_count": 3,
+      "extension_reason": "BREAKOUT_ACCEPTANCE_PENDING",
+      "retouch_count": 1,
+      "segment_count": 5,
+      "continuation_index": 4,
+      "open_tmp_files": [
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/cont_004/public_trades_raw.jsonl.zst.tmp",
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/cont_004/full_ob_raw_deltas.jsonl.zst.tmp"
+      ],
+      "queue_backlog": 0,
+      "queue_drops": 0,
+      "writer_error_count": 0,
+      "frozen_profile": {
+        "bracket_minutes": 30,
+        "causality": "trades_strictly_before_cutoff",
+        "completeness": "completed_window_only",
+        "cutoff": "2026-09-04T08:00:00+00:00",
+        "profile_id": "BTCUSDT_20260904T073000_080000",
+        "session_start": "2026-09-04T07:30:00+00:00",
+        "tpo_source": "volume_proxy_fallback",
+        "volume_poc": 80742.5,
+        "volume_vah": 80765.0,
+        "volume_val": 80635.0
+      },
+      "profile_contract_version": "BTCUSDT_20260904T073000_080000",
+      "data_quality": "INCOMPLETE",
+      "research_eligible": false,
+      "persisted_u_gap_count": 5,
+      "source_feed_u_gap_count": 0,
+      "incomplete_reasons": [
+        "PERSISTED_U_GAP"
+      ],
+      "outcome_status": null,
+      "actual_final_ts": null
+    },
+    "DOGEUSDT": {
+      "lifecycle": "FIGHT_ACTIVE",
+      "event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+      "trigger_ts_utc": "2026-09-04T08:05:51.864878Z",
+      "capture_duration_sec": 8698.711923,
+      "minimum_capture_end_ts": "2026-09-04T09:05:51.864878Z",
+      "normal_end_ts": "2026-09-04T10:35:51.864878Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:51.864878Z",
+      "now_utc": "2026-09-04T10:30:50.576801+00:00",
+      "seconds_until_hard_cap": 2101.288077,
+      "past_normal_end": false,
+      "past_minimum_end": true,
+      "extension_count": 3,
+      "extension_reason": "BREAKOUT_ACCEPTANCE_PENDING",
+      "retouch_count": 14,
+      "segment_count": 5,
+      "continuation_index": 4,
+      "open_tmp_files": [
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-04/DOGEUSDT_20260904T080551Z_2c38905508/cont_004/public_trades_raw.jsonl.zst.tmp",
+        "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-04/DOGEUSDT_20260904T080551Z_2c38905508/cont_004/full_ob_raw_deltas.jsonl.zst.tmp"
+      ],
+      "queue_backlog": 0,
+      "queue_drops": 0,
+      "writer_error_count": 0,
+      "frozen_profile": {
+        "bracket_minutes": 30,
+        "causality": "trades_strictly_before_cutoff",
+        "completeness": "completed_window_only",
+        "cutoff": "2026-09-04T08:00:00+00:00",
+        "profile_id": "DOGEUSDT_20260904T073000_080000",
+        "session_start": "2026-09-04T07:30:00+00:00",
+        "tpo_source": "volume_proxy_fallback",
+        "volume_poc": 0.0871525,
+        "volume_vah": 0.087315,
+        "volume_val": 0.08707
+      },
+      "profile_contract_version": "DOGEUSDT_20260904T073000_080000",
+      "data_quality": "INCOMPLETE",
+      "research_eligible": false,
+      "persisted_u_gap_count": 5,
+      "source_feed_u_gap_count": 0,
+      "incomplete_reasons": [
+        "PERSISTED_U_GAP"
+      ],
+      "outcome_status": null,
+      "actual_final_ts": null
+    }
+  }
+}

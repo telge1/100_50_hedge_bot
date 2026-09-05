@@ -1,0 +1,37 @@
+{
+  "audit_time_utc": "2026-09-04T11:25:28.309469Z",
+  "exactly_one_collector": true,
+  "collector_lines": [
+    "1565672 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "expected_pid": 1565672,
+  "pid_matches": true,
+  "symbols_active": [
+    "BTCUSDT",
+    "DOGEUSDT"
+  ],
+  "lifecycles": {
+    "BTCUSDT": "COOLDOWN",
+    "DOGEUSDT": "COOLDOWN"
+  },
+  "fight_event_ids": {
+    "BTCUSDT": null,
+    "DOGEUSDT": null
+  },
+  "not_fight_active": true,
+  "no_active_parent_capture": true,
+  "today_open_tmp_count": 0,
+  "sep3_tmp_count_untouched": 6,
+  "queue_backlog": 0,
+  "queue_drop_count": 0,
+  "writer_error_count": 0,
+  "oi_pid_147111_alive": true,
+  "events_finalized_today": true,
+  "WOULD_RESYNC_CHECKPOINT_BE_ACTIVE_AFTER_RESTART": true,
+  "WOULD_NESTED_SIGNALS_BE_ACTIVE_AFTER_RESTART": true,
+  "WOULD_SIGNAL_ISOLATION_BE_ACTIVE_AFTER_RESTART": true,
+  "code_compile_ok": true,
+  "retest_required": false,
+  "retest_note": "116 combined tests after isolation; no FR code changes since then (DB audit read-only)",
+  "ALL_GATES_PASS": true
+}

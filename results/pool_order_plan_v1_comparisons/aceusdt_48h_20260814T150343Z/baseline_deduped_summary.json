@@ -1,0 +1,32 @@
+{
+  "raw_aceusdt": 18,
+  "unique_entry_keys": 16,
+  "duplicates": 2,
+  "duplicate_signal_ids": [
+    "60f1ba2c-69db-5822-81c3-0391309b232b",
+    "a8aadfba-82bc-500c-87ba-0322be42375f"
+  ],
+  "dashboard_kpis_include_non_ace": true,
+  "before": {
+    "signals": 18,
+    "wins": 12,
+    "losses": 6,
+    "open": 0,
+    "win_rate_pct": 66.66666666666667,
+    "gross_profit_pct": 20.0,
+    "gross_loss_pct": -7.0,
+    "total_pnl_pct": 13.0,
+    "pnl_basis": "gross"
+  },
+  "after": {
+    "signals": 16,
+    "wins": 10,
+    "losses": 6,
+    "open": 0,
+    "win_rate_pct": 62.5,
+    "gross_profit_pct": 17.0,
+    "gross_loss_pct": -7.0,
+    "total_pnl_pct": 10.0,
+    "pnl_basis": "gross"
+  }
+}

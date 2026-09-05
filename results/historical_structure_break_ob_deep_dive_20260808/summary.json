@@ -1,0 +1,228 @@
+{
+  "primary_decision": "HISTORICAL_BREAK_OB_PATTERNS_VISIBLE",
+  "n_raw_events": 231,
+  "n_clustered_events": 67,
+  "n_selected": 15,
+  "type_counts": {
+    "PROTECTED_HIGH_BREAK": 30,
+    "PROTECTED_LOW_BREAK": 36,
+    "CHOCH": 1
+  },
+  "tf_counts_clustered": {
+    "1h": 16,
+    "5m": 46,
+    "4h": 5
+  },
+  "selected_tf_counts": {
+    "4h": 4,
+    "1h": 11
+  },
+  "selected_dir_counts": {
+    "bearish": 10,
+    "bullish": 5
+  },
+  "selected_sym_counts": {
+    "APTUSDT": 7,
+    "DOGEUSDT": 8
+  },
+  "classification_counts": {
+    "REFILL_THEN_RECLAIM": 3,
+    "BREAK_ACCEPTED_NO_QUICK_RECLAIM": 7,
+    "WALL_CONSUMED_OR_REMOVED_BREAK": 1,
+    "WALL_HELD_OR_RECLAIM": 1,
+    "WALL_PULLED_BEFORE_BREAK": 3
+  },
+  "quality_counts": {
+    "DATA_WARNING": 3,
+    "DATA_VALID": 12
+  },
+  "selected_events": [
+    {
+      "event_id": "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "4h",
+      "level": 1.0801,
+      "available_at": "2026-05-12T16:00:00.000Z",
+      "first_break_ts": "2026-05-12T12:32:15.000Z",
+      "ob_classification": "REFILL_THEN_RECLAIM"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260228_0p09133_4h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "4h",
+      "level": 0.09133,
+      "available_at": "2026-02-28T08:00:00.000Z",
+      "first_break_ts": "2026-02-28T06:18:05.000Z",
+      "ob_classification": "WALL_PULLED_BEFORE_BREAK"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260115_0p14187_4h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "4h",
+      "level": 0.14187,
+      "available_at": "2026-01-15T20:00:00.000Z",
+      "first_break_ts": "2026-01-15T15:45:00.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "4h",
+      "level": 1.589,
+      "available_at": "2025-12-29T20:00:00.000Z",
+      "first_break_ts": "2025-12-29T20:00:00.000Z",
+      "ob_classification": "REFILL_THEN_RECLAIM"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h",
+      "symbol": "APTUSDT",
+      "direction": "bullish",
+      "structure_type": "PROTECTED_HIGH_BREAK",
+      "timeframe": "1h",
+      "level": 0.9572,
+      "available_at": "2026-05-23T19:00:00.000Z",
+      "first_break_ts": "2026-05-23T18:13:00.000Z",
+      "ob_classification": "REFILL_THEN_RECLAIM"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_HIGH_BREAK_bullish_20260228_0p09259_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bullish",
+      "structure_type": "PROTECTED_HIGH_BREAK",
+      "timeframe": "1h",
+      "level": 0.09259,
+      "available_at": "2026-02-28T20:00:00.000Z",
+      "first_break_ts": "2026-02-28T18:55:15.000Z",
+      "ob_classification": "WALL_PULLED_BEFORE_BREAK"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260228_0p09106_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 0.09106,
+      "available_at": "2026-02-28T07:00:00.000Z",
+      "first_break_ts": "2026-02-28T06:18:20.000Z",
+      "ob_classification": "WALL_PULLED_BEFORE_BREAK"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260220_0p09777_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 0.09777,
+      "available_at": "2026-02-20T14:00:00.000Z",
+      "first_break_ts": "2026-02-20T13:02:45.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_HIGH_BREAK_bullish_20260220_0p09882_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bullish",
+      "structure_type": "PROTECTED_HIGH_BREAK",
+      "timeframe": "1h",
+      "level": 0.09882,
+      "available_at": "2026-02-20T03:00:00.000Z",
+      "first_break_ts": "2026-02-20T01:45:00.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260118_1p8316_1h",
+      "symbol": "APTUSDT",
+      "direction": "bullish",
+      "structure_type": "PROTECTED_HIGH_BREAK",
+      "timeframe": "1h",
+      "level": 1.8316,
+      "available_at": "2026-01-18T19:00:00.000Z",
+      "first_break_ts": "2026-01-18T18:15:05.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260118_1p8352_1h",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 1.8352,
+      "available_at": "2026-01-18T04:00:00.000Z",
+      "first_break_ts": "2026-01-18T02:45:00.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260115_0p14449_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 0.14449,
+      "available_at": "2026-01-15T03:00:00.000Z",
+      "first_break_ts": "2026-01-15T01:50:25.000Z",
+      "ob_classification": "WALL_HELD_OR_RECLAIM"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260106_1p896_1h",
+      "symbol": "APTUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 1.896,
+      "available_at": "2026-01-06T18:00:00.000Z",
+      "first_break_ts": "2026-01-06T16:45:00.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    },
+    {
+      "event_id": "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h",
+      "symbol": "DOGEUSDT",
+      "direction": "bearish",
+      "structure_type": "PROTECTED_LOW_BREAK",
+      "timeframe": "1h",
+      "level": 0.14909,
+      "available_at": "2026-01-06T17:00:00.000Z",
+      "first_break_ts": "2026-01-06T16:07:50.000Z",
+      "ob_classification": "WALL_CONSUMED_OR_REMOVED_BREAK"
+    },
+    {
+      "event_id": "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20251230_1p72_1h",
+      "symbol": "APTUSDT",
+      "direction": "bullish",
+      "structure_type": "PROTECTED_HIGH_BREAK",
+      "timeframe": "1h",
+      "level": 1.72,
+      "available_at": "2025-12-30T10:00:00.000Z",
+      "first_break_ts": "2025-12-30T09:28:10.000Z",
+      "ob_classification": "BREAK_ACCEPTED_NO_QUICK_RECLAIM"
+    }
+  ],
+  "behavior_narrative": "Across 15 deep-dive events (ORDERBOOK_ONLY): pulled-before-break=3, removed-at-break=1, reclaim/hold=4, accepted-no-quick-reclaim=7, mixed/unclear=0. Without trades, pull vs consumption cannot be separated \u2014 size drops are pull/consume proxies.",
+  "at_break_narrative": "At break (examples):\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h: at break mid=1.6825 beyond=0 support_wall=6466.8164400000005\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20251230_1p72_1h: at break mid=1.7215 beyond=1 support_wall=54336.41312\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260118_1p8316_1h: at break mid=1.8322500000000002 beyond=1 support_wall=23074.82703\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h: at break mid=1.0778500000000002 beyond=1 support_wall=7874.982467\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h: at break mid=0.95795 beyond=1 support_wall=8730.351643\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h: at break mid=0.14715499999999998 beyond=1 support_wall=0.0\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260115_0p14449_1h: at break mid=0.144475 beyond=1 support_wall=559864.0703\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260220_0p09777_1h: at break mid=0.097605 beyond=1 support_wall=74255.32773",
+  "pre_break_narrative": "Before break (examples):\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h: support_wall \u0394(\u221210s\u2192break)=0 notional; dist_pre10=588.4203901825056\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20251230_1p72_1h: support_wall \u0394(\u221210s\u2192break)=11183 notional; dist_pre10=-8.720930232557178\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260118_1p8316_1h: support_wall \u0394(\u221210s\u2192break)=7475 notional; dist_pre10=-4.640751255731575\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h: support_wall \u0394(\u221210s\u2192break)=-50883 notional; dist_pre10=11.573002499768291\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h: support_wall \u0394(\u221210s\u2192break)=-30243 notional; dist_pre10=-29.774341830338685\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h: support_wall \u0394(\u221210s\u2192break)=-604906 notional; dist_pre10=19.115970219331107\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260115_0p14449_1h: support_wall \u0394(\u221210s\u2192break)=9081 notional; dist_pre10=2.4223129628352997\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260220_0p09777_1h: support_wall \u0394(\u221210s\u2192break)=-554879 notional; dist_pre10=3.5798302137677456",
+  "post_break_narrative": "After break (examples):\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h: +60s beyond=0 support_wall=14809.5234 class=REFILL_THEN_RECLAIM\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20251230_1p72_1h: +60s beyond=1 support_wall=46705.4874 class=BREAK_ACCEPTED_NO_QUICK_RECLAIM\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20260106_1p896_1h: +60s beyond=1 support_wall=12668.54433 class=BREAK_ACCEPTED_NO_QUICK_RECLAIM\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260118_1p8316_1h: +60s beyond=1 support_wall=14395.61799 class=BREAK_ACCEPTED_NO_QUICK_RECLAIM\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20260118_1p8352_1h: +60s beyond=1 support_wall=15553.185267 class=BREAK_ACCEPTED_NO_QUICK_RECLAIM\n- APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h: +60s beyond=1 support_wall=10007.839395 class=REFILL_THEN_RECLAIM\n- APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h: +60s beyond=1 support_wall=8455.636885000002 class=REFILL_THEN_RECLAIM\n- DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h: +60s beyond=1 support_wall=0.0 class=WALL_CONSUMED_OR_REMOVED_BREAK",
+  "highlight_events": [
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20251229_1p589_4h \u2192 REFILL_THEN_RECLAIM",
+    "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20251230_1p72_1h \u2192 BREAK_ACCEPTED_NO_QUICK_RECLAIM",
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260106_1p896_1h \u2192 BREAK_ACCEPTED_NO_QUICK_RECLAIM",
+    "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260118_1p8316_1h \u2192 BREAK_ACCEPTED_NO_QUICK_RECLAIM",
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260118_1p8352_1h \u2192 BREAK_ACCEPTED_NO_QUICK_RECLAIM",
+    "APTUSDT_PROTECTED_LOW_BREAK_bearish_20260512_1p0801_4h \u2192 REFILL_THEN_RECLAIM",
+    "APTUSDT_PROTECTED_HIGH_BREAK_bullish_20260523_0p9572_1h \u2192 REFILL_THEN_RECLAIM",
+    "DOGEUSDT_PROTECTED_LOW_BREAK_bearish_20260106_0p14909_1h \u2192 WALL_CONSUMED_OR_REMOVED_BREAK"
+  ],
+  "next_test": "Next (not run): attach historical trades for the same 10 days to separate pull vs consumption; then compare WALL_PULLED_BEFORE_BREAK vs BREAK_ACCEPTED_NO_QUICK_RECLAIM with distance-conditioned residuals \u2014 still no live gate.",
+  "mode": "ORDERBOOK_ONLY",
+  "artifact_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/historical_structure_break_ob_deep_dive_20260808",
+  "pulled_before_break_n": 3,
+  "consumed_or_removed_n": 1,
+  "reclaim_hold_n": 4,
+  "accepted_n": 7,
+  "data_notes": "ORDERBOOK_ONLY (no historical trades). DOGE 2026-01-15 sequence RESET_SEEN \u2192 DATA_WARNING. Some scanner close-breaks lack contemporaneous BBO cross in the OB window (marked no_bbo_break_at_marked_break). Pull vs consumption cannot be separated without trades."
+}

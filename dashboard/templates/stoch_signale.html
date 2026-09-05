@@ -153,6 +153,53 @@
                 </div>
             </details>
 
+            <details class="stoch-card" id="dataCollectorHealthCard" open>
+                <summary class="stoch-card-summary">Daten-Collector Status</summary>
+                <div class="stoch-card-body">
+                    <p class="stoch-universe51-note">
+                        Evidenzbasiert (Prozess + Quelle/Heartbeat + Writer + DB-Freshness).
+                        Grüner Status nie nur aus PID. Full-OB bleibt STOPPED (kein Restart hier).
+                        OI-SoT: ClickHouse <code>open_interest_5m_history</code> (REST 5m) —
+                        nicht MySQL <code>research_open_interest_5m</code>; 5s wird nicht aus 5m vorgetäuscht.
+                        Public Trades: <strong>DEGRADED — LIVE CURRENT BUT DATA LOSS POSSIBLE</strong>
+                        (Backfill-Button deaktiviert bis Re-Audit).
+                    </p>
+                    <div class="stoch-collector-error" id="dataCollectorHealthError" style="display:none;"></div>
+                    <div class="stoch-collector-meta" id="dataCollectorHealthMeta">Prüfung: –</div>
+                    <div class="stoch-table-wrap">
+                        <table class="stoch-table" id="dataCollectorHealthTable">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Collector</th>
+                                    <th>Datenart</th>
+                                    <th>Prozess</th>
+                                    <th>DB-Alter</th>
+                                    <th>Letzter Write</th>
+                                    <th>Coverage</th>
+                                    <th>Lag</th>
+                                    <th>Drops/Queue</th>
+                                    <th>Backfill</th>
+                                    <th>Hinweis</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataCollectorHealthBody">
+                                <tr><td colspan="11" class="stoch-empty">Lade Evidenz…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="stoch-universe51-actions" style="margin-top:12px; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="stoch-btn" id="oiGapDetectBtn">OI 5m: Lücken prüfen</button>
+                        <button type="button" class="stoch-btn" id="oiBackfillDryRunBtn">OI 5m: Fehlende (Dry-Run)</button>
+                        <button type="button" class="stoch-btn" id="ptBackfillBtn" disabled title="Gate: PUBLIC_TRADES_BACKFILL_PARTIALLY_READY">
+                            Public Trades Backfill (deaktiviert)
+                        </button>
+                    </div>
+                    <div class="stoch-collector-meta" id="oiBackfillJobMeta"></div>
+                    <pre class="stoch-universe51-note" id="oiBackfillJobLog" style="max-height:180px; overflow:auto; white-space:pre-wrap;"></pre>
+                </div>
+            </details>
+
             <details class="stoch-card" id="universe51CoverageCard" open>
                 <summary class="stoch-card-summary">Historisches 51-Coin-Universe (read-only)</summary>
                 <div class="stoch-card-body">
@@ -468,7 +515,7 @@
 
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
     <script src="/static/js/stoch_chart_modal.js?v=7"></script>
-    <script src="/static/js/stoch_signale.js?v=21"></script>
+    <script src="/static/js/stoch_signale.js?v=22"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

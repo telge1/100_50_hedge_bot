@@ -1,0 +1,8 @@
+{
+  "simulated_status_before": "IMPORTING",
+  "status_after": "VERIFIED",
+  "logical_stable": true,
+  "physical_after": 48797,
+  "parity_ok": true,
+  "seconds": 19.74957823753357
+}

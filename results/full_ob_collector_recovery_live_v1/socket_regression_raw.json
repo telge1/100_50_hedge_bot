@@ -1,0 +1,103 @@
+{
+  "samples": [
+    {
+      "i": 1,
+      "btc_levels": 65485,
+      "doge_levels": 19258,
+      "btc_crossed": false,
+      "snap_btc_ok": true,
+      "snap_doge_ok": true,
+      "timeout": false
+    },
+    {
+      "i": 5,
+      "btc_levels": 65477,
+      "doge_levels": 19258,
+      "btc_crossed": false,
+      "snap_btc_ok": true,
+      "snap_doge_ok": true,
+      "timeout": false
+    },
+    {
+      "i": 10,
+      "btc_levels": 65485,
+      "doge_levels": 19257,
+      "btc_crossed": false,
+      "snap_btc_ok": true,
+      "snap_doge_ok": true,
+      "timeout": false
+    },
+    {
+      "i": 15,
+      "btc_levels": 65436,
+      "doge_levels": 19257,
+      "btc_crossed": false,
+      "snap_btc_ok": true,
+      "snap_doge_ok": true,
+      "timeout": false
+    },
+    {
+      "i": 20,
+      "btc_levels": 65314,
+      "doge_levels": 19257,
+      "btc_crossed": false,
+      "snap_btc_ok": true,
+      "snap_doge_ok": true,
+      "timeout": false
+    }
+  ],
+  "ob1000": [
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    },
+    {
+      "ok": true,
+      "state": "starting",
+      "hb": true
+    }
+  ],
+  "ob200": [
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    },
+    {
+      "ok": false,
+      "state": "error",
+      "hb": false
+    }
+  ]
+}

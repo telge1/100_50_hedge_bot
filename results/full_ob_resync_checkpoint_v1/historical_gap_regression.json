@@ -1,0 +1,75 @@
+{
+  "case": "u_4350204_to_4350353_stale_market_data",
+  "missing_u_count": 148,
+  "unobserved_seconds_approx": 29.8,
+  "replay": {
+    "ok": true,
+    "status": "COMPLETE_REPLAYABLE_BY_EPOCHS",
+    "applied_deltas": 0,
+    "final_u": 4350353,
+    "final_seq": 805051320556,
+    "best_bid": 100.0,
+    "best_ask": 100.1,
+    "crossed": false,
+    "bid_levels": 25,
+    "ask_levels": 22,
+    "delta_files": [
+      "/tmp/tmpky9f35u0/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst"
+    ],
+    "epochs": [
+      {
+        "continuity_epoch_id": 0,
+        "start_u": 4350204,
+        "end_u": 4350204,
+        "start_seq": 805051079937,
+        "end_seq": 805051079937,
+        "applied_deltas": 0,
+        "apply_epoch_u_gap_count": 0,
+        "bid_levels": 20,
+        "ask_levels": 20,
+        "best_bid": 100.0,
+        "best_ask": 100.1,
+        "crossed": false,
+        "seed_book_hash": "cbb3c23563eb9584697eaa6271304668b71a88717e13616557df1ad4ae4e153b",
+        "final_book_hash": "844fe542d8fc78b8163ccdf5121100489e8c8fcb2daf6e1cb6eb68aeeee7ea60",
+        "ok": true
+      },
+      {
+        "continuity_epoch_id": 1,
+        "start_u": 4350353,
+        "end_u": 4350353,
+        "start_seq": 805051320556,
+        "end_seq": 805051320556,
+        "applied_deltas": 0,
+        "apply_epoch_u_gap_count": 0,
+        "bid_levels": 25,
+        "ask_levels": 22,
+        "best_bid": 100.0,
+        "best_ask": 100.1,
+        "crossed": false,
+        "seed_book_hash": "ce403c2277b852610ee60285ef222921e32e55d17cb6a92483736b770aea163c",
+        "final_book_hash": "39f302d6a09c81add1e07ec8bfee53f860f4ace9949efaf2aa616a23d8233e0c",
+        "ok": true
+      }
+    ],
+    "continuous_capture": false,
+    "replayable_by_epochs": true,
+    "continuity_epoch_count": 2,
+    "unobserved_intervals": [
+      {
+        "prev_u": 4350204,
+        "reason": "stale_market_data",
+        "disconnect_ts": "2026-09-04T08:12:03Z",
+        "reconnect_ts": "2026-09-04T08:12:17Z"
+      }
+    ],
+    "research_eligible": false
+  },
+  "gates": {
+    "continuous_capture": true,
+    "replayable_by_epochs": true,
+    "research_eligible": true,
+    "two_epochs": true,
+    "no_invented_u_plus_1": true
+  }
+}

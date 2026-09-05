@@ -1,0 +1,15 @@
+=== PID CHECK 2026-09-04T17:47:32Z ===
+    PID                  STARTED     ELAPSED CMD
+ 147111 Tue Aug 18 18:02:02 2026 17-01:45:29 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+1661773 Fri Aug 21 10:27:35 2026 14-09:19:57 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades
+1780509 Fri Sep  4 19:38:38 2026       08:53 /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py
+--- dashboard MainPID ---
+1780509
+--- full ob ---
+ABSENT
+--- disk ---
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       916G  518G  352G  60% /
+/dev/sda2       916G  518G  352G  60% /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       916G  518G  352G  60% /

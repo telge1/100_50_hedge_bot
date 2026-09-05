@@ -1,0 +1,240 @@
+{
+  "BTCUSDT": {
+    "symbol": "BTCUSDT",
+    "min_ts": "2026-07-19 00:00:00.210000",
+    "max_ts": "2026-09-04 14:08:00.645000",
+    "physical_rows": 76990249,
+    "uniq_trade_ids": 76990249,
+    "distinct_days": 48,
+    "final_rows": 76990659,
+    "physical_minus_final": -410,
+    "missing_days_last_365_count": 318,
+    "missing_days_last_365_sample": [
+      "2025-09-04",
+      "2025-09-05",
+      "2025-09-06",
+      "2025-09-07",
+      "2025-09-08",
+      "2025-09-09",
+      "2025-09-10",
+      "2025-09-11",
+      "2025-09-12",
+      "2025-09-13",
+      "2025-09-14",
+      "2025-09-15",
+      "2025-09-16",
+      "2025-09-17",
+      "2025-09-18",
+      "2025-09-19",
+      "2025-09-20",
+      "2025-09-21",
+      "2025-09-22",
+      "2025-09-23",
+      "2025-09-24",
+      "2025-09-25",
+      "2025-09-26",
+      "2025-09-27",
+      "2025-09-28",
+      "2025-09-29",
+      "2025-09-30",
+      "2025-10-01",
+      "2025-10-02",
+      "2025-10-03",
+      "2025-10-04",
+      "2025-10-05",
+      "2025-10-06",
+      "2025-10-07",
+      "2025-10-08",
+      "2025-10-09",
+      "2025-10-10",
+      "2025-10-11",
+      "2025-10-12",
+      "2025-10-13"
+    ],
+    "max_consecutive_missing_days_between_present": 0,
+    "intraday_max_gap_last_present_day": {
+      "day": "2026-09-04",
+      "max_gap_seconds": 1788480000,
+      "note": "empty seconds are normal; large gaps may indicate collector hole"
+    },
+    "windows": {
+      "7d": {
+        "physical": 13694030,
+        "uniq_trade_id": 13694030,
+        "days_with_data": 8,
+        "expected_calendar_days": 8,
+        "missing_calendar_days_approx": 0,
+        "min_ts": "2026-08-28 14:08:01.405000",
+        "max_ts": "2026-09-04 14:08:10.499000"
+      },
+      "30d": {
+        "physical": 51620922,
+        "uniq_trade_id": 51620922,
+        "days_with_data": 31,
+        "expected_calendar_days": 31,
+        "missing_calendar_days_approx": 0,
+        "min_ts": "2026-08-05 14:08:01.026000",
+        "max_ts": "2026-09-04 14:08:11.170000"
+      },
+      "90d": {
+        "physical": 76991836,
+        "uniq_trade_id": 76991836,
+        "days_with_data": 48,
+        "expected_calendar_days": 91,
+        "missing_calendar_days_approx": 43,
+        "min_ts": "2026-07-19 00:00:00.210000",
+        "max_ts": "2026-09-04 14:08:14.250000"
+      },
+      "180d": {
+        "physical": 76992494,
+        "uniq_trade_id": 76992494,
+        "days_with_data": 48,
+        "expected_calendar_days": 181,
+        "missing_calendar_days_approx": 133,
+        "min_ts": "2026-07-19 00:00:00.210000",
+        "max_ts": "2026-09-04 14:08:18.448000"
+      },
+      "365d": {
+        "physical": 76992732,
+        "uniq_trade_id": 76992732,
+        "days_with_data": 48,
+        "expected_calendar_days": 366,
+        "missing_calendar_days_approx": 318,
+        "min_ts": "2026-07-19 00:00:00.210000",
+        "max_ts": "2026-09-04 14:08:21.288000"
+      }
+    },
+    "sources": [
+      {
+        "source": "archive",
+        "n": 42664080
+      },
+      {
+        "source": "live",
+        "n": 34328938
+      }
+    ]
+  },
+  "DOGEUSDT": {
+    "symbol": "DOGEUSDT",
+    "min_ts": "2026-07-19 00:00:00.482000",
+    "max_ts": "2026-09-04 14:08:24.554000",
+    "physical_rows": 14222781,
+    "uniq_trade_ids": 14222781,
+    "distinct_days": 48,
+    "final_rows": 14222788,
+    "physical_minus_final": -7,
+    "missing_days_last_365_count": 318,
+    "missing_days_last_365_sample": [
+      "2025-09-04",
+      "2025-09-05",
+      "2025-09-06",
+      "2025-09-07",
+      "2025-09-08",
+      "2025-09-09",
+      "2025-09-10",
+      "2025-09-11",
+      "2025-09-12",
+      "2025-09-13",
+      "2025-09-14",
+      "2025-09-15",
+      "2025-09-16",
+      "2025-09-17",
+      "2025-09-18",
+      "2025-09-19",
+      "2025-09-20",
+      "2025-09-21",
+      "2025-09-22",
+      "2025-09-23",
+      "2025-09-24",
+      "2025-09-25",
+      "2025-09-26",
+      "2025-09-27",
+      "2025-09-28",
+      "2025-09-29",
+      "2025-09-30",
+      "2025-10-01",
+      "2025-10-02",
+      "2025-10-03",
+      "2025-10-04",
+      "2025-10-05",
+      "2025-10-06",
+      "2025-10-07",
+      "2025-10-08",
+      "2025-10-09",
+      "2025-10-10",
+      "2025-10-11",
+      "2025-10-12",
+      "2025-10-13"
+    ],
+    "max_consecutive_missing_days_between_present": 0,
+    "intraday_max_gap_last_present_day": {
+      "day": "2026-09-04",
+      "max_gap_seconds": 1788480000,
+      "note": "empty seconds are normal; large gaps may indicate collector hole"
+    },
+    "windows": {
+      "7d": {
+        "physical": 2038029,
+        "uniq_trade_id": 2038029,
+        "days_with_data": 8,
+        "expected_calendar_days": 8,
+        "missing_calendar_days_approx": 0,
+        "min_ts": "2026-08-28 14:08:01.782000",
+        "max_ts": "2026-09-04 14:08:25.954000"
+      },
+      "30d": {
+        "physical": 10912133,
+        "uniq_trade_id": 10912133,
+        "days_with_data": 31,
+        "expected_calendar_days": 31,
+        "missing_calendar_days_approx": 0,
+        "min_ts": "2026-08-05 14:08:04.608000",
+        "max_ts": "2026-09-04 14:08:26.437000"
+      },
+      "90d": {
+        "physical": 14222793,
+        "uniq_trade_id": 14222793,
+        "days_with_data": 48,
+        "expected_calendar_days": 91,
+        "missing_calendar_days_approx": 43,
+        "min_ts": "2026-07-19 00:00:00.482000",
+        "max_ts": "2026-09-04 14:08:26.437000"
+      },
+      "180d": {
+        "physical": 14222793,
+        "uniq_trade_id": 14222793,
+        "days_with_data": 48,
+        "expected_calendar_days": 181,
+        "missing_calendar_days_approx": 133,
+        "min_ts": "2026-07-19 00:00:00.482000",
+        "max_ts": "2026-09-04 14:08:26.437000"
+      },
+      "365d": {
+        "physical": 14222793,
+        "uniq_trade_id": 14222793,
+        "days_with_data": 48,
+        "expected_calendar_days": 366,
+        "missing_calendar_days_approx": 318,
+        "min_ts": "2026-07-19 00:00:00.482000",
+        "max_ts": "2026-09-04 14:08:26.437000"
+      }
+    },
+    "sources": [
+      {
+        "source": "live",
+        "n": 8216155
+      },
+      {
+        "source": "archive",
+        "n": 6006642
+      }
+    ]
+  },
+  "sep4_window": {
+    "physical": 389723,
+    "uniq": 389723,
+    "min": "2026-09-04 11:17:00.051000",
+    "max": "2026-09-04 12:56:59.847000"
+  }
+}

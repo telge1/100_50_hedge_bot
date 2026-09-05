@@ -1,0 +1,10 @@
+{
+  "physical_after_2_imports": 10,
+  "logical_unique": 5,
+  "expected_unique": 5,
+  "epochs": 2,
+  "book_delta_bid_arrayjoin_rows": 2,
+  "checkpoint_arrayjoin_possible_but_filterable": 4,
+  "analysis_rule": "always filter record_kind=BOOK_DELTA and continuity_epoch_id=N",
+  "parity_ok": true
+}

@@ -1,0 +1,9 @@
+# DRAFT ONLY — do not install without explicit activation approval
+# [Unit]
+# Description=Full-OB finalized segment importer (once)
+# [Timer]
+# OnBootSec=5min
+# OnUnitActiveSec=5min
+# Persistent=true
+# [Install]
+# WantedBy=timers.target

@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-08-08T08:42:07.927854+00:00",
+  "historical_ob_days": {
+    "APTUSDT": [
+      "2025-12-29",
+      "2025-12-30",
+      "2026-01-06",
+      "2026-01-18",
+      "2026-05-12",
+      "2026-05-23"
+    ],
+    "DOGEUSDT": [
+      "2026-01-06",
+      "2026-01-15",
+      "2026-02-20",
+      "2026-02-28"
+    ]
+  },
+  "clickhouse_ob": {
+    "APTUSDT": {
+      "min": "2026-07-26T08:45:57.016000+00:00",
+      "max": "2026-08-07T07:42:23.516000+00:00",
+      "n": 13903759,
+      "trade_min": "2026-07-26T08:46:00.752000+00:00",
+      "trade_max": "2026-08-07T07:42:20.356000+00:00",
+      "trade_n": 470859
+    },
+    "DOGEUSDT": {
+      "min": "2026-07-26T22:11:53.680000+00:00",
+      "max": "2026-08-08T08:42:07.480000+00:00",
+      "n": 53155965,
+      "trade_min": "2026-07-26T22:11:55.065000+00:00",
+      "trade_max": "2026-08-08T08:42:06.683000+00:00",
+      "trade_n": 1462709
+    }
+  },
+  "counts": {
+    "NO_OB_COVERAGE": 3,
+    "CLICKHOUSE_OB_FULL": 54
+  },
+  "n_events": 57,
+  "n_hist_ob_full": 0,
+  "n_ch_ob_full": 54,
+  "blocker": "Known break/reclaim events (Jul/Aug 2026) do not overlap downloaded historical Bybit OB days (Dec2025\u2013May2026). July events have ClickHouse OB \u00b15m coverage for most post-start events."
+}

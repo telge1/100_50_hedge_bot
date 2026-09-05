@@ -1,0 +1,56 @@
+{
+  "EVENT": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+  "probes": [
+    {
+      "db": "btc_doge_research",
+      "table": "research_source_files",
+      "hits": [],
+      "found": 0
+    },
+    {
+      "db": "btc_doge_research",
+      "table": "research_batch_runs",
+      "hits": [],
+      "found": 0
+    },
+    {
+      "db": "btc_doge_research",
+      "table": "research_schema_versions",
+      "hits": [],
+      "found": 0
+    },
+    {
+      "db": "btc_doge_research",
+      "table": "research_producer_lineage",
+      "hits": [],
+      "found": 0
+    },
+    {
+      "db": "btc_doge_research",
+      "table": "research_pipeline_state",
+      "hits": [],
+      "found": 0
+    },
+    {
+      "db": "signal_generator",
+      "table": "candles_1m",
+      "hits": []
+    },
+    {
+      "db": "signal_generator",
+      "table": "signal_outcomes",
+      "hits": []
+    },
+    {
+      "db": "signal_generator",
+      "table": "signal_processing_state",
+      "hits": []
+    },
+    {
+      "db": "signal_generator",
+      "table": "signals",
+      "hits": []
+    }
+  ],
+  "PRODUCTION_FULL_OB_TEST_CONTAMINATION": false
+}

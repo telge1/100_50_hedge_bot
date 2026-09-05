@@ -1,0 +1,80 @@
+{
+  "table": "research_full_ob_smoke.full_ob_gap_audit_packets_v1",
+  "rows_inserted": 203,
+  "logical_rows": 203,
+  "source_forward_gaps_in_window": [
+    {
+      "kind": "forward_gap",
+      "line": 3774,
+      "prev_line": 3772,
+      "prev_u": 4350204,
+      "expected_u": 4350205,
+      "actual_u": 4350353,
+      "missing_u_count": 148,
+      "prev_seq": 805051079937,
+      "actual_seq": 805051320556,
+      "prev_ts": 1788509523272,
+      "actual_ts": 1788509553073,
+      "prev_cts": 1788509523268,
+      "actual_cts": 1788509553068,
+      "prev_recv_ns": 1788509523362596236,
+      "actual_recv_ns": 1788509553264168646,
+      "prev_type": "delta",
+      "actual_type": "delta",
+      "prev_apply": "applied",
+      "actual_apply": "accepted",
+      "dt_exchange_ms": 29801,
+      "dt_recv_ms": 29901.57241
+    },
+    {
+      "kind": "forward_gap",
+      "line": 3777,
+      "prev_line": 3774,
+      "prev_u": 4350353,
+      "expected_u": 4350354,
+      "actual_u": 4350507,
+      "missing_u_count": 153,
+      "prev_seq": 805051320556,
+      "actual_seq": 805051398884,
+      "prev_ts": 1788509553073,
+      "actual_ts": 1788509583873,
+      "prev_cts": 1788509553068,
+      "actual_cts": 1788509583872,
+      "prev_recv_ns": 1788509553264168646,
+      "actual_recv_ns": 1788509584021181274,
+      "prev_type": "delta",
+      "actual_type": "delta",
+      "prev_apply": "accepted",
+      "actual_apply": "accepted",
+      "dt_exchange_ms": 30800,
+      "dt_recv_ms": 30757.012628
+    }
+  ],
+  "clickhouse_forward_gaps_in_window": [
+    {
+      "prev_u": 4350204,
+      "actual_u": 4350353,
+      "missing": 148,
+      "prev_line": 3772,
+      "line": 3774,
+      "prev_seq": 805051079937,
+      "seq": 805051320556,
+      "prev_ts": 1788509523272,
+      "exchange_ts_ms": 1788509553073
+    },
+    {
+      "prev_u": 4350353,
+      "actual_u": 4350507,
+      "missing": 153,
+      "prev_line": 3774,
+      "line": 3777,
+      "prev_seq": 805051320556,
+      "seq": 805051398884,
+      "prev_ts": 1788509553073,
+      "exchange_ts_ms": 1788509583873
+    }
+  ],
+  "gaps_match": true,
+  "clickhouse_hides_gap": false,
+  "note": "CH reproduces the same forward u discontinuities; markers excluded via message_type filter"
+}

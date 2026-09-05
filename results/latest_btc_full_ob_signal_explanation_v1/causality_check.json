@@ -1,0 +1,23 @@
+{
+  "PROFILE_CAUSALITY_PASS": true,
+  "GENUINE_CROSS_PROVEN": true,
+  "evidence": {
+    "profile_completed_before_signal": true,
+    "profile_end_cutoff": "2026-09-04T11:00:00+00:00",
+    "signal_ts": "2026-09-04T11:27:35.764963Z",
+    "signal_after_cutoff": true,
+    "profile_uses_trades_strictly_before_cutoff": true,
+    "no_future_candles_in_signal": true,
+    "not_retroactive": true,
+    "not_synthetic_test": true,
+    "bootstrap_was_observation_only": true,
+    "bootstrap_did_not_open_capture": true,
+    "prior_zone_APPROACH_then_IN": true,
+    "trigger_source_CROSS_IN": true,
+    "trigger_quality_REAL_CROSS_IN": true,
+    "nearest_edge_was_VAH_not_VAL": true,
+    "at_cross_d_vah_bps": 19.405,
+    "at_cross_d_val_bps": 40.317,
+    "arm_50_entry_20_rearm_75_confirmed": true
+  }
+}

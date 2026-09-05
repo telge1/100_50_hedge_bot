@@ -1,0 +1,74 @@
+{
+  "audit_time_utc": "2026-09-04T11:13:31.399553Z",
+  "destructive_actions_executed": false,
+  "targets": [
+    {
+      "id": "smoke_dedupdemo",
+      "database": "research_full_ob_smoke",
+      "table": "full_ob_gap_audit_packets_v1_dedupdemo",
+      "event_ids": [],
+      "physical_rows": 203,
+      "logical_rows": 203,
+      "storage_bytes": 205536,
+      "reason": "Idempotency demo only; duplicate of gap_audit content purpose",
+      "source_reproducible": true,
+      "backup_export_recommended": false,
+      "proposed_action": "DROP TABLE IF needed later",
+      "risk": "LOW",
+      "rollback": "Re-run gap-audit dedup demo importer from artifacts"
+    },
+    {
+      "id": "smoke_db_optional_full",
+      "database": "research_full_ob_smoke",
+      "table": "* (all 5 tables + 1 view)",
+      "event_ids": [
+        "BTCUSDT_20260904T080534Z_1fd9a66d36"
+      ],
+      "physical_rows": "378481 packets+levels+gap+multi (~approx sum)",
+      "logical_rows": "similar",
+      "storage_bytes": 10254070,
+      "reason": "Entire isolated smoke DB disposable if disk needed; keep for regression preferred",
+      "source_reproducible": true,
+      "backup_export_recommended": true,
+      "proposed_action": "KEEP_FOR_REGRESSION now; DROP DATABASE only after explicit approval + optional export",
+      "risk": "LOW to research; NONE to production",
+      "rollback": "Re-import from JSONL.zst via run_smoke.py / gap / multi-epoch scripts"
+    },
+    {
+      "id": "sep3_orphan_tmp_files",
+      "database": "filesystem",
+      "table": "N/A",
+      "paths": [
+        "BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/*.tmp",
+        "DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/*.tmp"
+      ],
+      "physical_rows": 6,
+      "storage_bytes": 24851307,
+      "reason": "Orphan open .tmp from Sep 3 aborted/incomplete events; NOT today active capture",
+      "source_reproducible": false,
+      "backup_export_recommended": true,
+      "proposed_action": "DO NOT TOUCH without separate approval; user forbade .tmp mutation in this audit",
+      "risk": "MEDIUM if deleted blindly (may contain unrecovered data)",
+      "rollback": "None if deleted"
+    },
+    {
+      "id": "jsonl_source_keep",
+      "database": "filesystem",
+      "paths": [
+        ".../BTCUSDT/2026-09-04/BTCUSDT_20260904T080534Z_1fd9a66d36/full_ob_raw_deltas.jsonl.zst",
+        "rest_full_snapshot.json.zst",
+        "cont_* segments",
+        "event_manifest.json"
+      ],
+      "proposed_action": "MUST_KEEP \u2014 source of truth",
+      "risk": "CRITICAL if deleted",
+      "backup_export_recommended": "already on disk; optional offsite copy"
+    },
+    {
+      "id": "production_tables",
+      "database": "orderbook_analysis / btc_doge_research / signal_generator",
+      "proposed_action": "NO Full-OB smoke cleanup needed (no contamination found)",
+      "risk": "N/A"
+    }
+  ]
+}

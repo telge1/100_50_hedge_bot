@@ -1,0 +1,12 @@
+{
+  "clickhouse_timezone": "UTC",
+  "server_now_utc": "2026-09-04 13:23:31.714000",
+  "column_trade_ts_tz": "DateTime64(3,'UTC')",
+  "probes": {
+    "UTC_11_17_12_57": 389723,
+    "minus3h_08_17_09_57": 162631,
+    "plus3h_14_17_15_57": 0
+  },
+  "TIMEZONE_SHIFT_DETECTED": false,
+  "note": "Prior miss was wrong table/schema, not timezone. UTC window returns 389723 rows."
+}

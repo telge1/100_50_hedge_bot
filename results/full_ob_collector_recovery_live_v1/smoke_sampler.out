@@ -1,0 +1,25 @@
+2026-09-04T19:42:32Z acquire BTCUSDT ok=True state=live err=None
+2026-09-04T19:42:32Z acquire DOGEUSDT ok=True state=starting err=None
+2026-09-04T19:42:36Z sample 0 t+0.0m gate=False active=2 btc_lv=38043/27443 doge_lv=5044/14214 btc_u=4557367 doge_u=4557054
+2026-09-04T19:43:40Z sample 1 t+1.1m gate=True active=2 btc_lv=37991/27494 doge_lv=5046/14212 btc_u=4557688 doge_u=4557374
+2026-09-04T19:44:40Z sample 2 t+2.1m gate=False active=2 btc_lv=37973/27359 doge_lv=5045/14213 btc_u=4557988 doge_u=4557675
+2026-09-04T19:45:36Z sample 3 t+3.0m gate=False active=2 btc_lv=38030/27396 doge_lv=5044/14214 btc_u=4558268 doge_u=4557955
+2026-09-04T19:46:40Z sample 4 t+4.1m gate=False active=2 btc_lv=38086/27391 doge_lv=5052/14206 btc_u=4558588 doge_u=4558275
+2026-09-04T19:47:36Z sample 5 t+5.0m gate=True active=2 btc_lv=38102/27375 doge_lv=5055/14203 btc_u=4558868 doge_u=4558555
+2026-09-04T19:48:36Z sample 6 t+6.0m gate=False active=2 btc_lv=38131/27354 doge_lv=5062/14197 btc_u=4559169 doge_u=4558855
+2026-09-04T19:49:40Z sample 7 t+7.1m gate=False active=2 btc_lv=38105/27362 doge_lv=5059/14200 btc_u=4559489 doge_u=4559176
+2026-09-04T19:50:36Z sample 8 t+8.0m gate=False active=2 btc_lv=38105/27383 doge_lv=5059/14200 btc_u=4559769 doge_u=4559456
+2026-09-04T19:51:40Z sample 9 t+9.1m gate=False active=2 btc_lv=38047/27446 doge_lv=5060/14198 btc_u=4560089 doge_u=4559776
+2026-09-04T19:52:36Z sample 10 t+10.0m gate=True active=2 btc_lv=37964/27521 doge_lv=5052/14205 btc_u=4560370 doge_u=4560056
+2026-09-04T19:53:36Z sample 11 t+11.0m gate=False active=2 btc_lv=37987/27523 doge_lv=5049/14208 btc_u=4560670 doge_u=4560357
+2026-09-04T19:54:40Z sample 12 t+12.1m gate=False active=2 btc_lv=38044/27479 doge_lv=5052/14205 btc_u=4560990 doge_u=4560677
+2026-09-04T19:55:36Z sample 13 t+13.0m gate=False active=2 btc_lv=38052/27361 doge_lv=5053/14204 btc_u=4561270 doge_u=4560957
+2026-09-04T19:56:40Z sample 14 t+14.1m gate=False active=2 btc_lv=38064/27398 doge_lv=5048/14209 btc_u=4561590 doge_u=4561277
+2026-09-04T19:57:36Z sample 15 t+15.0m gate=True active=2 btc_lv=38153/27283 doge_lv=5049/14208 btc_u=4561871 doge_u=4561557
+2026-09-04T19:58:36Z sample 16 t+16.0m gate=False active=2 btc_lv=38076/27311 doge_lv=5057/14201 btc_u=4562171 doge_u=4561858
+2026-09-04T19:59:40Z sample 17 t+17.1m gate=False active=2 btc_lv=38132/27267 doge_lv=5053/14204 btc_u=4562491 doge_u=4562178
+2026-09-04T20:00:36Z sample 18 t+18.0m gate=False active=2 btc_lv=38129/27288 doge_lv=5051/14204 btc_u=4562771 doge_u=4562458
+2026-09-04T20:01:41Z sample 19 t+19.1m gate=False active=2 btc_lv=38191/27144 doge_lv=5057/14200 btc_u=4563092 doge_u=4562778
+2026-09-04T20:02:37Z sample 20 t+20.0m gate=True active=2 btc_lv=38232/27082 doge_lv=5056/14201 btc_u=4563372 doge_u=4563059
+2026-09-04T20:02:41Z SMOKE_SAMPLER_DONE
+SMOKE_SAMPLER_DONE

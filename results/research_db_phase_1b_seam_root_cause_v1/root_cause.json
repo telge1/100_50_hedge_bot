@@ -1,0 +1,47 @@
+{
+  "components": [
+    "EVENT_TIME_VS_RECEIVE_TIME",
+    "ASOF_BOUNDARY_DIFFERENCE"
+  ],
+  "current_phase1": {
+    "exact_matches": 46,
+    "exact_rate_pct": 2.5555555555555554,
+    "genuine_cf_matches": 1800,
+    "mid_abs_error_max": 85.75,
+    "mid_abs_error_mean": 0.3941116222222222,
+    "missing_ch_seconds": 0,
+    "missing_raw_seconds": 0,
+    "paired_seconds": 1800,
+    "tolerance_matches": 46,
+    "tolerance_rate_pct": 2.5555555555555554,
+    "variant": "CURRENT_PHASE1_IMPLEMENTATION",
+    "windows": 6
+  },
+  "event_lineage": {
+    "ch_terminal_event_present": 1800,
+    "current_exact": 46,
+    "last_source_ts_matches": 1796,
+    "last_update_id_matches": 1796,
+    "receive_exact": 1796
+  },
+  "prior_audit_correction": "Prior audit did not test local_receive_ts; its segment-continuity explanation was incomplete and its DOGE tolerance was not scale-safe.",
+  "producer_binary_hash": "NOT_AVAILABLE",
+  "producer_semantics": "PROVEN_BY_CODE_AND_1800_BUCKET_EVENT_LINEAGE",
+  "receive_time_last": {
+    "exact_matches": 1796,
+    "exact_rate_pct": 99.77777777777777,
+    "genuine_cf_matches": 1800,
+    "mid_abs_error_max": 5e-05,
+    "mid_abs_error_mean": 5.555555555555556e-08,
+    "missing_ch_seconds": 0,
+    "missing_raw_seconds": 0,
+    "paired_seconds": 1800,
+    "tolerance_matches": 1796,
+    "tolerance_rate_pct": 99.77777777777777,
+    "variant": "RECEIVE_TIME_LAST",
+    "windows": 6
+  },
+  "root_cause": "COMBINATION",
+  "unrecorded_scheduler_boundary_cases": 4,
+  "verdict": "BTC_DOGE_RESEARCH_DB_PHASE_1B_DIFFERENT_VALID_SEMANTICS_PROVEN"
+}

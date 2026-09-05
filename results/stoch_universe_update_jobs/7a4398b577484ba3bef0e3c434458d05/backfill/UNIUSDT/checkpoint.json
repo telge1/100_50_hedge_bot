@@ -1,0 +1,33 @@
+{
+  "chunk_days": 7,
+  "requested_end": "2026-08-15T09:42:00+00:00",
+  "requested_start": "2025-12-11T00:00:00+00:00",
+  "symbols": {
+    "UNIUSDT": {
+      "candles_repaired": 0,
+      "effective_start": "2026-08-11T00:00:00+00:00",
+      "final_status": "COMPLETE_CLEAN",
+      "gap_count": 0,
+      "largest_gap_seconds": 0,
+      "last_completed_timestamp": "2026-08-15T09:42:00+00:00",
+      "last_error": null,
+      "missing_candle_count": 0,
+      "missing_candles_detected": 0,
+      "missing_ranges_detected": 0,
+      "ohlc_error_count": 0,
+      "physical_rows": 356262,
+      "ranges_repaired": 0,
+      "repair_completed_at": "2026-08-15T09:45:11.461241+00:00",
+      "repair_started_at": "2026-08-15T09:45:11.460805+00:00",
+      "requested_end": "2026-08-15T09:42:00+00:00",
+      "requested_start": "2025-12-11T00:00:00+00:00",
+      "rows_inserted": 6342,
+      "status": "COMPLETE",
+      "symbol": "UNIUSDT",
+      "unique_final": 356262,
+      "unresolved_ranges": 0,
+      "updated_at": "2026-08-15T09:45:11.537610+00:00"
+    }
+  },
+  "version": 1
+}

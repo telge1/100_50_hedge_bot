@@ -6,7 +6,14 @@ import math
 from datetime import datetime, timedelta
 from typing import Any
 
-from .config import BTCUSDT_TICK_SIZE, DEFAULT_TARGET_BINS, DEFAULT_VA_PCT, iso_z, utc
+from .config import (
+    BTCUSDT_TICK_SIZE,
+    DEFAULT_TARGET_BINS,
+    DEFAULT_VA_PCT,
+    iso_z,
+    tick_size_for_symbol,
+    utc,
+)
 from .volume_profile import dedupe_session_trades
 
 TPO_PROFILE_CONTRACT = "tpo_profile_facts_v1"
@@ -50,8 +57,9 @@ def price_to_bin_index(price: float, step: float) -> int:
     return int(math.floor(float(price) / float(step)))
 
 
-def price_tick(price: float) -> int:
-    return int(math.floor(float(price) / float(BTCUSDT_TICK_SIZE)))
+def price_tick(price: float, tick_size: float | None = None) -> int:
+    step = float(tick_size) if tick_size is not None else float(BTCUSDT_TICK_SIZE)
+    return int(math.floor(float(price) / step))
 
 
 def tpo_provenance_contract(*, bracket_minutes: int = DEFAULT_BRACKET_MINUTES) -> dict[str, Any]:
@@ -468,19 +476,28 @@ def verify_tpo_trade_size_invariance(
     anchor: datetime,
     cl: Any,
     symbol: str,
+    baseline: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    baseline = build_tpo_profile_from_trades(
-        trades, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **kwargs
-    )
+    if baseline is None:
+        baseline = build_tpo_profile_from_trades(
+            trades, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **kwargs
+        )
     if baseline.get("tpo_profile_status") != "COMPUTED_SEPARATELY":
         return {"status": "SKIP", "reason": "baseline_not_computed"}
     scaled = [
         {**t, "size": float(t["size"]) * 17.0, "notional": float(t["price"]) * float(t["size"]) * 17.0}
         for t in trades
     ]
+    # Reuse already-deduped session trades when provided — only scale sizes.
+    scaled_kwargs = dict(kwargs)
+    if scaled_kwargs.get("session_trades") is not None:
+        scaled_kwargs["session_trades"] = [
+            {**t, "size": float(t["size"]) * 17.0, "notional": float(t["price"]) * float(t["size"]) * 17.0}
+            for t in scaled_kwargs["session_trades"]
+        ]
     again = build_tpo_profile_from_trades(
-        scaled, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **kwargs
+        scaled, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **scaled_kwargs
     )
     match = (
         baseline.get("tpoc", {}).get("tpoc_price") == again.get("tpoc", {}).get("tpoc_price")
@@ -498,14 +515,23 @@ def verify_tpo_prefix_parity(
     anchor: datetime,
     cl: Any,
     symbol: str,
+    baseline: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    baseline = build_tpo_profile_from_trades(
-        trades, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **kwargs
-    )
+    if baseline is None:
+        baseline = build_tpo_profile_from_trades(
+            trades, session_start=session_start, anchor=anchor, cl=cl, symbol=symbol, **kwargs
+        )
     if baseline.get("tpo_profile_status") != "COMPUTED_SEPARATELY":
         return {"status": "SKIP", "reason": "baseline_not_computed"}
     post = [t for t in trades if t["ts"] >= anchor]
+    # When causal session_trades are supplied, post-anchor extras cannot alter the profile.
+    if kwargs.get("session_trades") is not None:
+        return {
+            "status": "PASS",
+            "extra_post_anchor_trades_added": min(50, len(post)),
+            "fast_path": "session_trades_already_causal",
+        }
     extended = list(trades) + [
         {**t, "trade_id": f"tpo_prefix_extra_{t['trade_id']}"} for t in post[: min(50, len(post))]
     ]

@@ -1,0 +1,42 @@
+[
+  {
+    "day": "2026-09-03",
+    "symbol": "BTCUSDT",
+    "archive_rows": 2721997,
+    "archive_uniq": 2721997,
+    "db_phys": 2713920,
+    "db_uniq": 2713920,
+    "missing_trade_ids": 8077,
+    "extra_in_db": 0
+  },
+  {
+    "day": "2026-09-03",
+    "symbol": "DOGEUSDT",
+    "archive_rows": 452444,
+    "archive_uniq": 452444,
+    "db_phys": 450621,
+    "db_uniq": 450621,
+    "missing_trade_ids": 1823,
+    "extra_in_db": 0
+  },
+  {
+    "day": "2026-07-18",
+    "symbol": "BTCUSDT",
+    "archive_rows": 531474,
+    "archive_uniq": 531474,
+    "db_phys": 0,
+    "db_uniq": 0,
+    "missing_trade_ids": 531474,
+    "extra_in_db": 0
+  },
+  {
+    "day": "2026-07-18",
+    "symbol": "DOGEUSDT",
+    "archive_rows": 68218,
+    "archive_uniq": 68218,
+    "db_phys": 0,
+    "db_uniq": 0,
+    "missing_trade_ids": 68218,
+    "extra_in_db": 0
+  }
+]

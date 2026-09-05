@@ -1,0 +1,14 @@
+{
+  "totals": {
+    "BTCUSDT": {
+      "inserted": 4926,
+      "retries": 0
+    },
+    "DOGEUSDT": {
+      "inserted": 4926,
+      "retries": 0
+    }
+  },
+  "run_id": "f780caff-15b5-46f1-a43e-1be02b8d06e1",
+  "chunks": 36
+}

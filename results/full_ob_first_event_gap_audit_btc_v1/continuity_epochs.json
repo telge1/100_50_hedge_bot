@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "source_feed_u_gap_count": "FullBookRuntime.gap_count / CapturePlan.u_gap_count via apply_delta DeltaOutcome.GAP or U_RESET (excludes on_reconnect clears)",
+    "persisted_capture_u_gap_count": "ActiveEventWriter._note_continuity: consecutive persisted Bybit delta u with ui>last_u+1; markers excluded",
+    "database_replay_u_gap_count": "Replay of CH packet stream with same marker exclusion and u+1 rule"
+  },
+  "markers_excluded": true,
+  "stale_dup_handling": "u<=last ignored for gap counting in writer (only forward gaps); book apply ignores stale/dup",
+  "epochs": [
+    {
+      "epoch_id": "E0_pre_first_gap",
+      "seed": "rest_full_snapshot.json.zst",
+      "seed_u": 4347546,
+      "first_applied_u": 4347547,
+      "last_contiguous_u": 4350204,
+      "last_seq": 805051079937,
+      "self_contained": true,
+      "source_feed_gaps_in_epoch": 0,
+      "persisted_gaps_in_epoch": 0
+    },
+    {
+      "epoch_id": "BOUNDARY_reconnect_1",
+      "type": "RECONNECT_RESYNC",
+      "prev_u": 4350204,
+      "expected_u": 4350205,
+      "next_persisted_u": 4350353,
+      "missing_u_count": 148,
+      "reconnect_reason": "stale_market_data",
+      "new_rest_snapshot_in_event_dir": false,
+      "post_packet_phase": "buffer/accepted",
+      "self_contained_across": false
+    },
+    {
+      "epoch_id": "E1_after_gap1_not_seeded_in_capture",
+      "note": "Live book resynced via REST in memory, but FR event has no new snapshot seed; offline replay cannot start a new exact epoch from capture alone",
+      "self_contained": false
+    }
+  ],
+  "counts": {
+    "source_feed_u_gap_count": 0,
+    "persisted_capture_u_gap_count": 4,
+    "database_replay_u_gap_count": 2,
+    "persisted_missing_u_estimate": 752
+  }
+}

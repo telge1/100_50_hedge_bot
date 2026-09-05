@@ -1,0 +1,2618 @@
+{
+  "end_time_utc": "2026-09-04T11:46:16.867535Z",
+  "duration_sec": 1209.741,
+  "samples": [
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "elapsed_sec": 1.7,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 888535,
+      "PARENT_CAPTURE_COUNT": 1,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 89.68262587,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5347,
+          "raw_asks": 13793,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4408586,
+          "seq": 346024750316,
+          "cts_ms": 1788521262324,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40715,
+          "raw_asks": 23408,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4408899,
+          "seq": 805140657930,
+          "cts_ms": 1788521262271,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "CAPTURING",
+        "DOGEUSDT": "ARMED"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": null
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:28:15.461304Z",
+      "elapsed_sec": 32.4,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 1003492,
+      "PARENT_CAPTURE_COUNT": 1,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 119.631228951,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5346,
+          "raw_asks": 13795,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4408698,
+          "seq": 346024809067,
+          "cts_ms": 1788521284733,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40752,
+          "raw_asks": 23384,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409011,
+          "seq": 805140797933,
+          "cts_ms": 1788521284667,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "CAPTURING",
+        "DOGEUSDT": "ARMED"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": null
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:28:46.230086Z",
+      "elapsed_sec": 63.2,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 1141458,
+      "PARENT_CAPTURE_COUNT": 1,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 149.63694813,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5348,
+          "raw_asks": 13792,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4408886,
+          "seq": 346024932187,
+          "cts_ms": 1788521322323,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40725,
+          "raw_asks": 23270,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409199,
+          "seq": 805141030334,
+          "cts_ms": 1788521322270,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "ARMED"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": null
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:29:16.961427Z",
+      "elapsed_sec": 93.9,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 1228331,
+      "PARENT_CAPTURE_COUNT": 1,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 179.639683939,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5351,
+          "raw_asks": 13789,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4408998,
+          "seq": 346024992356,
+          "cts_ms": 1788521344732,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40744,
+          "raw_asks": 23244,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409311,
+          "seq": 805141116619,
+          "cts_ms": 1788521344670,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "ARMED"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": null
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:29:47.805549Z",
+      "elapsed_sec": 124.8,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 1419194,
+      "PARENT_CAPTURE_COUNT": 1,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 209.637701082,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5350,
+          "raw_asks": 13790,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409186,
+          "seq": 346025084109,
+          "cts_ms": 1788521382328,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40683,
+          "raw_asks": 23239,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409499,
+          "seq": 805141439292,
+          "cts_ms": 1788521382262,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "ARMED"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": null
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:30:18.530350Z",
+      "elapsed_sec": 155.5,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 1931568,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 0,
+      "nested_signal_count": 0,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5340,
+          "raw_asks": 13800,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409362,
+          "seq": 346025197148,
+          "cts_ms": 1788521417524,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40657,
+          "raw_asks": 23527,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409675,
+          "seq": 805141840939,
+          "cts_ms": 1788521417467,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "CAPTURING"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "elapsed_sec": 186.3,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2067894,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5338,
+          "raw_asks": 13802,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409486,
+          "seq": 346025290156,
+          "cts_ms": 1788521442332,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40635,
+          "raw_asks": 23560,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409799,
+          "seq": 805142107462,
+          "cts_ms": 1788521442269,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "CAPTURING"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:31:23.614819Z",
+      "elapsed_sec": 220.6,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2258041,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5346,
+          "raw_asks": 13795,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409664,
+          "seq": 346025399034,
+          "cts_ms": 1788521477920,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40699,
+          "raw_asks": 23508,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409977,
+          "seq": 805142429895,
+          "cts_ms": 1788521477870,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:31:54.519412Z",
+      "elapsed_sec": 251.5,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2428975,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5347,
+          "raw_asks": 13794,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409798,
+          "seq": 346025477714,
+          "cts_ms": 1788521504730,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40716,
+          "raw_asks": 23498,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410112,
+          "seq": 805142699877,
+          "cts_ms": 1788521504871,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:32:25.329353Z",
+      "elapsed_sec": 282.3,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2625012,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5343,
+          "raw_asks": 13797,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4409986,
+          "seq": 346025578324,
+          "cts_ms": 1788521542332,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40637,
+          "raw_asks": 23551,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410300,
+          "seq": 805143019680,
+          "cts_ms": 1788521542469,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:32:56.088308Z",
+      "elapsed_sec": 313.0,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2723438,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5345,
+          "raw_asks": 13796,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410099,
+          "seq": 346025649828,
+          "cts_ms": 1788521564927,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40700,
+          "raw_asks": 23462,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410412,
+          "seq": 805143172620,
+          "cts_ms": 1788521564870,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:33:26.897567Z",
+      "elapsed_sec": 343.9,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2901787,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5338,
+          "raw_asks": 13802,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410286,
+          "seq": 346025754430,
+          "cts_ms": 1788521602332,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40610,
+          "raw_asks": 23560,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410600,
+          "seq": 805143447994,
+          "cts_ms": 1788521602469,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "elapsed_sec": 374.6,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 2971584,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5340,
+          "raw_asks": 13800,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410399,
+          "seq": 346025803322,
+          "cts_ms": 1788521624927,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40626,
+          "raw_asks": 23568,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410713,
+          "seq": 805143532663,
+          "cts_ms": 1788521625069,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:34:28.494006Z",
+      "elapsed_sec": 405.5,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3124729,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5340,
+          "raw_asks": 13800,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410588,
+          "seq": 346025902976,
+          "cts_ms": 1788521662728,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40675,
+          "raw_asks": 23512,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410902,
+          "seq": 805143780363,
+          "cts_ms": 1788521662869,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:34:59.234763Z",
+      "elapsed_sec": 436.2,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3255479,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5337,
+          "raw_asks": 13803,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410763,
+          "seq": 346025971319,
+          "cts_ms": 1788521697733,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40568,
+          "raw_asks": 23595,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411077,
+          "seq": 805144034408,
+          "cts_ms": 1788521697860,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:35:30.002374Z",
+      "elapsed_sec": 467.0,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3361188,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5342,
+          "raw_asks": 13799,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4410888,
+          "seq": 346026072830,
+          "cts_ms": 1788521722727,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40568,
+          "raw_asks": 23574,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411202,
+          "seq": 805144185418,
+          "cts_ms": 1788521722871,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:36:00.730318Z",
+      "elapsed_sec": 497.7,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3512179,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5343,
+          "raw_asks": 13797,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411063,
+          "seq": 346026191246,
+          "cts_ms": 1788521757717,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40704,
+          "raw_asks": 23547,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411377,
+          "seq": 805144483782,
+          "cts_ms": 1788521757872,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:36:31.474166Z",
+      "elapsed_sec": 528.4,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3614190,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5342,
+          "raw_asks": 13798,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411188,
+          "seq": 346026264021,
+          "cts_ms": 1788521782726,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40680,
+          "raw_asks": 23560,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411501,
+          "seq": 805144690441,
+          "cts_ms": 1788521782671,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "elapsed_sec": 559.2,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3790697,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5343,
+          "raw_asks": 13797,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411364,
+          "seq": 346026464275,
+          "cts_ms": 1788521817933,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40666,
+          "raw_asks": 23563,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411678,
+          "seq": 805145062310,
+          "cts_ms": 1788521818070,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:37:32.952199Z",
+      "elapsed_sec": 589.9,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 3934218,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5342,
+          "raw_asks": 13798,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411490,
+          "seq": 346026556006,
+          "cts_ms": 1788521843132,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40685,
+          "raw_asks": 23586,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411803,
+          "seq": 805145377928,
+          "cts_ms": 1788521843065,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:38:03.683515Z",
+      "elapsed_sec": 620.6,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4086682,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5343,
+          "raw_asks": 13797,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411664,
+          "seq": 346026660416,
+          "cts_ms": 1788521877932,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40795,
+          "raw_asks": 23516,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411978,
+          "seq": 805145635629,
+          "cts_ms": 1788521878061,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:38:34.404621Z",
+      "elapsed_sec": 651.4,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4223902,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 1,
+      "nested_signal_count": 1,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5348,
+          "raw_asks": 13792,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411801,
+          "seq": 346026752413,
+          "cts_ms": 1788521905319,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40841,
+          "raw_asks": 23480,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412114,
+          "seq": 805145827317,
+          "cts_ms": 1788521905267,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:39:05.104782Z",
+      "elapsed_sec": 682.1,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4411398,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 2,
+      "nested_signal_count": 2,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5346,
+          "raw_asks": 13795,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4411990,
+          "seq": 346026874690,
+          "cts_ms": 1788521943120,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40721,
+          "raw_asks": 23546,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412303,
+          "seq": 805146076609,
+          "cts_ms": 1788521943067,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:39:35.845430Z",
+      "elapsed_sec": 712.8,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4484948,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 2,
+      "nested_signal_count": 2,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5345,
+          "raw_asks": 13796,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412101,
+          "seq": 346026924772,
+          "cts_ms": 1788521965318,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40724,
+          "raw_asks": 23557,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412415,
+          "seq": 805146150349,
+          "cts_ms": 1788521965466,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "elapsed_sec": 743.6,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4608204,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 2,
+      "nested_signal_count": 2,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5345,
+          "raw_asks": 13796,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412290,
+          "seq": 346027074016,
+          "cts_ms": 1788522003119,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40744,
+          "raw_asks": 23531,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412603,
+          "seq": 805146336897,
+          "cts_ms": 1788522003063,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:40:44.319631Z",
+      "elapsed_sec": 781.3,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4766909,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 2,
+      "nested_signal_count": 2,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5342,
+          "raw_asks": 13798,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412490,
+          "seq": 346027220232,
+          "cts_ms": 1788522043119,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40723,
+          "raw_asks": 23566,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412803,
+          "seq": 805146492837,
+          "cts_ms": 1788522043071,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:41:15.044699Z",
+      "elapsed_sec": 812.0,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4872844,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 2,
+      "nested_signal_count": 2,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5337,
+          "raw_asks": 13803,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412602,
+          "seq": 346027306515,
+          "cts_ms": 1788522065533,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40675,
+          "raw_asks": 23592,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412915,
+          "seq": 805146588193,
+          "cts_ms": 1788522065459,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:41:45.760367Z",
+      "elapsed_sec": 842.7,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 4974820,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 3,
+      "nested_signal_count": 3,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5337,
+          "raw_asks": 13803,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412790,
+          "seq": 346027415816,
+          "cts_ms": 1788522103122,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40640,
+          "raw_asks": 23605,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4413103,
+          "seq": 805146697748,
+          "cts_ms": 1788522103072,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    },
+    {
+      "t_utc": "2026-09-04T11:42:16.480549Z",
+      "elapsed_sec": 873.4,
+      "pid_alive": true,
+      "oi_alive": true,
+      "queue_drop_count": 0,
+      "writer_error_count": 0,
+      "writer_backlog": 0,
+      "open_tmp_bytes": 5038906,
+      "PARENT_CAPTURE_COUNT": 2,
+      "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 3,
+      "nested_signal_count": 3,
+      "secondary_edge_observation_count": 0,
+      "prebuffer": {
+        "DOGEUSDT": 0.0,
+        "BTCUSDT": 0.0
+      },
+      "bootstrap_observation_count": 2,
+      "bootstrap_persistent_capture": false,
+      "full_book": {
+        "DOGEUSDT": {
+          "symbol": "DOGEUSDT",
+          "subscription_state": "live",
+          "raw_bids": 5337,
+          "raw_asks": 13803,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4412902,
+          "seq": 346027468066,
+          "cts_ms": 1788522125532,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        },
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "subscription_state": "live",
+          "raw_bids": 40623,
+          "raw_asks": 23613,
+          "snapshot_loaded": true,
+          "book_ready": true,
+          "update_id": 4413216,
+          "seq": 805146761361,
+          "cts_ms": 1788522125655,
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "last_error": ""
+        }
+      },
+      "lifecycles": {
+        "BTCUSDT": "FIGHT_ACTIVE",
+        "DOGEUSDT": "FIGHT_ACTIVE"
+      },
+      "fight_ids": {
+        "BTCUSDT": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "DOGEUSDT": "DOGEUSDT_20260904T113003Z_bb7dfca728"
+      },
+      "bootstrap_status": {
+        "BTCUSDT": "N/A",
+        "DOGEUSDT": "N/A"
+      },
+      "fr_resync_fail": 0
+    }
+  ],
+  "socket_probes": [
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "BTCUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.73,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "DOGEUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.09,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "BTCUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "DOGEUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "BTCUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:27:44.715930Z",
+      "symbol": "DOGEUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "BTCUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 3571.57,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "DOGEUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.68,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "BTCUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.08,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "DOGEUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "BTCUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:30:49.317166Z",
+      "symbol": "DOGEUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "BTCUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.38,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "DOGEUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.12,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "BTCUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.11,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "DOGEUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.11,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "BTCUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.11,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:33:57.648515Z",
+      "symbol": "DOGEUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.13,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "BTCUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.33,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "DOGEUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 0.09,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "BTCUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "DOGEUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "BTCUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:37:02.195486Z",
+      "symbol": "DOGEUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.06,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "BTCUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 5004.6,
+      "error": "TimeoutError:timed out"
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "DOGEUSDT",
+      "depth": 0,
+      "ok": false,
+      "latency_ms": 1987.24,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "book_mode",
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "BTCUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.39,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "DOGEUSDT",
+      "depth": 1000,
+      "ok": false,
+      "latency_ms": 0.08,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "BTCUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.07,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    },
+    {
+      "t_utc": "2026-09-04T11:40:06.604567Z",
+      "symbol": "DOGEUSDT",
+      "depth": 200,
+      "ok": false,
+      "latency_ms": 0.1,
+      "bid_levels": 0,
+      "ask_levels": 0,
+      "u": null,
+      "seq": null,
+      "error": "unknown_operation",
+      "keys": [
+        "depth",
+        "error",
+        "expires_at",
+        "ok",
+        "request_id",
+        "subscription_state",
+        "symbol"
+      ]
+    }
+  ],
+  "final_health_excerpt": {
+    "uptime_seconds": 1214.746,
+    "nested_profile_signals_enabled": true,
+    "analysis_isolation_contract": "nested_signal_analysis_isolation_v1",
+    "queue_drop_count": 0,
+    "writer_error_count": 0,
+    "open_tmp_bytes": 6050663,
+    "PARENT_CAPTURE_COUNT": 2,
+    "NESTED_PROFILE_EDGE_SIGNAL_COUNT": 3,
+    "GENUINE_PARENT_SIGNAL_COUNT": 2,
+    "SECONDARY_OBSERVATIONS_SUPPRESSED": 0,
+    "secondary_edge_observation_count": 0,
+    "profile_arm_count": 3,
+    "profile_rearm_count": 0,
+    "ACTIVE_PROFILE_WATCH_COUNT": 2,
+    "prebuffer_coverage_seconds": {
+      "DOGEUSDT": 0.0,
+      "BTCUSDT": 0.0
+    },
+    "bootstrap_persistent_capture": false,
+    "bootstrap_observation_count": 2,
+    "full_book_runtimes": [
+      {
+        "symbol": "DOGEUSDT",
+        "subscription_state": "live",
+        "raw_bids": 5331,
+        "raw_asks": 13809,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4414166,
+        "seq": 346028167590,
+        "cts_ms": 1788522378321,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      },
+      {
+        "symbol": "BTCUSDT",
+        "subscription_state": "live",
+        "raw_bids": 40651,
+        "raw_asks": 23623,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4414480,
+        "seq": 805148342689,
+        "cts_ms": 1788522378472,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      }
+    ],
+    "fr_process_transport_reconnect_count": 0,
+    "fr_process_resync_checkpoint_success_count": 0,
+    "fr_process_resync_checkpoint_failure_count": 0,
+    "runtimes": {
+      "DOGEUSDT": {
+        "lifecycle": "FIGHT_ACTIVE",
+        "event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+        "fight_event_id": "DOGEUSDT_20260904T113003Z_bb7dfca728",
+        "continuation_index": 0,
+        "buffer_messages": 0,
+        "buffer_bytes": 0,
+        "buffer_span_seconds": null,
+        "prebuffer_coverage_seconds": 0.0,
+        "buffer_overflow": 0,
+        "capturing": true,
+        "bootstrap_status": "N/A",
+        "bootstrap_observation_count": 1,
+        "bootstrap_persistent_capture": false,
+        "writer_backlog": 0,
+        "queue_drops": 0,
+        "current_event_queue_drops": 0,
+        "symbol_lifetime_queue_drops": 0,
+        "last_event_queue_drops": 0,
+        "writer_alive": true,
+        "writer_error_count": 0,
+        "dropped_price_level_updates": 0,
+        "minimum_capture_end_ts": "2026-09-04T12:30:03.021416Z",
+        "normal_end_ts": "2026-09-04T12:30:03.021416Z",
+        "extension_count": 0,
+        "pre_trigger_seconds_actual": 230.487416,
+        "trigger_source": "CROSS_IN",
+        "trigger_quality": "REAL_CROSS_IN",
+        "research_eligible": true,
+        "data_quality": "INCOMPLETE",
+        "source_feed_u_gap_count": 0,
+        "apply_epoch_u_gap_count": 0,
+        "persisted_capture_u_gap_count": 0,
+        "transport_reconnect_count": 0,
+        "resync_boundary_count": 0,
+        "continuity_epoch_count": 1,
+        "continuous_capture": true,
+        "replayable_by_epochs": true,
+        "resync_checkpoint_success_count": 0,
+        "resync_checkpoint_failure_count": 0,
+        "nested_signal_count": 3,
+        "secondary_edge_observation_count": 0,
+        "duplicate_secondary_trigger_suppressed_count": 0,
+        "profile_arm_count": 3,
+        "profile_rearm_count": 0,
+        "profile_expiry_count": 0,
+        "active_profile_watch_count": 1
+      },
+      "BTCUSDT": {
+        "lifecycle": "FIGHT_ACTIVE",
+        "event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "fight_event_id": "BTCUSDT_20260904T112735Z_eb6191222e",
+        "continuation_index": 0,
+        "buffer_messages": 0,
+        "buffer_bytes": 0,
+        "buffer_span_seconds": null,
+        "prebuffer_coverage_seconds": 0.0,
+        "buffer_overflow": 0,
+        "capturing": true,
+        "bootstrap_status": "N/A",
+        "bootstrap_observation_count": 1,
+        "bootstrap_persistent_capture": false,
+        "writer_backlog": 0,
+        "queue_drops": 0,
+        "current_event_queue_drops": 0,
+        "symbol_lifetime_queue_drops": 0,
+        "last_event_queue_drops": 0,
+        "writer_alive": true,
+        "writer_error_count": 0,
+        "dropped_price_level_updates": 0,
+        "minimum_capture_end_ts": "2026-09-04T12:27:35.764963Z",
+        "normal_end_ts": "2026-09-04T12:27:35.764963Z",
+        "extension_count": 0,
+        "pre_trigger_seconds_actual": 82.091963,
+        "trigger_source": "CROSS_IN",
+        "trigger_quality": "REAL_CROSS_IN",
+        "research_eligible": true,
+        "data_quality": "INCOMPLETE",
+        "source_feed_u_gap_count": 0,
+        "apply_epoch_u_gap_count": 0,
+        "persisted_capture_u_gap_count": 0,
+        "transport_reconnect_count": 0,
+        "resync_boundary_count": 0,
+        "continuity_epoch_count": 1,
+        "continuous_capture": true,
+        "replayable_by_epochs": true,
+        "resync_checkpoint_success_count": 0,
+        "resync_checkpoint_failure_count": 0,
+        "nested_signal_count": 3,
+        "secondary_edge_observation_count": 0,
+        "duplicate_secondary_trigger_suppressed_count": 0,
+        "profile_arm_count": 3,
+        "profile_rearm_count": 0,
+        "profile_expiry_count": 0,
+        "active_profile_watch_count": 1
+      }
+    }
+  },
+  "max_prebuffer_observed_during_smoke": {
+    "BTCUSDT": 0.0,
+    "DOGEUSDT": 209.637701082
+  }
+}

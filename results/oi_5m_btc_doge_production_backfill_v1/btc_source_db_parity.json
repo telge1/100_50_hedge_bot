@@ -1,0 +1,26 @@
+{
+  "symbol": "BTCUSDT",
+  "expected_buckets": 4926,
+  "source_buckets": 4926,
+  "db_buckets": 4926,
+  "first_timestamp": "2026-08-18T15:10:00Z",
+  "last_timestamp": "2026-09-04T17:35:00Z",
+  "missing_buckets": 0,
+  "missing_sample": [],
+  "retries_fetch": 0,
+  "parity": {
+    "symbol": "BTCUSDT",
+    "n_source": 4926,
+    "n_db": 4926,
+    "mismatches": [],
+    "mismatch_count": 0,
+    "missing_in_db": [],
+    "missing_count": 0,
+    "extra_in_db_count": 0,
+    "logical_duplicate_buckets": 0,
+    "parse_rejects": 0,
+    "timestamp_shift": 0,
+    "parity": true
+  },
+  "SOURCE_DB_PARITY": true
+}

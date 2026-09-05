@@ -1,0 +1,32 @@
+{
+  "PUBLIC_TRADES": {
+    "canonical": "orderbook_analysis.public_trades_canonical",
+    "timestamp_column": "trade_ts",
+    "timestamp_type": "DateTime64(3,'UTC')",
+    "ingest_column": "ingest_timestamp",
+    "symbol_column": "symbol",
+    "side_semantics": "Enum8 Buy/Sell = aggressor/taker side",
+    "qty_columns": [
+      "size",
+      "notional"
+    ],
+    "producer": "Signal_Generator_Ralf live collector --enable-public-trades (PID 1661773)",
+    "wrongly_queried_by_prior_analysis": "btc_doge_research.research_public_trades (event_time) \u2014 ends 2026-08-31",
+    "consumer_prior_analysis": "results/btc_full_ob_signal_to_crash_20260904_v1/_run_analysis.py try_fetch + wrong CH path"
+  },
+  "OPEN_INTEREST": {
+    "canonical_events": "orderbook_analysis.open_interest_events",
+    "canonical_5s": "orderbook_analysis.open_interest_5s",
+    "timestamp_column_events": "event_time",
+    "timestamp_column_5s": "bucket_time",
+    "producer": "orderbook_analyse.oi_liquidation_collector PID 147111",
+    "wrongly_queried_by_prior_analysis": "btc_doge_research.research_open_interest_observations + assumed orderbook_analysis unloadable"
+  },
+  "LIQUIDATIONS": {
+    "canonical": "orderbook_analysis.all_liquidations",
+    "timestamp_column": "event_time",
+    "producer": "orderbook_analyse.oi_liquidation_collector PID 147111",
+    "wrongly_queried_by_prior_analysis": "btc_doge_research.research_liquidation_events"
+  },
+  "NOTE": "orderbook_analysis.orderbook_deltas is broken/unloadable, but other tables in the same DB are directly queryable when fully qualified."
+}

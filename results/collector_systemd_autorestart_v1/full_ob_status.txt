@@ -1,0 +1,11 @@
+● bybit-full-ob-raw-archive-btc-doge.service - Bybit Full-OB raw-archive + flight recorder (BTCUSDT/DOGEUSDT)
+     Loaded: loaded (/home/telgenbuescher/.config/systemd/user/bybit-full-ob-raw-archive-btc-doge.service; enabled; preset: enabled)
+     Active: active (running) since Sat 2026-09-05 11:30:35 CEST; 3s ago
+   Main PID: 1887870 (python)
+      Tasks: 8 (limit: 21419)
+     Memory: 91.9M (peak: 93.8M)
+        CPU: 650ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/bybit-full-ob-raw-archive-btc-doge.service
+             └─1887870 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO
+
+Sep 05 11:30:35 server-telgenbuescher systemd[1531]: Started bybit-full-ob-raw-archive-btc-doge.service - Bybit Full-OB raw-archive + flight recorder (BTCUSDT/DOGEUSDT).

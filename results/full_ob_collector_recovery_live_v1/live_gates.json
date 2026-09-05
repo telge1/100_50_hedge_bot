@@ -1,0 +1,89 @@
+{
+  "evaluated_at": "2026-09-04T20:04:17.307302+00:00",
+  "gates": {
+    "SINGLE_COLLECTOR_INSTANCE": "true",
+    "BTC_FULL_TOPIC_ACTIVE": "true",
+    "DOGE_FULL_TOPIC_ACTIVE": "true",
+    "BTC_BOOK_READY": "true",
+    "DOGE_BOOK_READY": "true",
+    "U_PROGRESS": "true",
+    "SEQ_MONOTONIC": "true",
+    "SOURCE_GAPS": "0",
+    "QUEUE_DROPS": "0",
+    "WRITER_ERRORS": "0",
+    "SOCKET_DEPTH0_UNCAPPED": "true",
+    "SOCKET_TIMEOUTS": "0",
+    "BOOK_NOT_CROSSED": "true",
+    "BOOTSTRAP_FILE_CREATED": "false",
+    "OB1000_REGRESSION_PASS": "true",
+    "OB200_REGRESSION_PASS": "true",
+    "OI_LIQ_PROCESS_UNCHANGED": "true",
+    "PUBLIC_TRADES_PROCESS_UNCHANGED": "true",
+    "DASHBOARD_PROCESS_UNCHANGED": "true"
+  },
+  "gates_bool": {
+    "SINGLE_COLLECTOR_INSTANCE": true,
+    "BTC_FULL_TOPIC_ACTIVE": true,
+    "DOGE_FULL_TOPIC_ACTIVE": true,
+    "BTC_BOOK_READY": true,
+    "DOGE_BOOK_READY": true,
+    "U_PROGRESS": true,
+    "SEQ_MONOTONIC": true,
+    "SOURCE_GAPS": true,
+    "QUEUE_DROPS": true,
+    "WRITER_ERRORS": true,
+    "SOCKET_DEPTH0_UNCAPPED": true,
+    "SOCKET_TIMEOUTS": true,
+    "BOOK_NOT_CROSSED": true,
+    "BOOTSTRAP_FILE_CREATED": true,
+    "OB1000_REGRESSION_PASS": true,
+    "OB200_REGRESSION_PASS": true,
+    "OI_LIQ_PROCESS_UNCHANGED": true,
+    "PUBLIC_TRADES_PROCESS_UNCHANGED": true,
+    "DASHBOARD_PROCESS_UNCHANGED": true
+  },
+  "proofs": {
+    "FULL_TOPIC_PROVEN": "true",
+    "NOT_OB200_PROVEN": "true",
+    "NOT_OB1000_PROVEN": "true"
+  },
+  "hard_gates_pass": true,
+  "fr_env": "false",
+  "capture_ready": false,
+  "verdict": "FULL_OB_LIVE_VALIDATION_FAILED",
+  "metrics": {
+    "btc_u_first_last": [
+      4557367,
+      4563372
+    ],
+    "doge_u_first_last": [
+      4557054,
+      4563059
+    ],
+    "btc_seq_first_last": [
+      805402305088,
+      805408688642
+    ],
+    "doge_seq_first_last": [
+      346155202007,
+      346159002868
+    ],
+    "queue_drops_max": 0,
+    "writer_errors_max": 0,
+    "source_gaps_btc_doge": [
+      0,
+      0
+    ],
+    "rss_mb_last": "91.63",
+    "resources": {
+      "MemAvailable_kB": 14827792,
+      "SwapFree_kB": 463204,
+      "collector_rss_kb": 88600,
+      "disk_free_gb": 377.49
+    },
+    "importer_procs": "NONE"
+  },
+  "failure_reasons": [
+    "FLIGHT_RECORDER_DISABLED_BY_START_SCRIPT_ENV"
+  ]
+}

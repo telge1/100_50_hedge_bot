@@ -1,0 +1,272 @@
+{
+  "already_current_count": 1,
+  "coins": [
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ETHUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "BTCUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "XRPUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "SOLUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "HYPEUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "XAUTUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ZECUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "LINKUSDT"
+    },
+    {
+      "message": "bereits aktuell",
+      "state": "ALREADY_CURRENT",
+      "symbol": "DOGEUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "BNBUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "SUIUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ADAUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "AVAXUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "PUMPFUNUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ONDOUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "1000PEPEUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "LTCUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "TAOUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "DOTUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "WLDUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "TRXUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ENAUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "NEARUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "SHIB1000USDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "HBARUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ARBUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "PAXGUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "APTUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "PENGUUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "UNIUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "OPUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "FARTCOINUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "KAITOUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ALGOUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "XMRUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "XLMUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "MNTUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "WLFIUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "CRVUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "INJUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "JTOUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "XPLUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ICPUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "LITUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "TIAUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "TRUMPUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "WIFUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "ATOMUSDT"
+    },
+    {
+      "message": "aktualisiert",
+      "state": "COMPLETED",
+      "symbol": "RENDERUSDT"
+    }
+  ],
+  "completed_symbols": 51,
+  "current_symbol": null,
+  "failed_count": 0,
+  "finished_at": "2026-08-15T09:46:47Z",
+  "job_id": "7a4398b577484ba3bef0e3c434458d05",
+  "message": "Aktualisierung abgeschlossen",
+  "pid": 1003984,
+  "return_code": 0,
+  "started_at": "2026-08-15T09:42:54Z",
+  "state": "COMPLETED",
+  "success_count": 51,
+  "total_symbols": 51
+}

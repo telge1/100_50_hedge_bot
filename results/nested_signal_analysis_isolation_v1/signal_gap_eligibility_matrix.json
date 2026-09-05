@@ -1,0 +1,71 @@
+{
+  "gap_only_A": [
+    {
+      "signal_id": "A",
+      "research_eligible": false,
+      "continuous_capture": false,
+      "coverage_status": "GAP_BROKEN",
+      "reasons": [
+        "GAP_IN_SIGNAL_WINDOW"
+      ],
+      "overlap_cluster_id": null
+    },
+    {
+      "signal_id": "B",
+      "research_eligible": true,
+      "continuous_capture": true,
+      "coverage_status": "FULL",
+      "reasons": [],
+      "overlap_cluster_id": null
+    }
+  ],
+  "gap_both": [
+    {
+      "signal_id": "A",
+      "research_eligible": false,
+      "continuous_capture": false,
+      "coverage_status": "GAP_BROKEN",
+      "reasons": [
+        "GAP_IN_SIGNAL_WINDOW"
+      ],
+      "overlap_cluster_id": "overlap_cluster_6439535b7475a479"
+    },
+    {
+      "signal_id": "B_close",
+      "research_eligible": false,
+      "continuous_capture": false,
+      "coverage_status": "GAP_BROKEN",
+      "reasons": [
+        "GAP_IN_SIGNAL_WINDOW"
+      ],
+      "overlap_cluster_id": "overlap_cluster_6439535b7475a479"
+    }
+  ],
+  "gap_between": [
+    {
+      "signal_id": "A",
+      "research_eligible": true,
+      "continuous_capture": true,
+      "coverage_status": "FULL",
+      "reasons": [],
+      "overlap_cluster_id": null
+    },
+    {
+      "signal_id": "B",
+      "research_eligible": true,
+      "continuous_capture": true,
+      "coverage_status": "FULL",
+      "reasons": [],
+      "overlap_cluster_id": null
+    }
+  ],
+  "local_epoch_parent_discontinuous": {
+    "signal_research_eligible": true,
+    "parent_continuous_capture": false,
+    "note": "Local continuous window can be research_eligible; parent global continuous_capture may remain false"
+  },
+  "insufficient_post": {
+    "research_eligible": false,
+    "reason": "INSUFFICIENT_SIGNAL_POST_COVERAGE"
+  }
+}

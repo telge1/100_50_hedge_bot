@@ -17,17 +17,20 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "ob-levels-2";
+  const ASSET_V = "ob-levels-15";
+  try { console.info("[research] asset ob-levels-15"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
   const OBP_KEY = "research.orderbook_profile";
-  const OBL_KEY = "research.orderbook_levels";
+  const OBL_KEY = "research.orderbook_levels.v3";
   const PTB_KEY = "research.trade_bubbles";
   const VP_DEBOUNCE_MS = 400;
-  const OBP_REFRESH_MS = 60 * 1000;
+  // Match OB1000 levels: continuous WS book via collector keeper + 2s poll.
+  const OBP_REFRESH_MS = 2 * 1000;
   const OBL_REFRESH_MS = 5 * 1000;
-  const OBL1000_REFRESH_MS = 1 * 1000;
+  const OBL1000_REFRESH_MS = 2 * 1000;
+  const OBL_FULL_REFRESH_MS = 2 * 1000;
   const OBL1000_HEARTBEAT_MS = 15 * 1000;
   const OBL1000_LEASE_KEY = "research.ob1000.lease_id";
   const STOCH_STRATEGY_KEY = "stoch.strategy_version";
@@ -82,8 +85,8 @@
     hostShift: false,
     vp: { enabled: false, rows: "auto", display: "buy_sell", poc: true, value_area: true, width: "normal", volume_mode: "base" },
     obp: { enabled: false, width: "normal", mode: "snapshot_at" },
-    obl: { enabled: false, depth: 200, mode: "aggregated", scale: "sqrt", width_px: 140 },
-    obl1000: { leaseId: null, leaseGen: 0, heartbeatTimer: null, leaseSymbol: null, uiState: "DISABLED" },
+    obl: { enabled: false, depth: 1000, mode: "aggregated", scale: "sqrt", width_px: 140 },
+    obl1000: { leaseId: null, leaseGen: 0, heartbeatTimer: null, leaseSymbol: null, leaseDepth: null, uiState: "DISABLED" },
     history: {
       preset: "30d",
       customStart: "",
@@ -1387,21 +1390,37 @@
     if (!state.obp || !state.obp.enabled) return;
     state.obpRefreshTimer = setInterval(function () {
       if (!state.obp || !state.obp.enabled || !state.initialLoadDone) return;
+      if (document.hidden) return;
       refreshOrderbookProfileVisible();
     }, OBP_REFRESH_MS);
   }
 
   function defaultOrderbookLevels() {
-    return { enabled: false, depth: 200, mode: "aggregated", scale: "sqrt", width_px: 140 };
+    return { enabled: false, depth: 1000, mode: "aggregated", scale: "sqrt", width_px: 140 };
   }
 
   function oblDataDepth() {
-    const d = state.obl && state.obl.depth != null ? Number(state.obl.depth) : 200;
-    return d === 1000 ? 1000 : 200;
+    const d = state.obl && state.obl.depth != null ? Number(state.obl.depth) : 1000;
+    if (d === 200) return 200;
+    if (d === 0) return 0; // FULL extra channel
+    return 1000;
+  }
+
+  function isOnDemandBookMode() {
+    const d = oblDataDepth();
+    return !!(state.obl && state.obl.enabled && (d === 1000 || d === 0) && !isHistoricalReplay());
   }
 
   function isOb1000Mode() {
-    return !!(state.obl && state.obl.enabled && oblDataDepth() === 1000 && !isHistoricalReplay());
+    // Back-compat alias: any live on-demand book (OB1000 or FULL).
+    return isOnDemandBookMode();
+  }
+
+  function oblDepthLabel(depth) {
+    const d = depth != null ? Number(depth) : oblDataDepth();
+    if (d === 0) return "FULL";
+    if (d === 1000) return "OB1000";
+    return "OB200";
   }
 
   function getOb1000LeaseId() {
@@ -1420,6 +1439,10 @@
   function parseOb1000ApiError(err) {
     if (!err) return null;
     const msg = String(err.message || err);
+    if (msg.indexOf("symbol_not_in_pilot") >= 0) return { code: "symbol_not_in_pilot", status: 400 };
+    if (msg.indexOf("unknown_lease") >= 0 || msg.indexOf("no_active_lease") >= 0) {
+      return { code: "unknown_lease", status: 409 };
+    }
     if (msg.indexOf("disabled") >= 0) return { code: "disabled", status: 503 };
     if (msg.indexOf("collector_unavailable") >= 0 || msg.indexOf("503") >= 0) {
       return { code: "collector_unavailable", status: 503 };
@@ -1431,23 +1454,26 @@
   }
 
   function ob1000UiLabel(code) {
+    const prefix = oblDepthLabel();
     const map = {
-      DISABLED: "OB1000 DISABLED",
-      STARTING: "OB1000 STARTING",
-      LIVE: "OB1000 LIVE",
-      DELAYED: "OB1000 DELAYED",
-      STALE: "OB1000 STALE",
-      CAPACITY: "OB1000 CAPACITY",
-      OFFLINE: "OB1000 COLLECTOR OFFLINE",
-      NO_DATA: "OB1000 NO DATA",
+      DISABLED: prefix + " DISABLED",
+      STARTING: prefix + " STARTING",
+      LIVE: prefix + " LIVE",
+      DELAYED: prefix + " DELAYED",
+      STALE: prefix + " STALE",
+      CAPACITY: prefix + " CAPACITY",
+      OFFLINE: prefix + " COLLECTOR OFFLINE",
+      NO_DATA: prefix + " NO DATA",
+      NOT_PILOT: prefix + " nur BTC/DOGE",
     };
     return map[code] || code;
   }
 
   function computeOb1000UiState(payload, err) {
     if (!state.obl || !state.obl.enabled) return "DISABLED";
-    if (oblDataDepth() !== 1000) return "DISABLED";
+    if (!isOnDemandBookMode()) return "DISABLED";
     if (isHistoricalReplay()) return "DISABLED";
+    if (err && err.code === "symbol_not_in_pilot") return "NOT_PILOT";
     if (err && err.code === "disabled") return "DISABLED";
     if (err && (err.code === "collector_unavailable" || err.status === 503)) return "OFFLINE";
     if (err && err.code === "capacity_reached") return "CAPACITY";
@@ -1472,7 +1498,11 @@
 
   function releaseOb1000LeaseBestEffort() {
     if (!state.obl1000 || !state.obl1000.leaseId) return;
-    const body = { op: "release", lease_id: state.obl1000.leaseId };
+    const body = {
+      op: "release",
+      lease_id: state.obl1000.leaseId,
+      depth: state.obl1000.leaseDepth != null ? state.obl1000.leaseDepth : oblDataDepth(),
+    };
     try {
       if (navigator.sendBeacon) {
         navigator.sendBeacon("/api/research/ob1000/lease", new Blob([JSON.stringify(body)], { type: "application/json" }));
@@ -1491,21 +1521,45 @@
     stopOb1000Heartbeat();
     state.obl1000.leaseGen += 1;
     const leaseId = state.obl1000.leaseId;
+    const leaseDepth = state.obl1000.leaseDepth;
     state.obl1000.leaseId = null;
     state.obl1000.leaseSymbol = null;
+    state.obl1000.leaseDepth = null;
     state.obl1000.uiState = "DISABLED";
     if (!leaseId) return;
     try {
-      await sendJson("/api/research/ob1000/lease", "POST", { op: "release", lease_id: leaseId }, { sourceAction: "ob1000-release" });
+      await sendJson("/api/research/ob1000/lease", "POST", {
+        op: "release",
+        lease_id: leaseId,
+        depth: leaseDepth != null ? leaseDepth : oblDataDepth(),
+      }, { sourceAction: "ob1000-release" });
     } catch (e) {}
   }
 
-  async function ensureOb1000Lease(symbol) {
-    if (!isOb1000Mode() || !symbol) return false;
-    const gen = ++state.obl1000.leaseGen;
+  function invalidateOb1000LeaseLocal() {
+    state.obl1000.leaseId = null;
+    state.obl1000.leaseSymbol = null;
+    state.obl1000.leaseDepth = null;
+  }
+
+  async function ensureOb1000Lease(symbol, opts) {
+    if (!isOnDemandBookMode() || !symbol) return false;
+    const force = !!(opts && opts.force);
     const leaseId = getOb1000LeaseId();
-    if (state.obl1000.leaseId === leaseId && state.obl1000.leaseSymbol === symbol) return true;
-    if (state.obl1000.leaseId && state.obl1000.leaseSymbol !== symbol) {
+    const depth = oblDataDepth();
+    if (
+      !force &&
+      state.obl1000.leaseId === leaseId &&
+      state.obl1000.leaseSymbol === symbol &&
+      state.obl1000.leaseDepth === depth
+    ) {
+      return true;
+    }
+    const gen = ++state.obl1000.leaseGen;
+    if (
+      state.obl1000.leaseId &&
+      (state.obl1000.leaseSymbol !== symbol || state.obl1000.leaseDepth !== depth)
+    ) {
       await stopOb1000Lease();
       if (gen !== state.obl1000.leaseGen) return false;
     }
@@ -1514,31 +1568,48 @@
         op: "acquire",
         symbol: symbol,
         lease_id: leaseId,
+        depth: depth,
       }, { sourceAction: "ob1000-acquire" });
       if (gen !== state.obl1000.leaseGen) return false;
       state.obl1000.leaseId = leaseId;
       state.obl1000.leaseSymbol = symbol;
+      state.obl1000.leaseDepth = depth;
       state.obl1000.uiState = computeOb1000UiState(resp, null);
       return true;
     } catch (err) {
       if (gen !== state.obl1000.leaseGen) return false;
       state.obl1000.uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+      invalidateOb1000LeaseLocal();
       return false;
     }
   }
 
   function startOb1000Heartbeat() {
     stopOb1000Heartbeat();
-    if (!isOb1000Mode()) return;
+    if (!isOnDemandBookMode()) return;
     state.obl1000.heartbeatTimer = setInterval(function () {
-      if (!isOb1000Mode() || document.hidden || !state.symbol) return;
+      if (!isOnDemandBookMode() || document.hidden || !state.symbol) return;
       const leaseId = state.obl1000.leaseId;
-      if (!leaseId) return;
+      if (!leaseId) {
+        ensureOb1000Lease(state.symbol, { force: true }).then(function (ok) {
+          if (ok) startOb1000Heartbeat();
+        });
+        return;
+      }
       sendJson("/api/research/ob1000/lease", "POST", {
         op: "heartbeat",
         lease_id: leaseId,
         symbol: state.symbol,
-      }, { sourceAction: "ob1000-heartbeat" }).catch(function () {});
+        depth: state.obl1000.leaseDepth != null ? state.obl1000.leaseDepth : oblDataDepth(),
+      }, { sourceAction: "ob1000-heartbeat" }).catch(function (err) {
+        const parsed = parseOb1000ApiError(err);
+        if (parsed && parsed.code === "unknown_lease") {
+          invalidateOb1000LeaseLocal();
+          ensureOb1000Lease(state.symbol, { force: true }).then(function (ok) {
+            if (ok) startOb1000Heartbeat();
+          });
+        }
+      });
     }, OBL1000_HEARTBEAT_MS);
   }
 
@@ -1561,7 +1632,10 @@
     const en = $("researchOblEnabled");
     if (en) en.checked = !!obl.enabled;
     const depth = $("researchOblDepth");
-    if (depth) depth.value = oblDataDepth() === 1000 ? "1000" : "200";
+    if (depth) {
+      const d = oblDataDepth();
+      depth.value = d === 0 ? "0" : (d === 1000 ? "1000" : "200");
+    }
     const mode = $("researchOblMode");
     if (mode) mode.value = obl.mode === "raw" ? "raw" : "aggregated";
     const scale = $("researchOblScale");
@@ -1578,7 +1652,9 @@
     }
     if (state.obl.depth != null) {
       const d = Number(state.obl.depth);
-      state.obl.depth = d === 1000 ? 1000 : 200;
+      if (d === 0) state.obl.depth = 0;
+      else if (d === 1000) state.obl.depth = 1000;
+      else state.obl.depth = 200;
     }
     fillOrderbookLevelsControls();
     if (!skipPersist) persistOrderbookLevels();
@@ -1588,10 +1664,19 @@
       visibleIds().forEach(function (pid) { clearPaneOrderbookLevels(state.panes[pid]); });
       return;
     }
-    if (prevDepth === 1000 && oblDataDepth() !== 1000) {
+    const wasOnDemand = prevDepth === 1000 || prevDepth === 0;
+    const nowOnDemand = isOnDemandBookMode();
+    if (wasOnDemand && (!nowOnDemand || prevDepth !== oblDataDepth())) {
       stopOb1000Lease();
+      // Drop cached OB1000 paint when switching to FULL (or vice versa).
+      visibleIds().forEach(function (pid) {
+        const pane = state.panes[pid];
+        if (!pane) return;
+        pane._oblHadLive = false;
+        pane._oblPaintSig = null;
+      });
     }
-    if (isOb1000Mode()) {
+    if (isOnDemandBookMode()) {
       ensureOb1000Lease(state.symbol).then(function () { startOb1000Heartbeat(); });
     } else {
       stopOb1000Lease();
@@ -1655,10 +1740,23 @@
   }
 
   function startOrderbookLevelsRefresh() {
-    stopOrderbookLevelsRefresh();
-    if (!state.obl || !state.obl.enabled) return;
-    if (isOb1000Mode()) startOb1000Heartbeat();
-    const interval = isOb1000Mode() ? OBL1000_REFRESH_MS : OBL_REFRESH_MS;
+    if (state.oblRefreshTimer) {
+      clearInterval(state.oblRefreshTimer);
+      state.oblRefreshTimer = null;
+    }
+    if (!state.obl || !state.obl.enabled) {
+      stopOb1000Heartbeat();
+      return;
+    }
+    // Keep an existing on-demand heartbeat across poll restarts (startPoll calls this often).
+    if (isOnDemandBookMode()) {
+      if (!state.obl1000.heartbeatTimer) startOb1000Heartbeat();
+    } else {
+      stopOb1000Heartbeat();
+    }
+    const interval = isOnDemandBookMode()
+      ? (oblDataDepth() === 0 ? OBL_FULL_REFRESH_MS : OBL1000_REFRESH_MS)
+      : OBL_REFRESH_MS;
     state.oblRefreshTimer = setInterval(function () {
       if (!state.obl || !state.obl.enabled || !state.initialLoadDone) return;
       if (document.hidden) return;
@@ -1674,7 +1772,7 @@
       freshness_state: "unknown",
       freshness_ms: null,
       timestamp_utc: null,
-      source: depth === 1000 ? "orderbook_v3_live_on_demand" : null,
+      source: (depth === 1000 || depth === 0) ? "orderbook_v3_live_on_demand" : null,
       depth: depth,
       sequence: null,
       ui_state: uiState || null,
@@ -1699,44 +1797,125 @@
     pane.oblAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
     pane.oblInflight = true;
     try {
-    if (reqDepth === 1000) {
+    if (reqDepth === 1000 || reqDepth === 0) {
       if (isHistoricalReplay()) {
         if (gen !== pane.oblGen || reqSymbol !== state.symbol) return;
         const live = api(pane);
         if (live && live.setOrderbookLevels) {
-          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 1000, "DISABLED"), oblSettingsPayload());
+          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, "DISABLED"), oblSettingsPayload());
         }
         return;
       }
       const leased = await ensureOb1000Lease(reqSymbol);
-      if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
-      let url = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol);
+      if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+      if (!leased) {
+        const uiState = state.obl1000.uiState || "NO_DATA";
+        if (uiState === "NOT_PILOT") {
+          setStatus(oblDepthLabel(reqDepth) + " Pilot: nur BTCUSDT / DOGEUSDT (aktuell " + reqSymbol + ")", "empty");
+        }
+        const live = api(pane);
+        if (live && live.setOrderbookLevels) {
+          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, uiState), oblSettingsPayload());
+        }
+        return;
+      }
+      let url = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol) +
+        "&depth=" + encodeURIComponent(String(reqDepth));
       if (state.obl1000.leaseId) {
         url += "&lease_id=" + encodeURIComponent(state.obl1000.leaseId);
       }
       try {
-        const body = await getJson(url, {
+        let body = await getJson(url, {
           signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
           sourceAction: "ob1000-levels",
         });
         if (gen !== pane.oblGen) return;
-        if (reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
-        body.depth = 1000;
+        if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+        const emptyBook = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
+        if (emptyBook && (body.data_status === "no_data" || body.subscription_state === "stopped" || body.subscription_state === "grace")) {
+          // Stale client lease after TTL/expiry — re-acquire once before blanking the panel.
+          invalidateOb1000LeaseLocal();
+          const again = await ensureOb1000Lease(reqSymbol, { force: true });
+          if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+          if (again) {
+            startOb1000Heartbeat();
+            let retryUrl = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol) +
+              "&depth=" + encodeURIComponent(String(reqDepth));
+            if (state.obl1000.leaseId) {
+              retryUrl += "&lease_id=" + encodeURIComponent(state.obl1000.leaseId);
+            }
+            body = await getJson(retryUrl, {
+              signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
+              sourceAction: "ob1000-levels-retry",
+            });
+            if (gen !== pane.oblGen) return;
+            if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+          }
+        }
+        const stillEmpty = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
+        // Never overwrite server depth/book_mode — prevents labeling OB1000 as FULL.
+        if (body.depth == null) body.depth = reqDepth;
+        const gotDepth = body.depth != null ? Number(body.depth) : reqDepth;
+        const gotMode = body.book_mode != null ? String(body.book_mode) : "";
+        if (reqDepth === 0 && (gotDepth !== 0 || (gotMode && gotMode !== "full"))) {
+          // Stale dashboard API without FULL support still serves OB1000.
+          body.bids = [];
+          body.asks = [];
+          body.ui_state = "OFFLINE";
+          body.subscription_state = "error";
+          body._mismatch = "expected_full_got_" + (gotMode || ("depth_" + String(gotDepth)));
+          state.obl1000.uiState = "OFFLINE";
+          setStatus("FULL braucht Dashboard-Restart (API liefert noch OB1000). sudo systemctl restart dashboard.service", "empty");
+          const live = api(pane);
+          if (live && live.setOrderbookLevels) {
+            live.setOrderbookLevels(body, oblSettingsPayload());
+            pane._oblHadLive = false;
+            pane._oblPaintSig = null;
+          }
+          return;
+        }
         body.ui_state = computeOb1000UiState(body, null);
         state.obl1000.uiState = body.ui_state;
         const live = api(pane);
         if (live && live.setOrderbookLevels) {
-          live.setOrderbookLevels(body, oblSettingsPayload());
+          const sig = String(body.timestamp_utc || "") + "|" + String(body.sequence || "") + "|" +
+            String((body.bids && body.bids.length) || 0) + "|" + String((body.asks && body.asks.length) || 0) + "|" +
+            String(body.ui_state || "") + "|" + String(body.raw_bid_count || "") + "|" + String(body.raw_ask_count || "") + "|" +
+            String(body.depth) + "|" + String(body.book_mode || "");
+          if (!stillEmpty) {
+            if (pane._oblPaintSig !== sig) {
+              live.setOrderbookLevels(body, oblSettingsPayload());
+              pane._oblPaintSig = sig;
+            }
+            pane._oblHadLive = true;
+          } else if (!pane._oblHadLive) {
+            live.setOrderbookLevels(body, oblSettingsPayload());
+            pane._oblPaintSig = sig;
+          }
+          // else: keep last live frame to avoid empty flicker while re-subscribing
         }
       } catch (err) {
         if (err && err.name === "AbortError") return;
         if (gen !== pane.oblGen) return;
-        if (reqSymbol !== state.symbol || oblDataDepth() !== 1000) return;
-        const uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+        if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+        const parsed = parseOb1000ApiError(err);
+        if (parsed && parsed.code === "unknown_lease") {
+          invalidateOb1000LeaseLocal();
+          await ensureOb1000Lease(reqSymbol, { force: true });
+          if (gen !== pane.oblGen) return;
+          return;
+        }
+        const uiState = computeOb1000UiState(null, parsed);
         state.obl1000.uiState = uiState;
-        const live = api(pane);
-        if (live && live.setOrderbookLevels) {
-          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 1000, uiState), oblSettingsPayload());
+        if (uiState === "NOT_PILOT") {
+          setStatus(oblDepthLabel(reqDepth) + " Pilot: nur BTCUSDT / DOGEUSDT (aktuell " + reqSymbol + ")", "empty");
+        }
+        // Keep last painted book on transient errors (except explicit not-pilot/offline/disabled).
+        if (uiState === "NOT_PILOT" || uiState === "OFFLINE" || uiState === "DISABLED" || uiState === "CAPACITY") {
+          const live = api(pane);
+          if (live && live.setOrderbookLevels) {
+            live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, uiState), oblSettingsPayload());
+          }
         }
       }
       return;
@@ -1814,10 +1993,20 @@
       } else {
         setStatus("Orderbook Profile: Chart-API fehlt (iframe neu laden)", "error");
       }
-      if (body && body.warning === "no_wall_data") {
+      if (body && body.warning === "no_ob200_archive") {
+        setStatus(
+          "Orderbook Walls: kein OB200-Archiv für " + String(state.symbol || "") +
+            " (nur BTCUSDT/DOGEUSDT)",
+          "empty"
+        );
+      } else if (body && body.warning === "no_wall_data") {
         setStatus("Orderbook Walls: keine aktuellen Daten", "empty");
       } else if (body && body.bar_count > 0) {
-        const src = body.profile_kind === "ob200_multi_walls" ? "OB200" : "Features";
+        const pk = String(body.profile_kind || "");
+        let src = "Features";
+        if (pk.indexOf("ob1000_on_demand") >= 0) src = "OB1000 WS";
+        else if (pk.indexOf("ob1000_rest") >= 0) src = "OB1000 REST";
+        else if (pk === "ob200_multi_walls") src = "OB200";
         const ob = body.ob200 || {};
         const live = ob.live_open ? " · live" : "";
         const lag = (ob.live_open && ob.lag_seconds != null) ? (" · lag " + Math.round(ob.lag_seconds) + "s") : "";
@@ -2445,6 +2634,7 @@
       chart.setLowerPane(pane.pendingLower);
       chart.setLldEma(pane.pendingLldEma);
       chart.setInteractionMode(toolMode());
+      if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
       pane.phase = "INTERACTION_READY";
     }
     syncOverlays(pane, pane.pendingOverlays);
@@ -2632,15 +2822,18 @@
     const gen = state.pollGen;
     state.pollTimer = setInterval(function () {
       if (gen !== state.pollGen || !state.initialLoadDone) return;
+      if (document.hidden) return;
       pollIncremental(gen);
       refreshLiveBar(false);
     }, POLL_MS);
     state.formingTimer = setInterval(function () {
       if (gen !== state.pollGen || !state.initialLoadDone) return;
+      if (document.hidden) return;
       pollForming(gen);
     }, FORMING_MS);
     // Immediate first tick so price moves without waiting for the interval.
-    pollForming(gen);
+    if (!document.hidden) pollForming(gen);
+    // Do not re-enable followLive here — pan/zoom stays until Zentrieren.
     if (state.obp && state.obp.enabled) startOrderbookProfileRefresh();
     if (state.obl && state.obl.enabled) startOrderbookLevelsRefresh();
   }
@@ -3325,7 +3518,10 @@
       el.addEventListener("change", function () {
         if (!state.obl) state.obl = defaultOrderbookLevels();
         if (id === "researchOblDepth") {
-          state.obl.depth = ($("researchOblDepth") && $("researchOblDepth").value === "1000") ? 1000 : 200;
+          const v = $("researchOblDepth") ? $("researchOblDepth").value : "0";
+          if (v === "0") state.obl.depth = 0;
+          else if (v === "1000") state.obl.depth = 1000;
+          else state.obl.depth = 200;
         } else {
           state.obl.mode = ($("researchOblMode") && $("researchOblMode").value) || "aggregated";
           state.obl.scale = ($("researchOblScale") && $("researchOblScale").value) || "sqrt";
@@ -4637,6 +4833,11 @@
       if (document.hidden) {
         stopOb1000Heartbeat();
         return;
+      }
+      // Browser throttles background timers — kick live price immediately.
+      if (state.initialLoadDone && !isHistoricalReplay()) {
+        if (!state.formingTimer || !state.pollTimer) startPoll();
+        else pollForming(state.pollGen);
       }
       if (isOb1000Mode() && state.symbol) {
         ensureOb1000Lease(state.symbol).then(function () {

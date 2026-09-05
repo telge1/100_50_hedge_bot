@@ -1,0 +1,56 @@
+{
+  "start": "2026-08-18T15:10:00Z",
+  "cutoff": "2026-09-04T17:38:05Z",
+  "lock_free": true,
+  "ch_ok": true,
+  "ddl_has_bucket_time": true,
+  "ddl_has_open_interest": true,
+  "ddl_engine": true,
+  "columns": [
+    "exchange",
+    "category",
+    "symbol",
+    "bucket_time",
+    "open_interest",
+    "open_interest_value",
+    "source",
+    "collector_instance_id",
+    "inserted_at"
+  ],
+  "logical_rows": {
+    "count": 8640,
+    "symbols": 1,
+    "min": "2026-07-19 15:10:00",
+    "max": "2026-08-18 15:05:00"
+  },
+  "expected_per_symbol": 4926,
+  "expected_first": "2026-08-18T15:10:00Z",
+  "expected_last": "2026-09-04T17:35:00Z",
+  "missing": {
+    "BTCUSDT": {
+      "present": 0,
+      "missing": 4926,
+      "first_missing": "2026-08-18T15:10:00Z",
+      "last_missing": "2026-09-04T17:35:00Z"
+    },
+    "DOGEUSDT": {
+      "present": 0,
+      "missing": 4926,
+      "first_missing": "2026-08-18T15:10:00Z",
+      "last_missing": "2026-09-04T17:35:00Z"
+    }
+  },
+  "missing_ok": true,
+  "rest_sample": {
+    "n": 12,
+    "match_first_missing": {
+      "openInterest": "62978.44900000",
+      "singleOpenInterest": "31489.225",
+      "timestamp": "1787065800000"
+    },
+    "retCode": 0
+  },
+  "other_backfill_procs": [
+    "1782713 tee /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/oi_5m_btc_doge_production_backfill_v1/preflight_checks.json"
+  ]
+}

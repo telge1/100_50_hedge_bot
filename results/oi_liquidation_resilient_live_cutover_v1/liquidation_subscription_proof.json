@@ -1,0 +1,20 @@
+{
+  "subscription_active": true,
+  "topics_expected": [
+    "tickers.{symbol}",
+    "allLiquidation.{symbol}"
+  ],
+  "universe_symbols": 51,
+  "health_ws_alive": true,
+  "health_writer_alive": true,
+  "health_status": "GREEN",
+  "last_liquidation_received_ts": 1788546195.558,
+  "last_liquidation_persisted_ts": 1788546197.0984986,
+  "all_liquidations_max_event_time": "2026-09-04 18:23:15.558000",
+  "all_liquidations_count": 144011,
+  "liq_status": "LIVE_EVENTS_OBSERVED",
+  "post_restart_session_locked": 0,
+  "post_restart_spool_meta_race_hits": 85,
+  "shared_writer_proven_via_oi": true,
+  "note": "No synthetic liquidations written."
+}

@@ -1,0 +1,24 @@
+{
+  "prefix_parity_ok": true,
+  "candidates_finite": true,
+  "funnel": {
+    "one_second_buckets": 5010,
+    "raw_bursts": 5926,
+    "compression_evaluated": 5707,
+    "compression_allowed": 141,
+    "same_side_veto": 9,
+    "delayed_continuation_veto": 1,
+    "counter_events": 2614,
+    "counter_confirmed": 24,
+    "diagnostic_candidates": 5,
+    "efficiency_flip": 24,
+    "structure_break_pending": 24,
+    "acceptance_pending": 15,
+    "timeout": 134,
+    "invalidated": 10
+  },
+  "oi_labels": 5400,
+  "ob_available": false,
+  "bbo_available": false,
+  "verdict": "AGGRESSOR_EFFICIENCY_FLIP_F0_PASSED_WITH_DATA_LIMITATIONS"
+}

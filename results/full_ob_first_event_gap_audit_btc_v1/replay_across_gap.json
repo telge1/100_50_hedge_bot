@@ -1,0 +1,21 @@
+{
+  "case": "EVENT_NOT_SELF_CONTAINED_ACROSS_GAP",
+  "continuous_replay_possible": false,
+  "reason": "First incoming u after silence fails FullBookState.apply_delta with GAP; no mid-event REST seed in capture to start new epoch",
+  "applied_deltas_before_gap": 2658,
+  "gap_hit": {
+    "line": 3774,
+    "book_u": 4350204,
+    "incoming_u": 4350353,
+    "book_seq": 805051079937,
+    "incoming_seq": 805051320556,
+    "bid_levels": 39533,
+    "ask_levels": 24245,
+    "book_hash": "71656656da5b6189d31fe6ab6159506e8b0d4e038743f508a9142c9ecabfe674",
+    "best_bid": 80694.2,
+    "best_ask": 80694.5,
+    "crossed": false
+  },
+  "new_seed_after_gap_in_capture": false,
+  "research_eligible": false
+}
