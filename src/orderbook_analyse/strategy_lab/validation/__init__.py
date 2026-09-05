@@ -20,7 +20,9 @@ from orderbook_analyse.strategy_lab.validation.p4b import (
     validate_strategy_v2_p4b,
 )
 from orderbook_analyse.strategy_lab.validation.p4c import (
+    require_valid_candidate_discovery_v2,
     require_valid_strategy_v2_p4c,
+    validate_candidate_discovery_v2,
     validate_strategy_v2_p4c,
 )
 
@@ -32,9 +34,11 @@ __all__ = [
     "ValidationReport",
     "ValidationSeverity",
     "production_catalog_bundle_v2",
+    "require_valid_candidate_discovery_v2",
     "require_valid_strategy_v2_p4a",
     "require_valid_strategy_v2_p4b",
     "require_valid_strategy_v2_p4c",
+    "validate_candidate_discovery_v2",
     "validate_strategy_v2_p4a",
     "validate_strategy_v2_p4b",
     "validate_strategy_v2_p4c",

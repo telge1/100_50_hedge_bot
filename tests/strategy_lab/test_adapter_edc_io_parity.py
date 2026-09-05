@@ -41,7 +41,7 @@ TRADE_CSV = (
     / "xrp_30d_horizon_tp_sl_matrix"
     / "trades_matrix.csv"
 )
-HASH_EDC = "fb0ebc45827c68ab60d3a920c2d5d68651857080cf950fc020994044935f81ea"
+HASH_EDC = "4aced6b481d19eadd5505afc535e6fb4976f231fd2894b11f7d79acebc53598f"
 WINDOW_START = datetime(2026, 7, 24, 0, 0, tzinfo=UTC)
 WINDOW_END = datetime(2026, 8, 23, 0, 0, tzinfo=UTC)
 

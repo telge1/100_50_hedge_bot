@@ -1,0 +1,11 @@
+"""Liquidity Location pool lookahead / repaint / prefix-stability audit (v1)."""
+
+from __future__ import annotations
+
+AUDIT_ID = "liquidity_location_pool_causality_audit_v1"
+AUDIT_VERSION = "v1"
+
+VERDICT_FREE = "LIQUIDITY_LOCATION_POOLS_LOOKAHEAD_AND_REPAINT_FREE"
+VERDICT_REPAINT = "LIQUIDITY_LOCATION_POOL_REPAINT_FOUND"
+VERDICT_LOOKAHEAD = "LIQUIDITY_LOCATION_POOL_LOOKAHEAD_FOUND"
+VERDICT_LIFECYCLE = "LIQUIDITY_LOCATION_POOL_LIFECYCLE_UNSTABLE"

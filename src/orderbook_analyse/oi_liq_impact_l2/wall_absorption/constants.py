@@ -1,0 +1,38 @@
+"""F3 wall-absorption discovery constants."""
+
+from __future__ import annotations
+
+FORMAT_VERSION = "oi_liq_impact_l2_wall_absorption/v1"
+SYMBOL = "BTCUSDT"
+WINDOW_START = "2026-08-20T12:33:00Z"
+WINDOW_END = "2026-08-24T06:35:00Z"
+DEFAULT_FILES_ROOT = (
+    "/home/telgenbuescher/projects/data/orderbook_raw_v2/bybit/linear/ob200"
+)
+CLUSTER_GAP_SENSITIVITIES = (1, 2, 3, 5)
+RECLAIM_HORIZONS_MINUTES = (1, 3, 5, 10, 15, 30, 60)
+RECLAIM_ANCHORS = (
+    "WALL_PRICE",
+    "CLUSTER_VWAP",
+    "ABSORPTION_RANGE_EXTREME",
+    "LAST_PRICE_BEFORE_FIRST_TOUCH",
+)
+WALL_TOP_N = 5
+WALL_LIFECYCLE_STATES = (
+    "WALL_UNTOUCHED",
+    "WALL_APPROACHED",
+    "WALL_TOUCHED",
+    "WALL_PARTIALLY_CONSUMED",
+    "WALL_REFILLED",
+    "WALL_HELD",
+    "WALL_REMOVED",
+    "WALL_TRADED_THROUGH",
+    "WALL_DATA_ABORT",
+)
+COMPARISON_GROUPS = (
+    "WALL_HELD_OR_REFILLED",
+    "WALL_REMOVED_OR_TRADED_THROUGH",
+    "WALL_NEVER_TOUCHED",
+    "WALL_DATA_ABORT",
+    "PARTIAL_UNRESOLVED",
+)

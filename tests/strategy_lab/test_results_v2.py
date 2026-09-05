@@ -32,7 +32,7 @@ from orderbook_analyse.strategy_lab.results_v2 import (
 )
 
 UTC = timezone.utc
-HASH_A = "fb0ebc45827c68ab60d3a920c2d5d68651857080cf950fc020994044935f81ea"
+HASH_A = "4aced6b481d19eadd5505afc535e6fb4976f231fd2894b11f7d79acebc53598f"
 HASH_B = "c70a16d5e22c9ccd1060e2800bf429c7eafdd7c8299f7e91e68903cad980cc4f"
 
 

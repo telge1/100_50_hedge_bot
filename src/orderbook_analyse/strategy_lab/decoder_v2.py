@@ -1,7 +1,9 @@
-"""Decode raw StrategySpec V2 mappings into frozen ``StrategySpecV2`` (P6).
+"""Decode raw StrategySpec V2 mappings into frozen strategy roots (P6).
 
 Uses the P2 safe YAML loader as the only YAML ingress, then reconstructs
-typed dataclasses without semantic defaults, mutation, or V1 migration.
+typed dataclasses without semantic defaults (except backward-compatible
+``run_intent`` defaulting to ``trade_backtest`` when omitted), mutation, or
+V1 migration.
 """
 
 from __future__ import annotations
@@ -21,19 +23,24 @@ from typing import (
 )
 
 from orderbook_analyse.strategy_lab.compiler_v2 import (
+    CompiledCandidateDiscoveryV2,
     CompiledStrategyV2,
+    compile_candidate_discovery_v2,
     compile_strategy_v2,
 )
 from orderbook_analyse.strategy_lab.loader import load_strategy_yaml, load_strategy_yaml_path
+from orderbook_analyse.strategy_lab.models.contracts_v2.enums import StrategyRunIntentV2
 from orderbook_analyse.strategy_lab.models.strategy_v2 import (
     STRATEGY_SPEC_V2_SCHEMA_VERSION,
-    StrategySpecV2,
+    AnyStrategySpecV2,
+    CandidateDiscoveryStrategySpecV2,
+    TradeBacktestStrategySpecV2,
 )
 from orderbook_analyse.strategy_lab.validation.catalogs import CatalogBundleV2
 
 
 class StrategyDecodeError(Exception):
-    """Raised when a raw mapping cannot be decoded into StrategySpecV2."""
+    """Raised when a raw mapping cannot be decoded into a StrategySpec V2 root."""
 
     def __init__(
         self,
@@ -51,16 +58,38 @@ class StrategyDecodeError(Exception):
         )
 
 
-def decode_strategy_v2(data: Mapping[str, object]) -> StrategySpecV2:
-    """Decode a raw mapping into ``StrategySpecV2`` (no validation/compile)."""
-    if not isinstance(data, Mapping):
+def _normalize_run_intent(
+    data: Mapping[str, object],
+) -> tuple[dict[str, object], StrategyRunIntentV2]:
+    """Copy mapping and apply backward-compatible run_intent default."""
+    payload = dict(data)
+    raw_intent = payload.get("run_intent")
+    if raw_intent is None:
+        # Existing trade specs omit run_intent; preserve prior semantics.
+        payload["run_intent"] = StrategyRunIntentV2.TRADE_BACKTEST.value
+        return payload, StrategyRunIntentV2.TRADE_BACKTEST
+    if type(raw_intent) is not str:
         raise StrategyDecodeError(
-            "strategy root must be a mapping",
-            path="$",
-            expected="Mapping[str, object]",
-            observed=type(data).__name__,
+            "run_intent must be a str",
+            path="$.run_intent",
+            expected="trade_backtest | candidate_discovery",
+            observed=type(raw_intent).__name__,
         )
-    if type(data) is not dict and not isinstance(data, Mapping):
+    try:
+        intent = StrategyRunIntentV2(raw_intent)
+    except ValueError as exc:
+        raise StrategyDecodeError(
+            "unknown run_intent",
+            path="$.run_intent",
+            expected="trade_backtest | candidate_discovery",
+            observed=repr(raw_intent),
+        ) from exc
+    return payload, intent
+
+
+def decode_strategy_v2(data: Mapping[str, object]) -> AnyStrategySpecV2:
+    """Decode a raw mapping into a StrategySpec V2 root (no validation/compile)."""
+    if not isinstance(data, Mapping):
         raise StrategyDecodeError(
             "strategy root must be a mapping",
             path="$",
@@ -85,26 +114,53 @@ def decode_strategy_v2(data: Mapping[str, object]) -> StrategySpecV2:
             observed=repr(schema_version),
         )
 
-    decoded = _decode_value(data, StrategySpecV2, path="$")
-    if not isinstance(decoded, StrategySpecV2):
+    payload, intent = _normalize_run_intent(data)
+    if intent is StrategyRunIntentV2.CANDIDATE_DISCOVERY:
+        for forbidden in (
+            "entry",
+            "exit",
+            "execution_assumptions",
+            "costs",
+            "portfolio_assumptions",
+            "intrabar_policy",
+        ):
+            if forbidden in payload:
+                raise StrategyDecodeError(
+                    f"candidate_discovery forbids field {forbidden!r}",
+                    path=f"$.{forbidden}",
+                    expected="absent",
+                    observed="present",
+                )
+        decoded = _decode_value(payload, CandidateDiscoveryStrategySpecV2, path="$")
+        if not isinstance(decoded, CandidateDiscoveryStrategySpecV2):
+            raise StrategyDecodeError(
+                "decoded root is not CandidateDiscoveryStrategySpecV2",
+                path="$",
+                expected="CandidateDiscoveryStrategySpecV2",
+                observed=type(decoded).__name__,
+            )
+        return decoded
+
+    decoded = _decode_value(payload, TradeBacktestStrategySpecV2, path="$")
+    if not isinstance(decoded, TradeBacktestStrategySpecV2):
         raise StrategyDecodeError(
-            "decoded root is not StrategySpecV2",
+            "decoded root is not TradeBacktestStrategySpecV2",
             path="$",
-            expected="StrategySpecV2",
+            expected="TradeBacktestStrategySpecV2",
             observed=type(decoded).__name__,
         )
     return decoded
 
 
-def load_strategy_v2_yaml(text: str) -> StrategySpecV2:
-    """Safely load YAML text and decode into ``StrategySpecV2``."""
+def load_strategy_v2_yaml(text: str) -> AnyStrategySpecV2:
+    """Safely load YAML text and decode into a StrategySpec V2 root."""
     if type(text) is not str:
         raise TypeError("text must be exact str")
     return decode_strategy_v2(load_strategy_yaml(text))
 
 
-def load_strategy_v2_yaml_file(path: str | Path) -> StrategySpecV2:
-    """Safely load a YAML file and decode into ``StrategySpecV2``."""
+def load_strategy_v2_yaml_file(path: str | Path) -> AnyStrategySpecV2:
+    """Safely load a YAML file and decode into a StrategySpec V2 root."""
     return decode_strategy_v2(load_strategy_yaml_path(path))
 
 
@@ -112,8 +168,16 @@ def load_compile_strategy_v2(
     path: str | Path,
     catalogs: CatalogBundleV2,
 ) -> CompiledStrategyV2:
-    """Load YAML, decode, then compile (P4C runs inside compile_strategy_v2)."""
+    """Load YAML, decode, then trade-compile (rejects candidate_discovery)."""
     return compile_strategy_v2(load_strategy_v2_yaml_file(path), catalogs)
+
+
+def load_compile_candidate_discovery_v2(
+    path: str | Path,
+    catalogs: CatalogBundleV2,
+) -> CompiledCandidateDiscoveryV2:
+    """Load YAML, decode, then candidate-compile (rejects trade_backtest)."""
+    return compile_candidate_discovery_v2(load_strategy_v2_yaml_file(path), catalogs)
 
 
 def _decode_value(raw: object, expected: Any, *, path: str) -> object:

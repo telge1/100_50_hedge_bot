@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from orderbook_analyse.strategy_lab.catalogs.v2.models import (
     CATALOG_CONTRACT_VERSION,
+    CandidatePluginDescriptorV2,
     PluginDescriptorV2,
 )
 from orderbook_analyse.strategy_lab.models.contracts_v2 import (
@@ -26,6 +27,7 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     PaddingNotApplicable,
     ParameterDefinitionV2,
     ParameterValueType,
+    PluginContractStatusV2,
     PluginModeContractV2,
     PluginModeRequirementV2,
     PluginParameterBindingTargetV2,
@@ -37,6 +39,7 @@ from orderbook_analyse.strategy_lab.models.contracts_v2 import (
     SignalTimeframeModeV2,
     SnapshotGranularityV2,
     SourceLoadingPaddingV2,
+    StrategyRunIntentV2,
     TimeframeGranularityV2,
     WarmupTimeframeBasisV2,
 )
@@ -735,7 +738,272 @@ CLUSTER_SWEEP = PluginDescriptorV2(
     ),
 )
 
-PLUGIN_DESCRIPTORS_V2: tuple[PluginDescriptorV2, ...] = (
+EMA_ZONE_MICROSTRUCTURE_CONFIRMATION = CandidatePluginDescriptorV2(
+    plugin_id=_SID(value="ema_zone_microstructure_confirmation"),
+    contract_version=ContractVersion(value=CATALOG_CONTRACT_VERSION),
+    kind=PluginKind.SIGNAL,
+    description=(
+        "RESEARCH_CONTRACT_ONLY: EMA9/20/59 regime + EMA20/59/200 zones with "
+        "microstructure candidate classification. No detector/runner; no entry/exit."
+    ),
+    parameters=(
+        PluginParameterDefinitionV2(
+            definition=ParameterDefinitionV2(
+                name=_SID(value="regime_slope_lookback_short"),
+                value_type=ParameterValueType.INTEGER,
+                required=True,
+                description="Closed 5m bars for short EMA slope (research default).",
+                allowed_identifiers=(),
+                int_bounds=IntBoundsV2(min_value=1, max_value=None),
+                decimal_bounds=None,
+                required_rate_unit=None,
+                legacy_reference_value="3",
+                must_be_explicit=True,
+                research_space_varies=True,
+                baseline_defining=False,
+            ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
+        ),
+        PluginParameterDefinitionV2(
+            definition=ParameterDefinitionV2(
+                name=_SID(value="regime_slope_lookback_long"),
+                value_type=ParameterValueType.INTEGER,
+                required=True,
+                description="Closed 5m bars for long EMA slope (research default).",
+                allowed_identifiers=(),
+                int_bounds=IntBoundsV2(min_value=1, max_value=None),
+                decimal_bounds=None,
+                required_rate_unit=None,
+                legacy_reference_value="6",
+                must_be_explicit=True,
+                research_space_varies=True,
+                baseline_defining=False,
+            ),
+            binding_target=PluginParameterBindingTargetV2.PLUGIN_REF_CONFIG,
+        ),
+    ),
+    mode_contract=PluginModeContractV2(
+        requirement=PluginModeRequirementV2.NOT_APPLICABLE,
+        allowed_modes=(),
+    ),
+    required_features=(
+        BoundFeatureRequirementV2(
+            alias=_SID(value="ema_fast"),
+            feature_id=_SID(value="ema"),
+            bindings=(BoundParameterBindingV2(name=_SID(value="period"), value=IntParam(value=9)),),
+        ),
+        BoundFeatureRequirementV2(
+            alias=_SID(value="ema_medium"),
+            feature_id=_SID(value="ema"),
+            bindings=(BoundParameterBindingV2(name=_SID(value="period"), value=IntParam(value=20)),),
+        ),
+        BoundFeatureRequirementV2(
+            alias=_SID(value="ema_slow"),
+            feature_id=_SID(value="ema"),
+            bindings=(BoundParameterBindingV2(name=_SID(value="period"), value=IntParam(value=59)),),
+        ),
+        BoundFeatureRequirementV2(
+            alias=_SID(value="ema_structure"),
+            feature_id=_SID(value="ema"),
+            bindings=(BoundParameterBindingV2(name=_SID(value="period"), value=IntParam(value=200)),),
+        ),
+        BoundFeatureRequirementV2(
+            alias=_SID(value="atr"),
+            feature_id=_SID(value="atr_wilder"),
+            bindings=(BoundParameterBindingV2(name=_SID(value="period"), value=IntParam(value=14)),),
+        ),
+    ),
+    data_requirements=(
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_candles_signal_tf"),
+            source_kind=DataSourceKindV2.CANDLES_SIGNAL_TF,
+            role=DataRequirementRoleV2.SIGNAL_REQUIRED,
+            required=True,
+            granularity=TimeframeGranularityV2(timeframe=_tf(5)),
+            availability=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            rationale="Closed 5m OHLCV for EMA regime and zone geometry.",
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+                    path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+                    symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+                    notes="research_contract_only",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_candles_execution_1m"),
+            source_kind=DataSourceKindV2.CANDLES_EXECUTION_1M,
+            role=DataRequirementRoleV2.SIGNAL_REQUIRED,
+            required=True,
+            granularity=TimeframeGranularityV2(timeframe=_tf(1)),
+            availability=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+            rationale="1m detail candles for zone approach clocks (not trade entry).",
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+                    path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+                    symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+                    notes="research_contract_only",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_orderbook_ob200_v3_raw"),
+            source_kind=DataSourceKindV2.ORDERBOOK_OB200_V3_RAW,
+            role=DataRequirementRoleV2.CONFIRMATION_REQUIRED,
+            required=True,
+            granularity=EventStreamGranularityV2(native_event_stream=True),
+            availability=AvailabilityTimingV2.WINDOW_EDGE,
+            rationale=(
+                "Per-level raw OB200 closed archive segments (ob200_v3.zst). "
+                "Distinct from orderbook_ob200_v3_1m. Open *.tmp must not be read. "
+                "Missing data → candidate_state data_incomplete."
+            ),
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.ob200_v3_raw_discovery.files",
+                    path="src/orderbook_analyse/ob200_v3_raw_discovery/files.py",
+                    symbol="list_closed_segments",
+                    notes="metadata registration only; no loader wired in this contract",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_public_trades_native"),
+            source_kind=DataSourceKindV2.PUBLIC_TRADES_NATIVE,
+            role=DataRequirementRoleV2.CONFIRMATION_REQUIRED,
+            required=True,
+            granularity=EventStreamGranularityV2(native_event_stream=True),
+            availability=AvailabilityTimingV2.WINDOW_EDGE,
+            rationale=(
+                "Native/tick public trades (public_trades_canonical). "
+                "Distinct from public_trades_1m aggregate."
+            ),
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.l2_wall_attack_discovery.trades",
+                    path="src/orderbook_analyse/l2_wall_attack_discovery/trades.py",
+                    symbol="load_public_trades",
+                    notes="metadata registration only; no loader wired in this contract",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_open_interest_1m"),
+            source_kind=DataSourceKindV2.OPEN_INTEREST_1M,
+            role=DataRequirementRoleV2.CONFIRMATION_REQUIRED,
+            required=True,
+            granularity=TimeframeGranularityV2(timeframe=_tf(1)),
+            availability=AvailabilityTimingV2.WINDOW_EDGE,
+            rationale="1m OI context at zones.",
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+                    path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+                    symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+                    notes="research_contract_only",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_liquidations"),
+            source_kind=DataSourceKindV2.LIQUIDATIONS,
+            role=DataRequirementRoleV2.CONFIRMATION_REQUIRED,
+            required=True,
+            granularity=EventStreamGranularityV2(native_event_stream=True),
+            availability=AvailabilityTimingV2.WINDOW_EDGE,
+            rationale="Native liquidation events for flush/squeeze/exhaustion context.",
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+                    path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+                    symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+                    notes="research_contract_only",
+                ),
+            ),
+        ),
+        DataRequirementSpecV2(
+            requirement_id=_SID(value="ezm_liquidity_locations"),
+            source_kind=DataSourceKindV2.LIQUIDITY_LOCATIONS,
+            role=DataRequirementRoleV2.ANALYSIS_OPTIONAL,
+            required=False,
+            granularity=SnapshotGranularityV2(aligned_timeframe=_tf(5)),
+            availability=AvailabilityTimingV2.PRIOR_BAR_OPEN,
+            rationale="Optional LLD locations for next-zone clearance confluence.",
+            required_for_policy=None,
+            provenance=(
+                LegacyProvenanceRefV2(
+                    module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+                    path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+                    symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+                    notes="research_contract_only",
+                ),
+            ),
+        ),
+    ),
+    confirmation_policy=None,
+    supported_directions=Directionality.BOTH,
+    signal_timeframe=SignalTimeframeContractV2(
+        mode=SignalTimeframeModeV2.FIXED,
+        reference_minutes=5,
+        allowed_minutes=(5,),
+        notes="Regime/EMA decisions use closed 5m bars only.",
+    ),
+    detail_timeframe=_tf(1),
+    signal_decision_timing=AvailabilityTimingV2.SIGNAL_BAR_CLOSE,
+    candidate_states=(
+        _SID(value="watch_zone"),
+        _SID(value="block_flat_compression"),
+        _SID(value="wait_microstructure_confirmation"),
+        _SID(value="defense_rejection_confirmed"),
+        _SID(value="breakout_confirmed"),
+        _SID(value="false_breakout_confirmed"),
+        _SID(value="wait_next_zone_confirmation"),
+        _SID(value="possible_regime_flip"),
+        _SID(value="full_regime_flip_confirmed"),
+        _SID(value="no_trade"),
+        _SID(value="data_incomplete"),
+    ),
+    signal_warmup=SignalEngineWarmupRequirementV2(
+        minimum_bars=200,
+        timeframe_basis=WarmupTimeframeBasisV2.SELECTED_SIGNAL_TIMEFRAME,
+        fixed_timeframe=None,
+    ),
+    source_loading_padding=SourceLoadingPaddingV2(
+        candle_history=_dur_days("10"),
+        auxiliary_source_history=_dur_hours("2"),
+    ),
+    outcome_evaluation_padding=OutcomeEvaluationPaddingV2(
+        post_window_duration=PaddingNotApplicable(not_applicable=True),
+    ),
+    causality_status=CausalityStatus.CAUSAL_REUSABLE_WHEN_DEPENDENCY_AVAILABLE,
+    causality_claim=(
+        "Regime/zone decisions use closed 5m bars only. Event_time, decision_time, "
+        "and possible later entry_time remain separate. No outcome MFE/MAE lookahead. "
+        "Missing raw OB/trades → data_incomplete."
+    ),
+    adapter_status=AdapterBindingStatusV2.CATALOG_ONLY,
+    provenance=(
+        LegacyProvenanceRefV2(
+            module="orderbook_analyse.strategy_lab.catalogs.v2.plugins",
+            path="src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py",
+            symbol="EMA_ZONE_MICROSTRUCTURE_CONFIRMATION",
+            notes="RESEARCH_CONTRACT_ONLY; no detector implemented",
+        ),
+    ),
+    contract_status=PluginContractStatusV2.RESEARCH_CONTRACT_ONLY,
+    run_intent=StrategyRunIntentV2.CANDIDATE_DISCOVERY,
+)
+
+PLUGIN_DESCRIPTORS_V2: tuple[PluginDescriptorV2 | CandidatePluginDescriptorV2, ...] = (
     EDC_M0_STRICT_SYNC,
     CLUSTER_SWEEP,
+    EMA_ZONE_MICROSTRUCTURE_CONFIRMATION,
 )

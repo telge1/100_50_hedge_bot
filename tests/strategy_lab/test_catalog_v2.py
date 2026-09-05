@@ -116,11 +116,13 @@ def test_rate_param_not_in_numeric_compare_signatures() -> None:
 
 
 def test_plugin_descriptors_complete() -> None:
-    assert len(PLUGIN_CATALOG_V2) == 2
+    assert len(PLUGIN_CATALOG_V2) == 3
     edc = get_plugin_v2("edc_m0_strict_sync")
     cluster = get_plugin_v2("cluster_sweep")
+    ezm = get_plugin_v2("ema_zone_microstructure_confirmation")
     assert edc.contract_version.value == "catalog/v2"
     assert cluster.contract_version.value == "catalog/v2"
+    assert ezm.contract_version.value == "catalog/v2"
     assert edc.confirmation_policy is not None
     assert cluster.confirmation_policy is None
 

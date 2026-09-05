@@ -1,0 +1,314 @@
+run_intent: candidate_discovery
+analysis_requirements:
+  forbidden_leakage_features: []
+  min_symbols: null
+  min_trades: null
+  notes: >
+    Candidate discovery only. No MFE/MAE/realized_pnl trade outcomes.
+    EMAs identify regime and decision zones. Per-level orderbook, public trades,
+    open interest and liquidations classify the reaction. Trade execution and
+    exit policy are intentionally deferred.
+  required_label_fields: []
+candidate_states:
+- value: watch_zone
+- value: block_flat_compression
+- value: wait_microstructure_confirmation
+- value: defense_rejection_confirmed
+- value: breakout_confirmed
+- value: false_breakout_confirmed
+- value: wait_next_zone_confirmation
+- value: possible_regime_flip
+- value: full_regime_flip_confirmed
+- value: no_trade
+- value: data_incomplete
+data_requirements:
+- availability: signal_bar_close
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 5
+  provenance:
+  - module: orderbook_analyse.strategy_lab.catalogs.v2.plugins
+    notes: research_contract_only
+    path: src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+    symbol: EMA_ZONE_MICROSTRUCTURE_CONFIRMATION
+  rationale: Closed 5m OHLCV for EMA9/20/59/200 regime and zone geometry.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_candles_signal_tf
+  role: signal_required
+  source_kind: candles_signal_tf
+- availability: signal_bar_close
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.strategy_lab.catalogs.v2.plugins
+    notes: research_contract_only; not a trade entry clock
+    path: src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+    symbol: EMA_ZONE_MICROSTRUCTURE_CONFIRMATION
+  rationale: 1m detail candles for zone approach clocks (not trade entry).
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_candles_execution_1m
+  role: signal_required
+  source_kind: candles_execution_1m
+- availability: window_edge
+  granularity:
+    kind: event_stream
+    native_event_stream: true
+  provenance:
+  - module: orderbook_analyse.ob200_v3_raw_discovery.files
+    notes: closed segments only; no open tmp; metadata registration only
+    path: src/orderbook_analyse/ob200_v3_raw_discovery/files.py
+    symbol: list_closed_segments
+  rationale: >
+    Per-level raw OB200 closed archive (orderbook_ob200_v3_raw). Distinct from
+    orderbook_ob200_v3_1m. Missing data → data_incomplete.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_orderbook_ob200_v3_raw
+  role: confirmation_required
+  source_kind: orderbook_ob200_v3_raw
+- availability: window_edge
+  granularity:
+    kind: event_stream
+    native_event_stream: true
+  provenance:
+  - module: orderbook_analyse.l2_wall_attack_discovery.trades
+    notes: public_trades_canonical; metadata registration only
+    path: src/orderbook_analyse/l2_wall_attack_discovery/trades.py
+    symbol: load_public_trades
+  rationale: >
+    Native/tick public trades (public_trades_native). Distinct from
+    public_trades_1m aggregate.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_public_trades_native
+  role: confirmation_required
+  source_kind: public_trades_native
+- availability: window_edge
+  granularity:
+    kind: timeframe
+    timeframe:
+      unit: minutes
+      value: 1
+  provenance:
+  - module: orderbook_analyse.strategy_lab.catalogs.v2.plugins
+    notes: research_contract_only
+    path: src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+    symbol: EMA_ZONE_MICROSTRUCTURE_CONFIRMATION
+  rationale: 1m OI context at zones.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_open_interest_1m
+  role: confirmation_required
+  source_kind: open_interest_1m
+- availability: window_edge
+  granularity:
+    kind: event_stream
+    native_event_stream: true
+  provenance:
+  - module: orderbook_analyse.strategy_lab.catalogs.v2.plugins
+    notes: research_contract_only
+    path: src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+    symbol: EMA_ZONE_MICROSTRUCTURE_CONFIRMATION
+  rationale: Native liquidation events for flush/squeeze/exhaustion context.
+  required: true
+  required_for_policy: null
+  requirement_id:
+    value: ezm_liquidations
+  role: confirmation_required
+  source_kind: liquidations
+- availability: prior_bar_open
+  granularity:
+    kind: snapshot
+    aligned_timeframe:
+      unit: minutes
+      value: 5
+  provenance:
+  - module: orderbook_analyse.strategy_lab.catalogs.v2.plugins
+    notes: research_contract_only
+    path: src/orderbook_analyse/strategy_lab/catalogs/v2/plugins.py
+    symbol: EMA_ZONE_MICROSTRUCTURE_CONFIRMATION
+  rationale: Optional LLD locations for next-zone clearance confluence.
+  required: false
+  required_for_policy: null
+  requirement_id:
+    value: ezm_liquidity_locations
+  role: analysis_optional
+  source_kind: liquidity_locations
+features:
+- alias:
+    value: ema_fast
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 9
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_medium
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 20
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_slow
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 59
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: ema_structure
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 200
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: ema
+- alias:
+    value: atr
+  bindings:
+  - name:
+      value: period
+    value:
+      kind: integer
+      value: 14
+  catalog_contract_version:
+    value: catalog/v2
+  catalog_feature_id:
+    value: atr_wilder
+metadata:
+  description: >
+    EMAs identify regime and decision zones. Per-level orderbook, public trades,
+    open interest and liquidations classify the reaction. Trade execution and
+    exit policy are intentionally deferred. EMA9/20/59 determine the short-term
+    regime; EMA200 is a superior decision zone (not equal-weight regime input).
+    Flat compression blocks candidates. Stacked EMA zones and next-zone clearance
+    are research contracts only. No entry/exit/TP/SL invented.
+  family: ema_zone_microstructure
+  schema_version: strategy_spec/v2
+  status: research
+  strategy_id: ema_zone_microstructure_confirmation_v1
+  strategy_version: 1.0.0
+  title: EMA Zone Microstructure Confirmation V1
+  variant: candidate_discovery_v1
+provenance:
+  catalog_contract_version:
+    value: catalog/v2
+  causality_status: causal_reusable_when_dependency_available
+  git_commit: 3f2f18f7720b5bdd802543e80e3291dd9d3aaa0f
+  plugin_refs:
+  - contract_version:
+      value: catalog/v2
+    plugin_id:
+      value: ema_zone_microstructure_confirmation
+  source_paths:
+  - strategies/strategy_lab/
+  source_repository: orderbook_analyse
+research_parameter_space:
+  dimensions: []
+signal:
+  confirmation:
+    description: Microstructure confirmation at EMA zones (research contract)
+    gates_policy_id: null
+    gates_policy_version: null
+    plugin: null
+    rules_embedded_in_yaml: false
+    status: null
+  confirmation_policy: null
+  directionality: both
+  invalidation:
+    description: Flat compression / data incomplete / no relevant zone contact
+    plugin: null
+    rules_embedded_in_yaml: false
+  kind: plugin
+  mode_id: null
+  plugin:
+    config:
+    - key: regime_slope_lookback_short
+      value:
+        kind: integer
+        value: 3
+    - key: regime_slope_lookback_long
+      value:
+        kind: integer
+        value: 6
+    contract_version:
+      value: catalog/v2
+    plugin_id:
+      value: ema_zone_microstructure_confirmation
+  rules_embedded_in_yaml: false
+  setup:
+    decision_at: signal_bar_close
+    description: >
+      Closed 5m EMA9/20/59 regime + EMA20/59/200 zone activation. Zone touch is
+      not an entry. EMA200 is superior S/R / clearance / flip context only.
+    notes: research_defaults_not_validated
+  trigger:
+    description: Microstructure candidate-state transitions (contract only; no detector)
+    plugin: null
+    plugin_ref: null
+timeframes:
+  execution:
+    unit: minutes
+    value: 1
+  signal:
+    unit: minutes
+    value: 5
+universe:
+  content_hash: sha256:796ace7b68178a52279aee256ea7c1a109a3aa780b8ebf36d965f89a300b49bb
+  universe_id:
+    value: tradeable_51
+  version: v1
+validation_requirements:
+  allowed_causality_statuses: []
+  notes: null
+  require_causality_audit: true
+  require_strategy_parity_check: false
+warmup:
+  outcome_evaluation:
+    post_window_duration:
+      kind: not_applicable
+      not_applicable: true
+  signal_engine:
+    bar_timeframe:
+      unit: minutes
+      value: 5
+    minimum_bars: 200
+  source_loading:
+    auxiliary_source_history:
+      unit: hours
+      value: !!float '2'
+    candle_history:
+      unit: hours
+      value: !!float '240'

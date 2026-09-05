@@ -316,7 +316,8 @@ from orderbook_analyse.strategy_lab.models.signals import (  # noqa: E402
 )
 from orderbook_analyse.strategy_lab.models.strategy_v2 import (  # noqa: E402
     STRATEGY_SPEC_V2_SCHEMA_VERSION,
-    StrategySpecV2,
+    CandidateDiscoveryStrategySpecV2,
+    TradeBacktestStrategySpecV2,
 )
 
 SCHEMA_V2_ID = (
@@ -380,10 +381,61 @@ def _ensure_padding_duration_v2_def(defs: dict[str, dict[str, object]]) -> None:
     }
 
 
+def _ensure_strategy_spec_v2_root_def(defs: dict[str, dict[str, object]]) -> None:
+    """Emit trade + candidate roots and a StrategySpecV2 oneOf union."""
+    _ensure_dataclass_def_v2(
+        TradeBacktestStrategySpecV2,
+        defs,
+        path="TradeBacktestStrategySpecV2",
+    )
+    _ensure_dataclass_def_v2(
+        CandidateDiscoveryStrategySpecV2,
+        defs,
+        path="CandidateDiscoveryStrategySpecV2",
+    )
+
+    trade = defs["TradeBacktestStrategySpecV2"]
+    trade_props = trade["properties"]
+    trade_props["run_intent"] = {
+        "type": "string",
+        "const": "trade_backtest",
+        "default": "trade_backtest",
+        "description": (
+            "Omitted run_intent defaults to trade_backtest for backward "
+            "compatibility with existing StrategySpec V2 YAML files."
+        ),
+    }
+    trade["required"] = sorted(
+        name for name in trade["required"] if name != "run_intent"
+    )
+
+    cand = defs["CandidateDiscoveryStrategySpecV2"]
+    cand["properties"]["run_intent"] = {
+        "type": "string",
+        "const": "candidate_discovery",
+    }
+    # candidate_states non-empty
+    if "candidate_states" in cand["properties"]:
+        cand["properties"]["candidate_states"]["minItems"] = 1
+
+    defs["StrategySpecV2"] = {
+        "title": "StrategySpecV2",
+        "oneOf": [
+            {"$ref": "#/$defs/TradeBacktestStrategySpecV2"},
+            {"$ref": "#/$defs/CandidateDiscoveryStrategySpecV2"},
+        ],
+        "description": (
+            "Closed StrategySpec V2 root union discriminated by run_intent: "
+            "trade_backtest (entry/exit/costs required) or candidate_discovery "
+            "(candidate_states required; trade execution forbidden)."
+        ),
+    }
+
+
 def generate_strategy_spec_v2_schema() -> dict[str, object]:
     """Build a deterministic JSON Schema document for StrategySpec V2."""
     defs: dict[str, dict[str, object]] = {}
-    _ensure_dataclass_def_v2(StrategySpecV2, defs, path="StrategySpecV2")
+    _ensure_strategy_spec_v2_root_def(defs)
     _ensure_param_value_def_v2(defs)
     _ensure_operand_def(defs)
     _ensure_boolean_expression_def(defs)
@@ -398,7 +450,7 @@ def generate_strategy_spec_v2_schema() -> dict[str, object]:
         "$id": SCHEMA_V2_ID,
         "title": SCHEMA_V2_TITLE,
         "type": "object",
-        "$ref": _ref_name(StrategySpecV2.__name__),
+        "$ref": "#/$defs/StrategySpecV2",
         "$defs": ordered_defs,
         "additionalProperties": False,
         "x-strategy-spec-schema-version": STRATEGY_SPEC_V2_SCHEMA_VERSION,

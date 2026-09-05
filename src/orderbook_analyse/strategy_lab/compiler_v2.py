@@ -1,11 +1,8 @@
-"""Canonical StrategySpecV2 compiler and stable SHA256 strategy hash (P5).
+"""Canonical StrategySpec V2 compilers and stable SHA256 strategy hashes (P5).
 
-Compiles an already-constructed ``StrategySpecV2`` into immutable canonical
-JSON bytes and a deterministic content hash. The compiler is pure: no I/O,
-no network, no environment, no timestamps, no silent defaults, and no
-mutation of the input spec.
-
-Decimal values are emitted as JSON number tokens (never strings, never float).
+Trade-backtest compile validates full P4C including entry/exit.
+Candidate-discovery compile validates a separate contract and never invents
+trades, entries, exits, or PnL.
 """
 
 from __future__ import annotations
@@ -17,13 +14,21 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from orderbook_analyse.strategy_lab.models.strategy_v2 import StrategySpecV2
+from orderbook_analyse.strategy_lab.models.strategy_v2 import (
+    AnyStrategySpecV2,
+    CandidateDiscoveryStrategySpecV2,
+    StrategySpecV2,
+    TradeBacktestStrategySpecV2,
+)
 from orderbook_analyse.strategy_lab.validation.catalogs import CatalogBundleV2
-from orderbook_analyse.strategy_lab.validation.p4c import require_valid_strategy_v2_p4c
+from orderbook_analyse.strategy_lab.validation.p4c import (
+    require_valid_candidate_discovery_v2,
+    require_valid_strategy_v2_p4c,
+)
 
 
 class StrategyCompilationError(ValueError):
-    """Raised when StrategySpecV2 compilation fails outside P4C validation."""
+    """Raised when StrategySpec V2 compilation fails outside P4C validation."""
 
 
 class CanonicalizationError(StrategyCompilationError):
@@ -36,7 +41,7 @@ class CanonicalizationError(StrategyCompilationError):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompiledStrategyV2:
-    """Immutable compile artifact for a validated StrategySpecV2."""
+    """Immutable trade-backtest compile artifact."""
 
     canonical_bytes: bytes
     strategy_hash: str
@@ -52,11 +57,40 @@ class CompiledStrategyV2:
         return self.canonical_bytes.decode("utf-8")
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CompiledCandidateDiscoveryV2:
+    """Minimal candidate-discovery compile artifact (no trades / PnL)."""
+
+    canonical_bytes: bytes
+    strategy_hash: str
+    candidate_states: tuple[str, ...]
+    data_requirement_ids: tuple[str, ...]
+    plugin_id: str | None
+
+    def __post_init__(self) -> None:
+        if type(self.canonical_bytes) is not bytes:
+            raise TypeError("canonical_bytes must be exact bytes")
+        if type(self.strategy_hash) is not str or not self.strategy_hash:
+            raise TypeError("strategy_hash must be a non-empty str")
+
+    @property
+    def canonical_json(self) -> str:
+        return self.canonical_bytes.decode("utf-8")
+
+
 def compile_strategy_v2(
-    spec: StrategySpecV2,
+    spec: AnyStrategySpecV2,
     catalogs: CatalogBundleV2,
 ) -> CompiledStrategyV2:
-    """Validate with P4C, then emit canonical JSON bytes and SHA256 hash."""
+    """Trade-backtest compile. Rejects candidate_discovery specs."""
+    if isinstance(spec, CandidateDiscoveryStrategySpecV2):
+        raise StrategyCompilationError(
+            "CANDIDATE_DISCOVERY_NOT_TRADE_BACKTEST: "
+            "candidate_discovery specs cannot use compile_strategy_v2; "
+            "use compile_candidate_discovery_v2"
+        )
+    if not isinstance(spec, TradeBacktestStrategySpecV2):
+        raise TypeError("spec must be a TradeBacktestStrategySpecV2 instance")
     require_valid_strategy_v2_p4c(spec, catalogs)
     canonical_bytes = render_canonical_strategy_v2_json(spec)
     return CompiledStrategyV2(
@@ -65,14 +99,44 @@ def compile_strategy_v2(
     )
 
 
-def render_canonical_strategy_v2_json(spec: StrategySpecV2) -> bytes:
+def compile_candidate_discovery_v2(
+    spec: AnyStrategySpecV2,
+    catalogs: CatalogBundleV2,
+) -> CompiledCandidateDiscoveryV2:
+    """Candidate-discovery compile — contract/hash only, no trade defaults."""
+    if isinstance(spec, TradeBacktestStrategySpecV2):
+        raise StrategyCompilationError(
+            "TRADE_BACKTEST_NOT_CANDIDATE_DISCOVERY: "
+            "trade_backtest specs cannot use compile_candidate_discovery_v2"
+        )
+    if not isinstance(spec, CandidateDiscoveryStrategySpecV2):
+        raise TypeError("spec must be a CandidateDiscoveryStrategySpecV2 instance")
+    require_valid_candidate_discovery_v2(spec, catalogs)
+    canonical_bytes = render_canonical_strategy_v2_json(spec)
+    plugin_id = None
+    from orderbook_analyse.strategy_lab.models.signals import PluginSignalSpec
+
+    if isinstance(spec.signal, PluginSignalSpec):
+        plugin_id = spec.signal.plugin.plugin_id.value
+    return CompiledCandidateDiscoveryV2(
+        canonical_bytes=canonical_bytes,
+        strategy_hash=hash_canonical_strategy_v2_json(canonical_bytes),
+        candidate_states=tuple(s.value for s in spec.candidate_states),
+        data_requirement_ids=tuple(
+            r.requirement_id.value for r in spec.data_requirements
+        ),
+        plugin_id=plugin_id,
+    )
+
+
+def render_canonical_strategy_v2_json(spec: AnyStrategySpecV2) -> bytes:
     """Render deterministic UTF-8 JSON bytes for ``spec`` (no validation)."""
-    if not isinstance(spec, StrategySpecV2):
-        raise TypeError("spec must be a StrategySpecV2 instance")
+    if not isinstance(spec, (TradeBacktestStrategySpecV2, CandidateDiscoveryStrategySpecV2)):
+        raise TypeError("spec must be a StrategySpec V2 root instance")
     payload = _canonicalize_value(spec, path="$")
     if not isinstance(payload, dict):
         raise CanonicalizationError(
-            "canonical StrategySpecV2 root must be a mapping",
+            "canonical StrategySpec V2 root must be a mapping",
             path="$",
         )
     text = _render_json_value(payload, path="$")

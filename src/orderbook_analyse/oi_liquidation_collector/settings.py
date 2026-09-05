@@ -15,6 +15,8 @@ DEFAULT_UNIVERSE = Path(
 DEFAULT_LOCK = PROJECT_ROOT / "logs" / "oi_liquidation_collector.lock"
 DEFAULT_PID = PROJECT_ROOT / "logs" / "oi_liquidation_collector.pid"
 DEFAULT_BACKFILL_DIR = PROJECT_ROOT / "data" / "oi_liquidation_collector" / "backfill"
+DEFAULT_SPOOL_DIR = PROJECT_ROOT / "data" / "oi_liquidation_collector" / "spool"
+DEFAULT_HEALTH_FILE = PROJECT_ROOT / "logs" / "oi_liquidation_collector.health.json"
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,15 @@ class OICollectorSettings:
     reconnect_initial_sec: float = 1.0
     reconnect_max_sec: float = 4.0
     subscribe_chunk: int = 10
+    spool_dir: Path = DEFAULT_SPOOL_DIR
+    health_file: Path = DEFAULT_HEALTH_FILE
+    health_interval_sec: float = 10.0
+    persistence_lag_fail_sec: float = 120.0
+    oi_stale_fail_sec: float = 60.0
+    spool_max_bytes: int = 512_000_000
+    spool_min_free_bytes: int = 256_000_000
+    spool_segment_max_bytes: int = 8_000_000
+    disable_spool: bool = False
 
 
 def load_oi_settings(*, dotenv_path: Path | None = None) -> OICollectorSettings:
@@ -57,6 +68,15 @@ def load_oi_settings(*, dotenv_path: Path | None = None) -> OICollectorSettings:
         universe_path=universe,
         lock_path=Path(os.environ.get("OI_LIQ_LOCK_PATH") or DEFAULT_LOCK),
         pid_path=Path(os.environ.get("OI_LIQ_PID_PATH") or DEFAULT_PID),
+        spool_dir=Path(os.environ.get("OI_LIQ_SPOOL_DIR") or DEFAULT_SPOOL_DIR),
+        health_file=Path(os.environ.get("OI_LIQ_HEALTH_FILE") or DEFAULT_HEALTH_FILE),
+        health_interval_sec=float(os.environ.get("OI_LIQ_HEALTH_INTERVAL_SEC") or 10.0),
+        persistence_lag_fail_sec=float(os.environ.get("OI_LIQ_PERSISTENCE_LAG_FAIL_SEC") or 120.0),
+        oi_stale_fail_sec=float(os.environ.get("OI_LIQ_OI_STALE_FAIL_SEC") or 60.0),
+        spool_max_bytes=int(os.environ.get("OI_LIQ_SPOOL_MAX_BYTES") or 512_000_000),
+        spool_min_free_bytes=int(os.environ.get("OI_LIQ_SPOOL_MIN_FREE_BYTES") or 256_000_000),
+        spool_segment_max_bytes=int(os.environ.get("OI_LIQ_SPOOL_SEGMENT_MAX_BYTES") or 8_000_000),
+        disable_spool=str(os.environ.get("OI_LIQ_DISABLE_SPOOL") or "").lower() in {"1", "true", "yes"},
     )
 
 

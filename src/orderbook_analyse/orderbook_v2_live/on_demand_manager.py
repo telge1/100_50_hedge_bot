@@ -24,6 +24,8 @@ from orderbook_analyse.orderbook_v2_live.on_demand_socket import resolve_socket_
 logger = logging.getLogger(__name__)
 
 VALID_OPERATIONS = frozenset({"acquire", "heartbeat", "release", "snapshot", "status"})
+KEEPER_LEASE_PREFIX = "ob1000-keeper-"
+
 
 
 @dataclass
@@ -43,8 +45,10 @@ class OnDemandRuntime:
 
 def load_on_demand_settings() -> dict[str, Any]:
     enabled = (os.environ.get("OB_V3_ON_DEMAND_ENABLE") or "false").lower() in {"1", "true", "yes"}
+    keeper = (os.environ.get("OB_V3_ON_DEMAND_KEEPER") or "true").lower() in {"1", "true", "yes"}
     return {
         "enabled": enabled,
+        "keeper_enabled": keeper,
         "max_active_topics": int(os.environ.get("OB_V3_ON_DEMAND_MAX_ACTIVE") or "4"),
         "heartbeat_sec": float(os.environ.get("OB_V3_ON_DEMAND_HEARTBEAT_SEC") or "15"),
         "lease_ttl_sec": float(os.environ.get("OB_V3_ON_DEMAND_LEASE_TTL_SEC") or "45"),
@@ -67,6 +71,7 @@ class OnDemandDepthManager:
     ) -> None:
         cfg = settings or load_on_demand_settings()
         self.enabled = bool(cfg["enabled"])
+        self.keeper_enabled = bool(cfg.get("keeper_enabled", True))
         self.exchange = exchange
         self.market = market
         self._send_chunk = send_chunk
@@ -76,7 +81,7 @@ class OnDemandDepthManager:
             heartbeat_sec=cfg["heartbeat_sec"],
             lease_ttl_sec=cfg["lease_ttl_sec"],
             max_active_topics=cfg["max_active_topics"],
-            pilot_symbols=cfg["pilot_symbols"],
+            pilot_symbols=frozenset(cfg["pilot_symbols"]),
         )
         self.runtimes: dict[tuple[str, int], OnDemandRuntime] = {}
         self._inflight_subscribe: set[tuple[str, int]] = set()
@@ -289,6 +294,18 @@ class OnDemandDepthManager:
             if op == "snapshot":
                 if not symbol:
                     raise ValueError("symbol_required")
+                # 1 Hz dashboard polls act as heartbeats — refresh TTL when lease_id is known.
+                if lease_id:
+                    try:
+                        self.leases.heartbeat(
+                            lease_id,
+                            symbol=symbol or None,
+                            depth=depth,
+                        )
+                    except KeyError:
+                        pass
+                    except ValueError:
+                        pass
                 if self.leases.active_count(LeaseKey(symbol, depth)) <= 0:
                     return self._base_response(
                         req,
@@ -454,9 +471,26 @@ class OnDemandDepthManager:
                 rt.subscription_state = "starting"
                 rt.pending_raw.clear()
 
+    def ensure_keeper_leases(self) -> None:
+        """Keep pilot OB1000 subscribed continuously (same pattern as Full-OB FR keeper).
+
+        Renews leases every tick so ``orderbook.1000.{BTC,DOGE}`` stay hot for
+        research Walls/Levels without requiring an open chart tab.
+        """
+        if not self.enabled or not self.keeper_enabled:
+            return
+        for sym in sorted(self.leases.pilot_symbols):
+            lid = f"{KEEPER_LEASE_PREFIX}{sym}"
+            try:
+                self.leases.acquire(symbol=sym, session_id=lid, lease_id=lid)
+            except Exception as exc:
+                logger.warning("ob1000_keeper_acquire_failed %s %s", sym, exc)
+
     async def tick(self, ws) -> None:
         if not self.enabled:
             return
+        # Renew keepers before expiry sweep so pilot books never drop.
+        self.ensure_keeper_leases()
         now = datetime.now(timezone.utc)
         expired = self.leases.expire_due(now=now)
         for key, unsub in expired:

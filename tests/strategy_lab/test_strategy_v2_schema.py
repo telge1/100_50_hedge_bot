@@ -167,13 +167,27 @@ def test_v2_schema_structural_constraints_match_python() -> None:
     fout = defs["FeatureOutputReference"]
     assert "output_id" in fout["required"]
     assert "output_id" in fout["properties"]
-    root_props = set(defs["StrategySpecV2"]["properties"])
-    assert not {"setup", "trigger", "confirmation", "invalidation", "long", "short"} & root_props
-    assert "baseline" not in root_props
-    assert "fees" not in root_props
-    assert "slippage" not in root_props
-    assert "funding" not in root_props
-    assert "costs" in root_props
+    assert "oneOf" in defs["StrategySpecV2"]
+    trade_props = set(defs["TradeBacktestStrategySpecV2"]["properties"])
+    cand_props = set(defs["CandidateDiscoveryStrategySpecV2"]["properties"])
+    assert not {"setup", "trigger", "confirmation", "invalidation", "long", "short"} & trade_props
+    assert "baseline" not in trade_props
+    assert "fees" not in trade_props
+    assert "slippage" not in trade_props
+    assert "funding" not in trade_props
+    assert "costs" in trade_props
+    assert "entry" in trade_props
+    assert "exit" in trade_props
+    assert "candidate_states" in cand_props
+    assert "entry" not in cand_props
+    assert "exit" not in cand_props
+    assert "costs" not in cand_props
+    assert defs["TradeBacktestStrategySpecV2"]["properties"]["run_intent"]["const"] == (
+        "trade_backtest"
+    )
+    assert defs["CandidateDiscoveryStrategySpecV2"]["properties"]["run_intent"]["const"] == (
+        "candidate_discovery"
+    )
 
 
 def _v2_subschema(schema: dict[str, object], name: str) -> dict[str, object]:

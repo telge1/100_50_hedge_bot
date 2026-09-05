@@ -25,7 +25,9 @@ from orderbook_analyse.strategy_lab.models.contracts_v2.enums import (
     EntryPriceReferenceV2,
     EntryReferenceRuleV2,
     EntryTimingAnchorV2,
+    PluginContractStatusV2,
     ResearchConfirmationPolicyV2,
+    StrategyRunIntentV2,
 )
 from orderbook_analyse.strategy_lab.models.enums import CausalityStatus, Directionality, PluginKind
 from orderbook_analyse.strategy_lab.models.identifiers import ContractVersion, StableIdentifier
@@ -95,6 +97,53 @@ class PluginDescriptorV2:
     causality_claim: str
     adapter_status: AdapterBindingStatusV2
     provenance: tuple[LegacyProvenanceRefV2, ...]
+    contract_status: PluginContractStatusV2 = PluginContractStatusV2.PRODUCTION
+    run_intent: StrategyRunIntentV2 = StrategyRunIntentV2.TRADE_BACKTEST
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CandidatePluginDescriptorV2:
+    """Candidate-discovery plugin contract — no entry/exit/order semantics."""
+
+    plugin_id: StableIdentifier
+    contract_version: ContractVersion
+    kind: PluginKind
+    description: str
+    parameters: tuple[PluginParameterDefinitionV2, ...]
+    mode_contract: PluginModeContractV2
+    required_features: tuple[BoundFeatureRequirementV2, ...]
+    data_requirements: tuple[DataRequirementSpecV2, ...]
+    confirmation_policy: ResearchConfirmationPolicyV2 | None
+    supported_directions: Directionality
+    signal_timeframe: SignalTimeframeContractV2
+    # Detail timeframe for microstructure clocks (not trade execution).
+    detail_timeframe: TimeframeValue
+    signal_decision_timing: AvailabilityTimingV2
+    candidate_states: tuple[StableIdentifier, ...]
+    signal_warmup: SignalEngineWarmupRequirementV2
+    source_loading_padding: SourceLoadingPaddingV2 | None
+    outcome_evaluation_padding: OutcomeEvaluationPaddingV2 | None
+    causality_status: CausalityStatus
+    causality_claim: str
+    adapter_status: AdapterBindingStatusV2
+    provenance: tuple[LegacyProvenanceRefV2, ...]
+    contract_status: PluginContractStatusV2 = (
+        PluginContractStatusV2.RESEARCH_CONTRACT_ONLY
+    )
+    run_intent: StrategyRunIntentV2 = StrategyRunIntentV2.CANDIDATE_DISCOVERY
+
+    def __post_init__(self) -> None:
+        if type(self.candidate_states) is not tuple or len(self.candidate_states) < 1:
+            raise ValueError("candidate_states must be a non-empty tuple")
+        if self.run_intent is not StrategyRunIntentV2.CANDIDATE_DISCOVERY:
+            raise ValueError("CandidatePluginDescriptorV2.run_intent must be candidate_discovery")
+        if self.contract_status is not PluginContractStatusV2.RESEARCH_CONTRACT_ONLY:
+            raise ValueError(
+                "CandidatePluginDescriptorV2.contract_status must be research_contract_only"
+            )
+
+
+AnyPluginDescriptorV2 = PluginDescriptorV2 | CandidatePluginDescriptorV2
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

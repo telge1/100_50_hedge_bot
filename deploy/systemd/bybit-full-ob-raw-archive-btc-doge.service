@@ -1,0 +1,25 @@
+[Unit]
+Description=Bybit Full-OB raw-archive + flight recorder (BTCUSDT/DOGEUSDT)
+After=network-online.target
+Wants=network-online.target
+# Allow quick recoveries; still bound runaway crash loops.
+StartLimitIntervalSec=120
+StartLimitBurst=30
+
+[Service]
+Type=simple
+WorkingDirectory=/home/telgenbuescher/projects/orderbook_analyse
+EnvironmentFile=-/home/telgenbuescher/projects/orderbook_analyse/.env
+Environment=PYTHONPATH=src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/telgenbuescher/projects/orderbook_analyse/scripts/run_orderbook_v3_raw_archive_btc_doge_foreground.sh
+# Always restart on any exit (crash, OOM, accidental kill) to minimize data gaps.
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=90
+StandardOutput=append:/home/telgenbuescher/projects/orderbook_analyse/logs/orderbook_v3_raw_archive_btc_doge.nohup.log
+StandardError=append:/home/telgenbuescher/projects/orderbook_analyse/logs/orderbook_v3_raw_archive_btc_doge.nohup.log
+
+[Install]
+WantedBy=default.target

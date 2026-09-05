@@ -33,6 +33,7 @@ from orderbook_analyse.orderbook_v2_live.on_demand_socket import OnDemandSocketS
 def _manager_settings(tmp_path: Path, **overrides) -> dict:
     base = {
         "enabled": True,
+        "keeper_enabled": False,
         "max_active_topics": 4,
         "heartbeat_sec": 15,
         "lease_ttl_sec": 45,
@@ -368,6 +369,39 @@ def test_grace_then_unsubscribe(tmp_path: Path):
 
     asyncio.run(_run())
 
+
+def test_keeper_leases_keep_pilot_subscribed(tmp_path: Path):
+    async def _run() -> None:
+        calls: list[tuple[str, list[str]]] = []
+
+        async def send_chunk(ws, op, args):
+            calls.append((op, list(args)))
+
+        mgr = OnDemandDepthManager(
+            exchange="bybit",
+            market="linear",
+            send_chunk=send_chunk,
+            confirmed_topics=[],
+            settings=_manager_settings(tmp_path, keeper_enabled=True, lease_ttl_sec=0.05),
+        )
+        await mgr.tick(object())
+        topics = {tuple(args) for op, args in calls if op == "subscribe"}
+        assert ("orderbook.1000.BTCUSDT",) in topics or any(
+            "orderbook.1000.BTCUSDT" in a for a in topics
+        )
+        # Flatten topic list checks — send_chunk gets list of topics.
+        flat = [t for op, args in calls if op == "subscribe" for t in args]
+        assert "orderbook.1000.BTCUSDT" in flat
+        assert "orderbook.1000.DOGEUSDT" in flat
+        assert mgr.leases.active_count(LeaseKey("BTCUSDT", ON_DEMAND_DEPTH)) >= 1
+        assert any(lid.startswith("ob1000-keeper-") for lid in mgr.leases._leases)
+        # After TTL window, keeper renew on next tick prevents unsubscribe.
+        await asyncio.sleep(0.06)
+        await mgr.tick(object())
+        assert ("unsubscribe", ["orderbook.1000.BTCUSDT"]) not in calls
+        assert ("unsubscribe", ["orderbook.1000.DOGEUSDT"]) not in calls
+
+    asyncio.run(_run())
 
 def test_stale_socket_removed(tmp_path: Path):
     sock_path = tmp_path / "ob1000.sock"

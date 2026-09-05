@@ -136,7 +136,9 @@ class OnDemandSocketServer:
                     await _write_response(writer, _error_response(None, "invalid_json"))
                     continue
                 try:
-                    resp = await self._handler(req)
+                    result = self._handler(req)
+                    # OB1000 handler is async; FULL handler is sync — support both.
+                    resp = await result if asyncio.iscoroutine(result) else result
                 except Exception as exc:
                     logger.exception("on_demand_socket_handler_error")
                     resp = _error_response(req.get("request_id"), str(exc))

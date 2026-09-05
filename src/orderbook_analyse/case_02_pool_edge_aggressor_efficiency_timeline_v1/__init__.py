@@ -1,0 +1,24 @@
+"""CASE_02 pool-edge aggressor-efficiency timeline — diagnostic research only."""
+
+FORMAT_VERSION = "case_02_pool_edge_aggressor_efficiency_timeline/v1"
+
+SYMBOL = "BTCUSDT"
+TIMEFRAME = "5m"
+SIDE = "ASK"
+APPROACH = "FROM_BELOW"
+CLUSTER_ID = "4d4ba3865c0ef221420d"
+ARRIVAL_TS = "2026-08-25T00:47:13Z"
+LOAD_START_TS = "2026-08-25T00:46:43Z"
+MAX_END_TS = "2026-08-25T02:45:00Z"
+POOL_LO = 79678.7
+POOL_HI = 80116.8
+START_WALL = 79700.0
+
+EDGE_TOL_BPS = (1.0, 2.0, 3.0)
+FLOW_WINDOWS_S = (1, 3, 5, 10, 30)
+ACCEPT_VARIANTS_S = (5, 15, 30, 60)
+PRIMARY_EDGE_TOL_BPS = 2.0  # reporting default; not outcome-fitted
+
+OUTCOME_USED_FOR_THRESHOLDS = False
+OUTCOME_USED_FOR_STATE_DEFINITION = False
+OUTCOME_USED_FOR_EVENT_SELECTION = True

@@ -90,6 +90,13 @@ def validate_strategy_v2_p4c(
     catalogs: CatalogBundleV2,
 ) -> ValidationReport:
     """Validate P4A + P4B + P4C scope: graph plus root contracts."""
+    from orderbook_analyse.strategy_lab.models.strategy_v2 import (
+        CandidateDiscoveryStrategySpecV2,
+    )
+
+    if isinstance(spec, CandidateDiscoveryStrategySpecV2):
+        return validate_candidate_discovery_v2(spec, catalogs)
+
     issues: list[ValidationIssue] = list(validate_strategy_v2_p4b(spec, catalogs).issues)
     p4a_codes = {issue.code for issue in issues}
     index = build_feature_resolution_index(spec.features, catalogs)
@@ -114,6 +121,149 @@ def require_valid_strategy_v2_p4c(
     report = validate_strategy_v2_p4c(spec, catalogs)
     if not report.is_valid:
         raise ValidationFailedError(report)
+
+
+def validate_candidate_discovery_v2(
+    spec: object,
+    catalogs: CatalogBundleV2,
+) -> ValidationReport:
+    """Validate candidate-discovery roots (no entry/exit/costs/portfolio)."""
+    from orderbook_analyse.strategy_lab.catalogs.v2.models import CandidatePluginDescriptorV2
+    from orderbook_analyse.strategy_lab.models.strategy_v2 import (
+        CandidateDiscoveryStrategySpecV2,
+    )
+
+    if not isinstance(spec, CandidateDiscoveryStrategySpecV2):
+        return build_report(
+            (
+                make_error(
+                    ValidationIssueCode.PLUGIN_KIND,
+                    path="$",
+                    message="expected CandidateDiscoveryStrategySpecV2",
+                    context=None,
+                ),
+            )
+        )
+
+    issues: list[ValidationIssue] = list(validate_strategy_v2_p4b(spec, catalogs).issues)
+    p4a_codes = {issue.code for issue in issues}
+    index = build_feature_resolution_index(spec.features, catalogs)
+    plugin = _resolve_plugin(spec, catalogs, p4a_codes)
+
+    if plugin is not None and not isinstance(plugin, CandidatePluginDescriptorV2):
+        issues.append(
+            make_error(
+                ValidationIssueCode.PLUGIN_KIND,
+                path="signal.plugin",
+                message=(
+                    "candidate_discovery requires a CandidatePluginDescriptorV2; "
+                    "trade plugins with entry semantics are not allowed"
+                ),
+                context=None,
+            )
+        )
+        plugin = None
+
+    issues.extend(_validate_timeframes_candidate(spec, plugin))
+    issues.extend(
+        _validate_data_requirements(spec, catalogs, index, plugin, p4a_codes)
+    )
+    issues.extend(_validate_warmup(spec, index, plugin))
+    issues.extend(_validate_candidate_states(spec, plugin))
+    issues.extend(_validate_research_space(spec, catalogs, index, plugin, p4a_codes))
+    issues.extend(_validate_provenance(spec, catalogs, plugin, p4a_codes))
+    return build_report(tuple(issues))
+
+
+def require_valid_candidate_discovery_v2(
+    spec: object,
+    catalogs: CatalogBundleV2,
+) -> None:
+    report = validate_candidate_discovery_v2(spec, catalogs)
+    if not report.is_valid:
+        raise ValidationFailedError(report)
+
+
+def _validate_timeframes_candidate(
+    spec: object,
+    plugin: object | None,
+) -> list[ValidationIssue]:
+    from orderbook_analyse.strategy_lab.catalogs.v2.models import CandidatePluginDescriptorV2
+    from orderbook_analyse.strategy_lab.models.strategy_v2 import (
+        CandidateDiscoveryStrategySpecV2,
+    )
+
+    assert isinstance(spec, CandidateDiscoveryStrategySpecV2)
+    issues: list[ValidationIssue] = []
+    signal_m = _signal_minutes(spec)
+    if signal_m is None:
+        issues.append(
+            make_error(
+                ValidationIssueCode.TIMEFRAME_SIGNAL_UNSUPPORTED,
+                path="timeframes.signal",
+                message="signal timeframe must use minutes",
+                context=None,
+            )
+        )
+    exec_m = _tf_minutes(spec.timeframes.execution)
+    if exec_m is None:
+        issues.append(
+            make_error(
+                ValidationIssueCode.TIMEFRAME_EXECUTION_UNSUPPORTED,
+                path="timeframes.execution",
+                message="execution/detail timeframe must use minutes",
+                context=None,
+            )
+        )
+    if isinstance(plugin, CandidatePluginDescriptorV2):
+        detail_m = _tf_minutes(plugin.detail_timeframe)
+        if detail_m is not None and exec_m is not None and detail_m != exec_m:
+            issues.append(
+                make_error(
+                    ValidationIssueCode.TIMEFRAME_EXECUTION_MISMATCH,
+                    path="timeframes.execution",
+                    message="strategy detail timeframe must match plugin detail_timeframe",
+                    context=None,
+                )
+            )
+    return issues
+
+
+def _validate_candidate_states(
+    spec: object,
+    plugin: object | None,
+) -> list[ValidationIssue]:
+    from orderbook_analyse.strategy_lab.catalogs.v2.models import CandidatePluginDescriptorV2
+    from orderbook_analyse.strategy_lab.models.strategy_v2 import (
+        CandidateDiscoveryStrategySpecV2,
+    )
+
+    assert isinstance(spec, CandidateDiscoveryStrategySpecV2)
+    issues: list[ValidationIssue] = []
+    if not spec.candidate_states:
+        issues.append(
+            make_error(
+                ValidationIssueCode.PLUGIN_MISSING_PARAMETER,
+                path="candidate_states",
+                message="candidate_states must be non-empty",
+                context=None,
+            )
+        )
+    if isinstance(plugin, CandidatePluginDescriptorV2):
+        expected = {s.value for s in plugin.candidate_states}
+        actual = {s.value for s in spec.candidate_states}
+        if actual != expected:
+            issues.append(
+                make_error(
+                    ValidationIssueCode.PLUGIN_POLICY_MISMATCH,
+                    path="candidate_states",
+                    message=(
+                        "candidate_states must exactly match plugin contract states"
+                    ),
+                    context=None,
+                )
+            )
+    return issues
 
 
 def _resolve_plugin(

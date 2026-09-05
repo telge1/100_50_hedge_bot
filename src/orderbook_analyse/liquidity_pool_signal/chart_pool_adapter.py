@@ -390,24 +390,52 @@ def export_snapshot(
     """Causal as-of snapshot via chart engine (lookback pack ending at as_of)."""
     del window_start
     eng = get_engine_function()
-    pack_start = chart_lookback_start(as_of, timeframe)
+    as_of_u = _utc(as_of)
+    pack_start = chart_lookback_start(as_of_u, timeframe)
     bundle = run_chart_backend_lld(
         symbol=symbol,
         timeframe=timeframe,
         start=pack_start,
-        end=as_of,
+        end=as_of_u,
         liquidity=liquidity,
     )
     cfg = bundle["config"]
-    market = market_price_at(bundle["candles"], as_of)
+    market = market_price_at(bundle["candles"], as_of_u)
     rows = [
-        pool_row_from_engine(p, cfg=cfg, as_of=as_of, market_price=market)
+        pool_row_from_engine(p, cfg=cfg, as_of=as_of_u, market_price=market)
         for p in bundle["engine_result"].pools
     ]
     active = active_pools_at(rows)
     front = nearest_front(active, market)
+    trp, _ = _load_chart_bindings()
+    as_of_unix = _unix(as_of_u)
+    serialized = trp["serialize_overlays"](bundle["overlays"])
+    clipped = [
+        o
+        for o in serialized
+        if (o.get("start_timestamp") is None or int(o["start_timestamp"]) <= as_of_unix)
+    ]
+
+    from orderbook_analyse.liquidity_pool_signal.canonical import (
+        CANONICAL_PROVIDER_VERSION,
+        canonical_pool_record,
+        overlay_fields_for_pool,
+    )
+
+    canonical_rows = [
+        canonical_pool_record(
+            row,
+            as_of=as_of_u,
+            overlay_fields=overlay_fields_for_pool(clipped, row["pool_id"], as_of_unix=as_of_unix),
+        )
+        for row in rows
+    ]
+    pool_norm = normalize_pool_payload(rows)
+    sha = fingerprint(
+        {"pools": pool_norm, "as_of": _iso_z(as_of_u), "provider": CANONICAL_PROVIDER_VERSION}
+    )
     return {
-        "as_of": _iso_z(as_of),
+        "as_of": _iso_z(as_of_u),
         "symbol": symbol,
         "timeframe": timeframe,
         "market_price": market,
@@ -423,6 +451,10 @@ def export_snapshot(
         "indicators_liquidity_overlay_count": len(bundle["serialized_overlays"]),
         "engine_module": eng.__module__,
         "engine_name": eng.__name__,
+        "canonical_provider_version": CANONICAL_PROVIDER_VERSION,
+        "canonical_snapshot_sha256": sha,
+        "canonical_pools": canonical_rows,
+        "active_canonical_pools": [r for r in canonical_rows if r["active_as_of"]],
     }
 
 

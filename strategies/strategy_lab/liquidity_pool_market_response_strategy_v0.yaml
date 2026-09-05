@@ -1,0 +1,30 @@
+# Liquidity Pool Market Response Strategy — research config v0
+# Canonical companion to docs/strategy_research/liquidity_pool_market_response_strategy_v0.md
+strategy_id:
+  value: liquidity_pool_market_response_v0
+strategy_name: Liquidity Pool Market Response Strategy V0
+status: research_not_live
+research_doc: docs/strategy_research/liquidity_pool_market_response_strategy_v0.md
+
+room_to_target:
+  enabled: true
+  min_target_distance_pct: 0.5
+  measurement_origin: mechanical_entry_price
+  target_edge_policy: first_reachable_edge
+
+  long_target:
+    pool_side: ask
+    edge: lower
+
+  short_target:
+    pool_side: bid
+    edge: upper
+
+  comparison: greater_than_or_equal
+  overlap_policy: block
+  missing_target_policy: block
+
+  cost_scenarios_bps:
+    - 11
+    - 15
+    - 20

@@ -1,0 +1,15 @@
+"""Phase-2 causal edge validation for Liquidity Location pools (research-only)."""
+
+from __future__ import annotations
+
+ANALYSIS_ID = "LIQUIDITY_LOCATION_POOL_EDGE_VALIDATION_V2"
+ANALYSIS_VERSION = "v2"
+VERDICT_COMPLETE = "LIQUIDITY_LOCATION_POOL_EDGE_VALIDATION_V2_COMPLETE"
+VERDICT_NO_STABLE = "LIQUIDITY_LOCATION_NO_STABLE_EDGE_YET"
+
+__all__ = [
+    "ANALYSIS_ID",
+    "ANALYSIS_VERSION",
+    "VERDICT_COMPLETE",
+    "VERDICT_NO_STABLE",
+]

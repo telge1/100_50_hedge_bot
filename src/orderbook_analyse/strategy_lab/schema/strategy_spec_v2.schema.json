@@ -165,6 +165,78 @@
       "title": "BooleanOrExpression",
       "type": "object"
     },
+    "CandidateDiscoveryStrategySpecV2": {
+      "additionalProperties": false,
+      "properties": {
+        "analysis_requirements": {
+          "$ref": "#/$defs/AnalysisRequirements"
+        },
+        "candidate_states": {
+          "items": {
+            "$ref": "#/$defs/StableIdentifier"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "data_requirements": {
+          "items": {
+            "$ref": "#/$defs/DataRequirementSpecV2"
+          },
+          "type": "array"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeatureBindingSpec"
+          },
+          "type": "array"
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ProvenanceSpecV2"
+        },
+        "research_parameter_space": {
+          "$ref": "#/$defs/ResearchParameterSpaceV2"
+        },
+        "run_intent": {
+          "const": "candidate_discovery",
+          "type": "string"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalDefinition"
+        },
+        "timeframes": {
+          "$ref": "#/$defs/Timeframes"
+        },
+        "universe": {
+          "$ref": "#/$defs/VersionedUniverseRefV2"
+        },
+        "validation_requirements": {
+          "$ref": "#/$defs/ValidationRequirements"
+        },
+        "warmup": {
+          "$ref": "#/$defs/WarmupSpecV2"
+        }
+      },
+      "required": [
+        "analysis_requirements",
+        "candidate_states",
+        "data_requirements",
+        "features",
+        "metadata",
+        "provenance",
+        "research_parameter_space",
+        "run_intent",
+        "signal",
+        "timeframes",
+        "universe",
+        "validation_requirements",
+        "warmup"
+      ],
+      "title": "CandidateDiscoveryStrategySpecV2",
+      "type": "object"
+    },
     "CausalityStatus": {
       "enum": [
         "causal_proven",
@@ -417,7 +489,9 @@
         "candles_signal_tf",
         "candles_execution_1m",
         "public_trades_1m",
+        "public_trades_native",
         "orderbook_ob200_v3_1m",
+        "orderbook_ob200_v3_raw",
         "open_interest_1m",
         "liquidations",
         "liquidity_locations"
@@ -1792,88 +1866,25 @@
       "title": "StateSpec",
       "type": "object"
     },
-    "StrategySpecV2": {
-      "additionalProperties": false,
-      "properties": {
-        "analysis_requirements": {
-          "$ref": "#/$defs/AnalysisRequirements"
-        },
-        "costs": {
-          "$ref": "#/$defs/CostsSpecV2"
-        },
-        "data_requirements": {
-          "items": {
-            "$ref": "#/$defs/DataRequirementSpecV2"
-          },
-          "type": "array"
-        },
-        "entry": {
-          "$ref": "#/$defs/EntrySpecV2"
-        },
-        "execution_assumptions": {
-          "$ref": "#/$defs/ExecutionAssumptionsV2"
-        },
-        "exit": {
-          "$ref": "#/$defs/ExitSpecV2"
-        },
-        "features": {
-          "items": {
-            "$ref": "#/$defs/FeatureBindingSpec"
-          },
-          "type": "array"
-        },
-        "intrabar_policy": {
-          "$ref": "#/$defs/IntrabarPolicy"
-        },
-        "metadata": {
-          "$ref": "#/$defs/Metadata"
-        },
-        "portfolio_assumptions": {
-          "$ref": "#/$defs/PortfolioAssumptionsV2"
-        },
-        "provenance": {
-          "$ref": "#/$defs/ProvenanceSpecV2"
-        },
-        "research_parameter_space": {
-          "$ref": "#/$defs/ResearchParameterSpaceV2"
-        },
-        "signal": {
-          "$ref": "#/$defs/SignalDefinition"
-        },
-        "timeframes": {
-          "$ref": "#/$defs/Timeframes"
-        },
-        "universe": {
-          "$ref": "#/$defs/VersionedUniverseRefV2"
-        },
-        "validation_requirements": {
-          "$ref": "#/$defs/ValidationRequirements"
-        },
-        "warmup": {
-          "$ref": "#/$defs/WarmupSpecV2"
-        }
-      },
-      "required": [
-        "analysis_requirements",
-        "costs",
-        "data_requirements",
-        "entry",
-        "execution_assumptions",
-        "exit",
-        "features",
-        "intrabar_policy",
-        "metadata",
-        "portfolio_assumptions",
-        "provenance",
-        "research_parameter_space",
-        "signal",
-        "timeframes",
-        "universe",
-        "validation_requirements",
-        "warmup"
+    "StrategyRunIntentV2": {
+      "enum": [
+        "trade_backtest",
+        "candidate_discovery"
       ],
-      "title": "StrategySpecV2",
-      "type": "object"
+      "title": "StrategyRunIntentV2",
+      "type": "string"
+    },
+    "StrategySpecV2": {
+      "description": "Closed StrategySpec V2 root union discriminated by run_intent: trade_backtest (entry/exit/costs required) or candidate_discovery (candidate_states required; trade execution forbidden).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TradeBacktestStrategySpecV2"
+        },
+        {
+          "$ref": "#/$defs/CandidateDiscoveryStrategySpecV2"
+        }
+      ],
+      "title": "StrategySpecV2"
     },
     "StringParam": {
       "additionalProperties": false,
@@ -1999,6 +2010,95 @@
         "to_state"
       ],
       "title": "TimeoutTransitionSpec",
+      "type": "object"
+    },
+    "TradeBacktestStrategySpecV2": {
+      "additionalProperties": false,
+      "properties": {
+        "analysis_requirements": {
+          "$ref": "#/$defs/AnalysisRequirements"
+        },
+        "costs": {
+          "$ref": "#/$defs/CostsSpecV2"
+        },
+        "data_requirements": {
+          "items": {
+            "$ref": "#/$defs/DataRequirementSpecV2"
+          },
+          "type": "array"
+        },
+        "entry": {
+          "$ref": "#/$defs/EntrySpecV2"
+        },
+        "execution_assumptions": {
+          "$ref": "#/$defs/ExecutionAssumptionsV2"
+        },
+        "exit": {
+          "$ref": "#/$defs/ExitSpecV2"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeatureBindingSpec"
+          },
+          "type": "array"
+        },
+        "intrabar_policy": {
+          "$ref": "#/$defs/IntrabarPolicy"
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "portfolio_assumptions": {
+          "$ref": "#/$defs/PortfolioAssumptionsV2"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ProvenanceSpecV2"
+        },
+        "research_parameter_space": {
+          "$ref": "#/$defs/ResearchParameterSpaceV2"
+        },
+        "run_intent": {
+          "const": "trade_backtest",
+          "default": "trade_backtest",
+          "description": "Omitted run_intent defaults to trade_backtest for backward compatibility with existing StrategySpec V2 YAML files.",
+          "type": "string"
+        },
+        "signal": {
+          "$ref": "#/$defs/SignalDefinition"
+        },
+        "timeframes": {
+          "$ref": "#/$defs/Timeframes"
+        },
+        "universe": {
+          "$ref": "#/$defs/VersionedUniverseRefV2"
+        },
+        "validation_requirements": {
+          "$ref": "#/$defs/ValidationRequirements"
+        },
+        "warmup": {
+          "$ref": "#/$defs/WarmupSpecV2"
+        }
+      },
+      "required": [
+        "analysis_requirements",
+        "costs",
+        "data_requirements",
+        "entry",
+        "execution_assumptions",
+        "exit",
+        "features",
+        "intrabar_policy",
+        "metadata",
+        "portfolio_assumptions",
+        "provenance",
+        "research_parameter_space",
+        "signal",
+        "timeframes",
+        "universe",
+        "validation_requirements",
+        "warmup"
+      ],
+      "title": "TradeBacktestStrategySpecV2",
       "type": "object"
     },
     "TransitionConflictPolicy": {

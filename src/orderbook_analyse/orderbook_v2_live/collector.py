@@ -132,9 +132,15 @@ class OrderbookV3LiveCollector:
             OnDemandDepthManager,
             load_on_demand_settings,
         )
+        from orderbook_analyse.orderbook_v2_live.on_demand_full import (
+            FullBookOnDemandManager,
+            load_full_book_settings,
+        )
 
         od_cfg = load_on_demand_settings()
+        full_cfg = load_full_book_settings()
         self.on_demand: OnDemandDepthManager | None = None
+        self.full_book: FullBookOnDemandManager | None = None
         if od_cfg["enabled"]:
             self.on_demand = OnDemandDepthManager(
                 exchange=settings.exchange,
@@ -143,12 +149,95 @@ class OrderbookV3LiveCollector:
                 confirmed_topics=self.confirmed_topics,
                 settings=od_cfg,
             )
-            from orderbook_analyse.orderbook_v2_live.on_demand_socket import OnDemandSocketServer
-
-            self._on_demand_socket = OnDemandSocketServer(
-                self.on_demand.socket_path,
-                self.on_demand.handle_request,
+        if full_cfg["enabled"]:
+            self.full_book = FullBookOnDemandManager(
+                market=settings.market,
+                send_chunk=self._send_chunk,
+                confirmed_topics=self.confirmed_topics,
+                settings=full_cfg,
             )
+        if self.on_demand is not None or self.full_book is not None:
+            from orderbook_analyse.orderbook_v2_live.on_demand_socket import (
+                OnDemandSocketServer,
+                resolve_socket_path,
+            )
+
+            sock_path = self.on_demand.socket_path if self.on_demand is not None else resolve_socket_path()
+            self._on_demand_socket = OnDemandSocketServer(
+                sock_path,
+                self._dispatch_on_demand_request,
+            )
+
+        self.full_ob_flight_recorder = None
+        try:
+            from orderbook_analyse.orderbook_v2_live.full_ob_edge_flight_recorder import (
+                FullObEdgeFlightRecorder,
+                load_flight_recorder_settings,
+            )
+
+            fr_settings = load_flight_recorder_settings()
+            if fr_settings.enabled and self.full_book is not None:
+                def _mid_from_ob200(symbol: str):
+                    rt = self.runtimes.get(symbol.upper())
+                    if rt is None or rt.clock.last_valid_book is None:
+                        return None
+                    book = rt.clock.last_valid_book
+                    if not book.is_valid or not book.bids or not book.asks:
+                        return None
+                    from orderbook_analyse.orderbook_v2.book import sorted_asks, sorted_bids
+                    bb = sorted_bids(book)[0][0]
+                    ba = sorted_asks(book)[0][0]
+                    return float((bb + ba) / 2)
+
+                profile_provider = None
+                try:
+                    from orderbook_analyse.orderbook_v2_live.full_ob_edge_flight_recorder.profiles import (
+                        ClickHouseCompletedProfileProvider,
+                    )
+
+                    profile_provider = ClickHouseCompletedProfileProvider(
+                        self._client_factory(),
+                        window_minutes=fr_settings.profile_window_minutes,
+                    )
+                except Exception:
+                    logger.warning("full_ob_fr_profile_provider_unavailable")
+                self.full_ob_flight_recorder = FullObEdgeFlightRecorder(
+                    fr_settings,
+                    profile_provider=profile_provider,
+                    mid_provider=_mid_from_ob200,
+                )
+                self.full_ob_flight_recorder.attach(self.full_book)
+        except Exception:
+            logger.exception("full_ob_flight_recorder_init_failed")
+
+    def _dispatch_on_demand_request(self, req: dict[str, Any]) -> dict[str, Any]:
+        """Route Unix-socket control by depth: 0=full book, 1000=OB1000."""
+        from orderbook_analyse.orderbook_v2_live.full_book_state import FULL_DEPTH
+
+        try:
+            depth = int(req.get("depth", 1000))
+        except (TypeError, ValueError):
+            depth = 1000
+        if depth == FULL_DEPTH:
+            if self.full_book is None:
+                return {
+                    "request_id": req.get("request_id"),
+                    "ok": False,
+                    "error": "disabled",
+                    "depth": FULL_DEPTH,
+                    "book_mode": "full",
+                    "subscription_state": "error",
+                }
+            return self.full_book.handle_request(req)
+        if self.on_demand is None:
+            return {
+                "request_id": req.get("request_id"),
+                "ok": False,
+                "error": "disabled",
+                "depth": depth,
+                "subscription_state": "error",
+            }
+        return self.on_demand.handle_request(req)
 
     def request_stop(self) -> None:
         self.collector_state = "STOPPING"
@@ -222,6 +311,8 @@ class OrderbookV3LiveCollector:
 
     def handle_orderbook_message(self, payload: dict[str, Any], received_at: datetime) -> None:
         if self.fail_closed or self._stop.is_set():
+            return
+        if self.full_book is not None and self.full_book.handle_message(payload, received_at):
             return
         if self.on_demand is not None and self.on_demand.handle_message(payload, received_at):
             return
@@ -457,6 +548,10 @@ class OrderbookV3LiveCollector:
             payload.update(self.raw_archive.health_dict())
         if self.on_demand is not None:
             payload.update(self.on_demand.health_dict())
+        if self.full_book is not None:
+            payload.update(self.full_book.health_dict())
+        if getattr(self, "full_ob_flight_recorder", None) is not None:
+            payload.update(self.full_ob_flight_recorder.health_dict())
         return payload
 
     def _log_health(self) -> None:
@@ -566,6 +661,10 @@ class OrderbookV3LiveCollector:
                 self.raw_archive.note_lifecycle("CONNECT")
             if self.on_demand is not None:
                 self.on_demand.on_reconnect()
+            if self.full_book is not None:
+                self.full_book.on_reconnect(
+                    reason=str(getattr(self, "last_error", None) or "transport_reconnect")
+                )
             for rt in self.runtimes.values():
                 rt.clock.begin_resync()
                 rt.dropping_until_subscribe_ack = True
@@ -628,6 +727,10 @@ class OrderbookV3LiveCollector:
                     next_hb = now + hb_every
                 if self.on_demand is not None:
                     await self.on_demand.tick(ws)
+                if self.full_book is not None:
+                    await self.full_book.tick(ws)
+                if getattr(self, "full_ob_flight_recorder", None) is not None:
+                    self.full_ob_flight_recorder.tick()
             try:
                 await ws.close()
             except Exception:
@@ -695,8 +798,17 @@ class OrderbookV3LiveCollector:
                     )
         finally:
             self.request_stop()
+            if getattr(self, "full_ob_flight_recorder", None) is not None:
+                try:
+                    self.full_ob_flight_recorder.shutdown(
+                        reason="INTERRUPTED_BY_CONTROLLED_RESTART"
+                    )
+                except Exception:
+                    logger.exception("full_ob_flight_recorder_shutdown_failed")
             if self._on_demand_socket is not None:
                 await self._on_demand_socket.stop()
+            if self.full_book is not None:
+                self.full_book.close()
             flushed = True
             if self._writer_task is not None:
                 flushed = await self.writer.join(self._writer_task)

@@ -57,10 +57,29 @@ class DataSourceKindV2(str, Enum):
     CANDLES_SIGNAL_TF = "candles_signal_tf"
     CANDLES_EXECUTION_1M = "candles_execution_1m"
     PUBLIC_TRADES_1M = "public_trades_1m"
+    # Native/tick public trades (e.g. public_trades_canonical); not the 1m aggregate.
+    PUBLIC_TRADES_NATIVE = "public_trades_native"
     ORDERBOOK_OB200_V3_1M = "orderbook_ob200_v3_1m"
+    # Closed per-level raw OB200 archive (ob200_v3.zst segments); not the 1m aggregate.
+    # Open *.tmp / *_open_* segments must not be read.
+    ORDERBOOK_OB200_V3_RAW = "orderbook_ob200_v3_raw"
     OPEN_INTEREST_1M = "open_interest_1m"
     LIQUIDATIONS = "liquidations"
     LIQUIDITY_LOCATIONS = "liquidity_locations"
+
+
+class StrategyRunIntentV2(str, Enum):
+    """Discriminates trade-backtest vs candidate-discovery StrategySpec V2 roots."""
+
+    TRADE_BACKTEST = "trade_backtest"
+    CANDIDATE_DISCOVERY = "candidate_discovery"
+
+
+class PluginContractStatusV2(str, Enum):
+    """Whether a catalog plugin is production-ready or research-contract-only."""
+
+    PRODUCTION = "production"
+    RESEARCH_CONTRACT_ONLY = "research_contract_only"
 
 
 class DataRequirementRoleV2(str, Enum):

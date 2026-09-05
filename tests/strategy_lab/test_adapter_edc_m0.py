@@ -31,7 +31,7 @@ from orderbook_analyse.strategy_lab.validation.catalogs import production_catalo
 UTC = timezone.utc
 REPO = Path(__file__).resolve().parents[2]
 EDC_YAML = REPO / "strategies" / "strategy_lab" / "edc_m0_strict_sync_v2.yaml"
-HASH_EDC = "fb0ebc45827c68ab60d3a920c2d5d68651857080cf950fc020994044935f81ea"
+HASH_EDC = "4aced6b481d19eadd5505afc535e6fb4976f231fd2894b11f7d79acebc53598f"
 
 
 @pytest.fixture(scope="module")

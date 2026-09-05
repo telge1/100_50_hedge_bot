@@ -2,8 +2,10 @@
 Description=Bybit linear OI + allLiquidation collector (no orderbook, no trading)
 After=network-online.target docker.service
 Wants=network-online.target
-StartLimitBurst=5
-StartLimitIntervalSec=60
+# Fail-fast exits (writer dead / persistence lag / spool full) should restart,
+# but not spin forever on a permanent misconfiguration.
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -12,12 +14,16 @@ Environment=PYTHONPATH=src
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/home/telgenbuescher/projects/orderbook_analyse/.env
 ExecStart=/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0
+# on-failure: process must exit nonzero when writer dies (new supervision).
+# Do not use Restart=always alone as a substitute for health checks.
+# Prefer always so OOM/SIGKILL/unexpected exit 0 still come back quickly.
 Restart=always
-RestartSec=5
+RestartSec=2
 KillSignal=SIGTERM
-TimeoutStopSec=30
+TimeoutStopSec=60
 StandardOutput=append:/home/telgenbuescher/projects/orderbook_analyse/logs/oi_liquidation_live.log
 StandardError=append:/home/telgenbuescher/projects/orderbook_analyse/logs/oi_liquidation_live.log
+# WatchdogSec intentionally omitted until sd_notify is implemented and tested.
 
 [Install]
 WantedBy=default.target

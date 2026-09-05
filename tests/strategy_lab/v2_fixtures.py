@@ -155,7 +155,10 @@ def _comparison(
 
 
 def _v2_base_kwargs() -> dict[str, object]:
+    from orderbook_analyse.strategy_lab.models.contracts_v2.enums import StrategyRunIntentV2
+
     return {
+        "run_intent": StrategyRunIntentV2.TRADE_BACKTEST,
         "metadata": Metadata(
             schema_version=STRATEGY_SPEC_V2_SCHEMA_VERSION,
             strategy_id="test.minimal.v2",

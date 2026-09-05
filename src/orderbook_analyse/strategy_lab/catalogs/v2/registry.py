@@ -8,6 +8,7 @@ from typing import Generic, TypeVar
 from orderbook_analyse.strategy_lab.catalogs.v2.features import FEATURE_DESCRIPTORS_V2
 from orderbook_analyse.strategy_lab.catalogs.v2.models import (
     CATALOG_ID_PATTERN,
+    CandidatePluginDescriptorV2,
     CatalogIntegrityIssueV2,
     CatalogIntegrityReportV2,
     FeatureDescriptorV2,
@@ -134,7 +135,7 @@ def build_operator_catalog_v2() -> CatalogRegistryV2[OperatorDescriptorV2]:
     )
 
 
-def build_plugin_catalog_v2() -> CatalogRegistryV2[PluginDescriptorV2]:
+def build_plugin_catalog_v2() -> CatalogRegistryV2[PluginDescriptorV2 | CandidatePluginDescriptorV2]:
     return CatalogRegistryV2(
         name="plugin",
         entries=PLUGIN_DESCRIPTORS_V2,
@@ -155,7 +156,7 @@ def get_operator_v2(operator_id: str) -> OperatorDescriptorV2:
     return OPERATOR_CATALOG_V2.get(operator_id)
 
 
-def get_plugin_v2(plugin_id: str) -> PluginDescriptorV2:
+def get_plugin_v2(plugin_id: str) -> PluginDescriptorV2 | CandidatePluginDescriptorV2:
     return PLUGIN_CATALOG_V2.get(plugin_id)
 
 
@@ -252,10 +253,28 @@ def _validate_operator_signatures(
 
 
 def _validate_plugin_entry_contract(
-    plugin: PluginDescriptorV2,
+    plugin: PluginDescriptorV2 | CandidatePluginDescriptorV2,
 ) -> list[CatalogIntegrityIssueV2]:
     pid = _stable_id_value(plugin.plugin_id)
     issues: list[CatalogIntegrityIssueV2] = []
+    if isinstance(plugin, CandidatePluginDescriptorV2):
+        if not plugin.candidate_states:
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="MISSING_CANDIDATE_STATES",
+                    message="candidate plugin must declare candidate_states",
+                    entry_id=pid,
+                )
+            )
+        if hasattr(plugin, "entry_reference_rule"):
+            issues.append(
+                CatalogIntegrityIssueV2(
+                    code="CANDIDATE_PLUGIN_HAS_ENTRY",
+                    message="candidate plugin must not declare entry semantics",
+                    entry_id=pid,
+                )
+            )
+        return issues
     if not isinstance(plugin.entry_reference_rule, EntryReferenceRuleV2):
         issues.append(
             CatalogIntegrityIssueV2(

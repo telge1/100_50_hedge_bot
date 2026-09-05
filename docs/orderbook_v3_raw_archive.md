@@ -108,3 +108,18 @@ Outputs: `results/orderbook_v3_raw_archive/offline_smoke/`
 
 Rough order of magnitude for BTCUSDT OB200 at ~1–5 Hz mixed snapshot/delta:
 ~50–200 MB/day compressed (zstd level 3), highly variable with volatility.
+
+## OB1000 on-demand (Unix socket)
+
+Pilot: BTCUSDT + DOGEUSDT only. Disabled unless `OB_V3_ON_DEMAND_ENABLE=true`.
+
+Socket (mode `0600`): `/run/user/$UID/orderbook_ob1000.sock`
+
+Start helper (keeps OB200 raw-archive-only + enables on-demand from `.env`):
+
+```bash
+./scripts/start_orderbook_v3_raw_archive_btc_doge.sh
+```
+
+Dashboard bridge reads the same `OB_V3_ON_DEMAND_*` keys from this repo's `.env`
+when the process env does not already set them.
