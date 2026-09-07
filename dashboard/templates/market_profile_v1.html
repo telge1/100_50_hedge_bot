@@ -151,6 +151,30 @@
                         <span class="trp-muted" id="mpClusterCounts"></span>
                     </div>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind" title="Live: OB1000 Walls (REST). Historie: OB200 Multi-Walls aus Raw-Archive (BTC/DOGE), sonst Features-Walls">
+                        <input type="checkbox" id="mpObpEnabled"> Orderbook Walls
+                    </label>
+                    <span class="trp-muted research-obp-legend" id="mpObpLegend" hidden>Bid · Ask Walls</span>
+                    <label class="trp-check trp-dock-ind" title="Reale Orderbook-Preislevel als Side-Panel rechts der Preisskala (FULL / OB1000 on-demand · OB200 Archiv)">
+                        <input type="checkbox" id="mpOblEnabled"> Orderbook Levels
+                    </label>
+                    <span id="mpOblControls" class="research-obl-controls" hidden>
+                        <select id="mpOblDepth" class="trp-select trp-width" title="Orderbook depth" aria-label="OB Levels Depth">
+                            <option value="200">OB200</option>
+                            <option value="1000" selected>OB1000</option>
+                            <option value="0">FULL</option>
+                        </select>
+                        <select id="mpOblMode" class="trp-select trp-width" title="Raw vs Aggregated" aria-label="OB Levels Mode">
+                            <option value="aggregated" selected>Aggregated</option>
+                            <option value="raw">Raw</option>
+                        </select>
+                        <select id="mpOblScale" class="trp-select trp-width" title="Balken-Skalierung" aria-label="OB Levels Scale">
+                            <option value="sqrt" selected>Sqrt</option>
+                            <option value="linear">Linear</option>
+                            <option value="log">Log</option>
+                        </select>
+                    </span>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
                     <span class="trp-field-label">WERKZEUG</span>
                     <div class="trp-tools" id="mpTools"></div>
                     <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
@@ -167,15 +191,29 @@
                 <div class="mp-chart-wrap" id="mpChart">
                     <div id="app" class="mp-trp-app">
                         <div id="price-pane">
-                            <div id="overlay">
-                                <div id="demo-badge" hidden>DEMO</div>
-                                <div id="legend"></div>
+                            <div id="price-main">
+                                <div id="overlay">
+                                    <div id="demo-badge" hidden>DEMO</div>
+                                    <div id="legend"></div>
+                                </div>
+                                <div id="empty" hidden></div>
+                                <div id="chart"></div>
+                                <div id="overlay-layer"></div>
+                                <canvas id="mpOverlay" class="mp-overlay"></canvas>
+                                <div id="mpTooltip" class="mp-tooltip" hidden></div>
+                                <canvas id="obp-overlay" aria-hidden="true"></canvas>
+                                <div id="obp-tooltip" hidden></div>
+                                <div id="obp-badge" hidden></div>
                             </div>
-                            <div id="empty" hidden></div>
-                            <div id="chart"></div>
-                            <div id="overlay-layer"></div>
-                            <canvas id="mpOverlay" class="mp-overlay"></canvas>
-                            <div id="mpTooltip" class="mp-tooltip" hidden></div>
+                            <aside id="ob-levels-panel" class="ob-levels-panel" hidden aria-label="Orderbook levels">
+                                <div id="ob-levels-header" class="ob-levels-header">
+                                    <span id="ob-levels-title">FULL</span>
+                                    <span id="ob-levels-meta" class="ob-levels-meta"></span>
+                                    <span id="ob-levels-fresh" class="ob-levels-fresh"></span>
+                                </div>
+                                <canvas id="ob-levels-canvas" aria-hidden="true"></canvas>
+                                <div id="ob-levels-tooltip" class="ob-levels-tooltip" hidden></div>
+                            </aside>
                         </div>
                     </div>
                     <div id="mpEmpty" class="mp-empty">Chart wird geladen …</div>

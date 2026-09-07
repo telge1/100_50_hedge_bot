@@ -9,8 +9,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-10 shift-measure harden (TF change / empty padding).
-  try { console.info("[mp] asset mp-10"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-11 Orderbook Walls + Levels (research 1:1) on Market Profile.
+  try { console.info("[mp] asset mp-11"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -231,6 +231,717 @@
     return !!(chart && candleSeries);
   }
 
+  /* ---- ORDERBOOK Walls (left) + Levels (right) — research APIs 1:1 ---- */
+  var OBP_KEY = "mp_v1.orderbook_profile";
+  var OBL_KEY = "mp_v1.orderbook_levels.v3";
+  var OBL1000_LEASE_KEY = "research.ob1000.lease_id";
+  var OBP_REFRESH_MS = 2000;
+  var OBL_REFRESH_MS = 5000;
+  var OBL1000_REFRESH_MS = 2000;
+  var OBL_FULL_REFRESH_MS = 2000;
+  var OBL1000_HEARTBEAT_MS = 15000;
+  var OBP_DEBOUNCE_MS = 400;
+
+  var obState = {
+    obp: { enabled: false, width: "normal", mode: "snapshot_at" },
+    obl: { enabled: false, depth: 1000, mode: "aggregated", scale: "sqrt", width_px: 140 },
+    obl1000: {
+      leaseId: null,
+      leaseSymbol: null,
+      leaseDepth: null,
+      leaseGen: 0,
+      heartbeatTimer: null,
+      uiState: "DISABLED"
+    },
+    obpRefreshTimer: null,
+    oblRefreshTimer: null,
+    obpGen: 0,
+    oblGen: 0,
+    obpTimer: null,
+    oblTimer: null,
+    obpAbort: null,
+    oblAbort: null,
+    oblInflight: false,
+    _oblHadLive: false,
+    _oblPaintSig: null
+  };
+
+  function currentSymbol() {
+    return ($("mpSymbol") && $("mpSymbol").value) || "";
+  }
+
+  function currentCandleTf() {
+    return ($("mpTimeframe") && $("mpTimeframe").value) || "15m";
+  }
+
+  function defaultOrderbookProfile() {
+    return { enabled: false, width: "normal", mode: "snapshot_at" };
+  }
+
+  function defaultOrderbookLevels() {
+    return { enabled: false, depth: 1000, mode: "aggregated", scale: "sqrt", width_px: 140 };
+  }
+
+  function readStoredOrderbookProfile() {
+    try {
+      var raw = localStorage.getItem(OBP_KEY);
+      if (!raw) return defaultOrderbookProfile();
+      var out = Object.assign(defaultOrderbookProfile(), JSON.parse(raw));
+      out.mode = "snapshot_at";
+      return out;
+    } catch (e) {
+      return defaultOrderbookProfile();
+    }
+  }
+
+  function readStoredOrderbookLevels() {
+    try {
+      var raw = localStorage.getItem(OBL_KEY);
+      if (!raw) return defaultOrderbookLevels();
+      return Object.assign(defaultOrderbookLevels(), JSON.parse(raw));
+    } catch (e) {
+      return defaultOrderbookLevels();
+    }
+  }
+
+  function persistOrderbookProfile() {
+    try { localStorage.setItem(OBP_KEY, JSON.stringify(obState.obp)); } catch (e) { /* ignore */ }
+  }
+
+  function persistOrderbookLevels() {
+    try { localStorage.setItem(OBL_KEY, JSON.stringify(obState.obl)); } catch (e) { /* ignore */ }
+  }
+
+  function oblDataDepth() {
+    var d = obState.obl && obState.obl.depth != null ? Number(obState.obl.depth) : 1000;
+    if (d === 200) return 200;
+    if (d === 0) return 0;
+    return 1000;
+  }
+
+  function isOnDemandBookMode() {
+    var d = oblDataDepth();
+    return !!(obState.obl && obState.obl.enabled && (d === 1000 || d === 0));
+  }
+
+  function oblDepthLabel(depth) {
+    var d = depth != null ? Number(depth) : oblDataDepth();
+    if (d === 0) return "FULL";
+    if (d === 1000) return "OB1000";
+    return "OB200";
+  }
+
+  function obpSettingsPayload() {
+    return { enabled: !!(obState.obp && obState.obp.enabled), width: (obState.obp && obState.obp.width) || "normal" };
+  }
+
+  function oblSettingsPayload() {
+    var obl = obState.obl || defaultOrderbookLevels();
+    return {
+      enabled: !!obl.enabled,
+      depth: oblDataDepth(),
+      mode: obl.mode === "raw" ? "raw" : "aggregated",
+      scale: ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt",
+      width_px: Math.max(100, Math.min(220, Number(obl.width_px) || 140))
+    };
+  }
+
+  function fillOrderbookProfileControls() {
+    var en = $("mpObpEnabled");
+    if (en) en.checked = !!(obState.obp && obState.obp.enabled);
+    var legend = $("mpObpLegend");
+    if (legend) legend.hidden = !(obState.obp && obState.obp.enabled);
+  }
+
+  function fillOrderbookLevelsControls() {
+    var obl = obState.obl || defaultOrderbookLevels();
+    var en = $("mpOblEnabled");
+    if (en) en.checked = !!obl.enabled;
+    var depth = $("mpOblDepth");
+    if (depth) {
+      var d = oblDataDepth();
+      depth.value = d === 0 ? "0" : (d === 1000 ? "1000" : "200");
+    }
+    var mode = $("mpOblMode");
+    if (mode) mode.value = obl.mode === "raw" ? "raw" : "aggregated";
+    var scale = $("mpOblScale");
+    if (scale) scale.value = ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt";
+    var wrap = $("mpOblControls");
+    if (wrap) wrap.hidden = !obl.enabled;
+  }
+
+  function getJson(url, opts) {
+    opts = opts || {};
+    return fetch(url, {
+      credentials: "same-origin",
+      signal: opts.signal
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok) {
+          var detail = body && (body.detail || body.message || body.error || body.code);
+          var text = typeof detail === "string" && detail ? detail : (res.statusText || "request failed");
+          throw new Error(res.status + " " + text);
+        }
+        return body;
+      });
+    });
+  }
+
+  function postJson(url, payload) {
+    return fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {})
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok) {
+          var detail = body && (body.detail || body.message || body.error || body.code);
+          var text = typeof detail === "string" && detail ? detail : (res.statusText || "request failed");
+          throw new Error(res.status + " " + text);
+        }
+        return body;
+      });
+    });
+  }
+
+  function getOb1000LeaseId() {
+    try {
+      var id = sessionStorage.getItem(OBL1000_LEASE_KEY);
+      if (!id) {
+        id = "tab-" + Math.random().toString(36).slice(2) + "-" + Date.now();
+        sessionStorage.setItem(OBL1000_LEASE_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return "tab-" + Date.now();
+    }
+  }
+
+  function parseOb1000ApiError(err) {
+    if (!err) return null;
+    var msg = String(err.message || err);
+    if (msg.indexOf("symbol_not_in_pilot") >= 0) return { code: "symbol_not_in_pilot", status: 400 };
+    if (msg.indexOf("unknown_lease") >= 0 || msg.indexOf("no_active_lease") >= 0) {
+      return { code: "unknown_lease", status: 409 };
+    }
+    if (msg.indexOf("disabled") >= 0) return { code: "disabled", status: 503 };
+    if (msg.indexOf("collector_unavailable") >= 0 || msg.indexOf("503") >= 0) {
+      return { code: "collector_unavailable", status: 503 };
+    }
+    if (msg.indexOf("capacity_reached") >= 0 || msg.indexOf("429") >= 0) {
+      return { code: "capacity_reached", status: 429 };
+    }
+    return { code: "error", message: msg };
+  }
+
+  function computeOb1000UiState(payload, err) {
+    if (!obState.obl || !obState.obl.enabled) return "DISABLED";
+    if (!isOnDemandBookMode()) return "DISABLED";
+    if (err && err.code === "symbol_not_in_pilot") return "NOT_PILOT";
+    if (err && err.code === "disabled") return "DISABLED";
+    if (err && (err.code === "collector_unavailable" || err.status === 503)) return "OFFLINE";
+    if (err && err.code === "capacity_reached") return "CAPACITY";
+    var sub = payload && payload.subscription_state ? String(payload.subscription_state) : "starting";
+    if (sub === "capacity") return "CAPACITY";
+    if (sub === "starting" || sub === "grace") return "STARTING";
+    var fresh = payload && payload.freshness_state ? String(payload.freshness_state) : "unknown";
+    var hasLevels = payload && ((payload.bids && payload.bids.length) || (payload.asks && payload.asks.length));
+    if (!hasLevels) return sub === "live" ? "NO_DATA" : "STARTING";
+    if (fresh === "stale") return "STALE";
+    if (fresh === "delayed") return "DELAYED";
+    if (fresh === "fresh") return "LIVE";
+    return "NO_DATA";
+  }
+
+  function oblEmptyPayload(reqSymbol, depth, uiState) {
+    return {
+      symbol: reqSymbol,
+      bids: [],
+      asks: [],
+      freshness_state: "unknown",
+      freshness_ms: null,
+      timestamp_utc: null,
+      source: (depth === 1000 || depth === 0) ? "orderbook_v3_live_on_demand" : null,
+      depth: depth,
+      sequence: null,
+      ui_state: uiState || null,
+      subscription_state: uiState === "OFFLINE" ? "error" : "stopped"
+    };
+  }
+
+  function invalidateOb1000LeaseLocal() {
+    obState.obl1000.leaseId = null;
+    obState.obl1000.leaseSymbol = null;
+    obState.obl1000.leaseDepth = null;
+  }
+
+  function stopOb1000Heartbeat() {
+    if (obState.obl1000.heartbeatTimer) {
+      clearInterval(obState.obl1000.heartbeatTimer);
+      obState.obl1000.heartbeatTimer = null;
+    }
+  }
+
+  function releaseOb1000LeaseBestEffort() {
+    if (!obState.obl1000.leaseId) return;
+    var body = {
+      op: "release",
+      lease_id: obState.obl1000.leaseId,
+      depth: obState.obl1000.leaseDepth != null ? obState.obl1000.leaseDepth : oblDataDepth()
+    };
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(
+          "/api/research/ob1000/lease",
+          new Blob([JSON.stringify(body)], { type: "application/json" })
+        );
+      }
+    } catch (e) { /* ignore */ }
+    invalidateOb1000LeaseLocal();
+  }
+
+  function stopOb1000Lease() {
+    stopOb1000Heartbeat();
+    obState.obl1000.leaseGen += 1;
+    var leaseId = obState.obl1000.leaseId;
+    var leaseDepth = obState.obl1000.leaseDepth;
+    invalidateOb1000LeaseLocal();
+    obState.obl1000.uiState = "DISABLED";
+    if (!leaseId) return Promise.resolve();
+    return postJson("/api/research/ob1000/lease", {
+      op: "release",
+      lease_id: leaseId,
+      depth: leaseDepth != null ? leaseDepth : oblDataDepth()
+    }).catch(function () {});
+  }
+
+  function ensureOb1000Lease(symbol, opts) {
+    if (!isOnDemandBookMode() || !symbol) return Promise.resolve(false);
+    var force = !!(opts && opts.force);
+    var leaseId = getOb1000LeaseId();
+    var depth = oblDataDepth();
+    if (
+      !force &&
+      obState.obl1000.leaseId === leaseId &&
+      obState.obl1000.leaseSymbol === symbol &&
+      obState.obl1000.leaseDepth === depth
+    ) {
+      return Promise.resolve(true);
+    }
+    var gen = ++obState.obl1000.leaseGen;
+    var prep = Promise.resolve();
+    if (
+      obState.obl1000.leaseId &&
+      (obState.obl1000.leaseSymbol !== symbol || obState.obl1000.leaseDepth !== depth)
+    ) {
+      prep = stopOb1000Lease();
+    }
+    return prep.then(function () {
+      if (gen !== obState.obl1000.leaseGen) return false;
+      return postJson("/api/research/ob1000/lease", {
+        op: "acquire",
+        symbol: symbol,
+        lease_id: leaseId,
+        depth: depth
+      }).then(function (resp) {
+        if (gen !== obState.obl1000.leaseGen) return false;
+        obState.obl1000.leaseId = leaseId;
+        obState.obl1000.leaseSymbol = symbol;
+        obState.obl1000.leaseDepth = depth;
+        obState.obl1000.uiState = computeOb1000UiState(resp, null);
+        return true;
+      }).catch(function (err) {
+        if (gen !== obState.obl1000.leaseGen) return false;
+        obState.obl1000.uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+        invalidateOb1000LeaseLocal();
+        return false;
+      });
+    });
+  }
+
+  function startOb1000Heartbeat() {
+    stopOb1000Heartbeat();
+    if (!isOnDemandBookMode()) return;
+    obState.obl1000.heartbeatTimer = setInterval(function () {
+      if (!isOnDemandBookMode() || document.hidden) return;
+      var symbol = currentSymbol();
+      if (!symbol) return;
+      var leaseId = obState.obl1000.leaseId;
+      if (!leaseId) {
+        ensureOb1000Lease(symbol, { force: true }).then(function (ok) {
+          if (ok) startOb1000Heartbeat();
+        });
+        return;
+      }
+      postJson("/api/research/ob1000/lease", {
+        op: "heartbeat",
+        lease_id: leaseId,
+        symbol: symbol,
+        depth: obState.obl1000.leaseDepth != null ? obState.obl1000.leaseDepth : oblDataDepth()
+      }).catch(function (err) {
+        var parsed = parseOb1000ApiError(err);
+        if (parsed && parsed.code === "unknown_lease") {
+          invalidateOb1000LeaseLocal();
+          ensureOb1000Lease(symbol, { force: true }).then(function (ok) {
+            if (ok) startOb1000Heartbeat();
+          });
+        }
+      });
+    }, OBL1000_HEARTBEAT_MS);
+  }
+
+  function clearOrderbookProfile() {
+    obState.obpGen += 1;
+    if (obState.obpTimer) {
+      clearTimeout(obState.obpTimer);
+      obState.obpTimer = null;
+    }
+    if (obState.obpAbort) {
+      try { obState.obpAbort.abort(); } catch (e) { /* ignore */ }
+      obState.obpAbort = null;
+    }
+    var api = chartApi();
+    if (api && api.clearOrderbookProfile) api.clearOrderbookProfile();
+  }
+
+  function clearOrderbookLevels() {
+    obState.oblGen += 1;
+    obState.oblInflight = false;
+    if (obState.oblTimer) {
+      clearTimeout(obState.oblTimer);
+      obState.oblTimer = null;
+    }
+    if (obState.oblAbort) {
+      try { obState.oblAbort.abort(); } catch (e) { /* ignore */ }
+      obState.oblAbort = null;
+    }
+    var api = chartApi();
+    if (api && api.clearOrderbookLevels) api.clearOrderbookLevels();
+    if (api && api.setOrderbookLevels) {
+      api.setOrderbookLevels(null, { enabled: false, width_px: oblSettingsPayload().width_px });
+    }
+  }
+
+  function stopOrderbookProfileRefresh() {
+    if (obState.obpRefreshTimer) {
+      clearInterval(obState.obpRefreshTimer);
+      obState.obpRefreshTimer = null;
+    }
+  }
+
+  function stopOrderbookLevelsRefresh() {
+    if (obState.oblRefreshTimer) {
+      clearInterval(obState.oblRefreshTimer);
+      obState.oblRefreshTimer = null;
+    }
+    stopOb1000Heartbeat();
+  }
+
+  function scheduleOrderbookProfile() {
+    if (!obState.obp || !obState.obp.enabled) return;
+    if (obState.obpTimer) clearTimeout(obState.obpTimer);
+    obState.obpTimer = setTimeout(function () {
+      obState.obpTimer = null;
+      refreshOrderbookProfile();
+    }, OBP_DEBOUNCE_MS);
+  }
+
+  function scheduleOrderbookLevels() {
+    if (!obState.obl || !obState.obl.enabled) return;
+    if (obState.oblTimer) clearTimeout(obState.oblTimer);
+    obState.oblTimer = setTimeout(function () {
+      obState.oblTimer = null;
+      refreshOrderbookLevels();
+    }, 200);
+  }
+
+  function startOrderbookProfileRefresh() {
+    stopOrderbookProfileRefresh();
+    if (!obState.obp || !obState.obp.enabled) return;
+    obState.obpRefreshTimer = setInterval(function () {
+      if (!obState.obp || !obState.obp.enabled) return;
+      if (document.hidden) return;
+      scheduleOrderbookProfile();
+    }, OBP_REFRESH_MS);
+  }
+
+  function startOrderbookLevelsRefresh() {
+    stopOrderbookLevelsRefresh();
+    if (!obState.obl || !obState.obl.enabled) return;
+    if (isOnDemandBookMode()) {
+      if (!obState.obl1000.heartbeatTimer) startOb1000Heartbeat();
+    }
+    var interval = isOnDemandBookMode()
+      ? (oblDataDepth() === 0 ? OBL_FULL_REFRESH_MS : OBL1000_REFRESH_MS)
+      : OBL_REFRESH_MS;
+    obState.oblRefreshTimer = setInterval(function () {
+      if (!obState.obl || !obState.obl.enabled) return;
+      if (document.hidden) return;
+      scheduleOrderbookLevels();
+    }, interval);
+  }
+
+  function refreshOrderbookProfile() {
+    if (!obState.obp || !obState.obp.enabled) {
+      clearOrderbookProfile();
+      return;
+    }
+    var symbol = currentSymbol();
+    var api = chartApi();
+    if (!api || !api.getVisibleTimeRange || !symbol) return;
+    var range = api.getVisibleTimeRange();
+    if (!range || range.firstCandle == null || range.lastCandle == null) return;
+    var step = TF_SEC[currentCandleTf()] || 60;
+    var start = Number(range.firstCandle);
+    var end = Number(range.lastCandle) + step;
+    if (!(end > start)) return;
+    var gen = ++obState.obpGen;
+    if (obState.obpAbort) {
+      try { obState.obpAbort.abort(); } catch (e) { /* ignore */ }
+    }
+    obState.obpAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var tip = Number(range.lastCandle) + step;
+    var nowSec = Math.floor(Date.now() / 1000);
+    var atSec = (nowSec - tip <= 180) ? nowSec : Math.floor(tip);
+    var url = "/api/research/orderbook-profile?symbol=" + encodeURIComponent(symbol) +
+      "&start=" + encodeURIComponent(String(start)) +
+      "&end=" + encodeURIComponent(String(Math.max(end, atSec + 1))) +
+      "&at=" + encodeURIComponent(String(atSec)) +
+      "&mode=snapshot_at";
+    getJson(url, { signal: obState.obpAbort && obState.obpAbort.signal })
+      .then(function (body) {
+        if (gen !== obState.obpGen) return;
+        if (!obState.obp.enabled) return;
+        var live = chartApi();
+        if (live && live.setOrderbookProfile) {
+          live.setOrderbookProfile(body, obpSettingsPayload());
+        }
+      })
+      .catch(function (err) {
+        if (err && err.name === "AbortError") return;
+      });
+  }
+
+  function refreshOrderbookLevels() {
+    if (!obState.obl || !obState.obl.enabled) {
+      clearOrderbookLevels();
+      return;
+    }
+    if (obState.oblInflight) return;
+    var symbol = currentSymbol();
+    var api = chartApi();
+    if (!api || !symbol) return;
+    var gen = ++obState.oblGen;
+    var reqSymbol = symbol;
+    var reqDepth = oblDataDepth();
+    if (obState.oblAbort) {
+      try { obState.oblAbort.abort(); } catch (e) { /* ignore */ }
+    }
+    obState.oblAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
+    obState.oblInflight = true;
+
+    function finish() {
+      if (gen === obState.oblGen) obState.oblInflight = false;
+      else obState.oblInflight = false;
+    }
+
+    if (reqDepth === 1000 || reqDepth === 0) {
+      ensureOb1000Lease(reqSymbol).then(function (leased) {
+        if (gen !== obState.oblGen || reqSymbol !== currentSymbol() || oblDataDepth() !== reqDepth) {
+          finish();
+          return null;
+        }
+        if (!leased) {
+          var uiState = obState.obl1000.uiState || "NO_DATA";
+          var live = chartApi();
+          if (live && live.setOrderbookLevels) {
+            live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, uiState), oblSettingsPayload());
+          }
+          finish();
+          return null;
+        }
+        var url = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol) +
+          "&depth=" + encodeURIComponent(String(reqDepth));
+        if (obState.obl1000.leaseId) {
+          url += "&lease_id=" + encodeURIComponent(obState.obl1000.leaseId);
+        }
+        return getJson(url, { signal: obState.oblAbort && obState.oblAbort.signal }).then(function (body) {
+          if (gen !== obState.oblGen) return;
+          if (reqSymbol !== currentSymbol() || oblDataDepth() !== reqDepth) return;
+          if (body.depth == null) body.depth = reqDepth;
+          body.ui_state = computeOb1000UiState(body, null);
+          obState.obl1000.uiState = body.ui_state;
+          var stillEmpty = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
+          var live = chartApi();
+          if (live && live.setOrderbookLevels) {
+            var sig = String(body.timestamp_utc || "") + "|" + String(body.sequence || "") + "|" +
+              String((body.bids && body.bids.length) || 0) + "|" + String((body.asks && body.asks.length) || 0) + "|" +
+              String(body.ui_state || "") + "|" + String(body.depth);
+            if (!stillEmpty) {
+              if (obState._oblPaintSig !== sig) {
+                live.setOrderbookLevels(body, oblSettingsPayload());
+                obState._oblPaintSig = sig;
+              }
+              obState._oblHadLive = true;
+            } else if (!obState._oblHadLive) {
+              live.setOrderbookLevels(body, oblSettingsPayload());
+              obState._oblPaintSig = sig;
+            }
+          }
+        }).catch(function (err) {
+          if (err && err.name === "AbortError") return;
+          if (gen !== obState.oblGen) return;
+          var parsed = parseOb1000ApiError(err);
+          if (parsed && parsed.code === "unknown_lease") {
+            invalidateOb1000LeaseLocal();
+            return ensureOb1000Lease(reqSymbol, { force: true });
+          }
+          var ui = computeOb1000UiState(null, parsed);
+          obState.obl1000.uiState = ui;
+          if (ui === "NOT_PILOT" || ui === "OFFLINE" || ui === "DISABLED" || ui === "CAPACITY") {
+            var live2 = chartApi();
+            if (live2 && live2.setOrderbookLevels) {
+              live2.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, ui), oblSettingsPayload());
+            }
+          }
+        });
+      }).then(function () { finish(); }, function () { finish(); });
+      return;
+    }
+
+    var url200 = "/api/research/ob200-levels?symbol=" + encodeURIComponent(reqSymbol);
+    getJson(url200, { signal: obState.oblAbort && obState.oblAbort.signal })
+      .then(function (body) {
+        if (gen !== obState.oblGen) return;
+        if (reqSymbol !== currentSymbol() || oblDataDepth() !== 200) return;
+        body.depth = 200;
+        var live = chartApi();
+        if (live && live.setOrderbookLevels) live.setOrderbookLevels(body, oblSettingsPayload());
+      })
+      .catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        if (gen !== obState.oblGen) return;
+        var live = chartApi();
+        if (live && live.setOrderbookLevels) {
+          live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 200, null), oblSettingsPayload());
+        }
+      })
+      .then(function () { finish(); }, function () { finish(); });
+  }
+
+  function applyOrderbookProfileSettings(raw, skipPersist) {
+    obState.obp = Object.assign(defaultOrderbookProfile(), raw || {});
+    fillOrderbookProfileControls();
+    if (!skipPersist) persistOrderbookProfile();
+    if (!obState.obp.enabled) {
+      stopOrderbookProfileRefresh();
+      clearOrderbookProfile();
+      return;
+    }
+    startOrderbookProfileRefresh();
+    scheduleOrderbookProfile();
+  }
+
+  function applyOrderbookLevelsSettings(raw, skipPersist) {
+    var prevDepth = oblDataDepth();
+    obState.obl = Object.assign(defaultOrderbookLevels(), raw || {});
+    if (obState.obl.width_px != null) {
+      obState.obl.width_px = Math.max(100, Math.min(220, Number(obState.obl.width_px) || 140));
+    }
+    if (obState.obl.depth != null) {
+      var d = Number(obState.obl.depth);
+      if (d === 0) obState.obl.depth = 0;
+      else if (d === 1000) obState.obl.depth = 1000;
+      else obState.obl.depth = 200;
+    }
+    fillOrderbookLevelsControls();
+    if (!skipPersist) persistOrderbookLevels();
+    if (!obState.obl.enabled) {
+      stopOrderbookLevelsRefresh();
+      stopOb1000Lease();
+      clearOrderbookLevels();
+      return;
+    }
+    var wasOnDemand = prevDepth === 1000 || prevDepth === 0;
+    var nowOnDemand = isOnDemandBookMode();
+    if (wasOnDemand && (!nowOnDemand || prevDepth !== oblDataDepth())) {
+      stopOb1000Lease();
+      obState._oblHadLive = false;
+      obState._oblPaintSig = null;
+    }
+    if (isOnDemandBookMode()) {
+      ensureOb1000Lease(currentSymbol()).then(function () { startOb1000Heartbeat(); });
+    } else {
+      stopOb1000Lease();
+    }
+    startOrderbookLevelsRefresh();
+    scheduleOrderbookLevels();
+  }
+
+  function initOrderbookControls() {
+    obState.obp = readStoredOrderbookProfile();
+    obState.obl = readStoredOrderbookLevels();
+    fillOrderbookProfileControls();
+    fillOrderbookLevelsControls();
+    var obpEn = $("mpObpEnabled");
+    if (obpEn && !obpEn._mpObBound) {
+      obpEn.addEventListener("change", function () {
+        obState.obp.enabled = obpEn.checked;
+        persistOrderbookProfile();
+        fillOrderbookProfileControls();
+        applyOrderbookProfileSettings(obState.obp, true);
+      });
+      obpEn._mpObBound = true;
+    }
+    var oblEn = $("mpOblEnabled");
+    if (oblEn && !oblEn._mpObBound) {
+      oblEn.addEventListener("change", function () {
+        obState.obl.enabled = oblEn.checked;
+        persistOrderbookLevels();
+        fillOrderbookLevelsControls();
+        applyOrderbookLevelsSettings(obState.obl, true);
+      });
+      oblEn._mpObBound = true;
+    }
+    ["mpOblMode", "mpOblScale", "mpOblDepth"].forEach(function (id) {
+      var el = $(id);
+      if (!el || el._mpObBound) return;
+      el.addEventListener("change", function () {
+        if (!obState.obl) obState.obl = defaultOrderbookLevels();
+        if (id === "mpOblDepth") {
+          var v = $("mpOblDepth") ? $("mpOblDepth").value : "1000";
+          if (v === "0") obState.obl.depth = 0;
+          else if (v === "1000") obState.obl.depth = 1000;
+          else obState.obl.depth = 200;
+        } else {
+          obState.obl.mode = ($("mpOblMode") && $("mpOblMode").value) || "aggregated";
+          obState.obl.scale = ($("mpOblScale") && $("mpOblScale").value) || "sqrt";
+        }
+        persistOrderbookLevels();
+        applyOrderbookLevelsSettings(obState.obl, true);
+      });
+      el._mpObBound = true;
+    });
+    if (obState.obp.enabled) applyOrderbookProfileSettings(obState.obp, true);
+    if (obState.obl.enabled) applyOrderbookLevelsSettings(obState.obl, true);
+  }
+
+  function onOrderbookSymbolOrViewChange() {
+    if (obState.obp && obState.obp.enabled) scheduleOrderbookProfile();
+    if (obState.obl && obState.obl.enabled) {
+      if (isOnDemandBookMode()) {
+        ensureOb1000Lease(currentSymbol()).then(function () {
+          startOb1000Heartbeat();
+          scheduleOrderbookLevels();
+        });
+      } else {
+        scheduleOrderbookLevels();
+      }
+    }
+  }
+  /* ---- ORDERBOOK_HOOK end ---- */
+
   function whenChartReady(cb) {
     var done = false;
     function fire() {
@@ -403,10 +1114,14 @@
       pane.addEventListener("mousemove", onHover);
       pane.addEventListener("mouseleave", function () { $("mpTooltip").hidden = true; });
     }
-    window.__mpOnVisibleRange = function () { scheduleDrawDebounced(90); };
+    window.__mpOnVisibleRange = function () {
+      scheduleDrawDebounced(90);
+      onOrderbookSymbolOrViewChange();
+    };
     try {
       chart.timeScale().subscribeVisibleLogicalRangeChange(function () {
         scheduleDrawDebounced(90);
+        onOrderbookSymbolOrViewChange();
       });
     } catch (err) { /* chart may already notify via bridge */ }
     var wrap = $("price-pane") || $("mpChart");
@@ -1749,6 +2464,7 @@
       if (ev && ev.target && ev.target.id === "mpDays" && $("mpDays").value === "custom") {
         return;
       }
+      onOrderbookSymbolOrViewChange();
       load();
     }
 
@@ -1808,6 +2524,7 @@
     syncConditionalControls();
     bindChartChrome();
     bind();
+    initOrderbookControls();
     restoreChartHeight();
     renderLegend();
     document.addEventListener("visibilitychange", function () {
@@ -1815,6 +2532,10 @@
       if (!payload || !payload.candles || !payload.candles.length) return;
       if (!formingTimer) startLivePoll();
       else pollForming(livePollGen);
+      onOrderbookSymbolOrViewChange();
+    });
+    window.addEventListener("pagehide", function () {
+      releaseOb1000LeaseBestEffort();
     });
     sendJson("/api/research/workspace").then(function (snap) {
       applyWorkspace(snap);
@@ -1825,6 +2546,7 @@
         scheduleDraw();
         startLivePoll();
       }
+      onOrderbookSymbolOrViewChange();
     });
     // Auto-load immediately with the default/persisted range (do not wait for
     // the chart bridge — that left the empty placeholder stuck forever).
