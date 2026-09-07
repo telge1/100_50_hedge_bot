@@ -1,0 +1,182 @@
+/* Footprint overlay — sits above Lightweight Charts, below Market Profile overlay. */
+
+#fpOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  display: block;
+}
+
+#fpOverlay[hidden] {
+  display: none !important;
+}
+
+.fp-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fp-status {
+  font-size: 12px;
+  color: #9aa4b2;
+  margin-left: 6px;
+}
+
+.fp-status.is-busy {
+  color: #93c5fd;
+}
+
+.fp-status.is-ok {
+  color: #86efac;
+}
+
+.fp-status.is-warn {
+  color: #fbbf24;
+}
+
+.fp-status.is-error {
+  color: #f87171;
+}
+
+.mp-check.fp-toggle input {
+  accent-color: #f0b90b;
+}
+
+.fp-avr-expand {
+  font-size: 11px;
+  padding: 2px 8px;
+  margin-left: 2px;
+  background: transparent;
+  border: 1px solid rgba(140, 150, 170, 0.45);
+  color: #c5cdd8;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.fp-avr-expand[aria-expanded="true"] {
+  border-color: #f0b90b;
+  color: #f0b90b;
+}
+
+/* Panel lives ABOVE the chart stack — never as a free overlay on candles. */
+.fp-avr-panel {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(14, 18, 26, 0.96);
+  border: 1px solid rgba(140, 150, 170, 0.35);
+  color: #d7dde8;
+  font-family: "DejaVu Sans Mono", ui-monospace, monospace;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.fp-avr-panel-title {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9aa4b2;
+  margin-bottom: 6px;
+}
+
+.fp-avr-panel-body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.fp-avr-panel[hidden] {
+  display: none !important;
+}
+
+.fp-avr-panel .fp-avr-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.fp-avr-panel .fp-avr-k {
+  color: #8b95a5;
+}
+
+.fp-avr-panel .fp-avr-thirds {
+  margin: 6px 0;
+  padding: 6px 0;
+  border-top: 1px solid rgba(120, 130, 150, 0.25);
+  border-bottom: 1px solid rgba(120, 130, 150, 0.25);
+}
+
+.fp-avr-panel .fp-avr-details {
+  color: #a8b0bd;
+  font-size: 11px;
+}
+
+/* AVR color legend — sits above Market Profile legend */
+.fp-avr-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 6px 0 4px;
+  padding: 6px 8px;
+  font: 11px/1.35 "DejaVu Sans Mono", ui-monospace, monospace;
+  color: #b8c0cc;
+  background: rgba(12, 14, 18, 0.55);
+  border-top: 1px solid rgba(120, 130, 150, 0.22);
+}
+
+.fp-avr-legend[hidden] {
+  display: none !important;
+}
+
+.fp-avr-legend-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #e6ebf2;
+  margin-right: 4px;
+}
+
+.fp-avr-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.fp-avr-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.fp-avr-legend-swatch.fp-avr-legend-q {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(60, 64, 72, 0.9);
+  color: #f0c14a;
+  font-size: 9px;
+  font-weight: 700;
+  width: 12px;
+  height: 12px;
+}
+
+.fp-avr-legend-abbr {
+  color: #e6ebf2;
+  font-weight: 600;
+}
+
+.fp-avr-legend-desc {
+  color: #9aa3b2;
+}

@@ -9,8 +9,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-11 Orderbook Walls + Levels (research 1:1) on Market Profile.
-  try { console.info("[mp] asset mp-11"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-19 Orderbook Walls + Levels (research 1:1) on Market Profile.
+  try { console.info("[mp] asset mp-19"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -132,6 +132,8 @@
       extendLevels: $("mpExtendLevels").checked,
       showShape: $("mpShowShape").checked,
       showLiquidity: $("mpShowLiquidity").checked,
+      // FOOTPRINT_HOOK: persistence only — rendering lives in FootprintCandles.
+      showFootprint: $("mpShowFootprint") ? $("mpShowFootprint").checked : false,
       valueAreaPct: parseFloat($("mpValueAreaPct").value) || 70,
       targetBins: parseInt($("mpTargetBins").value, 10) || 160,
       final: $("mpFinal").checked
@@ -187,6 +189,8 @@
     setChk("mpExtendLevels", s.extendLevels);
     setChk("mpShowShape", s.showShape);
     setChk("mpShowLiquidity", s.showLiquidity);
+    // FOOTPRINT_HOOK
+    setChk("mpShowFootprint", s.showFootprint);
     setChk("mpFinal", s.final);
 
     if (Array.isArray(s.sessions) && s.sessions.length) {
@@ -228,8 +232,32 @@
     if (!api || !api.getChart || !api.getCandleSeries) return false;
     chart = api.getChart();
     candleSeries = api.getCandleSeries();
+    // FOOTPRINT_HOOK: pass chart refs to sibling module (no footprint math here).
+    syncFootprintContext();
     return !!(chart && candleSeries);
   }
+
+  /* ---- FOOTPRINT_HOOK begin (activate/deactivate only) ---- */
+  function syncFootprintContext() {
+    if (!window.FootprintCandles || !window.FootprintCandles.setContext) return;
+    var s = readSettings();
+    window.FootprintCandles.setContext({
+      chart: chart,
+      candleSeries: candleSeries,
+      symbol: s.symbol,
+      timeframe: s.timeframe,
+      statusEl: $("fpStatus")
+    });
+  }
+
+  function applyFootprintToggle() {
+    syncFootprintContext();
+    if (!window.FootprintCandles) return;
+    var on = $("mpShowFootprint") && $("mpShowFootprint").checked;
+    if (on) window.FootprintCandles.enable();
+    else window.FootprintCandles.disable();
+  }
+  /* ---- FOOTPRINT_HOOK end ---- */
 
   /* ---- ORDERBOOK Walls (left) + Levels (right) — research APIs 1:1 ---- */
   var OBP_KEY = "mp_v1.orderbook_profile";
@@ -1116,6 +1144,10 @@
     }
     window.__mpOnVisibleRange = function () {
       scheduleDrawDebounced(90);
+      // FOOTPRINT_HOOK
+      if (window.FootprintCandles && window.FootprintCandles.onVisibleRange) {
+        window.FootprintCandles.onVisibleRange();
+      }
       onOrderbookSymbolOrViewChange();
     };
     try {
@@ -2464,6 +2496,11 @@
       if (ev && ev.target && ev.target.id === "mpDays" && $("mpDays").value === "custom") {
         return;
       }
+      // FOOTPRINT_HOOK: refresh module context before MP reload.
+      syncFootprintContext();
+      if (window.FootprintCandles && window.FootprintCandles.isEnabled && window.FootprintCandles.isEnabled()) {
+        window.FootprintCandles.onVisibleRange();
+      }
       onOrderbookSymbolOrViewChange();
       load();
     }
@@ -2502,6 +2539,13 @@
       refreshLiquidityLocation();
     });
 
+    // FOOTPRINT_HOOK: toggle only — fetch/draw owned by FootprintCandles.
+    if ($("mpShowFootprint")) {
+      $("mpShowFootprint").addEventListener("change", function () {
+        persistSettings();
+        applyFootprintToggle();
+      });
+    }
     // These change what gets computed, so they need a reload to take effect
     // (FINAL is expensive — keep as explicit Laden / advanced only).
     ["mpValueAreaPct", "mpTargetBins", "mpFinal"].forEach(function (id) {
@@ -2546,9 +2590,10 @@
         scheduleDraw();
         startLivePoll();
       }
+      // FOOTPRINT_HOOK: apply persisted toggle after chart exists (default off).
+      applyFootprintToggle();
       onOrderbookSymbolOrViewChange();
-    });
-    // Auto-load immediately with the default/persisted range (do not wait for
+    });    // Auto-load immediately with the default/persisted range (do not wait for
     // the chart bridge — that left the empty placeholder stuck forever).
     load();
   }

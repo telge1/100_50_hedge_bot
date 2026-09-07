@@ -2946,6 +2946,15 @@ def render_template(template_name: str, context: dict) -> str:
 
 # Static files
 static_dir = Path(__file__).parent / "static"
+# Footprint assets must mount BEFORE the catch-all /static mount, otherwise
+# Starlette serves /static/footprint_candles/* from dashboard/static/ (missing).
+_fp_static_early = Path(__file__).resolve().parent / "footprint_candles" / "static"
+if _fp_static_early.is_dir():
+    app.mount(
+        "/static/footprint_candles",
+        StaticFiles(directory=str(_fp_static_early)),
+        name="static_footprint_candles",
+    )
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Compat aliases: older host/iframe URLs omitted the /static prefix and 404'd,
 # which left Research charts without chartApi.updateFormingBar (price appeared frozen).
@@ -3016,6 +3025,7 @@ from research_charts.api import build_router as _build_research_router  # noqa: 
 from gold_shadow.api import build_router as _build_gold_shadow_router  # noqa: E402
 from market_profile_v1.api import build_router as _build_market_profile_router  # noqa: E402
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
+from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
 app.include_router(
     _build_research_router(require_auth=require_auth, render_template=render_template)
 )
@@ -3026,6 +3036,7 @@ app.include_router(
     _build_market_profile_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(_build_collector_health_router(require_auth=require_auth))
+app.include_router(_build_footprint_candles_router(require_auth=require_auth))
 
 
 @app.get("/", response_class=HTMLResponse)

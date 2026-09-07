@@ -240,6 +240,12 @@
   z-index: 4;
 }
 
+/* Footprint layer: above candles (z1), below MP overlay (z4). Rules also in footprint_candles.css */
+#fpOverlay {
+  z-index: 3;
+  pointer-events: none;
+}
+
 #obp-overlay {
   position: absolute;
   inset: 0;

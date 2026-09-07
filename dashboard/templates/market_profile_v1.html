@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/research.css?v=mp-trp-1">
     <link rel="stylesheet" href="/static/market_profile_v1/style.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/static/footprint_candles/footprint_candles.css?v={{ asset_v }}">
 </head>
 <body>
     <div class="dashboard-container">
@@ -116,6 +117,18 @@
                     <label class="mp-check"><input type="checkbox" id="mpShowShape" checked> Shape-Verdikt</label>
                 </div>
 
+                <div class="mp-group fp-toggle-group">
+                    <span class="mp-label">FOOTPRINT</span>
+                    <label class="mp-check fp-toggle" title="Nur BTCUSDT / 5m Kerzen — ausgeführte Public Trades">
+                        <input type="checkbox" id="mpShowFootprint"> An
+                    </label>
+                    <label class="mp-check fp-toggle" title="AVR-Badges und State-Leiste (keine Signale)">
+                        <input type="checkbox" id="fpShowAvrPanel" checked> AVR
+                    </label>
+                    <button type="button" class="mp-btn fp-avr-expand" id="fpAvrExpand" aria-expanded="false" title="AVR-Details ein-/ausklappen">ERWEITERT</button>
+                    <span class="fp-status" id="fpStatus"></span>
+                </div>
+
                 <details class="mp-advanced">
                     <summary>Erweitert</summary>
                     <div class="mp-advanced-body">
@@ -130,6 +143,11 @@
 
             <div class="mp-notice" id="mpShapeNotice">
                 <strong>Hinweis:</strong> {{ shape_notice }}
+            </div>
+
+            <div id="fpAvrPanel" class="fp-avr-panel" hidden>
+                <div class="fp-avr-panel-title">AVR · <span id="fpAvrPanelHint">Aktuelle Candle</span></div>
+                <div id="fpAvrPanelBody" class="fp-avr-panel-body"></div>
             </div>
 
             <div class="mp-chart-stack" id="mpChartStack">
@@ -199,6 +217,7 @@
                                 <div id="empty" hidden></div>
                                 <div id="chart"></div>
                                 <div id="overlay-layer"></div>
+                                <canvas id="fpOverlay" hidden aria-hidden="true"></canvas>
                                 <canvas id="mpOverlay" class="mp-overlay"></canvas>
                                 <div id="mpTooltip" class="mp-tooltip" hidden></div>
                                 <canvas id="obp-overlay" aria-hidden="true"></canvas>
@@ -220,6 +239,7 @@
                 </div>
             </div>
 
+            <div class="fp-avr-legend" id="fpAvrLegend" hidden aria-label="AVR Farblegende"></div>
             <div class="mp-legend" id="mpLegend"></div>
         </div>
     </div>
@@ -316,6 +336,7 @@
     };
     </script>
     <script src="/static/research_trp/chart.js?v={{ asset_v }}"></script>
+    <script src="/static/footprint_candles/footprint_candles.js?v={{ asset_v }}"></script>
     <script src="/static/market_profile_v1/app.js?v={{ asset_v }}"></script>
 </body>
 </html>
