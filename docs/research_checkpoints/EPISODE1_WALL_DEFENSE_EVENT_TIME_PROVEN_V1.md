@@ -5,7 +5,7 @@
 **Git-Repo:** `/home/telgenbuescher/projects/orderbook_analyse`
 **Git-Branch:** `research/episode1-wall-defense-proven-v1`
 **Git-Tag:** `episode1-wall-defense-event-time-proven-v1`
-**Commit-Hash:** _(eingetragen nach Commit)_
+**Commit-Hash:** `f5e923b39d9b17afc5674b17fbd67c1f2bcfcdfc`
 
 ## Scope
 
@@ -159,6 +159,22 @@ PYTHONPATH=src:../src python -m pytest \
   tests/test_level_first_episode1_touch_provenance_v1.py \
   -q
 ```
+
+### Checkpoint-Lauf 2026-09-10 (Ergebnisse)
+
+- Touch/Detection Independent: 7 passed
+- Independent Derivation: 13 passed
+- Wall-Flow/QDH Base: 28 passed
+- Detection→Wall-Flow Integration: 6 passed
+- Price Response/Reclaim: 10 passed (1 deselected: `pipeline_ok_smoke` is `pytest.skip`; covered by prior e2e A/B)
+- Wall Migration Structure: 7 passed (1 deselected: marked `@pytest.mark.slow` `pipeline_smoke`; prior e2e A/B proven)
+- Defense Chain: 8 passed
+- Outcome Contract: 10 passed
+- Next-Major Headroom: 10 passed
+- Corrected SMS1 Persist: 16 passed
+- Causal Availability: 14 passed
+- Touch Provenance: 8 passed
+- Import-Smoke der 8 bewiesenen Pakete: OK
 
 Import-Smoke:
 
