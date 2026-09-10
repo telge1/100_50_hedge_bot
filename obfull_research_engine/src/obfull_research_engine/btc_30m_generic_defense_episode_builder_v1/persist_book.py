@@ -49,14 +49,20 @@ def existing_persist_covers(
     if not all((persist_dir / name).exists() for name in required):
         return False
     manifest_path = persist_dir / "run_manifest.json"
-    if not manifest_path.exists():
-        # Files present — allow reuse only if caller accepts unknown window
-        return False
-    try:
-        import json
+    meta_path = persist_dir / "persist_meta.json"
+    man = None
+    for path in (manifest_path, meta_path):
+        if not path.exists():
+            continue
+        try:
+            import json
 
-        man = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
+            man = json.loads(path.read_text(encoding="utf-8"))
+            break
+        except Exception:  # noqa: BLE001
+            man = None
+    if not man:
+        # Files present — allow reuse only if caller accepts unknown window
         return False
     # Try common keys
     ws = man.get("window_start") or man.get("persist_window_start") or (man.get("config") or {}).get(
@@ -107,31 +113,89 @@ def persist_episode_book(
     Persist [zone_touch-5m, max(detection, zone_touch+3m)] via replay_window.
     Reuse existing persist dir if window covered (read-only fallback).
     """
+    from ..level_first_episode1_corrected_sms1_persist_v1.reader import replay_payload_from_tables
+
     need_start, need_end = episode_persist_window(
         zone_touch_ts=zone_touch_ts, detection_ts=detection_ts
     )
+    out_dir = Path(out_dir)
+    # Prefer already-written local book for this cluster (same worktree run or resume).
+    if allow_reuse and existing_persist_covers(out_dir, need_start=need_start, need_end=need_end):
+        try:
+            replay = replay_payload_from_tables(out_dir)
+            if not replay.get("window_end"):
+                replay["window_end"] = format_utc_z(need_end)
+            return {
+                "ok": True,
+                "reused": True,
+                "persist_dir": str(out_dir),
+                "window_start": format_utc_z(need_start),
+                "window_end": format_utc_z(need_end),
+                "book_source": BOOK_SOURCE,
+                "reuse_of": str(out_dir),
+                "replay": replay,
+            }
+        except Exception:  # noqa: BLE001
+            pass
+    # Also accept local tables without coverage manifest (fresh prior smoke).
+    if allow_reuse and all(
+        (out_dir / name).exists()
+        for name in ("states_100ms.jsonl.zst", "level_changes.jsonl.zst", "initial_book.jsonl.zst", "book_resets.jsonl.zst")
+    ):
+        try:
+            replay = replay_payload_from_tables(out_dir)
+            if not replay.get("window_end"):
+                replay["window_end"] = format_utc_z(need_end)
+            return {
+                "ok": True,
+                "reused": True,
+                "persist_dir": str(out_dir),
+                "window_start": format_utc_z(need_start),
+                "window_end": format_utc_z(need_end),
+                "book_source": BOOK_SOURCE,
+                "reuse_of": str(out_dir),
+                "replay": replay,
+            }
+        except Exception:  # noqa: BLE001
+            pass
     fallback = Path(existing_persist_fallback) if existing_persist_fallback else None
     if allow_reuse and fallback is not None and existing_persist_covers(
         fallback, need_start=need_start, need_end=need_end
     ):
-        return {
-            "ok": True,
-            "reused": True,
-            "persist_dir": str(fallback),
-            "window_start": format_utc_z(need_start),
-            "window_end": format_utc_z(need_end),
-            "book_source": BOOK_SOURCE,
-            "reuse_of": str(fallback),
-        }
+        try:
+            replay = replay_payload_from_tables(fallback)
+            if not replay.get("window_end"):
+                replay["window_end"] = format_utc_z(need_end)
+            return {
+                "ok": True,
+                "reused": True,
+                "persist_dir": str(fallback),
+                "window_start": format_utc_z(need_start),
+                "window_end": format_utc_z(need_end),
+                "book_source": BOOK_SOURCE,
+                "reuse_of": str(fallback),
+                "replay": replay,
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "reused": True,
+                "error": f"reuse_replay_load_failed: {exc}",
+                "persist_dir": str(fallback),
+                "window_start": format_utc_z(need_start),
+                "window_end": format_utc_z(need_end),
+            }
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Pass trades=None so replay_window loads TradeRow via modalities (dicts are incompatible).
+    # Public-trade freeze remains available for visit/detection stages separately.
     replay = replay_window(
         symbol=symbol,
         window_start=need_start,
         window_end=need_end,
         archive_root=Path(archive_root),
-        trades=trades,
+        trades=None,
     )
     if not replay.get("ok", True):
         return {
