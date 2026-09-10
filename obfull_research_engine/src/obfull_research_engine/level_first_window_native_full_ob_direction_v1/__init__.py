@@ -53,6 +53,12 @@ REACTION_CLASSES = (
     "REJECTED_DOWN_FROM_RESISTANCE_CONTEXT",
 )
 
-from .runner import run_window_native  # noqa: E402
+def __getattr__(name: str):
+    if name == "run_window_native":
+        from .runner import run_window_native
+
+        return run_window_native
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = ["CONTRACT_NAME", "run_window_native"]

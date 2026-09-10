@@ -132,7 +132,14 @@ FROZEN_PHASE2_DIR = (
 )
 FROZEN_PHASE1_DIR = "results/market_profile_liquidation_chart_source_parity_audit_v1"
 
-from .runner import run_pilot  # noqa: E402
+# Lazy export: importing episodes/reactions/persist must not pull analyze/CH precheck.
+def __getattr__(name: str):
+    if name == "run_pilot":
+        from .runner import run_pilot
+
+        return run_pilot
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "CONTRACT_NAME",

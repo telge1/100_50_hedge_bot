@@ -87,6 +87,12 @@ EXPECTED_DETECTION = parse_iso(EXPECTED_DETECTION_ISO)
 EFFECTIVE_BUCKET_START = parse_iso(EFFECTIVE_BUCKET_START_ISO)
 FIRST_BUCKET_AVAILABLE_AT = parse_iso(FIRST_BUCKET_AVAILABLE_AT_ISO)
 
-from .runner import run_audit  # noqa: E402
+def __getattr__(name: str):
+    if name == "run_audit":
+        from .runner import run_audit
+
+        return run_audit
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = ["AUDIT_ID", "run_audit", "ALLOW_ARCHIVE_REPLAY", "ALLOW_CLICKHOUSE_WRITES"]

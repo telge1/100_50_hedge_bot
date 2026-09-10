@@ -1,0 +1,28 @@
+{
+  "symbol": "BTCUSDT",
+  "window_start": "2026-09-06T19:00:00Z",
+  "window_end": "2026-09-06T23:00:00Z",
+  "tick_size": 0.1,
+  "band_ticks": 5,
+  "max_pilot_clusters": 20,
+  "attack_cluster_gap_ms": 60000,
+  "wall_distance_cap_ticks": 50,
+  "book_source": "ORDERBOOK_FULL",
+  "mp_events_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/bounded_level_first_analyzer_pilot_v1/BTCUSDT/lf1_69e21d12d280596e/mp_level_events.csv",
+  "level_clusters_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/bounded_level_first_analyzer_pilot_v1/BTCUSDT/lf1_69e21d12d280596e/level_clusters.csv",
+  "trades_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/level_first_episode1_corrected_sms1_persist_v1/BTCUSDT/episode1_independent_derivation_inputs_v1/public_trades_zone_window.jsonl",
+  "candles_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/level_first_episode1_corrected_sms1_persist_v1/BTCUSDT/episode1_independent_derivation_inputs_v1/candles_1m_zone_window.jsonl",
+  "full_ob_archive": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_v1",
+  "existing_persist_fallback": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/level_first_episode1_wall_flow_qdh_base_v1/BTCUSDT/wfq1_58db1918314881b6a",
+  "expected_contract_hash": "efd620a305e8252e61f03c516c69de364049153e6fb02c091caf6137e4e7e46a",
+  "schema_version": "btc_30m_generic_defense_episode_builder_v1",
+  "run_prefix": "gdeb1_",
+  "note_no_visit_count_selector": "research_visit_count is NOT used as a selector in the generic builder",
+  "note_no_known_episode_ids": "No FIRST_TOUCH_ISO / known episode IDs / known touch times as calc inputs",
+  "notes": [
+    "Read-only absolute data paths — do not copy raw data into the worktree.",
+    "Features and outcomes are written under separate directories.",
+    "Book source ORDERBOOK_FULL only.",
+    "Bid walls: discovery/handoff/price/outcomes continue; wall_flow skipped with WALL_FLOW_FROZEN_ASK_ONLY_V1."
+  ]
+}
