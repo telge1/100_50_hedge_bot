@@ -42,6 +42,19 @@ DEFAULT_EXISTING_PERSIST = Path(
     "level_first_episode1_wall_flow_qdh_base_v1/BTCUSDT/wfq1_58db1918314881b6a"
 )
 
+# Episode-1 / lf1 pilot fixtures — allowed for pilot mode only, never as silent full-run.
+PILOT_FIXTURE_PATHS = frozenset(
+    {
+        str(DEFAULT_MP_EVENTS),
+        str(DEFAULT_LEVEL_CLUSTERS),
+        str(DEFAULT_TRADES),
+        str(DEFAULT_CANDLES),
+    }
+)
+
+INPUT_CONTRACT_PILOT_FIXTURE_V1 = "pilot_fixture_v1"
+INPUT_CONTRACT_FULL_RUN_GENERIC_V1 = "full_run_generic_v1"
+
 RESULTS_ROOT = Path(WORKTREE_ROOT) / "obfull_research_engine/results/btc_30m_generic_defense_episode_builder_v1"
 
 # Keys that must never appear as calculation inputs.
@@ -63,7 +76,10 @@ class BuilderConfig:
     window_end: str = "2026-09-06T23:00:00Z"
     tick_size: float = 0.1
     band_ticks: int = 5
+    # Pilot-only default ceiling. Full mode ignores this unless max_clusters is set.
     max_pilot_clusters: int = 20
+    # Explicit optional limit for either mode. None = no explicit override.
+    max_clusters: int | None = None
     attack_cluster_gap_ms: int = ATTACK_CLUSTER_GAP_MS_DEFAULT
     wall_distance_cap_ticks: int = 50
     wall_min_notional_heuristic: float = 0.0
@@ -77,6 +93,8 @@ class BuilderConfig:
     out_root: str = str(RESULTS_ROOT)
     run_key: str | None = None
     pilot: bool = False
+    # Declares which input contract this run claims. Full mode requires full_run_generic_v1.
+    input_contract: str = INPUT_CONTRACT_PILOT_FIXTURE_V1
     expected_contract_hash: str = EXPECTED_CONTRACT_HASH
     schema_version: str = SCHEMA_VERSION
     run_prefix: str = RUN_PREFIX
@@ -89,6 +107,36 @@ class BuilderConfig:
     )
     extra: dict[str, Any] = field(default_factory=dict)
 
+    def run_mode(self) -> str:
+        return "pilot" if self.pilot else "full"
+
+    def effective_cluster_limit(self) -> int | None:
+        """
+        Effective enrichment ceiling.
+
+        - If max_clusters is set: that value (both modes).
+        - Else if pilot: max_pilot_clusters.
+        - Else (full without override): None = unlimited (process all valid clusters).
+        """
+        if self.max_clusters is not None:
+            if int(self.max_clusters) < 0:
+                raise ValueError("max_clusters must be >= 0")
+            return int(self.max_clusters)
+        if self.pilot:
+            if int(self.max_pilot_clusters) < 0:
+                raise ValueError("max_pilot_clusters must be >= 0")
+            return int(self.max_pilot_clusters)
+        return None
+
+    def uses_pilot_fixture_paths(self) -> bool:
+        paths = {
+            str(Path(self.mp_events_path)),
+            str(Path(self.level_clusters_path)),
+            str(Path(self.trades_path)),
+            str(Path(self.candles_path)),
+        }
+        return bool(paths & PILOT_FIXTURE_PATHS)
+
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         # Ensure forbidden keys never sneak into calc config via extra.
@@ -96,6 +144,8 @@ class BuilderConfig:
             d.pop(k, None)
             if isinstance(d.get("extra"), dict):
                 d["extra"].pop(k, None)
+        d["run_mode"] = self.run_mode()
+        d["effective_cluster_limit"] = self.effective_cluster_limit()
         return d
 
     def source_manifest(self) -> dict[str, Any]:
@@ -113,7 +163,12 @@ class BuilderConfig:
             "attack_cluster_gap_ms": self.attack_cluster_gap_ms,
             "tick_size": self.tick_size,
             "band_ticks": self.band_ticks,
+            "pilot": self.pilot,
+            "run_mode": self.run_mode(),
             "max_pilot_clusters": self.max_pilot_clusters,
+            "max_clusters": self.max_clusters,
+            "effective_cluster_limit": self.effective_cluster_limit(),
+            "input_contract": self.input_contract,
             "expected_contract_hash": self.expected_contract_hash,
             "schema_version": self.schema_version,
         }

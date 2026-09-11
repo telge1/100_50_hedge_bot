@@ -7,6 +7,7 @@ import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -408,3 +409,460 @@ def test_headroom_keys_present_no_rule():
     assert "not activated" in str(ph.get("headroom_rule_note", "")).lower() or (
         "no trading rule" in str(ph.get("headroom_rule_note", "")).lower()
     )
+
+
+def test_pilot_mode_effective_limit_default_20():
+    cfg = BuilderConfig(pilot=True)
+    assert cfg.run_mode() == "pilot"
+    assert cfg.effective_cluster_limit() == 20
+    assert cfg.max_clusters is None
+
+
+def test_full_mode_effective_limit_unlimited():
+    cfg = BuilderConfig(pilot=False, input_contract="full_run_generic_v1")
+    assert cfg.run_mode() == "full"
+    assert cfg.effective_cluster_limit() is None
+
+
+def test_max_clusters_overrides_both_modes():
+    pilot = BuilderConfig(pilot=True, max_clusters=7, max_pilot_clusters=20)
+    full = BuilderConfig(pilot=False, max_clusters=3, input_contract="full_run_generic_v1")
+    assert pilot.effective_cluster_limit() == 7
+    assert full.effective_cluster_limit() == 3
+
+
+def test_e2e_cli_pilot_sets_pilot_not_silent_full(tmp_path: Path, monkeypatch):
+    from obfull_research_engine.btc_30m_generic_defense_episode_builder_v1 import e2e as e2e_mod
+
+    captured: dict[str, Any] = {}
+
+    def fake_run(cfg, dry_discovery_only=False):
+        captured["pilot"] = cfg.pilot
+        captured["limit"] = cfg.effective_cluster_limit()
+        captured["max_clusters"] = cfg.max_clusters
+        out = tmp_path / "BTCUSDT" / (cfg.run_key or "gdeb1_x")
+        out.mkdir(parents=True, exist_ok=True)
+        return {
+            "ok": True,
+            "run_key": cfg.run_key,
+            "out_dir": str(out),
+            "run_mode": cfg.run_mode(),
+            "effective_cluster_limit": cfg.effective_cluster_limit(),
+            "outcome_contract_hash": "efd620a305e8252e61f03c516c69de364049153e6fb02c091caf6137e4e7e46a",
+        }
+
+    monkeypatch.setattr(e2e_mod, "run_builder", fake_run)
+    rc = e2e_mod.main(["--pilot", "--run-key", "gdeb1_cli_pilot", "--out-dir", str(tmp_path)])
+    assert rc == 0
+    assert captured["pilot"] is True
+    assert captured["limit"] == 20
+    assert captured["max_clusters"] is None
+
+
+def test_e2e_cli_full_with_max_clusters(tmp_path: Path, monkeypatch):
+    from obfull_research_engine.btc_30m_generic_defense_episode_builder_v1 import e2e as e2e_mod
+
+    captured: dict[str, Any] = {}
+
+    def fake_run(cfg, dry_discovery_only=False):
+        captured["pilot"] = cfg.pilot
+        captured["limit"] = cfg.effective_cluster_limit()
+        captured["max_clusters"] = cfg.max_clusters
+        out = tmp_path / "BTCUSDT" / (cfg.run_key or "gdeb1_x")
+        out.mkdir(parents=True, exist_ok=True)
+        return {
+            "ok": True,
+            "run_key": cfg.run_key,
+            "out_dir": str(out),
+            "run_mode": cfg.run_mode(),
+            "effective_cluster_limit": cfg.effective_cluster_limit(),
+            "outcome_contract_hash": "efd620a305e8252e61f03c516c69de364049153e6fb02c091caf6137e4e7e46a",
+        }
+
+    monkeypatch.setattr(e2e_mod, "run_builder", fake_run)
+    rc = e2e_mod.main(["--max-clusters", "5", "--run-key", "gdeb1_cli_full5", "--out-dir", str(tmp_path)])
+    assert rc == 0
+    assert captured["pilot"] is False
+    assert captured["max_clusters"] == 5
+    assert captured["limit"] == 5
+
+
+def test_full_mode_refuses_pilot_fixture_paths(tmp_path: Path):
+    from obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.input_coverage import (
+        FullRunInputError,
+        validate_run_inputs,
+    )
+
+    cfg = BuilderConfig(
+        pilot=False,
+        input_contract="full_run_generic_v1",
+        out_root=str(tmp_path),
+        run_key="gdeb1_refuse_fixtures",
+    )
+    with pytest.raises(FullRunInputError) as ei:
+        validate_run_inputs(cfg, skip_disk=False)
+    assert "pilot fixture" in str(ei.value).lower() or "refuses" in str(ei.value).lower()
+
+
+def test_full_mode_refuses_wrong_input_contract():
+    from obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.input_coverage import (
+        FullRunInputError,
+        validate_run_inputs,
+    )
+
+    cfg = BuilderConfig(pilot=False, input_contract="pilot_fixture_v1")
+    with pytest.raises(FullRunInputError) as ei:
+        validate_run_inputs(cfg, skip_disk=False)
+    assert "full_run_generic_v1" in str(ei.value)
+
+
+def test_full_mode_refuses_empty_coverage(tmp_path: Path):
+    from obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.input_coverage import (
+        FullRunInputError,
+        validate_run_inputs,
+    )
+
+    mp = tmp_path / "mp.csv"
+    lc = tmp_path / "lc.csv"
+    tr = tmp_path / "trades.jsonl"
+    ca = tmp_path / "candles.jsonl"
+    arch = tmp_path / "full_ob"
+    arch.mkdir()
+    mp.write_text("level_id,available_at\n", encoding="utf-8")
+    lc.write_text("level_cluster_id\n", encoding="utf-8")
+    tr.write_text("", encoding="utf-8")
+    ca.write_text("", encoding="utf-8")
+    cfg = BuilderConfig(
+        pilot=False,
+        input_contract="full_run_generic_v1",
+        mp_events_path=str(mp),
+        level_clusters_path=str(lc),
+        trades_path=str(tr),
+        candles_path=str(ca),
+        full_ob_archive=str(arch),
+        existing_persist_fallback="",
+        out_root=str(tmp_path / "out"),
+        run_key="gdeb1_empty_cov",
+    )
+    with pytest.raises(FullRunInputError) as ei:
+        validate_run_inputs(cfg, skip_disk=False)
+    msg = str(ei.value).lower()
+    assert "empty" in msg or "missing" in msg or "no usable" in msg
+
+
+def test_manifest_records_mode_limit_and_window(tmp_path: Path):
+    cfg = BuilderConfig(
+        pilot=True,
+        max_pilot_clusters=20,
+        out_root=str(tmp_path),
+        run_key="gdeb1_manifest_mode",
+        window_start="2026-09-06T19:00:00Z",
+        window_end="2026-09-06T23:00:00Z",
+    )
+    zone = {
+        "zone_id": "z_m",
+        "persistent_cluster_id": "z_m",
+        "level_cluster_id": "z_m",
+        "cluster_price_low": 100.0,
+        "cluster_price_high": 101.0,
+        "zone_low": 100.0,
+        "zone_high": 101.0,
+        "zone_available_at": "2026-09-06T19:00:00Z",
+        "zone_available_at_dt": _utc("2026-09-06T19:00:00Z"),
+        "tpo_type": "TPO_VAL",
+        "member_level_types": ["TPO_VAL"],
+        "timeframe": "30m",
+        "profile_state": "CLOSED",
+    }
+    result = run_builder(
+        cfg,
+        dry_discovery_only=True,
+        synthetic={"zones": [zone], "trades": [], "candles": [], "mid_events": []},
+    )
+    man = json.loads((Path(result["out_dir"]) / "run_manifest.json").read_text(encoding="utf-8"))
+    assert man["run_mode"] == "pilot"
+    assert man["effective_cluster_limit"] == 20
+    assert man["window_start"] == "2026-09-06T19:00:00Z"
+    assert man["window_end"] == "2026-09-06T23:00:00Z"
+    assert man["input_contract"] == "pilot_fixture_v1"
+    assert result["run_mode"] == "pilot"
+    assert result["effective_cluster_limit"] == 20
+
+
+def test_pipeline_full_mode_no_implicit_20_cap_in_manifest(tmp_path: Path):
+    cfg = BuilderConfig(
+        pilot=False,
+        input_contract="full_run_generic_v1",
+        out_root=str(tmp_path),
+        run_key="gdeb1_full_nolimit",
+        # Avoid default fixture paths for uses_pilot_fixture_paths in skip_disk metadata.
+        mp_events_path=str(tmp_path / "mp.csv"),
+        level_clusters_path=str(tmp_path / "lc.csv"),
+        trades_path=str(tmp_path / "tr.jsonl"),
+        candles_path=str(tmp_path / "ca.jsonl"),
+    )
+    assert cfg.effective_cluster_limit() is None
+    zone = {
+        "zone_id": "z_f",
+        "persistent_cluster_id": "z_f",
+        "level_cluster_id": "z_f",
+        "cluster_price_low": 100.0,
+        "cluster_price_high": 101.0,
+        "zone_low": 100.0,
+        "zone_high": 101.0,
+        "zone_available_at": "2026-09-06T19:00:00Z",
+        "zone_available_at_dt": _utc("2026-09-06T19:00:00Z"),
+        "tpo_type": "TPO_VAL",
+        "member_level_types": ["TPO_VAL"],
+        "timeframe": "30m",
+        "profile_state": "CLOSED",
+    }
+    result = run_builder(
+        cfg,
+        dry_discovery_only=True,
+        synthetic={"zones": [zone], "trades": [], "candles": [], "mid_events": []},
+    )
+    man = json.loads((Path(result["out_dir"]) / "run_manifest.json").read_text(encoding="utf-8"))
+    assert man["run_mode"] == "full"
+    assert man["effective_cluster_limit"] is None
+    assert man["max_pilot_clusters"] == 20  # retained for audit, not applied
+
+
+def test_episode1_id_not_selection_input_in_config():
+    cfg = BuilderConfig(pilot=True)
+    d = cfg.to_dict()
+    assert "known_episode_id" not in d
+    assert "FIRST_TOUCH_ISO" not in d
+    assert "research_visit_count" not in d
+    assert_no_forbidden_calc_inputs(cfg)
+
+
+def _wall_ask():
+    return {
+        "wall_id": "w_ask",
+        "wall_side": "ask",
+        "wall_price": 101.5,
+        "qty": 10.0,
+        "wall_generation_id": "wg",
+        "replay_epoch": 1,
+        "wall_generation_index": 0,
+        "generation_start_exchange_time": "2026-09-06T19:00:00Z",
+    }
+
+
+def _fake_walls_ok(*args, **kwargs):
+    ask = _wall_ask()
+    return {"ok": True, "has_any_wall": True, "ask_wall": ask, "bid_wall": None, "ask": ask, "bid": None}
+
+
+def _fake_touches_ok(*args, **kwargs):
+    cluster = kwargs.get("attack_cluster") or {}
+    primary = cluster.get("primary_visit") or {}
+    ask = kwargs.get("ask_wall") or _wall_ask()
+    return {
+        "zone_touch": {
+            "episode_id": primary.get("episode_id"),
+            "zone_id": primary.get("zone_id"),
+            "zone_low": primary.get("zone_low"),
+            "zone_high": primary.get("zone_high"),
+            "zone_available_at": primary.get("zone_available_at"),
+            "exchange_event_time": primary.get("exchange_event_time"),
+            "event_available_at": primary.get("event_available_at"),
+            "trigger_record_id": primary.get("trigger_record_id"),
+            "first_touch_ts": primary.get("first_touch_ts"),
+        },
+        "wall_touches": {
+            "ask": {
+                **ask,
+                "exchange_event_time": "2026-09-06T19:10:05Z",
+                "event_available_at": "2026-09-06T19:10:05Z",
+                "trigger_record_id": "wt1",
+                "qty_at_zone_touch": 10.0,
+            }
+        },
+        "detection": {"available": False},
+        "book_ok": True,
+        "errors": [],
+    }
+
+
+class _FakeHandoff:
+    episode_id = "ep:z:0"
+    wall_side = "ask"
+    wall_price = 101.5
+    wall_id = "w_ask"
+    wall_generation_id = "wg"
+    replay_epoch = 1
+    zone_id = "z_lim"
+    attack_cluster_id = "ac_0"
+
+    def to_dict(self):
+        return {"episode_id": self.episode_id, "wall_side": self.wall_side}
+
+
+def _patch_enrichment_short_circuit(pipe, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        pipe,
+        "persist_episode_book",
+        lambda *a, **k: {
+            "ok": True,
+            "reused": True,
+            "persist_dir": str(tmp_path / "book"),
+            "replay": {"ok": True, "window_end": "2026-09-06T23:00:00Z", "states": []},
+        },
+    )
+    monkeypatch.setattr(pipe, "select_walls_at_zone_touch", _fake_walls_ok)
+    monkeypatch.setattr(pipe, "enrich_cluster_touches", _fake_touches_ok)
+    monkeypatch.setattr(
+        pipe,
+        "run_wall_flow_stage",
+        lambda *a, **k: {"ok": True, "timeline_rows": [], "out_dir": str(tmp_path)},
+    )
+    monkeypatch.setattr(
+        pipe,
+        "run_price_response_stage",
+        lambda *a, **k: {"ok": True, "timeline_rows": [], "reclaim_status": "RECLAIM_NOT_CALIBRATED"},
+    )
+    monkeypatch.setattr(pipe, "run_defense_chain_stage", lambda *a, **k: {"ok": False})
+    monkeypatch.setattr(pipe, "build_decision_snapshots", lambda *a, **k: [])
+    monkeypatch.setattr(
+        pipe,
+        "apply_outcomes_for_episode",
+        lambda *a, **k: {"n_complete": 0, "n_censored": 0, "complete": [], "censored": []},
+    )
+    monkeypatch.setattr(pipe, "build_defense_handoff", lambda *a, **k: _FakeHandoff())
+
+
+def _synth_clusters(n: int, zone_id: str = "z_lim"):
+    visits = []
+    clusters = []
+    for i in range(n):
+        v = {
+            "episode_id": f"ep:z:{i}",
+            "zone_id": zone_id,
+            "persistent_cluster_id": zone_id,
+            "zone_low": 100.0,
+            "zone_high": 101.0,
+            "zone_available_at": "2026-09-06T19:00:00Z",
+            "visit_start": f"2026-09-06T19:1{i}:00Z",
+            "visit_end": f"2026-09-06T19:1{i}:30Z",
+            "first_touch_ts": f"2026-09-06T19:1{i}:00Z",
+            "exchange_event_time": f"2026-09-06T19:1{i}:00Z",
+            "event_available_at": f"2026-09-06T19:1{i}:00Z",
+            "trigger_record_id": f"t{i}",
+        }
+        visits.append(v)
+        clusters.append(
+            {
+                "attack_cluster_id": f"ac_{i}",
+                "zone_id": zone_id,
+                "persistent_cluster_id": zone_id,
+                "zone_low": 100.0,
+                "zone_high": 101.0,
+                "zone_available_at": "2026-09-06T19:00:00Z",
+                "cluster_start": v["visit_start"],
+                "primary_visit": v,
+                "visits": [v],
+                "episode_ids": [v["episode_id"]],
+            }
+        )
+    zone = {
+        "zone_id": zone_id,
+        "persistent_cluster_id": zone_id,
+        "level_cluster_id": zone_id,
+        "cluster_price_low": 100.0,
+        "cluster_price_high": 101.0,
+        "zone_low": 100.0,
+        "zone_high": 101.0,
+        "zone_available_at": "2026-09-06T19:00:00Z",
+        "zone_available_at_dt": _utc("2026-09-06T19:00:00Z"),
+        "tpo_type": "TPO_VAL",
+        "member_level_types": ["TPO_VAL"],
+        "timeframe": "30m",
+        "profile_state": "CLOSED",
+    }
+    return visits, clusters, zone
+
+
+def test_pipeline_stops_at_pilot_limit_with_injected_valid_clusters(tmp_path: Path, monkeypatch):
+    """Prove pilot ceiling stops enrichment after N valid clusters (synthetic)."""
+    import obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.pipeline as pipe
+
+    cfg = BuilderConfig(
+        pilot=True,
+        max_pilot_clusters=2,
+        out_root=str(tmp_path),
+        run_key="gdeb1_limit2",
+    )
+    visits, clusters, zone = _synth_clusters(4)
+    monkeypatch.setattr(pipe, "detect_all_visits_for_zones", lambda **kwargs: visits)
+    monkeypatch.setattr(pipe, "group_attack_clusters", lambda *a, **k: clusters)
+    _patch_enrichment_short_circuit(pipe, monkeypatch, tmp_path)
+
+    result = run_builder(
+        cfg,
+        dry_discovery_only=False,
+        synthetic={"zones": [zone], "trades": [], "candles": [], "mid_events": []},
+    )
+    assert result["ok"] is True
+    assert result["run_mode"] == "pilot"
+    assert result["effective_cluster_limit"] == 2
+    assert result["n_valid_enriched"] == 2
+    assert result["funnel"]["n_valid_clusters"] == 2
+
+
+def test_pipeline_full_mode_processes_all_valid_without_cap(tmp_path: Path, monkeypatch):
+    import obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.pipeline as pipe
+
+    cfg = BuilderConfig(
+        pilot=False,
+        input_contract="full_run_generic_v1",
+        out_root=str(tmp_path),
+        run_key="gdeb1_full_all",
+        mp_events_path=str(tmp_path / "mp.csv"),
+        level_clusters_path=str(tmp_path / "lc.csv"),
+        trades_path=str(tmp_path / "tr.jsonl"),
+        candles_path=str(tmp_path / "ca.jsonl"),
+        max_pilot_clusters=20,
+    )
+    visits, clusters, zone = _synth_clusters(4, zone_id="z_all")
+    monkeypatch.setattr(pipe, "detect_all_visits_for_zones", lambda **kwargs: visits)
+    monkeypatch.setattr(pipe, "group_attack_clusters", lambda *a, **k: clusters)
+    _patch_enrichment_short_circuit(pipe, monkeypatch, tmp_path)
+
+    result = run_builder(
+        cfg,
+        dry_discovery_only=False,
+        synthetic={"zones": [zone], "trades": [], "candles": [], "mid_events": []},
+    )
+    assert result["effective_cluster_limit"] is None
+    assert result["n_valid_enriched"] == 4
+    assert result["funnel"]["n_valid_clusters"] == 4
+
+
+def test_pipeline_full_mode_respects_max_clusters(tmp_path: Path, monkeypatch):
+    import obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.pipeline as pipe
+
+    cfg = BuilderConfig(
+        pilot=False,
+        input_contract="full_run_generic_v1",
+        max_clusters=3,
+        out_root=str(tmp_path),
+        run_key="gdeb1_full_max3",
+        mp_events_path=str(tmp_path / "mp.csv"),
+        level_clusters_path=str(tmp_path / "lc.csv"),
+        trades_path=str(tmp_path / "tr.jsonl"),
+        candles_path=str(tmp_path / "ca.jsonl"),
+    )
+    visits, clusters, zone = _synth_clusters(5, zone_id="z_m3")
+    monkeypatch.setattr(pipe, "detect_all_visits_for_zones", lambda **kwargs: visits)
+    monkeypatch.setattr(pipe, "group_attack_clusters", lambda *a, **k: clusters)
+    _patch_enrichment_short_circuit(pipe, monkeypatch, tmp_path)
+
+    result = run_builder(
+        cfg,
+        dry_discovery_only=False,
+        synthetic={"zones": [zone], "trades": [], "candles": [], "mid_events": []},
+    )
+    assert result["effective_cluster_limit"] == 3
+    assert result["n_valid_enriched"] == 3

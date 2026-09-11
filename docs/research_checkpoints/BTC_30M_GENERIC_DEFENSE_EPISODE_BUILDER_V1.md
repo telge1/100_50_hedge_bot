@@ -71,13 +71,20 @@ Schema keys prepared (`executable_best_bid/ask`, `wall_side`, `decision_time`, `
 ## Attack cluster validity
 
 A cluster is valid for enrichment if it has `zone_touch` and at least one past-only wall candidate that gets a `wall_touch` within continuous book coverage.
-Order by `cluster_start` ascending; take first `max_pilot_clusters` valid ones. Never select by outcome/profit.
+Order by `cluster_start` ascending. Never select by outcome/profit.
+
+Enrichment ceiling:
+
+- `--pilot` → apply `max_pilot_clusters` (default 20)
+- full mode (no `--pilot`) → **no** implicit 20-cap; process all valid clusters
+- `--max-clusters N` → explicit ceiling for either mode (`None` = mode default / unlimited in full)
 
 ## Defaults
 
 - Window: `2026-09-06T19:00:00Z` .. `2026-09-06T23:00:00Z`
 - tick=`0.1`, band_ticks=`5`, max_pilot_clusters=`20`
 - attack_cluster_gap_ms=`60000` (from outcome contract)
+- Default absolute paths are **pilot fixtures** (`input_contract=pilot_fixture_v1`). Full mode refuses them; use `config/btc_30m_generic_defense_episode_builder_v1_full_run.json` after regenerating generic inputs.
 
 ## Explicitly out of scope
 
@@ -87,9 +94,16 @@ No DOGE, no 1h/4h (except cluster metadata match), no LLD, no OI, no liq, no cla
 
 ```bash
 export PYTHONPATH=/home/telgenbuescher/projects/orderbook_analyse_btc30m_v1/obfull_research_engine/src:/home/telgenbuescher/projects/orderbook_analyse/src
+# Pilot (fixture paths; ceiling 20):
 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m \
   obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.e2e \
-  --pilot --max-clusters 20 --run-key gdeb1_pilot
+  --pilot --run-key gdeb1_pilot
+
+# Full (requires full_run_generic_v1 config with regenerated inputs — not Episode-1 fixtures):
+/home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m \
+  obfull_research_engine.btc_30m_generic_defense_episode_builder_v1.e2e \
+  --config /home/telgenbuescher/projects/orderbook_analyse_btc30m_v1/config/btc_30m_generic_defense_episode_builder_v1_full_run.json \
+  --run-key gdeb1_full_REPLACE
 ```
 
 Import smoke:

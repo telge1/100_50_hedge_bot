@@ -1,0 +1,33 @@
+{
+  "symbol": "BTCUSDT",
+  "pilot": false,
+  "input_contract": "full_run_generic_v1",
+  "window_start": "REPLACE_WITH_AUDITED_START_Z",
+  "window_end": "REPLACE_WITH_AUDITED_END_Z",
+  "tick_size": 0.1,
+  "band_ticks": 5,
+  "max_pilot_clusters": 20,
+  "max_clusters": null,
+  "attack_cluster_gap_ms": 60000,
+  "wall_distance_cap_ticks": 50,
+  "book_source": "ORDERBOOK_FULL",
+  "mp_events_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/bounded_level_first_analyzer_pilot_v1/BTCUSDT/REPLACE_LF1_RUN/mp_level_events.csv",
+  "level_clusters_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/bounded_level_first_analyzer_pilot_v1/BTCUSDT/REPLACE_LF1_RUN/level_clusters.csv",
+  "trades_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/btc_30m_generic_defense_episode_builder_v1_inputs/BTCUSDT/REPLACE_WINDOW/public_trades_window.jsonl",
+  "candles_path": "/home/telgenbuescher/projects/orderbook_analyse/obfull_research_engine/results/btc_30m_generic_defense_episode_builder_v1_inputs/BTCUSDT/REPLACE_WINDOW/candles_1m_window.jsonl",
+  "full_ob_archive": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_v1",
+  "existing_persist_fallback": "",
+  "expected_contract_hash": "efd620a305e8252e61f03c516c69de364049153e6fb02c091caf6137e4e7e46a",
+  "schema_version": "btc_30m_generic_defense_episode_builder_v1",
+  "run_prefix": "gdeb1_",
+  "inputs_ready": false,
+  "notes": [
+    "FULL-RUN INPUT CONTRACT — do not point at Episode-1 freeze JSONL or lf1_69e21d12d280596e for a claimed full run.",
+    "Regenerate MP+clusters via: python -m obfull_research_engine.bounded_level_first_analyzer_pilot_v1.cli --symbol BTCUSDT --start ... --end ... --outcome-end ...",
+    "Export wider trades/candles (CH read-only) into a NEW directory under btc_30m_generic_defense_episode_builder_v1_inputs/ — never overwrite Episode-1 fixtures.",
+    "full_ob_v1 hour shards currently span ~2026-09-05T17:00Z .. 2026-09-11T07:00Z with known gaps (e.g. Sep-6 ~22:00).",
+    "Default Episode-1 trades/candles only cover ~2026-09-06T19:30Z .. 21:15Z — insufficient for multi-hour/day full runs.",
+    "Set inputs_ready=true only after paths exist and coverage audit passes.",
+    "Read-only absolute data paths — do not copy raw data into the worktree."
+  ]
+}

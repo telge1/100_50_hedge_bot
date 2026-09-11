@@ -50,8 +50,17 @@ def assert_worktree_imports(modules: list[str] | None = None) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=AUDIT_ID)
-    p.add_argument("--pilot", action="store_true", help="Pilot mode (max_pilot_clusters)")
-    p.add_argument("--max-clusters", type=int, default=None)
+    p.add_argument(
+        "--pilot",
+        action="store_true",
+        help="Pilot mode: apply max_pilot_clusters (default 20) unless --max-clusters overrides",
+    )
+    p.add_argument(
+        "--max-clusters",
+        type=int,
+        default=None,
+        help="Explicit enrichment ceiling for pilot or full mode (None = mode default)",
+    )
     p.add_argument("--out-dir", type=str, default=None)
     p.add_argument("--run-key", type=str, default=None)
     p.add_argument("--config", type=str, default=None)
@@ -77,7 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.pilot:
         cfg.pilot = True
     if args.max_clusters is not None:
-        cfg.max_pilot_clusters = int(args.max_clusters)
+        # Explicit limit for either mode — does NOT silently mutate max_pilot_clusters.
+        cfg.max_clusters = int(args.max_clusters)
     if args.out_dir:
         cfg.out_root = str(Path(args.out_dir))
     if args.run_key:
@@ -86,8 +96,14 @@ def main(argv: list[str] | None = None) -> int:
     result = run_builder(cfg, dry_discovery_only=bool(args.discovery_only))
     out = Path(result["out_dir"])
     atomic_write_json(out / "e2e_result.json", result)
-    print(f"ok={result.get('ok')} run_key={result.get('run_key')} out={result.get('out_dir')}")
+    print(
+        f"ok={result.get('ok')} run_mode={result.get('run_mode')} "
+        f"limit={result.get('effective_cluster_limit')} "
+        f"run_key={result.get('run_key')} out={result.get('out_dir')}"
+    )
     print(f"contract_hash={result.get('outcome_contract_hash') or CONTRACT_HASH}")
+    if result.get("input_error"):
+        print(f"input_error={result['input_error']}")
     return 0 if result.get("ok") else 1
 
 

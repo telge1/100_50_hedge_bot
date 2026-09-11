@@ -30,6 +30,7 @@ from .exclusions import (
 from .funnel import FunnelCounters
 from .handoff import HandoffError, build_defense_handoff
 from .hashing import sha256_json, source_manifest_hash
+from .input_coverage import FullRunInputError, validate_run_inputs
 from .oracle import build_oracle_report, rediscover_episode1_visit
 from .outcomes_apply import apply_outcomes_for_episode, verify_contract_hash
 from .persist_book import persist_episode_book
@@ -83,6 +84,8 @@ def run_builder(
     """
     assert_no_forbidden_calc_inputs(cfg)
     contract_hash = verify_contract_hash()
+    cluster_limit = cfg.effective_cluster_limit()
+    run_mode = cfg.run_mode()
 
     window_start = parse_utc(cfg.window_start)
     window_end = parse_utc(cfg.window_end)
@@ -92,7 +95,48 @@ def run_builder(
         trades = list(synthetic.get("trades") or [])
         candles = list(synthetic.get("candles") or [])
         mid_events = list(synthetic.get("mid_events") or [])
+        try:
+            input_coverage = validate_run_inputs(cfg, skip_disk=True)
+        except FullRunInputError as exc:
+            return {
+                "ok": False,
+                "error": "full_run_inputs_not_ready",
+                "input_error": str(exc),
+                "run_mode": run_mode,
+                "effective_cluster_limit": cluster_limit,
+                "outcome_contract_hash": contract_hash,
+            }
     else:
+        try:
+            input_coverage = validate_run_inputs(cfg, skip_disk=False)
+        except FullRunInputError as exc:
+            # Still write a minimal refusal artifact when out dirs can be resolved.
+            cfg_dict_early = cfg.to_dict()
+            run_key_early = cfg.run_key
+            if not run_key_early:
+                run_key_early = f"{RUN_PREFIX}{sha256_json({**cfg_dict_early, 'schema': SCHEMA_VERSION})[:16]}"
+            elif not str(run_key_early).startswith(RUN_PREFIX):
+                run_key_early = f"{RUN_PREFIX}{run_key_early}"
+            cfg.run_key = run_key_early
+            out_early = cfg.out_dir()
+            out_early.mkdir(parents=True, exist_ok=True)
+            refusal = {
+                "ok": False,
+                "error": "full_run_inputs_not_ready",
+                "input_error": str(exc),
+                "run_mode": run_mode,
+                "effective_cluster_limit": cluster_limit,
+                "window_start": cfg.window_start,
+                "window_end": cfg.window_end,
+                "input_contract": cfg.input_contract,
+                "uses_pilot_fixture_paths": cfg.uses_pilot_fixture_paths(),
+                "outcome_contract_hash": contract_hash,
+                "run_key": run_key_early,
+                "out_dir": str(out_early),
+            }
+            atomic_write_json(out_early / "run_manifest.json", refusal)
+            atomic_write_json(out_early / "e2e_result.json", refusal)
+            return refusal
         zones = load_zones(
             mp_events_path=cfg.mp_events_path,
             level_clusters_path=cfg.level_clusters_path,
@@ -140,7 +184,13 @@ def run_builder(
         "source_manifest_hash": source_manifest_hash(cfg.source_manifest()),
         "window_start": cfg.window_start,
         "window_end": cfg.window_end,
+        "run_mode": run_mode,
+        "pilot": bool(cfg.pilot),
         "max_pilot_clusters": cfg.max_pilot_clusters,
+        "max_clusters": cfg.max_clusters,
+        "effective_cluster_limit": cluster_limit,
+        "input_contract": cfg.input_contract,
+        "input_coverage": input_coverage,
         "note_no_visit_count_selector": cfg.note_no_visit_count_selector,
         "features_dir": str(features_dir),
         "outcomes_dir": str(outcomes_dir),
@@ -196,6 +246,11 @@ def run_builder(
             "oracle": oracle,
             "n_clusters": len(clusters),
             "dry_discovery_only": True,
+            "run_mode": run_mode,
+            "effective_cluster_limit": cluster_limit,
+            "input_contract": cfg.input_contract,
+            "window_start": cfg.window_start,
+            "window_end": cfg.window_end,
         }
 
     enriched_summary: list[dict[str, Any]] = []
@@ -203,7 +258,8 @@ def run_builder(
     valid_taken = 0
 
     for cluster in clusters:
-        if valid_taken >= int(cfg.max_pilot_clusters):
+        # Pilot: max_pilot_clusters (unless --max-clusters). Full: unlimited unless --max-clusters.
+        if cluster_limit is not None and valid_taken >= int(cluster_limit):
             break
         zid = str(cluster["zone_id"])
         zone = zone_map.get(zid)
@@ -569,6 +625,11 @@ def run_builder(
     )
     atomic_write_jsonl(out_dir / "exclusions.jsonl", exclusions)
 
+    # Rewrite manifest with final funnel counts for audit.
+    manifest["funnel"] = funnel.to_dict()
+    manifest["n_valid_enriched"] = valid_taken
+    atomic_write_json(out_dir / "run_manifest.json", manifest)
+
     return {
         "ok": True,
         "run_key": run_key,
@@ -579,4 +640,9 @@ def run_builder(
         "oracle": oracle,
         "n_valid_enriched": valid_taken,
         "outcome_contract_hash": contract_hash,
+        "run_mode": run_mode,
+        "effective_cluster_limit": cluster_limit,
+        "input_contract": cfg.input_contract,
+        "window_start": cfg.window_start,
+        "window_end": cfg.window_end,
     }
