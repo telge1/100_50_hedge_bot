@@ -18,6 +18,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--precheck-only", action="store_true")
     parser.add_argument("--skip-local-ob-replay", action="store_true")
+    parser.add_argument(
+        "--results-root",
+        type=str,
+        default=None,
+        help=(
+            "Isolated output root (required when default RESULTS_ROOT is a symlink "
+            "into the frozen main checkout). Writes SYMBOL/lf1_<hash>/ underneath."
+        ),
+    )
+    parser.add_argument(
+        "--export-builder-price-inputs",
+        action="store_true",
+        help=(
+            "After a COMPLETE run, export public_trades_window.jsonl and "
+            "candles_1m_window.jsonl into the run directory (CH read-only)."
+        ),
+    )
     args = parser.parse_args(argv)
     sys.path[:0] = [
         str(Path(__file__).resolve().parents[2]),
@@ -35,6 +52,8 @@ def main(argv: list[str] | None = None) -> int:
         resume=not args.no_resume,
         precheck_only=args.precheck_only,
         skip_local_ob_replay=args.skip_local_ob_replay,
+        results_root=args.results_root,
+        export_builder_price_inputs=bool(args.export_builder_price_inputs),
     )
     printable = {k: result[k] for k in result if k not in {"manifest", "coverage"}}
     if args.precheck_only:

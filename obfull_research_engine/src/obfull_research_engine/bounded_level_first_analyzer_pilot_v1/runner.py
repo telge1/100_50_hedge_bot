@@ -220,6 +220,7 @@ def run_precheck(
     start: datetime | None = None,
     end: datetime | None = None,
     outcome_end: datetime | None = None,
+    results_root: str | Path | None = None,
 ) -> dict[str, Any]:
     start = start or parse_utc(DEFAULT_START_Z)
     end = end or parse_utc(DEFAULT_END_Z)
@@ -251,7 +252,7 @@ def run_precheck(
         "estimated_runtime_seconds": round(seconds_est, 1),
         "exceeds_10_minutes": seconds_est > 600,
         "run_key": key,
-        "result_path": str(run_dir(symbol, key)),
+        "result_path": str(run_dir(symbol, key, results_root=results_root)),
         "config_hash": cfg["config_hash"],
     }
     return out
@@ -266,6 +267,8 @@ def run_pilot(
     resume: bool = True,
     precheck_only: bool = False,
     skip_local_ob_replay: bool = False,
+    results_root: str | Path | None = None,
+    export_builder_price_inputs: bool = False,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     rss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
@@ -276,9 +279,15 @@ def run_pilot(
     end = parse_utc(end_z)
     outcome_end = parse_utc(outcome_end_z)
     key = compute_run_key(cfg)
-    directory = run_dir(symbol, key)
+    directory = run_dir(symbol, key, results_root=results_root)
     if precheck_only:
-        pre = run_precheck(symbol=symbol, start=start, end=end, outcome_end=outcome_end)
+        pre = run_precheck(
+            symbol=symbol,
+            start=start,
+            end=end,
+            outcome_end=outcome_end,
+            results_root=results_root,
+        )
         return {**pre, "precheck_only": True, "run_key": key, "result_path": str(directory)}
 
     directory.mkdir(parents=True, exist_ok=True)
@@ -784,12 +793,13 @@ def run_pilot(
             outcomes_loaded=True,
         )
         atomic_write_json(manifest_path, manifest)
-        return {
+        out = {
             "status": "COMPLETE",
             "reused": False,
             "verdict": verdict,
             "run_key": key,
             "run_dir": str(directory),
+            "results_root": str(Path(directory).parents[1]),
             "n_episodes": n_ep,
             "elapsed_s": elapsed,
             "rss_mb": rss1,
@@ -799,6 +809,17 @@ def run_pilot(
             "blind_hash": blind_hash,
             "manifest": manifest,
         }
+        if export_builder_price_inputs:
+            from .export_builder_price_inputs import export_trades_and_candles_jsonl
+
+            price_export = export_trades_and_candles_jsonl(
+                symbol=symbol,
+                start=start,
+                end=outcome_end,
+                out_dir=directory,
+            )
+            out["builder_price_inputs"] = price_export
+        return out
     except Exception as exc:
         mark(manifest, "FAILED", error=f"{type(exc).__name__}: {exc}")
         atomic_write_json(manifest_path, manifest)
