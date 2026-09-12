@@ -11,11 +11,15 @@ from obfull_research_engine.clickhouse_research_store_v1.silver_full_build_v1_3 
 )
 from obfull_research_engine.clickhouse_research_store_v1.silver_plan_coverage_parity_v1_3 import (
     bucket_count,
+    bucket_plan_audit,
     classify_excluded_safe_ns,
     compare_interval_sets,
     decompose_production_only_against_audit,
+    direct_bucket_plan_proof,
+    iter_epoch_bucket_starts,
     planned_output_union,
     production_coverage_contract,
+    prove_continuous_stream_no_event_hold_forward,
 )
 from obfull_research_engine.clickhouse_research_store_v1.silver_replay import BronzeRecord
 
@@ -159,6 +163,44 @@ def test_audit_subset_of_production_safe_union():
 
 def test_bucket_count_matches_hundred_ms_grid():
     assert bucket_count([(0, 250_000_000)]) == 3
+
+
+def test_iter_epoch_bucket_starts_uses_ceil_start():
+    assert list(iter_epoch_bucket_starts(150_000_000, 350_000_000)) == [
+        200_000_000,
+        300_000_000,
+    ]
+
+
+def test_direct_bucket_plan_proof_matches_interval_count():
+    minute = 60 * 1_000_000_000
+    epochs = [_epoch(start=0, end=3 * minute)]
+    proof = direct_bucket_plan_proof(epochs)
+    assert proof["direct_stream_bucket_count"] == 1800
+    assert proof["stream_matches_interval_count"] is True
+
+
+def test_hold_forward_semantics_and_bucket_plan():
+    minute = 60 * 1_000_000_000
+    physical = [(minute, 3 * minute)]
+    epochs = [_epoch(start=0, end=3 * minute)]
+    safe = [(0, 3 * minute)]
+    hold = prove_continuous_stream_no_event_hold_forward(
+        production_safe=safe,
+        physical=physical,
+        production_epochs=epochs,
+        audit_blind=[(4 * minute, 5 * minute)],
+    )
+    assert hold["hold_forward_union_ns"] == minute
+    assert hold["overlap_audit_blind_union_ns"] == 0
+    audit = bucket_plan_audit(
+        epochs,
+        production_safe=safe,
+        physical=physical,
+        planned_output=safe,
+        audit_blind=[(4 * minute, 5 * minute)],
+    )
+    assert audit["verdict"] == "GO_SILVER_BUCKET_PLAN_PROVEN"
 
 
 def test_production_only_decomposition_is_disjoint_and_exact():

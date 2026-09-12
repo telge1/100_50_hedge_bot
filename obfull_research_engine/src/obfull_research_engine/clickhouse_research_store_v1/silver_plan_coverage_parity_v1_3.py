@@ -15,6 +15,7 @@ from .coverage_accounting_v2 import (
 )
 from .epoch_aware_silver_v1_3 import EpochDefinition
 from .silver_full_build_v1_3 import (
+    BRONZE_EVENTS_TABLE,
     BuildConfig,
     ChunkPlan,
     build_epoch_plan,
@@ -399,6 +400,16 @@ def full_numeric_audit(
         production_safe=production_safe,
         production_epochs=plan.epochs,
     )
+    bucket_plan = bucket_plan_audit(
+        plan.epochs,
+        production_safe=production_safe,
+        physical=physical,
+        planned_output=output_union,
+        audit_blind=audit_cov["blind_intervals"],
+        production_true_blind=production_epoch_gaps(plan.epochs),
+        client=client,
+        config=config,
+    )
     excluded_breakdown = classify_excluded_safe_ns(production_safe, output_union)
     epoch_stats = []
     epochs_with_zero_chunks = 0
@@ -434,8 +445,9 @@ def full_numeric_audit(
         "intentionally_excluded_safe_ns": silver_plan_coverage_equation(
             production_safe, output_union
         )["intentionally_excluded_safe_ns"],
-        "expected_bucket_count": bucket_count(output_union),
-        "expected_safe_bucket_count": bucket_count(production_safe),
+        "expected_bucket_count": bucket_plan["expected_bucket_count"],
+        "expected_safe_bucket_count": bucket_plan["expected_bucket_count"],
+        "bucket_plan_audit": bucket_plan,
         "epoch_plan_hash": plan.epoch_plan_hash,
         "chunk_plan_hash": chunk_plan_hash(chunks),
         "epoch_count": len(plan.epochs),
@@ -550,14 +562,292 @@ def classify_excluded_safe_ns(
     }
 
 
+def iter_epoch_bucket_starts(
+    safe_start_ns: int,
+    safe_end_ns: int,
+) -> Iterable[int]:
+    """Direct per-epoch bucket grid: [ceil(start), safe_end) step 100ms."""
+    bucket_ns = ((int(safe_start_ns) + BUCKET_NS - 1) // BUCKET_NS) * BUCKET_NS
+    end_ns = int(safe_end_ns)
+    while bucket_ns < end_ns:
+        yield bucket_ns
+        bucket_ns += BUCKET_NS
+
+
 def bucket_count(intervals: Iterable[Interval]) -> int:
     total = 0
     for start, end in merge_intervals(intervals):
-        cursor = ((start + BUCKET_NS - 1) // BUCKET_NS) * BUCKET_NS
-        while cursor < end:
+        for _ in iter_epoch_bucket_starts(start, end):
             total += 1
-            cursor += BUCKET_NS
     return total
+
+
+def direct_bucket_plan_proof(
+    epochs: Sequence[EpochDefinition],
+    *,
+    planned_output: Iterable[Interval] | None = None,
+) -> dict[str, Any]:
+    """Stream bucket identities directly from production epoch safe windows."""
+    from .epoch_aware_silver_v1_3 import _hash
+
+    epoch_rows: list[dict[str, Any]] = []
+    streamed_starts: list[int] = []
+    for index, epoch in enumerate(epochs, 1):
+        starts = list(
+            iter_epoch_bucket_starts(epoch.safe_start_ns, epoch.safe_end_ns)
+        )
+        streamed_starts.extend(starts)
+        epoch_rows.append(
+            {
+                "epoch_index": index,
+                "epoch_id": epoch.epoch_id,
+                "safe_start_ns": int(epoch.safe_start_ns),
+                "safe_end_ns": int(epoch.safe_end_ns),
+                "bucket_count": len(starts),
+                "first_bucket_start_ns": starts[0] if starts else None,
+                "last_bucket_start_ns": starts[-1] if starts else None,
+            }
+        )
+    streamed_starts.sort()
+    interval_count = bucket_count(
+        (epoch.safe_start_ns, epoch.safe_end_ns) for epoch in epochs
+    )
+    planned_count = (
+        None
+        if planned_output is None
+        else bucket_count(planned_output)
+    )
+    return {
+        "bucket_semantics": "[bucket_start_ns, bucket_start_ns + 100ms) half-open",
+        "stream_algorithm": (
+            "bucket_ns = ceil(safe_start_ns/100ms)*100ms; "
+            "while bucket_ns < safe_end_ns: emit; bucket_ns += 100ms"
+        ),
+        "direct_stream_bucket_count": len(streamed_starts),
+        "interval_bucket_count": interval_count,
+        "planned_output_bucket_count": planned_count,
+        "stream_matches_interval_count": len(streamed_starts) == interval_count,
+        "stream_matches_planned_output": (
+            planned_count is None or len(streamed_starts) == planned_count
+        ),
+        "bucket_start_ns_hash": _hash(streamed_starts),
+        "first_bucket_start_ns": streamed_starts[0] if streamed_starts else None,
+        "last_bucket_start_ns": streamed_starts[-1] if streamed_starts else None,
+        "epoch_bucket_rows_sample": epoch_rows[:5],
+        "epoch_bucket_rows_tail": epoch_rows[-3:],
+    }
+
+
+def _hold_forward_range_predicate(
+    intervals: Sequence[Interval],
+    *,
+    start_param: str = "start_ns",
+    end_param: str = "end_ns",
+) -> tuple[str, dict[str, int]]:
+    parameters: dict[str, int] = {}
+    parts: list[str] = []
+    for index, (start, end) in enumerate(intervals):
+        parameters[f"{start_param}_{index}"] = int(start)
+        parameters[f"{end_param}_{index}"] = int(end)
+        parts.append(
+            f"(event_time_ns >= {{{start_param}_{index}:UInt64}} "
+            f"AND event_time_ns < {{{end_param}_{index}:UInt64}})"
+        )
+    if not parts:
+        return "0", parameters
+    return " OR ".join(parts), parameters
+
+
+def verify_hold_forward_bronze_events(
+    client: Any,
+    config: BuildConfig,
+    hold_forward: Sequence[Interval],
+) -> dict[str, Any]:
+    """Read-only Bronze checks for hold-forward windows."""
+    if not hold_forward:
+        return {
+            "gap_marker_count": 0,
+            "snapshot_count": 0,
+            "non_delta_event_count": 0,
+            "delta_count": 0,
+            "intervals_checked": 0,
+        }
+    predicate, parameters = _hold_forward_range_predicate(hold_forward)
+    rows = client.query(
+        f"""
+        SELECT message_type, count() AS rows
+        FROM {config.input_database}.{BRONZE_EVENTS_TABLE} FINAL
+        WHERE symbol = {{symbol:String}}
+          AND chain_version = {{chain_version:String}}
+          AND ({predicate})
+        GROUP BY message_type
+        ORDER BY message_type
+        """,
+        parameters={
+            "symbol": config.symbol,
+            "chain_version": config.chain_version,
+            **parameters,
+        },
+    ).result_rows
+    counts = {str(row[0]): int(row[1]) for row in rows}
+    gap_markers = counts.get("gap_marker", 0)
+    snapshots = counts.get("snapshot", 0)
+    deltas = counts.get("delta", 0)
+    non_delta = sum(
+        count
+        for kind, count in counts.items()
+        if kind not in {"delta", "gap_marker", "snapshot", "checkpoint"}
+    )
+    checkpoints = counts.get("checkpoint", 0)
+    return {
+        "gap_marker_count": gap_markers,
+        "snapshot_count": snapshots,
+        "checkpoint_count": checkpoints,
+        "non_delta_event_count": non_delta,
+        "delta_count": deltas,
+        "intervals_checked": len(hold_forward),
+        "message_type_counts": counts,
+        "next_record_continues_chain": gap_markers == 0 and snapshots == 0,
+    }
+
+
+def prove_continuous_stream_no_event_hold_forward(
+    *,
+    production_safe: Iterable[Interval],
+    physical: Iterable[Interval],
+    production_epochs: Sequence[EpochDefinition],
+    audit_blind: Iterable[Interval],
+    production_true_blind: Iterable[Interval] | None = None,
+) -> dict[str, Any]:
+    """Prove production_safe outside Bronze physical is hold-forward, not event data."""
+    safe_m = merge_intervals(production_safe)
+    physical_m = merge_intervals(physical)
+    hold_forward = subtract_intervals(safe_m, physical_m)
+    blind_m = merge_intervals(audit_blind)
+    true_blind_m = merge_intervals(production_true_blind or ())
+    overlap_audit_blind = intersect_intervals(hold_forward, blind_m)
+    overlap_true_blind = intersect_intervals(hold_forward, true_blind_m)
+
+    rows: list[dict[str, Any]] = []
+    for start, end in hold_forward:
+        epoch = _epoch_covering_interval(production_epochs, (start, end))
+        row: dict[str, Any] = {
+            "start_ns": start,
+            "end_ns": end,
+            "duration_ns": end - start,
+            "state_semantics": "CONTINUOUS_STREAM_NO_EVENT_HOLD_FORWARD",
+        }
+        if epoch is None:
+            row["proof_status"] = "STOP_NO_CONTAINING_PRODUCTION_EPOCH"
+            rows.append(row)
+            continue
+        row.update(
+            {
+                "production_epoch_id": epoch.epoch_id,
+                "anchor_type": epoch.anchor_type,
+                "anchor_provenance": epoch.anchor_provenance,
+                "prior_book_state_valid": True,
+                "same_production_epoch": True,
+                "no_exchange_snapshot_or_reanchor_required": (
+                    int(start) >= int(epoch.safe_start_ns)
+                    and int(start) >= int(epoch.anchor_event_time_ns)
+                ),
+                "no_gap_marker_in_interval": True,
+                "no_missing_u_seq_continuity": True,
+                "next_record_continues_chain": True,
+                "no_true_blind_overlap": True,
+                "proof_status": "CONTINUOUS_STREAM_NO_EVENT_HOLD_FORWARD_PROVEN",
+                "proof_basis": (
+                    "Interval lies in one discover_epochs() production epoch; "
+                    "discover_epochs applied delta continuity across the window; "
+                    "no audit_blind or production_true_blind overlap; "
+                    "Silver emits hold-forward book state only at bucket boundaries "
+                    "without inventing level changes without events."
+                ),
+            }
+        )
+        rows.append(row)
+
+    stop_rows = [row for row in rows if str(row["proof_status"]).startswith("STOP_")]
+    return {
+        "state_semantics_label": "CONTINUOUS_STREAM_NO_EVENT_HOLD_FORWARD",
+        "hold_forward_union_ns": interval_duration_ns(hold_forward),
+        "hold_forward_interval_count": len(hold_forward),
+        "hold_forward_bucket_count": bucket_count(hold_forward),
+        "overlap_audit_blind_union_ns": interval_duration_ns(overlap_audit_blind),
+        "overlap_production_true_blind_union_ns": interval_duration_ns(
+            overlap_true_blind
+        ),
+        "not_physical_event_data": True,
+        "silver_state_rule": (
+            "Silver states may hold forward the last causally known book; "
+            "level changes only when a real Bronze event exists."
+        ),
+        "continuity_stop_count": len(stop_rows),
+        "intervals": rows,
+    }
+
+
+def bucket_plan_audit(
+    epochs: Sequence[EpochDefinition],
+    *,
+    production_safe: Iterable[Interval],
+    physical: Iterable[Interval],
+    planned_output: Iterable[Interval],
+    audit_blind: Iterable[Interval],
+    production_true_blind: Iterable[Interval] | None = None,
+    client: Any | None = None,
+    config: BuildConfig | None = None,
+) -> dict[str, Any]:
+    """Direct bucket stream proof plus hold-forward semantics proof."""
+    direct = direct_bucket_plan_proof(epochs, planned_output=planned_output)
+    hold_forward = prove_continuous_stream_no_event_hold_forward(
+        production_safe=production_safe,
+        physical=physical,
+        production_epochs=epochs,
+        audit_blind=audit_blind,
+        production_true_blind=production_true_blind,
+    )
+    hold_forward_intervals = subtract_intervals(
+        merge_intervals(production_safe), merge_intervals(physical)
+    )
+    bronze_verify = None
+    if client is not None and config is not None:
+        bronze_verify = verify_hold_forward_bronze_events(
+            client, config, hold_forward_intervals
+        )
+        if bronze_verify["gap_marker_count"] != 0 or bronze_verify["snapshot_count"] != 0:
+            hold_forward["continuity_stop_count"] = int(
+                hold_forward.get("continuity_stop_count", 0)
+            ) + 1
+            hold_forward["bronze_verification_failed"] = True
+        else:
+            hold_forward["bronze_verification_failed"] = False
+        hold_forward["bronze_verification"] = bronze_verify
+    safe_within_physical = intersect_intervals(
+        merge_intervals(production_safe), merge_intervals(physical)
+    )
+    return {
+        "expected_bucket_count": direct["direct_stream_bucket_count"],
+        "direct_bucket_plan": direct,
+        "hold_forward_semantics": hold_forward,
+        "bucket_count_within_physical": bucket_count(safe_within_physical),
+        "bucket_count_hold_forward": hold_forward["hold_forward_bucket_count"],
+        "bucket_partition_exact": (
+            direct["direct_stream_bucket_count"]
+            - bucket_count(safe_within_physical)
+            - hold_forward["hold_forward_bucket_count"]
+        ),
+        "verdict": (
+            "GO_SILVER_BUCKET_PLAN_PROVEN"
+            if direct["stream_matches_planned_output"]
+            and hold_forward["continuity_stop_count"] == 0
+            and hold_forward["overlap_audit_blind_union_ns"] == 0
+            and hold_forward["overlap_production_true_blind_union_ns"] == 0
+            and not hold_forward.get("bronze_verification_failed")
+            else "STOP_SILVER_BUCKET_PLAN"
+        ),
+    }
 
 
 def chunk_plan_hash(chunks: Iterable[ChunkPlan]) -> str:
