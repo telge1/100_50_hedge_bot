@@ -7,7 +7,8 @@ SILVER_REPLAY_CONTRACT = (
     "FullBookState.apply_snapshot/apply_delta + drilldown epoch-on-checkpoint; "
     "level_changes sparse (analysis window only); "
     "metrics_100ms event_time_strict_lt bucket_end analysis window only; "
-    "source order = (source_segment_sha256, record_ordinal); "
+    "single-segment source order = record_ordinal; multi-segment source order "
+    "= (canonical_segment_chain_index, record_ordinal), never SHA-primary; "
     "DateTime64 via fromUnixTimestamp64Nano(ns,'UTC')"
 )
 BUCKET_MS = 100

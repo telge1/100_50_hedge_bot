@@ -153,6 +153,7 @@ class BronzeRecord:
     record_ordinal: int
     payload_sha256: str
     original_payload: dict[str, Any]
+    canonical_segment_chain_index: int | None = None
 
 
 @dataclass
@@ -189,7 +190,43 @@ def dedupe_bronze_by_record_id(rows: list[BronzeRecord]) -> list[BronzeRecord]:
 
 
 def sort_bronze_source_order(rows: list[BronzeRecord]) -> list[BronzeRecord]:
-    return sorted(rows, key=lambda r: (r.source_segment_sha256, r.record_ordinal))
+    """Order records by canonical segment rank, then physical in-segment ordinal.
+
+    A single v1.2 segment remains unambiguous without a rank. Multi-segment
+    replay must carry the v1.3 rank; SHA-256 is identity only.
+    """
+    if not rows:
+        return []
+    segment_shas = {r.source_segment_sha256 for r in rows}
+    if len(segment_shas) == 1 and all(r.canonical_segment_chain_index is None for r in rows):
+        return sorted(rows, key=lambda r: r.record_ordinal)
+
+    if any(r.canonical_segment_chain_index is None for r in rows):
+        raise SilverReplayError(
+            "STOP_V1_3_BRONZE_SEGMENT_MAPPING_INVALID: missing canonical segment rank"
+        )
+
+    sha_to_rank: dict[str, int] = {}
+    rank_to_sha: dict[int, str] = {}
+    record_identities: set[tuple[str, int]] = set()
+    for row in rows:
+        rank = int(row.canonical_segment_chain_index)  # type: ignore[arg-type]
+        identity = (row.source_segment_sha256, row.record_ordinal)
+        if identity in record_identities:
+            raise SilverReplayError(
+                "STOP_V1_3_BRONZE_SEGMENT_MAPPING_INVALID: duplicate segment record ordinal"
+            )
+        record_identities.add(identity)
+        prior_rank = sha_to_rank.setdefault(row.source_segment_sha256, rank)
+        prior_sha = rank_to_sha.setdefault(rank, row.source_segment_sha256)
+        if prior_rank != rank or prior_sha != row.source_segment_sha256:
+            raise SilverReplayError(
+                "STOP_V1_3_BRONZE_SEGMENT_MAPPING_INVALID: duplicate or conflicting segment rank"
+            )
+    return sorted(
+        rows,
+        key=lambda r: (int(r.canonical_segment_chain_index), r.record_ordinal),
+    )
 
 
 def assert_strict_ordinals(rows: list[BronzeRecord]) -> None:
@@ -608,6 +645,9 @@ def replay_bronze_to_silver(
 
 
 def bronze_row_from_ch(row: tuple[Any, ...]) -> BronzeRecord:
+    canonical_segment_chain_index = None
+    if len(row) == 14:
+        *row, canonical_segment_chain_index = row
     (
         record_id,
         symbol,
@@ -639,4 +679,9 @@ def bronze_row_from_ch(row: tuple[Any, ...]) -> BronzeRecord:
         record_ordinal=int(record_ordinal),
         payload_sha256=_as_text(payload_sha256),
         original_payload=payload_obj if isinstance(payload_obj, dict) else {},
+        canonical_segment_chain_index=(
+            int(canonical_segment_chain_index)
+            if canonical_segment_chain_index is not None
+            else None
+        ),
     )

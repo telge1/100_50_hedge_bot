@@ -26,6 +26,7 @@ venv/
 /data/oi_liquidation_collector/
 /data/wall_transitions/
 /logs/clickhouse/
+/obfull_research_engine/runs/
 
 # Keep empty dir placeholders
 !/logs/.gitkeep

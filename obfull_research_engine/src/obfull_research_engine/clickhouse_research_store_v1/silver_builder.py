@@ -213,29 +213,109 @@ def load_bronze_window(
     symbol: str,
     window_start: str,
     window_end: str,
+    chain_version: str | None = None,
+    canonical_chain_hash: str | None = None,
 ) -> tuple[list[Any], float]:
     start_ns = iso_to_ns_exact(window_start)
     end_ns = iso_to_ns_exact(window_end)
-    sql = f"""
-    SELECT
-      record_id, symbol, message_type, event_time_ns, receive_time_ns,
-      update_id, seq, update_id_present, seq_present,
-      source_segment_sha256, record_ordinal, payload_sha256, original_payload
-    FROM {DATABASE}.{EVENTS_TABLE} FINAL
-    WHERE symbol = {{symbol:String}}
-      AND event_time_ns >= {{start_ns:UInt64}}
-      AND event_time_ns < {{end_ns:UInt64}}
-    ORDER BY source_segment_sha256, record_ordinal
-    """
-    t0 = time.monotonic()
-    rows = client.query(
-        sql,
-        parameters={
+    if chain_version is None:
+        # Legacy v1.2 is safe only for a single segment. Never SHA-sort it.
+        sql = f"""
+        SELECT
+          record_id, symbol, message_type, event_time_ns, receive_time_ns,
+          update_id, seq, update_id_present, seq_present,
+          source_segment_sha256, record_ordinal, payload_sha256, original_payload
+        FROM {DATABASE}.{EVENTS_TABLE} FINAL
+        WHERE symbol = {{symbol:String}}
+          AND event_time_ns >= {{start_ns:UInt64}}
+          AND event_time_ns < {{end_ns:UInt64}}
+        ORDER BY record_ordinal
+        """
+        parameters = {
             "symbol": symbol.upper(),
             "start_ns": start_ns,
             "end_ns": end_ns,
-        },
-    ).result_rows
+        }
+    else:
+        if not canonical_chain_hash:
+            raise SilverBuildError(
+                "STOP_V1_3_CHAIN_NOT_STABLE: expected canonical chain hash is required"
+            )
+        v13_database = "research_full_ob_continuous_pilot_v1_3"
+        events = "raw_full_ob_events_pilot_v1_3"
+        segments = "canonical_segments_pilot_v1_3"
+        mapping = client.query(
+            f"""
+            SELECT
+              count(),
+              uniqExact(source_segment_sha256),
+              uniqExact(canonical_segment_chain_index),
+              uniqExact(canonical_chain_hash),
+              any(canonical_chain_hash)
+            FROM {v13_database}.{segments} FINAL
+            WHERE symbol = {{symbol:String}}
+              AND chain_version = {{chain_version:String}}
+              AND is_canonical = 1
+            """,
+            parameters={"symbol": symbol.upper(), "chain_version": chain_version},
+        ).result_rows
+        count, unique_shas, unique_ranks, unique_hashes, actual_hash = (
+            mapping[0] if mapping else (0, 0, 0, 0, "")
+        )
+        actual_hash = _as_text(actual_hash)
+        if (
+            int(count) == 0
+            or int(count) != int(unique_shas)
+            or int(count) != int(unique_ranks)
+        ):
+            raise SilverBuildError(
+                "STOP_V1_3_BRONZE_SEGMENT_MAPPING_INVALID: missing or duplicate canonical rank"
+            )
+        if int(unique_hashes) != 1 or actual_hash != canonical_chain_hash:
+            raise SilverBuildError(
+                "STOP_V1_3_CHAIN_NOT_STABLE: canonical chain hash changed"
+            )
+        sql = f"""
+        SELECT
+          e.record_id, e.symbol, e.message_type, e.event_time_ns, e.receive_time_ns,
+          e.update_id, e.seq, e.update_id_present, e.seq_present,
+          e.source_segment_sha256, e.record_ordinal, e.payload_sha256, e.original_payload,
+          s.canonical_segment_chain_index
+        FROM {v13_database}.{events} AS e FINAL
+        INNER JOIN
+        (
+          SELECT
+            source_segment_sha256,
+            canonical_segment_chain_index
+          FROM {v13_database}.{segments} FINAL
+          WHERE symbol = {{symbol:String}}
+            AND chain_version = {{chain_version:String}}
+            AND is_canonical = 1
+        ) AS s
+          ON e.source_segment_sha256 = s.source_segment_sha256
+         AND e.canonical_segment_chain_index = s.canonical_segment_chain_index
+        WHERE e.symbol = {{symbol:String}}
+          AND e.chain_version = {{chain_version:String}}
+          AND e.event_time_ns >= {{start_ns:UInt64}}
+          AND e.event_time_ns < {{end_ns:UInt64}}
+        ORDER BY s.canonical_segment_chain_index, e.record_ordinal
+        """
+        parameters = {
+            "symbol": symbol.upper(),
+            "chain_version": chain_version,
+            "start_ns": start_ns,
+            "end_ns": end_ns,
+        }
+
+    t0 = time.monotonic()
+    rows = client.query(sql, parameters=parameters).result_rows
+    if chain_version is None:
+        segment_shas = {_as_text(row[9]) for row in rows}
+        if len(segment_shas) > 1:
+            raise SilverBuildError(
+                "STOP_SILVER_CANONICAL_SEGMENT_ORDER_SCHEMA_MISSING: "
+                "legacy v1.2 window contains multiple segments"
+            )
     return rows, time.monotonic() - t0
 
 
