@@ -13,6 +13,7 @@ import obfull_research_engine.clickhouse_research_store_v1.silver_full_build_v1_
 from obfull_research_engine.clickhouse_research_store_v1.epoch_aware_silver_v1_3 import (
     EpochDefinition,
     discover_epochs,
+    split_resume_and_replay_stream,
 )
 from obfull_research_engine.clickhouse_research_store_v1.silver_replay import BronzeRecord
 
@@ -170,8 +171,15 @@ class FakeClient:
             return SimpleNamespace(result_rows=[])
         raise AssertionError(f"unexpected query: {text}")
 
-    def query_row_block_stream(self, sql, parameters=None):
+    def query_row_block_stream(self, sql, parameters=None, settings=None):
+        self.last_stream_sql = str(sql)
+        self.last_stream_parameters = parameters or {}
+        self.last_stream_settings = settings or {}
+        self.commands.append(f"STREAM:{sql[:120]}")
         class _Stream:
+            def __init__(_self, rows):
+                _self.rows = rows
+
             def __enter__(_self):
                 return _self
 
@@ -179,9 +187,9 @@ class FakeClient:
                 return False
 
             def __iter__(_self):
-                return iter([])
+                return iter(_self.rows)
 
-        return _Stream()
+        return _Stream(getattr(self, "stream_blocks", []))
 
 
 def _config(tmp_path, **overrides):
@@ -741,6 +749,169 @@ def test_episode1_replay_parity_remains_exact():
         warmup_ns=0,
     )
     assert decision.status == "OK"
+
+
+def test_epoch_plan_stream_uses_lifecycle_payload_and_pk_order(tmp_path):
+    client = FakeClient()
+    list(
+        runner.iter_bronze_epoch_plan_records(
+            client,
+            _config(tmp_path),
+        )
+    )
+    sql = client.last_stream_sql
+    assert "INNER JOIN" not in sql
+    assert "multiIf(" in sql
+    assert "ORDER BY e.canonical_segment_chain_index, e.record_ordinal" in sql
+    assert client.last_stream_settings["max_memory_usage"] == runner.BRONZE_STREAM_MAX_MEMORY_BYTES
+    assert client.last_stream_settings["max_block_size"] == runner.BRONZE_STREAM_MAX_BLOCK_SIZE
+
+
+def test_chunk_stream_query_is_apply_bounded_and_full_payload(tmp_path):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    client.stream_blocks = [[
+        (
+            "r" * 64,
+            "BTCUSDT",
+            "snapshot",
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            SHA_A,
+            1,
+            "d" * 64,
+            json.dumps(
+                {
+                    "data": {
+                        "u": 1,
+                        "seq": 1,
+                        "b": [["100", "1"]],
+                        "a": [["101", "1"]],
+                    }
+                }
+            ),
+            1,
+        )
+    ]]
+    with pytest.raises(runner.SilverBuildError):
+        runner.build_one_chunk(
+            client,
+            _config(tmp_path, resume=True),
+            run_id="r" * 64,
+            epoch_plan_hash=plan.epoch_plan_hash,
+            chunk=chunk,
+            stop=runner.StopState(),
+        )
+    assert "canonical_segment_chain_index, e.record_ordinal" in client.last_stream_sql
+    assert "original_payload AS original_payload" in client.last_stream_sql
+    assert client.last_stream_parameters["start_rank"] == 1
+
+
+def test_clickhouse_memory_error_maps_to_stop_verdict():
+    with pytest.raises(runner.SilverBuildError, match="STOP_SILVER_CH_MEMORY_LIMIT"):
+        runner._raise_clickhouse_stream_error(
+            RuntimeError("Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED")
+        )
+
+
+def test_epoch_plan_hash_matches_full_payload_reference():
+    records = [
+        _record(rank=1, ordinal=1, kind="gap_marker", event_ns=1_000_000_000),
+        _record(rank=1, ordinal=2, kind="snapshot", event_ns=1_100_000_000),
+        _record(rank=1, ordinal=3, kind="delta", event_ns=1_200_000_000),
+        _record(rank=1, ordinal=4, kind="delta", event_ns=1_300_000_000),
+    ]
+    records[2].original_payload = {
+        "data": {"u": 11, "seq": 11, "b": [], "a": []},
+    }
+    records[2].update_id = 11
+    records[2].seq = 11
+    records[3].original_payload = {
+        "data": {"u": 20, "seq": 20, "b": [], "a": []},
+    }
+    records[3].update_id = 20
+    records[3].seq = 20
+    full = discover_epochs(
+        records,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        scan_end_ns=2_000_000_000,
+        clean_segment_start_ranks={1},
+    )
+    lightweight = list(records)
+    lightweight[2].original_payload = {}
+    lightweight[3].original_payload = {}
+    streamed = discover_epochs(
+        lightweight,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        scan_end_ns=2_000_000_000,
+        clean_segment_start_ranks={1},
+    )
+    assert len(full.epochs) == len(streamed.epochs)
+    assert full.epochs[0].epoch_id == streamed.epochs[0].epoch_id
+    assert full.epochs[0].epoch_hash == streamed.epochs[0].epoch_hash
+
+
+def test_split_resume_stream_avoids_full_materialization():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=1_000_000_000),
+        _record(rank=1, ordinal=2, kind="delta", event_ns=1_100_000_000),
+        _record(rank=1, ordinal=3, kind="delta", event_ns=1_200_000_000),
+    ]
+    records[0].original_payload = {
+        "data": {"u": 1, "seq": 1, "b": [["100", "1"]], "a": [["101", "1"]]},
+    }
+    epoch = discover_epochs(
+        records,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        scan_end_ns=2_000_000_000,
+        clean_segment_start_ranks={1},
+    ).epochs[0]
+    resume, tail = split_resume_and_replay_stream(
+        iter(records),
+        epoch=epoch,
+        analysis_start_ns=1_050_000_000,
+    )
+    assert resume.message_type == "snapshot"
+    assert sum(1 for _ in tail) == 2
 
 
 def test_multi_epoch_plan_keeps_independent_safe_windows():

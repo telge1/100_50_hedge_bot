@@ -209,6 +209,17 @@ def test_real_delta_gap_ends_epoch():
     assert discovery.epochs[0].terminating_reason.startswith("GAP:")
 
 
+def test_delta_gap_without_payload_uses_column_u_seq():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND, u=10),
+        _record(rank=1, ordinal=2, kind="delta", event_ns=2 * SECOND, u=12),
+    ]
+    records[1].original_payload = {}
+    discovery = _discover(records)
+    assert len(discovery.gaps) == 1
+    assert discovery.epochs[0].terminating_reason.startswith("GAP:")
+
+
 def test_backward_event_time_does_not_change_apply_order():
     records = [
         _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND, u=10),

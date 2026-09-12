@@ -43,6 +43,29 @@ env PYTHONPATH=/home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/ob
   --lock-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/silver_full_build_v1_3/build.lock
 ```
 
+## Read-only epoch-plan proof
+
+Streams Bronze per segment without delta payloads and without Silver DML.
+Use this after `--check-only` PASS and before any `--run`.
+
+```bash
+env PYTHONPATH=/home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/src:/home/telgenbuescher/projects/orderbook_analyse/src \
+  /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -u \
+  -m obfull_research_engine.clickhouse_research_store_v1.silver_full_build_v1_3 \
+  --symbol BTCUSDT \
+  --input-database research_full_ob_continuous_v1_3 \
+  --output-database research_full_ob_silver_v1_3 \
+  --chain-version canonical_segment_chain_v1_3_BTCUSDT_20260912T060011Z_f666e592a0bef459 \
+  --expected-chain-hash f666e592a0bef4598545b3f247cf5dd97dd9c53017028e3c33ddfce5e0d15333 \
+  --expected-bronze-records 2638997 \
+  --epoch-plan-only \
+  --max-rss-mib 1536 \
+  --min-free-disk-gib 200 \
+  --min-available-memory-mib 4096 \
+  --report-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/silver_full_build_v1_3/epoch_plan_profile.json \
+  --lock-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/silver_full_build_v1_3/build.lock
+```
+
 ## Read-only preflight
 
 Requires Bronze to be complete, verified, and idle.

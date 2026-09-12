@@ -621,14 +621,31 @@ def discover_epochs(
             continue
 
         payload = _payload(record)
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        if payload:
+            data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+            bids = data.get("b") or []
+            asks = data.get("a") or []
+            u = data.get("u")
+            seq = data.get("seq")
+            ts_ms = int(
+                payload.get("ts") or data.get("ts") or record.event_time_ns // 1_000_000
+            )
+            cts_ms = payload.get("cts") or data.get("cts")
+        else:
+            # Epoch planning streams lifecycle rows with payloads and deltas without
+            # original_payload; continuity uses persisted update_id/seq columns only.
+            bids, asks = [], []
+            u = int(record.update_id) if record.update_id_present else None
+            seq = int(record.seq) if record.seq_present else None
+            ts_ms = int(record.event_time_ns // 1_000_000)
+            cts_ms = None
         outcome = state.apply_delta(
-            bids=data.get("b") or [],
-            asks=data.get("a") or [],
-            u=data.get("u"),
-            seq=data.get("seq"),
-            ts_ms=int(payload.get("ts") or data.get("ts") or record.event_time_ns // 1_000_000),
-            cts_ms=payload.get("cts") or data.get("cts"),
+            bids=bids,
+            asks=asks,
+            u=u,
+            seq=seq,
+            ts_ms=ts_ms,
+            cts_ms=cts_ms,
             receive_time_ns=record.receive_time_ns,
             enforce_continuity=True,
         )
@@ -699,6 +716,25 @@ def validate_epoch_window(
     )
 
 
+def _resume_checkpoint_candidate(
+    record: BronzeRecord,
+    *,
+    candidate: BronzeRecord | None,
+) -> BronzeRecord | None:
+    if record.message_type == "snapshot":
+        return record
+    if record.message_type == "checkpoint" and _anchor_book_hash(record):
+        reason = _checkpoint_reason(record)
+        if reason in {
+            "segment_start",
+            "periodic_5m",
+            "reconnect_resync",
+            "shutdown",
+        }:
+            return record
+    return candidate
+
+
 def select_resume_checkpoint(
     records: Iterable[BronzeRecord],
     *,
@@ -716,22 +752,43 @@ def select_resume_checkpoint(
             # suppress already-observed analysis records, even if its own
             # event timestamp moves backwards.
             break
-        if record.message_type == "snapshot":
-            candidate = record
-        elif record.message_type == "checkpoint" and _anchor_book_hash(record):
-            reason = _checkpoint_reason(record)
-            if reason in {
-                "segment_start",
-                "periodic_5m",
-                "reconnect_resync",
-                "shutdown",
-            }:
-                candidate = record
+        candidate = _resume_checkpoint_candidate(record, candidate=candidate)
     if candidate is None:
         raise EpochSilverError(
             "STOP_EPOCH_ANCHOR_PROVENANCE_UNRESOLVED: no resume checkpoint in epoch"
         )
     return candidate
+
+
+def split_resume_and_replay_stream(
+    records: Iterable[BronzeRecord],
+    *,
+    epoch: EpochDefinition,
+    analysis_start_ns: int,
+) -> tuple[BronzeRecord, Iterator[BronzeRecord]]:
+    """Single-pass resume selection with a tail iterator for replay."""
+    candidate: BronzeRecord | None = None
+    iterator = iter(records)
+    head: BronzeRecord | None = None
+    for record in iterator:
+        key = _record_key(record)
+        if key < (epoch.anchor_segment_chain_index, epoch.anchor_record_ordinal):
+            continue
+        if _causal_ns(record) >= analysis_start_ns:
+            head = record
+            break
+        candidate = _resume_checkpoint_candidate(record, candidate=candidate)
+    if candidate is None:
+        raise EpochSilverError(
+            "STOP_EPOCH_ANCHOR_PROVENANCE_UNRESOLVED: no resume checkpoint in epoch"
+        )
+
+    def tail() -> Iterator[BronzeRecord]:
+        if head is not None:
+            yield head
+        yield from iterator
+
+    return candidate, tail()
 
 
 def epoch_apply_bounds(

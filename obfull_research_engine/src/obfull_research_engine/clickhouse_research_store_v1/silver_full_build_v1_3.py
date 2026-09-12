@@ -42,7 +42,7 @@ from .epoch_aware_silver_v1_3 import (
     make_build_id,
     make_chunk_key,
     replay_epoch_window,
-    select_resume_checkpoint,
+    split_resume_and_replay_stream,
     validate_epoch_window,
 )
 from .helpers import current_rss_bytes, get_clickhouse_client, iso_to_ns_exact
@@ -89,6 +89,15 @@ CHUNK_STATUSES = frozenset(
         "EPOCH_BOUNDARY",
     }
 )
+BRONZE_STREAM_MAX_MEMORY_BYTES = 1_610_612_736  # 1.5 GiB per Silver query
+BRONZE_STREAM_MAX_BLOCK_SIZE = 8192
+BRONZE_STREAM_SETTINGS = {
+    "max_threads": 1,
+    "max_block_size": BRONZE_STREAM_MAX_BLOCK_SIZE,
+    "max_memory_usage": BRONZE_STREAM_MAX_MEMORY_BYTES,
+}
+BRONZE_PAYLOAD_FULL = "full"
+BRONZE_PAYLOAD_EPOCH_PLAN = "epoch_plan"
 
 
 class SilverBuildError(RuntimeError):
@@ -658,57 +667,84 @@ def bronze_hard_preflight(
     }
 
 
+def _is_clickhouse_memory_error(exc: BaseException) -> bool:
+    text = str(exc)
+    return "241" in text or "MEMORY_LIMIT_EXCEEDED" in text
+
+
+def _raise_clickhouse_stream_error(exc: BaseException) -> None:
+    if _is_clickhouse_memory_error(exc):
+        raise SilverBuildError(f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}") from exc
+    raise SilverBuildError(f"STOP_SILVER_CH_QUERY_NOT_STREAMING: {exc}") from exc
+
+
+def _bronze_payload_select(payload_mode: str) -> str:
+    if payload_mode == BRONZE_PAYLOAD_EPOCH_PLAN:
+        return (
+            "multiIf("
+            "e.message_type IN ('snapshot', 'checkpoint', 'gap_marker'), "
+            "e.original_payload, "
+            "''"
+            ") AS original_payload"
+        )
+    if payload_mode == BRONZE_PAYLOAD_FULL:
+        return "e.original_payload AS original_payload"
+    raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_BRONZE_PAYLOAD_MODE_INVALID")
+
+
 def iter_bronze_records(
     client: Any,
     config: BuildConfig,
     *,
+    chain_index: int | None = None,
     start_apply_key: tuple[int, int] | None = None,
     end_apply_key: tuple[int, int] | None = None,
+    payload_mode: str = BRONZE_PAYLOAD_FULL,
 ) -> Iterator[BronzeRecord]:
+    if chain_index is not None and (
+        start_apply_key is not None or end_apply_key is not None
+    ):
+        raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_APPLY_BOUNDS_INVALID")
     if (start_apply_key is None) != (end_apply_key is None):
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_APPLY_BOUNDS_INVALID")
-    if start_apply_key is not None and end_apply_key is not None:
+    if chain_index is not None:
         predicate = """
-      AND (s.canonical_segment_chain_index, e.record_ordinal) >=
+      AND e.canonical_segment_chain_index = {chain_index:UInt64}
+        """
+    elif start_apply_key is not None and end_apply_key is not None:
+        predicate = """
+      AND (e.canonical_segment_chain_index, e.record_ordinal) >=
           ({start_rank:UInt64}, {start_ordinal:UInt64})
-      AND (s.canonical_segment_chain_index, e.record_ordinal) <
+      AND (e.canonical_segment_chain_index, e.record_ordinal) <
           ({end_rank:UInt64}, {end_ordinal:UInt64})
         """
     else:
         predicate = """
-      AND s.canonical_segment_chain_index >= {start_index:UInt64}
-      AND s.canonical_segment_chain_index <= {end_index:UInt64}
+      AND e.canonical_segment_chain_index >= {start_index:UInt64}
+      AND e.canonical_segment_chain_index <= {end_index:UInt64}
         """
+    payload_select = _bronze_payload_select(payload_mode)
     sql = f"""
     SELECT
       e.record_id, e.symbol, e.message_type, e.event_time_ns, e.receive_time_ns,
       e.update_id, e.seq, e.update_id_present, e.seq_present,
       e.source_segment_sha256, e.record_ordinal, e.payload_sha256,
-      e.original_payload, s.canonical_segment_chain_index
+      {payload_select},
+      e.canonical_segment_chain_index
     FROM {config.input_database}.{BRONZE_EVENTS_TABLE} AS e FINAL
-    INNER JOIN
-    (
-      SELECT source_segment_sha256, canonical_segment_chain_index
-      FROM {config.input_database}.{BRONZE_SEGMENTS_TABLE} FINAL
-      WHERE symbol = {{symbol:String}}
-        AND chain_version = {{chain_version:String}}
-        AND canonical_chain_hash = {{chain_hash:String}}
-        AND is_canonical = 1
-    ) AS s
-      ON e.source_segment_sha256 = s.source_segment_sha256
-     AND e.canonical_segment_chain_index = s.canonical_segment_chain_index
     WHERE e.symbol = {{symbol:String}}
       AND e.chain_version = {{chain_version:String}}
       {predicate}
-    ORDER BY s.canonical_segment_chain_index, e.record_ordinal
+    ORDER BY e.canonical_segment_chain_index, e.record_ordinal
     """
     parameters: dict[str, Any] = {
         "symbol": config.symbol,
         "chain_version": config.chain_version,
-        "chain_hash": config.expected_chain_hash,
         "start_index": config.start_chain_index,
         "end_index": config.end_chain_index,
     }
+    if chain_index is not None:
+        parameters["chain_index"] = int(chain_index)
     if start_apply_key is not None and end_apply_key is not None:
         parameters.update(
             {
@@ -719,17 +755,40 @@ def iter_bronze_records(
             }
         )
     previous: tuple[int, int] | None = None
-    with client.query_row_block_stream(sql, parameters=parameters) as stream:
-        for block in stream:
-            for row in block:
-                record = bronze_row_from_ch(tuple(row))
-                key = _record_key(record)
-                if previous is not None and key <= previous:
-                    raise SilverBuildError(
-                        "STOP_SILVER_REPLAY_ORDER_MISMATCH: streamed order invalid"
-                    )
-                previous = key
-                yield record
+    try:
+        with client.query_row_block_stream(
+            sql,
+            parameters=parameters,
+            settings=BRONZE_STREAM_SETTINGS,
+        ) as stream:
+            for block in stream:
+                for row in block:
+                    record = bronze_row_from_ch(tuple(row))
+                    key = _record_key(record)
+                    if previous is not None and key <= previous:
+                        raise SilverBuildError(
+                            "STOP_SILVER_REPLAY_ORDER_MISMATCH: streamed order invalid"
+                        )
+                    previous = key
+                    yield record
+    except SilverBuildError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _raise_clickhouse_stream_error(exc)
+
+
+def iter_bronze_epoch_plan_records(
+    client: Any,
+    config: BuildConfig,
+) -> Iterator[BronzeRecord]:
+    """Stream canonical Bronze rows for epoch planning without delta payloads."""
+    for rank in range(config.start_chain_index, config.end_chain_index + 1):
+        yield from iter_bronze_records(
+            client,
+            config,
+            chain_index=rank,
+            payload_mode=BRONZE_PAYLOAD_EPOCH_PLAN,
+        )
 
 
 def build_epoch_plan(
@@ -742,7 +801,7 @@ def build_epoch_plan(
     scan_end_ns = max(row["last_event_time_ns"] for row in metadata.values()) + 1
     clean_ranks = clean_segment_start_ranks(metadata)
     discovery = discover_epochs(
-        iter_bronze_records(client, config),
+        iter_bronze_epoch_plan_records(client, config),
         chain_version=config.chain_version,
         canonical_chain_hash=config.expected_chain_hash,
         scan_end_ns=scan_end_ns,
@@ -755,6 +814,38 @@ def build_epoch_plan(
     )
     plan.finalize()
     return plan
+
+
+def profile_epoch_plan(
+    client: Any,
+    config: BuildConfig,
+    metadata: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Read-only epoch-plan build with streaming and memory accounting."""
+    started = time.monotonic()
+    rss_start = current_rss_bytes()
+    metadata = metadata or load_segment_metadata(client, config)
+    plan = build_epoch_plan(client, config, metadata)
+    rss_peak = current_rss_bytes()
+    elapsed = time.monotonic() - started
+    return {
+        "status": "EPOCH_PLAN_PROFILED",
+        "epoch_plan_hash": plan.epoch_plan_hash,
+        "epochs": len(plan.epochs),
+        "gaps": len(plan.gaps),
+        "chunks": len(
+            plan_epoch_chunks(
+                plan.epochs,
+                chunk_market_minutes=config.chunk_market_minutes,
+                warmup_minutes=config.warmup_minutes,
+            )
+        ),
+        "elapsed_s": round(elapsed, 3),
+        "python_rss_start_bytes": rss_start,
+        "python_rss_peak_bytes": rss_peak,
+        "python_rss_peak_mib": round(rss_peak / (1024 * 1024), 3),
+        "clickhouse_stream_settings": dict(BRONZE_STREAM_SETTINGS),
+    }
 
 
 def plan_epoch_chunks(
@@ -1226,19 +1317,20 @@ def build_one_chunk(
             raise SilverBuildError("STOP_SILVER_RESUME_INCOMPLETE_REQUIRES_RESUME")
 
     start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
-    records = list(
-        iter_bronze_records(
-            client,
-            config,
-            start_apply_key=start_apply,
-            end_apply_key=end_apply,
+    try:
+        resume_record, replay_stream = split_resume_and_replay_stream(
+            iter_bronze_records(
+                client,
+                config,
+                start_apply_key=start_apply,
+                end_apply_key=end_apply,
+                payload_mode=BRONZE_PAYLOAD_FULL,
+            ),
+            epoch=chunk.epoch,
+            analysis_start_ns=chunk.analysis_start_ns,
         )
-    )
-    resume_record = select_resume_checkpoint(
-        records,
-        epoch=chunk.epoch,
-        analysis_start_ns=chunk.analysis_start_ns,
-    )
+    except EpochSilverError as exc:
+        raise SilverBuildError(str(exc)) from exc
     _write_chunk_status(
         client,
         config,
@@ -1248,14 +1340,17 @@ def build_one_chunk(
         status="RUNNING",
     )
     stop.check()
-    replay = replay_epoch_window(
-        records,
-        epoch=chunk.epoch,
-        resume_record=resume_record,
-        analysis_start_ns=chunk.analysis_start_ns,
-        analysis_end_ns=chunk.analysis_end_ns,
-        build_id=chunk.build_id,
-    )
+    try:
+        replay = replay_epoch_window(
+            replay_stream,
+            epoch=chunk.epoch,
+            resume_record=resume_record,
+            analysis_start_ns=chunk.analysis_start_ns,
+            analysis_end_ns=chunk.analysis_end_ns,
+            build_id=chunk.build_id,
+        )
+    except EpochSilverError as exc:
+        raise SilverBuildError(str(exc)) from exc
     stop.check()
     output_hash = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
     _write_chunk_status(
@@ -1590,6 +1685,11 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--check-only", action="store_true")
     mode.add_argument("--run", action="store_true")
     mode.add_argument("--verify-only", action="store_true")
+    mode.add_argument(
+        "--epoch-plan-only",
+        action="store_true",
+        help="Read-only streaming epoch-plan build with memory accounting.",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max-rss-mib", type=int, default=DEFAULT_MAX_RSS_MIB)
     parser.add_argument(
@@ -1644,11 +1744,17 @@ def execute(
     client: Any | None = None,
     bronze_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if not (args.check_only or args.run or args.verify_only or args.init_schema):
+    if not (
+        args.check_only
+        or args.run
+        or args.verify_only
+        or args.init_schema
+        or args.epoch_plan_only
+    ):
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_EXPLICIT_MODE_REQUIRED")
     if args.resume and not args.run:
         raise SilverBuildError("STOP_SILVER_RESUME_REQUIRES_RUN")
-    if (args.check_only or args.verify_only) and args.init_schema:
+    if (args.check_only or args.verify_only or args.epoch_plan_only) and args.init_schema:
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_READ_ONLY_MODE_WITH_DDL")
     config = config_from_args(args)
     own_client = client is None
@@ -1658,6 +1764,14 @@ def execute(
             report = preflight(client, config, bronze_probe=bronze_probe)
             print(json.dumps(report, indent=2, sort_keys=True), flush=True)
             return report
+        if args.epoch_plan_only:
+            preflight_report = preflight(client, config, bronze_probe=bronze_probe)
+            metadata = load_segment_metadata(client, config)
+            profile = profile_epoch_plan(client, config, metadata)
+            payload = {"preflight": preflight_report, "epoch_plan": profile}
+            _write_report(config.report_path, payload)
+            print(json.dumps(payload, indent=2, sort_keys=True), flush=True)
+            return payload
         if args.verify_only:
             preflight_report = preflight(
                 client, config, require_output_schema=True, bronze_probe=bronze_probe
@@ -1715,17 +1829,29 @@ def execute(
                     return payload
                 except BaseException as exc:
                     interrupted = isinstance(exc, ControlledInterrupt)
+                    memory_limited = _is_clickhouse_memory_error(exc) or (
+                        isinstance(exc, SilverBuildError)
+                        and "STOP_SILVER_CH_MEMORY_LIMIT" in str(exc)
+                    )
+                    status = "INTERRUPTED" if interrupted else "FAILED"
+                    if memory_limited and not interrupted:
+                        status = "INTERRUPTED"
                     _write_report(
                         config.report_path,
                         {
-                            "status": "INTERRUPTED" if interrupted else "FAILED",
+                            "status": status,
                             "error": str(exc),
                             "signal": stop.signal_number,
                             "failed_at": _now_iso(),
+                            "memory_limited": memory_limited,
                         },
                     )
                     if isinstance(exc, SilverBuildError):
                         raise
+                    if _is_clickhouse_memory_error(exc):
+                        raise SilverBuildError(
+                            f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}"
+                        ) from exc
                     raise SilverBuildError(
                         f"STOP_SILVER_RUNNER_SAFETY_UNEXPECTED: {exc}"
                     ) from exc
