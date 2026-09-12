@@ -13,7 +13,9 @@ from obfull_research_engine.clickhouse_research_store_v1.silver_plan_coverage_pa
     bucket_count,
     classify_excluded_safe_ns,
     compare_interval_sets,
+    decompose_production_only_against_audit,
     planned_output_union,
+    production_coverage_contract,
 )
 from obfull_research_engine.clickhouse_research_store_v1.silver_replay import BronzeRecord
 
@@ -157,3 +159,40 @@ def test_audit_subset_of_production_safe_union():
 
 def test_bucket_count_matches_hundred_ms_grid():
     assert bucket_count([(0, 250_000_000)]) == 3
+
+
+def test_production_only_decomposition_is_disjoint_and_exact():
+    minute = 60 * 1_000_000_000
+    production_only = [(minute, minute + 599_000_000)]
+    audit_blind = [(2 * minute, 3 * minute)]
+    audit_boundary = [(4 * minute, 4 * minute + 200_000_000)]
+    epoch = _epoch(start=0, end=5 * minute)
+    report = decompose_production_only_against_audit(
+        production_only=production_only,
+        audit_blind=audit_blind,
+        audit_boundary=audit_boundary,
+        production_epochs=[epoch],
+    )
+    assert report["partition_exact_ns"] == 0
+    assert report["overlap_audit_blind"]["union_ns"] == 0
+    assert report["overlap_audit_boundary"]["union_ns"] == 0
+    assert report["outside_audit_blind_and_boundary"]["union_ns"] == 599_000_000
+    assert report["continuity_stop_count"] == 0
+
+
+def test_production_coverage_contract_balances():
+    minute = 60 * 1_000_000_000
+    physical = [(0, 5 * minute)]
+    epochs = [
+        _epoch(start=0, end=2 * minute),
+        _epoch(start=3 * minute, end=5 * minute),
+    ]
+    safe = [(e.safe_start_ns, e.safe_end_ns) for e in epochs]
+    contract = production_coverage_contract(
+        physical=physical,
+        production_safe=safe,
+        production_epochs=epochs,
+    )
+    assert contract["physical_partition_balances"] is True
+    assert contract["production_true_blind_union_ns"] == minute
+    assert contract["production_safe_union_ns"] == 4 * minute
