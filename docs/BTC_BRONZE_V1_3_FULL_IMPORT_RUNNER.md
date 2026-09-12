@@ -80,7 +80,7 @@ nohup nice -n 19 ionice -c3 \
   --progress-every-segments 1 \
   --report-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/bronze_full_import_v1_3/report.json \
   --lock-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/bronze_full_import_v1_3/import.lock \
-  > /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/bronze_full_import_v1_3/nohup.log 2>&1 &
+  >> /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/bronze_full_import_v1_3/nohup.log 2>&1 &
 echo $! > /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/bronze_full_import_v1_3/runner.pid
 ```
 
