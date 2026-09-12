@@ -335,6 +335,7 @@ def _metric_row(
     symbol: str,
     silver_build_id: str,
     created_at_ms: int,
+    book_hash_override: str | None = None,
 ) -> dict[str, Any]:
     bb = state.best_bid()
     ba = state.best_ask()
@@ -356,7 +357,11 @@ def _metric_row(
         "ask_depth_near": float(bands.get(f"ask_depth_notional_usdt_bps_{NEAR_BPS}") or 0.0),
         "last_update_id": state.update_id,
         "last_seq": state.seq,
-        "book_hash": book_map_sha256(state.bids, state.asks),
+        "book_hash": (
+            book_hash_override
+            if book_hash_override is not None
+            else book_map_sha256(state.bids, state.asks)
+        ),
         "silver_build_id": silver_build_id,
         "created_at": 0,
         "created_at_ms": created_at_ms,
