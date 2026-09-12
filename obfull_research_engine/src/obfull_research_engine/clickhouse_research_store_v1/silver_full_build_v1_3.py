@@ -65,7 +65,7 @@ GAPS_TABLE = "silver_epoch_gaps_v1_3"
 RUNNER_VERSION = "btc_silver_full_build_v1_3"
 BUILD_SCHEMA_VERSION = "silver_full_build_v1_3"
 DEFAULT_CHUNK_MARKET_MINUTES = 15
-DEFAULT_WARMUP_MINUTES = 5
+DEFAULT_WARMUP_MINUTES = 0
 DEFAULT_MAX_RSS_MIB = 1536
 DEFAULT_MIN_FREE_DISK_GIB = 200.0
 DEFAULT_MIN_AVAILABLE_MEMORY_MIB = 4096
@@ -826,20 +826,22 @@ def profile_epoch_plan(
     rss_start = current_rss_bytes()
     metadata = metadata or load_segment_metadata(client, config)
     plan = build_epoch_plan(client, config, metadata)
+    chunks = plan_epoch_chunks(
+        plan.epochs,
+        chunk_market_minutes=config.chunk_market_minutes,
+        warmup_minutes=config.warmup_minutes,
+    )
+    from .silver_plan_coverage_parity_v1_3 import chunk_plan_hash
+
     rss_peak = current_rss_bytes()
     elapsed = time.monotonic() - started
     return {
         "status": "EPOCH_PLAN_PROFILED",
         "epoch_plan_hash": plan.epoch_plan_hash,
+        "chunk_plan_hash": chunk_plan_hash(chunks),
         "epochs": len(plan.epochs),
         "gaps": len(plan.gaps),
-        "chunks": len(
-            plan_epoch_chunks(
-                plan.epochs,
-                chunk_market_minutes=config.chunk_market_minutes,
-                warmup_minutes=config.warmup_minutes,
-            )
-        ),
+        "chunks": len(chunks),
         "elapsed_s": round(elapsed, 3),
         "python_rss_start_bytes": rss_start,
         "python_rss_peak_bytes": rss_peak,
@@ -857,18 +859,23 @@ def plan_epoch_chunks(
     if chunk_market_minutes <= 0:
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_CHUNK_MINUTES_INVALID")
     chunk_ns = chunk_market_minutes * 60 * 1_000_000_000
-    warmup_ns = warmup_minutes * 60 * 1_000_000_000
+    # Warm-up is a replay read prefix only. Full-book Silver output starts at
+    # safe_start_ns because the exchange snapshot anchor already materializes
+    # the book at the epoch boundary.
+    replay_warmup_ns = warmup_minutes * 60 * 1_000_000_000
     chunks: list[ChunkPlan] = []
     for epoch_index, epoch in enumerate(epochs, 1):
-        cursor = int(epoch.safe_start_ns) + warmup_ns
+        cursor = int(epoch.safe_start_ns)
         chunk_index = 0
         while cursor < int(epoch.safe_end_ns):
             analysis_end = min(cursor + chunk_ns, int(epoch.safe_end_ns))
+            if analysis_end <= cursor:
+                break
             decision = validate_epoch_window(
                 [epoch],
                 analysis_start_ns=cursor,
                 analysis_end_ns=analysis_end,
-                warmup_ns=warmup_ns,
+                warmup_ns=0,
             )
             if decision.status != "OK":
                 break
@@ -879,7 +886,7 @@ def plan_epoch_chunks(
                 epoch=epoch,
                 analysis_start_ns=cursor,
                 analysis_end_ns=analysis_end,
-                warmup_ns=warmup_ns,
+                warmup_ns=replay_warmup_ns,
             )
             chunk.materialize_ids()
             chunks.append(chunk)

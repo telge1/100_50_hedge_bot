@@ -16,7 +16,8 @@ a fully verified Bronze input, and no active Bronze import process.
 - Chain hash:
   `f666e592a0bef4598545b3f247cf5dd97dd9c53017028e3c33ddfce5e0d15333`
 - Proven chunk size: `15` market minutes
-- Proven warmup: `5` minutes inside the same epoch
+- Full-build output warmup: `0` minutes (exchange snapshot is the book anchor)
+- Optional replay warm-up prefix for bounded pilots: pass `--warmup-minutes` explicitly
 
 Do not start Silver while the Bronze full import is still running.
 
@@ -107,7 +108,6 @@ nohup nice -n 19 ionice -c3 \
   --start-chain-index 0 \
   --end-chain-index 163 \
   --chunk-market-minutes 15 \
-  --warmup-minutes 5 \
   --run --resume \
   --max-rss-mib 1536 \
   --min-free-disk-gib 200 \
