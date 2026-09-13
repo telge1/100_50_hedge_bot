@@ -49,6 +49,7 @@ class FakeClient:
         self.level_changes: set[str] = set()
         self.metrics: set[str] = set()
         self.epochs: dict[str, str] = {}
+        self.gaps: set[str] = set()
         self.tables = set()
 
     def command(self, sql):
@@ -85,6 +86,9 @@ class FakeClient:
                     materialised[-1][column_names.index("level_change_count")]
                 ),
                 "state_count": int(materialised[-1][column_names.index("state_count")]),
+                "source_record_count": int(
+                    materialised[-1][column_names.index("source_record_count")]
+                ),
             }
         elif table.endswith(runner.LEVEL_CHANGES_TABLE):
             for row in materialised:
@@ -95,6 +99,9 @@ class FakeClient:
         elif table.endswith(runner.EPOCHS_TABLE):
             for row in materialised:
                 self.epochs[str(row[0])] = str(row[1])
+        elif table.endswith(runner.GAPS_TABLE):
+            for row in materialised:
+                self.gaps.add(str(row[0]))
 
     def query(self, sql, parameters=None):
         text = str(sql)
@@ -164,10 +171,31 @@ class FakeClient:
                     )
                 )
             return SimpleNamespace(result_rows=rows)
-        if f"{runner.CHUNKS_TABLE}" in text and "SELECT status" in text:
+        if (
+            f"{runner.CHUNKS_TABLE}" in text
+            and "status" in text
+            and "epoch_plan_hash" in text
+            and "WHERE chunk_key" in text
+        ):
             chunk_key = str(parameters.get("chunk_key", ""))
             value = self.chunks.get(chunk_key)
-            return SimpleNamespace(result_rows=[value] if value else [])
+            if not value:
+                return SimpleNamespace(result_rows=[])
+            if "level_change_count" in text:
+                counts = self.chunk_rows.get(chunk_key, {})
+                return SimpleNamespace(
+                    result_rows=[
+                        (
+                            value[0],
+                            value[1],
+                            value[2],
+                            int(counts.get("level_change_count", 0)),
+                            int(counts.get("state_count", 0)),
+                            int(counts.get("source_record_count", 0)),
+                        )
+                    ]
+                )
+            return SimpleNamespace(result_rows=[value])
         if f"{runner.CHUNKS_TABLE}" in text and "SELECT version_ms" in text:
             return SimpleNamespace(result_rows=[])
         if f"{runner.LEVEL_CHANGES_TABLE}" in text and "WHERE chunk_key" in text and "count()" in text:
@@ -185,6 +213,8 @@ class FakeClient:
             return SimpleNamespace(result_rows=[(0,)])
         if f"{runner.EPOCHS_TABLE}" in text and "SELECT epoch_id" in text:
             return SimpleNamespace(result_rows=[(k, v) for k, v in self.epochs.items()])
+        if f"{runner.GAPS_TABLE}" in text and "SELECT gap_id" in text:
+            return SimpleNamespace(result_rows=[(gap_id,) for gap_id in sorted(self.gaps)])
         if f"{runner.RUNS_TABLE}" in text:
             return SimpleNamespace(result_rows=[])
         raise AssertionError(f"unexpected query: {text}")
@@ -603,6 +633,11 @@ def test_complete_chunk_is_skipped_without_replay(tmp_path, monkeypatch):
     plan.finalize()
     plan_hash = plan.epoch_plan_hash
     client.chunks[chunk.chunk_key] = ("COMPLETE", epoch.epoch_hash, plan_hash)
+    client.chunk_rows[chunk.chunk_key] = {
+        "level_change_count": 545214,
+        "state_count": 8999,
+        "source_record_count": 12,
+    }
     monkeypatch.setattr(runner, "iter_bronze_records", lambda *_args, **_kwargs: iter([]))
     result = runner.build_one_chunk(
         client,
@@ -613,6 +648,8 @@ def test_complete_chunk_is_skipped_without_replay(tmp_path, monkeypatch):
         stop=runner.StopState(),
     )
     assert result["status"] == "SKIPPED_ALREADY_COMPLETE"
+    assert result["level_change_count"] == 545214
+    assert result["state_count"] == 8999
     assert client.inserts == []
 
 
@@ -1110,4 +1147,420 @@ def test_complete_requires_verified_insert_counts(tmp_path, monkeypatch):
             chunk=chunk,
             stop=runner.StopState(),
         )
-    assert client.chunks[chunk.chunk_key][0] == "RUNNING"
+    assert client.chunks[chunk.chunk_key][0] == "FAILED"
+
+
+def test_persist_buffers_clear_and_counts_use_replay_totals(tmp_path):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    replay = SimpleNamespace(
+        level_changes=[
+            {
+                "canonical_segment_chain_index": 1,
+                "source_segment_sha256": "a" * 64,
+                "source_record_ordinal": i,
+                "apply_order": i,
+                "event_time_ns": i * 1000,
+                "receive_time_ns": i * 1000,
+                "side": "bid",
+                "price": 1.0,
+                "old_size": 0.0,
+                "new_size": 1.0,
+            }
+            for i in range(1, 26)
+        ],
+        states=[
+            {
+                "bucket_start_ms": i * 100,
+                "best_bid": 1.0,
+                "best_ask": 2.0,
+                "book_hash": "a" * 64,
+            }
+            for i in range(1, 8)
+        ],
+        level_change_hash_apply_order="b" * 64,
+        end_apply_key=(1, 25),
+    )
+    stats = runner._persist_chunk_outputs(
+        client, _config(tmp_path), chunk=chunk, replay=replay, batch_size=5
+    )
+    assert stats["level_change_count"] == 25
+    assert stats["state_count"] == 7
+    assert stats["insert_calls_level_changes"] >= 2
+    assert len(client.level_changes) == 25
+    assert len(client.metrics) == 7
+
+
+def test_progress_log_matches_ledger_and_uses_cumulative_timing(tmp_path, monkeypatch, capsys):
+    config = _config(tmp_path, resume=True, warmup_minutes=0, progress_every_chunks=1)
+    client = FakeClient(schema_tables=6)
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunks = []
+    for index in range(1, 5):
+        chunk = runner.ChunkPlan(
+            epoch_index=1,
+            chunk_index=index,
+            epoch=epoch,
+            analysis_start_ns=(index - 1) * 15 * 60 * 1_000_000_000,
+            analysis_end_ns=index * 15 * 60 * 1_000_000_000,
+            warmup_ns=0,
+        )
+        chunk.materialize_ids()
+        chunks.append(chunk)
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[], chunks=chunks)
+    plan.finalize()
+    for chunk, lc, st in zip(
+        chunks,
+        (545214, 573228, 377759, 363705),
+        (8999, 8999, 8999, 8999),
+    ):
+        client.chunks[chunk.chunk_key] = ("COMPLETE", epoch.epoch_hash, plan.epoch_plan_hash)
+        client.chunk_rows[chunk.chunk_key] = {
+            "level_change_count": lc,
+            "state_count": st,
+            "source_record_count": 1,
+        }
+
+    clock = {"t": 1000.0}
+
+    def _mono():
+        return clock["t"]
+
+    monkeypatch.setattr(runner.time, "monotonic", _mono)
+    monkeypatch.setattr(runner, "_check_resources", lambda *_a, **_k: None)
+
+    original = runner.build_one_chunk
+
+    def _timed_build(*args, **kwargs):
+        clock["t"] += 10.0
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "build_one_chunk", _timed_build)
+    result = runner.run_build(client, config, plan, stop=runner.StopState())
+    lines = [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
+    assert [row["level_changes"] for row in lines] == [545214, 573228, 377759, 363705]
+    assert [row["states_100ms"] for row in lines] == [8999, 8999, 8999, 8999]
+    assert all(row["status"] == "SKIPPED_ALREADY_COMPLETE" for row in lines)
+    assert lines[0]["chunk_elapsed_s"] == 10.0
+    assert lines[0]["total_elapsed_s"] == 10.0
+    assert lines[0]["chunk_seconds_per_market_minute"] == round(10.0 / 15.0, 3)
+    assert lines[0]["cumulative_seconds_per_market_minute"] == round(10.0 / 15.0, 3)
+    assert lines[3]["total_elapsed_s"] == 40.0
+    assert lines[3]["completed_market_minutes"] == 60.0
+    assert lines[3]["cumulative_seconds_per_market_minute"] == round(40.0 / 60.0, 3)
+    assert lines[3]["chunks_complete"] == 4
+    assert lines[3]["chunks_total"] == 4
+    assert lines[3]["eta_s"] == 0.0
+    assert result["skipped_chunks"] == 4
+
+
+def test_controlled_interrupt_writes_interrupted_ledger(tmp_path, monkeypatch):
+    config = _config(tmp_path, resume=True, warmup_minutes=0)
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    stop = runner.StopState()
+
+    def _interrupt(*_args, **_kwargs):
+        raise runner.ControlledInterrupt("STOP_SILVER_BUILD_INTERRUPTED_SIGNAL_15")
+
+    monkeypatch.setattr(runner, "split_resume_and_replay_stream", _interrupt)
+    with pytest.raises(runner.ControlledInterrupt):
+        runner.build_one_chunk(
+            client,
+            config,
+            run_id="r" * 64,
+            epoch_plan_hash=plan.epoch_plan_hash,
+            chunk=chunk,
+            stop=stop,
+        )
+    assert client.chunks[chunk.chunk_key][0] == "INTERRUPTED"
+
+
+def test_resume_skips_complete_and_rebuilds_running_zero(tmp_path, monkeypatch):
+    config = _config(tmp_path, resume=True, warmup_minutes=0)
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunks = []
+    for index in range(1, 6):
+        chunk = runner.ChunkPlan(
+            epoch_index=1,
+            chunk_index=index,
+            epoch=epoch,
+            analysis_start_ns=(index - 1) * 15 * 60 * 1_000_000_000,
+            analysis_end_ns=index * 15 * 60 * 1_000_000_000,
+            warmup_ns=0,
+        )
+        chunk.materialize_ids()
+        chunks.append(chunk)
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    for chunk in chunks[:4]:
+        client.chunks[chunk.chunk_key] = ("COMPLETE", epoch.epoch_hash, plan.epoch_plan_hash)
+        client.chunk_rows[chunk.chunk_key] = {
+            "level_change_count": 100,
+            "state_count": 10,
+            "source_record_count": 1,
+        }
+    client.chunks[chunks[4].chunk_key] = ("RUNNING", epoch.epoch_hash, plan.epoch_plan_hash)
+    client.chunk_rows[chunks[4].chunk_key] = {
+        "level_change_count": 0,
+        "state_count": 0,
+        "source_record_count": 0,
+    }
+
+    seen: list[str] = []
+
+    def _fake_build(client_arg, config_arg, *, run_id, epoch_plan_hash, chunk, stop):
+        existing = runner._chunk_status(client_arg, config_arg, chunk.chunk_key)
+        assert existing is not None
+        status = existing[0]
+        if status == "COMPLETE":
+            seen.append("SKIP")
+            return {
+                "status": "SKIPPED_ALREADY_COMPLETE",
+                "chunk_key": chunk.chunk_key,
+                "rows_inserted": 0,
+                "level_change_count": existing[3],
+                "state_count": existing[4],
+            }
+        assert status in {"RUNNING", "INTERRUPTED", "FAILED"}
+        seen.append("REBUILD")
+        runner._write_chunk_status(
+            client_arg,
+            config_arg,
+            run_id=run_id,
+            epoch_plan_hash=epoch_plan_hash,
+            chunk=chunk,
+            status="COMPLETE",
+            level_change_count=42,
+            state_count=7,
+            source_record_count=3,
+            output_hash="c" * 64,
+        )
+        return {
+            "status": "COMPLETE",
+            "chunk_key": chunk.chunk_key,
+            "rows_inserted": 49,
+            "level_change_count": 42,
+            "state_count": 7,
+        }
+
+    monkeypatch.setattr(runner, "build_one_chunk", _fake_build)
+    monkeypatch.setattr(runner, "_check_resources", lambda *_a, **_k: None)
+    monkeypatch.setattr(runner, "persist_epochs_and_gaps", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runner,
+        "plan_epoch_chunks",
+        lambda *_a, **_k: chunks,
+    )
+    result = runner.run_build(client, config, plan, stop=runner.StopState())
+    assert seen == ["SKIP", "SKIP", "SKIP", "SKIP", "REBUILD"]
+    assert client.chunks[chunks[4].chunk_key][0] == "COMPLETE"
+    assert client.chunk_rows[chunks[4].chunk_key]["level_change_count"] == 42
+    assert result["completed_chunks"] == 1
+    assert result["skipped_chunks"] == 4
+
+
+def test_gap_persist_is_idempotent_on_resume(tmp_path):
+    config = _config(tmp_path)
+    client = FakeClient()
+    epoch = discover_epochs(
+        [_record(rank=1, ordinal=1, kind="snapshot", event_ns=1_000_000_000)],
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        scan_end_ns=2_000_000_000,
+        clean_segment_start_ranks={1},
+    ).epochs[0]
+    from obfull_research_engine.clickhouse_research_store_v1.epoch_aware_silver_v1_3 import (
+        GapDefinition,
+    )
+
+    gap = GapDefinition(
+        gap_id="g" * 64,
+        reason="SEQUENCE_GAP",
+        segment_chain_index=1,
+        record_ordinal=2,
+        gap_time_ns=1_500_000_000,
+    )
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[gap])
+    plan.finalize()
+    runner.persist_epochs_and_gaps(client, config, plan)
+    first_gap_inserts = sum(1 for table in client.inserts if table.endswith(runner.GAPS_TABLE))
+    assert first_gap_inserts == 1
+    assert client.gaps == {"g" * 64}
+    runner.persist_epochs_and_gaps(client, config, plan)
+    second_gap_inserts = sum(1 for table in client.inserts if table.endswith(runner.GAPS_TABLE))
+    assert second_gap_inserts == 1
+
+
+def test_eta_uses_all_completed_market_minutes(tmp_path, monkeypatch, capsys):
+    config = _config(tmp_path, resume=True, warmup_minutes=0)
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=90 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunks = []
+    for index in range(1, 4):
+        chunk = runner.ChunkPlan(
+            epoch_index=1,
+            chunk_index=index,
+            epoch=epoch,
+            analysis_start_ns=(index - 1) * 15 * 60 * 1_000_000_000,
+            analysis_end_ns=index * 15 * 60 * 1_000_000_000,
+            warmup_ns=0,
+        )
+        chunk.materialize_ids()
+        chunks.append(chunk)
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[], chunks=chunks)
+    plan.finalize()
+    clock = {"t": 0.0}
+
+    def _mono():
+        return clock["t"]
+
+    def _fake_build(_client, _config, *, run_id, epoch_plan_hash, chunk, stop):
+        clock["t"] += 30.0
+        return {
+            "status": "COMPLETE",
+            "chunk_key": chunk.chunk_key,
+            "rows_inserted": 1,
+            "level_change_count": 11,
+            "state_count": 2,
+        }
+
+    monkeypatch.setattr(runner.time, "monotonic", _mono)
+    monkeypatch.setattr(runner, "build_one_chunk", _fake_build)
+    monkeypatch.setattr(runner, "_check_resources", lambda *_a, **_k: None)
+    monkeypatch.setattr(runner, "persist_epochs_and_gaps", lambda *_a, **_k: None)
+    monkeypatch.setattr(runner, "plan_epoch_chunks", lambda *_a, **_k: chunks)
+    runner.run_build(client, config, plan, stop=runner.StopState())
+    lines = [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
+    # after chunk 1: 30s / 15mm = 2 spm; remaining 30mm => eta 60
+    assert lines[0]["eta_s"] == 60.0
+    # after chunk 2: 60s / 30mm = 2 spm; remaining 15mm => eta 30
+    assert lines[1]["eta_s"] == 30.0
+    assert lines[1]["cumulative_seconds_per_market_minute"] == 2.0
+    assert lines[2]["eta_s"] == 0.0

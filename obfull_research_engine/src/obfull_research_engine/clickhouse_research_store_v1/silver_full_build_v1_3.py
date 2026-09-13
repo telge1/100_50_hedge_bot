@@ -1021,10 +1021,16 @@ class BuildLock:
 
 def _chunk_status(
     client: Any, config: BuildConfig, chunk_key: str
-) -> tuple[str, str, str] | None:
+) -> tuple[str, str, str, int, int, int] | None:
     rows = client.query(
         f"""
-        SELECT status, epoch_hash, epoch_plan_hash
+        SELECT
+          status,
+          epoch_hash,
+          epoch_plan_hash,
+          level_change_count,
+          state_count,
+          source_record_count
         FROM {config.output_database}.{CHUNKS_TABLE} FINAL
         WHERE chunk_key = {{chunk_key:String}}
         LIMIT 1
@@ -1033,7 +1039,14 @@ def _chunk_status(
     ).result_rows
     if not rows:
         return None
-    return _text(rows[0][0]), _text(rows[0][1]), _text(rows[0][2])
+    return (
+        _text(rows[0][0]),
+        _text(rows[0][1]),
+        _text(rows[0][2]),
+        int(rows[0][3]),
+        int(rows[0][4]),
+        int(rows[0][5]),
+    )
 
 
 def _write_chunk_status(
@@ -1120,6 +1133,15 @@ def persist_epochs_and_gaps(
         parameters={"chain_version": config.chain_version},
     ).result_rows
     existing_epochs = {_text(row[0]): _text(row[1]) for row in existing}
+    existing_gap_rows = client.query(
+        f"""
+        SELECT gap_id
+        FROM {config.output_database}.{GAPS_TABLE} FINAL
+        WHERE chain_version = {{chain_version:String}}
+        """,
+        parameters={"chain_version": config.chain_version},
+    ).result_rows
+    existing_gaps = {_text(row[0]) for row in existing_gap_rows}
     now = int(time.time() * 1000)
     epoch_rows = []
     for epoch in plan.epochs:
@@ -1178,6 +1200,8 @@ def persist_epochs_and_gaps(
         )
     gap_rows = []
     for gap in plan.gaps:
+        if gap.gap_id in existing_gaps:
+            continue
         gap_rows.append([
             gap.gap_id,
             config.chain_version,
@@ -1382,6 +1406,8 @@ def _persist_chunk_outputs(
         "insert_calls_states": st_insert_calls,
         "batch_size": batch_size,
         "batch_max_bytes": batch_max_bytes,
+        "level_change_count": len(replay.level_changes),
+        "state_count": len(replay.states),
     }
 
 
@@ -1420,6 +1446,13 @@ def _verify_chunk_inserts(
         )
 
 
+def _chunk_market_minutes(chunk: ChunkPlan) -> float:
+    return max(
+        (chunk.analysis_end_ns - chunk.analysis_start_ns) / 60_000_000_000,
+        1e-9,
+    )
+
+
 def build_one_chunk(
     client: Any,
     config: BuildConfig,
@@ -1431,7 +1464,14 @@ def build_one_chunk(
 ) -> dict[str, Any]:
     existing = _chunk_status(client, config, chunk.chunk_key)
     if existing is not None:
-        status, epoch_hash, stored_plan_hash = existing
+        (
+            status,
+            epoch_hash,
+            stored_plan_hash,
+            lc_count,
+            st_count,
+            src_count,
+        ) = existing
         if epoch_hash != chunk.epoch.epoch_hash or stored_plan_hash != epoch_plan_hash:
             raise SilverBuildError("STOP_SILVER_EPOCH_PLAN_CHANGED: chunk contract drift")
         if status == "COMPLETE":
@@ -1439,6 +1479,9 @@ def build_one_chunk(
                 "status": "SKIPPED_ALREADY_COMPLETE",
                 "chunk_key": chunk.chunk_key,
                 "rows_inserted": 0,
+                "level_change_count": lc_count,
+                "state_count": st_count,
+                "source_record_count": src_count,
             }
         if status in {"RUNNING", "INTERRUPTED", "FAILED"} and not config.resume:
             raise SilverBuildError("STOP_SILVER_RESUME_INCOMPLETE_REQUIRES_RESUME")
@@ -1451,63 +1494,92 @@ def build_one_chunk(
         chunk=chunk,
         status="RUNNING",
     )
-    start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
     try:
-        resume_record, replay_stream = split_resume_and_replay_stream(
-            iter_bronze_records(
-                client,
-                config,
-                start_apply_key=start_apply,
-                end_apply_key=end_apply,
-                payload_mode=BRONZE_PAYLOAD_FULL,
-            ),
-            epoch=chunk.epoch,
-            analysis_start_ns=chunk.analysis_start_ns,
+        start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
+        try:
+            resume_record, replay_stream = split_resume_and_replay_stream(
+                iter_bronze_records(
+                    client,
+                    config,
+                    start_apply_key=start_apply,
+                    end_apply_key=end_apply,
+                    payload_mode=BRONZE_PAYLOAD_FULL,
+                ),
+                epoch=chunk.epoch,
+                analysis_start_ns=chunk.analysis_start_ns,
+            )
+        except EpochSilverError as exc:
+            raise SilverBuildError(str(exc)) from exc
+        stop.check()
+        try:
+            replay = replay_epoch_window(
+                replay_stream,
+                epoch=chunk.epoch,
+                resume_record=resume_record,
+                analysis_start_ns=chunk.analysis_start_ns,
+                analysis_end_ns=chunk.analysis_end_ns,
+                build_id=chunk.build_id,
+            )
+        except EpochSilverError as exc:
+            raise SilverBuildError(str(exc)) from exc
+        stop.check()
+        persist_stats = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
+        level_change_count = len(replay.level_changes)
+        state_count = len(replay.states)
+        _verify_chunk_inserts(
+            client,
+            config,
+            chunk=chunk,
+            level_change_count=level_change_count,
+            state_count=state_count,
         )
-    except EpochSilverError as exc:
-        raise SilverBuildError(str(exc)) from exc
-    stop.check()
-    try:
-        replay = replay_epoch_window(
-            replay_stream,
-            epoch=chunk.epoch,
-            resume_record=resume_record,
-            analysis_start_ns=chunk.analysis_start_ns,
-            analysis_end_ns=chunk.analysis_end_ns,
-            build_id=chunk.build_id,
+        _write_chunk_status(
+            client,
+            config,
+            run_id=run_id,
+            epoch_plan_hash=epoch_plan_hash,
+            chunk=chunk,
+            status="COMPLETE",
+            level_change_count=level_change_count,
+            state_count=state_count,
+            source_record_count=replay.source_records,
+            output_hash=persist_stats["output_hash"],
         )
-    except EpochSilverError as exc:
-        raise SilverBuildError(str(exc)) from exc
-    stop.check()
-    persist_stats = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
-    _verify_chunk_inserts(
-        client,
-        config,
-        chunk=chunk,
-        level_change_count=len(replay.level_changes),
-        state_count=len(replay.states),
-    )
-    _write_chunk_status(
-        client,
-        config,
-        run_id=run_id,
-        epoch_plan_hash=epoch_plan_hash,
-        chunk=chunk,
-        status="COMPLETE",
-        level_change_count=len(replay.level_changes),
-        state_count=len(replay.states),
-        source_record_count=replay.source_records,
-        output_hash=persist_stats["output_hash"],
-    )
-    return {
-        "status": "COMPLETE",
-        "chunk_key": chunk.chunk_key,
-        "rows_inserted": len(replay.level_changes) + len(replay.states),
-        "output_hash": persist_stats["output_hash"],
-        "insert_calls_level_changes": persist_stats["insert_calls_level_changes"],
-        "insert_calls_states": persist_stats["insert_calls_states"],
-        "batch_size": persist_stats["batch_size"],
-    }
+        return {
+            "status": "COMPLETE",
+            "chunk_key": chunk.chunk_key,
+            "rows_inserted": level_change_count + state_count,
+            "level_change_count": level_change_count,
+            "state_count": state_count,
+            "source_record_count": replay.source_records,
+            "output_hash": persist_stats["output_hash"],
+            "insert_calls_level_changes": persist_stats["insert_calls_level_changes"],
+            "insert_calls_states": persist_stats["insert_calls_states"],
+            "batch_size": persist_stats["batch_size"],
+        }
+    except ControlledInterrupt as exc:
+        # Newer append-only ledger version; resume rebuilds RUNNING/INTERRUPTED/FAILED.
+        _write_chunk_status(
+            client,
+            config,
+            run_id=run_id,
+            epoch_plan_hash=epoch_plan_hash,
+            chunk=chunk,
+            status="INTERRUPTED",
+            stop_reason=str(exc),
+        )
+        raise
+    except SilverBuildError as exc:
+        _write_chunk_status(
+            client,
+            config,
+            run_id=run_id,
+            epoch_plan_hash=epoch_plan_hash,
+            chunk=chunk,
+            status="FAILED",
+            stop_reason=str(exc),
+        )
+        raise
 
 
 def run_build(
@@ -1544,10 +1616,12 @@ def run_build(
     started = time.monotonic()
     completed = skipped = 0
     total_rows = 0
+    completed_market_minutes = 0.0
     progress: list[dict[str, Any]] = []
     for position, chunk in enumerate(plan.chunks, 1):
         stop.check()
         _check_resources(client, config)
+        chunk_started = time.monotonic()
         result = build_one_chunk(
             client,
             config,
@@ -1556,23 +1630,44 @@ def run_build(
             chunk=chunk,
             stop=stop,
         )
+        chunk_elapsed = max(time.monotonic() - chunk_started, 1e-9)
         status = result["status"]
         skipped += int(status == "SKIPPED_ALREADY_COMPLETE")
-        completed += int(status == "COMPLETE" and result.get("rows_inserted", 0) > 0)
+        completed += int(status == "COMPLETE")
         total_rows += int(result.get("rows_inserted", 0))
-        elapsed = max(time.monotonic() - started, 1e-9)
-        market_minutes = max(
-            (chunk.analysis_end_ns - chunk.analysis_start_ns) / 60_000_000_000, 1e-9
+        market_minutes = _chunk_market_minutes(chunk)
+        if status in {"COMPLETE", "SKIPPED_ALREADY_COMPLETE"}:
+            completed_market_minutes += market_minutes
+        total_elapsed = max(time.monotonic() - started, 1e-9)
+        chunks_done = completed + skipped
+        remaining_market_minutes = sum(
+            _chunk_market_minutes(remaining) for remaining in plan.chunks[position:]
+        )
+        cumulative_spm = (
+            total_elapsed / completed_market_minutes
+            if completed_market_minutes > 0
+            else 0.0
+        )
+        eta_s = (
+            remaining_market_minutes * cumulative_spm
+            if completed_market_minutes > 0
+            else None
         )
         row = {
             "chunk": f"{position}/{len(plan.chunks)}",
             "epoch": f"{chunk.epoch_index}/{len(plan.epochs)}",
             "segment_rank": chunk.epoch.anchor_segment_chain_index,
             "market_window": f"{_ns_iso(chunk.analysis_start_ns)}..{_ns_iso(chunk.analysis_end_ns)}",
-            "level_changes": result.get("level_change_count", 0),
-            "states_100ms": result.get("state_count", 0),
-            "elapsed_s": round(elapsed, 3),
-            "seconds_per_market_minute": round(elapsed / market_minutes, 3),
+            "level_changes": int(result.get("level_change_count", 0)),
+            "states_100ms": int(result.get("state_count", 0)),
+            "chunk_elapsed_s": round(chunk_elapsed, 3),
+            "total_elapsed_s": round(total_elapsed, 3),
+            "chunk_seconds_per_market_minute": round(chunk_elapsed / market_minutes, 3),
+            "cumulative_seconds_per_market_minute": round(cumulative_spm, 3),
+            "completed_market_minutes": round(completed_market_minutes, 6),
+            "chunks_complete": chunks_done,
+            "chunks_total": len(plan.chunks),
+            "eta_s": None if eta_s is None else round(eta_s, 3),
             "peak_rss_mib": round(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 3
             ),
