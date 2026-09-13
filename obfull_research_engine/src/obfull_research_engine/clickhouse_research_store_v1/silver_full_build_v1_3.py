@@ -29,6 +29,7 @@ from .epoch_aware_silver_v1_3 import (
     EpochDiscovery,
     EpochSilverError,
     GapDefinition,
+    INSERT_BATCH_MAX_BYTES,
     INSERT_BATCH_SIZE,
     ReplayResult,
     _canonical_bytes,
@@ -39,10 +40,12 @@ from .epoch_aware_silver_v1_3 import (
     clean_segment_start_ranks,
     discover_epochs,
     epoch_apply_bounds,
+    level_change_row_id,
     make_build_id,
     make_chunk_key,
     replay_epoch_window,
     split_resume_and_replay_stream,
+    state_row_id,
     validate_epoch_window,
 )
 from .helpers import current_rss_bytes, get_clickhouse_client, iso_to_ns_exact
@@ -700,6 +703,8 @@ def iter_bronze_records(
     start_apply_key: tuple[int, int] | None = None,
     end_apply_key: tuple[int, int] | None = None,
     payload_mode: str = BRONZE_PAYLOAD_FULL,
+    message_types: Sequence[str] | None = None,
+    event_time_ns_to: int | None = None,
 ) -> Iterator[BronzeRecord]:
     if chain_index is not None and (
         start_apply_key is not None or end_apply_key is not None
@@ -723,6 +728,17 @@ def iter_bronze_records(
       AND e.canonical_segment_chain_index >= {start_index:UInt64}
       AND e.canonical_segment_chain_index <= {end_index:UInt64}
         """
+    type_filter = ""
+    if message_types is not None:
+        if not message_types:
+            raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_MESSAGE_TYPES_EMPTY")
+        allowed = tuple(str(t).lower() for t in message_types)
+        if any(t not in {"snapshot", "checkpoint", "delta", "gap_marker"} for t in allowed):
+            raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_MESSAGE_TYPES_INVALID")
+        type_filter = "AND e.message_type IN {message_types:Array(String)}"
+    time_filter = ""
+    if event_time_ns_to is not None:
+        time_filter = "AND e.event_time_ns <= {event_time_ns_to:UInt64}"
     payload_select = _bronze_payload_select(payload_mode)
     sql = f"""
     SELECT
@@ -735,6 +751,8 @@ def iter_bronze_records(
     WHERE e.symbol = {{symbol:String}}
       AND e.chain_version = {{chain_version:String}}
       {predicate}
+      {type_filter}
+      {time_filter}
     ORDER BY e.canonical_segment_chain_index, e.record_ordinal
     """
     parameters: dict[str, Any] = {
@@ -743,6 +761,10 @@ def iter_bronze_records(
         "start_index": config.start_chain_index,
         "end_index": config.end_chain_index,
     }
+    if message_types is not None:
+        parameters["message_types"] = [str(t).lower() for t in message_types]
+    if event_time_ns_to is not None:
+        parameters["event_time_ns_to"] = int(event_time_ns_to)
     if chain_index is not None:
         parameters["chain_index"] = int(chain_index)
     if start_apply_key is not None and end_apply_key is not None:
@@ -1185,13 +1207,39 @@ def persist_epochs_and_gaps(
         )
 
 
+def _flush_insert_rows(
+    client: Any,
+    *,
+    table: str,
+    column_names: Sequence[str],
+    columns: list[list[Any]],
+) -> None:
+    """Native column-oriented ClickHouse insert; no row-by-row round trips."""
+    if not columns or not columns[0]:
+        return
+    client.insert(
+        table,
+        columns,
+        column_names=list(column_names),
+        column_oriented=True,
+    )
+    _check_rss()
+
+
 def _persist_chunk_outputs(
     client: Any,
     config: BuildConfig,
     *,
     chunk: ChunkPlan,
     replay: ReplayResult,
-) -> str:
+    batch_size: int | None = None,
+    batch_max_bytes: int | None = None,
+) -> dict[str, Any]:
+    """Persist LC + 100ms states in byte-capped batches; return output hash + stats."""
+    batch_size = int(batch_size or INSERT_BATCH_SIZE)
+    batch_max_bytes = int(batch_max_bytes or INSERT_BATCH_MAX_BYTES)
+    if batch_size <= 0:
+        raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_INSERT_BATCH_INVALID")
     version_ms = int(time.time() * 1000)
     lc_columns = [
         "row_id",
@@ -1211,44 +1259,58 @@ def _persist_chunk_outputs(
         "payload",
         "version_ms",
     ]
-    inserted = 0
-    for offset in range(0, len(replay.level_changes), INSERT_BATCH_SIZE):
-        batch = replay.level_changes[offset : offset + INSERT_BATCH_SIZE]
-        rows = []
-        for row in batch:
-            row_id = _hash(
-                {
-                    "chunk_key": chunk.chunk_key,
-                    "segment_rank": row["canonical_segment_chain_index"],
-                    "record_ordinal": row["source_record_ordinal"],
-                    "apply_order": row["apply_order"],
-                }
-            )
-            rows.append([
-                row_id,
-                chunk.build_id,
-                chunk.chunk_key,
-                chunk.epoch.epoch_id,
-                chunk.epoch.epoch_hash,
-                chunk.epoch.chain_version,
-                chunk.epoch.canonical_chain_hash,
-                chunk.epoch.symbol,
-                row["canonical_segment_chain_index"],
-                row.get("source_segment_sha256", "0" * 64),
-                row["source_record_ordinal"],
-                row["apply_order"],
-                row["event_time_ns"],
-                row.get("receive_time_ns", row["event_time_ns"]),
-                json.dumps(row, separators=(",", ":")),
-                version_ms,
-            ])
-        client.insert(
-            f"{config.output_database}.{LEVEL_CHANGES_TABLE}",
-            rows,
-            column_names=lc_columns,
+    lc_buffers: list[list[Any]] = [[] for _ in lc_columns]
+    lc_bytes = 0
+    lc_insert_calls = 0
+    lc_table = f"{config.output_database}.{LEVEL_CHANGES_TABLE}"
+
+    def flush_lc() -> None:
+        nonlocal lc_bytes, lc_insert_calls
+        if not lc_buffers[0]:
+            return
+        _flush_insert_rows(
+            client, table=lc_table, column_names=lc_columns, columns=lc_buffers
         )
-        inserted += len(rows)
-        _check_rss()
+        lc_insert_calls += 1
+        for buf in lc_buffers:
+            buf.clear()
+        lc_bytes = 0
+
+    for row in replay.level_changes:
+        payload = json.dumps(row, separators=(",", ":"))
+        payload_len = len(payload)
+        if lc_buffers[0] and (
+            len(lc_buffers[0]) >= batch_size or lc_bytes + payload_len > batch_max_bytes
+        ):
+            flush_lc()
+        row_id = level_change_row_id(
+            chunk_key=chunk.chunk_key,
+            segment_rank=int(row["canonical_segment_chain_index"]),
+            record_ordinal=int(row["source_record_ordinal"]),
+            apply_order=int(row["apply_order"]),
+        )
+        values = [
+            row_id,
+            chunk.build_id,
+            chunk.chunk_key,
+            chunk.epoch.epoch_id,
+            chunk.epoch.epoch_hash,
+            chunk.epoch.chain_version,
+            chunk.epoch.canonical_chain_hash,
+            chunk.epoch.symbol,
+            row["canonical_segment_chain_index"],
+            row.get("source_segment_sha256", "0" * 64),
+            row["source_record_ordinal"],
+            row["apply_order"],
+            row["event_time_ns"],
+            row.get("receive_time_ns", row["event_time_ns"]),
+            payload,
+            version_ms,
+        ]
+        for buf, value in zip(lc_buffers, values):
+            buf.append(value)
+        lc_bytes += payload_len
+    flush_lc()
 
     state_columns = [
         "row_id",
@@ -1263,31 +1325,48 @@ def _persist_chunk_outputs(
         "payload",
         "version_ms",
     ]
-    for offset in range(0, len(replay.states), INSERT_BATCH_SIZE):
-        batch = replay.states[offset : offset + INSERT_BATCH_SIZE]
-        rows = []
-        for row in batch:
-            bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
-            rows.append([
-                _hash({"chunk_key": chunk.chunk_key, "bucket_start_ns": bucket_ns}),
-                chunk.build_id,
-                chunk.chunk_key,
-                chunk.epoch.epoch_id,
-                chunk.epoch.epoch_hash,
-                chunk.epoch.chain_version,
-                chunk.epoch.canonical_chain_hash,
-                chunk.epoch.symbol,
-                bucket_ns,
-                json.dumps(row, separators=(",", ":")),
-                version_ms,
-            ])
-        client.insert(
-            f"{config.output_database}.{METRICS_TABLE}",
-            rows,
-            column_names=state_columns,
+    st_buffers: list[list[Any]] = [[] for _ in state_columns]
+    st_bytes = 0
+    st_insert_calls = 0
+    st_table = f"{config.output_database}.{METRICS_TABLE}"
+
+    def flush_states() -> None:
+        nonlocal st_bytes, st_insert_calls
+        if not st_buffers[0]:
+            return
+        _flush_insert_rows(
+            client, table=st_table, column_names=state_columns, columns=st_buffers
         )
-        inserted += len(rows)
-        _check_rss()
+        st_insert_calls += 1
+        for buf in st_buffers:
+            buf.clear()
+        st_bytes = 0
+
+    for row in replay.states:
+        bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
+        payload = json.dumps(row, separators=(",", ":"))
+        payload_len = len(payload)
+        if st_buffers[0] and (
+            len(st_buffers[0]) >= batch_size or st_bytes + payload_len > batch_max_bytes
+        ):
+            flush_states()
+        values = [
+            state_row_id(chunk_key=chunk.chunk_key, bucket_start_ns=bucket_ns),
+            chunk.build_id,
+            chunk.chunk_key,
+            chunk.epoch.epoch_id,
+            chunk.epoch.epoch_hash,
+            chunk.epoch.chain_version,
+            chunk.epoch.canonical_chain_hash,
+            chunk.epoch.symbol,
+            bucket_ns,
+            payload,
+            version_ms,
+        ]
+        for buf, value in zip(st_buffers, values):
+            buf.append(value)
+        st_bytes += payload_len
+    flush_states()
 
     output_hash = _hash(
         {
@@ -1297,7 +1376,48 @@ def _persist_chunk_outputs(
             "last_apply_key": replay.end_apply_key,
         }
     )
-    return output_hash
+    return {
+        "output_hash": output_hash,
+        "insert_calls_level_changes": lc_insert_calls,
+        "insert_calls_states": st_insert_calls,
+        "batch_size": batch_size,
+        "batch_max_bytes": batch_max_bytes,
+    }
+
+
+def _verify_chunk_inserts(
+    client: Any,
+    config: BuildConfig,
+    *,
+    chunk: ChunkPlan,
+    level_change_count: int,
+    state_count: int,
+) -> None:
+    lc = int(
+        client.query(
+            f"""
+            SELECT count()
+            FROM {config.output_database}.{LEVEL_CHANGES_TABLE} FINAL
+            WHERE chunk_key = {{chunk_key:String}}
+            """,
+            parameters={"chunk_key": chunk.chunk_key},
+        ).result_rows[0][0]
+    )
+    st = int(
+        client.query(
+            f"""
+            SELECT count()
+            FROM {config.output_database}.{METRICS_TABLE} FINAL
+            WHERE chunk_key = {{chunk_key:String}}
+            """,
+            parameters={"chunk_key": chunk.chunk_key},
+        ).result_rows[0][0]
+    )
+    if lc != level_change_count or st != state_count:
+        raise SilverBuildError(
+            "STOP_SILVER_VERIFY_OUTPUT_MISMATCH: "
+            f"lc={lc}/{level_change_count} states={st}/{state_count}"
+        )
 
 
 def build_one_chunk(
@@ -1359,7 +1479,14 @@ def build_one_chunk(
     except EpochSilverError as exc:
         raise SilverBuildError(str(exc)) from exc
     stop.check()
-    output_hash = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
+    persist_stats = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
+    _verify_chunk_inserts(
+        client,
+        config,
+        chunk=chunk,
+        level_change_count=len(replay.level_changes),
+        state_count=len(replay.states),
+    )
     _write_chunk_status(
         client,
         config,
@@ -1370,13 +1497,16 @@ def build_one_chunk(
         level_change_count=len(replay.level_changes),
         state_count=len(replay.states),
         source_record_count=replay.source_records,
-        output_hash=output_hash,
+        output_hash=persist_stats["output_hash"],
     )
     return {
         "status": "COMPLETE",
         "chunk_key": chunk.chunk_key,
         "rows_inserted": len(replay.level_changes) + len(replay.states),
-        "output_hash": output_hash,
+        "output_hash": persist_stats["output_hash"],
+        "insert_calls_level_changes": persist_stats["insert_calls_level_changes"],
+        "insert_calls_states": persist_stats["insert_calls_states"],
+        "batch_size": persist_stats["batch_size"],
     }
 
 

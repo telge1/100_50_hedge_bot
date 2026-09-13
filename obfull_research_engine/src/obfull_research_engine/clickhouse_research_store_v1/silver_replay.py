@@ -154,6 +154,17 @@ class BronzeRecord:
     payload_sha256: str
     original_payload: dict[str, Any]
     canonical_segment_chain_index: int | None = None
+    _raw_payload: str | None = field(default=None, repr=False, compare=False)
+
+
+def ensure_original_payload(record: BronzeRecord) -> dict[str, Any]:
+    """Parse Bronze JSON at most once; safe no-op when already materialized."""
+    raw = record._raw_payload
+    if raw is not None:
+        obj = json.loads(raw) if raw else {}
+        record.original_payload = obj if isinstance(obj, dict) else {}
+        record._raw_payload = None
+    return record.original_payload
 
 
 @dataclass
@@ -260,7 +271,7 @@ def is_full_book_anchor(payload: dict[str, Any], message_type: str) -> bool:
 def find_first_full_anchor(rows: list[BronzeRecord]) -> BronzeRecord | None:
     for r in rows:
         if r.message_type in ("checkpoint", "snapshot") and is_full_book_anchor(
-            r.original_payload, r.message_type
+            ensure_original_payload(r), r.message_type
         ):
             return r
     return None
@@ -409,7 +420,7 @@ def replay_bronze_to_silver(
     result.replay_coverage_start_ns = coverage_start_ns
     result.replay_coverage_end_ns = int(window_end_ns)
 
-    payload = anchor.original_payload
+    payload = ensure_original_payload(anchor)
     if anchor.message_type == "checkpoint":
         bids, asks = payload.get("bids") or [], payload.get("asks") or []
         u, seq = payload.get("u"), payload.get("seq")
@@ -513,9 +524,9 @@ def replay_bronze_to_silver(
         emit_due_buckets(r.event_time_ns, epoch)
 
         if r.message_type in ("checkpoint", "snapshot"):
-            if not is_full_book_anchor(r.original_payload, r.message_type):
+            p = ensure_original_payload(r)
+            if not is_full_book_anchor(p, r.message_type):
                 continue
-            p = r.original_payload
             if r.message_type == "checkpoint":
                 bids, asks = p.get("bids") or [], p.get("asks") or []
                 u, seq = p.get("u"), p.get("seq")
@@ -577,12 +588,13 @@ def replay_bronze_to_silver(
         if in_analysis:
             result.delta_message_count += 1
         message_order += 1
-        data = r.original_payload.get("data") if isinstance(r.original_payload.get("data"), dict) else {}
+        payload = ensure_original_payload(r)
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
         b_lvls = data.get("b") or []
         a_lvls = data.get("a") or []
         u = data.get("u")
         seq = data.get("seq")
-        ts = r.original_payload.get("ts") or data.get("ts")
+        ts = payload.get("ts") or data.get("ts")
 
         bid_changes: list[dict[str, Any]] = []
         ask_changes: list[dict[str, Any]] = []
@@ -630,7 +642,7 @@ def replay_bronze_to_silver(
             u=u,
             seq=seq,
             ts_ms=int(ts) if ts is not None else int(r.event_time_ns // 1_000_000),
-            cts_ms=r.original_payload.get("cts") or data.get("cts"),
+            cts_ms=payload.get("cts") or data.get("cts"),
             receive_time_ns=r.receive_time_ns,
             enforce_continuity=True,
         )
@@ -669,7 +681,6 @@ def bronze_row_from_ch(row: tuple[Any, ...]) -> BronzeRecord:
         original_payload,
     ) = row
     payload_txt = _as_text(original_payload)
-    payload_obj = json.loads(payload_txt) if payload_txt else {}
     return BronzeRecord(
         record_id=_as_text(record_id),
         symbol=_as_text(symbol).upper(),
@@ -683,10 +694,11 @@ def bronze_row_from_ch(row: tuple[Any, ...]) -> BronzeRecord:
         source_segment_sha256=_as_text(source_segment_sha256),
         record_ordinal=int(record_ordinal),
         payload_sha256=_as_text(payload_sha256),
-        original_payload=payload_obj if isinstance(payload_obj, dict) else {},
+        original_payload={},
         canonical_segment_chain_index=(
             int(canonical_segment_chain_index)
             if canonical_segment_chain_index is not None
             else None
         ),
+        _raw_payload=payload_txt,
     )

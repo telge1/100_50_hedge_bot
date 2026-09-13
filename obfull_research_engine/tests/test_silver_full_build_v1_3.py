@@ -66,22 +66,34 @@ class FakeClient:
                     self.tables.add(table)
         return 1
 
-    def insert(self, table, rows, column_names):
+    def insert(self, table, rows, column_names=None, column_oriented=False, settings=None):
         self.inserts.append(table)
+        column_names = list(column_names or [])
+        if column_oriented:
+            n = len(rows[0]) if rows else 0
+            materialised = [[col[i] for col in rows] for i in range(n)]
+        else:
+            materialised = list(rows)
         if table.endswith(runner.CHUNKS_TABLE):
-            chunk_key = rows[-1][column_names.index("chunk_key")]
-            status = rows[-1][column_names.index("status")]
-            epoch_hash = rows[-1][column_names.index("epoch_hash")]
-            plan_hash = rows[-1][column_names.index("epoch_plan_hash")]
+            chunk_key = materialised[-1][column_names.index("chunk_key")]
+            status = materialised[-1][column_names.index("status")]
+            epoch_hash = materialised[-1][column_names.index("epoch_hash")]
+            plan_hash = materialised[-1][column_names.index("epoch_plan_hash")]
             self.chunks[str(chunk_key)] = (str(status), str(epoch_hash), str(plan_hash))
+            self.chunk_rows[str(chunk_key)] = {
+                "level_change_count": int(
+                    materialised[-1][column_names.index("level_change_count")]
+                ),
+                "state_count": int(materialised[-1][column_names.index("state_count")]),
+            }
         elif table.endswith(runner.LEVEL_CHANGES_TABLE):
-            for row in rows:
+            for row in materialised:
                 self.level_changes.add(str(row[0]))
         elif table.endswith(runner.METRICS_TABLE):
-            for row in rows:
+            for row in materialised:
                 self.metrics.add(str(row[0]))
         elif table.endswith(runner.EPOCHS_TABLE):
-            for row in rows:
+            for row in materialised:
                 self.epochs[str(row[0])] = str(row[1])
 
     def query(self, sql, parameters=None):
@@ -158,6 +170,10 @@ class FakeClient:
             return SimpleNamespace(result_rows=[value] if value else [])
         if f"{runner.CHUNKS_TABLE}" in text and "SELECT version_ms" in text:
             return SimpleNamespace(result_rows=[])
+        if f"{runner.LEVEL_CHANGES_TABLE}" in text and "WHERE chunk_key" in text and "count()" in text:
+            return SimpleNamespace(result_rows=[(len(self.level_changes),)])
+        if f"{runner.METRICS_TABLE}" in text and "WHERE chunk_key" in text and "count()" in text:
+            return SimpleNamespace(result_rows=[(len(self.metrics),)])
         if f"{runner.CHUNKS_TABLE}" in text and "RUNNING" in text:
             bad = sum(1 for status, _, _ in self.chunks.values() if status in {"RUNNING", "INTERRUPTED", "FAILED"})
             return SimpleNamespace(result_rows=[(bad,)])
@@ -942,3 +958,156 @@ def test_multi_epoch_plan_keeps_independent_safe_windows():
     assert chunks
     for chunk in chunks:
         assert chunk.analysis_end_ns <= chunk.epoch.safe_end_ns
+
+
+def test_fast_row_ids_match_canonical_hash():
+    from obfull_research_engine.clickhouse_research_store_v1.epoch_aware_silver_v1_3 import (
+        _hash,
+        level_change_row_id,
+        state_row_id,
+    )
+
+    chunk_key = "ab" * 32
+    assert level_change_row_id(
+        chunk_key=chunk_key, segment_rank=7, record_ordinal=9, apply_order=11
+    ) == _hash(
+        {
+            "chunk_key": chunk_key,
+            "segment_rank": 7,
+            "record_ordinal": 9,
+            "apply_order": 11,
+        }
+    )
+    assert state_row_id(chunk_key=chunk_key, bucket_start_ns=123456789) == _hash(
+        {"chunk_key": chunk_key, "bucket_start_ns": 123456789}
+    )
+
+
+def test_persist_batch_sizes_keep_identical_row_ids(tmp_path):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=10,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=60_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    replay = runner.ReplayResult(
+        level_changes=[
+            {
+                "canonical_segment_chain_index": 1,
+                "source_record_ordinal": i,
+                "apply_order": i,
+                "event_time_ns": i * 1000,
+                "receive_time_ns": i * 1000,
+                "side": "bid",
+                "price": 1.0,
+                "old_size": 0.0,
+                "new_size": 1.0,
+            }
+            for i in range(1, 25)
+        ],
+        states=[
+            {"bucket_start_ms": i * 100, "best_bid": 1.0, "best_ask": 2.0, "book_hash": "a" * 64}
+            for i in range(1, 12)
+        ],
+        source_records=24,
+        delta_records=24,
+        resume_key=(1, 1),
+        end_apply_key=(1, 24),
+        level_change_hash_apply_order="b" * 64,
+        timings_s={},
+    )
+    ids_by_batch = []
+    for batch in (5, 10, 25_000):
+        client.level_changes.clear()
+        client.metrics.clear()
+        stats = runner._persist_chunk_outputs(
+            client, _config(tmp_path), chunk=chunk, replay=replay, batch_size=batch
+        )
+        ids_by_batch.append((frozenset(client.level_changes), frozenset(client.metrics), stats["output_hash"]))
+    assert ids_by_batch[0] == ids_by_batch[1] == ids_by_batch[2]
+    assert ids_by_batch[0][2] == ids_by_batch[1][2]
+
+
+def test_complete_requires_verified_insert_counts(tmp_path, monkeypatch):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    client.stream_blocks = [[
+        (
+            "r" * 64, "BTCUSDT", "snapshot", 0, 0, 1, 1, 1, 1, SHA_A, 1, "d" * 64,
+            json.dumps({"data": {"u": 1, "seq": 1, "b": [["100", "1"]], "a": [["101", "1"]]}}),
+            1,
+        )
+    ]]
+
+    def _bad_verify(*_args, **_kwargs):
+        raise runner.SilverBuildError("STOP_SILVER_VERIFY_OUTPUT_MISMATCH: forced")
+
+    monkeypatch.setattr(runner, "_verify_chunk_inserts", _bad_verify)
+    with pytest.raises(runner.SilverBuildError, match="STOP_SILVER_VERIFY_OUTPUT_MISMATCH"):
+        runner.build_one_chunk(
+            client,
+            _config(tmp_path, resume=True),
+            run_id="r" * 64,
+            epoch_plan_hash=plan.epoch_plan_hash,
+            chunk=chunk,
+            stop=runner.StopState(),
+        )
+    assert client.chunks[chunk.chunk_key][0] == "RUNNING"

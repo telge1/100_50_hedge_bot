@@ -42,7 +42,8 @@ CHUNKS_TABLE = "ob_silver_chunks_epoch_pilot_v1_3"
 SCHEMA_VERSION = "epoch_aware_silver_pilot_v1_3"
 RSS_LIMIT_KB = 1_500 * 1024
 BUCKET_NS = 100_000_000
-INSERT_BATCH_SIZE = 2_000
+INSERT_BATCH_SIZE = 10_000
+INSERT_BATCH_MAX_BYTES = 12 * 1024 * 1024  # ~12 MiB packed payload budget per insert
 
 
 class EpochSilverError(RuntimeError):
@@ -252,6 +253,30 @@ def _hash(value: Any) -> str:
     return hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
+def level_change_row_id(
+    *,
+    chunk_key: str,
+    segment_rank: int,
+    record_ordinal: int,
+    apply_order: int,
+) -> str:
+    """Deterministic LC row_id; byte-identical to ``_hash`` of the same fields."""
+    body = (
+        f'{{"apply_order":{int(apply_order)},"chunk_key":"{chunk_key}",'
+        f'"record_ordinal":{int(record_ordinal)},'
+        f'"segment_rank":{int(segment_rank)}}}'
+    )
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def state_row_id(*, chunk_key: str, bucket_start_ns: int) -> str:
+    """Deterministic 100ms-state row_id; byte-identical to ``_hash``."""
+    body = (
+        f'{{"bucket_start_ns":{int(bucket_start_ns)},"chunk_key":"{chunk_key}"}}'
+    )
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 def _text(value: Any) -> str:
     return value.decode() if isinstance(value, (bytes, bytearray)) else str(value)
 
@@ -280,7 +305,9 @@ def _causal_ns(record: BronzeRecord) -> int:
 
 
 def _payload(record: BronzeRecord) -> dict[str, Any]:
-    return record.original_payload if isinstance(record.original_payload, dict) else {}
+    from .silver_replay import ensure_original_payload
+
+    return ensure_original_payload(record)
 
 
 def _checkpoint_reason(record: BronzeRecord) -> str:
@@ -1525,13 +1552,11 @@ def persist_replay_chunk(
         batch = replay.level_changes[offset : offset + INSERT_BATCH_SIZE]
         rows = []
         for row in batch:
-            row_id = _hash(
-                {
-                    "chunk_key": chunk_key,
-                    "segment_rank": row["canonical_segment_chain_index"],
-                    "record_ordinal": row["source_record_ordinal"],
-                    "apply_order": row["apply_order"],
-                }
+            row_id = level_change_row_id(
+                chunk_key=chunk_key,
+                segment_rank=int(row["canonical_segment_chain_index"]),
+                record_ordinal=int(row["source_record_ordinal"]),
+                apply_order=int(row["apply_order"]),
             )
             rows.append([
                 row_id, build_id, chunk_key, epoch.epoch_id, epoch.epoch_hash,
@@ -1560,7 +1585,7 @@ def persist_replay_chunk(
         for row in batch:
             bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
             rows.append([
-                _hash({"chunk_key": chunk_key, "bucket_start_ns": bucket_ns}),
+                state_row_id(chunk_key=chunk_key, bucket_start_ns=bucket_ns),
                 build_id, chunk_key, epoch.epoch_id, epoch.epoch_hash,
                 epoch.chain_version, epoch.canonical_chain_hash, epoch.symbol,
                 bucket_ns, json.dumps(row, separators=(",", ":")), version_ms,
