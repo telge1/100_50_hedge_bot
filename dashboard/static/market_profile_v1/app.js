@@ -59,7 +59,11 @@
   var livePollGen = 0;
   var formingTimer = null;
   var formingInflight = false;
-  var FORMING_MS = 250;
+  // Prefer shared helpers (bootstrapped by chart.js); fallback keeps semantics if order flips.
+  var _hp = (typeof globalThis !== "undefined" && globalThis.MpHotpathHelpers) || null;
+  var FORMING_MS = (_hp && _hp.FORMING_MS) || 1000;
+  var lastFormingSig = "";
+  var overlayInflight = (_hp && _hp.createInflightDedupe) ? _hp.createInflightDedupe() : null;
   var TF_SEC = {
     "1m": 60, "3m": 180, "5m": 300, "15m": 900,
     "30m": 1800, "1h": 3600, "2h": 7200, "4h": 14400, "1d": 86400
@@ -1035,6 +1039,15 @@
     formingInflight = false;
   }
 
+  function pauseLivePoll() {
+    // Pause without bumping generation so an in-flight response can still be
+    // discarded via document.hidden checks / resume start().
+    if (formingTimer) {
+      clearInterval(formingTimer);
+      formingTimer = null;
+    }
+  }
+
   function formingBarForTf(forming, tfSec, lastCandle) {
     var t1 = Number(forming && forming.time);
     var px = Number(forming && forming.close);
@@ -1095,8 +1108,16 @@
     var last = candles[candles.length - 1];
     var bar = formingBarForTf(forming, tfSec, last);
     if (!bar) return false;
+    // Change-only: skip series update when consumed OHLC/meta signature is unchanged.
+    var nextSig = lastFormingSig;
+    if (_hp && _hp.shouldApplyForming) {
+      var decision = _hp.shouldApplyForming(lastFormingSig, bar);
+      if (!decision.apply) return false;
+      nextSig = decision.signature;
+    }
     var ok = !!api.updateFormingBar(bar);
     if (ok) {
+      lastFormingSig = nextSig;
       if (Number(candles[candles.length - 1].time) === Number(bar.time)) {
         candles[candles.length - 1] = Object.assign({}, candles[candles.length - 1], bar);
       } else if (Number(bar.time) > Number(last.time)) {
@@ -1119,6 +1140,7 @@
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (body) {
         if (gen !== livePollGen) return;
+        if (document.hidden) return;
         if (body && body.forming) applyLiveForming(body.forming);
       })
       .catch(function () { /* live tip is best-effort */ })
@@ -1128,6 +1150,7 @@
   function startLivePoll() {
     stopLivePoll();
     if (!payload || !payload.candles || !payload.candles.length) return;
+    lastFormingSig = "";
     var gen = livePollGen;
     formingTimer = setInterval(function () {
       if (gen !== livePollGen || document.hidden) return;
@@ -1463,6 +1486,20 @@
       clearLiquidityOverlays();
       return Promise.resolve();
     }
+    var key = _hp && _hp.requestKey
+      ? _hp.requestKey({
+          layer: "lld",
+          symbol: s.symbol,
+          timeframe: s.timeframe,
+          start: lastLoadRange.start,
+          end: lastLoadRange.end,
+          generation: livePollGen
+        })
+      : null;
+    if (overlayInflight && key && !overlayInflight.begin(key)) {
+      return Promise.resolve();
+    }
+    var genAtStart = livePollGen;
     return sendJson("/api/research/indicator-enabled", "POST", {
       name: "liquidity",
       enabled: true
@@ -1470,12 +1507,16 @@
       applyWorkspace(snap);
       return loadResearchPaneForLld();
     }).then(function (body) {
+      if (genAtStart !== livePollGen) return;
+      if (!readSettings().showLiquidity) return;
       // Keep Market-Profile candles + EMA on the series. Replacing them with
       // the pane bundle emptied the visible bars while LLD boxes stayed.
       applyLldPaneBundle(body);
       if (lastEmaPayload) applyEmaOverlays(lastEmaPayload);
     }).catch(function () {
       clearLiquidityOverlays();
+    }).then(function () {
+      if (overlayInflight && key) overlayInflight.end(key);
     });
   }
 
@@ -1646,6 +1687,20 @@
     }
     if (!lastLoadRange) return Promise.resolve();
     var s = readSettings();
+    var key = _hp && _hp.requestKey
+      ? _hp.requestKey({
+          layer: "oi",
+          symbol: s.symbol,
+          timeframe: s.timeframe,
+          start: lastLoadRange.start,
+          end: lastLoadRange.end,
+          generation: livePollGen
+        })
+      : null;
+    if (overlayInflight && key && !overlayInflight.begin(key)) {
+      return Promise.resolve();
+    }
+    var genAtStart = livePollGen;
     applyOiPane({
       id: "open_interest",
       title: "Open Interest",
@@ -1655,11 +1710,15 @@
       levels: []
     });
     return fetchOpenInterest(s.symbol, s.timeframe, lastLoadRange).then(function (payload) {
+      if (genAtStart !== livePollGen) return;
+      if (!oiEnabled()) return;
       applyOiPane(payload);
       var n = ((((payload.series || [])[0] || {}).data) || []).length;
       if (!n) setStatus("Open Interest: keine Daten für " + s.symbol, "error");
     }).catch(function (err) {
       setStatus("Open Interest: " + (err && err.message ? err.message : err), "error");
+    }).then(function () {
+      if (overlayInflight && key) overlayInflight.end(key);
     });
   }
 
@@ -2524,8 +2583,10 @@
               (payload.cached ? " · cached" : "")
           );
           try {
-            // Preserve pan/zoom after overlay refresh — first paint already set the view.
-            if (applyPayloadToChart(s, { preserveView: true })) scheduleDraw();
+            // Candles already painted above. Overlays use setEmaOverlays / setLldEma /
+            // setOiPane / overlay registry — a second setData with the same candles
+            // was redundant (preserveView path). Only redraw MP canvas + ensure poll.
+            scheduleDraw();
             startLivePoll();
           } catch (err2) { /* already painted */ }
         });
@@ -2656,10 +2717,13 @@
     restoreChartHeight();
     renderLegend();
     document.addEventListener("visibilitychange", function () {
-      if (document.hidden) return;
+      if (document.hidden) {
+        pauseLivePoll();
+        return;
+      }
       if (!payload || !payload.candles || !payload.candles.length) return;
-      if (!formingTimer) startLivePoll();
-      else pollForming(livePollGen);
+      // Resume: drop old timer, one immediate fetch, then a single 1s chain.
+      startLivePoll();
       onOrderbookSymbolOrViewChange();
     });
     window.addEventListener("pagehide", function () {
