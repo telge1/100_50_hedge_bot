@@ -22,6 +22,8 @@ STATUSES = frozenset(
 )
 
 COLLECTOR_IDS = (
+    "ob1000_raw_archive",
+    "ob1000_materializer",
     "full_ob_raw_archive",
     "oi_liquidation_live",
     "oi_5m_history",

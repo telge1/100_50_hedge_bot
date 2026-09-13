@@ -17,6 +17,9 @@ from .contracts import (
     utc,
     validate_symbol,
 )
+
+# Default stays BTC/DOGE research pilot validation. OB1000 live materializer
+# passes validate_ob1000_live_symbol explicitly.
 from .source_file_registry import SourceFile
 
 ZERO = Decimal("0")
@@ -59,18 +62,26 @@ class ParseAudit:
 
 
 def iter_json_records(path: Path) -> Iterator[tuple[int, dict[str, Any]]]:
-    if path.suffix == ".zst":
+    is_zstd = path.suffix == ".zst" or str(path.name).endswith(".zst.tmp")
+    if is_zstd:
         import zstandard as zstd
 
         with path.open("rb") as handle:
             with zstd.ZstdDecompressor().stream_reader(handle) as stream:
                 text = io.TextIOWrapper(stream, encoding="utf-8")
                 for record, line in enumerate(text):
-                    if line.strip():
+                    if not line.strip():
+                        continue
+                    try:
                         value = json.loads(line)
-                        if not isinstance(value, dict):
-                            raise ValueError(f"record {record} is not an object")
-                        yield record, value
+                    except json.JSONDecodeError:
+                        # Open .zst.tmp frames can end mid-line; stop cleanly.
+                        if str(path.name).endswith(".zst.tmp"):
+                            return
+                        raise
+                    if not isinstance(value, dict):
+                        raise ValueError(f"record {record} is not an object")
+                    yield record, value
         return
     with path.open("rt", encoding="utf-8") as handle:
         for record, line in enumerate(handle):
@@ -82,105 +93,203 @@ def iter_json_records(path: Path) -> Iterator[tuple[int, dict[str, Any]]]:
 
 
 class OB200SegmentReader:
-    def __init__(self, source: SourceFile, symbol: str) -> None:
+    def __init__(
+        self,
+        source: SourceFile,
+        symbol: str,
+        *,
+        max_depth: int = 200,
+        symbol_validator=validate_symbol,
+    ) -> None:
         self.source = source
-        self.symbol = validate_symbol(symbol)
+        self.symbol = symbol_validator(symbol)
+        self.max_depth = int(max_depth)
         self.audit = ParseAudit(
             manifest_replayable=bool(source.manifest.get("replayable"))
         )
 
     def iter_full_books(
-        self, start: datetime, end: datetime
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        emit: str = "all",
+        warmup_sources: tuple[SourceFile, ...] = (),
     ) -> Iterator[FullBookEvent]:
+        """Replay segment books.
+
+        emit:
+          - ``all``: every in-window full book (tests / exact replay)
+          - ``second_end``: only the last book per UTC second (materializer)
+
+        warmup_sources:
+          Prior closed segments applied for book continuity only (no emits).
+          Used when an open segment starts with deltas after hour rotation.
+        """
+        if emit not in {"all", "second_end"}:
+            raise ValueError(f"unsupported emit mode: {emit}")
         start, end = utc(start), utc(end)
         bids: dict[Decimal, Decimal] = {}
         asks: dict[Decimal, Decimal] = {}
         last_u: int | None = None
         valid = False
         previous_ts: datetime | None = None
+        pending_meta: dict[str, Any] | None = None
 
-        for record, obj in iter_json_records(self.source.path):
-            self.audit.records_read += 1
-            event_type = str(obj.get("type", ""))
-            if event_type not in SUPPORTED_TYPES:
-                continue
-            self.audit.replayable_records += 1
-            if obj.get("format_version") not in {
-                None,
-                "ob200_v3_live_archive/v1",
-            }:
-                raise ValueError(f"unexpected record format at {record}")
-            data = obj.get("data")
-            if not isinstance(data, dict) or str(data.get("s")) != self.symbol:
-                raise ValueError(f"invalid symbol/data at record {record}")
-            event_ms = obj.get("ts")
-            if not isinstance(event_ms, int):
-                raise ValueError(f"missing integer ts at record {record}")
-            event_time = datetime.fromtimestamp(
-                event_ms / 1000.0, tz=timezone.utc
-            )
-            self.audit.first_event_time = self.audit.first_event_time or event_time
-            self.audit.last_event_time = event_time
-            if previous_ts == event_time:
-                self.audit.identical_timestamp_groups += 1
-            previous_ts = event_time
-
-            update_id = int(data.get("u") or 0)
-            sequence = int(data.get("seq") or 0)
-            if event_type in {"snapshot", "rotation_checkpoint"}:
-                bids.clear()
-                asks.clear()
-                self._apply_levels(bids, data.get("b"), record)
-                self._apply_levels(asks, data.get("a"), record)
-                last_u = update_id
-                valid = True
-            else:
-                if not valid or last_u is None:
-                    raise ValueError(f"delta before checkpoint at record {record}")
-                if update_id == last_u:
-                    self.audit.duplicate_u += 1
-                elif update_id != last_u + 1:
-                    self.audit.u_gaps.append((last_u, update_id))
-                    raise ValueError(
-                        f"u continuity gap at record {record}: {last_u}->{update_id}"
-                    )
-                self._apply_levels(bids, data.get("b"), record)
-                self._apply_levels(asks, data.get("a"), record)
-                last_u = update_id
-
-            if not (start <= event_time < end):
-                continue
+        def _emit_from_book(meta: dict[str, Any]) -> FullBookEvent:
             sorted_bids = tuple(sorted(bids.items(), reverse=True))
             sorted_asks = tuple(sorted(asks.items()))
-            flags = self._validate_book(sorted_bids, sorted_asks, record)
-            receive_time = self._receive_time(obj.get("local_receive_ts"))
+            flags = self._validate_book(sorted_bids, sorted_asks, meta["record"])
             key_payload = {
                 "version": OB200_KEY_VERSION,
                 "symbol": self.symbol,
-                "event_ms": event_ms,
-                "update_id": update_id,
-                "event_type": event_type,
+                "event_ms": meta["event_ms"],
+                "update_id": meta["update_id"],
+                "event_type": meta["event_type"],
                 "source_fingerprint": self.source.fingerprint,
-                "source_record": record,
+                "source_record": meta["record"],
             }
             content_payload = {
                 "bids": [(str(p), str(q)) for p, q in sorted_bids],
                 "asks": [(str(p), str(q)) for p, q in sorted_asks],
             }
             self.audit.emitted_events += 1
-            yield FullBookEvent(
-                event_time=event_time,
-                receive_time=receive_time,
-                exchange_sequence=sequence,
-                update_id=update_id,
-                raw_event_type=event_type,
+            return FullBookEvent(
+                event_time=meta["event_time"],
+                receive_time=meta["receive_time"],
+                exchange_sequence=meta["sequence"],
+                update_id=meta["update_id"],
+                raw_event_type=meta["event_type"],
                 bids=sorted_bids,
                 asks=sorted_asks,
-                source_record=record,
+                source_record=meta["record"],
                 event_key=stable_hash(key_payload),
                 content_fingerprint=stable_hash(content_payload),
                 quality_flags=tuple(flags),
             )
+
+        def _apply_file(path: Path, *, allow_emit: bool) -> Iterator[FullBookEvent]:
+            nonlocal last_u, valid, previous_ts, pending_meta
+            for record, obj in iter_json_records(path):
+                self.audit.records_read += 1
+                event_type = str(obj.get("type", ""))
+                if event_type not in SUPPORTED_TYPES:
+                    continue
+                self.audit.replayable_records += 1
+                if obj.get("format_version") not in {
+                    None,
+                    "ob200_v3_live_archive/v1",
+                    "ob1000_v1_live_archive/v1",
+                }:
+                    raise ValueError(f"unexpected record format at {record}")
+                data = obj.get("data")
+                if not isinstance(data, dict) or str(data.get("s")) != self.symbol:
+                    raise ValueError(f"invalid symbol/data at record {record}")
+                event_ms = obj.get("ts")
+                if not isinstance(event_ms, int):
+                    raise ValueError(f"missing integer ts at record {record}")
+                event_time = datetime.fromtimestamp(
+                    event_ms / 1000.0, tz=timezone.utc
+                )
+                self.audit.first_event_time = self.audit.first_event_time or event_time
+                self.audit.last_event_time = event_time
+                if previous_ts == event_time:
+                    self.audit.identical_timestamp_groups += 1
+                previous_ts = event_time
+
+                update_id = int(data.get("u") or 0)
+                sequence = int(data.get("seq") or 0)
+                in_window = allow_emit and (start <= event_time < end)
+                second = event_time.replace(microsecond=0)
+
+                if (
+                    allow_emit
+                    and emit == "second_end"
+                    and pending_meta is not None
+                    and in_window
+                    and pending_meta["second"] != second
+                ):
+                    yield _emit_from_book(pending_meta)
+                    pending_meta = None
+
+                if event_type in {"snapshot", "rotation_checkpoint"}:
+                    bids.clear()
+                    asks.clear()
+                    self._apply_levels(bids, data.get("b"), record)
+                    self._apply_levels(asks, data.get("a"), record)
+                    last_u = update_id
+                    valid = True
+                else:
+                    if not valid or last_u is None:
+                        raise ValueError(f"delta before checkpoint at record {record}")
+                    if update_id == last_u:
+                        self.audit.duplicate_u += 1
+                    elif update_id != last_u + 1:
+                        self.audit.u_gaps.append((last_u, update_id))
+                        raise ValueError(
+                            f"u continuity gap at record {record}: {last_u}->{update_id}"
+                        )
+                    self._apply_levels(bids, data.get("b"), record)
+                    self._apply_levels(asks, data.get("a"), record)
+                    last_u = update_id
+
+                if not in_window:
+                    continue
+
+                if emit == "second_end":
+                    pending_meta = {
+                        "second": second,
+                        "event_time": event_time,
+                        "event_ms": event_ms,
+                        "update_id": update_id,
+                        "sequence": sequence,
+                        "event_type": event_type,
+                        "record": record,
+                        "receive_time": self._receive_time(obj.get("local_receive_ts")),
+                    }
+                    continue
+
+                sorted_bids = tuple(sorted(bids.items(), reverse=True))
+                sorted_asks = tuple(sorted(asks.items()))
+                flags = self._validate_book(sorted_bids, sorted_asks, record)
+                receive_time = self._receive_time(obj.get("local_receive_ts"))
+                key_payload = {
+                    "version": OB200_KEY_VERSION,
+                    "symbol": self.symbol,
+                    "event_ms": event_ms,
+                    "update_id": update_id,
+                    "event_type": event_type,
+                    "source_fingerprint": self.source.fingerprint,
+                    "source_record": record,
+                }
+                content_payload = {
+                    "bids": [(str(p), str(q)) for p, q in sorted_bids],
+                    "asks": [(str(p), str(q)) for p, q in sorted_asks],
+                }
+                self.audit.emitted_events += 1
+                yield FullBookEvent(
+                    event_time=event_time,
+                    receive_time=receive_time,
+                    exchange_sequence=sequence,
+                    update_id=update_id,
+                    raw_event_type=event_type,
+                    bids=sorted_bids,
+                    asks=sorted_asks,
+                    source_record=record,
+                    event_key=stable_hash(key_payload),
+                    content_fingerprint=stable_hash(content_payload),
+                    quality_flags=tuple(flags),
+                )
+
+        for warm in warmup_sources:
+            # Drain generator for side effects (book state only).
+            for _ in _apply_file(warm.path, allow_emit=False):
+                pass
+
+        yield from _apply_file(self.source.path, allow_emit=True)
+
+        if emit == "second_end" and pending_meta is not None:
+            yield _emit_from_book(pending_meta)
 
         self.audit.full_file_consumed = True
         self.audit.effective_replayable = not self.audit.u_gaps and valid
@@ -214,8 +323,8 @@ class OB200SegmentReader:
     ) -> list[str]:
         if not bids or not asks:
             raise ValueError(f"empty book side at record {record}")
-        if len(bids) > 200 or len(asks) > 200:
-            raise ValueError(f"more than 200 levels at record {record}")
+        if len(bids) > self.max_depth or len(asks) > self.max_depth:
+            raise ValueError(f"more than {self.max_depth} levels at record {record}")
         if bids[0][0] >= asks[0][0]:
             raise ValueError(f"crossed book at record {record}")
         self.audit.min_bid_levels = (
@@ -231,7 +340,7 @@ class OB200SegmentReader:
         self.audit.max_bid_levels = max(self.audit.max_bid_levels, len(bids))
         self.audit.max_ask_levels = max(self.audit.max_ask_levels, len(asks))
         flags: list[str] = []
-        if len(bids) < 200 or len(asks) < 200:
+        if len(bids) < self.max_depth or len(asks) < self.max_depth:
             flags.append("SHORT_BOOK")
             self.audit.short_book_events += 1
         if self.source.manifest.get("replayable") is False:

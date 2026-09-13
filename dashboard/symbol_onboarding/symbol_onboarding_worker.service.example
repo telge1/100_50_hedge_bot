@@ -1,0 +1,26 @@
+# Optional durable worker unit — DO NOT enable/start without explicit approval.
+#
+# Preferred runtime model: per-apply spawn via dashboard/symbol_onboarding/worker.py
+# (same pattern as stoch_universe_51/update_worker.py). That child process survives
+# dashboard reload because it is start_new_session=True.
+#
+# This unit is only a fallback supervisor documentation template.
+
+[Unit]
+Description=Symbol onboarding apply worker (manual / optional)
+After=network.target
+# Conflict intentionally with accidental double starts of the live dashboard.
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+WorkingDirectory=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+Environment=PYTHONPATH=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+# Example only — real apply jobs are spawned with an explicit job_id + queue dir:
+# ExecStart=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python \
+#   symbol_onboarding/worker.py JOB_ID /path/to/queue/JOB_ID
+ExecStart=/bin/true
+User=telgenbuescher
+
+[Install]
+WantedBy=multi-user.target

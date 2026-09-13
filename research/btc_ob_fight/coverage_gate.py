@@ -66,7 +66,7 @@ def _missing_intervals(missing_seconds: list[datetime]) -> list[dict[str, str]]:
     return intervals
 
 
-def evaluate_ob200_coverage(
+def evaluate_ob1000_coverage(
     snapshots: list[dict[str, Any]],
     *,
     symbol: str,
@@ -78,7 +78,7 @@ def evaluate_ob200_coverage(
     end = utc(end)
     expected = int((end - start).total_seconds()) + (1 if inclusive_end else 0)
     expected = max(0, expected)
-    by_ts = {utc(s["ts"]): s for s in snapshots if s.get("ok")}
+    by_ts = {utc(s["ts"]): s for s in snapshots if s.get("ts") is not None}
     observed = len(by_ts)
     missing: list[datetime] = []
     cursor = start
@@ -88,7 +88,7 @@ def evaluate_ob200_coverage(
         if cursor not in by_ts:
             missing.append(cursor)
         cursor += step
-    levels_ok = all(s.get("genuine_200") for s in by_ts.values()) if by_ts else False
+    levels_ok = all(s.get("genuine_1000") for s in by_ts.values()) if by_ts else False
     dup = len(snapshots) - observed
     if observed == 0:
         status = "NOT_AVAILABLE"
@@ -97,7 +97,7 @@ def evaluate_ob200_coverage(
     else:
         status = "COMPLETE"
     return {
-        "source_name": "OB200",
+        "source_name": "OB1000",
         "symbol": symbol,
         "requested_start": iso_z(start),
         "requested_end": iso_z(end),
@@ -109,7 +109,8 @@ def evaluate_ob200_coverage(
         "missing_intervals": _missing_intervals(missing),
         "missing_seconds": [iso_z(x) for x in missing],
         "duplicate_seconds": dup,
-        "levels_200x200_ok": levels_ok,
+        "levels_1000x1000_ok": levels_ok,
+        "levels_200x200_ok": False,
         "source_segment_status": snapshots[0].get("coverage_status") if snapshots else None,
         "effective_coverage_status": status,
         "mandatory_for_facts": True,
@@ -119,6 +120,10 @@ def evaluate_ob200_coverage(
             {s.get("source_fingerprint") for s in snapshots if s.get("source_fingerprint")}
         ),
     }
+
+
+def evaluate_ob200_coverage(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    return evaluate_ob1000_coverage(*args, **kwargs)
 
 
 def evaluate_trades_coverage(
@@ -287,7 +292,7 @@ def build_eligibility_bundle(
     contract_error: str | None = None,
 ) -> dict[str, Any]:
     mandatory = {
-        "OB200": ob_cov["effective_coverage_status"],
+        "OB1000": ob_cov["effective_coverage_status"],
         "PUBLIC_TRADES": fight_trades_cov["effective_coverage_status"],
         "PROFILE_TRADES": profile_trades_cov["effective_coverage_status"],
     }

@@ -94,6 +94,7 @@ def probe_full_ob_raw() -> dict[str, Any]:
     last_state = None
     last_connected = None
     last_error = None
+    health: dict[str, Any] = {}
     if OB_RAW_HEALTH.is_file():
         try:
             with OB_RAW_HEALTH.open("rb") as f:
@@ -107,13 +108,15 @@ def probe_full_ob_raw() -> dict[str, Any]:
                     obj = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                last_state = obj.get("collector_state")
-                last_connected = obj.get("connected")
-                last_error = obj.get("last_error")
+                health = obj if isinstance(obj, dict) else {}
+                last_state = health.get("collector_state")
+                last_connected = health.get("connected")
+                last_error = health.get("last_error")
                 break
         except OSError:
             pass
     running = bool(pids)
+    ob1000 = health.get("ob1000_raw_archive") if isinstance(health.get("ob1000_raw_archive"), dict) else {}
     return {
         "process_running": running,
         "pid": pids[0] if pids else None,
@@ -122,6 +125,36 @@ def probe_full_ob_raw() -> dict[str, Any]:
         "connected": last_connected,
         "last_error": last_error,
         "lock_present": OB_RAW_LOCK.is_file(),
+        "health": health,
+        "ob1000": ob1000,
+        "full_ob_messages_written": health.get("full_ob_raw_archive_messages_written"),
+        "full_ob_queue_depth": health.get("full_ob_raw_archive_queue_depth"),
+        "confirmed_topics": health.get("confirmed_topics"),
+    }
+
+
+def probe_ob1000_materializer() -> dict[str, Any]:
+    root = Path(
+        os.environ.get(
+            "SPREAD_RECOVERY_ROOT",
+            "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev",
+        )
+    )
+    heartbeat = root / "run" / "ob1000_materializer" / "heartbeat.json"
+    pids = find_pids_by_needle("ob1000_materializer_runner")
+    hb: dict[str, Any] = {}
+    if heartbeat.is_file():
+        try:
+            hb = json.loads(heartbeat.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            hb = {}
+    running = bool(pids)
+    return {
+        "process_running": running,
+        "pid": pids[0] if pids else None,
+        "process_started_at": _proc_start_iso(pids[0]) if pids else None,
+        "heartbeat": hb,
+        "heartbeat_path": str(heartbeat),
     }
 
 

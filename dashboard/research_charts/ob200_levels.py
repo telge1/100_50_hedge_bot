@@ -22,8 +22,8 @@ from .ob200_walls import (
 )
 from .trade_bubbles import tick_size
 
-SOURCE_NAME = "ob200_raw_shadow_v3"
-DEPTH = 200
+DEPTH = 1000  # prefer OB1000 archive / live tip; OB200 remains fallback SoT
+SOURCE_NAME = "ob1000_raw_shadow_v1"
 
 # Freshness thresholds (ms). Three states, fully covering [0, +inf).
 FRESH_MS = 15_000

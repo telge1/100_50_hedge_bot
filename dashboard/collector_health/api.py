@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from .csrf import COOKIE_NAME, csrf_issue_payload, mutate_post_guard
 from .jobs import get_job, start_job
 from .service import build_health_report, get_collector
+from .verify_import import verify_import
 
 
 def build_router(*, require_auth: Callable) -> APIRouter:
@@ -39,6 +40,27 @@ def build_router(*, require_auth: Callable) -> APIRouter:
         if row is None:
             return JSONResponse({"error": "UNKNOWN_COLLECTOR_ID"}, status_code=404)
         return JSONResponse(row)
+
+    @router.post("/api/collector-health/verify-import")
+    async def api_verify_import(request: Request, user: dict = Depends(require_auth)):
+        err = mutate_post_guard(
+            origin=request.headers.get("origin"),
+            referer=request.headers.get("referer"),
+            content_type=request.headers.get("content-type"),
+            csrf_header=request.headers.get("x-csrf-token"),
+            csrf_cookie=request.cookies.get(COOKIE_NAME),
+        )
+        if err:
+            return JSONResponse({"success": False, "error": err}, status_code=403)
+        wait_seconds = 5.0
+        try:
+            raw = await request.json()
+            if isinstance(raw, dict) and raw.get("wait_seconds") is not None:
+                wait_seconds = float(raw["wait_seconds"])
+        except Exception:
+            wait_seconds = 5.0
+        payload = await asyncio.to_thread(verify_import, wait_seconds=wait_seconds)
+        return JSONResponse(payload)
 
     @router.post("/api/collector-backfill/detect")
     async def api_detect(request: Request, user: dict = Depends(require_auth)):

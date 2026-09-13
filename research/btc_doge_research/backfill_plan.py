@@ -25,6 +25,7 @@ TARGET_TABLE = {
     "OPEN_INTEREST": "research_open_interest_observations",
     "CANDLES": "research_market_1m",
     "OB200": "research_ob200_snapshots_1s",
+    "OB1000": "research_ob1000_snapshots_1s",
     "TPO_PROFILE": "research_tpo_profile_bins_session",
     "VOLUME_PROFILE": "research_volume_profile_bins_session",
 }

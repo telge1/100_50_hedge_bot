@@ -17,8 +17,8 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "ob-levels-15";
-  try { console.info("[research] asset ob-levels-15"); } catch (e) { /* ignore */ }
+  const ASSET_V = "ob-levels-19";
+  try { console.info("[research] asset ob-levels-19"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
@@ -860,6 +860,7 @@
         }
         if (pane.pendingEma) chart.setEmaOverlays(pane.pendingEma);
         if (pane.pendingLower) chart.setLowerPane(pane.pendingLower);
+        if (pane.pendingOi && chart.setOiPane) chart.setOiPane(pane.pendingOi);
         if (pane.pendingLldEma) chart.setLldEma(pane.pendingLldEma);
         if (pane.pendingOverlays) syncOverlays(pane, pane.pendingOverlays);
         chart.setInteractionMode(toolMode());
@@ -2447,6 +2448,9 @@
     }
     $("trpPositionSettings").disabled = !snap.position_settings;
     $("researchIndStoch").checked = !!(snap.stochastic && snap.stochastic.enabled);
+    if ($("researchIndOi")) {
+      $("researchIndOi").checked = !!(snap.open_interest && snap.open_interest.enabled);
+    }
     $("researchIndLld").checked = !!(snap.liquidity && snap.liquidity.enabled);
     if (snap.volume_profile) applyVolumeProfileSettings(snap.volume_profile, true);
     if (snap.orderbook_profile) applyOrderbookProfileSettings(snap.orderbook_profile, true);
@@ -2611,6 +2615,7 @@
     }
     pane.pendingEma = packed.ema || { series: [] };
     pane.pendingLower = packed.stochastic || { id: "stochastic", visible: false };
+    pane.pendingOi = packed.open_interest || { id: "open_interest", visible: false };
     pane.pendingLldEma = packed.lld_ema || (packed.liquidity && packed.liquidity.ema) || {
       fast: [], slow: [], fast_visible: false, slow_visible: false,
     };
@@ -2632,6 +2637,7 @@
         skipRangeRestore: !!(opts && opts.skipEmaRangeRestore),
       });
       chart.setLowerPane(pane.pendingLower);
+      if (chart.setOiPane) chart.setOiPane(pane.pendingOi || { id: "open_interest", visible: false });
       chart.setLldEma(pane.pendingLldEma);
       chart.setInteractionMode(toolMode());
       if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
@@ -2657,6 +2663,7 @@
       timeframe: pane.tf,
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
+      open_interest: ws.open_interest || { enabled: false },
       liquidity: ws.liquidity || { enabled: false },
       allow_stale: !!(opts && opts.allowStale),
     };
@@ -4677,6 +4684,14 @@
       }, { sourceAction: "stoch-toggle" }));
       await refreshIndicatorsVisible("stoch-toggle");
     });
+    if ($("researchIndOi")) {
+      $("researchIndOi").addEventListener("change", async function () {
+        applyWorkspace(await sendJson("/api/research/indicator-enabled", "POST", {
+          name: "open_interest", enabled: $("researchIndOi").checked,
+        }, { sourceAction: "oi-toggle" }));
+        await refreshIndicatorsVisible("oi-toggle");
+      });
+    }
     $("researchIndLld").addEventListener("change", async function () {
       applyWorkspace(await sendJson("/api/research/indicator-enabled", "POST", {
         name: "liquidity", enabled: $("researchIndLld").checked,

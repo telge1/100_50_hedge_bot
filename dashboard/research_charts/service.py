@@ -15,6 +15,9 @@ from .clickhouse_source import ClickHouseResearchCandleSource
 from .collector_control import fetch_collector_status, fetch_forming_candle
 from .data_source import MySQLResearchCandleSource, SOURCE_TF
 from .live_universe import classify_live_capability, is_live_configured, load_live_universe_symbols
+from .open_interest import candles_from_times
+from .open_interest import empty_payload as empty_oi_payload
+from .open_interest import load_open_interest_payload
 from .trp_import import load_trp
 
 DEFAULT_LIMIT = 1500
@@ -536,11 +539,14 @@ def _indicators_from_candles(
     *,
     ema: dict | None = None,
     stochastic: dict | None = None,
+    open_interest: dict | None = None,
     liquidity: dict | None = None,
+    oi_times: list | None = None,
 ) -> dict[str, Any]:
     trp = load_trp()
     ema_raw = dict(ema or {})
     stoch_raw = dict(stochastic or {})
+    oi_raw = dict(open_interest or {})
     lld_raw = dict(liquidity or {})
 
     ema_payload = {"series": []}
@@ -556,6 +562,19 @@ def _indicators_from_candles(
     if bool(stoch_cfg.enabled):
         result = trp["compute_stochastic"](candles, stoch_cfg)
         stoch_payload = trp["stochastic_payload"](result, stoch_cfg)
+
+    oi_payload = empty_oi_payload(visible=False)
+    if bool(oi_raw.get("enabled")):
+        oi_candles = candles
+        mapped = candles_from_times(oi_times or [])
+        if mapped:
+            oi_candles = mapped
+        oi_payload = load_open_interest_payload(
+            packed.get("symbol") or "",
+            oi_candles,
+            enabled=True,
+            timeframe=str(packed.get("timeframe") or "5m"),
+        )
 
     overlays: list = []
     lld_ema = {"fast": [], "slow": [], "fast_visible": False, "slow_visible": False}
@@ -592,6 +611,7 @@ def _indicators_from_candles(
         "timeframe": packed["timeframe"],
         "ema": ema_payload,
         "stochastic": stoch_payload,
+        "open_interest": oi_payload,
         "liquidity": {
             "overlays": overlays,
             "ema": lld_ema,
@@ -609,14 +629,22 @@ def compute_indicators(
     limit: int | None = None,
     ema: dict | None = None,
     stochastic: dict | None = None,
+    open_interest: dict | None = None,
     liquidity: dict | None = None,
+    times: list | None = None,
 ) -> dict[str, Any]:
     packed = resolve_candle_pack(
         symbol, timeframe, start=start, end=end, limit=limit, allow_stale=True
     )
     candles = _candles_from_packed(packed, allow_stale=True)
     return _indicators_from_candles(
-        packed, candles, ema=ema, stochastic=stochastic, liquidity=liquidity
+        packed,
+        candles,
+        ema=ema,
+        stochastic=stochastic,
+        open_interest=open_interest,
+        liquidity=liquidity,
+        oi_times=times,
     )
 
 
@@ -629,11 +657,12 @@ def pane_bundle(
     limit: int | None = None,
     ema: dict | None = None,
     stochastic: dict | None = None,
+    open_interest: dict | None = None,
     liquidity: dict | None = None,
     allow_stale: bool = False,
     liquidity_location_as_of: str | None = None,
 ) -> dict[str, Any]:
-    """One candle read, then EMA/Stoch/LLD/overlays from that same payload."""
+    """One candle read, then EMA/Stoch/OI/LLD/overlays from that same payload."""
     from .workspace_session import get_workspace
 
     packed = resolve_candle_pack(
@@ -643,9 +672,15 @@ def pane_bundle(
     ws = get_workspace()
     ema_cfg = ema if ema is not None else ws.ema_config.to_dict()
     stoch_cfg = stochastic if stochastic is not None else ws.stoch_config.to_dict()
+    oi_cfg = open_interest if open_interest is not None else dict(ws.open_interest)
     lld_cfg = liquidity if liquidity is not None else ws.lld_config.to_dict()
     indicators = _indicators_from_candles(
-        packed, candles, ema=ema_cfg, stochastic=stoch_cfg, liquidity={"enabled": False}
+        packed,
+        candles,
+        ema=ema_cfg,
+        stochastic=stoch_cfg,
+        open_interest=oi_cfg,
+        liquidity={"enabled": False},
     )
     trp = load_trp()
     lld_config_obj = (
@@ -700,6 +735,7 @@ def pane_bundle(
         "feed_ready": True,
         "ema": indicators["ema"],
         "stochastic": indicators["stochastic"],
+        "open_interest": indicators["open_interest"],
         "liquidity": {
             "overlays": lld_serialized,
             "ema": lld_ema,

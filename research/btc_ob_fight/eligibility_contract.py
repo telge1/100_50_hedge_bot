@@ -20,7 +20,7 @@ DATA_CONTRACT_ERROR = "DATA_CONTRACT_ERROR"
 
 MANDATORY_SOURCES: Final[tuple[str, ...]] = (
     "PUBLIC_TRADES",
-    "OB200",
+    "OB1000",
     "PROFILE_TRADES",  # causal trades for session_start <= ts < anchor
 )
 CONTEXT_SOURCES: Final[tuple[str, ...]] = (
@@ -98,15 +98,15 @@ def evaluate_eligibility(
             "decision_blocked_reason": "MANDATORY_DATA_ABSENT",
         }
 
-    # Fight observation requires OB200; complete absence → DATA_NOT_AVAILABLE
+    # Fight observation requires OB1000; complete absence → DATA_NOT_AVAILABLE
     # even if trades/candles exist elsewhere (e.g. pre-OB-history anchors).
-    if mandatory_statuses.get("OB200") == "NOT_AVAILABLE":
+    if mandatory_statuses.get("OB1000") == "NOT_AVAILABLE":
         flags["profile_causality_passed"] = bool(profile_causality_passed)
         return {
             "eligibility_contract": ELIGIBILITY_CONTRACT_VERSION,
             "eligibility_status": DATA_NOT_AVAILABLE,
             **flags,
-            "decision_blocked_reason": "OB200_HISTORY_ABSENT",
+            "decision_blocked_reason": "OB1000_HISTORY_ABSENT",
         }
 
     # Public trade events must come from research_public_trades (source purity).

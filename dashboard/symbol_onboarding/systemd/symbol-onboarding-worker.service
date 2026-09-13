@@ -1,0 +1,25 @@
+[Unit]
+Description=Symbol onboarding queue worker (OnboardService apply consumer)
+Documentation=file:///home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/symbol_onboarding/queue_consumer.py
+After=default.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+# Intentionally NOT PartOf=dashboard.service — must survive dashboard restarts.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+Environment=PYTHONPATH=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+Environment=SYMBOL_ONBOARDING_OA_ROOT=/home/telgenbuescher/projects/orderbook_analyse
+Environment=SYMBOL_ONBOARDING_ALLOW_FIXTURE=0
+ExecStart=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python -m symbol_onboarding.queue_consumer --poll-sec 2
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=symbol-onboarding-worker
+
+[Install]
+WantedBy=default.target

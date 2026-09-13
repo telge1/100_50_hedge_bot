@@ -427,4 +427,4 @@ def test_mp_hooks_remain_thin_no_color_logic():
     assert "savedCandleStyle" not in mp
     assert "upColor" not in mp
     assert "applyOptions" not in mp
-    assert "mp-19" in mp
+    assert "mp-24" in mp

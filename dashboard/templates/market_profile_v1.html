@@ -160,6 +160,9 @@
                         <input type="checkbox" id="mpShowLiquidity"> Liquidity Location
                     </label>
                     <button type="button" class="trp-text-btn" id="mpLldSettings" title="Liquidity Location Settings">⚙</button>
+                    <label class="trp-check trp-dock-ind" title="Open Interest unter dem Chart (wie Stochastic auf Research)">
+                        <input type="checkbox" id="mpShowOi"> Open Interest
+                    </label>
                     <div class="trp-lld-legend" id="mpLldLegend" hidden>
                         <span class="trp-muted">Vol Str</span>
                         <div class="trp-vol-rows">
@@ -233,6 +236,11 @@
                                 <canvas id="ob-levels-canvas" aria-hidden="true"></canvas>
                                 <div id="ob-levels-tooltip" class="ob-levels-tooltip" hidden></div>
                             </aside>
+                        </div>
+                        <div id="lower-split" title="Resize oscillator"></div>
+                        <div id="lower-pane">
+                            <div id="osc-legend"></div>
+                            <div id="oscillator"></div>
                         </div>
                     </div>
                     <div id="mpEmpty" class="mp-empty">Chart wird geladen …</div>

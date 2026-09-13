@@ -14,6 +14,10 @@ OB200_ROOT = Path(
     "/home/telgenbuescher/projects/orderbook_analyse/data/"
     "orderbook_raw_shadow/ob200_v3"
 )
+OB1000_ROOT = Path(
+    "/home/telgenbuescher/projects/orderbook_analyse/data/"
+    "orderbook_raw_shadow/ob1000_v1"
+)
 
 
 @dataclass(frozen=True)

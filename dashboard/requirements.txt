@@ -13,4 +13,7 @@ pymysql>=1.1.0
 clickhouse-connect>=0.7.0
 pandas>=2.0
 numpy>=1.24
+# Local editable package for symbol onboarding (install with --no-deps):
+#   .venv/bin/python -m pip install -e /home/telgenbuescher/projects/orderbook_analyse --no-deps
+# See requirements-symbol-onboarding.txt
 

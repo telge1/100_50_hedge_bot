@@ -19,7 +19,13 @@ from . import (
 from .ch_config import load_orderbook_ch_config
 from .contract import THRESHOLDS, empty_collector, sanitize_json, utc_now
 from .oi_backfill import last_closed_5m
-from .probes import probe_full_ob_raw, probe_oi_process, probe_stoch_process, probe_stoch_status
+from .probes import (
+    probe_full_ob_raw,
+    probe_ob1000_materializer,
+    probe_oi_process,
+    probe_stoch_process,
+    probe_stoch_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +60,8 @@ def _ch_query(sql: str, parameters: dict | None = None) -> list[tuple]:
 def _build_full_ob() -> dict[str, Any]:
     c = empty_collector(
         "full_ob_raw_archive",
-        display_name="Full Orderbook Raw Archive",
-        status="STOPPED",
-        evidence="process absent; Phase B forbids start/repair",
+        display_name="Full Orderbook Raw Archive (BTC/DOGE)",
+        status="UNKNOWN",
     )
     probe = probe_full_ob_raw()
     c["process_running"] = probe["process_running"]
@@ -64,19 +69,131 @@ def _build_full_ob() -> dict[str, Any]:
     c["process_started_at"] = probe["process_started_at"]
     c["source_connected"] = probe.get("connected")
     c["last_error"] = probe.get("last_error")
-    c["writer_status"] = "DISABLED_OR_STOPPED"
+    c["queue_depth"] = probe.get("full_ob_queue_depth")
+    c["granularity"] = "raw_orderbook_full"
+    c["source"] = "bybit_ws_orderbook.full"
     c["backfill_supported"] = False
-    c["backfill_status"] = "DISABLED"
-    c["granularity"] = "raw_orderbook"
-    c["source"] = "bybit_ws_orderbook"
-    if probe["process_running"]:
-        c["status"] = "DEGRADED"
-        c["evidence"] = "unexpected process running; no restart/kill from this module"
-        c["reason"] = c["evidence"]
-    else:
+    c["backfill_status"] = "N/A_LIVE_ARCHIVE"
+    c["expected_symbol_count"] = 2
+    written = probe.get("full_ob_messages_written")
+    c["write_rate"] = written
+    health_state = str(probe.get("health_state") or "").upper()
+    if not probe["process_running"]:
         c["status"] = "STOPPED"
-        c["evidence"] = f"STOPPED health_state={probe.get('health_state')!r}"
-        c["reason"] = c["evidence"]
+        c["writer_status"] = "STOPPED"
+        c["evidence"] = f"process absent; health_state={health_state!r}"
+    elif health_state == "LIVE" and probe.get("connected") and written:
+        c["status"] = "HEALTHY"
+        c["writer_status"] = "OK"
+        c["fresh_symbol_count"] = 2
+        c["last_successful_write_at"] = (probe.get("health") or {}).get(
+            "full_ob_raw_archive_last_write_at"
+        ) or probe.get("health_state")
+        c["evidence"] = (
+            f"LIVE connected; full_ob messages_written={written}; "
+            f"topics={probe.get('confirmed_topics')}"
+        )
+    elif probe["process_running"]:
+        c["status"] = "DEGRADED"
+        c["writer_status"] = "UNKNOWN"
+        c["evidence"] = (
+            f"process running but health_state={health_state!r} "
+            f"connected={probe.get('connected')} written={written}"
+        )
+    else:
+        c["status"] = "UNKNOWN"
+        c["evidence"] = "inconclusive"
+    c["reason"] = c["evidence"]
+    return c
+
+
+def _build_ob1000_raw() -> dict[str, Any]:
+    c = empty_collector(
+        "ob1000_raw_archive",
+        display_name="OB1000 Raw Archive (BTC/DOGE)",
+        status="UNKNOWN",
+    )
+    probe = probe_full_ob_raw()
+    ob = probe.get("ob1000") or {}
+    c["process_running"] = probe["process_running"]
+    c["pid"] = probe["pid"]
+    c["process_started_at"] = probe["process_started_at"]
+    c["source_connected"] = probe.get("connected")
+    c["granularity"] = "raw_orderbook_1000"
+    c["source"] = "bybit_ws_orderbook.1000"
+    c["backfill_supported"] = False
+    c["backfill_status"] = "N/A_LIVE_ARCHIVE"
+    c["expected_symbol_count"] = 2
+    written = ob.get("raw_events_written")
+    c["write_rate"] = written
+    c["last_successful_write_at"] = ob.get("raw_last_write_at")
+    c["queue_depth"] = ob.get("raw_queue_current")
+    c["dropped_events"] = ob.get("raw_events_dropped_overflow")
+    enabled = ob.get("raw_archive_enabled")
+    if not probe["process_running"]:
+        c["status"] = "STOPPED"
+        c["evidence"] = "raw-archive process not running"
+    elif enabled is False:
+        c["status"] = "STOPPED"
+        c["evidence"] = "ob1000 archive disabled in health"
+    elif probe.get("connected") and written:
+        c["status"] = "HEALTHY"
+        c["writer_status"] = "OK"
+        c["fresh_symbol_count"] = 2
+        c["evidence"] = (
+            f"events_written={written}; last={ob.get('raw_last_write_at')}; "
+            f"replayable={ob.get('raw_segment_replayable')}"
+        )
+    else:
+        c["status"] = "DEGRADED"
+        c["evidence"] = f"running but weak evidence written={written} connected={probe.get('connected')}"
+    c["reason"] = c["evidence"]
+    return c
+
+
+def _build_ob1000_materializer() -> dict[str, Any]:
+    c = empty_collector(
+        "ob1000_materializer",
+        display_name="OB1000 Materializer (FS→CH 1s)",
+        status="UNKNOWN",
+    )
+    probe = probe_ob1000_materializer()
+    hb = probe.get("heartbeat") or {}
+    lag = hb.get("lag") or {}
+    c["process_running"] = probe["process_running"]
+    c["pid"] = probe["pid"]
+    c["process_started_at"] = probe["process_started_at"]
+    c["granularity"] = "1s_snapshots"
+    c["source"] = "ob1000_v1_fs_archive"
+    c["backfill_supported"] = False
+    c["backfill_status"] = "CONTINUOUS_LOOP"
+    c["lag_seconds"] = lag.get("worst_lag_seconds")
+    c["last_successful_write_at"] = hb.get("updated_at")
+    c["write_rate"] = hb.get("rows_inserted")
+    status = str(hb.get("status") or "").upper()
+    worst = lag.get("worst_lag_seconds")
+    if not probe["process_running"]:
+        c["status"] = "STOPPED"
+        c["evidence"] = "materializer process not running"
+    elif status in {"RUNNING", "OK"} and (worst is None or float(worst) <= 90):
+        c["status"] = "HEALTHY"
+        c["writer_status"] = "OK"
+        c["source_connected"] = True
+        c["evidence"] = (
+            f"heartbeat={status}; cycle={hb.get('cycle')}; "
+            f"rows_last_cycle={hb.get('rows_inserted')}; lag_s={worst}"
+        )
+    elif status == "LAG_WARN" or (worst is not None and float(worst) > 90):
+        c["status"] = "STALE"
+        c["evidence"] = f"lag_warn lag_s={worst}; status={status}"
+    elif status == "ERROR":
+        c["status"] = "DEGRADED"
+        c["last_error"] = hb.get("error")
+        c["evidence"] = f"heartbeat ERROR: {hb.get('error')}"
+    else:
+        c["status"] = "DEGRADED"
+        c["evidence"] = f"heartbeat status={status!r} lag_s={worst}"
+    c["reason"] = c["evidence"]
     return c
 
 
@@ -370,6 +487,8 @@ def build_health_report(*, use_cache: bool = True) -> dict[str, Any]:
             return sanitize_json(_cache["payload"])
 
     collectors = [
+        _build_ob1000_raw(),
+        _build_ob1000_materializer(),
         _build_full_ob(),
         _build_oi_live(),
         _build_oi_5m(),
@@ -377,7 +496,7 @@ def build_health_report(*, use_cache: bool = True) -> dict[str, Any]:
         _build_candles(),
     ]
     payload = {
-        "contract_version": "collector_health_v1",
+        "contract_version": "collector_health_v2",
         "checked_at": utc_now().isoformat().replace("+00:00", "Z"),
         "oi_sot": {
             "database": OI_SOT_DATABASE,
@@ -390,7 +509,7 @@ def build_health_report(*, use_cache: bool = True) -> dict[str, Any]:
             "public_trades_backfill": PUBLIC_TRADES_BACKFILL_GATE,
             "public_trades_ui": PUBLIC_TRADES_UI_BANNER,
             "oi_backfill_execute_default": "dry_run_only_until_activation",
-            "full_ob_restart": "FORBIDDEN_THIS_PHASE",
+            "import_verify": "snapshot_wait_delta_v1",
         },
         "collectors": collectors,
     }

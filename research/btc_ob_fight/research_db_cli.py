@@ -204,7 +204,7 @@ def _run_coverage_only(
 
     missing_lines = []
     for sec in (ob_cov.get("missing_seconds") or [])[:20]:
-        missing_lines.append(f"OB200 {sec}")
+        missing_lines.append(f"OB1000 {sec}")
     if fight_trades_cov["effective_coverage_status"] == "NOT_AVAILABLE":
         missing_lines.append("PUBLIC_TRADES RESEARCH_TRADE_EVENTS_MISSING")
     if profile_trades_cov["effective_coverage_status"] == "NOT_AVAILABLE":
@@ -377,12 +377,12 @@ def run_research_db_analysis(cfg: RunConfig) -> int:
     missing_iv = ob_cov.get("missing_intervals") or []
     if len(missing_secs) > 20 and missing_iv:
         for iv in missing_iv[:10]:
-            missing_lines.append(f"OB200 {iv.get('start')}..{iv.get('end')}")
+            missing_lines.append(f"OB1000 {iv.get('start')}..{iv.get('end')}")
         if len(missing_iv) > 10:
-            missing_lines.append(f"OB200 ... +{len(missing_iv) - 10} more intervals ({len(missing_secs)} seconds)")
+            missing_lines.append(f"OB1000 ... +{len(missing_iv) - 10} more intervals ({len(missing_secs)} seconds)")
     else:
         for sec in missing_secs:
-            missing_lines.append(f"OB200 {sec}")
+            missing_lines.append(f"OB1000 {sec}")
     if fight_trades_cov["effective_coverage_status"] in {"PARTIAL", "NOT_AVAILABLE"}:
         missing_lines.append("PUBLIC_TRADES window coverage incomplete")
     if profile_trades_cov["effective_coverage_status"] in {"PARTIAL", "NOT_AVAILABLE"}:

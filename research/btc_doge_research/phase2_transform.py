@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
+from .ob1000_live_ticks import resolve_ob1000_tick_size
 from .phase2_contracts import TICK_SIZE
 
 
@@ -83,7 +84,11 @@ def aggregate_trade_buckets(
 
 
 def price_to_tick(symbol: str, price: Decimal) -> int:
-    tick = TICK_SIZE[symbol]
+    # Pilot map first; OB1000 live registry for additional registered symbols.
+    try:
+        tick = TICK_SIZE[symbol]
+    except KeyError:
+        tick = resolve_ob1000_tick_size(symbol)
     ticks = price / tick
     if ticks != ticks.to_integral_value():
         raise ValueError(f"price is not on {symbol} tick: {price}")
@@ -94,6 +99,8 @@ def compact_ob_state(
     symbol: str,
     bids: tuple[tuple[Decimal, Decimal], ...],
     asks: tuple[tuple[Decimal, Decimal], ...],
+    *,
+    expected_depth: int = 200,
 ) -> dict[str, Any]:
     if not bids or not asks or bids[0][0] >= asks[0][0]:
         raise ValueError("invalid order book")
@@ -104,6 +111,7 @@ def compact_ob_state(
     if ask_ticks != sorted(ask_ticks):
         raise ValueError("asks not ascending")
     best_bid, best_ask = bids[0][0], asks[0][0]
+    depth = int(expected_depth)
     return {
         "bid_price_ticks": bid_ticks,
         "bid_quantities": [qty for _, qty in bids],
@@ -115,7 +123,7 @@ def compact_ob_state(
         "spread": best_ask - best_bid,
         "bid_level_count": len(bids),
         "ask_level_count": len(asks),
-        "genuine_depth": int(len(bids) == 200 and len(asks) == 200),
+        "genuine_depth": int(len(bids) == depth and len(asks) == depth),
     }
 
 

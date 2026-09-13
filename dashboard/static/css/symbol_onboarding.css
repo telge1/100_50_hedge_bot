@@ -1,0 +1,193 @@
+/* Symbol onboarding admin page — reuses stoch card/table language */
+
+.so-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.so-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 960px) {
+  .so-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.so-card .stoch-card-summary {
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.so-card .stoch-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.so-card label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.so-card input[type="text"],
+.so-card input[type="number"],
+.so-card select {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-width: 320px;
+}
+
+.so-fieldset {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 4px 0;
+}
+
+.so-fieldset legend {
+  padding: 0 6px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.so-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.so-hint,
+.so-muted {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.so-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.so-error {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.so-progress-bar-wrap {
+  height: 10px;
+  background: #1e293b;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.so-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #22c55e, #38bdf8);
+  transition: width 0.25s ease;
+}
+
+.so-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.so-stages li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.so-stage-ok { color: #86efac; }
+.so-stage-run { color: #7dd3fc; }
+.so-stage-fail { color: #fca5a5; }
+.so-stage-wait { color: #fcd34d; }
+.so-stage-skip { color: #94a3b8; }
+
+.so-archive-hint {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 53, 15, 0.35);
+  color: #fde68a;
+}
+
+.so-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.so-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.so-modal {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  max-width: 520px;
+  width: 100%;
+  padding: 16px;
+  color: #e2e8f0;
+}
+
+.so-confirm-summary {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 10px;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.stoch-page-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.so-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.so-mode-btn.is-active {
+  outline: 1px solid rgba(56, 189, 248, 0.55);
+}

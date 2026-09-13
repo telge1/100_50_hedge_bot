@@ -22,7 +22,7 @@ from research.btc_ob_fight.research_db_loader import FORBIDDEN_WRITE, _assert_re
 
 def test_data_complete_flags():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
+        mandatory_statuses={"OB1000": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
         context_statuses={"OPEN_INTEREST": "COMPLETE", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=True,
     )
@@ -35,19 +35,19 @@ def test_data_complete_flags():
     assert gate["direction"] is None
 
 
-def test_ob200_absent_is_data_not_available_even_if_trades_exist():
+def test_ob1000_absent_is_data_not_available_even_if_trades_exist():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "NOT_AVAILABLE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
+        mandatory_statuses={"OB1000": "NOT_AVAILABLE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
         context_statuses={"OPEN_INTEREST": "COMPLETE", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=False,
     )
     assert gate["eligibility_status"] == DATA_NOT_AVAILABLE
-    assert gate["decision_blocked_reason"] == "OB200_HISTORY_ABSENT"
+    assert gate["decision_blocked_reason"] == "OB1000_HISTORY_ABSENT"
 
 
 def test_context_partial_oi():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
+        mandatory_statuses={"OB1000": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
         context_statuses={"OPEN_INTEREST": "PARTIAL", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=True,
     )
@@ -59,7 +59,7 @@ def test_context_partial_oi():
 
 def test_partial_ob_mid_hour_gap():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "PARTIAL", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
+        mandatory_statuses={"OB1000": "PARTIAL", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
         context_statuses={"OPEN_INTEREST": "COMPLETE", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=True,
     )
@@ -71,7 +71,7 @@ def test_partial_ob_mid_hour_gap():
 def test_data_not_available():
     gate = evaluate_eligibility(
         mandatory_statuses={
-            "OB200": "NOT_AVAILABLE",
+            "OB1000": "NOT_AVAILABLE",
             "PUBLIC_TRADES": "NOT_AVAILABLE",
             "PROFILE_TRADES": "NOT_AVAILABLE",
         },
@@ -83,7 +83,7 @@ def test_data_not_available():
 
 def test_contract_error():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
+        mandatory_statuses={"OB1000": "COMPLETE", "PUBLIC_TRADES": "COMPLETE", "PROFILE_TRADES": "COMPLETE"},
         context_statuses={"OPEN_INTEREST": "COMPLETE", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=True,
         contract_error="LINEAGE_MISMATCH",
@@ -197,7 +197,7 @@ def test_cli_defaults_research_db():
 
 def test_public_trades_absent_is_research_trade_events_missing():
     gate = evaluate_eligibility(
-        mandatory_statuses={"OB200": "COMPLETE", "PUBLIC_TRADES": "NOT_AVAILABLE", "PROFILE_TRADES": "NOT_AVAILABLE"},
+        mandatory_statuses={"OB1000": "COMPLETE", "PUBLIC_TRADES": "NOT_AVAILABLE", "PROFILE_TRADES": "NOT_AVAILABLE"},
         context_statuses={"OPEN_INTEREST": "COMPLETE", "LIQUIDATIONS": "COMPLETE", "CANDLES_1M": "COMPLETE"},
         profile_causality_passed=True,
     )

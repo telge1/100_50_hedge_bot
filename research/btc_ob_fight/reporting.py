@@ -601,7 +601,7 @@ def build_report_md(
         lines.append(f"- Cluster counts by gap: {gaps}")
         ob_cov = sq.get("ob_coverage_metrics") or {}
         if ob_cov:
-            lines.append(f"- OB200 coverage metrics: {ob_cov.get('overall') or ob_cov}")
+            lines.append(f"- OB1000 coverage metrics: {ob_cov.get('overall') or ob_cov}")
         cons = sq.get("consumption_metrics") or sq.get("consumption_by_scope") or {}
         lines.append(f"- Consumption metrics: {cons}")
         lines.append(f"- Exact refills: {sq.get('exact_refill_count')}")
@@ -705,7 +705,7 @@ def _observability_console_block(sq: dict[str, Any]) -> list[str]:
     ) or "OUTSIDE_BOOK" in str(status)
     if mostly_outside:
         lines.append("PASSIVE EDGE CONTROL: NOT_EVALUATED")
-        lines.append("REASON: EDGE_REGION_MOSTLY_OUTSIDE_OB200_RANGE")
+        lines.append("REASON: EDGE_REGION_MOSTLY_OUTSIDE_OB1000_RANGE")
         lines.append("- Note: not observable ≠ 0 observed; no absorption/refill/control inferred.")
     return lines
 

@@ -22,6 +22,17 @@
     max-width: 720px;
 }
 
+.stoch-page-header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.so-admin-btn {
+    white-space: nowrap;
+}
+
 .stoch-research-banner {
     margin-bottom: 12px;
     padding: 12px 14px;

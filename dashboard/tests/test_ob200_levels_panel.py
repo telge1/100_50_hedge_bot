@@ -606,7 +606,7 @@ def test_frontend_ob1000_wiring_and_desync_helpers():
     assert "scheduleDrawOrderbookLevels" in chart
     assert "oblFilterVisible" in chart
     assert "position: absolute" in css
-    assert "ob-levels-15" in pane
+    assert "ob-levels-19" in pane
     assert "debugOrderbookLevels" in chart
     assert "raw_bid_count" in chart
 

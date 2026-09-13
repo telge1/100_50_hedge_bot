@@ -1,4 +1,4 @@
-"""OB200 edge-region book coverage from in-memory replay snapshots."""
+"""OB1000 edge-region book coverage from in-memory replay snapshots."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def build_edge_book_coverage(
     ob_rows: list[dict[str, Any]],
     region_catalog: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    """Analyze edge-region visibility in reconstructed 200-level books."""
+    """Analyze edge-region visibility in reconstructed 1000-level books."""
     coverage_rows: list[dict[str, Any]] = []
     depth_samples: list[dict[str, Any]] = []
 
@@ -85,7 +85,7 @@ def _sample_region(
     if ask_map is None:
         ask_map = _level_qty_by_tick(asks)
 
-    # Iterate book levels (≤200/side) instead of every region tick — same counts.
+    # Iterate book levels (≤1000/side) instead of every region tick — same counts.
     bid_qty = 0.0
     ask_qty = 0.0
     observed: set[int] = set()

@@ -84,7 +84,7 @@ class TimedQuery:
         return result
 
 
-def load_ob200_snapshots(
+def load_ob1000_snapshots(
     client: Any,
     timer: TimedQuery,
     symbol: str,
@@ -93,7 +93,10 @@ def load_ob200_snapshots(
     *,
     inclusive_end: bool = True,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Load unique 1s OB200 snapshots; keep first build_id by computed_at for safety."""
+    """Load unique 1s OB1000 snapshots; keep first build_id by computed_at for safety.
+
+    OB200 is intentionally not used (no fallback).
+    """
     start = utc(start)
     end = utc(end)
     op = "<=" if inclusive_end else "<"
@@ -103,7 +106,7 @@ def load_ob200_snapshots(
             ask_price_ticks, ask_quantities, best_bid, best_ask, mid, spread,
             bid_level_count, ask_level_count, genuine_depth, source_fingerprint,
             build_id, coverage_status, computed_at
-        FROM {TARGET_DATABASE}.research_ob200_snapshots_1s
+        FROM {TARGET_DATABASE}.research_ob1000_snapshots_1s
         WHERE symbol = %(symbol)s
           AND snapshot_ts >= %(start)s
           AND snapshot_ts {op} %(end)s
@@ -111,7 +114,7 @@ def load_ob200_snapshots(
     """
     raw = timer.run(
         client,
-        "OB200",
+        "OB1000",
         sql,
         {"symbol": symbol, "start": start, "end": end},
     )
@@ -139,7 +142,8 @@ def load_ob200_snapshots(
             "spread": float(r[9]),
             "bid_levels": int(r[10]),
             "ask_levels": int(r[11]),
-            "genuine_200": bool(r[12]) and int(r[10]) == 200 and int(r[11]) == 200,
+            "genuine_1000": bool(r[12]) and int(r[10]) == 1000 and int(r[11]) == 1000,
+            "genuine_200": False,  # legacy key kept False (no OB200 fallback)
             "source_fingerprint": _dec_fs(r[13]),
             "build_id": _dec_fs(r[14]),
             "coverage_status": str(r[15]),
@@ -147,15 +151,20 @@ def load_ob200_snapshots(
         }
     out = [by_ts[k] for k in sorted(by_ts)]
     meta = {
-        "table": f"{TARGET_DATABASE}.research_ob200_snapshots_1s",
+        "table": f"{TARGET_DATABASE}.research_ob1000_snapshots_1s",
         "raw_rows": len(raw),
         "unique_seconds": len(out),
         "duplicate_seconds_dropped": dup,
         "min_ts": iso_z(out[0]["ts"]) if out else None,
         "max_ts": iso_z(out[-1]["ts"]) if out else None,
-        "levels_200x200": sum(1 for x in out if x["genuine_200"]),
+        "levels_1000x1000": sum(1 for x in out if x["genuine_1000"]),
     }
     return out, meta
+
+
+# Backward-compatible name used by older imports — OB1000 only, no OB200.
+def load_ob200_snapshots(*args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    return load_ob1000_snapshots(*args, **kwargs)
 
 
 def _extract_walls_float(snap: dict[str, Any], *, max_walls: int = 10) -> list[dict[str, Any]]:
@@ -240,7 +249,8 @@ def ob_snapshots_to_wall_rows(snapshots: list[dict[str, Any]]) -> list[dict[str,
                 "spread_bps": spread_bps,
                 "bid_levels": snap["bid_levels"],
                 "ask_levels": snap["ask_levels"],
-                "genuine_200": snap["genuine_200"],
+                "genuine_1000": snap.get("genuine_1000"),
+                "genuine_200": snap.get("genuine_1000"),  # walls tolerate legacy key
                 "top_bid_walls": [_wall_dict(w) for w in top_bid],
                 "top_ask_walls": [_wall_dict(w) for w in top_ask],
                 "bids": bids,
@@ -579,7 +589,7 @@ def terminal_batch_status(
     return str(found[0][0])
 
 
-def probe_ob200_coverage_meta(
+def probe_ob1000_coverage_meta(
     client: Any,
     timer: TimedQuery,
     symbol: str,
@@ -588,20 +598,20 @@ def probe_ob200_coverage_meta(
     *,
     inclusive_end: bool = True,
 ) -> dict[str, Any]:
-    """Lightweight OB200 coverage without loading bid/ask arrays."""
+    """Lightweight OB1000 coverage without loading bid/ask arrays."""
     start = utc(start)
     end = utc(end)
     expected = int((end - start).total_seconds()) + (1 if inclusive_end else 0)
     op = "<=" if inclusive_end else "<"
     sql = f"""
         SELECT countDistinct(snapshot_ts), min(snapshot_ts), max(snapshot_ts),
-               countIf(bid_level_count=200 AND ask_level_count=200),
+               countIf(bid_level_count=1000 AND ask_level_count=1000),
                count() - countDistinct(snapshot_ts)
-        FROM {TARGET_DATABASE}.research_ob200_snapshots_1s
+        FROM {TARGET_DATABASE}.research_ob1000_snapshots_1s
         WHERE symbol=%(symbol)s
           AND snapshot_ts >= %(start)s AND snapshot_ts {op} %(end)s
     """
-    row = timer.run(client, "OB200_COVERAGE_META", sql, {"symbol": symbol, "start": start, "end": end})[0]
+    row = timer.run(client, "OB1000_COVERAGE_META", sql, {"symbol": symbol, "start": start, "end": end})[0]
     observed = int(row[0] or 0)
     levels_ok = int(row[3] or 0) == observed and observed > 0
     dup = int(row[4] or 0)
@@ -612,7 +622,6 @@ def probe_ob200_coverage_meta(
         missing_seconds: list[str] = []
     elif missing_count or not levels_ok or dup > 0:
         status = "PARTIAL"
-        # Only enumerate missing seconds when few; else interval summary
         missing_seconds = []
         missing_intervals = []
         if 0 < missing_count <= 64:
@@ -623,7 +632,7 @@ def probe_ob200_coverage_meta(
                 ),
                 have AS (
                   SELECT DISTINCT snapshot_ts AS ts
-                  FROM {TARGET_DATABASE}.research_ob200_snapshots_1s
+                  FROM {TARGET_DATABASE}.research_ob1000_snapshots_1s
                   WHERE symbol=%(symbol)s
                     AND snapshot_ts >= %(start)s AND snapshot_ts {op} %(end)s
                 )
@@ -632,7 +641,7 @@ def probe_ob200_coverage_meta(
             n = expected if inclusive_end else expected
             miss_rows = timer.run(
                 client,
-                "OB200_MISSING_SECONDS",
+                "OB1000_MISSING_SECONDS",
                 miss_sql,
                 {"symbol": symbol, "start": start, "end": end, "n": n},
             )
@@ -655,7 +664,7 @@ def probe_ob200_coverage_meta(
         missing_intervals = []
         missing_seconds = []
     return {
-        "source_name": "OB200",
+        "source_name": "OB1000",
         "symbol": symbol,
         "requested_start": iso_z(start),
         "requested_end": iso_z(end),
@@ -667,14 +676,19 @@ def probe_ob200_coverage_meta(
         "missing_intervals": missing_intervals,
         "missing_seconds": missing_seconds,
         "duplicate_seconds": dup,
-        "levels_200x200_ok": levels_ok,
+        "levels_1000x1000_ok": levels_ok,
+        "levels_200x200_ok": False,
         "source_segment_status": status,
         "effective_coverage_status": status,
         "mandatory_for_facts": True,
         "mandatory_for_interpretation": True,
         "probe_mode": "COVERAGE_META_NO_ARRAYS",
-        "table": f"{TARGET_DATABASE}.research_ob200_snapshots_1s",
+        "table": f"{TARGET_DATABASE}.research_ob1000_snapshots_1s",
     }
+
+
+def probe_ob200_coverage_meta(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    return probe_ob1000_coverage_meta(*args, **kwargs)
 
 
 def probe_public_trade_events_meta(

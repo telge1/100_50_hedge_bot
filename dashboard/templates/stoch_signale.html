@@ -49,6 +49,11 @@
                     </div>
                     {% endif %}
                 </div>
+                {% if user.role == 'admin' %}
+                <div class="stoch-page-header-actions">
+                    <a href="/datenverwaltung/symbole" class="stoch-btn so-admin-btn" title="Symbol-Onboarding">Symbol hinzufügen</a>
+                </div>
+                {% endif %}
             </div>
 
             <div class="stoch-perf" id="stochPerfSummary" aria-live="polite">
@@ -158,14 +163,21 @@
                 <div class="stoch-card-body">
                     <p class="stoch-universe51-note">
                         Evidenzbasiert (Prozess + Quelle/Heartbeat + Writer + DB-Freshness).
-                        Grüner Status nie nur aus PID. Full-OB bleibt STOPPED (kein Restart hier).
-                        OI-SoT: ClickHouse <code>open_interest_5m_history</code> (REST 5m) —
-                        nicht MySQL <code>research_open_interest_5m</code>; 5s wird nicht aus 5m vorgetäuscht.
+                        Grüner Status nie nur aus PID.
+                        Button <strong>Import jetzt prüfen</strong>: misst echte Zähler vorher/nachher
+                        (~5s) — PASS nur wenn Daten wirklich weiterlaufen.
+                        OI-SoT: ClickHouse <code>open_interest_5m_history</code> (REST 5m).
                         Public Trades: <strong>DEGRADED — LIVE CURRENT BUT DATA LOSS POSSIBLE</strong>
                         (Backfill-Button deaktiviert bis Re-Audit).
                     </p>
                     <div class="stoch-collector-error" id="dataCollectorHealthError" style="display:none;"></div>
                     <div class="stoch-collector-meta" id="dataCollectorHealthMeta">Prüfung: –</div>
+                    <div class="stoch-universe51-actions" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="stoch-btn" id="importVerifyBtn">Import jetzt prüfen (5s)</button>
+                        <button type="button" class="stoch-btn" id="dataHealthRefreshBtn">Status aktualisieren</button>
+                    </div>
+                    <div class="stoch-collector-meta" id="importVerifyMeta" style="margin-top:8px;"></div>
+                    <pre class="stoch-universe51-note" id="importVerifyLog" style="max-height:220px; overflow:auto; white-space:pre-wrap;"></pre>
                     <div class="stoch-table-wrap">
                         <table class="stoch-table" id="dataCollectorHealthTable">
                             <thead>
@@ -515,7 +527,7 @@
 
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
     <script src="/static/js/stoch_chart_modal.js?v=7"></script>
-    <script src="/static/js/stoch_signale.js?v=22"></script>
+    <script src="/static/js/stoch_signale.js?v=23"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

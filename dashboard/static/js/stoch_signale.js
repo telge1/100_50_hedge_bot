@@ -2632,6 +2632,66 @@
     }
   }
 
+  async function runImportVerify() {
+    const btn = $("importVerifyBtn");
+    const meta = $("importVerifyMeta");
+    const log = $("importVerifyLog");
+    if (btn) btn.disabled = true;
+    if (meta) meta.textContent = "Import-Prüfung läuft (~5s, Zähler vorher/nachher)…";
+    if (log) log.textContent = "";
+    try {
+      const token = dataHealthUi.csrf || (await ensureDataHealthCsrf());
+      const res = await fetch("/api/collector-health/verify-import", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": token,
+        },
+        body: JSON.stringify({ wait_seconds: 5 }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || ("HTTP " + res.status));
+      }
+      const result = data.result || {};
+      const overall = result.overall || (data.ok ? "PASS" : "FAIL");
+      if (meta) {
+        meta.textContent =
+          "Ergebnis: " +
+          overall +
+          " · passed=" +
+          (result.passed != null ? result.passed : "–") +
+          " · failed=" +
+          ((result.failed || []).join(",") || "–") +
+          " · " +
+          (data.checked_at || "");
+      }
+      const lines = (result.checks || []).map(function (c) {
+        return (
+          (c.verdict || (c.ok ? "PASS" : "FAIL")) +
+          "  " +
+          (c.id || "") +
+          "  —  " +
+          (c.detail || "")
+        );
+      });
+      if (log) {
+        log.textContent =
+          (data.explanation || "") +
+          "\n\n" +
+          lines.join("\n");
+      }
+      await loadDataCollectorHealth();
+    } catch (err) {
+      if (meta) meta.textContent = "Import-Prüfung fehlgeschlagen";
+      if (log) log.textContent = String(err);
+      setErr("dataCollectorHealthError", "Import-Prüfung: " + err);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function postOiBackfill(path, body) {
     const token = dataHealthUi.csrf || (await ensureDataHealthCsrf());
     const res = await fetch(path, {
@@ -2745,8 +2805,12 @@
     const detect = $("oiGapDetectBtn");
     const dry = $("oiBackfillDryRunBtn");
     const pt = $("ptBackfillBtn");
+    const verifyBtn = $("importVerifyBtn");
+    const refreshBtn = $("dataHealthRefreshBtn");
     if (detect) detect.addEventListener("click", startOiDetect);
     if (dry) dry.addEventListener("click", startOiDryRun);
+    if (verifyBtn) verifyBtn.addEventListener("click", runImportVerify);
+    if (refreshBtn) refreshBtn.addEventListener("click", loadDataCollectorHealth);
     if (pt) {
       pt.disabled = true;
       pt.title = "DEGRADED — LIVE CURRENT BUT DATA LOSS POSSIBLE";
