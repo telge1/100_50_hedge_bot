@@ -26,6 +26,7 @@ from .service import (
     default_limit,
     known_symbols,
     list_symbols,
+    liquidity_location_overlay_bundle,
     load_candles,
     pane_bundle,
     symbol_meta,
@@ -457,6 +458,39 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(400, str(exc), str(exc))
         except Exception as exc:
             return _error(500, "pane_load_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/liquidity-location")
+    async def api_research_liquidity_location(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Slim LLD overlay for Market Profile (no candle duplication).
+
+        Same auth and LLD engine as /api/research/pane; response omits candles
+        and unused research series. Read-only.
+        """
+        tf = str(body.get("timeframe") or "5m")
+        if tf not in SUPPORTED_TIMEFRAMES:
+            return _error(400, "invalid_timeframe", f"unsupported timeframe {tf}")
+        try:
+            payload = await asyncio.to_thread(
+                liquidity_location_overlay_bundle,
+                str(body.get("symbol") or ""),
+                tf,
+                start=body.get("from"),
+                end=body.get("to"),
+                limit=body.get("limit"),
+                liquidity=body.get("liquidity"),
+                allow_stale=bool(body.get("allow_stale")),
+                liquidity_location_as_of=body.get("liquidity_location_as_of"),
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", "no 1m candles for symbol")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "lld_overlay_load_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
 
     @router.get("/api/research/live-status")
