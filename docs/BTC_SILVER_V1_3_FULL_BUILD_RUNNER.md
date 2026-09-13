@@ -21,6 +21,13 @@ a fully verified Bronze input, and no active Bronze import process.
 
 Do not start Silver while the Bronze full import is still running.
 
+## Parallel analysis while building
+
+Completed Silver windows may be analysed read-only in parallel with the builder.
+See [BTC_SILVER_V1_3_ANALYSIS_READINESS.md](BTC_SILVER_V1_3_ANALYSIS_READINESS.md).
+Analysis must call `assert_analysis_window_ready` first and must never touch the
+builder lock.
+
 ## Schema initialization
 
 Creates only the new productive Silver v1.3 tables. No Bronze reads beyond
