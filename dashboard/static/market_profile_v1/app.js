@@ -168,6 +168,520 @@
 
 /* === end MpLldOverlayHelpers bootstrap === */
 
+/* === MpUxModeHelpers bootstrap (synced with ux_mode_helpers.js) === */
+/**
+ * Pure Market-Profile UX helpers (Node + browser).
+ * Standard/Pro migration, data-quality derivation, legend copy.
+ * No network, no ClickHouse, no DOM mutation except optional builders.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === "object" && module.exports) {
+    module.exports = api;
+  }
+  if (root) {
+    root.MpUxModeHelpers = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var SETTINGS_SCHEMA = 2;
+  var STORAGE_KEY = "mp_v1_settings";
+
+  /** Layer keys that Standard may suppress (heavy / detail). */
+  var HEAVY_LAYER_KEYS = [
+    "showVolumeLine",
+    "splitBuySell",
+    "showHvn",
+    "showLvn",
+    "showSinglePrints",
+    "showNakedPoc",
+    "showShape",
+    "showOi",
+    "showFootprint",
+    "final",
+    "fpShowAvrPanel",
+    "obpEnabled",
+    "oblEnabled"
+  ];
+
+  /** Core visual defaults for brand-new Standard users. */
+  var STANDARD_CORE = {
+    showHistogram: true,
+    showVolumeLine: false,
+    splitBuySell: false,
+    showPoc: true,
+    showValueArea: true,
+    showHvn: false,
+    showLvn: false,
+    showSinglePrints: false,
+    showNakedPoc: false,
+    extendLevels: true,
+    showShape: false,
+    showLiquidity: true,
+    showOi: false,
+    showFootprint: false,
+    final: false,
+    fpShowAvrPanel: false,
+    obpEnabled: false,
+    oblEnabled: false
+  };
+
+  function isObject(v) {
+    return v !== null && typeof v === "object" && !Array.isArray(v);
+  }
+
+  function clone(obj) {
+    return JSON.parse(JSON.stringify(obj || {}));
+  }
+
+  /**
+   * Safe migration of persisted settings.
+   * @param {string|null} rawString localStorage blob
+   * @returns {{ok:boolean, isNewUser:boolean, migratedFromLegacy:boolean, settings:object, reason?:string}}
+   */
+  function migratePersistedSettings(rawString) {
+    if (rawString == null || rawString === "") {
+      return {
+        ok: true,
+        isNewUser: true,
+        migratedFromLegacy: false,
+        settings: Object.assign(
+          {
+            ui_mode: "standard",
+            settings_schema: SETTINGS_SCHEMA,
+            pro_snapshot: null
+          },
+          STANDARD_CORE
+        )
+      };
+    }
+    var parsed;
+    try {
+      parsed = JSON.parse(rawString);
+    } catch (err) {
+      return {
+        ok: true,
+        isNewUser: true,
+        migratedFromLegacy: false,
+        reason: "corrupt_json",
+        settings: Object.assign(
+          {
+            ui_mode: "standard",
+            settings_schema: SETTINGS_SCHEMA,
+            pro_snapshot: null
+          },
+          STANDARD_CORE
+        )
+      };
+    }
+    if (!isObject(parsed)) {
+      return {
+        ok: true,
+        isNewUser: true,
+        migratedFromLegacy: false,
+        reason: "not_object",
+        settings: Object.assign(
+          {
+            ui_mode: "standard",
+            settings_schema: SETTINGS_SCHEMA,
+            pro_snapshot: null
+          },
+          STANDARD_CORE
+        )
+      };
+    }
+
+    var out = clone(parsed);
+    var migratedFromLegacy = false;
+    if (out.ui_mode !== "standard" && out.ui_mode !== "pro") {
+      // Existing user without ui_mode: preserve visual state as Pro.
+      out.ui_mode = "pro";
+      migratedFromLegacy = true;
+    }
+    if (out.settings_schema == null) out.settings_schema = SETTINGS_SCHEMA;
+    if (out.pro_snapshot === undefined) out.pro_snapshot = null;
+    // Unknown legacy keys remain on `out` harmlessly.
+    return {
+      ok: true,
+      isNewUser: false,
+      migratedFromLegacy: migratedFromLegacy,
+      settings: out
+    };
+  }
+
+  function captureProSnapshot(layerState) {
+    var snap = {};
+    HEAVY_LAYER_KEYS.forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(layerState, k)) {
+        snap[k] = !!layerState[k];
+      }
+    });
+    // Also preserve core toggles so restore is complete.
+    [
+      "showHistogram",
+      "showPoc",
+      "showValueArea",
+      "showLiquidity",
+      "extendLevels"
+    ].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(layerState, k)) {
+        snap[k] = !!layerState[k];
+      }
+    });
+    return snap;
+  }
+
+  function applyStandardMask(layerState) {
+    return Object.assign({}, layerState || {}, STANDARD_CORE);
+  }
+
+  function restoreProSnapshot(layerState, snapshot) {
+    if (!isObject(snapshot)) return Object.assign({}, layerState || {});
+    return Object.assign({}, layerState || {}, snapshot);
+  }
+
+  /**
+   * Mode transition plan — pure; caller applies DOM / network effects.
+   */
+  function planModeSwitch(fromMode, toMode, currentLayers, existingSnapshot) {
+    fromMode = fromMode === "standard" ? "standard" : "pro";
+    toMode = toMode === "standard" ? "standard" : "pro";
+    if (fromMode === toMode) {
+      return {
+        changed: false,
+        ui_mode: toMode,
+        layers: currentLayers,
+        pro_snapshot: existingSnapshot || null,
+        bumpGeneration: false,
+        enableFetches: [],
+        disableLayers: []
+      };
+    }
+    if (toMode === "standard") {
+      var snap = captureProSnapshot(currentLayers);
+      var masked = applyStandardMask(currentLayers);
+      var disableLayers = HEAVY_LAYER_KEYS.filter(function (k) {
+        return !!currentLayers[k] && !masked[k];
+      });
+      var enableFetches = [];
+      if (masked.showLiquidity && !currentLayers.showLiquidity) {
+        enableFetches.push("lld");
+      }
+      return {
+        changed: true,
+        ui_mode: "standard",
+        layers: masked,
+        pro_snapshot: snap,
+        bumpGeneration: true,
+        enableFetches: enableFetches,
+        disableLayers: disableLayers
+      };
+    }
+    // → pro
+    var restored = restoreProSnapshot(currentLayers, existingSnapshot);
+    var enableFetchesPro = [];
+    if (restored.showLiquidity && !currentLayers.showLiquidity) enableFetchesPro.push("lld");
+    if (restored.showOi && !currentLayers.showOi) enableFetchesPro.push("oi");
+    if (restored.showFootprint && !currentLayers.showFootprint) enableFetchesPro.push("footprint");
+    if (restored.obpEnabled && !currentLayers.obpEnabled) enableFetchesPro.push("obp");
+    if (restored.oblEnabled && !currentLayers.oblEnabled) enableFetchesPro.push("obl");
+    return {
+      changed: true,
+      ui_mode: "pro",
+      layers: restored,
+      pro_snapshot: existingSnapshot || null,
+      bumpGeneration: false,
+      enableFetches: enableFetchesPro,
+      disableLayers: []
+    };
+  }
+
+  function standardHeavyRequestCount(layers) {
+    var n = 0;
+    if (layers.showOi) n += 1;
+    if (layers.showFootprint) n += 1;
+    if (layers.obpEnabled) n += 1;
+    if (layers.oblEnabled) n += 1;
+    return n;
+  }
+
+  /**
+   * Honest data-quality summary from already-loaded metadata only.
+   * Missing evidence → Unbekannt (never invent Gesund/Vollständig).
+   */
+  function deriveDataQuality(sources) {
+    sources = sources || {};
+    var details = [];
+    var rank = { unknown: 0, unavailable: 1, delayed: 2, partial: 3, complete: 4 };
+    var worst = null;
+
+    function note(status, label, detail) {
+      details.push({ status: status, label: label, detail: detail || "" });
+      if (worst == null || rank[status] < rank[worst]) worst = status;
+    }
+
+    var meta = sources.profileMeta;
+    if (!meta || typeof meta !== "object") {
+      note("unknown", "Market Profile", "Keine Metadaten geladen");
+    } else {
+      var built = Number(meta.profiles_built);
+      var windows = Number(meta.windows);
+      var skipped = Array.isArray(meta.skipped_windows) ? meta.skipped_windows.length : null;
+      if (!isFinite(built) || !isFinite(windows)) {
+        note("unknown", "Market Profile", "Fensterzahlen unbekannt");
+      } else if (windows <= 0) {
+        note("unavailable", "Market Profile", "Keine Fenster");
+      } else if (built < windows || (skipped != null && skipped > 0)) {
+        note(
+          "partial",
+          "Market Profile",
+          built + "/" + windows + " Fenster" + (skipped ? ", " + skipped + " ohne Daten" : "")
+        );
+      } else {
+        note("complete", "Market Profile", built + "/" + windows + " Fenster");
+      }
+      if (meta.error || meta.error_code) {
+        note("unavailable", "Market Profile Fehler", String(meta.error || meta.error_code));
+      }
+    }
+
+    if (sources.cached === true) details.push({ status: "complete", label: "Cache", detail: "Treffer" });
+    else if (sources.cached === false) details.push({ status: "complete", label: "Cache", detail: "Frischer Abruf" });
+    else details.push({ status: "unknown", label: "Cache", detail: "Unbekannt" });
+
+    if (sources.liveLagSec == null || !isFinite(Number(sources.liveLagSec))) {
+      details.push({ status: "unknown", label: "Live-Lag", detail: "Unbekannt" });
+    } else {
+      var lag = Number(sources.liveLagSec);
+      if (lag > 120) note("delayed", "Live-Lag", Math.round(lag) + "s");
+      else details.push({ status: "complete", label: "Live-Lag", detail: Math.round(lag) + "s" });
+    }
+
+    var developing = sources.developing;
+    if (developing === true) details.push({ status: "partial", label: "Profil", detail: "DEVELOPING" });
+    else if (developing === false) details.push({ status: "complete", label: "Profil", detail: "CLOSED" });
+    else details.push({ status: "unknown", label: "Profil", detail: "CLOSED/DEVELOPING unbekannt" });
+
+    if (sources.obArchive === "no_ob200_archive") {
+      note("unavailable", "Orderbook-Archiv", "no_ob200_archive");
+    } else if (sources.obArchive === true) {
+      details.push({ status: "complete", label: "Orderbook-Archiv", detail: "Verfügbar" });
+    } else if (sources.obArchive === false) {
+      note("unavailable", "Orderbook-Archiv", "Nicht verfügbar");
+    } else {
+      details.push({ status: "unknown", label: "Orderbook-Archiv", detail: "Unbekannt" });
+    }
+
+    if (sources.lldAvailable === true) details.push({ status: "complete", label: "LLD", detail: "Geladen" });
+    else if (sources.lldAvailable === false) details.push({ status: "unavailable", label: "LLD", detail: "Nicht verfügbar" });
+    else details.push({ status: "unknown", label: "LLD", detail: "Unbekannt" });
+
+    if (sources.oiAvailable === true) details.push({ status: "complete", label: "Open Interest", detail: "Geladen" });
+    else if (sources.oiAvailable === false) details.push({ status: "unavailable", label: "OI", detail: "Nicht verfügbar" });
+    else details.push({ status: "unknown", label: "Open Interest", detail: "Unbekannt" });
+
+    if (sources.footprintCoverage == null || sources.footprintCoverage === "") {
+      details.push({ status: "unknown", label: "Footprint", detail: "Unbekannt" });
+    } else {
+      var cov = String(sources.footprintCoverage).toUpperCase();
+      if (cov === "FULL" || cov === "COMPLETE" || cov === "OK") {
+        details.push({ status: "complete", label: "Footprint", detail: cov });
+      } else if (cov === "PARTIAL" || cov === "GAP") {
+        note("partial", "Footprint", cov);
+      } else if (cov === "NONE" || cov === "MISSING") {
+        note("unavailable", "Footprint", cov);
+      } else {
+        details.push({ status: "unknown", label: "Footprint", detail: cov });
+      }
+    }
+
+    if (sources.errorMessage) {
+      note("unavailable", "Fehler", String(sources.errorMessage).slice(0, 120));
+    }
+
+    var status = worst || "unknown";
+    var labels = {
+      complete: "Vollständig",
+      partial: "Teilweise",
+      delayed: "Verzögert",
+      unavailable: "Nicht verfügbar",
+      unknown: "Unbekannt"
+    };
+    // Never claim overall complete unless every critical channel proved complete
+    // and nothing worse was noted. If any unknown remains among profile/cache, keep honest.
+    var hasUnknownCritical = details.some(function (d) {
+      return (
+        d.status === "unknown" &&
+        (d.label === "Market Profile" || d.label.indexOf("Fehler") >= 0)
+      );
+    });
+    if (status === "complete" && hasUnknownCritical) status = "unknown";
+
+    return {
+      status: status,
+      label: labels[status] || "Unbekannt",
+      details: details
+    };
+  }
+
+  function legendSections(colors) {
+    colors = colors || {};
+    return [
+      {
+        id: "avr",
+        title: "Footprint / AVR",
+        items: [
+          {
+            id: "b_ctrl",
+            abbr: "B CTRL",
+            title: "Buy Control",
+            color: colors.buyControl || "rgba(38, 166, 154, 0.92)",
+            text: "Käufer dominieren den Orderflow in diesem Abschnitt."
+          },
+          {
+            id: "s_ctrl",
+            abbr: "S CTRL",
+            title: "Sell Control",
+            color: colors.sellControl || "rgba(239, 83, 80, 0.92)",
+            text: "Verkäufer dominieren den Orderflow in diesem Abschnitt."
+          },
+          {
+            id: "b_abs",
+            abbr: "B ABS",
+            title: "Buy Absorption",
+            color: colors.buyAbs || "rgba(45, 212, 191, 0.92)",
+            text: "Kaufaggressoren treffen auf aufnehmende Verkaufslimits (Kandidat)."
+          },
+          {
+            id: "s_abs",
+            abbr: "S ABS",
+            title: "Sell Absorption",
+            color: colors.sellAbs || "rgba(245, 158, 11, 0.92)",
+            text: "Verkaufsaggressoren treffen auf aufnehmende Kauflimits (Kandidat)."
+          },
+          {
+            id: "vac_up",
+            abbr: "VAC UP",
+            title: "Aufwärtsvakuum",
+            color: colors.vacUp || "rgba(56, 189, 248, 0.75)",
+            text: "Dünne Gegenseite nach oben (Proxy bei unvollständiger Evidenz)."
+          },
+          {
+            id: "vac_down",
+            abbr: "VAC DOWN",
+            title: "Abwärtsvakuum",
+            color: colors.vacDown || "rgba(167, 139, 250, 0.75)",
+            text: "Dünne Gegenseite nach unten (Proxy bei unvollständiger Evidenz)."
+          },
+          {
+            id: "proxy",
+            abbr: "Proxy",
+            title: "Proxy",
+            color: colors.proxy || "rgba(100, 110, 125, 0.7)",
+            text: "Angenäherte Klassifikation — direkte Evidenz unvollständig. Kein Handelssignal."
+          }
+        ]
+      },
+      {
+        id: "mp",
+        title: "Market Profile",
+        items: [
+          {
+            id: "poc",
+            abbr: "POC",
+            title: "Point of Control",
+            color: colors.poc || "#ef4444",
+            text: "Preis mit dem höchsten Volumen im Profilfenster."
+          },
+          {
+            id: "vah",
+            abbr: "VAH",
+            title: "Value Area High",
+            color: colors.valueArea || "#3b82f6",
+            text: "Oberes Ende der Value Area."
+          },
+          {
+            id: "val",
+            abbr: "VAL",
+            title: "Value Area Low",
+            color: colors.valueArea || "#3b82f6",
+            text: "Unteres Ende der Value Area."
+          },
+          {
+            id: "hvn",
+            abbr: "HVN",
+            title: "High Volume Node",
+            color: colors.hvn || "#a855f7",
+            text: "Lokales Volumenhoch — oft akzeptierter Preisbereich."
+          },
+          {
+            id: "lvn",
+            abbr: "LVN",
+            title: "Low Volume Node",
+            color: colors.lvn || "#64748b",
+            text: "Lokales Volumentief — oft schneller durchlaufen."
+          }
+        ]
+      },
+      {
+        id: "context",
+        title: "Kontext (keine Signale)",
+        items: [
+          {
+            id: "lld",
+            abbr: "LLD",
+            title: "Liquidity Location",
+            color: colors.lld || "#228bab",
+            text: "Berechnete Liquiditäts-Zonen aus Kerzenstruktur. Kein Nachweis echter Liquidationen."
+          },
+          {
+            id: "liq",
+            abbr: "Liq",
+            title: "Echte Liquidation",
+            color: colors.liquidation || "#f59e0b",
+            text: "Separater Liquidationsdatenpfad (Exchange). Nicht identisch mit LLD."
+          },
+          {
+            id: "bid_wall",
+            abbr: "Bid-Wall",
+            title: "Bid-Wall",
+            color: colors.bidWall || "rgba(38, 166, 154, 0.7)",
+            text: "Sichtbare Kauflimit-Liquidität im Orderbuch — kann verschoben oder gelöscht werden."
+          },
+          {
+            id: "ask_wall",
+            abbr: "Ask-Wall",
+            title: "Ask-Wall",
+            color: colors.askWall || "rgba(239, 83, 80, 0.7)",
+            text: "Sichtbare Verkaufslimit-Liquidität im Orderbuch — kann verschoben oder gelöscht werden."
+          }
+        ]
+      }
+    ];
+  }
+
+  return {
+    SETTINGS_SCHEMA: SETTINGS_SCHEMA,
+    STORAGE_KEY: STORAGE_KEY,
+    HEAVY_LAYER_KEYS: HEAVY_LAYER_KEYS,
+    STANDARD_CORE: STANDARD_CORE,
+    migratePersistedSettings: migratePersistedSettings,
+    captureProSnapshot: captureProSnapshot,
+    applyStandardMask: applyStandardMask,
+    restoreProSnapshot: restoreProSnapshot,
+    planModeSwitch: planModeSwitch,
+    standardHeavyRequestCount: standardHeavyRequestCount,
+    deriveDataQuality: deriveDataQuality,
+    legendSections: legendSections
+  };
+});
+
+/* === end MpUxModeHelpers bootstrap === */
+
+
+
+
 
 /* Anchored market profile page.
  *
@@ -233,6 +747,12 @@
   // Prefer shared helpers (bootstrapped by chart.js); fallback keeps semantics if order flips.
   var _hp = (typeof globalThis !== "undefined" && globalThis.MpHotpathHelpers) || null;
   var _lldH = (typeof globalThis !== "undefined" && globalThis.MpLldOverlayHelpers) || null;
+  var _ux = (typeof globalThis !== "undefined" && globalThis.MpUxModeHelpers) || null;
+  var uiMode = "pro";
+  var proSnapshot = null;
+  var uxMigratedLegacy = false;
+  var uxIsNewUser = false;
+  var lastDqSources = {};
   var FORMING_MS = (_hp && _hp.FORMING_MS) || 1000;
   var lastFormingSig = "";
   var overlayInflight = (_hp && _hp.createInflightDedupe) ? _hp.createInflightDedupe() : null;
@@ -280,7 +800,60 @@
 
   /* ---------------------------------------------------------------- settings */
 
+  function setVal(id, v) {
+    var el = $(id);
+    if (el && v !== undefined && v !== null && v !== "") el.value = String(v);
+  }
+  function setChk(id, v) {
+    var el = $(id);
+    if (el && typeof v === "boolean") el.checked = v;
+  }
+
+  function readLayerFlags() {
+    return {
+      showHistogram: $("mpShowHistogram") ? $("mpShowHistogram").checked : true,
+      showVolumeLine: $("mpShowVolumeLine") ? $("mpShowVolumeLine").checked : false,
+      splitBuySell: $("mpSplitBuySell") ? $("mpSplitBuySell").checked : false,
+      showPoc: $("mpShowPoc") ? $("mpShowPoc").checked : true,
+      showValueArea: $("mpShowValueArea") ? $("mpShowValueArea").checked : true,
+      showHvn: $("mpShowHvn") ? $("mpShowHvn").checked : false,
+      showLvn: $("mpShowLvn") ? $("mpShowLvn").checked : false,
+      showSinglePrints: $("mpShowSinglePrints") ? $("mpShowSinglePrints").checked : false,
+      showNakedPoc: $("mpShowNakedPoc") ? $("mpShowNakedPoc").checked : false,
+      extendLevels: $("mpExtendLevels") ? $("mpExtendLevels").checked : true,
+      showShape: $("mpShowShape") ? $("mpShowShape").checked : false,
+      showLiquidity: $("mpShowLiquidity") ? $("mpShowLiquidity").checked : false,
+      showOi: $("mpShowOi") ? $("mpShowOi").checked : false,
+      showFootprint: $("mpShowFootprint") ? $("mpShowFootprint").checked : false,
+      final: $("mpFinal") ? $("mpFinal").checked : false,
+      fpShowAvrPanel: $("fpShowAvrPanel") ? $("fpShowAvrPanel").checked : false,
+      obpEnabled: !!(obState.obp && obState.obp.enabled),
+      oblEnabled: !!(obState.obl && obState.obl.enabled)
+    };
+  }
+
+  function applyLayerFlags(flags) {
+    if (!flags) return;
+    setChk("mpShowHistogram", flags.showHistogram);
+    setChk("mpShowVolumeLine", flags.showVolumeLine);
+    setChk("mpSplitBuySell", flags.splitBuySell);
+    setChk("mpShowPoc", flags.showPoc);
+    setChk("mpShowValueArea", flags.showValueArea);
+    setChk("mpShowHvn", flags.showHvn);
+    setChk("mpShowLvn", flags.showLvn);
+    setChk("mpShowSinglePrints", flags.showSinglePrints);
+    setChk("mpShowNakedPoc", flags.showNakedPoc);
+    setChk("mpExtendLevels", flags.extendLevels);
+    setChk("mpShowShape", flags.showShape);
+    setChk("mpShowLiquidity", flags.showLiquidity);
+    setChk("mpShowOi", flags.showOi);
+    setChk("mpShowFootprint", flags.showFootprint);
+    setChk("mpFinal", flags.final);
+    setChk("fpShowAvrPanel", flags.fpShowAvrPanel);
+  }
+
   function readSettings() {
+    var layers = readLayerFlags();
     return {
       symbol: $("mpSymbol").value,
       // Market-profile window type (periods / day / session / composite).
@@ -295,25 +868,29 @@
       end: $("mpEnd").value,
       // Candle resolution only — never written into MP controls.
       timeframe: $("mpTimeframe").value,
-      showHistogram: $("mpShowHistogram").checked,
-      showVolumeLine: $("mpShowVolumeLine") ? $("mpShowVolumeLine").checked : false,
-      splitBuySell: $("mpSplitBuySell").checked,
+      showHistogram: layers.showHistogram,
+      showVolumeLine: layers.showVolumeLine,
+      splitBuySell: layers.splitBuySell,
       width: parseFloat($("mpWidth").value) || 0.45,
-      showPoc: $("mpShowPoc").checked,
-      showValueArea: $("mpShowValueArea").checked,
-      showHvn: $("mpShowHvn").checked,
-      showLvn: $("mpShowLvn").checked,
-      showSinglePrints: $("mpShowSinglePrints").checked,
-      showNakedPoc: $("mpShowNakedPoc").checked,
-      extendLevels: $("mpExtendLevels").checked,
-      showShape: $("mpShowShape").checked,
-      showLiquidity: $("mpShowLiquidity").checked,
-      showOi: $("mpShowOi") ? $("mpShowOi").checked : false,
+      showPoc: layers.showPoc,
+      showValueArea: layers.showValueArea,
+      showHvn: layers.showHvn,
+      showLvn: layers.showLvn,
+      showSinglePrints: layers.showSinglePrints,
+      showNakedPoc: layers.showNakedPoc,
+      extendLevels: layers.extendLevels,
+      showShape: layers.showShape,
+      showLiquidity: layers.showLiquidity,
+      showOi: layers.showOi,
       // FOOTPRINT_HOOK: persistence only — rendering lives in FootprintCandles.
-      showFootprint: $("mpShowFootprint") ? $("mpShowFootprint").checked : false,
+      showFootprint: layers.showFootprint,
       valueAreaPct: parseFloat($("mpValueAreaPct").value) || 70,
       targetBins: parseInt($("mpTargetBins").value, 10) || 160,
-      final: $("mpFinal").checked
+      final: layers.final,
+      fpShowAvrPanel: layers.fpShowAvrPanel,
+      ui_mode: uiMode,
+      settings_schema: (_ux && _ux.SETTINGS_SCHEMA) || 2,
+      pro_snapshot: proSnapshot
     };
   }
 
@@ -323,28 +900,9 @@
     } catch (err) { /* private mode: settings simply do not persist */ }
   }
 
-  function restoreSettings() {
-    var raw;
-    try {
-      raw = window.localStorage.getItem(STORAGE_KEY);
-    } catch (err) { return; }
-    if (!raw) return;
-    var s;
-    try { s = JSON.parse(raw); } catch (err) { return; }
+  function applySettingsObject(s) {
     if (!s || typeof s !== "object") return;
-
-    function setVal(id, v) {
-      var el = $(id);
-      if (el && v !== undefined && v !== null && v !== "") el.value = String(v);
-    }
-    function setChk(id, v) {
-      var el = $(id);
-      if (el && typeof v === "boolean") el.checked = v;
-    }
-
     setVal("mpSymbol", s.symbol);
-    // Prefer explicit mpTimeframe; fall back to legacy `anchor` only.
-    // Never copy candle `timeframe` into the MP control.
     var mpTf = s.mpTimeframe || s.anchor;
     if (mpTf) setVal("mpAnchor", mpTf);
     setVal("mpDays", s.days);
@@ -354,27 +912,261 @@
     setVal("mpWidth", s.width);
     setVal("mpValueAreaPct", s.valueAreaPct);
     setVal("mpTargetBins", s.targetBins);
-    setChk("mpShowHistogram", s.showHistogram);
-    setChk("mpShowVolumeLine", s.showVolumeLine);
-    setChk("mpSplitBuySell", s.splitBuySell);
-    setChk("mpShowPoc", s.showPoc);
-    setChk("mpShowValueArea", s.showValueArea);
-    setChk("mpShowHvn", s.showHvn);
-    setChk("mpShowLvn", s.showLvn);
-    setChk("mpShowSinglePrints", s.showSinglePrints);
-    setChk("mpShowNakedPoc", s.showNakedPoc);
-    setChk("mpExtendLevels", s.extendLevels);
-    setChk("mpShowShape", s.showShape);
-    setChk("mpShowLiquidity", s.showLiquidity);
-    setChk("mpShowOi", s.showOi);
-    // FOOTPRINT_HOOK
-    setChk("mpShowFootprint", s.showFootprint);
-    setChk("mpFinal", s.final);
-
+    applyLayerFlags(s);
+    if (typeof s.fpShowAvrPanel === "boolean") setChk("fpShowAvrPanel", s.fpShowAvrPanel);
     if (Array.isArray(s.sessions) && s.sessions.length) {
       Array.prototype.forEach.call(document.querySelectorAll(".mp-session"), function (el) {
         el.checked = s.sessions.indexOf(el.value) !== -1;
       });
+    }
+  }
+
+  function restoreSettings() {
+    var raw = null;
+    try {
+      raw = window.localStorage.getItem(STORAGE_KEY);
+    } catch (err) { raw = null; }
+    var mig = _ux && _ux.migratePersistedSettings
+      ? _ux.migratePersistedSettings(raw)
+      : { ok: true, isNewUser: !raw, migratedFromLegacy: false, settings: raw ? JSON.parse(raw) : {} };
+    uxIsNewUser = !!mig.isNewUser;
+    uxMigratedLegacy = !!mig.migratedFromLegacy;
+    var s = mig.settings || {};
+    uiMode = s.ui_mode === "standard" ? "standard" : "pro";
+    proSnapshot = s.pro_snapshot || null;
+    if (uxIsNewUser && _ux && _ux.STANDARD_CORE) {
+      applyLayerFlags(_ux.STANDARD_CORE);
+    }
+    applySettingsObject(s);
+    if (uxIsNewUser && _ux && _ux.STANDARD_CORE) {
+      // Ensure Standard core wins over HTML checkbox defaults for first visit.
+      applyLayerFlags(_ux.STANDARD_CORE);
+      uiMode = "standard";
+    }
+  }
+
+  function updateModeChrome() {
+    var shell = document.querySelector(".mp-shell");
+    if (shell) {
+      shell.classList.toggle("is-standard", uiMode === "standard");
+      shell.classList.toggle("is-pro", uiMode === "pro");
+    }
+    var stdBtn = $("mpModeStandard");
+    var proBtn = $("mpModePro");
+    if (stdBtn) {
+      stdBtn.classList.toggle("is-active", uiMode === "standard");
+      stdBtn.setAttribute("aria-pressed", uiMode === "standard" ? "true" : "false");
+    }
+    if (proBtn) {
+      proBtn.classList.toggle("is-active", uiMode === "pro");
+      proBtn.setAttribute("aria-pressed", uiMode === "pro" ? "true" : "false");
+    }
+    var hint = $("mpModeHint");
+    if (hint) {
+      hint.textContent = uiMode === "standard"
+        ? "Kernansicht · Market Profile + LLD · keine Handelssignale"
+        : "Profi · alle Werkzeuge · Layer nur bei aktivem Schalter";
+    }
+    var shape = $("mpShapeNotice");
+    if (shape) shape.hidden = uiMode === "standard" && !($("mpShowShape") && $("mpShowShape").checked);
+  }
+
+  function disableHeavyRuntime(disabledKeys) {
+    var keys = disabledKeys || [];
+    function has(k) { return keys.indexOf(k) >= 0; }
+    if (has("showFootprint")) {
+      if (typeof applyFootprintToggle === "function") applyFootprintToggle();
+    }
+    if (has("obpEnabled")) {
+      if (obState.obp) obState.obp.enabled = false;
+      if (typeof applyOrderbookProfileSettings === "function") {
+        applyOrderbookProfileSettings(obState.obp || { enabled: false }, true);
+      }
+    }
+    if (has("oblEnabled")) {
+      if (obState.obl) obState.obl.enabled = false;
+      if (typeof applyOrderbookLevelsSettings === "function") {
+        applyOrderbookLevelsSettings(obState.obl || { enabled: false }, true);
+      }
+    }
+    if (has("showLiquidity")) {
+      if (typeof clearLiquidityOverlays === "function") clearLiquidityOverlays();
+    }
+    if (has("showOi") && typeof refreshOpenInterestDisplay === "function") {
+      refreshOpenInterestDisplay();
+    }
+  }
+
+  function applyModeSwitch(toMode) {
+    if (!_ux || !_ux.planModeSwitch) {
+      uiMode = toMode === "standard" ? "standard" : "pro";
+      updateModeChrome();
+      persistSettings();
+      return;
+    }
+    var current = readLayerFlags();
+    var plan = _ux.planModeSwitch(uiMode, toMode, current, proSnapshot);
+    if (!plan.changed) {
+      updateModeChrome();
+      return;
+    }
+    if (plan.bumpGeneration) livePollGen += 1;
+    uiMode = plan.ui_mode;
+    proSnapshot = plan.pro_snapshot;
+    applyLayerFlags(plan.layers);
+    // Sync OB flags into separate OB state without inventing new timers.
+    if (obState.obp) obState.obp.enabled = !!plan.layers.obpEnabled;
+    if (obState.obl) obState.obl.enabled = !!plan.layers.oblEnabled;
+    if (typeof syncOrderbookControlsFromState === "function") {
+      try { syncOrderbookControlsFromState(); } catch (e) { /* optional */ }
+    } else {
+      var obpEn = $("mpObpEnabled");
+      if (obpEn) obpEn.checked = !!plan.layers.obpEnabled;
+      var oblEn = $("mpOblEnabled");
+      if (oblEn) oblEn.checked = !!plan.layers.oblEnabled;
+    }
+    disableHeavyRuntime(plan.disableLayers);
+    updateModeChrome();
+    persistSettings();
+    scheduleDraw();
+    // Only fetch layers that became newly active.
+    (plan.enableFetches || []).forEach(function (kind) {
+      if (kind === "lld") refreshLiquidityLocation();
+      else if (kind === "oi") refreshOpenInterestDisplay();
+      else if (kind === "footprint") applyFootprintToggle();
+      else if (kind === "obp") applyOrderbookProfileSettings(obState.obp, true);
+      else if (kind === "obl") applyOrderbookLevelsSettings(obState.obl, true);
+    });
+    if (($("mpShowOi") && !$("mpShowOi").checked) && typeof refreshOpenInterestDisplay === "function") {
+      refreshOpenInterestDisplay();
+    }
+    if (($("mpShowLiquidity") && !$("mpShowLiquidity").checked)) {
+      clearLiquidityOverlays();
+    }
+  }
+
+  function appendLegendItem(host, item) {
+    if (!host || !item) return;
+    var wrap = document.createElement("span");
+    wrap.className = "mp-legend-item";
+    wrap.setAttribute("title", item.text || "");
+    var sw = document.createElement("span");
+    sw.className = "mp-swatch";
+    sw.style.background = item.color || "#787b86";
+    wrap.appendChild(sw);
+    var txt = document.createElement("span");
+    txt.className = "mp-legend-text";
+    var abbr = document.createElement("span");
+    abbr.className = "mp-legend-abbr";
+    abbr.textContent = item.abbr || "";
+    txt.appendChild(abbr);
+    txt.appendChild(document.createTextNode((item.title || "") + " — " + (item.text || "")));
+    wrap.appendChild(txt);
+    host.appendChild(wrap);
+  }
+
+  function renderLegend() {
+    var mpHost = $("mpLegend");
+    var fpHost = $("fpAvrLegend");
+    if (!mpHost) return;
+    while (mpHost.firstChild) mpHost.removeChild(mpHost.firstChild);
+    if (fpHost) {
+      while (fpHost.firstChild) fpHost.removeChild(fpHost.firstChild);
+      fpHost.hidden = false;
+    }
+    var sections = _ux && _ux.legendSections
+      ? _ux.legendSections({
+          poc: COLORS.poc,
+          valueArea: COLORS.valueArea,
+          hvn: COLORS.hvn,
+          lvn: COLORS.lvn,
+          lld: "#228bab",
+          bidWall: COLORS.buy,
+          askWall: COLORS.sell
+        })
+      : [];
+    sections.forEach(function (sec) {
+      var target = sec.id === "avr" ? fpHost : mpHost;
+      if (!target) return;
+      var title = document.createElement("div");
+      title.className = "mp-legend-section-title";
+      title.textContent = sec.title;
+      target.appendChild(title);
+      (sec.items || []).forEach(function (it) { appendLegendItem(target, it); });
+    });
+    var panel = $("mpLegendPanel");
+    if (panel && !panel._mpLegendBound) {
+      panel.addEventListener("toggle", function () {
+        var sum = panel.querySelector("summary");
+        if (sum) sum.setAttribute("aria-expanded", panel.open ? "true" : "false");
+      });
+      panel._mpLegendBound = true;
+    }
+  }
+
+  function updateDataQualityBar(extra) {
+    var sources = Object.assign({}, lastDqSources, extra || {});
+    lastDqSources = sources;
+    if (!_ux || !_ux.deriveDataQuality) return;
+    var dq = _ux.deriveDataQuality(sources);
+    var pill = $("mpDqStatus");
+    if (pill) {
+      pill.textContent = dq.label;
+      pill.className = "mp-dq-pill mp-dq-" + dq.status;
+      pill.title = (dq.details || []).map(function (d) {
+        return d.label + ": " + (d.detail || d.status);
+      }).join(" · ");
+    }
+    var box = $("mpDqDetails");
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    (dq.details || []).forEach(function (d) {
+      var row = document.createElement("div");
+      row.className = "mp-dq-detail-row";
+      var lab = document.createElement("span");
+      lab.className = "mp-dq-detail-label";
+      lab.textContent = d.label;
+      var val = document.createElement("span");
+      val.textContent = d.detail || d.status;
+      row.appendChild(lab);
+      row.appendChild(val);
+      box.appendChild(row);
+    });
+  }
+
+  function bindUxChrome() {
+    function onModeClick(ev) {
+      var btn = ev.currentTarget;
+      var mode = btn && btn.getAttribute("data-mode");
+      if (!mode || mode === uiMode) return;
+      applyModeSwitch(mode);
+    }
+    if ($("mpModeStandard") && !$("mpModeStandard")._mpModeBound) {
+      $("mpModeStandard").addEventListener("click", onModeClick);
+      $("mpModeStandard")._mpModeBound = true;
+    }
+    if ($("mpModePro") && !$("mpModePro")._mpModeBound) {
+      $("mpModePro").addEventListener("click", onModeClick);
+      $("mpModePro")._mpModeBound = true;
+    }
+    var dqToggle = $("mpDqToggle");
+    if (dqToggle && !dqToggle._mpDqBound) {
+      dqToggle.addEventListener("click", function () {
+        var details = $("mpDqDetails");
+        if (!details) return;
+        var open = details.hidden;
+        details.hidden = !open;
+        dqToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      dqToggle._mpDqBound = true;
+    }
+    var adv = $("mpProfileDetails");
+    if (adv && !adv._mpSumBound) {
+      adv.addEventListener("toggle", function () {
+        var sum = adv.querySelector("summary");
+        if (sum) sum.setAttribute("aria-expanded", adv.open ? "true" : "false");
+      });
+      adv._mpSumBound = true;
     }
   }
 
@@ -2696,30 +3488,6 @@
     return v.toFixed(2);
   }
 
-  function renderLegend() {
-    var items = [
-      ["TPO POC", COLORS.poc, false],
-      ["TPO VAH / VAL", COLORS.valueArea, true],
-      ["Naked POC", COLORS.nakedPoc, true],
-      ["Vol HVN", COLORS.hvn, true],
-      ["Vol LVN", COLORS.lvn, true],
-      ["Buy-Volumen", COLORS.buy, false],
-      ["Sell-Volumen", COLORS.sell, false],
-      ["TPO Bracket", COLORS.total, false],
-      ["Volumenlinie", COLORS.volumeLine, true]
-    ];
-    $("mpLegend").innerHTML = items
-      .map(function (it) {
-        return (
-          "<span class=\"mp-legend-item\"><span class=\"mp-swatch" +
-          (it[2] ? " is-dashed" : "") +
-          "\" style=\"" + (it[2] ? "color:" + it[1] : "background:" + it[1]) + "\"></span>" +
-          it[0] + "</span>"
-        );
-      })
-      .join("");
-  }
-
   /* --------------------------------------------------------------------- load */
 
   function load() {
@@ -2800,6 +3568,17 @@
             (payload.cached ? " · cached" : "") +
             " · Overlays …"
         );
+        updateDataQualityBar({
+          profileMeta: m,
+          cached: payload.cached,
+          developing: m.developing != null ? !!m.developing : (m.profile_state === "DEVELOPING" ? true : (m.profile_state === "CLOSED" ? false : null)),
+          errorMessage: null,
+          lldAvailable: null,
+          oiAvailable: null,
+          footprintCoverage: null,
+          obArchive: null,
+          liveLagSec: null
+        });
 
         return Promise.all([
           fetchEmaOverlays(s.symbol, s.timeframe, range).then(applyEmaOverlays).catch(function () {}),
@@ -2813,6 +3592,10 @@
               " · " + (payload.candles || []).length + " Kerzen" +
               (payload.cached ? " · cached" : "")
           );
+          updateDataQualityBar({
+            lldAvailable: s.showLiquidity ? (Object.keys(lldPayloads || {}).length > 0 ? true : null) : null,
+            oiAvailable: s.showOi ? null : null
+          });
           try {
             // Candles already painted above. Overlays use setEmaOverlays / setLldEma /
             // setOiPane / overlay registry — a second setData with the same candles
@@ -2826,6 +3609,7 @@
         if (err && err.name === "AbortError") return;
         var msg = "Netzwerkfehler: " + (err && err.message ? err.message : err);
         setStatus(msg, "error");
+        updateDataQualityBar({ errorMessage: "Netzwerkfehler" });
         if ($("mpEmpty")) {
           $("mpEmpty").hidden = false;
           $("mpEmpty").textContent = msg;
@@ -2942,11 +3726,25 @@
     var mpEl = $("mpAnchor");
     if (mpEl && !mpEl.value) mpEl.value = "day";
     syncConditionalControls();
+    bindUxChrome();
+    updateModeChrome();
+    updateDataQualityBar({});
     bindChartChrome();
     bind();
     initOrderbookControls();
+    // After OB state restored: if Standard mode, force heavy OB off without
+    // wiping the separate OB localStorage snapshot used when returning to Pro.
+    if (uiMode === "standard") {
+      if (obState.obp) obState.obp.enabled = false;
+      if (obState.obl) obState.obl.enabled = false;
+      var obpEn = $("mpObpEnabled");
+      if (obpEn) obpEn.checked = false;
+      var oblEn = $("mpOblEnabled");
+      if (oblEn) oblEn.checked = false;
+    }
     restoreChartHeight();
     renderLegend();
+    persistSettings();
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) {
         pauseLivePoll();
