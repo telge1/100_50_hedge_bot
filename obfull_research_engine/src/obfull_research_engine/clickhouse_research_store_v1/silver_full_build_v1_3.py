@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
@@ -1614,8 +1614,11 @@ def run_build(
 
     persist_epochs_and_gaps(client, config, plan)
     started = time.monotonic()
+    wall_started = datetime.now(timezone.utc)
     completed = skipped = 0
     total_rows = 0
+    cumulative_level_changes = 0
+    cumulative_states = 0
     completed_market_minutes = 0.0
     progress: list[dict[str, Any]] = []
     for position, chunk in enumerate(plan.chunks, 1):
@@ -1634,12 +1637,19 @@ def run_build(
         status = result["status"]
         skipped += int(status == "SKIPPED_ALREADY_COMPLETE")
         completed += int(status == "COMPLETE")
+        level_changes = int(result.get("level_change_count", 0))
+        states_100ms = int(result.get("state_count", 0))
         total_rows += int(result.get("rows_inserted", 0))
+        if status in {"COMPLETE", "SKIPPED_ALREADY_COMPLETE"}:
+            # Skip path returns verified ledger counts; COMPLETE returns fresh counts.
+            cumulative_level_changes += level_changes
+            cumulative_states += states_100ms
         market_minutes = _chunk_market_minutes(chunk)
         if status in {"COMPLETE", "SKIPPED_ALREADY_COMPLETE"}:
             completed_market_minutes += market_minutes
         total_elapsed = max(time.monotonic() - started, 1e-9)
         chunks_done = completed + skipped
+        remaining_chunks = len(plan.chunks) - position
         remaining_market_minutes = sum(
             _chunk_market_minutes(remaining) for remaining in plan.chunks[position:]
         )
@@ -1648,18 +1658,25 @@ def run_build(
             if completed_market_minutes > 0
             else 0.0
         )
-        eta_s = (
+        eta_seconds = (
             remaining_market_minutes * cumulative_spm
             if completed_market_minutes > 0
             else None
         )
+        eta_utc = None
+        if eta_seconds is not None:
+            eta_utc = (
+                wall_started + timedelta(seconds=float(eta_seconds))
+            ).isoformat().replace("+00:00", "Z")
         row = {
             "chunk": f"{position}/{len(plan.chunks)}",
             "epoch": f"{chunk.epoch_index}/{len(plan.epochs)}",
             "segment_rank": chunk.epoch.anchor_segment_chain_index,
             "market_window": f"{_ns_iso(chunk.analysis_start_ns)}..{_ns_iso(chunk.analysis_end_ns)}",
-            "level_changes": int(result.get("level_change_count", 0)),
-            "states_100ms": int(result.get("state_count", 0)),
+            "level_changes": level_changes,
+            "states_100ms": states_100ms,
+            "cumulative_level_changes": cumulative_level_changes,
+            "cumulative_states_100ms": cumulative_states,
             "chunk_elapsed_s": round(chunk_elapsed, 3),
             "total_elapsed_s": round(total_elapsed, 3),
             "chunk_seconds_per_market_minute": round(chunk_elapsed / market_minutes, 3),
@@ -1667,7 +1684,10 @@ def run_build(
             "completed_market_minutes": round(completed_market_minutes, 6),
             "chunks_complete": chunks_done,
             "chunks_total": len(plan.chunks),
-            "eta_s": None if eta_s is None else round(eta_s, 3),
+            "remaining_chunks": remaining_chunks,
+            "eta_s": None if eta_seconds is None else round(eta_seconds, 3),
+            "eta_seconds": None if eta_seconds is None else round(eta_seconds, 3),
+            "eta_utc": eta_utc,
             "peak_rss_mib": round(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 3
             ),

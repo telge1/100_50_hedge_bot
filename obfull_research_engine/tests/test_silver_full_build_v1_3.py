@@ -1302,6 +1302,11 @@ def test_progress_log_matches_ledger_and_uses_cumulative_timing(tmp_path, monkey
     assert lines[3]["chunks_complete"] == 4
     assert lines[3]["chunks_total"] == 4
     assert lines[3]["eta_s"] == 0.0
+    assert lines[3]["eta_seconds"] == 0.0
+    assert lines[3]["remaining_chunks"] == 0
+    assert lines[3]["cumulative_level_changes"] == 545214 + 573228 + 377759 + 363705
+    assert lines[3]["cumulative_states_100ms"] == 8999 * 4
+    assert lines[3]["eta_utc"] is not None
     assert result["skipped_chunks"] == 4
 
 
@@ -1560,7 +1565,16 @@ def test_eta_uses_all_completed_market_minutes(tmp_path, monkeypatch, capsys):
     lines = [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
     # after chunk 1: 30s / 15mm = 2 spm; remaining 30mm => eta 60
     assert lines[0]["eta_s"] == 60.0
+    assert lines[0]["eta_seconds"] == 60.0
+    assert lines[0]["remaining_chunks"] == 2
+    assert lines[0]["cumulative_level_changes"] == 11
+    assert lines[0]["cumulative_states_100ms"] == 2
+    assert isinstance(lines[0]["eta_utc"], str) and lines[0]["eta_utc"].endswith("Z")
     # after chunk 2: 60s / 30mm = 2 spm; remaining 15mm => eta 30
     assert lines[1]["eta_s"] == 30.0
+    assert lines[1]["remaining_chunks"] == 1
     assert lines[1]["cumulative_seconds_per_market_minute"] == 2.0
+    assert lines[1]["cumulative_level_changes"] == 22
     assert lines[2]["eta_s"] == 0.0
+    assert lines[2]["remaining_chunks"] == 0
+    assert lines[2]["cumulative_level_changes"] == 33
