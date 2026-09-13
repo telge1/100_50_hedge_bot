@@ -499,6 +499,25 @@ from bots.shared.atr_helper import update_atr_burn_state, load_atr_burn_state
 MASTER_BOT_API_URL = os.getenv("MASTER_BOT_API_URL", "http://localhost:8001")
 MASTER_BOT_API_TOKEN = os.getenv("MASTER_BOT_API_TOKEN", "superlongrandomstringchangeme")
 
+# ---------------------------------------------------------------------------
+# TEMPORARY manual Main-wallet / equity display override for /dashboard cards.
+# Set DASHBOARD_MANUAL_MAIN_WALLET_USDT empty / unset and leave the default
+# None path to restore live Bybit balances.
+# To disable: export DASHBOARD_MANUAL_MAIN_WALLET_USDT=  (empty) or set
+# DASHBOARD_MANUAL_MAIN_WALLET_USDT=off
+# ---------------------------------------------------------------------------
+def _parse_manual_main_wallet_usdt() -> Optional[float]:
+    raw = os.getenv("DASHBOARD_MANUAL_MAIN_WALLET_USDT", "94.83").strip()
+    if not raw or raw.lower() in {"off", "none", "false", "0"}:
+        return None
+    try:
+        return round(float(raw.replace(",", ".")), 2)
+    except ValueError:
+        return None
+
+
+DASHBOARD_MANUAL_MAIN_WALLET_USDT: Optional[float] = _parse_manual_main_wallet_usdt()
+
 # Tracks symbols that already issued a bot start via open_hedged_positions.
 # NOTE: In-memory only. Persistence can be added here if restart-deduplication is required.
 _START_GATE: Dict[str, Dict[str, object]] = {}
@@ -3026,6 +3045,7 @@ from gold_shadow.api import build_router as _build_gold_shadow_router  # noqa: E
 from market_profile_v1.api import build_router as _build_market_profile_router  # noqa: E402
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
+from symbol_onboarding.api import build_router as _build_symbol_onboarding_router  # noqa: E402
 app.include_router(
     _build_research_router(require_auth=require_auth, render_template=render_template)
 )
@@ -3037,6 +3057,9 @@ app.include_router(
 )
 app.include_router(_build_collector_health_router(require_auth=require_auth))
 app.include_router(_build_footprint_candles_router(require_auth=require_auth))
+app.include_router(
+    _build_symbol_onboarding_router(require_auth=require_auth, render_template=render_template)
+)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -8514,6 +8537,10 @@ async def api_get_hedge_equity(
 ):
     """Get Main and Sub account equity (bzw. Long/Short-Account des Profils)"""
     try:
+        # TEMPORARY: display-only Main wallet/equity override (default 94.83).
+        # Disable with DASHBOARD_MANUAL_MAIN_WALLET_USDT=off then restart dashboard.
+        manual_main = DASHBOARD_MANUAL_MAIN_WALLET_USDT
+
         available_profiles = {"main", *(profile_data["profile"] for profile_data in get_bot_profiles())}
         if profile and profile in available_profiles and profile != "main":
             main_api_key, main_secret_key, sub_api_key, sub_secret_key = _get_account_keys_by_profile(profile)
@@ -8521,14 +8548,19 @@ async def api_get_hedge_equity(
             main_api_key, main_secret_key = _get_account_keys("main")
             sub_api_key, sub_secret_key = _get_account_keys("sub")
 
-        if not any([main_api_key and main_secret_key, sub_api_key and sub_secret_key]):
+        if not any([main_api_key and main_secret_key, sub_api_key and sub_secret_key]) and manual_main is None:
             return {"success": False, "error": "API-Keys fehlen"}
 
         import asyncio
+        values: dict[str, dict[str, Optional[float]]] = {
+            "main": {"equity": None, "margin": None, "available": None},
+            "sub": {"equity": None, "margin": None, "available": None},
+        }
         try:
             tasks: list[asyncio.Future] = []
             task_keys: list[tuple[str, str]] = []
-            if main_api_key and main_secret_key:
+            # When Main is manually overridden, skip Main Bybit calls (less noise / rate limit).
+            if main_api_key and main_secret_key and manual_main is None:
                 main_order_manager = BybitOrderManager(main_api_key, main_secret_key)
                 tasks.extend([
                     asyncio.to_thread(main_order_manager.get_account_equity),
@@ -8553,23 +8585,21 @@ async def api_get_hedge_equity(
                     ("sub", "available"),
                 ])
 
-            values: dict[str, dict[str, Optional[float]]] = {
-                "main": {"equity": None, "margin": None, "available": None},
-                "sub": {"equity": None, "margin": None, "available": None},
-            }
-            results = await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
-                timeout=30.0
-            )
-            for result, (side, metric) in zip(results, task_keys):
-                if isinstance(result, Exception):
-                    logger.error("Fehler beim Abrufen der %s %s: %s", side, metric, result)
-                    values[side][metric] = None
-                else:
-                    values[side][metric] = result
+            if tasks:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=30.0
+                )
+                for result, (side, metric) in zip(results, task_keys):
+                    if isinstance(result, Exception):
+                        logger.error("Fehler beim Abrufen der %s %s: %s", side, metric, result)
+                        values[side][metric] = None
+                    else:
+                        values[side][metric] = result
         except asyncio.TimeoutError:
             logger.error("Timeout beim Abrufen der Equity")
-            return {"success": False, "error": "API-Aufruf dauerte zu lange (Timeout)"}
+            if manual_main is None:
+                return {"success": False, "error": "API-Aufruf dauerte zu lange (Timeout)"}
 
         main_equity = values["main"]["equity"]
         main_margin = values["main"]["margin"]
@@ -8578,10 +8608,19 @@ async def api_get_hedge_equity(
         sub_margin = values["sub"]["margin"]
         sub_available = values["sub"]["available"]
 
+        if manual_main is not None:
+            logger.warning(
+                "[equity] MANUAL override active: main wallet/equity=%.2f USDT (Bybit live values ignored for main)",
+                manual_main,
+            )
+            main_equity = manual_main
+            main_margin = manual_main
+            main_available = manual_main
+
         if all(value is None for value in (main_equity, main_margin, main_available, sub_equity, sub_margin, sub_available)):
             return {"success": False, "error": "Equity-Daten konnten nicht geladen werden"}
 
-        total_equity = 0
+        total_equity = 0.0
         if main_equity:
             total_equity += main_equity
         if sub_equity:
@@ -8609,6 +8648,8 @@ async def api_get_hedge_equity(
             "sub_available_balance": round(sub_available, 2) if sub_available is not None else None,
             "total_available_balance": round(total_available, 2) if total_available is not None else None,
             "partial": not bool(sub_api_key and sub_secret_key and main_api_key and main_secret_key),
+            "manual_main_wallet_override": manual_main is not None,
+            "manual_main_wallet_usdt": manual_main,
         }
         
     except Exception as e:

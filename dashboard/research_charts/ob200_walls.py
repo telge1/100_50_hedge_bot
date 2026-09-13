@@ -26,22 +26,40 @@ from pathlib import Path
 from typing import Any, Iterator
 
 ZERO = Decimal("0")
-_NAME_RE = re.compile(
-    r"^(?P<symbol>[A-Z0-9]+)_"
-    r"(?P<start>\d{8}T\d{6}Z)_"
-    r"(?P<end>\d{8}T\d{6}Z)_"
-    r"ob200_v3\.zst$"
-)
-_OPEN_RE = re.compile(
-    r"^(?P<symbol>[A-Z0-9]+)_"
-    r"(?P<start>\d{8}T\d{6}Z)_"
-    r"open_ob200_v3\.zst\.tmp$"
-)
 
 # Default: OA project next to this repo.
 _OA_ROOT = Path("/home/telgenbuescher/projects/orderbook_analyse")
 DEFAULT_SHADOW_ROOT = _OA_ROOT / "data" / "orderbook_raw_shadow" / "ob200_v3"
 DEFAULT_LIVE_ROOT = _OA_ROOT / "data" / "orderbook_raw_live" / "ob200_v3"
+DEFAULT_OB1000_SHADOW_ROOT = _OA_ROOT / "data" / "orderbook_raw_shadow" / "ob1000_v1"
+DEFAULT_OB1000_LIVE_ROOT = _OA_ROOT / "data" / "orderbook_raw_live" / "ob1000_v1"
+DEFAULT_PARSER_VERSION = "ob200_v3"
+OB1000_PARSER_VERSION = "ob1000_v1"
+
+
+def _closed_name_re(parser_version: str) -> re.Pattern[str]:
+    return re.compile(
+        r"^(?P<symbol>[A-Z0-9]+)_"
+        r"(?P<start>\d{8}T\d{6}Z)_"
+        r"(?P<end>\d{8}T\d{6}Z)_"
+        + re.escape(parser_version)
+        + r"\.zst$"
+    )
+
+
+def _open_name_re(parser_version: str) -> re.Pattern[str]:
+    return re.compile(
+        r"^(?P<symbol>[A-Z0-9]+)_"
+        r"(?P<start>\d{8}T\d{6}Z)_"
+        r"open_"
+        + re.escape(parser_version)
+        + r"\.zst\.tmp$"
+    )
+
+
+# Backward-compatible aliases used by older tests/callers.
+_NAME_RE = _closed_name_re(DEFAULT_PARSER_VERSION)
+_OPEN_RE = _open_name_re(DEFAULT_PARSER_VERSION)
 
 WALL_MAX_BPS = Decimal("800")
 WALL_QTY_MEDIAN_MULT = 3.0
@@ -233,21 +251,24 @@ def list_closed_segments(
     symbol: str,
     *,
     include_boundary_stubs: bool = False,
+    parser_version: str = DEFAULT_PARSER_VERSION,
 ) -> list[SegmentRef]:
     sym = symbol.upper()
     out: list[SegmentRef] = []
     seen: set[Path] = set()
+    name_re = _closed_name_re(parser_version)
+    glob_pat = f"*_{parser_version}.zst"
     for root in roots:
         sym_root = root / sym
         if not sym_root.is_dir():
             continue
-        for path in sorted(sym_root.rglob("*_ob200_v3.zst")):
+        for path in sorted(sym_root.rglob(glob_pat)):
             if path in seen:
                 continue
             name = path.name
             if "_open_" in name or name.endswith(".tmp"):
                 continue
-            m = _NAME_RE.match(name)
+            m = name_re.match(name)
             if not m:
                 continue
             ref = SegmentRef(
@@ -265,8 +286,13 @@ def list_closed_segments(
     return out
 
 
-def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
-    """Currently-writing hour files (``*_open_ob200_v3.zst.tmp``).
+def list_open_segments(
+    roots: list[Path],
+    symbol: str,
+    *,
+    parser_version: str = DEFAULT_PARSER_VERSION,
+) -> list[SegmentRef]:
+    """Currently-writing hour files (``*_open_<parser>.zst.tmp``).
 
     Skips empty orphan ``.tmp`` files left behind by abrupt process stops —
     they have no NDJSON and would otherwise pollute live segment selection.
@@ -275,11 +301,13 @@ def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
     out: list[SegmentRef] = []
     seen: set[Path] = set()
     now = datetime.now(timezone.utc)
+    open_re = _open_name_re(parser_version)
+    glob_pat = f"*_open_{parser_version}.zst.tmp"
     for root in roots:
         sym_root = root / sym
         if not sym_root.is_dir():
             continue
-        for path in sorted(sym_root.rglob("*_open_ob200_v3.zst.tmp")):
+        for path in sorted(sym_root.rglob(glob_pat)):
             if path in seen or not path.is_file():
                 continue
             try:
@@ -287,7 +315,7 @@ def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
                     continue
             except OSError:
                 continue
-            m = _OPEN_RE.match(path.name)
+            m = open_re.match(path.name)
             if not m or m.group("symbol") != sym:
                 continue
             start = _parse_stamp(m.group("start"))
@@ -308,15 +336,47 @@ def list_open_segments(roots: list[Path], symbol: str) -> list[SegmentRef]:
     return out
 
 
-def coverage_bounds(symbol: str, *, roots: list[Path] | None = None) -> tuple[datetime, datetime] | None:
+def coverage_bounds(
+    symbol: str,
+    *,
+    roots: list[Path] | None = None,
+    parser_version: str = DEFAULT_PARSER_VERSION,
+) -> tuple[datetime, datetime] | None:
     roots = roots or [DEFAULT_SHADOW_ROOT, DEFAULT_LIVE_ROOT]
-    segs = list_closed_segments(roots, symbol)
-    opens = list_open_segments(roots, symbol)
+    segs = list_closed_segments(roots, symbol, parser_version=parser_version)
+    opens = list_open_segments(roots, symbol, parser_version=parser_version)
     if not segs and not opens:
         return None
     starts = [s.start_utc for s in segs] + [s.start_utc for s in opens]
     ends = [s.end_utc for s in segs] + [s.end_utc for s in opens]
     return min(starts), max(ends)
+
+
+def resolve_archive_roots_for_replay(
+    symbol: str,
+    *,
+    roots: list[Path] | None = None,
+) -> tuple[list[Path], str, str]:
+    """OB1000 FS archive only (no OB200 fallback).
+
+    Returns ``(roots, parser_version, source_name)``.
+    """
+    if roots is not None:
+        joined = " ".join(str(r) for r in roots)
+        if "ob200" in joined and "ob1000" not in joined:
+            raise Ob200WallsError(
+                "ob200_fallback_disabled",
+                "OB200 archive fallback is disabled; pass OB1000 roots",
+            )
+        return roots, OB1000_PARSER_VERSION, "ob1000_raw_shadow_v1"
+
+    ob1000_roots = [DEFAULT_OB1000_SHADOW_ROOT, DEFAULT_OB1000_LIVE_ROOT]
+    if coverage_bounds(symbol, roots=ob1000_roots, parser_version=OB1000_PARSER_VERSION):
+        return ob1000_roots, OB1000_PARSER_VERSION, "ob1000_raw_shadow_v1"
+    raise Ob200WallsError(
+        "ob1000_missing",
+        f"no OB1000 archive for {symbol} (OB200 fallback disabled)",
+    )
 
 
 def has_ob200_archive(symbol: str, *, roots: list[Path] | None = None) -> bool:
@@ -636,9 +696,8 @@ def replay_book_as_of(
     Live tip priority:
       1) continuous OB1000 on-demand WS book (keeper / lease)
       2) Bybit REST ``limit=1000`` snapshot
-      3) local OB200 archive replay
+      3) local OB1000 archive if present, else OB200 archive
     """
-    roots = roots or [DEFAULT_SHADOW_ROOT, DEFAULT_LIVE_ROOT]
     at_u = _utc(at)
     live_tip = abs((datetime.now(timezone.utc) - at_u).total_seconds()) < 180
 
@@ -647,10 +706,16 @@ def replay_book_as_of(
         if od is not None:
             return od
 
+    hist_roots, parser_version, archive_source = resolve_archive_roots_for_replay(
+        symbol, roots=roots
+    )
+
     # Live tip fallback: REST OB1000 if on-demand book not ready yet.
     if live_tip and allow_rest_live_fallback:
         try:
-            cov = coverage_bounds(symbol, roots=roots)
+            cov = coverage_bounds(
+                symbol, roots=hist_roots, parser_version=parser_version
+            )
             if cov is None:
                 cov_start = cov_end = at_u
             else:
@@ -670,16 +735,16 @@ def replay_book_as_of(
                 source="bybit_rest_orderbook_1000",
             )
         except Ob200WallsError:
-            # Fall through to local OB200 archive replay.
+            # Fall through to local archive replay.
             pass
 
-    closed = list_closed_segments(roots, symbol)
-    opens = list_open_segments(roots, symbol)
+    closed = list_closed_segments(hist_roots, symbol, parser_version=parser_version)
+    opens = list_open_segments(hist_roots, symbol, parser_version=parser_version)
     if not closed and not opens:
-        raise Ob200WallsError("ob200_missing", f"no OB200 archive for {symbol}")
+        raise Ob200WallsError("ob200_missing", f"no OB archive for {symbol}")
 
     ref, effective, clamped = _pick_replay_target(closed, opens, at_u)
-    cov = coverage_bounds(symbol, roots=roots)
+    cov = coverage_bounds(symbol, roots=hist_roots, parser_version=parser_version)
     assert cov is not None
     cov_start, cov_end = cov
 
@@ -711,7 +776,7 @@ def replay_book_as_of(
     if last_ts2 is not None:
         last_ts = last_ts2
 
-    source = "ob200_raw_shadow_v3"
+    source = archive_source
     seed_ref: SegmentRef | None = None
 
     if not book.is_valid or not book.bids or not book.asks:
@@ -724,7 +789,7 @@ def replay_book_as_of(
                 seed_ref = closed[-1]
             book, last_ts, events = _replay_path(seed_ref, cutoff_ms=None)
             clamped = True
-            source = "ob200_raw_shadow_v3_closed_fallback"
+            source = f"{archive_source}_closed_fallback"
             if not book.is_valid or not book.bids or not book.asks:
                 raise Ob200WallsError(
                     "ob200_invalid_book", "reconstructed book invalid or empty"
@@ -739,7 +804,7 @@ def replay_book_as_of(
         if last_ts is not None
         else effective
     )
-    if source == "ob200_raw_shadow_v3_closed_fallback":
+    if source.endswith("_closed_fallback"):
         segment = str(seed_ref.path) if seed_ref is not None else str(ref.path)
         live_open_flag = False
     else:

@@ -81,6 +81,9 @@
   let oscSeriesById = new Map();
   let oscPriceLines = [];
   let lastLowerPayload = null;
+  let lastStochPayload = null;
+  let lastOiPayload = null;
+  let oscSeriesMeta = new Map();
   let lowerVisible = false;
   let timeSyncLock = false;
   let programmaticNavDepth = 0;
@@ -544,8 +547,8 @@
     if (lastPayload) {
       setData(lastPayload);
     }
-    if (lastLowerPayload) {
-      setLowerPane(lastLowerPayload);
+    if (lastStochPayload || lastOiPayload || lastLowerPayload) {
+      rebuildLowerPane();
     }
     if (lastEmaOverlays && lastEmaOverlays.series && lastEmaOverlays.series.length) {
       setEmaOverlays(lastEmaOverlays);
@@ -568,8 +571,8 @@
     }
     if (wasInvalid) {
       recreateNativeOverlays();
-      if (lastLowerPayload) {
-        setLowerPane(lastLowerPayload);
+      if (lastStochPayload || lastOiPayload || lastLowerPayload) {
+        rebuildLowerPane();
       }
       if (lastEmaOverlays) {
         setEmaOverlays(lastEmaOverlays);
@@ -1731,18 +1734,15 @@
     }
     if (oscChart && lowerVisible) {
       try {
-        oscChart.applyOptions({
-          rightPriceScale: {
-            autoScale: true,
-            scaleMargins: OSC_SCALE_MARGINS,
-          },
-        });
-        if (oscTimeBase) {
-          oscTimeBase.applyOptions({ autoscaleInfoProvider: lockedScaleProvider() });
-        }
-        oscSeriesById.forEach(function (series) {
+        applyOscScaleMode(lastLowerPayload);
+        oscSeriesById.forEach(function (series, id) {
+          const meta = oscSeriesMeta.get(id);
+          if (!meta || meta.auto_scale) return;
           series.applyOptions({ autoscaleInfoProvider: lockedScaleProvider() });
         });
+        fitAutoOscToVisibleRange(
+          chart ? chart.timeScale().getVisibleLogicalRange() : null
+        );
       } catch (err) {
         /* public applyOptions only */
       }
@@ -5231,6 +5231,178 @@
     };
   }
 
+  function oscValueRange(data) {
+    const vals = [];
+    const list = data || [];
+    for (let i = 0; i < list.length; i++) {
+      const raw = list[i] && list[i].value;
+      if (raw == null || raw === "") continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      vals.push(n);
+    }
+    if (!vals.length) return null;
+    let min = vals[0];
+    let max = vals[0];
+    for (let i = 1; i < vals.length; i++) {
+      if (vals[i] < min) min = vals[i];
+      if (vals[i] > max) max = vals[i];
+    }
+    if (max === min) {
+      const pad = Math.max(Math.abs(min) * 0.0025, 1);
+      return { minValue: min - pad, maxValue: max + pad };
+    }
+    const pad = (max - min) * 0.12;
+    return { minValue: min - pad, maxValue: max + pad };
+  }
+
+  function oscMinMove(range) {
+    const span = range ? Number(range.maxValue) - Number(range.minValue) : 0;
+    if (!(span > 0) || !Number.isFinite(span)) return 1;
+    const step = Math.pow(10, Math.floor(Math.log10(span / 80)));
+    return Math.max(1, step);
+  }
+
+  function fittedOscScaleProvider(range) {
+    const priceRange = range;
+    return function () {
+      return {
+        priceRange: priceRange,
+        margins: { above: 0.04, below: 0.04 },
+      };
+    };
+  }
+
+  function compactOscPriceFormat(range) {
+    const span = range ? Number(range.maxValue) - Number(range.minValue) : 0;
+    return {
+      type: "custom",
+      minMove: oscMinMove(range),
+      formatter: function (price) {
+        const n = Number(price);
+        if (!Number.isFinite(n)) return "";
+        const abs = Math.abs(n);
+        const sign = n < 0 ? "-" : "";
+        if (abs >= 1e9) {
+          const digits = span > 0 && span / abs < 0.08 ? 3 : 2;
+          return sign + (abs / 1e9).toFixed(digits) + "B";
+        }
+        if (abs >= 1e6) {
+          const digits = span > 0 && span / abs < 0.08 ? 3 : 2;
+          return sign + (abs / 1e6).toFixed(digits) + "M";
+        }
+        if (abs >= 1e4) return sign + (abs / 1e3).toFixed(1) + "K";
+        return sign + String(Math.round(abs));
+      },
+    };
+  }
+
+  function fitAutoOscToVisibleRange(logicalRange) {
+    if (!oscChart || !lowerVisible) return;
+    oscSeriesById.forEach(function (series, id) {
+      const meta = oscSeriesMeta.get(id);
+      if (!meta || !meta.auto_scale || !meta.data || !meta.data.length) return;
+      const data = meta.data;
+      let lo = 0;
+      let hi = data.length - 1;
+      const range = logicalRange || (chart && chart.timeScale().getVisibleLogicalRange())
+        || oscChart.timeScale().getVisibleLogicalRange();
+      if (range && range.from != null && range.to != null) {
+        lo = Math.max(0, Math.floor(Number(range.from)));
+        hi = Math.min(data.length - 1, Math.ceil(Number(range.to)));
+      }
+      if (hi < lo) return;
+      const fitted = oscValueRange(data.slice(lo, hi + 1));
+      if (!fitted) return;
+      meta.priceRange = fitted;
+      try {
+        series.applyOptions({
+          autoscaleInfoProvider: fittedOscScaleProvider(fitted),
+          priceFormat: compactOscPriceFormat(fitted),
+        });
+        oscChart.priceScale(meta.priceScaleId || "right").applyOptions({ autoScale: true });
+      } catch (err) {
+        /* ignore */
+      }
+    });
+  }
+
+  function sanitizeOscPoints(data) {
+    const out = [];
+    let lastT = null;
+    const list = data || [];
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      if (!p || p.time == null) continue;
+      const t = Number(p.time);
+      if (!Number.isFinite(t) || (lastT != null && t <= lastT)) continue;
+      lastT = t;
+      if (p.value == null || p.value === "") {
+        out.push({ time: t });
+        continue;
+      }
+      const v = Number(p.value);
+      if (!Number.isFinite(v)) {
+        out.push({ time: t });
+        continue;
+      }
+      out.push({ time: t, value: v });
+    }
+    return out;
+  }
+
+  function alignOscPointsToCandles(data) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    const pts = sanitizeOscPoints(data);
+    const valued = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].value != null) valued.push(pts[i]);
+    }
+    if (!candles.length) return valued.length ? valued : pts;
+
+    const candleTimes = [];
+    let lastT = null;
+    for (let i = 0; i < candles.length; i++) {
+      const t = Number(candles[i].time);
+      if (!Number.isFinite(t) || (lastT != null && t <= lastT)) continue;
+      lastT = t;
+      candleTimes.push(t);
+    }
+    if (!candleTimes.length) return valued.length ? valued : pts;
+
+    const byT = new Map();
+    valued.forEach(function (p) {
+      byT.set(p.time, p.value);
+    });
+    let exact = 0;
+    for (let i = 0; i < candleTimes.length; i++) {
+      if (byT.has(candleTimes[i])) exact += 1;
+    }
+
+    const out = [];
+    if (exact >= Math.max(1, candleTimes.length * 0.5)) {
+      for (let i = 0; i < candleTimes.length; i++) {
+        const t = candleTimes[i];
+        if (byT.has(t)) out.push({ time: t, value: byT.get(t) });
+        else out.push({ time: t });
+      }
+      return out;
+    }
+
+    let j = 0;
+    let lastVal = null;
+    for (let i = 0; i < candleTimes.length; i++) {
+      const t = candleTimes[i];
+      while (j < valued.length && valued[j].time <= t) {
+        lastVal = valued[j].value;
+        j += 1;
+      }
+      if (lastVal == null) out.push({ time: t });
+      else out.push({ time: t, value: lastVal });
+    }
+    return out;
+  }
+
   function oscSize() {
     const el = $("oscillator");
     return {
@@ -5307,6 +5479,13 @@
         scaleMargins: OSC_SCALE_MARGINS,
         minimumWidth: 56,
       },
+      leftPriceScale: {
+        visible: false,
+        borderColor: COLORS.border,
+        autoScale: false,
+        scaleMargins: OSC_SCALE_MARGINS,
+        minimumWidth: 56,
+      },
       timeScale: {
         borderColor: COLORS.border,
         timeVisible: false,
@@ -5323,10 +5502,10 @@
         vertTouchDrag: false,
       },
       handleScale: {
-        axisPressedMouseMove: { time: true, price: false },
+        axisPressedMouseMove: { time: true, price: true },
         mouseWheel: true,
         pinch: true,
-        axisDoubleClickReset: { time: true, price: false },
+        axisDoubleClickReset: { time: true, price: true },
       },
       width: w,
       height: h,
@@ -5339,8 +5518,11 @@
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
-      visible: true,
-      autoscaleInfoProvider: lockedScaleProvider(),
+      visible: false,
+      priceScaleId: "left",
+      autoscaleInfoProvider: function () {
+        return { priceRange: { minValue: 0, maxValue: 1 } };
+      },
     });
 
     oscChart.timeScale().subscribeVisibleLogicalRangeChange(function (range) {
@@ -5356,6 +5538,7 @@
         /* ignore */
       }
       timeSyncLock = false;
+      fitAutoOscToVisibleRange(range);
     });
 
     oscChart.subscribeCrosshairMove(function (param) {
@@ -5413,15 +5596,25 @@
       /* ignore */
     }
     timeSyncLock = false;
+    fitAutoOscToVisibleRange(range);
   }
 
   function updateOscTimeBase() {
     if (!oscTimeBase) return;
     const candles = (lastPayload && lastPayload.candles) || [];
-    const data = candles.map(function (c) {
-      return { time: c.time };
-    });
-    oscTimeBase.setData(data);
+    const data = [];
+    let lastT = null;
+    for (let i = 0; i < candles.length; i++) {
+      const t = Number(candles[i].time);
+      if (!Number.isFinite(t) || (lastT != null && t <= lastT)) continue;
+      lastT = t;
+      data.push({ time: t });
+    }
+    try {
+      oscTimeBase.setData(data);
+    } catch (err) {
+      /* whitespace-only points rejected on some builds */
+    }
   }
 
   function clearOscPriceLines() {
@@ -5472,37 +5665,86 @@
           /* ignore */
         }
         oscSeriesById.delete(id);
+        oscSeriesMeta.delete(id);
       }
     });
     Object.keys(wanted).forEach(function (id) {
       const spec = wanted[id];
+      const scaleId = spec.priceScaleId || "right";
+      const autoScale = spec.auto_scale === true;
+      const prev = oscSeriesMeta.get(id);
       let series = oscSeriesById.get(id);
+      if (series && prev && (prev.priceScaleId !== scaleId || prev.auto_scale !== autoScale)) {
+        try {
+          oscChart.removeSeries(series);
+        } catch (err) {
+          /* ignore */
+        }
+        oscSeriesById.delete(id);
+        oscSeriesMeta.delete(id);
+        series = null;
+      }
+      const data = autoScale ? alignOscPointsToCandles(spec.data || []) : sanitizeOscPoints(spec.data || []);
+      const fittedRange = autoScale ? oscValueRange(data) : null;
+      const seriesOpts = {
+        color: spec.color || "#5b8def",
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: true,
+        visible: spec.visible !== false,
+        priceScaleId: scaleId,
+      };
+      if (autoScale) {
+        seriesOpts.priceFormat = compactOscPriceFormat(fittedRange);
+        if (fittedRange) {
+          seriesOpts.autoscaleInfoProvider = fittedOscScaleProvider(fittedRange);
+        }
+      } else {
+        seriesOpts.autoscaleInfoProvider = lockedScaleProvider();
+      }
       if (!series) {
-        series = oscChart.addLineSeries({
-          color: spec.color || "#5b8def",
-          lineWidth: 2,
-          priceLineVisible: false,
-          lastValueVisible: true,
-          crosshairMarkerVisible: true,
-          visible: spec.visible !== false,
-          autoscaleInfoProvider: lockedScaleProvider(),
-        });
+        try {
+          series = oscChart.addLineSeries(seriesOpts);
+        } catch (err) {
+          if (seriesOpts.priceFormat && seriesOpts.priceFormat.type === "custom") {
+            seriesOpts.priceFormat = { type: "price", precision: 0, minMove: 1 };
+            series = oscChart.addLineSeries(seriesOpts);
+          } else {
+            throw err;
+          }
+        }
         oscSeriesById.set(id, series);
       } else {
-        series.applyOptions({
-          color: spec.color || "#5b8def",
-          visible: spec.visible !== false,
-          autoscaleInfoProvider: lockedScaleProvider(),
-        });
+        series.applyOptions(seriesOpts);
       }
-      const data = spec.data || [];
-      series.setData(data);
-      if (id === "k" || oscValueByTime.size === 0) {
+      oscSeriesMeta.set(id, {
+        priceScaleId: scaleId,
+        auto_scale: autoScale,
+        priceRange: fittedRange,
+        data: data,
+      });
+      try {
+        series.setData(data);
+      } catch (err) {
+        /* skip corrupt points rather than leaving a blank pane */
+      }
+      if (id === "k" || (oscValueByTime.size === 0 && id === "oi")) {
         for (let i = 0; i < data.length; i++) {
-          oscValueByTime.set(data[i].time, data[i].value);
+          if (data[i].value != null) oscValueByTime.set(data[i].time, data[i].value);
         }
       }
     });
+    if (oscChart && lastLowerPayload && lastLowerPayload.auto_scale) {
+      try {
+        oscChart.priceScale("right").applyOptions({ autoScale: true });
+      } catch (err) {
+        /* ignore */
+      }
+      fitAutoOscToVisibleRange(
+        chart ? chart.timeScale().getVisibleLogicalRange() : null
+      );
+    }
   }
 
   function applyLocalOscCrosshair(unix) {
@@ -5517,7 +5759,7 @@
 
   function applyLocalOscCrosshairUnlocked(unix) {
     if (!oscChart || !lowerVisible) return;
-    const series = oscSeriesById.get("k") || oscTimeBase;
+    const series = oscSeriesById.get("k") || oscSeriesById.get("oi") || oscTimeBase;
     if (!series) return;
     const value = oscValueByTime.has(unix) ? oscValueByTime.get(unix) : 50;
     try {
@@ -5540,8 +5782,71 @@
     localXhairLock = false;
   }
 
-  function setLowerPane(payload) {
-    lastLowerPayload = payload || { id: "stochastic", visible: false };
+  function mergeStochOi(stoch, oi) {
+    stoch = stoch || { visible: false };
+    oi = oi || { visible: false };
+    const stochOn = !!stoch.visible;
+    const oiOn = !!oi.visible;
+    if (!stochOn && !oiOn) {
+      return { id: "none", visible: false, series: [], levels: [] };
+    }
+    const series = [];
+    const titles = [];
+    if (stochOn) {
+      titles.push(stoch.title || "Stochastic");
+      (stoch.series || []).forEach(function (s) {
+        series.push(Object.assign({}, s, {
+          auto_scale: false,
+          priceScaleId: oiOn ? "left" : "right",
+        }));
+      });
+    }
+    if (oiOn) {
+      titles.push(oi.title || "Open Interest");
+      (oi.series || []).forEach(function (s) {
+        series.push(Object.assign({}, s, {
+          auto_scale: true,
+          priceScaleId: "right",
+        }));
+      });
+    }
+    return {
+      id: stochOn && oiOn ? "stoch+oi" : (stochOn ? "stochastic" : "open_interest"),
+      title: titles.join("  ·  "),
+      visible: true,
+      dual_scale: stochOn && oiOn,
+      auto_scale: oiOn,
+      price_min: stochOn ? (stoch.price_min != null ? stoch.price_min : 0) : null,
+      price_max: stochOn ? (stoch.price_max != null ? stoch.price_max : 100) : null,
+      series: series,
+      levels: stochOn ? (stoch.levels || []) : [],
+    };
+  }
+
+  function applyOscScaleMode(payload) {
+    if (!oscChart) return;
+    const dual = !!(payload && payload.dual_scale);
+    const autoRight = !!(payload && payload.auto_scale);
+    oscChart.applyOptions({
+      leftPriceScale: {
+        visible: dual,
+        borderColor: COLORS.border,
+        autoScale: false,
+        scaleMargins: OSC_SCALE_MARGINS,
+        minimumWidth: dual ? 56 : 0,
+      },
+      rightPriceScale: {
+        visible: true,
+        borderColor: COLORS.border,
+        autoScale: autoRight,
+        scaleMargins: OSC_SCALE_MARGINS,
+        minimumWidth: 56,
+      },
+    });
+  }
+
+  function applyLowerPane(payload) {
+    lastLowerPayload = payload || { id: "none", visible: false };
     const visible = !!(lastLowerPayload && lastLowerPayload.visible);
     const legend = $("osc-legend");
     if (!visible) {
@@ -5551,6 +5856,7 @@
         applyOscSeries([]);
         clearOscPriceLines();
         if (oscTimeBase) oscTimeBase.setData([]);
+        applyOscScaleMode({ dual_scale: false, auto_scale: false });
       }
       if (chart) {
         resize();
@@ -5559,6 +5865,7 @@
     }
     setLowerOpen(true);
     ensureOscChart();
+    applyOscScaleMode(lastLowerPayload);
     if (chart && oscChart) {
       try {
         const opt = chart.timeScale().options();
@@ -5578,6 +5885,20 @@
     syncOscLogicalFromMain(
       chart ? chart.timeScale().getVisibleLogicalRange() : null
     );
+  }
+
+  function rebuildLowerPane() {
+    applyLowerPane(mergeStochOi(lastStochPayload, lastOiPayload));
+  }
+
+  function setLowerPane(payload) {
+    lastStochPayload = payload || { id: "stochastic", visible: false };
+    rebuildLowerPane();
+  }
+
+  function setOiPane(payload) {
+    lastOiPayload = payload || { id: "open_interest", visible: false };
+    rebuildLowerPane();
   }
 
   function connectBridge() {
@@ -5677,6 +5998,7 @@
           : null,
       lowerKCount: lowerSeriesCount("k"),
       lowerDCount: lowerSeriesCount("d"),
+      lowerOiCount: lowerSeriesCount("oi"),
       lowerLogical: oscLogicalRange(),
       lowerSize: oscSize(),
       lowerOpen: !!(
@@ -5732,6 +6054,10 @@
     getCandleSeries: function () {
       return candleSeries;
     },
+    // FOOTPRINT_HOOK: thin barSpacing adapter for footprint zoom gates.
+    getBarSpacing: function () {
+      return timeScaleOption("barSpacing");
+    },
     setData: setData,
     updateFormingBar: updateFormingBar,
     setIndicatorVisible: setIndicatorVisible,
@@ -5750,6 +6076,7 @@
     setLldEma: setLldEma,
     setEmaOverlays: setEmaOverlays,
     setLowerPane: setLowerPane,
+    setOiPane: setOiPane,
     syncLowerTime: function () {
       updateOscTimeBase();
       syncOscLogicalFromMain(

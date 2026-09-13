@@ -431,6 +431,7 @@ def test_the_app_wires_trp_chart_tools_and_ema():
     for token in (
         "chartApi", "setEmaOverlays", "mpTools", "mpResetView", "setHostShift",
         "fetchEmaOverlays", "mpShowLiquidity", "refreshLiquidityLocation",
+        "mpShowOi", "refreshOpenInterestDisplay",
         "loadResearchPaneForLld", "isUserDrawingOverlay", "mpLldSettings", "renderLldLegend",
     ):
         assert token in js, f"app.js must wire TRP chart feature {token}"
@@ -439,6 +440,7 @@ def test_the_app_wires_trp_chart_tools_and_ema():
 def test_the_template_offers_liquidity_location_toggle():
     html = PAGE_HTML.read_text(encoding="utf-8")
     assert 'id="mpShowLiquidity"' in html
+    assert 'id="mpShowOi"' in html
     assert 'id="mpLldSettings"' in html
     assert 'id="modalLld"' in html
 
@@ -462,7 +464,7 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-19"
+    assert ASSET_V == "mp-24"
 
 
 def test_kerzen_and_market_profile_controls_are_separate():

@@ -5,6 +5,7 @@ Ports MainWindow drawing/settings semantics without PySide. Host JS is the shell
 
 from __future__ import annotations
 
+import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +56,10 @@ DEFAULT_ORDERBOOK_LEVELS = {
     "mode": "aggregated",
     "scale": "sqrt",
     "width_px": 140,
+}
+
+DEFAULT_OPEN_INTEREST = {
+    "enabled": False,
 }
 
 
@@ -127,6 +132,13 @@ def normalize_orderbook_levels(raw: dict | None) -> dict[str, Any]:
     return src
 
 
+def normalize_open_interest(raw: dict | None) -> dict[str, Any]:
+    src = dict(DEFAULT_OPEN_INTEREST)
+    if isinstance(raw, dict) and "enabled" in raw:
+        src["enabled"] = bool(raw["enabled"])
+    return src
+
+
 USER_DATA_DIR = Path(__file__).resolve().parent / "user_data"
 DRAWINGS_PATH = USER_DATA_DIR / "drawings.json"
 SETTINGS_PATH = USER_DATA_DIR / "indicator_settings.json"
@@ -182,6 +194,7 @@ class ResearchWorkspace:
         self.volume_profile = dict(DEFAULT_VOLUME_PROFILE)
         self.orderbook_profile = dict(DEFAULT_ORDERBOOK_PROFILE)
         self.orderbook_levels = dict(DEFAULT_ORDERBOOK_LEVELS)
+        self.open_interest = self._load_open_interest()
         self._cluster_sweep_run: dict[str, Any] | None = None
         self._cluster_sweep_visible: bool = False
         self._cluster_sweep_event_index: int = 0
@@ -231,6 +244,32 @@ class ResearchWorkspace:
             self.indicator_store.set_config(trp["LIQUIDITY_LOCATION"], self.lld_config)
         except OSError:
             pass
+        self._persist_open_interest()
+
+    def _load_open_interest(self) -> dict[str, Any]:
+        try:
+            if not SETTINGS_PATH.is_file():
+                return dict(DEFAULT_OPEN_INTEREST)
+            raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return dict(DEFAULT_OPEN_INTEREST)
+        if not isinstance(raw, dict):
+            return dict(DEFAULT_OPEN_INTEREST)
+        return normalize_open_interest(raw.get("open_interest"))
+
+    def _persist_open_interest(self) -> None:
+        try:
+            USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            if SETTINGS_PATH.is_file():
+                raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+                if not isinstance(raw, dict):
+                    raw = {"version": 1, "indicators": {}}
+            else:
+                raw = {"version": 1, "indicators": {}}
+            raw["open_interest"] = dict(self.open_interest)
+            SETTINGS_PATH.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+        except (OSError, ValueError, TypeError):
+            pass
 
     def snapshot(self) -> dict[str, Any]:
         trp = self._trp
@@ -255,6 +294,7 @@ class ResearchWorkspace:
             },
             "ema": self.ema_config.to_dict(),
             "stochastic": self.stoch_config.to_dict(),
+            "open_interest": dict(self.open_interest),
             "liquidity": self.lld_config.to_dict(),
             "volume_profile": dict(self.volume_profile),
             "orderbook_profile": dict(self.orderbook_profile),
@@ -396,6 +436,7 @@ class ResearchWorkspace:
         return {
             "ema": trp["EmaOverlaysConfig"].defaults().to_dict(),
             "stochastic": trp["StochasticConfig"].defaults().to_dict(),
+            "open_interest": dict(DEFAULT_OPEN_INTEREST),
             "liquidity": trp["LiquidityLocationConfig"].defaults().to_dict(),
             "volume_profile": dict(DEFAULT_VOLUME_PROFILE),
             "orderbook_profile": dict(DEFAULT_ORDERBOOK_PROFILE),
@@ -407,6 +448,7 @@ class ResearchWorkspace:
         *,
         ema: dict | None = None,
         stochastic: dict | None = None,
+        open_interest: dict | None = None,
         liquidity: dict | None = None,
         volume_profile: dict | None = None,
         orderbook_profile: dict | None = None,
@@ -421,6 +463,8 @@ class ResearchWorkspace:
             if "enabled" not in stochastic:
                 cfg.enabled = enabled
             self.stoch_config = cfg
+        if open_interest is not None:
+            self.open_interest = normalize_open_interest(open_interest)
         if liquidity is not None:
             enabled = bool(self.lld_config.enabled)
             cfg = trp["LiquidityLocationConfig"].from_dict(liquidity)
@@ -439,6 +483,8 @@ class ResearchWorkspace:
     def set_indicator_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
         if name == "stochastic":
             self.stoch_config.enabled = bool(enabled)
+        elif name in {"open_interest", "oi"}:
+            self.open_interest["enabled"] = bool(enabled)
         elif name in {"liquidity", "liquidity_location", "lld"}:
             self.lld_config.enabled = bool(enabled)
         else:

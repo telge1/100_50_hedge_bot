@@ -9,8 +9,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-19 Orderbook Walls + Levels (research 1:1) on Market Profile.
-  try { console.info("[mp] asset mp-19"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-24 OI Y-scale follows visible window (not 0–max).
+  try { console.info("[mp] asset mp-24"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -132,6 +132,7 @@
       extendLevels: $("mpExtendLevels").checked,
       showShape: $("mpShowShape").checked,
       showLiquidity: $("mpShowLiquidity").checked,
+      showOi: $("mpShowOi") ? $("mpShowOi").checked : false,
       // FOOTPRINT_HOOK: persistence only — rendering lives in FootprintCandles.
       showFootprint: $("mpShowFootprint") ? $("mpShowFootprint").checked : false,
       valueAreaPct: parseFloat($("mpValueAreaPct").value) || 70,
@@ -189,6 +190,7 @@
     setChk("mpExtendLevels", s.extendLevels);
     setChk("mpShowShape", s.showShape);
     setChk("mpShowLiquidity", s.showLiquidity);
+    setChk("mpShowOi", s.showOi);
     // FOOTPRINT_HOOK
     setChk("mpShowFootprint", s.showFootprint);
     setChk("mpFinal", s.final);
@@ -1448,6 +1450,7 @@
       to: lastLoadRange.end,
       ema: ws.ema || { enabled: false, lines: [] },
       stochastic: ws.stochastic || { enabled: false },
+      open_interest: ws.open_interest || { enabled: false },
       liquidity: researchLiquidityConfig(),
       allow_stale: true
     });
@@ -1578,6 +1581,7 @@
       to: range.end,
       ema: emaCfg,
       stochastic: { enabled: false },
+      open_interest: { enabled: false },
       liquidity: { enabled: false }
     }).then(function (body) {
       return (body && body.ema) || { series: [] };
@@ -1592,6 +1596,71 @@
     if (api && api.setEmaOverlays) {
       api.setEmaOverlays(lastEmaPayload, { skipRangeRestore: true });
     }
+  }
+
+  function oiEnabled() {
+    return !!($("mpShowOi") && $("mpShowOi").checked);
+  }
+
+  function applyOiPane(oiPayload) {
+    var api = chartApi();
+    if (!api) return;
+    if (typeof api.setOiPane === "function") {
+      api.setOiPane(oiPayload || { id: "open_interest", visible: false });
+      return;
+    }
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-24)", "error");
+  }
+
+  function fetchOpenInterest(symbol, timeframe, range) {
+    if (!oiEnabled()) {
+      return Promise.resolve({ id: "open_interest", visible: false, series: [] });
+    }
+    var times = ((payload && payload.candles) || []).map(function (c) {
+      return Number(c && c.time);
+    }).filter(function (t) { return Number.isFinite(t); });
+    return sendJson("/api/research/indicators", "POST", {
+      symbol: symbol,
+      timeframe: timeframe,
+      from: range.start,
+      to: range.end,
+      times: times,
+      ema: { enabled: false },
+      stochastic: { enabled: false },
+      open_interest: { enabled: true },
+      liquidity: { enabled: false }
+    }).then(function (body) {
+      var oiBody = body && body.open_interest;
+      if (!oiBody) {
+        throw new Error("API lieferte kein open_interest (Dashboard-Prozess neu starten)");
+      }
+      oiBody.visible = true;
+      return oiBody;
+    });
+  }
+
+  function refreshOpenInterestDisplay() {
+    if (!oiEnabled()) {
+      applyOiPane({ id: "open_interest", visible: false });
+      return Promise.resolve();
+    }
+    if (!lastLoadRange) return Promise.resolve();
+    var s = readSettings();
+    applyOiPane({
+      id: "open_interest",
+      title: "Open Interest",
+      visible: true,
+      auto_scale: true,
+      series: [],
+      levels: []
+    });
+    return fetchOpenInterest(s.symbol, s.timeframe, lastLoadRange).then(function (payload) {
+      applyOiPane(payload);
+      var n = ((((payload.series || [])[0] || {}).data) || []).length;
+      if (!n) setStatus("Open Interest: keine Daten für " + s.symbol, "error");
+    }).catch(function (err) {
+      setStatus("Open Interest: " + (err && err.message ? err.message : err), "error");
+    });
   }
 
   function bindChartChrome() {
@@ -2445,7 +2514,8 @@
         return Promise.all([
           fetchEmaOverlays(s.symbol, s.timeframe, range).then(applyEmaOverlays).catch(function () {}),
           refreshDrawings(),
-          refreshLiquidityLocation()
+          refreshLiquidityLocation(),
+          refreshOpenInterestDisplay()
         ]).then(function () {
           setStatus(
             m.profiles_built + "/" + m.windows + " Fenster" +
@@ -2539,6 +2609,20 @@
       refreshLiquidityLocation();
     });
 
+    if ($("mpShowOi")) {
+      $("mpShowOi").addEventListener("change", function () {
+        persistSettings();
+        sendJson("/api/research/indicator-enabled", "POST", {
+          name: "open_interest",
+          enabled: $("mpShowOi").checked
+        }).then(function (snap) {
+          applyWorkspace(snap);
+        }).catch(function () { /* workspace optional; pane still loads */ }).then(function () {
+          return refreshOpenInterestDisplay();
+        });
+      });
+    }
+
     // FOOTPRINT_HOOK: toggle only — fetch/draw owned by FootprintCandles.
     if ($("mpShowFootprint")) {
       $("mpShowFootprint").addEventListener("change", function () {
@@ -2583,6 +2667,8 @@
     });
     sendJson("/api/research/workspace").then(function (snap) {
       applyWorkspace(snap);
+      persistSettings();
+      if (lastLoadRange) refreshOpenInterestDisplay();
     }).catch(function () { /* workspace optional */ });
     whenChartReady(function () {
       if (payload) {

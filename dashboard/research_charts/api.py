@@ -446,6 +446,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 limit=body.get("limit"),
                 ema=body.get("ema"),
                 stochastic=body.get("stochastic"),
+                open_interest=body.get("open_interest"),
                 liquidity=body.get("liquidity"),
                 allow_stale=bool(body.get("allow_stale")),
                 liquidity_location_as_of=body.get("liquidity_location_as_of"),
@@ -524,6 +525,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         end: Optional[int] = Query(None, alias="to"),
         ema: bool = Query(False),
         stochastic: bool = Query(False),
+        open_interest: bool = Query(False),
         liquidity: bool = Query(False),
         k_length: int = Query(14),
         k_smoothing: int = Query(3),
@@ -547,6 +549,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                     "k_smoothing": k_smoothing,
                     "d_smoothing": d_smoothing,
                 },
+                open_interest={"enabled": open_interest},
                 liquidity={
                     "enabled": liquidity,
                     "highest_len": highest_len,
@@ -577,7 +580,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 limit=body.get("limit"),
                 ema=body.get("ema"),
                 stochastic=body.get("stochastic"),
+                open_interest=body.get("open_interest"),
                 liquidity=body.get("liquidity"),
+                times=body.get("times"),
             )
         except KeyError:
             return _error(404, "unknown_symbol", "no 1m candles for symbol")
@@ -635,6 +640,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return get_workspace().apply_settings(
                 ema=body.get("ema"),
                 stochastic=body.get("stochastic"),
+                open_interest=body.get("open_interest"),
                 liquidity=body.get("liquidity"),
                 volume_profile=body.get("volume_profile"),
                 orderbook_profile=body.get("orderbook_profile"),
