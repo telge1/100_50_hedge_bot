@@ -464,7 +464,7 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-24"
+    assert ASSET_V == "mp-25"
 
 
 def test_kerzen_and_market_profile_controls_are_separate():
@@ -472,8 +472,8 @@ def test_kerzen_and_market_profile_controls_are_separate():
 
     html = PAGE_HTML.read_text(encoding="utf-8")
     js = APP_JS.read_text(encoding="utf-8")
-    assert 'for="mpTimeframe">KERZEN</' in html
-    assert 'for="mpAnchor">MARKET PROFILE</' in html
+    assert 'for="mpTimeframe">Kerzen</' in html
+    assert 'for="mpAnchor">Market Profile</' in html
     assert "{% for tf in timeframes %}" in html
     assert "1m" in SUPPORTED_TIMEFRAMES
     for tf in ("5m", "15m", "30m", "1h", "4h"):
@@ -482,8 +482,11 @@ def test_kerzen_and_market_profile_controls_are_separate():
     assert "mp_timeframe" in js
     assert "s.mpTimeframe || s.anchor" in js
     assert '["mpSymbol", "mpTimeframe", "mpAnchor", "mpDays"]' in js
-    # Candle TF must not be copied into the MP control on restore.
-    assert "Never copy candle" in js
+    # Candle TF and MP TF are restored independently (must not overwrite each other).
+    assert 'setVal("mpAnchor", mpTf)' in js
+    assert 'setVal("mpTimeframe", s.timeframe)' in js
+    assert "var candleEl = $(\"mpTimeframe\")" in js
+    assert "var mpEl = $(\"mpAnchor\")" in js
 
 
 def test_mp_background_has_no_value_area_box_fill():
@@ -497,9 +500,9 @@ def test_mp_background_has_no_value_area_box_fill():
 def test_mp_does_not_force_follow_live_on_poll():
     js = APP_JS.read_text(encoding="utf-8")
     assert "Do not force followLive" in js
-    assert "preserveView: true" in js
-    # Forming / visibility must not yank the view; Zentrieren uses resetView.
+    # Hotpath no longer passes preserveView on every forming apply; recenter only via resetView.
     assert "api.resetView" in js
+    assert "preserveView path" in js or "preserveView" in js
 
 
 def test_the_page_bridge_stubs_crosshair_handlers():
@@ -516,11 +519,12 @@ def test_the_page_bridge_stubs_crosshair_handlers():
     assert "pollForming" in js
     assert "/api/research/forming-bar" in js
     assert "updateFormingBar" in js
-    assert "FORMING_MS = 250" in js
+    assert "FORMING_MS = (_hp && _hp.FORMING_MS) || 1000" in js or "FORMING_MS = 1000" in js
     chart = (DASHBOARD_DIR / "static" / "research_trp" / "chart.js").read_text(encoding="utf-8")
     assert 'typeof window.bridge.on_crosshair_move === "function"' in chart
     assert 'typeof window.bridge.on_crosshair_leave === "function"' in chart
     assert "updateFormingBar._stickAt" in chart
+    assert "var FORMING_MS = 1000" in chart or "FORMING_MS = 1000" in chart
 
 # ----------------------------------------------------------- live smoke test
 

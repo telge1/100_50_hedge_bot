@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-24 OI Y-scale follows visible window (not 0–max).
-  try { console.info("[mp] asset mp-24"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-25 OI Y-scale follows visible window (not 0–max).
+  try { console.info("[mp] asset mp-25"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2673,7 +2673,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-24)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-25)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {
