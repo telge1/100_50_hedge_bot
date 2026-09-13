@@ -10,6 +10,7 @@ from obfull_research_engine.clickhouse_research_store_v1.epoch_aware_silver_v1_3
     BookHashCache,
     BookHashProfile,
     EPOCH_SILVER_DDLS,
+    EpochDefinition,
     EpochSilverError,
     ReplayResult,
     discover_epochs,
@@ -20,6 +21,7 @@ from obfull_research_engine.clickhouse_research_store_v1.epoch_aware_silver_v1_3
     persist_epochs,
     replay_epoch_window,
     select_resume_checkpoint,
+    split_resume_and_replay_stream,
     validate_epoch_window,
     _mapping_preflight,
     canonical_book_bytes_profiled,
@@ -384,6 +386,136 @@ def test_epoch_hash_changes_when_definition_changes():
     epoch.safe_end_ns += 1
     epoch.finalize_hash()
     assert epoch.epoch_hash != original
+
+
+def test_first_epoch_chunk_resumes_from_exchange_snapshot_anchor():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND),
+        _record(rank=1, ordinal=2, kind="delta", event_ns=SECOND + 100_000_000),
+    ]
+    epoch = _discover(records, end=5 * SECOND).epochs[0]
+    resume, tail = split_resume_and_replay_stream(
+        iter(records),
+        epoch=epoch,
+        analysis_start_ns=epoch.safe_start_ns,
+    )
+    assert resume.message_type == "snapshot"
+    assert resume.record_ordinal == epoch.anchor_record_ordinal
+    replay = replay_epoch_window(
+        tail,
+        epoch=epoch,
+        resume_record=resume,
+        analysis_start_ns=epoch.safe_start_ns,
+        analysis_end_ns=5 * SECOND,
+        build_id="b" * 64,
+    )
+    assert replay.delta_records == 1
+
+
+def test_short_epoch_without_periodic_checkpoint_still_replays_from_anchor():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND),
+        _record(rank=1, ordinal=2, kind="delta", event_ns=2 * SECOND),
+    ]
+    epoch = _discover(records, end=3 * SECOND).epochs[0]
+    resume = select_resume_checkpoint(
+        records, epoch=epoch, analysis_start_ns=epoch.safe_start_ns
+    )
+    assert resume.record_ordinal == 1
+
+
+def test_later_chunk_still_replays_from_epoch_anchor_when_no_local_checkpoint():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND),
+        _record(
+            rank=1,
+            ordinal=2,
+            kind="delta",
+            event_ns=2 * SECOND,
+            u=11,
+            bids=[["100", "2"]],
+        ),
+        _record(
+            rank=1,
+            ordinal=3,
+            kind="delta",
+            event_ns=6 * SECOND,
+            u=12,
+            bids=[["100", "3"]],
+        ),
+    ]
+    epoch = _discover(records, end=10 * SECOND).epochs[0]
+    resume = select_resume_checkpoint(
+        records, epoch=epoch, analysis_start_ns=5 * SECOND
+    )
+    assert resume.record_ordinal == 1
+    _, tail = split_resume_and_replay_stream(
+        iter(records),
+        epoch=epoch,
+        analysis_start_ns=5 * SECOND,
+    )
+    replay = replay_epoch_window(
+        tail,
+        epoch=epoch,
+        resume_record=resume,
+        analysis_start_ns=5 * SECOND,
+        analysis_end_ns=8 * SECOND,
+        build_id="b" * 64,
+    )
+    assert replay.delta_records == 1
+    assert replay.level_changes[0]["new_size"] == 3.0
+
+
+def test_replay_stops_at_analysis_end_and_ignores_trailing_records():
+    records = [
+        _record(rank=1, ordinal=1, kind="snapshot", event_ns=SECOND),
+        _record(rank=1, ordinal=2, kind="delta", event_ns=2 * SECOND, u=11),
+        _record(rank=1, ordinal=3, kind="delta", event_ns=3 * SECOND, u=12),
+        _record(rank=1, ordinal=4, kind="delta", event_ns=8 * SECOND, u=13),
+    ]
+    epoch = _discover(records, end=10 * SECOND).epochs[0]
+    replay = replay_epoch_window(
+        iter(records),
+        epoch=epoch,
+        resume_record=records[0],
+        analysis_start_ns=epoch.safe_start_ns,
+        analysis_end_ns=4 * SECOND,
+        build_id="b" * 64,
+    )
+    assert replay.delta_records == 2
+    assert replay.source_records == 2
+
+
+def test_missing_independent_anchor_still_hard_stops():
+    records = [
+        _record(rank=1, ordinal=1, kind="delta", event_ns=SECOND),
+    ]
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=SECOND,
+        anchor_receive_time_ns=SECOND,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=SECOND,
+        safe_end_ns=5 * SECOND,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=2,
+    )
+    with pytest.raises(EpochSilverError, match="STOP_EPOCH_ANCHOR_PROVENANCE_UNRESOLVED"):
+        select_resume_checkpoint(
+            records, epoch=epoch, analysis_start_ns=2 * SECOND
+        )
 
 
 def test_resume_checkpoint_is_inside_proven_epoch_not_an_opener():

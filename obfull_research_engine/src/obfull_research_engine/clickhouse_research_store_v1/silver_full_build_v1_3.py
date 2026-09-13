@@ -1323,6 +1323,14 @@ def build_one_chunk(
         if status in {"RUNNING", "INTERRUPTED", "FAILED"} and not config.resume:
             raise SilverBuildError("STOP_SILVER_RESUME_INCOMPLETE_REQUIRES_RESUME")
 
+    _write_chunk_status(
+        client,
+        config,
+        run_id=run_id,
+        epoch_plan_hash=epoch_plan_hash,
+        chunk=chunk,
+        status="RUNNING",
+    )
     start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
     try:
         resume_record, replay_stream = split_resume_and_replay_stream(
@@ -1338,14 +1346,6 @@ def build_one_chunk(
         )
     except EpochSilverError as exc:
         raise SilverBuildError(str(exc)) from exc
-    _write_chunk_status(
-        client,
-        config,
-        run_id=run_id,
-        epoch_plan_hash=epoch_plan_hash,
-        chunk=chunk,
-        status="RUNNING",
-    )
     stop.check()
     try:
         replay = replay_epoch_window(

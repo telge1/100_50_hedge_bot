@@ -716,6 +716,45 @@ def validate_epoch_window(
     )
 
 
+def _epoch_anchor_key(epoch: EpochDefinition) -> tuple[int, int]:
+    return (int(epoch.anchor_segment_chain_index), int(epoch.anchor_record_ordinal))
+
+
+def _anchor_resume_at_analysis_start(
+    record: BronzeRecord,
+    *,
+    epoch: EpochDefinition,
+    analysis_start_ns: int,
+) -> bool:
+    """First epoch chunk may resume directly from the validated epoch anchor."""
+    if int(analysis_start_ns) != int(epoch.safe_start_ns):
+        return False
+    if _record_key(record) != _epoch_anchor_key(epoch):
+        return False
+    if record.message_type == "snapshot" and epoch.anchor_type == "exchange_snapshot":
+        return _anchor_book_hash(record) is not None
+    if (
+        record.message_type == "checkpoint"
+        and epoch.anchor_type == "segment_start_clean"
+    ):
+        return _anchor_book_hash(record) is not None
+    return False
+
+
+def _resume_precedes_analysis(
+    epoch: EpochDefinition,
+    resume_record: BronzeRecord,
+    analysis_start_ns: int,
+) -> bool:
+    if (
+        int(analysis_start_ns) == int(epoch.safe_start_ns)
+        and _record_key(resume_record) == _epoch_anchor_key(epoch)
+    ):
+        return True
+    causal = _causal_ns(resume_record)
+    return int(epoch.safe_start_ns) <= causal < int(analysis_start_ns)
+
+
 def _resume_checkpoint_candidate(
     record: BronzeRecord,
     *,
@@ -748,9 +787,12 @@ def select_resume_checkpoint(
         if key < (epoch.anchor_segment_chain_index, epoch.anchor_record_ordinal):
             continue
         if _causal_ns(record) >= analysis_start_ns:
-            # Once physical replay reaches analysis, no later checkpoint may
-            # suppress already-observed analysis records, even if its own
-            # event timestamp moves backwards.
+            if candidate is None and _anchor_resume_at_analysis_start(
+                record,
+                epoch=epoch,
+                analysis_start_ns=analysis_start_ns,
+            ):
+                candidate = record
             break
         candidate = _resume_checkpoint_candidate(record, candidate=candidate)
     if candidate is None:
@@ -766,8 +808,10 @@ def split_resume_and_replay_stream(
     epoch: EpochDefinition,
     analysis_start_ns: int,
 ) -> tuple[BronzeRecord, Iterator[BronzeRecord]]:
-    """Single-pass resume selection with a tail iterator for replay."""
+    """Single-pass resume selection with replay prefix through analysis_start."""
     candidate: BronzeRecord | None = None
+    candidate_key: tuple[int, int] | None = None
+    prefix: list[BronzeRecord] = []
     iterator = iter(records)
     head: BronzeRecord | None = None
     for record in iterator:
@@ -775,15 +819,33 @@ def split_resume_and_replay_stream(
         if key < (epoch.anchor_segment_chain_index, epoch.anchor_record_ordinal):
             continue
         if _causal_ns(record) >= analysis_start_ns:
-            head = record
+            if candidate is None and _anchor_resume_at_analysis_start(
+                record,
+                epoch=epoch,
+                analysis_start_ns=analysis_start_ns,
+            ):
+                candidate = record
+                candidate_key = key
+                head = next(iterator, None)
+            else:
+                head = record
             break
-        candidate = _resume_checkpoint_candidate(record, candidate=candidate)
+        updated = _resume_checkpoint_candidate(record, candidate=candidate)
+        if updated is not None and (
+            candidate is None or _record_key(updated) != candidate_key
+        ):
+            candidate = updated
+            candidate_key = _record_key(updated)
+            prefix = []
+        elif candidate is not None and candidate_key is not None and key > candidate_key:
+            prefix.append(record)
     if candidate is None:
         raise EpochSilverError(
             "STOP_EPOCH_ANCHOR_PROVENANCE_UNRESOLVED: no resume checkpoint in epoch"
         )
 
     def tail() -> Iterator[BronzeRecord]:
+        yield from prefix
         if head is not None:
             yield head
         yield from iterator
@@ -841,7 +903,7 @@ def replay_epoch_window(
 ) -> ReplayResult:
     """Replay one already-validated epoch; never crosses its boundaries."""
     if not (
-        epoch.safe_start_ns <= _causal_ns(resume_record) < analysis_start_ns
+        _resume_precedes_analysis(epoch, resume_record, analysis_start_ns)
         and analysis_end_ns <= epoch.safe_end_ns
     ):
         raise EpochSilverError(
@@ -905,8 +967,11 @@ def replay_epoch_window(
             )
         if record.message_type != "delta":
             continue
-        source_records += 1
         event_ns = int(record.event_time_ns)
+        if event_ns >= analysis_end_ns:
+            emit_due(analysis_end_ns)
+            break
+        source_records += 1
         emit_due(event_ns)
         json_started = time.perf_counter()
         payload = _payload(record)

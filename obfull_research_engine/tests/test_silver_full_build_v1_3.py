@@ -156,6 +156,8 @@ class FakeClient:
             chunk_key = str(parameters.get("chunk_key", ""))
             value = self.chunks.get(chunk_key)
             return SimpleNamespace(result_rows=[value] if value else [])
+        if f"{runner.CHUNKS_TABLE}" in text and "SELECT version_ms" in text:
+            return SimpleNamespace(result_rows=[])
         if f"{runner.CHUNKS_TABLE}" in text and "RUNNING" in text:
             bad = sum(1 for status, _, _ in self.chunks.values() if status in {"RUNNING", "INTERRUPTED", "FAILED"})
             return SimpleNamespace(result_rows=[(bad,)])
@@ -807,8 +809,8 @@ def test_chunk_stream_query_is_apply_bounded_and_full_payload(tmp_path):
             "r" * 64,
             "BTCUSDT",
             "snapshot",
-            1,
-            1,
+            0,
+            0,
             1,
             1,
             1,
@@ -829,15 +831,15 @@ def test_chunk_stream_query_is_apply_bounded_and_full_payload(tmp_path):
             1,
         )
     ]]
-    with pytest.raises(runner.SilverBuildError):
-        runner.build_one_chunk(
-            client,
-            _config(tmp_path, resume=True),
-            run_id="r" * 64,
-            epoch_plan_hash=plan.epoch_plan_hash,
-            chunk=chunk,
-            stop=runner.StopState(),
-        )
+    result = runner.build_one_chunk(
+        client,
+        _config(tmp_path, resume=True),
+        run_id="r" * 64,
+        epoch_plan_hash=plan.epoch_plan_hash,
+        chunk=chunk,
+        stop=runner.StopState(),
+    )
+    assert result["status"] == "COMPLETE"
     assert "canonical_segment_chain_index, e.record_ordinal" in client.last_stream_sql
     assert "original_payload AS original_payload" in client.last_stream_sql
     assert client.last_stream_parameters["start_rank"] == 1
