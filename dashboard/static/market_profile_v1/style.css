@@ -635,3 +635,243 @@
   position: absolute;
   box-sizing: border-box;
 }
+
+/* --- Prompt 5: Standard / Profi UX --- */
+
+.mp-group-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5d6472;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.mp-dock-title {
+  margin-right: 8px;
+}
+
+.mp-bar-mode {
+  gap: 10px;
+}
+
+.mp-mode-toggle {
+  display: inline-flex;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mp-mode-btn {
+  background: #1e222d;
+  color: #9aa0aa;
+  border: 0;
+  border-right: 1px solid #2a2e39;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mp-mode-btn:last-child {
+  border-right: 0;
+}
+
+.mp-mode-btn:focus-visible {
+  outline: 2px solid #2962ff;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.mp-mode-btn.is-active {
+  background: #2962ff;
+  color: #fff;
+}
+
+.mp-mode-hint {
+  font-size: 11px;
+  color: #787b86;
+}
+
+.mp-dq-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 6px 12px;
+  background: #10141c;
+  border: 1px solid #2a2e39;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: #9aa0aa;
+}
+
+.mp-dq-label {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: #5d6472;
+}
+
+.mp-dq-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #2a2e39;
+  font-size: 11px;
+}
+
+.mp-dq-complete { color: #26a69a; border-color: rgba(38, 166, 154, 0.45); }
+.mp-dq-partial { color: #f0b90b; border-color: rgba(240, 185, 11, 0.45); }
+.mp-dq-delayed { color: #f59e0b; border-color: rgba(245, 158, 11, 0.45); }
+.mp-dq-unavailable { color: #ef5350; border-color: rgba(239, 83, 80, 0.45); }
+.mp-dq-unknown { color: #787b86; border-color: #2a2e39; }
+
+.mp-dq-toggle {
+  background: transparent;
+  border: 1px solid #2a2e39;
+  color: #9aa0aa;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mp-dq-toggle:focus-visible {
+  outline: 2px solid #2962ff;
+  outline-offset: 1px;
+}
+
+.mp-dq-details {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 4px 12px;
+  padding-top: 4px;
+  color: #9aa0aa;
+}
+
+.mp-dq-detail-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.mp-dq-detail-label {
+  color: #5d6472;
+  min-width: 7em;
+}
+
+.mp-shell.is-standard .mp-pro-only,
+.mp-shell.is-standard [data-pro-control="1"] {
+  display: none !important;
+}
+
+.mp-shell.is-pro details.mp-pro-only {
+  display: block;
+}
+
+.mp-shell.is-pro .mp-group.fp-toggle-group.mp-pro-only,
+.mp-shell.is-pro label.trp-check.mp-pro-only,
+.mp-shell.is-pro label.mp-check.mp-pro-only {
+  display: inline-flex;
+}
+
+.mp-shell.is-pro span.mp-group-title.mp-pro-only,
+.mp-shell.is-pro span.trp-dock-sep.mp-pro-only {
+  display: inline;
+}
+
+.mp-legend-stack {
+  margin-top: 2px;
+}
+
+.mp-legend-panel {
+  background: #131722;
+  border: 1px solid #2a2e39;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.mp-legend-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #9aa0aa;
+}
+
+.mp-legend-summary::-webkit-details-marker {
+  display: none;
+}
+
+.mp-legend-summary:focus-visible {
+  outline: 2px solid #2962ff;
+  outline-offset: -2px;
+}
+
+.mp-legend-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.mp-legend-section-title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5d6472;
+  margin: 4px 0 2px;
+}
+
+.mp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.mp-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #c7ccd6;
+  max-width: 420px;
+}
+
+.mp-legend-item .mp-legend-text {
+  line-height: 1.35;
+}
+
+.mp-legend-item .mp-legend-abbr {
+  font-weight: 600;
+  color: #d1d4dc;
+  margin-right: 4px;
+}
+
+.fp-avr-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.fp-avr-legend[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  .mp-bar {
+    gap: 10px;
+  }
+  .mp-mode-hint {
+    flex: 1 1 100%;
+  }
+  .mp-status {
+    margin-left: 0;
+  }
+}

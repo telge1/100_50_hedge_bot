@@ -25,27 +25,44 @@
         <div class="dashboard-content mp-shell">
             <h1 class="visually-hidden">Market Profile</h1>
 
-            <div class="mp-bar">
+            <div class="mp-bar mp-bar-mode" role="group" aria-label="Ansichtsmodus">
+                <span class="mp-label">ANSICHT</span>
+                <div class="mp-mode-toggle" id="mpModeToggle">
+                    <button type="button" class="mp-mode-btn is-active" id="mpModeStandard" data-mode="standard" aria-pressed="true" title="Ruhige Kernansicht: Market Profile + LLD">Standard</button>
+                    <button type="button" class="mp-mode-btn" id="mpModePro" data-mode="pro" aria-pressed="false" title="Alle Werkzeuge und Detail-Layer">Profi</button>
+                </div>
+                <span class="mp-mode-hint" id="mpModeHint">Kernansicht · keine Handelssignale</span>
+                <button type="button" class="mp-btn mp-primary" id="mpLoad">Laden</button>
+                <span class="mp-status" id="mpStatus">–</span>
+            </div>
+
+            <div class="mp-dq-bar" id="mpDataQuality" role="status" aria-live="polite">
+                <span class="mp-dq-label">Datenqualität</span>
+                <span class="mp-dq-pill mp-dq-unknown" id="mpDqStatus" title="Nur aus bereits geladenen Metadaten">Unbekannt</span>
+                <button type="button" class="mp-dq-toggle" id="mpDqToggle" aria-expanded="false" aria-controls="mpDqDetails">Details</button>
+                <div class="mp-dq-details" id="mpDqDetails" hidden></div>
+            </div>
+
+            <div class="mp-bar mp-bar-market" data-mp-group="markt">
+                <span class="mp-group-title">Markt</span>
                 <div class="mp-group">
-                    <label class="mp-label" for="mpSymbol">SYMBOL</label>
-                    <select id="mpSymbol" class="mp-select">
+                    <label class="mp-label" for="mpSymbol">Symbol</label>
+                    <select id="mpSymbol" class="mp-select" aria-label="Handelssymbol">
                         {% for s in symbols %}
                         <option value="{{ s }}"{% if s == 'BTCUSDT' %} selected{% endif %}>{{ s }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
                 <div class="mp-group">
-                    <label class="mp-label" for="mpTimeframe">KERZEN</label>
+                    <label class="mp-label" for="mpTimeframe">Kerzen</label>
                     <select id="mpTimeframe" class="mp-select" title="Nur Candle-Auflösung — ändert das Market Profile nicht" aria-label="Kerzen-Timeframe">
                         {% for tf in timeframes %}
                         <option value="{{ tf }}"{% if tf == '15m' %} selected{% endif %}>{{ tf }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
                 <div class="mp-group">
-                    <label class="mp-label" for="mpAnchor">MARKET PROFILE</label>
+                    <label class="mp-label" for="mpAnchor">Market Profile</label>
                     <select id="mpAnchor" class="mp-select" title="Profil-Fenster (unabhängig von Kerzen): Perioden, Tag, Session, Composite" aria-label="Market-Profile-Timeframe">
                         <option value="5m">5m</option>
                         <option value="15m">15m</option>
@@ -57,17 +74,15 @@
                         <option value="composite">Composite</option>
                     </select>
                 </div>
-
                 <div class="mp-group mp-sessions" id="mpSessionsGroup" hidden>
-                    <span class="mp-label">SESSIONS</span>
+                    <span class="mp-label">Sessions</span>
                     {% for name in sessions %}
                     <label class="mp-check"><input type="checkbox" class="mp-session" value="{{ name }}" checked> {{ name|upper }}</label>
                     {% endfor %}
                 </div>
-
                 <div class="mp-group">
-                    <label class="mp-label" for="mpDays">ZEITRAUM</label>
-                    <select id="mpDays" class="mp-select">
+                    <label class="mp-label" for="mpDays">Zeitraum</label>
+                    <select id="mpDays" class="mp-select" aria-label="Zeitraum">
                         <option value="3">3 Tage</option>
                         <option value="7">7 Tage</option>
                         <option value="14">14 Tage</option>
@@ -75,68 +90,43 @@
                         <option value="custom">benutzerdefiniert</option>
                     </select>
                 </div>
-
                 <div class="mp-group mp-custom-range" id="mpCustomRange" hidden>
-                    <label class="mp-label" for="mpStart">VON</label>
+                    <label class="mp-label" for="mpStart">Von</label>
                     <input type="date" id="mpStart" class="mp-input">
-                    <label class="mp-label" for="mpEnd">BIS</label>
+                    <label class="mp-label" for="mpEnd">Bis</label>
                     <input type="date" id="mpEnd" class="mp-input">
                 </div>
-
-                <button type="button" class="mp-btn mp-primary" id="mpLoad">Laden</button>
-                <span class="mp-status" id="mpStatus">–</span>
             </div>
 
-            <div class="mp-bar mp-bar-toggles">
-                <div class="mp-group">
-                    <span class="mp-label">PROFIL</span>
-                    <label class="mp-check"><input type="checkbox" id="mpShowHistogram" checked> Histogramm</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowVolumeLine" checked> Volumenlinie</label>
-                    <label class="mp-check"><input type="checkbox" id="mpSplitBuySell" checked> Buy/Sell getrennt</label>
+            <div class="mp-bar mp-bar-toggles" data-mp-group="market-profile">
+                <span class="mp-group-title">Market Profile</span>
+                <div class="mp-group mp-core-toggles">
+                    <label class="mp-check" title="Volumen-Histogramm je Profilfenster"><input type="checkbox" id="mpShowHistogram" checked> Histogramm</label>
+                    <label class="mp-check" title="Point of Control"><input type="checkbox" id="mpShowPoc" checked> POC</label>
+                    <label class="mp-check" title="Value Area High / Low (VAH / VAL)"><input type="checkbox" id="mpShowValueArea" checked> VAH / VAL</label>
                     <label class="mp-label mp-inline" for="mpWidth">Breite</label>
-                    <select id="mpWidth" class="mp-select mp-select-sm">
+                    <select id="mpWidth" class="mp-select mp-select-sm" aria-label="Profilbreite">
                         <option value="0.18">schmal</option>
                         <option value="0.30" selected>normal</option>
                         <option value="0.50">breit</option>
                     </select>
                 </div>
-
-                <div class="mp-group">
-                    <span class="mp-label">LINIEN</span>
-                    <label class="mp-check"><input type="checkbox" id="mpShowPoc" checked> POC</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowValueArea" checked> Value Area</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowHvn"> HVN</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowLvn"> LVN</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowSinglePrints"> Single Prints</label>
-                    <label class="mp-check"><input type="checkbox" id="mpShowNakedPoc" checked> Naked POC</label>
-                    <label class="mp-check"><input type="checkbox" id="mpExtendLevels" checked> nach rechts verlängern</label>
-                </div>
-
-                <div class="mp-group">
-                    <span class="mp-label">LABELS</span>
-                    <label class="mp-check"><input type="checkbox" id="mpShowShape" checked> Shape-Verdikt</label>
-                </div>
-
-                <div class="mp-group fp-toggle-group">
-                    <span class="mp-label">FOOTPRINT</span>
-                    <label class="mp-check fp-toggle" title="Nur BTCUSDT / 5m Kerzen — ausgeführte Public Trades">
-                        <input type="checkbox" id="mpShowFootprint"> An
-                    </label>
-                    <label class="mp-check fp-toggle" title="AVR-Badges und State-Leiste (keine Signale)">
-                        <input type="checkbox" id="fpShowAvrPanel" checked> AVR
-                    </label>
-                    <button type="button" class="mp-btn fp-avr-expand" id="fpAvrExpand" aria-expanded="false" title="AVR-Details ein-/ausklappen">ERWEITERT</button>
-                    <span class="fp-status" id="fpStatus"></span>
-                </div>
-
-                <details class="mp-advanced">
-                    <summary>Erweitert</summary>
+                <details class="mp-advanced mp-pro-only" id="mpProfileDetails" data-pro-panel="1">
+                    <summary aria-expanded="false">Profil-Details</summary>
                     <div class="mp-advanced-body">
+                        <label class="mp-check" title="Volumenlinie über dem Histogramm"><input type="checkbox" id="mpShowVolumeLine" checked> Volumenlinie</label>
+                        <label class="mp-check" title="Buy- und Sell-Volumen getrennt darstellen"><input type="checkbox" id="mpSplitBuySell" checked> Buy/Sell getrennt</label>
+                        <label class="mp-check" title="High Volume Node"><input type="checkbox" id="mpShowHvn"> HVN</label>
+                        <label class="mp-check" title="Low Volume Node"><input type="checkbox" id="mpShowLvn"> LVN</label>
+                        <label class="mp-check"><input type="checkbox" id="mpShowSinglePrints"> Single Prints</label>
+                        <label class="mp-check" title="Unangereicherte POC-Linien"><input type="checkbox" id="mpShowNakedPoc" checked> Naked POC</label>
+                        <label class="mp-check"><input type="checkbox" id="mpExtendLevels" checked> nach rechts verlängern</label>
+                        <label class="mp-check" title="Automatisches Shape-Verdikt (Hinweis beachten)"><input type="checkbox" id="mpShowShape" checked> Shape-Verdikt</label>
                         <label class="mp-label mp-inline" for="mpValueAreaPct">Value Area %</label>
-                        <input type="number" id="mpValueAreaPct" class="mp-input mp-input-sm" value="70" min="30" max="95" step="1">
+                        <input type="number" id="mpValueAreaPct" class="mp-input mp-input-sm" value="70" min="30" max="95" step="1" aria-label="Value Area Prozent">
                         <label class="mp-label mp-inline" for="mpTargetBins">Ziel-Bins</label>
-                        <input type="number" id="mpTargetBins" class="mp-input mp-input-sm" value="160" min="40" max="400" step="10">
-                        <label class="mp-check"><input type="checkbox" id="mpFinal"> FINAL-Dedupe (ca. 60x langsamer)</label>
+                        <input type="number" id="mpTargetBins" class="mp-input mp-input-sm" value="160" min="40" max="400" step="10" aria-label="Ziel-Bins">
+                        <label class="mp-check" title="Teure Deduplizierung — nur bei Bedarf"><input type="checkbox" id="mpFinal"> FINAL-Dedupe (ca. 60× langsamer)</label>
                     </div>
                 </details>
             </div>
@@ -152,16 +142,17 @@
 
             <div class="mp-chart-stack" id="mpChartStack">
                 <div class="trp-dock-bar mp-chart-dock">
+                    <span class="mp-group-title mp-dock-title">Kontext</span>
                     <span class="trp-field-label">EMA</span>
-                    <button type="button" class="trp-text-btn" id="mpEmaSettings" title="EMA Overlays">Settings</button>
+                    <button type="button" class="trp-text-btn" id="mpEmaSettings" title="EMA-Overlays (Standard empfiehlt EMA9 und EMA20)">EMA</button>
                     <span class="trp-muted" id="mpEmaSummary">off</span>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
-                    <label class="trp-check trp-dock-ind" title="Liquidity Location Detector (Research LLD)">
-                        <input type="checkbox" id="mpShowLiquidity"> Liquidity Location
+                    <label class="trp-check trp-dock-ind" title="Liquidity Location: berechnete Zonen aus Kerzen — keine echten Liquidationen">
+                        <input type="checkbox" id="mpShowLiquidity" aria-label="Liquidity Location (LLD)"> LLD
                     </label>
-                    <button type="button" class="trp-text-btn" id="mpLldSettings" title="Liquidity Location Settings">⚙</button>
-                    <label class="trp-check trp-dock-ind" title="Open Interest unter dem Chart (wie Stochastic auf Research)">
-                        <input type="checkbox" id="mpShowOi"> Open Interest
+                    <button type="button" class="trp-text-btn" id="mpLldSettings" title="Liquidity-Location-Einstellungen" aria-label="LLD-Einstellungen">⚙</button>
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Open Interest unter dem Chart" data-pro-control="1">
+                        <input type="checkbox" id="mpShowOi" aria-label="Open Interest"> OI
                     </label>
                     <div class="trp-lld-legend" id="mpLldLegend" hidden>
                         <span class="trp-muted">Vol Str</span>
@@ -171,13 +162,13 @@
                         </div>
                         <span class="trp-muted" id="mpClusterCounts"></span>
                     </div>
-                    <span class="trp-dock-sep" aria-hidden="true"></span>
-                    <label class="trp-check trp-dock-ind" title="Live: OB1000 Walls (REST). Historie: OB200 Multi-Walls aus Raw-Archive (BTC/DOGE), sonst Features-Walls">
-                        <input type="checkbox" id="mpObpEnabled"> Orderbook Walls
+                    <span class="trp-dock-sep mp-pro-only" aria-hidden="true" data-pro-control="1"></span>
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Orderbuch-Walls: sichtbare Limit-Liquidität, verschiebbar/löschbar" data-pro-control="1">
+                        <input type="checkbox" id="mpObpEnabled" aria-label="Orderbook Walls"> Walls
                     </label>
                     <span class="trp-muted research-obp-legend" id="mpObpLegend" hidden>Bid · Ask Walls</span>
-                    <label class="trp-check trp-dock-ind" title="Reale Orderbook-Preislevel als Side-Panel rechts der Preisskala (FULL / OB1000 on-demand · OB200 Archiv)">
-                        <input type="checkbox" id="mpOblEnabled"> Orderbook Levels
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Orderbuch-Preislevel als Seitenpanel" data-pro-control="1">
+                        <input type="checkbox" id="mpOblEnabled" aria-label="Orderbook Levels"> Levels
                     </label>
                     <span id="mpOblControls" class="research-obl-controls" hidden>
                         <select id="mpOblDepth" class="trp-select trp-width" title="Orderbook depth" aria-label="OB Levels Depth">
@@ -195,18 +186,30 @@
                             <option value="log">Log</option>
                         </select>
                     </span>
+                    <span class="trp-dock-sep mp-pro-only" aria-hidden="true" data-pro-control="1"></span>
+                    <span class="mp-group-title mp-dock-title mp-pro-only" data-pro-control="1">Orderflow</span>
+                    <div class="mp-group fp-toggle-group mp-pro-only" data-pro-control="1">
+                        <label class="mp-check fp-toggle" title="Nur BTCUSDT / 5m Kerzen — ausgeführte Public Trades">
+                            <input type="checkbox" id="mpShowFootprint" aria-label="Footprint"> Footprint
+                        </label>
+                        <label class="mp-check fp-toggle" title="AVR-Zustände (keine Handelssignale)">
+                            <input type="checkbox" id="fpShowAvrPanel" checked aria-label="AVR-Anzeige"> AVR
+                        </label>
+                        <button type="button" class="mp-btn fp-avr-expand" id="fpAvrExpand" aria-expanded="false" title="AVR-Details ein-/ausklappen">Erweitert</button>
+                        <span class="fp-status" id="fpStatus"></span>
+                    </div>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
-                    <span class="trp-field-label">WERKZEUG</span>
+                    <span class="mp-group-title mp-dock-title">Werkzeuge</span>
                     <div class="trp-tools" id="mpTools"></div>
                     <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
                     <select id="mpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
                     </select>
-                    <button type="button" class="trp-tool-btn" id="mpDelete" title="Löschen">⌫</button>
-                    <button type="button" class="trp-tool-btn" id="mpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                    <button type="button" class="trp-tool-btn" id="mpDelete" title="Löschen" aria-label="Zeichnung löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="mpClear" title="Zeichnungen dieses Symbols löschen" aria-label="Alle Zeichnungen löschen">⊘</button>
                     <button type="button" class="trp-text-btn" id="mpResetView" title="Chart zentrieren / Ansicht zurücksetzen">⟲ Zentrieren</button>
                     <span class="trp-muted mp-shift-hint">Shift+Klick = messen</span>
-                    <button type="button" class="trp-text-btn trp-fs-dock" id="mpFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="mpFullscreenBtn" title="Chart aufziehen oder zurücksetzen" aria-label="Vollbild">⛶</button>
                 </div>
 
                 <div class="mp-chart-wrap" id="mpChart">
@@ -247,8 +250,15 @@
                 </div>
             </div>
 
-            <div class="fp-avr-legend" id="fpAvrLegend" hidden aria-label="AVR Farblegende"></div>
-            <div class="mp-legend" id="mpLegend"></div>
+            <div class="mp-legend-stack" id="mpLegendStack">
+                <details class="mp-legend-panel" id="mpLegendPanel" open>
+                    <summary class="mp-legend-summary" aria-expanded="true">Legende · AVR vor Market Profile · keine Handelssignale</summary>
+                    <div class="mp-legend-body" id="mpLegendBody">
+                        <div class="fp-avr-legend" id="fpAvrLegend" aria-label="AVR Farblegende"></div>
+                        <div class="mp-legend" id="mpLegend" aria-label="Market-Profile- und Kontext-Legende"></div>
+                    </div>
+                </details>
+            </div>
         </div>
     </div>
 
