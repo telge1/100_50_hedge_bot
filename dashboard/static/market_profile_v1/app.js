@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-30 Wall Decision AVR symbol isolation + stale gate.
-  try { console.info("[mp] asset mp-30"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-32 Manual Target Major/Q95 selection.
+  try { console.info("[mp] asset mp-32"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2707,7 +2707,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-30)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-32)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {

@@ -307,6 +307,9 @@
   let livePriceLine = null;
   let wallBreakpointLine = null;
   let wallBpDrag = null;
+  let wallTargetGuideLines = [];
+  let wallTargetHighlightIds = new Set();
+  let wallTargetLockedId = null;
   let lastCrosshairTime = null;
   let lastSelectedUnix = null;
   let suppressUntilTime = null;
@@ -751,6 +754,22 @@
         }
         return;
       }
+      if (interactionMode === "wall_target") {
+        let pickPrice = pt.price != null ? Number(pt.price) : null;
+        let pickId = null;
+        if (pt.x != null && pt.y != null) {
+          const idx = obpBarAt(pt.x, pt.y);
+          if (idx >= 0 && obpPayload && obpPayload.bars && obpPayload.bars[idx]) {
+            const bar = obpPayload.bars[idx];
+            if (bar.price != null) pickPrice = Number(bar.price);
+            if (bar.id != null) pickId = String(bar.id);
+          }
+        }
+        if (pickPrice != null && typeof window.__mpOnWallTargetClick === "function") {
+          window.__mpOnWallTargetClick({ price: pickPrice, id: pickId, time: pt.time });
+        }
+        return;
+      }
       if (interactionMode && interactionMode !== "select") {
         const mode = interactionMode;
         emitDrawing({ type: "point", time: pt.time, price: pt.price });
@@ -1004,6 +1023,67 @@
       /* ignore */
     }
     wallBreakpointLine = null;
+  }
+
+  function clearWallTargetGuides() {
+    if (!candleSeries) {
+      wallTargetGuideLines = [];
+      return;
+    }
+    for (let i = 0; i < wallTargetGuideLines.length; i++) {
+      try {
+        candleSeries.removePriceLine(wallTargetGuideLines[i]);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    wallTargetGuideLines = [];
+  }
+
+  function setWallTargetGuides(opts) {
+    opts = opts || {};
+    clearWallTargetGuides();
+    if (!candleSeries) return;
+    const candidates = Array.isArray(opts.candidates) ? opts.candidates : [];
+    const lockedId = opts.lockedId != null ? String(opts.lockedId) : null;
+    const maxGuides = 12;
+    for (let i = 0; i < candidates.length && i < maxGuides; i++) {
+      const c = candidates[i];
+      if (!c || c.price == null || !Number.isFinite(Number(c.price))) continue;
+      const isLocked = lockedId && c.id != null && String(c.id) === lockedId;
+      try {
+        const line = candleSeries.createPriceLine({
+          price: Number(c.price),
+          color: isLocked ? "#22d3ee" : "rgba(250, 204, 21, 0.55)",
+          lineWidth: isLocked ? 2 : 1,
+          lineStyle: isLocked
+            ? LightweightCharts.LineStyle.Solid
+            : LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: isLocked,
+          title: isLocked ? "TARGET" : "",
+        });
+        wallTargetGuideLines.push(line);
+      } catch (err) {
+        /* best-effort */
+      }
+    }
+  }
+
+  function setWallTargetHighlight(opts) {
+    opts = opts || {};
+    wallTargetHighlightIds = new Set(
+      (Array.isArray(opts.ids) ? opts.ids : []).map(function (id) {
+        return String(id);
+      })
+    );
+    wallTargetLockedId = opts.lockedId != null ? String(opts.lockedId) : null;
+    drawOrderbookProfile();
+  }
+
+  function clearWallTargetHighlight() {
+    wallTargetHighlightIds = new Set();
+    wallTargetLockedId = null;
+    drawOrderbookProfile();
   }
 
   function setWallBreakpoint(opts) {
@@ -3767,14 +3847,23 @@
       const w = Math.max(2, (Number(b.value) / maxVal) * region.w);
       const y0 = y - barH / 2;
       const isBid = String(b.side).toUpperCase() === "BID";
-      const alpha = i === obpHoverIndex ? 0.92 : (b.carried_forward ? 0.45 : 0.72);
+      const barId = b.id != null ? String(b.id) : null;
+      const isCandidate = barId && wallTargetHighlightIds.has(barId);
+      const isLocked = barId && wallTargetLockedId && barId === wallTargetLockedId;
+      const alpha = i === obpHoverIndex || isLocked ? 0.95 : isCandidate ? 0.88 : (b.carried_forward ? 0.45 : 0.72);
       ctx.fillStyle = isBid
         ? "rgba(61, 204, 145, " + alpha + ")"
         : "rgba(240, 97, 109, " + alpha + ")";
       ctx.fillRect(region.x1 - w, y0, w, barH);
-      if (i === obpHoverIndex) {
-        ctx.strokeStyle = "rgba(255,255,255,0.65)";
+      if (i === obpHoverIndex || isCandidate || isLocked) {
+        ctx.strokeStyle = isLocked
+          ? "rgba(34, 211, 238, 0.95)"
+          : isCandidate
+            ? "rgba(250, 204, 21, 0.9)"
+            : "rgba(255,255,255,0.65)";
+        ctx.lineWidth = isLocked ? 2 : 1;
         ctx.strokeRect(region.x1 - w, y0, w, barH);
+        ctx.lineWidth = 1;
       }
     }
     // Legend ticks near top of region
@@ -4431,6 +4520,10 @@
     if (interactionMode === "select") {
       toolClickCount = 0;
       setPanEnabled(!dragState);
+    } else if (interactionMode === "wall_bp" || interactionMode === "wall_target") {
+      toolClickCount = 0;
+      setPanEnabled(false);
+      setChartCursor("crosshair");
     } else {
       toolClickCount = 0;
       setPanEnabled(false);
@@ -5568,8 +5661,8 @@
     if (wallBpDrag) {
       if (wallBpDrag.moved) suppressNextClick = true;
       wallBpDrag = null;
-      setPanEnabled(interactionMode === "select" || interactionMode === "wall_bp");
-      setChartCursor(interactionMode === "wall_bp" ? "crosshair" : "crosshair");
+      setPanEnabled(interactionMode === "select" || interactionMode === "wall_bp" || interactionMode === "wall_target");
+      setChartCursor(interactionMode === "wall_bp" || interactionMode === "wall_target" ? "crosshair" : "crosshair");
       return;
     }
     if (!dragState) return;
@@ -6532,6 +6625,10 @@
     debugOrderbookProfile: debugOrderbookProfile,
     setWallBreakpoint: setWallBreakpoint,
     clearWallBreakpoint: clearWallBreakpoint,
+    setWallTargetGuides: setWallTargetGuides,
+    clearWallTargetGuides: clearWallTargetGuides,
+    setWallTargetHighlight: setWallTargetHighlight,
+    clearWallTargetHighlight: clearWallTargetHighlight,
     setOrderbookLevels: setOrderbookLevels,
     clearOrderbookLevels: clearOrderbookLevels,
     debugOrderbookLevels: debugOrderbookLevels,

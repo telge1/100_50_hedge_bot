@@ -25,14 +25,21 @@
     acceptance_sec: 15,
     replenish_max_pct: 0.25,
     hysteresis_ticks: 2,
-    major_wall_median_mult: 3.0
+    major_wall_median_mult: 3.0,
+    major_wall_q_percentile: 95
   });
 
   var STATES = Object.freeze([
     "DISARMED",
-    "ARMED",
-    "NO_TARGET_WALL",
+    "BP_SET_WAITING_TARGET",
+    "TARGET_CANDIDATES_READY",
     "TARGET_LOCKED",
+    "ARMED",
+    "MISSED_TRIGGER",
+    "TARGET_LOST_BEFORE_TRIGGER",
+    "TARGET_MOVED",
+    "TARGET_INVALID",
+    "NO_TARGET_WALL",
     "TRIGGERED",
     "WALL_ATTACK",
     "WALL_CONSUMED",
@@ -52,6 +59,8 @@
     "CANCELLED",
     "EXPIRED"
   ]);
+
+  var WALL_PICK_TOL_TICKS = 5;
 
   var TERMINAL_NO_TRADE = Object.freeze({
     LONG_READY: false,
@@ -103,81 +112,291 @@
     return null;
   }
 
+  function wallNotional(w) {
+    if (!w) return null;
+    var n = num(w.notional);
+    if (n != null && n > 0) return n;
+    var v = num(w.value);
+    if (v != null && v > 0) return v;
+    var p = num(w.price);
+    var q = num(w.qty);
+    if (p != null && q != null && q > 0) return p * q;
+    return null;
+  }
+
+  function percentileRank(sortedAsc, value) {
+    var v = num(value);
+    if (v == null || !sortedAsc || !sortedAsc.length) return null;
+    var le = 0;
+    for (var i = 0; i < sortedAsc.length; i += 1) {
+      if (sortedAsc[i] <= v) le += 1;
+    }
+    return (le / sortedAsc.length) * 100;
+  }
+
   /**
-   * Select next relevant wall behind breakpoint in attack direction.
-   * walls: [{id, side:'BID'|'ASK', price, qty, notional, major?:boolean}]
+   * Annotate walls with major/Q95 proof. Never invents major=true.
+   * Major if explicit major OR source percentile>=Q OR notional percentile>=Q (per side).
    */
-  function selectTargetWall(opts) {
+  function classifyMajorWalls(walls, opts) {
+    opts = opts || {};
+    var qGate =
+      num(opts.qPercentile) != null
+        ? num(opts.qPercentile)
+        : V1_PROVISIONAL.major_wall_q_percentile;
+    var mult =
+      num(opts.medianMult) != null
+        ? num(opts.medianMult)
+        : V1_PROVISIONAL.major_wall_median_mult;
+    var nowMs = opts.nowMs != null ? Number(opts.nowMs) : Date.now();
+    var list = Array.isArray(walls) ? walls : [];
+
+    var bySide = { BID: [], ASK: [] };
+    for (var i = 0; i < list.length; i += 1) {
+      var w0 = list[i];
+      if (!w0) continue;
+      var side0 = String(w0.side || "").toUpperCase();
+      if (side0 !== "BID" && side0 !== "ASK") continue;
+      var n0 = wallNotional(w0);
+      if (n0 == null || n0 <= 0) continue;
+      bySide[side0].push(n0);
+    }
+    bySide.BID.sort(function (a, b) { return a - b; });
+    bySide.ASK.sort(function (a, b) { return a - b; });
+
+    var qtysAll = list
+      .map(function (w) { return num(w && w.qty); })
+      .filter(function (q) { return q != null && q > 0; })
+      .sort(function (a, b) { return a - b; });
+    var medianQty = null;
+    if (qtysAll.length) {
+      var mid = Math.floor(qtysAll.length / 2);
+      medianQty =
+        qtysAll.length % 2
+          ? qtysAll[mid]
+          : (qtysAll[mid - 1] + qtysAll[mid]) / 2;
+    }
+
+    return list.map(function (w, idx) {
+      if (!w) return null;
+      var side = String(w.side || "").toUpperCase();
+      var notional = wallNotional(w);
+      var qty = num(w.qty);
+      var price = num(w.price);
+      var srcPct = num(w.percentile);
+      var ratio = num(w.wall_ratio != null ? w.wall_ratio : w.ratio);
+      var snapTs = num(w.timestamp != null ? w.timestamp : w.snapshot_ts);
+      var snapMs =
+        snapTs == null
+          ? null
+          : snapTs > 1e12
+            ? snapTs
+            : snapTs * 1000;
+      var ageMs = snapMs != null ? Math.max(0, nowMs - snapMs) : null;
+      var pct =
+        notional != null && bySide[side]
+          ? percentileRank(bySide[side], notional)
+          : null;
+
+      var majorRule = null;
+      var isMajor = false;
+      if (w.major === true) {
+        isMajor = true;
+        majorRule = "explicit_major";
+      } else if (srcPct != null && srcPct >= qGate) {
+        isMajor = true;
+        majorRule = "source_percentile_q" + qGate;
+      } else if (pct != null && pct + 1e-9 >= qGate) {
+        isMajor = true;
+        majorRule = "notional_q" + qGate;
+      }
+
+      var passesMedianMult =
+        medianQty != null &&
+        medianQty > 0 &&
+        qty != null &&
+        qty >= medianQty * mult;
+
+      return {
+        id: w.id != null ? String(w.id) : side + ":" + String(price) + ":" + idx,
+        symbol: w.symbol != null ? String(w.symbol).toUpperCase() : null,
+        side: side,
+        price: price,
+        qty: qty,
+        notional: notional,
+        zone_lo: num(w.zone_lo) != null ? num(w.zone_lo) : price,
+        zone_hi: num(w.zone_hi) != null ? num(w.zone_hi) : price,
+        wall_ratio: ratio,
+        percentile: pct,
+        source_percentile: srcPct,
+        major: isMajor,
+        majorRule: majorRule,
+        passes_median_mult: !!passesMedianMult,
+        snapshot_ts: snapTs,
+        snapshot_ms: snapMs,
+        data_age_ms: ageMs,
+        relevant: isMajor
+      };
+    }).filter(Boolean);
+  }
+
+  /**
+   * Selectable Major/Q95 walls in attack direction only (no auto-lock).
+   */
+  function listTargetCandidates(opts) {
     opts = opts || {};
     var bp = num(opts.breakpoint);
     var direction = opts.direction || attackDirection(bp, opts.refPrice);
     var side = expectedWallSide(direction);
     var walls = Array.isArray(opts.walls) ? opts.walls : [];
-    var mult = num(opts.medianMult) != null ? opts.medianMult : V1_PROVISIONAL.major_wall_median_mult;
+    var qGate =
+      num(opts.qPercentile) != null
+        ? num(opts.qPercentile)
+        : V1_PROVISIONAL.major_wall_q_percentile;
 
     if (!side || bp == null) {
-      return { status: "NO_TARGET_WALL", wall: null, reason: "no_direction" };
+      return {
+        status: "NO_TARGET_WALL",
+        candidates: [],
+        direction: direction,
+        side: side,
+        reason: "no_direction",
+        qPercentile: qGate
+      };
     }
 
-    var qtys = walls.map(function (w) { return num(w.qty); }).filter(function (q) { return q != null && q > 0; });
-    var median = null;
-    if (qtys.length) {
-      qtys.sort(function (a, b) { return a - b; });
-      var mid = Math.floor(qtys.length / 2);
-      median = qtys.length % 2 ? qtys[mid] : (qtys[mid - 1] + qtys[mid]) / 2;
-    }
+    var classified = classifyMajorWalls(walls, {
+      qPercentile: qGate,
+      medianMult: opts.medianMult,
+      nowMs: opts.nowMs
+    });
 
-    var candidates = walls.filter(function (w) {
-      if (!w || String(w.side).toUpperCase() !== side) return false;
+    var candidates = classified.filter(function (w) {
+      if (!w || w.side !== side) return false;
+      if (!w.major) return false;
       var p = num(w.price);
       if (p == null) return false;
       if (direction === "UP_ASK" && !(p >= bp)) return false;
       if (direction === "DOWN_BID" && !(p <= bp)) return false;
-      if (w.major === true) return true;
-      if (median == null || median <= 0) return true;
       var q = num(w.qty);
-      return q != null && q >= median * mult;
+      return q != null && q > 0;
+    }).map(function (w) {
+      return Object.assign({}, w, {
+        bp_direction: direction,
+        relative_to_bp:
+          direction === "UP_ASK"
+            ? "ask_at_or_above_bp"
+            : direction === "DOWN_BID"
+              ? "bid_at_or_below_bp"
+              : null
+      });
     });
-
-    if (!candidates.length) {
-      return { status: "NO_TARGET_WALL", wall: null, reason: "no_relevant_wall" };
-    }
 
     candidates.sort(function (a, b) {
       var pa = Math.abs(num(a.price) - bp);
       var pb = Math.abs(num(b.price) - bp);
       if (pa !== pb) return pa - pb;
-      return (num(b.qty) || 0) - (num(a.qty) || 0);
+      return (num(b.notional) || 0) - (num(a.notional) || 0);
     });
 
-    var best = candidates[0];
-    var second = candidates[1];
-    if (second) {
+    return {
+      status: candidates.length ? "TARGET_CANDIDATES_READY" : "NO_TARGET_WALL",
+      candidates: candidates,
+      direction: direction,
+      side: side,
+      reason: candidates.length ? "major_q95_candidates_ready" : "no_major_q95_wall",
+      qPercentile: qGate,
+      universe_count: classified.length,
+      major_count: classified.filter(function (w) { return w.major; }).length
+    };
+  }
+
+  function matchWallAtPrice(candidates, price, tickSize, tolTicks) {
+    var px = num(price);
+    var tick = num(tickSize) || 0.1;
+    var tol = (num(tolTicks) != null ? num(tolTicks) : WALL_PICK_TOL_TICKS) * tick;
+    var list = Array.isArray(candidates) ? candidates : [];
+    if (px == null || !list.length) {
+      return { ok: false, wall: null, reason: "no_candidates" };
+    }
+    var hits = [];
+    for (var i = 0; i < list.length; i += 1) {
+      var w = list[i];
+      if (!w || !w.major) continue;
+      var lo = num(w.zone_lo) != null ? num(w.zone_lo) : num(w.price);
+      var hi = num(w.zone_hi) != null ? num(w.zone_hi) : num(w.price);
+      if (lo == null || hi == null) continue;
+      if (lo > hi) {
+        var tmp = lo;
+        lo = hi;
+        hi = tmp;
+      }
+      var inZone = px >= lo - tol && px <= hi + tol;
+      var nearPrice = Math.abs(num(w.price) - px) <= tol;
+      if (!inZone && !nearPrice) continue;
+      hits.push({
+        wall: w,
+        dist: Math.min(Math.abs(num(w.price) - px), Math.abs(((lo + hi) / 2) - px))
+      });
+    }
+    if (!hits.length) {
+      return { ok: false, wall: null, reason: "no_major_wall_at_price" };
+    }
+    hits.sort(function (a, b) {
+      if (a.dist !== b.dist) return a.dist - b.dist;
+      return (num(b.wall.notional) || 0) - (num(a.wall.notional) || 0);
+    });
+    return { ok: true, wall: hits[0].wall, reason: "matched_major_wall", hits: hits.length };
+  }
+
+  function normalizeWall(wall, side) {
+    if (!wall) return null;
+    var s = String(side || wall.side || "").toUpperCase();
+    return {
+      id: wall.id != null ? String(wall.id) : s + ":" + String(wall.price),
+      side: s,
+      price: num(wall.price),
+      qty: num(wall.qty),
+      notional: wallNotional(wall),
+      zone_lo: num(wall.zone_lo) != null ? num(wall.zone_lo) : num(wall.price),
+      zone_hi: num(wall.zone_hi) != null ? num(wall.zone_hi) : num(wall.price),
+      major: wall.major === true,
+      majorRule: wall.majorRule || null,
+      percentile: num(wall.percentile),
+      snapshot_ts: num(wall.snapshot_ts != null ? wall.snapshot_ts : wall.timestamp),
+      relative_to_bp: wall.relative_to_bp || null
+    };
+  }
+
+  /**
+   * Diagnostics / fixtures only — live UI uses lockManualTarget.
+   */
+  function selectTargetWall(opts) {
+    var listed = listTargetCandidates(opts);
+    if (!listed.candidates.length) {
+      return { status: "NO_TARGET_WALL", wall: null, reason: listed.reason || "no_major_q95_wall" };
+    }
+    var best = listed.candidates[0];
+    var second = listed.candidates[1];
+    var bp = num(opts && opts.breakpoint);
+    if (second && bp != null) {
       var d0 = Math.abs(num(best.price) - bp);
       var d1 = Math.abs(num(second.price) - bp);
-      var q0 = num(best.qty) || 0;
-      var q1 = num(second.qty) || 0;
+      var q0 = num(best.notional) || 0;
+      var q1 = num(second.notional) || 0;
       if (d0 === d1 && Math.abs(q0 - q1) / Math.max(q0, q1, 1) < 0.05) {
         return {
           status: "AMBIGUOUS_TARGET",
-          wall: best,
-          candidates: candidates.slice(0, 3),
+          wall: normalizeWall(best, listed.side),
+          candidates: listed.candidates.slice(0, 3),
           reason: "ambiguous_nearest"
         };
       }
     }
-
     return {
       status: "TARGET_LOCKED",
-      wall: {
-        id: best.id != null ? String(best.id) : side + ":" + String(best.price),
-        side: side,
-        price: num(best.price),
-        qty: num(best.qty),
-        notional: num(best.notional),
-        zone_lo: num(best.zone_lo) != null ? num(best.zone_lo) : num(best.price),
-        zone_hi: num(best.zone_hi) != null ? num(best.zone_hi) : num(best.price)
-      },
+      wall: normalizeWall(best, listed.side),
+      candidates: listed.candidates,
       reason: "nearest_major"
     };
   }
@@ -187,6 +406,7 @@
     return "wd1_" + String(symbol || "UNK").toUpperCase() + "_" + t;
   }
 
+  /** Place BP only — never auto-locks a target. */
   function createBreakpointState(opts) {
     opts = opts || {};
     var symbol = String(opts.symbol || "").toUpperCase();
@@ -195,7 +415,7 @@
     var ref = num(opts.refPrice);
     var direction = attackDirection(price, ref);
     var now = opts.nowMs != null ? Number(opts.nowMs) : Date.now();
-    var target = selectTargetWall({
+    var listed = listTargetCandidates({
       breakpoint: price,
       refPrice: ref,
       direction: direction,
@@ -203,11 +423,10 @@
       medianMult: opts.medianMult
     });
     var status =
-      target.status === "NO_TARGET_WALL"
-        ? "NO_TARGET_WALL"
-        : target.status === "AMBIGUOUS_TARGET"
-          ? "ARMED"
-          : "TARGET_LOCKED";
+      listed.status === "TARGET_CANDIDATES_READY"
+        ? "TARGET_CANDIDATES_READY"
+        : "BP_SET_WAITING_TARGET";
+    if (!direction) status = "BP_SET_WAITING_TARGET";
     return {
       symbol: symbol,
       price: price,
@@ -215,26 +434,73 @@
       direction: direction,
       wallSide: expectedWallSide(direction),
       status: status,
-      targetStatus: target.status,
-      targetWall: target.wall,
-      ambiguous: target.status === "AMBIGUOUS_TARGET",
+      targetStatus: listed.status,
+      targetWall: null,
+      targetCandidates: listed.candidates || [],
+      ambiguous: false,
       createdAtMs: now,
       updatedAtMs: now,
       armedCycleId: createSessionId(symbol, now * 1e6),
       triggered: false,
-      sessionId: null
+      sessionId: null,
+      manualTarget: true
     };
   }
 
-  /**
-   * Directional trigger with one-shot per armed cycle + hysteresis.
-   */
+  function lockManualTarget(bpState, wall, opts) {
+    opts = opts || {};
+    if (!bpState) return { ok: false, state: null, reason: "missing_bp" };
+    var side = expectedWallSide(bpState.direction);
+    var candidates = Array.isArray(opts.candidates)
+      ? opts.candidates
+      : bpState.targetCandidates || [];
+    var picked = wall;
+    if (!picked && opts.price != null) {
+      var match = matchWallAtPrice(candidates, opts.price, bpState.tickSize, opts.tolTicks);
+      if (!match.ok) return { ok: false, state: bpState, reason: match.reason };
+      picked = match.wall;
+    }
+    if (!picked) return { ok: false, state: bpState, reason: "no_wall" };
+    var norm = normalizeWall(picked, side || picked.side);
+    if (!norm || !side || String(norm.side).toUpperCase() !== side) {
+      return { ok: false, state: bpState, reason: "wrong_side" };
+    }
+    if (norm.major !== true && !(picked && picked.major === true)) {
+      return { ok: false, state: bpState, reason: "not_major_q95" };
+    }
+    var allowed = false;
+    for (var i = 0; i < candidates.length; i += 1) {
+      var c = candidates[i];
+      if (!c) continue;
+      if (c.id != null && norm.id != null && String(c.id) === String(norm.id)) {
+        allowed = true;
+        break;
+      }
+      if (String(c.side).toUpperCase() === String(norm.side).toUpperCase() && num(c.price) === num(norm.price)) {
+        allowed = true;
+        break;
+      }
+    }
+    if (!allowed) {
+      return { ok: false, state: bpState, reason: "wall_not_in_candidates" };
+    }
+    var now = opts.nowMs != null ? Number(opts.nowMs) : Date.now();
+    var next = Object.assign({}, bpState, {
+      targetWall: norm,
+      targetStatus: "TARGET_LOCKED",
+      status: "ARMED",
+      updatedAtMs: now,
+      ambiguous: false
+    });
+    return { ok: true, state: next, reason: "manual_lock" };
+  }
+
   function evaluateTrigger(bpState, livePrice, opts) {
     opts = opts || {};
     if (!bpState || bpState.triggered) {
       return { triggered: false, reason: "already_triggered_or_missing" };
     }
-    if (bpState.status !== "ARMED" && bpState.status !== "TARGET_LOCKED" && bpState.status !== "NO_TARGET_WALL") {
+    if (bpState.status !== "ARMED" || !bpState.targetWall) {
       return { triggered: false, reason: "not_armed" };
     }
     var px = num(livePrice);
@@ -277,35 +543,56 @@
     opts = opts || {};
     var tick = num(bpState && bpState.tickSize) || defaultTickSize(opts.symbol || (bpState && bpState.symbol));
     var price = roundToTick(newPrice, tick);
-    var base = Object.assign({}, bpState || {}, {
+    return createBreakpointState({
+      symbol: (bpState && bpState.symbol) || opts.symbol,
       price: price,
       tickSize: tick,
-      triggered: false,
-      sessionId: null,
-      triggeredAtMs: null,
+      refPrice: opts.refPrice,
+      walls: opts.walls || [],
+      medianMult: opts.medianMult,
+      nowMs: opts.nowMs
+    });
+  }
+
+  function refreshTargetCandidates(bpState, walls, opts) {
+    opts = opts || {};
+    if (!bpState) return bpState;
+    var listed = listTargetCandidates({
+      breakpoint: bpState.price,
+      refPrice: opts.refPrice,
+      direction: bpState.direction,
+      walls: walls || [],
+      medianMult: opts.medianMult
+    });
+    var next = Object.assign({}, bpState, {
+      targetCandidates: listed.candidates || [],
       updatedAtMs: opts.nowMs != null ? Number(opts.nowMs) : Date.now()
     });
-    var direction = attackDirection(price, opts.refPrice);
-    base.direction = direction;
-    base.wallSide = expectedWallSide(direction);
-    base.armedCycleId = createSessionId(base.symbol, base.updatedAtMs * 1e6);
-    var target = selectTargetWall({
-      breakpoint: price,
-      refPrice: opts.refPrice,
-      direction: direction,
-      walls: opts.walls || []
-    });
-    base.targetStatus = target.status;
-    base.targetWall = target.wall;
-    base.ambiguous = target.status === "AMBIGUOUS_TARGET";
-    if (target.status === "NO_TARGET_WALL") {
-      base.status = "NO_TARGET_WALL";
-    } else if (target.status === "TARGET_LOCKED") {
-      base.status = "TARGET_LOCKED";
-    } else {
-      base.status = "ARMED";
+    if (bpState.targetWall && bpState.status === "ARMED") {
+      var still = false;
+      for (var i = 0; i < listed.candidates.length; i += 1) {
+        var c = listed.candidates[i];
+        if (c && String(c.id) === String(bpState.targetWall.id)) {
+          still = true;
+          next.targetWall = normalizeWall(c, bpState.wallSide);
+          break;
+        }
+      }
+      if (!still) {
+        next.status = "TARGET_LOST_BEFORE_TRIGGER";
+        next.targetStatus = "TARGET_LOST_BEFORE_TRIGGER";
+        next.targetWall = null;
+      }
+      return next;
     }
-    return base;
+    if (!bpState.targetWall) {
+      next.targetStatus = listed.status;
+      next.status =
+        listed.status === "TARGET_CANDIDATES_READY"
+          ? "TARGET_CANDIDATES_READY"
+          : "BP_SET_WAITING_TARGET";
+    }
+    return next;
   }
 
   /**
@@ -417,7 +704,23 @@
   }
 
   function decisionTone(state) {
-    if (state === "ARMED" || state === "TARGET_LOCKED" || state === "NO_TARGET_WALL") return "armed";
+    if (
+      state === "ARMED" ||
+      state === "TARGET_LOCKED" ||
+      state === "TARGET_CANDIDATES_READY" ||
+      state === "BP_SET_WAITING_TARGET"
+    ) {
+      return "armed";
+    }
+    if (
+      state === "NO_TARGET_WALL" ||
+      state === "TARGET_LOST_BEFORE_TRIGGER" ||
+      state === "TARGET_MOVED" ||
+      state === "TARGET_INVALID" ||
+      state === "MISSED_TRIGGER"
+    ) {
+      return "neutral";
+    }
     if (state === "TRIGGERED" || state === "WALL_ATTACK" || state === "BREAKOUT_PENDING" || state === "REJECTION_PENDING" || state === "ABSORPTION") {
       return "analyse";
     }
@@ -432,7 +735,13 @@
     var map = {
       ARMED: "ARMED",
       TARGET_LOCKED: "TARGET LOCKED",
+      TARGET_CANDIDATES_READY: "BP SET · SELECT TARGET",
+      BP_SET_WAITING_TARGET: "BP SET · SELECT TARGET",
       NO_TARGET_WALL: "NO TARGET WALL",
+      TARGET_LOST_BEFORE_TRIGGER: "TARGET LOST",
+      TARGET_MOVED: "TARGET MOVED",
+      TARGET_INVALID: "TARGET INVALID",
+      MISSED_TRIGGER: "MISSED TRIGGER",
       TRIGGERED: "TRIGGERED",
       WALL_ATTACK: "ANALYSE LÄUFT",
       BREAKOUT_PENDING: "ANALYSE LÄUFT",
@@ -481,9 +790,11 @@
         wallSide: bpState.wallSide,
         targetWall: bpState.targetWall,
         targetStatus: bpState.targetStatus,
+        targetCandidates: bpState.targetCandidates || [],
         createdAtMs: bpState.createdAtMs,
         updatedAtMs: bpState.updatedAtMs,
-        armedCycleId: bpState.armedCycleId
+        armedCycleId: bpState.armedCycleId,
+        manualTarget: true
       };
     }
     next.version = 1;
@@ -506,6 +817,11 @@
     attackDirection: attackDirection,
     expectedWallSide: expectedWallSide,
     selectTargetWall: selectTargetWall,
+    classifyMajorWalls: classifyMajorWalls,
+    listTargetCandidates: listTargetCandidates,
+    matchWallAtPrice: matchWallAtPrice,
+    lockManualTarget: lockManualTarget,
+    refreshTargetCandidates: refreshTargetCandidates,
     createSessionId: createSessionId,
     createBreakpointState: createBreakpointState,
     evaluateTrigger: evaluateTrigger,

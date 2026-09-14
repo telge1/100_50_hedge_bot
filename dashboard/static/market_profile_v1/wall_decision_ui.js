@@ -13,6 +13,7 @@
 
   var state = {
     toolActive: false,
+    targetPickActive: false,
     bp: null,
     decision: null,
     lastPrice: null,
@@ -63,8 +64,29 @@
         status: raw.status === "TRIGGERED" ? "ARMED" : raw.status
       });
       if (state.bp.status === "TRIGGERED") state.bp.status = "ARMED";
+      // Legacy auto-locked targets are not armed until user re-confirms.
+      if (state.bp.manualTarget !== true || !state.bp.targetWall) {
+        state.bp.targetWall = null;
+        state.bp = H.refreshTargetCandidates(state.bp, wallsFromChart(), {
+          refPrice: state.lastPrice
+        });
+        if (state.bp.status === "ARMED" || state.bp.status === "TARGET_LOCKED") {
+          state.bp.status =
+            (state.bp.targetCandidates && state.bp.targetCandidates.length)
+              ? "TARGET_CANDIDATES_READY"
+              : "BP_SET_WAITING_TARGET";
+        }
+      }
       paintBreakpoint();
+      syncTargetVisuals();
       updateLabel();
+      if (
+        state.bp &&
+        (state.bp.status === "TARGET_CANDIDATES_READY" ||
+          state.bp.status === "BP_SET_WAITING_TARGET")
+      ) {
+        enterTargetPickMode();
+      }
     } catch (e) { /* ignore */ }
   }
 
@@ -83,15 +105,18 @@
       api.clearWallBreakpoint();
       return;
     }
-    var label = "BP " + state.bp.price + " · " + H.decisionLabel(state.bp.status || "ARMED");
-    if (state.bp.targetStatus === "AMBIGUOUS_TARGET") {
-      label = "BP " + state.bp.price + " · AMBIGUOUS TARGET";
-    } else if (state.bp.status === "TARGET_LOCKED") {
+    var label = "BP " + state.bp.price + " · " + H.decisionLabel(state.bp.status || "DISARMED");
+    if (state.bp.status === "TARGET_LOCKED") {
       label = "BP " + state.bp.price + " · TARGET LOCKED";
     } else if (state.bp.status === "ARMED") {
       label = "BP " + state.bp.price + " · ARMED";
     } else if (state.bp.status === "TRIGGERED") {
       label = "BP " + state.bp.price + " · TRIGGERED";
+    } else if (
+      state.bp.status === "TARGET_CANDIDATES_READY" ||
+      state.bp.status === "BP_SET_WAITING_TARGET"
+    ) {
+      label = "BP " + state.bp.price + " · BP SET · SELECT TARGET";
     }
     api.setWallBreakpoint({
       price: state.bp.price,
@@ -107,11 +132,7 @@
       el.textContent = "BP –";
       return;
     }
-    if (state.bp.targetStatus === "AMBIGUOUS_TARGET") {
-      el.textContent = "BP " + state.bp.price + " · AMBIGUOUS TARGET";
-      return;
-    }
-    el.textContent = "BP " + state.bp.price + " · " + H.decisionLabel(state.bp.status || "ARMED");
+    el.textContent = "BP " + state.bp.price + " · " + H.decisionLabel(state.bp.status || "DISARMED");
   }
 
   function wallsFromChart() {
@@ -123,17 +144,74 @@
       return bars.map(function (b, i) {
         return {
           id: b.id || ((b.side || "UNK") + ":" + b.price + ":" + i),
+          symbol: b.symbol || symbol(),
           side: String(b.side || "").toUpperCase(),
           price: Number(b.price),
           qty: Number(b.qty != null ? b.qty : b.size),
           notional: Number(b.notional != null ? b.notional : b.value),
-          zone_lo: b.zone_lo,
-          zone_hi: b.zone_hi,
-          major: b.major === false ? false : true
+          value: Number(b.value != null ? b.value : b.notional),
+          zone_lo: b.zone_lo != null ? b.zone_lo : b.price,
+          zone_hi: b.zone_hi != null ? b.zone_hi : b.price,
+          wall_ratio: b.wall_ratio != null ? b.wall_ratio : b.ratio,
+          percentile: b.percentile,
+          timestamp: b.timestamp,
+          // Never invent major=true — Q95 classifier decides.
+          major: b.major === true
         };
       });
     } catch (e) {
       return [];
+    }
+  }
+
+  function syncTargetVisuals() {
+    var api = chartApi();
+    if (!api) return;
+    var candidates =
+      (state.bp && state.bp.targetCandidates) ||
+      [];
+    var locked = state.bp && state.bp.targetWall;
+    if (typeof api.setWallTargetGuides === "function") {
+      if (!state.bp || state.bp.price == null) {
+        api.clearWallTargetGuides();
+      } else {
+        api.setWallTargetGuides({
+          candidates: candidates,
+          lockedId: locked && locked.id
+        });
+      }
+    }
+    if (typeof api.setWallTargetHighlight === "function") {
+      if (!state.bp) {
+        api.clearWallTargetHighlight();
+      } else {
+        api.setWallTargetHighlight({
+          ids: candidates.map(function (c) {
+            return c && c.id;
+          }).filter(Boolean),
+          lockedId: locked && locked.id
+        });
+      }
+    }
+  }
+
+  function enterTargetPickMode() {
+    state.targetPickActive = true;
+    state.toolActive = false;
+    var btn = $("mpWallBpTool");
+    if (btn) btn.classList.toggle("active", false);
+    var api = chartApi();
+    if (api && typeof api.setInteractionMode === "function") {
+      api.setInteractionMode("wall_target");
+    }
+  }
+
+  function exitTargetPickMode() {
+    state.targetPickActive = false;
+    var api = chartApi();
+    if (api && typeof api.setInteractionMode === "function") {
+      if (state.toolActive) api.setInteractionMode("wall_bp");
+      else api.setInteractionMode("select");
     }
   }
 
@@ -205,6 +283,7 @@
 
   function setToolActive(on) {
     state.toolActive = !!on;
+    if (state.toolActive) state.targetPickActive = false;
     var btn = $("mpWallBpTool");
     if (btn) btn.classList.toggle("active", state.toolActive);
     var api = chartApi();
@@ -229,8 +308,56 @@
     stopAnalysisLoop();
     persist();
     paintBreakpoint();
+    syncTargetVisuals();
     updateLabel();
     setToolActive(false);
+    enterTargetPickMode();
+    renderPanel();
+  }
+
+  function lockTargetFromClick(payload) {
+    if (!state.bp || state.bp.triggered) return;
+    if (
+      state.bp.status !== "TARGET_CANDIDATES_READY" &&
+      state.bp.status !== "BP_SET_WAITING_TARGET" &&
+      state.bp.status !== "TARGET_LOST_BEFORE_TRIGGER"
+    ) {
+      return;
+    }
+    state.bp = H.refreshTargetCandidates(state.bp, wallsFromChart(), {
+      refPrice: state.lastPrice
+    });
+    var candidates = state.bp.targetCandidates || [];
+    var wall = null;
+    if (payload && payload.id != null) {
+      for (var i = 0; i < candidates.length; i += 1) {
+        if (candidates[i] && String(candidates[i].id) === String(payload.id)) {
+          wall = candidates[i];
+          break;
+        }
+      }
+    }
+    var locked = H.lockManualTarget(state.bp, wall, {
+      price: payload && payload.price,
+      candidates: candidates
+    });
+    if (!locked.ok) {
+      // Missed click on empty chart space — do not invent a wall.
+      syncTargetVisuals();
+      updateLabel();
+      return;
+    }
+    state.bp = locked.state;
+    state.decision = null;
+    state.liveMetrics = null;
+    state.session = null;
+    stopAnalysisLoop();
+    persist();
+    paintBreakpoint();
+    syncTargetVisuals();
+    updateLabel();
+    exitTargetPickMode();
+    openPanel();
     renderPanel();
   }
 
@@ -240,8 +367,10 @@
     state.liveMetrics = null;
     state.session = null;
     stopAnalysisLoop();
+    exitTargetPickMode();
     persist();
     paintBreakpoint();
+    syncTargetVisuals();
     updateLabel();
     closePanel();
   }
@@ -262,6 +391,31 @@
   function onPrice(price) {
     state.lastPrice = H.num(price);
     if (!state.bp || state.fixtureMode) return;
+    if (
+      !state.bp.triggered &&
+      state.bp.status !== "ARMED" &&
+      (state.bp.status === "TARGET_CANDIDATES_READY" ||
+        state.bp.status === "BP_SET_WAITING_TARGET" ||
+        state.bp.status === "TARGET_LOST_BEFORE_TRIGGER")
+    ) {
+      state.bp = H.refreshTargetCandidates(state.bp, wallsFromChart(), {
+        refPrice: state.lastPrice
+      });
+      syncTargetVisuals();
+      updateLabel();
+    } else if (!state.bp.triggered && state.bp.status === "ARMED" && state.bp.targetWall) {
+      state.bp = H.refreshTargetCandidates(state.bp, wallsFromChart(), {
+        refPrice: state.lastPrice
+      });
+      if (state.bp.status === "TARGET_LOST_BEFORE_TRIGGER") {
+        syncTargetVisuals();
+        updateLabel();
+        enterTargetPickMode();
+        renderPanel();
+        return;
+      }
+      syncTargetVisuals();
+    }
     if (state.bp.triggered) {
       updateAcceptance(state.lastPrice);
       return;
@@ -284,6 +438,7 @@
     state.lastAcceptTs = Date.now();
     persist();
     paintBreakpoint();
+    syncTargetVisuals();
     updateLabel();
     openPanel();
     state.decision = { state: "WALL_ATTACK", reasons: ["ANALYSING"], tradeReady: false };
@@ -463,7 +618,23 @@
     html += row("Richtung", bp && bp.direction);
     html += row("Zielseite", bp && bp.wallSide);
     html += row("Target", bp && bp.targetStatus);
+    html += row(
+      "Kandidaten",
+      bp && bp.targetCandidates && bp.targetCandidates.length
+        ? String(bp.targetCandidates.length)
+        : "0"
+    );
+    html += row(
+      "Major-Regel",
+      tw && tw.majorRule
+        ? tw.majorRule
+        : tw && tw.percentile != null
+          ? "Q" + Math.round(tw.percentile)
+          : "N/A"
+    );
+    html += row("Percentile", tw && tw.percentile != null ? Number(tw.percentile).toFixed(1) : "N/A");
     html += row("Wall-Zone", tw ? ((tw.zone_lo != null ? tw.zone_lo : tw.price) + "–" + (tw.zone_hi != null ? tw.zone_hi : tw.price)) : "DATA UNAVAILABLE");
+    html += row("Wall-Notional", tw && tw.notional != null ? fmtNum(tw.notional, 0) + " USDT" : "N/A");
     html += row("Wall-Baseline", state.session && state.session.baselineQty != null ? state.session.baselineQty : "N/A");
     html += row("Wall aktuell", m.wall_current_qty != null ? m.wall_current_qty : "DATA UNAVAILABLE");
     html += row("Wall-ID", tw && tw.id);
@@ -584,8 +755,14 @@
       placeBreakpoint(price);
     };
 
+    root.__mpOnWallTargetClick = function (payload) {
+      if (!state.targetPickActive && !(state.bp && !state.bp.targetWall)) return;
+      lockTargetFromClick(payload || {});
+    };
+
     root.__mpOnWallBpDrag = function (payload) {
       if (!state.bp || !payload || payload.price == null) return;
+      if (state.bp.triggered) return;
       state.bp = H.rearmAfterMove(state.bp, payload.price, {
         symbol: state.bp.symbol,
         refPrice: state.lastPrice,
@@ -597,7 +774,10 @@
       stopAnalysisLoop();
       persist();
       paintBreakpoint();
+      syncTargetVisuals();
       updateLabel();
+      enterTargetPickMode();
+      renderPanel();
     };
 
     document.addEventListener("contextmenu", function (ev) {
@@ -630,8 +810,12 @@
     root.__mpOnChartReady = function () {
       if (typeof prevReady === "function") prevReady();
       paintBreakpoint();
+      syncTargetVisuals();
     };
-    if (root.__mpChartReady) paintBreakpoint();
+    if (root.__mpChartReady) {
+      paintBreakpoint();
+      syncTargetVisuals();
+    }
   }
 
   function applyFixture(sequence) {
@@ -655,8 +839,18 @@
           walls: frame.walls || []
         });
       }
+      if (frame.lockTarget && state.bp) {
+        var lockedFx = H.lockManualTarget(state.bp, frame.lockTarget, {
+          candidates: state.bp.targetCandidates || frame.walls || []
+        });
+        if (lockedFx.ok) state.bp = lockedFx.state;
+      }
       if (frame.trigger) {
-        state.bp = H.applyTrigger(state.bp, { triggered: true, atMs: Date.now(), reason: "fixture" });
+        if (!state.bp || !state.bp.targetWall) {
+          /* fixture cannot trigger without locked target */
+        } else {
+          state.bp = H.applyTrigger(state.bp, { triggered: true, atMs: Date.now(), reason: "fixture" });
+        }
       }
       if (frame.metrics) {
         state.decision = H.transitionDecision(frame.prevState || "TRIGGERED", frame.metrics);
@@ -688,6 +882,7 @@
     root.__mpWallDecision = {
       onPrice: onPrice,
       placeBreakpoint: placeBreakpoint,
+      lockTargetFromClick: lockTargetFromClick,
       clearBreakpoint: clearBreakpoint,
       openPanel: openPanel,
       applyFixture: applyFixture,
@@ -700,7 +895,8 @@
           liveMetrics: state.liveMetrics,
           session: state.session,
           fixtureMode: state.fixtureMode,
-          fixtureAllowed: FIXTURE_ALLOWED
+          fixtureAllowed: FIXTURE_ALLOWED,
+          targetPickActive: state.targetPickActive
         };
       }
     };
