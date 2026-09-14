@@ -175,7 +175,12 @@ def _load_trades_in_zone(
     return out
 
 
-def _load_live_book_candidates(symbol: str) -> list[dict[str, Any]]:
+def _load_live_book_candidates(
+    symbol: str,
+    *,
+    preferred_depth: int | None = None,
+    lease_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Load OB ladders with proven coverage first.
 
     Depth 1000 is the primary wall source (dense near mid, low latency).
@@ -184,11 +189,20 @@ def _load_live_book_candidates(symbol: str) -> list[dict[str, Any]]:
     """
     from research_charts.ob1000_on_demand import freshness_from_payload, load_ob1000_levels
 
+    depths: list[int] = []
+    if preferred_depth in (0, 1000):
+        depths.append(int(preferred_depth))
+    for d in (1000, 0):
+        if d not in depths:
+            depths.append(d)
+
     out: list[dict[str, Any]] = []
     last_err: Exception | None = None
-    for depth in (1000, 0):
+    for depth in depths:
         try:
-            payload = freshness_from_payload(load_ob1000_levels(symbol, depth=depth))
+            payload = freshness_from_payload(
+                load_ob1000_levels(symbol, depth=depth, lease_id=lease_id)
+            )
             payload["_requested_depth"] = depth
             out.append(payload)
         except Exception as exc:  # noqa: BLE001
@@ -217,6 +231,9 @@ def resolve_wall_current_qty(
     symbol: str,
     target_wall: dict[str, Any],
     tick: float,
+    preferred_depth: int | None = None,
+    lease_id: str | None = None,
+    client_wall_qty: float | None = None,
 ) -> dict[str, Any]:
     """Return wall qty at locked zone from live book, else OBP fallback.
 
@@ -239,7 +256,9 @@ def resolve_wall_current_qty(
     price = _f(target_wall.get("price")) or lo
 
     try:
-        books = _load_live_book_candidates(symbol)
+        books = _load_live_book_candidates(
+            symbol, preferred_depth=preferred_depth, lease_id=lease_id
+        )
         result["coverage"]["live_book_attempts"] = [
             {
                 "depth": b.get("_requested_depth"),
@@ -294,7 +313,11 @@ def resolve_wall_current_qty(
             result["qty"] = float(chosen_qty)
             result["wall_absent"] = chosen_absent
             result["adapter"] = "ok"
-            result["source"] = "ob1000_on_demand"
+            result["source"] = (
+                "ob_full_on_demand"
+                if chosen.get("_requested_depth") == 0
+                else "ob1000_on_demand"
+            )
             return result
         if books:
             book = books[0]
@@ -313,6 +336,19 @@ def resolve_wall_current_qty(
     except Exception as exc:  # noqa: BLE001
         result["error"] = f"live_book:{exc}"
         result["adapter"] = "DATA_GAP"
+
+    # Client chart qty (OBP / Levels already painted) — prefer over slow/failed OBP.
+    cq = _f(client_wall_qty)
+    if cq is not None and cq >= 0:
+        result["qty"] = float(cq)
+        result["wall_absent"] = cq <= 0.0
+        result["adapter"] = "ok"
+        result["source"] = "client_chart_wall"
+        if result.get("error"):
+            result["error"] = str(result["error"]) + "|client_wall_qty_fallback"
+        else:
+            result["error"] = "client_wall_qty_fallback"
+        return result
 
     # Fallback: major-wall OBP (cannot prove absence → only positive matches)
     try:
@@ -371,6 +407,9 @@ def compute_live_metrics(
     avr_state: str | None = None,
     oi_at_trigger: float | None = None,
     oi_current: float | None = None,
+    preferred_depth: int | None = None,
+    lease_id: str | None = None,
+    client_wall_qty: float | None = None,
 ) -> dict[str, Any]:
     from research_charts.trade_bubbles import tick_size
 
@@ -423,7 +462,14 @@ def compute_live_metrics(
             out["avr_state"] = str(avr_state)
         return out
 
-    wall = resolve_wall_current_qty(symbol=sym, target_wall=target_wall, tick=tick)
+    wall = resolve_wall_current_qty(
+        symbol=sym,
+        target_wall=target_wall,
+        tick=tick,
+        preferred_depth=preferred_depth,
+        lease_id=str(lease_id) if lease_id else None,
+        client_wall_qty=client_wall_qty,
+    )
     out["coverage"].update(wall.get("coverage") or {})
     out["event_time"] = wall.get("event_time")
     out["adapters"]["wall_current"] = wall.get("adapter")

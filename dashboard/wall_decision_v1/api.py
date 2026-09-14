@@ -64,6 +64,12 @@ def build_router(*, require_auth: Callable) -> APIRouter:
         except (TypeError, ValueError):
             return _error(400, "invalid_breakpoint", "breakpoint must be a number")
         tw = body.get("target_wall") if isinstance(body.get("target_wall"), dict) else None
+        pref_depth = None
+        if body.get("preferred_depth") not in (None, ""):
+            try:
+                pref_depth = int(body.get("preferred_depth"))
+            except (TypeError, ValueError):
+                pref_depth = None
         try:
             metrics = await compute_live_metrics_async(
                 symbol=symbol,
@@ -80,6 +86,9 @@ def build_router(*, require_auth: Callable) -> APIRouter:
                 avr_state=str(body["avr_state"]) if body.get("avr_state") not in (None, "") else None,
                 oi_at_trigger=body.get("oi_at_trigger"),
                 oi_current=body.get("oi_current"),
+                preferred_depth=pref_depth,
+                lease_id=str(body["lease_id"]) if body.get("lease_id") not in (None, "") else None,
+                client_wall_qty=body.get("client_wall_qty"),
             )
         except Exception as exc:  # noqa: BLE001
             return _error(500, "metrics_failed", str(exc))

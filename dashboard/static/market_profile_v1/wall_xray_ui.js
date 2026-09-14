@@ -54,7 +54,7 @@
     return Number(v).toFixed(digits == null ? 2 : digits);
   }
 
-  function wallsFromChart() {
+  function wallsFromObp() {
     var api = chartApi();
     if (!api || typeof api.debugOrderbookProfile !== "function") return [];
     try {
@@ -74,7 +74,8 @@
           wall_ratio: b.wall_ratio != null ? b.wall_ratio : b.ratio,
           percentile: b.percentile,
           timestamp: b.timestamp,
-          major: b.major === true
+          major: b.major === true,
+          source: "obp"
         };
       });
     } catch (e) {
@@ -82,18 +83,117 @@
     }
   }
 
-  function wallsFromFullOb(priceHint) {
+  function wallsFromLevels() {
     var api = chartApi();
-    if (!api || typeof api.debugOrderbookLevels !== "function") return wallsFromChart();
+    if (!api || typeof api.debugOrderbookLevels !== "function") return [];
     try {
       var dbg = api.debugOrderbookLevels();
-      var levels = (dbg && (dbg.levels || dbg.bars || dbg.asks || dbg.bids)) || null;
-      if (!levels || !levels.length) return wallsFromChart();
-      // Prefer OBP classified universe; Full-OB click still matches via same candidate list.
-      return wallsFromChart();
+      if (!dbg) return [];
+      var out = [];
+      function pushSide(side, levels) {
+        (levels || []).forEach(function (lv, i) {
+          var price = Number(lv && (lv.price != null ? lv.price : lv[0]));
+          var qty = Number(lv && (lv.size != null ? lv.size : lv.qty != null ? lv.qty : lv[1]));
+          if (!Number.isFinite(price) || !Number.isFinite(qty) || qty <= 0) return;
+          out.push({
+            id: "lvl:" + side + ":" + price + ":" + i,
+            symbol: symbol(),
+            side: side,
+            price: price,
+            qty: qty,
+            notional: price * qty,
+            value: price * qty,
+            zone_lo: price,
+            zone_hi: price,
+            timestamp: dbg.timestamp_utc || dbg.timestamp,
+            major: false,
+            source: "levels"
+          });
+        });
+      }
+      pushSide("BID", dbg.bids || []);
+      pushSide("ASK", dbg.asks || []);
+      // Keep strongest levels for classification (perf).
+      out.sort(function (a, b) {
+        return (b.notional || 0) - (a.notional || 0);
+      });
+      return out.slice(0, 400);
     } catch (e) {
-      return wallsFromChart();
+      return [];
     }
+  }
+
+  function bookDepth() {
+    var bridge = root.__mpObBookBridge;
+    if (bridge && typeof bridge.depth === "function") {
+      var d = Number(bridge.depth());
+      if (d === 0 || d === 1000 || d === 200) return d;
+    }
+    var el = $("mpOblDepth");
+    if (!el) return 1000;
+    var v = String(el.value || "1000");
+    if (v === "0") return 0;
+    if (v === "200") return 200;
+    return 1000;
+  }
+
+  function bookDepthLabel() {
+    var d = bookDepth();
+    if (d === 0) return "FULL";
+    if (d === 1000) return "OB1000";
+    return "OB200";
+  }
+
+  function wallsUniverse() {
+    var depth = bookDepth();
+    var levels = wallsFromLevels();
+    var obp = wallsFromObp();
+    // FULL → Levels are authoritative; OB1000 → OBP majors + Levels fallback.
+    if (depth === 0) {
+      return levels.length ? levels : obp;
+    }
+    return obp.length ? obp.concat(levels) : levels;
+  }
+
+  function wallsFromChart() {
+    return wallsUniverse();
+  }
+
+  function clientWallQtyForTarget(tw) {
+    if (!tw) return null;
+    var walls = wallsUniverse();
+    var lo = Number(tw.zone_lo != null ? tw.zone_lo : tw.price);
+    var hi = Number(tw.zone_hi != null ? tw.zone_hi : tw.price);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+    if (lo > hi) {
+      var t = lo;
+      lo = hi;
+      hi = t;
+    }
+    var side = String(tw.side || "").toUpperCase();
+    var sum = 0;
+    var hit = false;
+    walls.forEach(function (w) {
+      if (!w || String(w.side || "").toUpperCase() !== side) return;
+      var p = Number(w.price);
+      var q = Number(w.qty);
+      if (!Number.isFinite(p) || !Number.isFinite(q)) return;
+      if (p >= lo - 1e-9 && p <= hi + 1e-9) {
+        sum += q;
+        hit = true;
+      }
+    });
+    return hit ? sum : null;
+  }
+
+  function ensureBookFeed() {
+    var bridge = root.__mpObBookBridge;
+    if (!bridge) return;
+    try {
+      if (typeof bridge.enableLevels === "function") bridge.enableLevels();
+      if (typeof bridge.ensureLease === "function") bridge.ensureLease(symbol());
+      if (typeof bridge.refreshLevels === "function") bridge.refreshLevels();
+    } catch (e) { /* ignore */ }
   }
 
   function readAvr() {
@@ -132,6 +232,7 @@
       api.setInteractionMode(state.toolActive ? "wall_xray" : "select");
     }
     if (state.toolActive) {
+      ensureBookFeed();
       refreshRadar();
       syncVisuals();
     }
@@ -257,6 +358,7 @@
     if (state.session) {
       stopXray("REPLACED_BY_NEW_XRAY");
     }
+    ensureBookFeed();
     var created = X.createXraySession({
       symbol: symbol(),
       wall: wall,
@@ -272,6 +374,8 @@
       return;
     }
     state.session = created.session;
+    state.session.bookDepth = bookDepth();
+    state.session.bookDepthLabel = bookDepthLabel();
     state.acceptAboveMs = 0;
     state.acceptBelowMs = 0;
     state.lastAcceptTs = Date.now();
@@ -349,8 +453,12 @@
   function pollLiveMetrics() {
     if (!state.session || !state.session.target || state.analysisInflight) return;
     state.analysisInflight = true;
+    ensureBookFeed();
     var tw = state.session.target;
     var avrNow = readAvr();
+    var bridge = root.__mpObBookBridge;
+    var leaseId = bridge && typeof bridge.leaseId === "function" ? bridge.leaseId() : null;
+    var clientQty = clientWallQtyForTarget(tw);
     var body = {
       symbol: state.session.symbol,
       breakpoint: tw.price,
@@ -374,7 +482,10 @@
       avr_state: avrNow.status === "ok" ? avrNow.value : null,
       oi_at_trigger: null,
       oi_current: readOiCurrent(),
-      xray: true
+      xray: true,
+      preferred_depth: bookDepth() === 200 ? 1000 : bookDepth(),
+      lease_id: leaseId,
+      client_wall_qty: clientQty
     };
     fetch("/api/wall-decision/v1/live-metrics", {
       method: "POST",
@@ -387,6 +498,24 @@
       })
       .then(function (payload) {
         if (!payload || payload.success === false) {
+          // Soft-fail with client qty so UI is not blank at contact.
+          if (clientQty != null) {
+            state.liveMetrics = {
+              wall_current_qty: clientQty,
+              wall_reduce_pct:
+                state.session.baselineQty > 0
+                  ? Math.max(0, (state.session.baselineQty - clientQty) / state.session.baselineQty)
+                  : null,
+              trade_explained_pct: null,
+              pull_pct: null,
+              replenish_pct: null,
+              data_gap: true,
+              adapters: { wall_current: "ok", wall_source: "client_chart_wall" },
+              errors: ["LIVE_METRICS_HTTP_FAILED"]
+            };
+            renderPanel();
+            return;
+          }
           state.session = Object.assign({}, state.session, {
             status: "DATA_GAP",
             phase: "DATA_GAP",
@@ -397,6 +526,15 @@
           return;
         }
         state.liveMetrics = payload;
+        if (payload.wall_current_qty == null && clientQty != null) {
+          payload.wall_current_qty = clientQty;
+          if (state.session.baselineQty > 0) {
+            payload.wall_reduce_pct = Math.max(
+              0,
+              (state.session.baselineQty - clientQty) / state.session.baselineQty
+            );
+          }
+        }
         if (payload.wall_current_qty != null && state.session) {
           var cur = Number(payload.wall_current_qty);
           if (Number.isFinite(cur)) {
@@ -425,6 +563,16 @@
         shadowPost();
       })
       .catch(function () {
+        if (clientQty != null) {
+          state.liveMetrics = {
+            wall_current_qty: clientQty,
+            data_gap: true,
+            adapters: { wall_source: "client_chart_wall" },
+            errors: ["LIVE_METRICS_FETCH_ERROR"]
+          };
+          renderPanel();
+          return;
+        }
         state.session = Object.assign({}, state.session, {
           status: "DATA_GAP",
           phase: "DATA_GAP",
@@ -571,6 +719,10 @@
     var roles = s && s.roles;
     var html = "";
     html += row("Mode", s ? "XRAY ACTIVE" : "XRAY IDLE");
+    html += row("Wall-Quelle", bookDepthLabel() + (bookDepth() === 0 ? " (Levels)" : " (OBP+Levels)"));
+    if (!s) {
+      html += row("Hinweis", "Major/Q95-Wall anklicken · Levels OB1000/FULL umschalten");
+    }
     if (state.lastClickStatus && !s) html += row("Click", state.lastClickStatus);
     html += row("Symbol", s && s.symbol);
     html += row("Session", s && s.sessionId);
@@ -587,20 +739,25 @@
     html += row("Bias", s && s.bias);
     html += row("Reasons", s && s.reasons ? s.reasons.join(", ") : "–");
     html += row("Start", s && s.startNote);
-    html += row("Wall-Baseline", s && s.baselineQty != null ? s.baselineQty : "N/A");
-    html += row("Wall aktuell", m.wall_current_qty != null ? m.wall_current_qty : "DATA UNAVAILABLE");
-    html += row("Wall-Abbau %", fmtPct(m.wall_reduce_pct));
-    html += row("Trades erklärt %", fmtPct(m.trade_explained_pct));
-    html += row("Pull-Anteil", fmtPct(m.pull_pct));
-    html += row("Replenishment", fmtPct(m.replenish_pct));
-    html += row(
-      "Agg Buy/Sell",
-      m.aggressor_buy_notional != null
-        ? fmtNum(m.aggressor_buy_notional, 0) + " / " + fmtNum(m.aggressor_sell_notional, 0)
-        : "DATA UNAVAILABLE"
-    );
-    html += row("AVR", m.avr_state != null ? m.avr_state : "DATA UNAVAILABLE");
-    html += row("OI Δ", m.oi_delta != null ? m.oi_delta : "DATA UNAVAILABLE");
+    html += row("Wall-Baseline", s && s.baselineQty != null ? s.baselineQty : "–");
+    if (s) {
+      html += row("Wall aktuell", m.wall_current_qty != null ? m.wall_current_qty : "DATA UNAVAILABLE");
+      html += row("Wall-Abbau %", fmtPct(m.wall_reduce_pct));
+      html += row("Trades erklärt %", fmtPct(m.trade_explained_pct));
+      html += row("Pull-Anteil", fmtPct(m.pull_pct));
+      html += row("Replenishment", fmtPct(m.replenish_pct));
+      html += row(
+        "Agg Buy/Sell",
+        m.aggressor_buy_notional != null
+          ? fmtNum(m.aggressor_buy_notional, 0) + " / " + fmtNum(m.aggressor_sell_notional, 0)
+          : "DATA UNAVAILABLE"
+      );
+      html += row("AVR", m.avr_state != null ? m.avr_state : "DATA UNAVAILABLE");
+      html += row("OI Δ", m.oi_delta != null ? m.oi_delta : "DATA UNAVAILABLE");
+      html += row("Wall-Source", (m.adapters && m.adapters.wall_source) || "–");
+    } else {
+      html += row("Live-Metriken", "warten auf Target-Lock");
+    }
     html += row("Warnings", s && s.warnings && s.warnings.length ? s.warnings.join(", ") : "–");
     if (roles) {
       html += row("FRONT", roles.FRONT_WALL ? roles.FRONT_WALL.id : "–");
@@ -660,6 +817,18 @@
       stopBtn.addEventListener("click", function () {
         stopXray("USER_STOP");
         setToolActive(false);
+      });
+    }
+    var depthSel = $("mpOblDepth");
+    if (depthSel && !depthSel._xrBound) {
+      depthSel._xrBound = true;
+      depthSel.addEventListener("change", function () {
+        ensureBookFeed();
+        if (state.toolActive || state.session) {
+          refreshRadar();
+          syncVisuals();
+          renderPanel();
+        }
       });
     }
     root.__mpOnWallXrayClick = function (payload) {

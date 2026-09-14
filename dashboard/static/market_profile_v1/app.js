@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-35 panel min-button + distance as %.
-  try { console.info("[mp] asset mp-35"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-36 X-Ray OB1000/FULL switch + live metrics lease/fallback.
+  try { console.info("[mp] asset mp-36"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2707,7 +2707,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-35)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-36)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {
@@ -3809,6 +3809,34 @@
     });    // Auto-load immediately with the default/persisted range (do not wait for
     // the chart bridge — that left the empty placeholder stuck forever).
     load();
+
+    // Bridge for Wall X-Ray / Wall Decision: OB1000 vs FULL lease + refresh.
+    try {
+      window.__mpObBookBridge = {
+        depth: oblDataDepth,
+        depthLabel: oblDepthLabel,
+        leaseId: function () {
+          return obState.obl1000 && obState.obl1000.leaseId ? obState.obl1000.leaseId : null;
+        },
+        ensureLease: function (sym) {
+          return ensureOb1000Lease(sym || currentSymbol(), { force: false });
+        },
+        enableLevels: function () {
+          if (!obState.obl) obState.obl = defaultOrderbookLevels();
+          if (!obState.obl.enabled) {
+            obState.obl.enabled = true;
+            var en = document.getElementById("mpOblEnabled");
+            if (en) en.checked = true;
+            applyOrderbookLevelsSettings(obState.obl, true);
+          } else if (isOnDemandBookMode()) {
+            startOb1000Heartbeat();
+          }
+        },
+        refreshLevels: function () {
+          if (typeof onOrderbookSymbolOrViewChange === "function") onOrderbookSymbolOrViewChange();
+        }
+      };
+    } catch (eBridge) { /* ignore */ }
   }
 
   if (document.readyState === "loading") {
