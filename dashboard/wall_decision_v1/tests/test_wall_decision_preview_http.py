@@ -62,7 +62,9 @@ def test_preview_market_profile_is_real_page_not_fixture():
     assert "FIXTURE / REPLAY PREVIEW" not in html
     assert "wall_decision_preview" not in html
     assert (
-        "mp-34" in html
+        "mp-35" in html
+        or "mp-35" in html
+        or "mp-34" in html
         or "mp-33" in html
         or "mp-32" in html
         or "mp-31" in html

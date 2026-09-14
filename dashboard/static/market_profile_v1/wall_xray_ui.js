@@ -42,6 +42,13 @@
     return (Number(v) * 100).toFixed(1) + "%";
   }
 
+  /** Convert bps → percent display (1 bps = 0.01%). */
+  function fmtBpsAsPct(bps, digits) {
+    if (bps == null || !Number.isFinite(Number(bps))) return "DATA UNAVAILABLE";
+    var d = digits == null ? 3 : digits;
+    return (Number(bps) / 100).toFixed(d) + "%";
+  }
+
   function fmtNum(v, digits) {
     if (v == null || !Number.isFinite(Number(v))) return "DATA UNAVAILABLE";
     return Number(v).toFixed(digits == null ? 2 : digits);
@@ -510,8 +517,8 @@
           "–" +
           fmtNum(r.zone_hi, 1) +
           " · " +
-          fmtNum(r.distance_bps, 1) +
-          " bps · p" +
+          fmtBpsAsPct(r.distance_bps, 3) +
+          " · p" +
           fmtNum(r.percentile, 0) +
           "</div>" +
           "<div class='xr-bar'><span style='width:" +
@@ -569,7 +576,12 @@
     html += row("Session", s && s.sessionId);
     html += row("Target", tw ? tw.side + " · " + tw.id : "–");
     html += row("Wall-Zone", tw ? tw.zone_lo + "–" + tw.zone_hi : "–");
-    html += row("Distanz", s && s.distance_bps != null ? fmtNum(s.distance_abs, 2) + " / " + fmtNum(s.distance_bps, 2) + " bps" : "–");
+    html += row(
+      "Distanz",
+      s && s.distance_bps != null
+        ? fmtNum(s.distance_abs, 2) + " / " + fmtBpsAsPct(s.distance_bps, 3)
+        : "–"
+    );
     html += row("Approach", s && s.approach);
     html += row("Phase", s && s.phase);
     html += row("Bias", s && s.bias);

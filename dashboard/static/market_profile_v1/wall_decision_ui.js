@@ -693,11 +693,17 @@
     var oy = 0;
     head.addEventListener("pointerdown", function (ev) {
       if (ev.button !== 0) return;
+      var t = ev.target;
+      if (t && t.closest && t.closest(".wd-panel-actions, button, a, input, select, textarea")) {
+        return;
+      }
       dragging = true;
       var rect = panel.getBoundingClientRect();
       ox = ev.clientX - rect.left;
       oy = ev.clientY - rect.top;
-      head.setPointerCapture(ev.pointerId);
+      try {
+        head.setPointerCapture(ev.pointerId);
+      } catch (e) { /* ignore */ }
     });
     head.addEventListener("pointermove", function (ev) {
       if (!dragging) return;
@@ -734,19 +740,29 @@
     var minBtn = $("wdPanelMin");
     if (minBtn && !minBtn._wdBound) {
       minBtn._wdBound = true;
-      minBtn.addEventListener("click", function (ev) {
-        if (ev && ev.stopPropagation) ev.stopPropagation();
+      function toggleMin(ev) {
+        if (ev) {
+          if (ev.preventDefault) ev.preventDefault();
+          if (ev.stopPropagation) ev.stopPropagation();
+        }
         var body = $("wdPanelBody");
         if (!body) return;
         body.hidden = !body.hidden;
         minBtn.setAttribute("aria-expanded", body.hidden ? "false" : "true");
         minBtn.title = body.hidden ? "Ausklappen" : "Einklappen";
         minBtn.textContent = body.hidden ? "+" : "–";
+      }
+      minBtn.addEventListener("pointerdown", function (ev) {
+        if (ev.stopPropagation) ev.stopPropagation();
       });
+      minBtn.addEventListener("click", toggleMin);
     }
     var closeBtn = $("wdPanelClose");
     if (closeBtn && !closeBtn._wdBound) {
       closeBtn._wdBound = true;
+      closeBtn.addEventListener("pointerdown", function (ev) {
+        if (ev.stopPropagation) ev.stopPropagation();
+      });
       closeBtn.addEventListener("click", function (ev) {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         closePanel();

@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-34 Wall Decision panel collapse/close chrome fix.
-  try { console.info("[mp] asset mp-34"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-35 panel min-button + distance as %.
+  try { console.info("[mp] asset mp-35"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2707,7 +2707,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-34)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-35)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {
