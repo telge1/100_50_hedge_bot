@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-28 Wall Decision adapters (exact book zone + trade semantics).
-  try { console.info("[mp] asset mp-28"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-29 Wall Decision AVR context (independent of Footprint visual TF).
+  try { console.info("[mp] asset mp-29"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2700,7 +2700,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-28)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-29)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {

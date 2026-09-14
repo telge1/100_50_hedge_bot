@@ -1299,6 +1299,20 @@
       coverage: coverage
     });
     syncAvrMarksFromCandles();
+    /* Publish authoritative AVR for Wall Decision when store has it. */
+    try {
+      var bridge = global.MpWallDecisionAvrContext;
+      if (bridge && typeof bridge.publishFromCandle === "function") {
+        for (var i = candles.length - 1; i >= 0; i -= 1) {
+          if (candles[i] && candles[i].avr) {
+            bridge.publishFromCandle(candles[i], state.symbol || SUPPORTED_SYMBOL);
+            break;
+          }
+        }
+      }
+    } catch (ePub) {
+      /* ignore */
+    }
     return state.payload;
   }
 

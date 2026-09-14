@@ -138,16 +138,35 @@
   }
 
   function readAvrFromFootprint() {
+    // Authoritative path: __mpWallDecisionContext.avr (native AVR BTCUSDT/5m).
+    // Independent of chart TF and visual Footprint toggle.
+    try {
+      var bridge = root.MpWallDecisionAvrContext;
+      if (bridge && typeof bridge.readStateName === "function") {
+        var fromCtx = bridge.readStateName();
+        if (fromCtx && fromCtx.status === "ok" && fromCtx.value) return fromCtx;
+      }
+      var ctxAvr = root.__mpWallDecisionContext && root.__mpWallDecisionContext.avr;
+      if (ctxAvr && ctxAvr.available && ctxAvr.state) {
+        return { value: String(ctxAvr.state), status: "ok", avr: ctxAvr };
+      }
+    } catch (e0) {
+      /* fall through */
+    }
+    // Legacy fallback: Footprint store only when it already holds AVR candles.
     try {
       var FC = root.FootprintCandles;
       if (!FC) return { value: null, status: "DATA_UNAVAILABLE" };
       var st = FC._state;
-      var candles = st && st.payload && st.payload.candles;
+      var candles =
+        (st && st.payload && st.payload.candles) || (st && st.historyCandles) || [];
       if (!candles || !candles.length) return { value: null, status: "DATA_UNAVAILABLE" };
-      var last = candles[candles.length - 1];
-      var avr = last && last.avr;
-      var name = avr && (avr.final_state || avr.dominant_state);
-      return name ? { value: String(name), status: "ok" } : { value: null, status: "DATA_UNAVAILABLE" };
+      for (var i = candles.length - 1; i >= 0; i -= 1) {
+        var avr = candles[i] && candles[i].avr;
+        var name = avr && (avr.final_state || avr.dominant_state);
+        if (name) return { value: String(name), status: "ok" };
+      }
+      return { value: null, status: "DATA_UNAVAILABLE" };
     } catch (e) {
       return { value: null, status: "DATA_UNAVAILABLE" };
     }
@@ -637,6 +656,14 @@
     bindUi();
     loadPersisted();
     updateLabel();
+    // AVR feed is independent of Footprint visual / chart TF (native 5m).
+    try {
+      if (root.MpWallDecisionAvrContext && typeof root.MpWallDecisionAvrContext.start === "function") {
+        root.MpWallDecisionAvrContext.start({ intervalMs: 5000 });
+      }
+    } catch (eStart) {
+      /* ignore */
+    }
     root.__mpWallDecision = {
       onPrice: onPrice,
       placeBreakpoint: placeBreakpoint,
@@ -650,6 +677,7 @@
           decision: state.decision,
           lastPrice: state.lastPrice,
           liveMetrics: state.liveMetrics,
+          session: state.session,
           fixtureMode: state.fixtureMode,
           fixtureAllowed: FIXTURE_ALLOWED
         };
