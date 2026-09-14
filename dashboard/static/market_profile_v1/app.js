@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-36 X-Ray OB1000/FULL switch + live metrics lease/fallback.
-  try { console.info("[mp] asset mp-36"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-37 X-Ray auto-lock on contact + OBP/Levels merge.
+  try { console.info("[mp] asset mp-37"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 

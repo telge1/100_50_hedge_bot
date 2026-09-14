@@ -145,14 +145,13 @@
   }
 
   function wallsUniverse() {
-    var depth = bookDepth();
     var levels = wallsFromLevels();
     var obp = wallsFromObp();
-    // FULL → Levels are authoritative; OB1000 → OBP majors + Levels fallback.
-    if (depth === 0) {
-      return levels.length ? levels : obp;
-    }
-    return obp.length ? obp.concat(levels) : levels;
+    // Always merge: chart OBP majors + live Levels (OB1000/FULL).
+    // FULL-only dropped OBP majors and left only CONTEXT rows → no lock possible.
+    if (!obp.length) return levels;
+    if (!levels.length) return obp;
+    return obp.concat(levels);
   }
 
   function wallsFromChart() {
@@ -243,9 +242,65 @@
       tickSize: H.defaultTickSize(symbol()),
       nowMs: Date.now()
     });
-    return clusters.filter(function (c) {
+    var majors = clusters.filter(function (c) {
       return c && c.major === true;
     });
+    if (majors.length) return majors;
+    // If Q95 yields none (sparse FULL sample), promote strongest per side so
+    // contact/lock is possible without inventing random mid-book ticks.
+    var bySide = { ASK: [], BID: [] };
+    clusters.forEach(function (c) {
+      if (!c || (c.side !== "ASK" && c.side !== "BID")) return;
+      bySide[c.side].push(c);
+    });
+    var promoted = [];
+    ["ASK", "BID"].forEach(function (side) {
+      bySide[side].sort(function (a, b) {
+        return (Number(b.notional) || 0) - (Number(a.notional) || 0);
+      });
+      bySide[side].slice(0, 3).forEach(function (c) {
+        promoted.push(
+          Object.assign({}, c, {
+            major: true,
+            is_major: true,
+            majorRule: c.majorRule || "xray_top_size_promote",
+            badge: c.badge === "DOMINANT" ? "DOMINANT" : "MAJOR"
+          })
+        );
+      });
+    });
+    return promoted;
+  }
+
+  function maybeAutoLockOnContact(price) {
+    if (!state.toolActive || state.session || price == null) return;
+    var cands = majorCandidates();
+    if (!cands.length) {
+      state.lastClickStatus = "NO_MAJOR_WALL_NEAR_PRICE";
+      return;
+    }
+    var live = Number(price);
+    var best = null;
+    var bestAbs = null;
+    cands.forEach(function (w) {
+      var ref =
+        w.side === "ASK"
+          ? Number(w.zone_lo != null ? w.zone_lo : w.price)
+          : Number(w.zone_hi != null ? w.zone_hi : w.price);
+      if (!Number.isFinite(ref) || ref === 0) return;
+      // ASK only above/at live; BID only below/at live
+      if (w.side === "ASK" && ref < live - 1e-9) return;
+      if (w.side === "BID" && ref > live + 1e-9) return;
+      var bps = (Math.abs(ref - live) / live) * 10000;
+      if (bps > 2.5) return; // CONTACT band
+      if (bestAbs == null || bps < bestAbs) {
+        bestAbs = bps;
+        best = w;
+      }
+    });
+    if (!best) return;
+    state.lastClickStatus = "AUTO_CONTACT_LOCK";
+    startXrayFromWall(best);
   }
 
   function refreshRadar() {
@@ -420,6 +475,9 @@
     if (state.toolActive || state.session) {
       refreshRadar();
       syncVisuals();
+    }
+    if (state.toolActive && !state.session) {
+      maybeAutoLockOnContact(state.lastPrice);
     }
     if (!state.session) return;
     updateAcceptance(state.lastPrice);
@@ -721,7 +779,8 @@
     html += row("Mode", s ? "XRAY ACTIVE" : "XRAY IDLE");
     html += row("Wall-Quelle", bookDepthLabel() + (bookDepth() === 0 ? " (Levels)" : " (OBP+Levels)"));
     if (!s) {
-      html += row("Hinweis", "Major/Q95-Wall anklicken · Levels OB1000/FULL umschalten");
+      html += row("Hinweis", "Major/Q95 oder Top-Wall anklicken · bei Kontakt Auto-Lock · OB1000/FULL umschalten");
+      html += row("Live-Metriken", "warten auf Target-Lock (sonst keine Contact-Daten)");
     }
     if (state.lastClickStatus && !s) html += row("Click", state.lastClickStatus);
     html += row("Symbol", s && s.symbol);
@@ -755,8 +814,6 @@
       html += row("AVR", m.avr_state != null ? m.avr_state : "DATA UNAVAILABLE");
       html += row("OI Δ", m.oi_delta != null ? m.oi_delta : "DATA UNAVAILABLE");
       html += row("Wall-Source", (m.adapters && m.adapters.wall_source) || "–");
-    } else {
-      html += row("Live-Metriken", "warten auf Target-Lock");
     }
     html += row("Warnings", s && s.warnings && s.warnings.length ? s.warnings.join(", ") : "–");
     if (roles) {
