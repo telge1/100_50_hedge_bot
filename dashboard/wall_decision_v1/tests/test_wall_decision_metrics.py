@@ -156,7 +156,9 @@ def test_prefer_ob1000_positive_over_sparse_full_zero(monkeypatch):
     }
 
     # Candidates are returned depth-1000-first by production loader.
-    monkeypatch.setattr(m, "_load_live_book_candidates", lambda symbol: [dense_1000, sparse_full])
+    monkeypatch.setattr(
+        m, "_load_live_book_candidates", lambda symbol, **kwargs: [dense_1000, sparse_full]
+    )
 
     out = m.resolve_wall_current_qty(
         symbol="BTCUSDT",
@@ -182,7 +184,7 @@ def test_confirmed_zero_on_covering_ob1000(monkeypatch):
         "bids": [{"price": 78000.0, "size": 2.0}, {"price": 77900.0, "size": 2.0}],
         "asks": [{"price": 78001.0, "size": 1.0}],
     }
-    monkeypatch.setattr(m, "_load_live_book_candidates", lambda symbol: [book])
+    monkeypatch.setattr(m, "_load_live_book_candidates", lambda symbol, **kwargs: [book])
     out = m.resolve_wall_current_qty(
         symbol="BTCUSDT",
         target_wall={"side": "BID", "price": 77950.0, "zone_lo": 77950.0, "zone_hi": 77950.0},
