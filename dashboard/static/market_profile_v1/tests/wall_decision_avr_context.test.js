@@ -95,13 +95,54 @@ describe("Wall Decision AVR context", () => {
 
   it("publishes into window.__mpWallDecisionContext.avr", () => {
     const A = loadAvrContext();
+    A.setActiveSymbol("BTCUSDT");
+    const now = Math.floor(Date.now() / 1000);
     A.publishFromCandle({
-      time: 10,
-      avr: { final_state: "BUYER_CONTROL", dominant_state: "BUYER_CONTROL" }
+      time: now - 60,
+      avr: {
+        final_state: "BUYER_CONTROL",
+        dominant_state: "BUYER_CONTROL",
+        evidence: [{ available_at: now - 5 }]
+      }
     });
-    const got = A.readStateName();
+    const got = A.readStateName({ symbol: "BTCUSDT" });
     assert.equal(got.status, "ok");
     assert.equal(got.value, "BUYER_CONTROL");
     assert.equal(A.getAvr().available, true);
+  });
+
+  it("does not leak BTC AVR to DOGE", () => {
+    const A = loadAvrContext();
+    A.setActiveSymbol("BTCUSDT");
+    const now = Math.floor(Date.now() / 1000);
+    A.publishFromCandle({
+      time: now - 60,
+      avr: {
+        final_state: "SELLER_CONTROL",
+        dominant_state: "SELLER_CONTROL",
+        evidence: [{ available_at: now - 5 }]
+      }
+    });
+    A.setActiveSymbol("DOGEUSDT");
+    const got = A.readStateName({ symbol: "DOGEUSDT" });
+    assert.equal(got.status, "DATA_UNAVAILABLE");
+    assert.match(String(got.reason || ""), /symbol_unsupported/);
+  });
+
+  it("blocks stale AVR", () => {
+    const A = loadAvrContext();
+    A.setActiveSymbol("BTCUSDT");
+    const out = A.buildFromCandle({
+      time: Math.floor(Date.now() / 1000) - 3600,
+      avr: {
+        final_state: "BALANCED",
+        dominant_state: "BALANCED",
+        evidence: [{ available_at: Math.floor(Date.now() / 1000) - 3600 }]
+      }
+    });
+    A.publish(out);
+    const got = A.readStateName({ symbol: "BTCUSDT" });
+    assert.equal(got.status, "DATA_UNAVAILABLE");
+    assert.equal(got.reason, "avr_stale");
   });
 });

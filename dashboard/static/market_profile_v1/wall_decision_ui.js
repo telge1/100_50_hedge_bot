@@ -138,26 +138,47 @@
   }
 
   function readAvrFromFootprint() {
+    var sym = String(symbol() || "").toUpperCase();
     // Authoritative path: __mpWallDecisionContext.avr (native AVR BTCUSDT/5m).
-    // Independent of chart TF and visual Footprint toggle.
+    // Never leak BTC AVR into another symbol.
     try {
       var bridge = root.MpWallDecisionAvrContext;
+      if (bridge && typeof bridge.setActiveSymbol === "function") {
+        bridge.setActiveSymbol(sym);
+      }
       if (bridge && typeof bridge.readStateName === "function") {
-        var fromCtx = bridge.readStateName();
+        var fromCtx = bridge.readStateName({ symbol: sym });
         if (fromCtx && fromCtx.status === "ok" && fromCtx.value) return fromCtx;
+        return {
+          value: null,
+          status: "DATA_UNAVAILABLE",
+          reason: (fromCtx && fromCtx.reason) || "DATA_UNAVAILABLE"
+        };
       }
       var ctxAvr = root.__mpWallDecisionContext && root.__mpWallDecisionContext.avr;
-      if (ctxAvr && ctxAvr.available && ctxAvr.state) {
+      if (
+        ctxAvr &&
+        ctxAvr.available &&
+        ctxAvr.state &&
+        String(ctxAvr.symbol || "").toUpperCase() === "BTCUSDT" &&
+        sym === "BTCUSDT"
+      ) {
         return { value: String(ctxAvr.state), status: "ok", avr: ctxAvr };
       }
     } catch (e0) {
       /* fall through */
     }
-    // Legacy fallback: Footprint store only when it already holds AVR candles.
+    if (sym !== "BTCUSDT") {
+      return { value: null, status: "DATA_UNAVAILABLE", reason: "symbol_unsupported" };
+    }
+    // Legacy fallback: Footprint store only when it already holds AVR candles for BTC.
     try {
       var FC = root.FootprintCandles;
       if (!FC) return { value: null, status: "DATA_UNAVAILABLE" };
       var st = FC._state;
+      if (!st || String(st.symbol || "").toUpperCase() !== "BTCUSDT") {
+        return { value: null, status: "DATA_UNAVAILABLE" };
+      }
       var candles =
         (st && st.payload && st.payload.candles) || (st && st.historyCandles) || [];
       if (!candles || !candles.length) return { value: null, status: "DATA_UNAVAILABLE" };
@@ -659,7 +680,7 @@
     // AVR feed is independent of Footprint visual / chart TF (native 5m).
     try {
       if (root.MpWallDecisionAvrContext && typeof root.MpWallDecisionAvrContext.start === "function") {
-        root.MpWallDecisionAvrContext.start({ intervalMs: 5000 });
+        root.MpWallDecisionAvrContext.start({ intervalMs: 5000, symbol: symbol() });
       }
     } catch (eStart) {
       /* ignore */

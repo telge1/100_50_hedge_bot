@@ -48,11 +48,11 @@ def test_preview_market_profile_is_real_page_not_fixture():
     assert "wall_decision_helpers.js" in html
     assert "FIXTURE / REPLAY PREVIEW" not in html
     assert "wall_decision_preview" not in html
-    assert "mp-29" in html or "asset_v" in html or "?v=" in html
+    assert "mp-30" in html or "asset_v" in html or "?v=" in html
     # AVR context script is required on mp-29+ builds; older previews may omit it.
-    if "mp-29" in html or "mp-2" in html:
-        if "wall_decision_avr_context.js" not in html and "mp-29" in html:
-            raise AssertionError("mp-29 page must include wall_decision_avr_context.js")
+    if "mp-30" in html or "mp-29" in html:
+        if "wall_decision_avr_context.js" not in html:
+            raise AssertionError("mp-29+ page must include wall_decision_avr_context.js")
 
 
 def test_preview_config_api_marks_non_execution():

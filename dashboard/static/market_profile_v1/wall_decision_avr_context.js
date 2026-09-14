@@ -16,6 +16,8 @@
   var BUCKET_STEP = "5";
   var LOOKBACK_S = 20 * 60; /* ~4 closed 5m candles + forming */
   var POLL_MS = 5000;
+  /* Fail-closed: AVR older than 2× native candle is not used by Wall Decision. */
+  var MAX_AGE_MS = 10 * 60 * 1000;
 
   var ctx = global.__mpWallDecisionContext || (global.__mpWallDecisionContext = {});
   if (!ctx.avr) {
@@ -42,6 +44,7 @@
   var timer = null;
   var inflight = null;
   var lastFetchAtMs = 0;
+  var activeSymbol = null;
 
   function nowMs() {
     return Date.now();
@@ -267,21 +270,61 @@
     return inflight;
   }
 
+  function footprintStoreReady() {
+    try {
+      var FC = global.FootprintCandles;
+      var st = FC && FC._state;
+      if (!st || !st.enabled) return false;
+      if (String(st.symbol || "").toUpperCase() !== SYMBOL) return false;
+      if (String(st.timeframe || "").toLowerCase() !== TIMEFRAME) return false;
+      if (st.unsupported) return false;
+      var candles =
+        (st.payload && st.payload.candles) || st.historyCandles || null;
+      return !!latestCandleWithAvr(candles);
+    } catch (e) {
+      return false;
+    }
+  }
+
   function refresh() {
-    if (tryPublishFromFootprintStore()) {
-      /* Still refresh via API periodically so chart TF / disabled footprint
-         cannot starve Wall Decision. Prefer store if fresher than 15s. */
+    var sym = String(activeSymbol || "").toUpperCase();
+    if (sym && sym !== SYMBOL) {
+      publish(buildUnavailable("symbol_unsupported:" + sym, sym));
+      return Promise.resolve(ctx.avr);
+    }
+    /* Prefer Footprint store when visual layer already holds fresh BTC/5m AVR —
+       avoids a second identical /api/footprint-candles poll. */
+    if (tryPublishFromFootprintStore() && footprintStoreReady()) {
       var age = ctx.avr && ctx.avr.age_ms;
-      if (age != null && age < 15000 && nowMs() - lastFetchAtMs < 15000) {
+      if (age != null && age < MAX_AGE_MS) {
         return Promise.resolve(ctx.avr);
       }
     }
     return fetchSnapshot();
   }
 
+  function setActiveSymbol(symbol) {
+    var next = symbol != null ? String(symbol).toUpperCase() : null;
+    var prev = activeSymbol;
+    activeSymbol = next;
+    if (next && next !== SYMBOL) {
+      publish(buildUnavailable("symbol_unsupported:" + next, next));
+      return ctx.avr;
+    }
+    if (prev !== next) {
+      /* Symbol change must not leak prior BTC AVR into a non-BTC session. */
+      if (next === SYMBOL) {
+        publish(buildUnavailable("symbol_changed_refreshing", SYMBOL));
+        return refresh();
+      }
+    }
+    return ctx.avr;
+  }
+
   function start(opts) {
     opts = opts || {};
     var interval = opts.intervalMs != null ? Number(opts.intervalMs) : POLL_MS;
+    if (opts.symbol != null) setActiveSymbol(opts.symbol);
     stop();
     refresh();
     timer = setInterval(function () {
@@ -300,9 +343,35 @@
     return ctx.avr;
   }
 
-  function readStateName() {
+  function isStale(avr) {
+    if (!avr || !avr.available) return true;
+    if (avr.age_ms == null || !Number.isFinite(Number(avr.age_ms))) return true;
+    return Number(avr.age_ms) > MAX_AGE_MS;
+  }
+
+  function readStateName(opts) {
+    opts = opts || {};
+    var want = opts.symbol != null ? String(opts.symbol).toUpperCase() : activeSymbol;
     var a = ctx.avr;
-    if (a && a.available && a.state) return { value: a.state, status: "ok", avr: a };
+    if (want && want !== SYMBOL) {
+      return {
+        value: null,
+        status: "DATA_UNAVAILABLE",
+        reason: "symbol_unsupported:" + want,
+        avr: a || null
+      };
+    }
+    if (a && a.available && a.state && String(a.symbol || "").toUpperCase() === SYMBOL) {
+      if (isStale(a)) {
+        return {
+          value: null,
+          status: "DATA_UNAVAILABLE",
+          reason: "avr_stale",
+          avr: a
+        };
+      }
+      return { value: a.state, status: "ok", avr: a };
+    }
     return {
       value: null,
       status: "DATA_UNAVAILABLE",
@@ -315,6 +384,7 @@
     SOURCE: SOURCE,
     SYMBOL: SYMBOL,
     TIMEFRAME: TIMEFRAME,
+    MAX_AGE_MS: MAX_AGE_MS,
     buildFromCandle: buildFromCandle,
     buildUnavailable: buildUnavailable,
     publish: publish,
@@ -324,10 +394,12 @@
     refresh: refresh,
     fetchSnapshot: fetchSnapshot,
     tryPublishFromFootprintStore: tryPublishFromFootprintStore,
+    setActiveSymbol: setActiveSymbol,
     start: start,
     stop: stop,
     getAvr: getAvr,
     readStateName: readStateName,
+    isStale: isStale,
     _ctx: ctx
   };
 })(typeof window !== "undefined" ? window : globalThis);

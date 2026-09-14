@@ -1299,10 +1299,15 @@
       coverage: coverage
     });
     syncAvrMarksFromCandles();
-    /* Publish authoritative AVR for Wall Decision when store has it. */
+    /* Publish authoritative AVR for Wall Decision when store has it (BTC/5m only). */
     try {
       var bridge = global.MpWallDecisionAvrContext;
-      if (bridge && typeof bridge.publishFromCandle === "function") {
+      if (
+        bridge &&
+        typeof bridge.publishFromCandle === "function" &&
+        String(state.symbol || "").toUpperCase() === SUPPORTED_SYMBOL &&
+        String(state.timeframe || "").toLowerCase() === SUPPORTED_TF
+      ) {
         for (var i = candles.length - 1; i >= 0; i -= 1) {
           if (candles[i] && candles[i].avr) {
             bridge.publishFromCandle(candles[i], state.symbol || SUPPORTED_SYMBOL);

@@ -469,7 +469,7 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-29"
+    assert ASSET_V == "mp-30"
 
 
 def test_kerzen_and_market_profile_controls_are_separate():
