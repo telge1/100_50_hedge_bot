@@ -285,6 +285,8 @@ def test_the_template_wires_the_versioned_assets_and_chart_nodes():
     assert "/static/market_profile_v1/app.js?v={{ asset_v }}" in html
     assert "/static/market_profile_v1/wall_decision_helpers.js?v={{ asset_v }}" in html
     assert "/static/market_profile_v1/wall_decision_ui.js?v={{ asset_v }}" in html
+    assert "/static/market_profile_v1/wall_xray_helpers.js?v={{ asset_v }}" in html
+    assert "/static/market_profile_v1/wall_xray_ui.js?v={{ asset_v }}" in html
     assert "/static/market_profile_v1/style.css?v={{ asset_v }}" in html
     assert "/static/research_trp/vendor/lightweight-charts.min.js" in html
     assert "/static/research_trp/chart.js?v={{ asset_v }}" in html
@@ -298,6 +300,7 @@ def test_the_template_wires_the_versioned_assets_and_chart_nodes():
         "mpFullscreenBtn",
         "mpTools",
         "mpWallBpTool",
+        "mpWallXrayTool",
         "wdPanel",
         "wdBpLabel",
         "mpResetView",
@@ -469,7 +472,7 @@ def test_the_app_auto_loads_on_start_and_defaults_to_30_days():
 
 def test_the_asset_version_is_a_non_empty_token():
     assert isinstance(ASSET_V, str) and ASSET_V.strip()
-    assert ASSET_V == "mp-32"
+    assert ASSET_V == "mp-33"
 
 
 def test_kerzen_and_market_profile_controls_are_separate():

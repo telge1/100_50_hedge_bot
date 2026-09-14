@@ -46,6 +46,7 @@ def build_router(*, require_auth: Callable) -> APIRouter:
             "thresholds": dict(V1_PROVISIONAL),
             "note": "Thresholds are V1_PROVISIONAL and not proven for expectancy.",
             "execution": False,
+            "wall_xray_v1": True,
             "fixture_route": False,
         }
 

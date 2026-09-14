@@ -202,8 +202,10 @@
                     <span class="mp-group-title mp-dock-title">Werkzeuge</span>
                     <div class="trp-tools" id="mpTools"></div>
                     <button type="button" class="trp-tool-btn" id="mpWallBpTool" title="Wall-Breakpoint setzen" aria-label="Wall-Breakpoint setzen">BP</button>
+                    <button type="button" class="trp-tool-btn" id="mpWallXrayTool" title="Wall X-Ray (Major/Q95, ohne Breakpoint)" aria-label="Wall X-Ray">XRAY</button>
                     <span class="wd-bp-label" id="wdBpLabel" title="Aktiver Wall-Breakpoint">BP –</span>
                     <button type="button" class="trp-text-btn" id="wdClearBp" title="Breakpoint entfernen" aria-label="Breakpoint entfernen">BP⌫</button>
+                    <button type="button" class="trp-text-btn" id="xrStop" title="X-Ray Session beenden" aria-label="X-Ray stoppen" hidden>XRAY⏹</button>
                     <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
                     <select id="mpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
@@ -372,6 +374,8 @@
     <script src="/static/market_profile_v1/wall_decision_helpers.js?v={{ asset_v }}"></script>
     <script src="/static/market_profile_v1/wall_decision_avr_context.js?v={{ asset_v }}"></script>
     <script src="/static/market_profile_v1/wall_decision_ui.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_xray_helpers.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_xray_ui.js?v={{ asset_v }}"></script>
     <script src="/static/market_profile_v1/app.js?v={{ asset_v }}"></script>
 </body>
 </html>

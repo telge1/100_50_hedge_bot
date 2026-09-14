@@ -309,6 +309,8 @@
   let wallBpDrag = null;
   let wallTargetGuideLines = [];
   let wallTargetHighlightIds = new Set();
+  let wallXrayZoneLines = [];
+  let wallXrayZone = null;
   let wallTargetLockedId = null;
   let lastCrosshairTime = null;
   let lastSelectedUnix = null;
@@ -770,6 +772,27 @@
         }
         return;
       }
+      if (interactionMode === "wall_xray") {
+        let pickPrice = pt.price != null ? Number(pt.price) : null;
+        let pickId = null;
+        if (pt.x != null && pt.y != null) {
+          const idx = obpBarAt(pt.x, pt.y);
+          if (idx >= 0 && obpPayload && obpPayload.bars && obpPayload.bars[idx]) {
+            const bar = obpPayload.bars[idx];
+            if (bar.price != null) pickPrice = Number(bar.price);
+            if (bar.id != null) pickId = String(bar.id);
+          }
+        }
+        if (pickPrice != null && typeof window.__mpOnWallXrayClick === "function") {
+          window.__mpOnWallXrayClick({
+            price: pickPrice,
+            id: pickId,
+            time: pt.time,
+            source: "chart",
+          });
+        }
+        return;
+      }
       if (interactionMode && interactionMode !== "select") {
         const mode = interactionMode;
         emitDrawing({ type: "point", time: pt.time, price: pt.price });
@@ -1084,6 +1107,60 @@
     wallTargetHighlightIds = new Set();
     wallTargetLockedId = null;
     drawOrderbookProfile();
+  }
+
+  function clearXrayZone() {
+    if (!candleSeries) {
+      wallXrayZoneLines = [];
+      wallXrayZone = null;
+      return;
+    }
+    for (let i = 0; i < wallXrayZoneLines.length; i++) {
+      try {
+        candleSeries.removePriceLine(wallXrayZoneLines[i]);
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    wallXrayZoneLines = [];
+    wallXrayZone = null;
+  }
+
+  function setXrayZone(opts) {
+    opts = opts || {};
+    clearXrayZone();
+    if (!candleSeries) return;
+    const lo = Number(opts.zone_lo);
+    const hi = Number(opts.zone_hi);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return;
+    const side = String(opts.side || "").toUpperCase();
+    const title = opts.title != null ? String(opts.title) : "XRAY";
+    const color = side === "BID" ? "rgba(34, 211, 238, 0.95)" : "rgba(250, 204, 21, 0.95)";
+    wallXrayZone = { zone_lo: Math.min(lo, hi), zone_hi: Math.max(lo, hi), side: side };
+    try {
+      wallXrayZoneLines.push(
+        candleSeries.createPriceLine({
+          price: wallXrayZone.zone_lo,
+          color: color,
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: title + " LO",
+        })
+      );
+      wallXrayZoneLines.push(
+        candleSeries.createPriceLine({
+          price: wallXrayZone.zone_hi,
+          color: color,
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: title + " HI",
+        })
+      );
+    } catch (err) {
+      /* best-effort */
+    }
   }
 
   function setWallBreakpoint(opts) {
@@ -3496,6 +3573,36 @@
         tip.textContent = "";
       }
     });
+    canvas.addEventListener("click", function (ev) {
+      if (interactionMode !== "wall_xray") return;
+      const rect = canvas.getBoundingClientRect();
+      const y = ev.clientY - rect.top;
+      let hit = null;
+      for (let i = 0; i < oblHitBars.length; i++) {
+        const b = oblHitBars[i];
+        if (Math.abs(y - b.y) <= Math.max(3, b.h * 0.5 + 1)) {
+          hit = b;
+          break;
+        }
+      }
+      if (!hit || hit.price == null) {
+        if (typeof window.__mpOnWallXrayClick === "function") {
+          window.__mpOnWallXrayClick({
+            price: null,
+            source: "full_ob",
+            miss: true,
+          });
+        }
+        return;
+      }
+      if (typeof window.__mpOnWallXrayClick === "function") {
+        window.__mpOnWallXrayClick({
+          price: Number(hit.price),
+          side: hit.side,
+          source: "full_ob",
+        });
+      }
+    });
   }
 
   function drawOrderbookLevels() {
@@ -4520,7 +4627,11 @@
     if (interactionMode === "select") {
       toolClickCount = 0;
       setPanEnabled(!dragState);
-    } else if (interactionMode === "wall_bp" || interactionMode === "wall_target") {
+    } else if (
+      interactionMode === "wall_bp" ||
+      interactionMode === "wall_target" ||
+      interactionMode === "wall_xray"
+    ) {
       toolClickCount = 0;
       setPanEnabled(false);
       setChartCursor("crosshair");
@@ -5661,8 +5772,19 @@
     if (wallBpDrag) {
       if (wallBpDrag.moved) suppressNextClick = true;
       wallBpDrag = null;
-      setPanEnabled(interactionMode === "select" || interactionMode === "wall_bp" || interactionMode === "wall_target");
-      setChartCursor(interactionMode === "wall_bp" || interactionMode === "wall_target" ? "crosshair" : "crosshair");
+      setPanEnabled(
+        interactionMode === "select" ||
+          interactionMode === "wall_bp" ||
+          interactionMode === "wall_target" ||
+          interactionMode === "wall_xray"
+      );
+      setChartCursor(
+        interactionMode === "wall_bp" ||
+          interactionMode === "wall_target" ||
+          interactionMode === "wall_xray"
+          ? "crosshair"
+          : "crosshair"
+      );
       return;
     }
     if (!dragState) return;
@@ -6629,6 +6751,8 @@
     clearWallTargetGuides: clearWallTargetGuides,
     setWallTargetHighlight: setWallTargetHighlight,
     clearWallTargetHighlight: clearWallTargetHighlight,
+    setXrayZone: setXrayZone,
+    clearXrayZone: clearXrayZone,
     setOrderbookLevels: setOrderbookLevels,
     clearOrderbookLevels: clearOrderbookLevels,
     debugOrderbookLevels: debugOrderbookLevels,

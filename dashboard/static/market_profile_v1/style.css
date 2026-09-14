@@ -891,7 +891,7 @@
   top: 12px;
   right: 72px;
   z-index: 40;
-  width: min(320px, calc(100% - 24px));
+  width: min(380px, calc(100% - 24px));
   max-height: calc(100% - 24px);
   overflow: auto;
   background: rgba(18, 22, 30, 0.94);
@@ -959,6 +959,67 @@
   margin: 8px 0 0;
   font-size: 10px;
   color: #6b7280;
+}
+
+.xr-radar {
+  margin-top: 10px;
+  border-top: 1px solid #2a2e39;
+  padding-top: 8px;
+}
+
+.xr-radar-tools {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.xr-radar-side {
+  margin-bottom: 8px;
+}
+
+.xr-radar-h {
+  font-weight: 600;
+  color: #e0e3eb;
+  margin-bottom: 4px;
+}
+
+.xr-radar-row {
+  cursor: pointer;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(42, 46, 57, 0.7);
+}
+
+.xr-radar-row:hover {
+  background: rgba(55, 65, 81, 0.35);
+}
+
+.xr-radar-meta,
+.xr-radar-sub {
+  font-size: 11px;
+  color: #c0c4ce;
+}
+
+.xr-radar-sub {
+  color: #8b919d;
+}
+
+.xr-bar {
+  height: 4px;
+  background: #1f2430;
+  border-radius: 2px;
+  margin: 3px 0;
+  overflow: hidden;
+}
+
+.xr-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #f59e0b);
+}
+
+#mpWallXrayTool.active {
+  border-color: #22d3ee;
+  color: #22d3ee;
 }
 
 .wd-state {
