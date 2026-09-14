@@ -146,3 +146,8 @@ research/regime_scanner/results_*/
 research/backtests/results/
 research/trend_forecast_validation/results/
 results/pool_order_plan_v1/
+
+# Wall Decision V1 runtime / local preview artifacts
+dashboard/wall_decision_v1/screenshots/
+dashboard/wall_decision_v1/screenshots_real_mp_3012/
+dashboard/logs/wall_decision_shadow/

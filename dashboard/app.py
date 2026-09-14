@@ -3046,6 +3046,7 @@ from market_profile_v1.api import build_router as _build_market_profile_router  
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
 from symbol_onboarding.api import build_router as _build_symbol_onboarding_router  # noqa: E402
+from wall_decision_v1.api import build_router as _build_wall_decision_router  # noqa: E402
 app.include_router(
     _build_research_router(require_auth=require_auth, render_template=render_template)
 )
@@ -3060,6 +3061,7 @@ app.include_router(_build_footprint_candles_router(require_auth=require_auth))
 app.include_router(
     _build_symbol_onboarding_router(require_auth=require_auth, render_template=render_template)
 )
+app.include_router(_build_wall_decision_router(require_auth=require_auth))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -15584,14 +15586,16 @@ async def api_run_stop_long_bot_cleanup_script(
 if __name__ == "__main__":
     # Bind to 0.0.0.0 to allow access from other devices
     # WICHTIG: reload=False für Production (reload=True kann zu Instabilität führen)
+    # DASHBOARD_PORT: feature/preview worktrees only — live unit stays on 3000.
     import os
     import subprocess
     reload_enabled = os.getenv("DASHBOARD_RELOAD", "false").lower() == "true"
+    dashboard_port = int(os.getenv("DASHBOARD_PORT", "3000"))
     
     logger.info("=" * 80)
     logger.info("🚀 Dashboard wird gestartet...")
     logger.info(f"📁 Working Directory: {os.getcwd()}")
-    logger.info(f"🌐 Host: 0.0.0.0, Port: 3000")
+    logger.info(f"🌐 Host: 0.0.0.0, Port: {dashboard_port}")
     logger.info(f"🔄 Reload: {reload_enabled}")
     logger.info("=" * 80)
     
@@ -15600,7 +15604,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
-        port=3000,
+        port=dashboard_port,
         reload=reload_enabled,
         log_level="info",
         access_log=True,

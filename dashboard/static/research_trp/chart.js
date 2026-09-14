@@ -305,6 +305,8 @@
   let viewManual = false;
   let replayViewLock = null;
   let livePriceLine = null;
+  let wallBreakpointLine = null;
+  let wallBpDrag = null;
   let lastCrosshairTime = null;
   let lastSelectedUnix = null;
   let suppressUntilTime = null;
@@ -743,6 +745,12 @@
       }
       if (!window.bridge) return;
       const pt = pointFromParam(param);
+      if (interactionMode === "wall_bp") {
+        if (pt.price != null && typeof window.__mpOnWallBpClick === "function") {
+          window.__mpOnWallBpClick({ price: Number(pt.price), time: pt.time });
+        }
+        return;
+      }
       if (interactionMode && interactionMode !== "select") {
         const mode = interactionMode;
         emitDrawing({ type: "point", time: pt.time, price: pt.price });
@@ -982,6 +990,61 @@
       /* ignore */
     }
     livePriceLine = null;
+  }
+
+  function clearWallBreakpoint() {
+    wallBpDrag = null;
+    if (!candleSeries || !wallBreakpointLine) {
+      wallBreakpointLine = null;
+      return;
+    }
+    try {
+      candleSeries.removePriceLine(wallBreakpointLine);
+    } catch (err) {
+      /* ignore */
+    }
+    wallBreakpointLine = null;
+  }
+
+  function setWallBreakpoint(opts) {
+    opts = opts || {};
+    const price = Number(opts.price);
+    if (!candleSeries || !Number.isFinite(price)) {
+      clearWallBreakpoint();
+      return;
+    }
+    const title = opts.title != null ? String(opts.title) : "BP";
+    const color = opts.color || "#f59e0b";
+    try {
+      if (!wallBreakpointLine) {
+        wallBreakpointLine = candleSeries.createPriceLine({
+          price: price,
+          color: color,
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Solid,
+          axisLabelVisible: true,
+          title: title,
+        });
+      } else {
+        wallBreakpointLine.applyOptions({
+          price: price,
+          color: color,
+          title: title,
+        });
+      }
+    } catch (err) {
+      /* best-effort */
+    }
+  }
+
+  function debugOrderbookProfile() {
+    if (!obpPayload) return { bars: [], warning: "no_payload" };
+    return {
+      bars: Array.isArray(obpPayload.bars) ? obpPayload.bars.slice() : [],
+      label: obpPayload.label || null,
+      warning: obpPayload.warning || null,
+      updated_at: obpPayload.updated_at || null,
+    };
   }
 
   function lockManualPriceScale() {
@@ -4374,6 +4437,10 @@
     }
   }
 
+  function getInteractionMode() {
+    return interactionMode || "select";
+  }
+
   function finishToolToSelect() {
     setInteractionMode("select");
     clearPreview();
@@ -5318,12 +5385,43 @@
     }
   }
 
+  function wallBpHitTest(y) {
+    if (!candleSeries || !wallBreakpointLine || y == null) return false;
+    try {
+      const opts = wallBreakpointLine.options ? wallBreakpointLine.options() : null;
+      const price = opts && opts.price != null ? Number(opts.price) : null;
+      if (price == null || Number.isNaN(price)) return false;
+      const py = candleSeries.priceToCoordinate(price);
+      if (py == null || Number.isNaN(py)) return false;
+      return Math.abs(py - y) <= 8;
+    } catch (err) {
+      return false;
+    }
+  }
+
   function onPointerDown(ev) {
     if (ev.button != null && ev.button !== 0) return;
     if (shiftHeld(ev) || (shiftMeasure && shiftMeasure.dragging)) return;
-    if (interactionMode !== "select" || !chart) return;
+    if (!chart) return;
     const xy = xyFromEvent(ev);
     if (!xy) return;
+    if ((interactionMode === "select" || interactionMode === "wall_bp") && wallBpHitTest(xy.y)) {
+      if (ev.preventDefault) ev.preventDefault();
+      if (ev.stopPropagation) ev.stopPropagation();
+      wallBpDrag = { moved: false };
+      setPanEnabled(false);
+      setChartCursor("ns-resize");
+      const el = $("chart");
+      if (el && ev.pointerId != null && el.setPointerCapture) {
+        try {
+          el.setPointerCapture(ev.pointerId);
+        } catch (err) {
+          /* ignore */
+        }
+      }
+      return;
+    }
+    if (interactionMode !== "select") return;
     const hit = hitTestXY(xy.x, xy.y);
     if (!hit) return;
     const rec = overlayRegistry.get(hit);
@@ -5363,6 +5461,22 @@
   function onPointerMove(ev) {
     if (shiftMeasure && shiftMeasure.dragging) {
       scheduleShiftMeasureMove(ev);
+      return;
+    }
+    if (wallBpDrag && candleSeries && chart) {
+      const xy = xyFromEvent(ev);
+      if (!xy) return;
+      const price = candleSeries.coordinateToPrice(xy.y);
+      if (price == null || Number.isNaN(price)) return;
+      wallBpDrag.moved = true;
+      setWallBreakpoint({
+        price: Number(price),
+        title: (wallBreakpointLine && wallBreakpointLine.options && wallBreakpointLine.options().title) || "BP",
+        color: "#f59e0b",
+      });
+      if (typeof window.__mpOnWallBpDrag === "function") {
+        window.__mpOnWallBpDrag({ price: Number(price) });
+      }
       return;
     }
     if (!dragState || !candleSeries || !chart) return;
@@ -5449,6 +5563,13 @@
   function onPointerUp(ev) {
     if (shiftMeasure && shiftMeasure.dragging) {
       finishShiftMeasure(ev);
+      return;
+    }
+    if (wallBpDrag) {
+      if (wallBpDrag.moved) suppressNextClick = true;
+      wallBpDrag = null;
+      setPanEnabled(interactionMode === "select" || interactionMode === "wall_bp");
+      setChartCursor(interactionMode === "wall_bp" ? "crosshair" : "crosshair");
       return;
     }
     if (!dragState) return;
@@ -6362,6 +6483,7 @@
     removeOverlay: removeOverlay,
     clearOverlays: clearOverlays,
     setInteractionMode: setInteractionMode,
+    getInteractionMode: getInteractionMode,
     setPreviewAnchor: setPreviewAnchor,
     clearPreview: clearPreview,
     setLldEma: setLldEma,
@@ -6407,6 +6529,9 @@
     clearVolumeProfile: clearVolumeProfile,
     setOrderbookProfile: setOrderbookProfile,
     clearOrderbookProfile: clearOrderbookProfile,
+    debugOrderbookProfile: debugOrderbookProfile,
+    setWallBreakpoint: setWallBreakpoint,
+    clearWallBreakpoint: clearWallBreakpoint,
     setOrderbookLevels: setOrderbookLevels,
     clearOrderbookLevels: clearOrderbookLevels,
     debugOrderbookLevels: debugOrderbookLevels,

@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-25 OI Y-scale follows visible window (not 0–max).
-  try { console.info("[mp] asset mp-25"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-27 Wall Decision live adapters on real Market Profile route.
+  try { console.info("[mp] asset mp-27"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2088,6 +2088,11 @@
         candles.push(bar);
       }
       payload.candles = candles;
+      try {
+        if (window.__mpWallDecision && typeof window.__mpWallDecision.onPrice === "function") {
+          window.__mpWallDecision.onPrice(Number(bar.close));
+        }
+      } catch (e) { /* wall decision must never break forming */ }
     }
     return ok;
   }
@@ -2544,6 +2549,18 @@
   }
 
   function setTool(tool) {
+    try {
+      if (window.__mpWallDecision && window.__mpWallDecision.setToolActive) {
+        window.__mpWallDecision.setToolActive(false);
+      } else {
+        var bpBtn = document.getElementById("mpWallBpTool");
+        if (bpBtn) bpBtn.classList.remove("active");
+        var api0 = chartApi();
+        if (api0 && api0.getInteractionMode && api0.getInteractionMode() === "wall_bp") {
+          api0.setInteractionMode("select");
+        }
+      }
+    } catch (e) { /* ignore */ }
     return sendJson("/api/research/drawings/tool", "POST", { tool: tool }).then(function (snap) {
       applyWorkspace(snap);
       var api = chartApi();
@@ -2673,7 +2690,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-25)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-27)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {

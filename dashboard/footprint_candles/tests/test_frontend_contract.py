@@ -83,7 +83,7 @@ def test_avr_panel_and_oc_ticks_contract():
     assert 'id="fpAvrPanel"' in html
     assert 'id="fpShowAvrPanel"' in html
     assert 'id="fpAvrExpand"' in html
-    assert "ERWEITERT" in html
+    assert "Erweitert" in html
     # Panel must sit outside the chart canvas stack (not over candles)
     assert html.index('id="fpAvrPanel"') < html.index('id="mpChartStack"')
     assert 'id="fpAvrPanel"' not in html[html.index('id="price-pane"') : html.index('id="mpOverlay"')]

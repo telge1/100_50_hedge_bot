@@ -201,6 +201,9 @@
                     <span class="trp-dock-sep" aria-hidden="true"></span>
                     <span class="mp-group-title mp-dock-title">Werkzeuge</span>
                     <div class="trp-tools" id="mpTools"></div>
+                    <button type="button" class="trp-tool-btn" id="mpWallBpTool" title="Wall-Breakpoint setzen" aria-label="Wall-Breakpoint setzen">BP</button>
+                    <span class="wd-bp-label" id="wdBpLabel" title="Aktiver Wall-Breakpoint">BP –</span>
+                    <button type="button" class="trp-text-btn" id="wdClearBp" title="Breakpoint entfernen" aria-label="Breakpoint entfernen">BP⌫</button>
                     <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
                     <select id="mpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
@@ -245,6 +248,17 @@
                             <div id="osc-legend"></div>
                             <div id="oscillator"></div>
                         </div>
+                    </div>
+                    <div id="wdPanel" class="wd-panel" hidden aria-label="Wall Decision">
+                        <div class="wd-panel-head" id="wdPanelHead">
+                            <strong>Wall Decision</strong>
+                            <span class="wd-state wd-tone-armed" id="wdPanelState">DISARMED</span>
+                            <span class="wd-panel-actions">
+                                <button type="button" class="wd-icon-btn" id="wdPanelMin" title="Minimieren" aria-expanded="true">–</button>
+                                <button type="button" class="wd-icon-btn" id="wdPanelClose" title="Schließen">×</button>
+                            </span>
+                        </div>
+                        <div class="wd-panel-body" id="wdPanelBody"></div>
                     </div>
                     <div id="mpEmpty" class="mp-empty">Chart wird geladen …</div>
                 </div>
@@ -355,6 +369,8 @@
     </script>
     <script src="/static/research_trp/chart.js?v={{ asset_v }}"></script>
     <script src="/static/footprint_candles/footprint_candles.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_decision_helpers.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_decision_ui.js?v={{ asset_v }}"></script>
     <script src="/static/market_profile_v1/app.js?v={{ asset_v }}"></script>
 </body>
 </html>

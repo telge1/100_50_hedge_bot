@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "kind": "FIXTURE_TEST_DATA",
+    "label": "long_ready_ask_consumed",
+    "note": "Not live market data. Shadow-mode replay only."
+  },
+  "sequence": [
+    {
+      "symbol": "BTCUSDT",
+      "breakpoint": 101050,
+      "refPrice": 101000,
+      "walls": [
+        {"id": "ask_major_1", "side": "ASK", "price": 101100, "qty": 80, "major": true, "zone_lo": 101095, "zone_hi": 101105}
+      ],
+      "delayMs": 300
+    },
+    {"trigger": true, "delayMs": 400},
+    {
+      "prevState": "TRIGGERED",
+      "metrics": {
+        "wallSide": "ASK",
+        "wallReducePct": 0.4,
+        "tradeExplainedPct": 0.5,
+        "replenishPct": 0.05
+      },
+      "delayMs": 400
+    },
+    {
+      "prevState": "WALL_ATTACK",
+      "metrics": {
+        "wallSide": "ASK",
+        "wallReducePct": 0.72,
+        "tradeExplainedPct": 0.7,
+        "replenishPct": 0.08,
+        "acceptedAboveSec": 5
+      },
+      "delayMs": 400
+    },
+    {
+      "state": "LONG_READY",
+      "reasons": ["ASK_CONSUMED_BY_TRADES", "LOW_REPLENISHMENT", "ACCEPTED_ABOVE_15S", "RETEST_HELD", "FIXTURE"],
+      "tradeReady": true,
+      "delayMs": 500
+    }
+  ]
+}
