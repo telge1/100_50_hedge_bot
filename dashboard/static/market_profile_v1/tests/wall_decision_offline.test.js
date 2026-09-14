@@ -249,6 +249,22 @@ describe("State machine", () => {
     assert.equal(H.transitionDecision("TRIGGERED", { epochBoundary: true }).state, "NO_TRADE");
   });
 
+  it("no wall reduction + explained 0 is not incomplete trades", () => {
+    // Session wd1 bug: UI forced incompleteTrades from DATA_UNAVAILABLE explained.
+    // After fix, server sends explained=0 / incomplete=false → stay analysing path.
+    const d = H.transitionDecision("WALL_ATTACK", {
+      wallSide: "BID",
+      wallReducePct: 0,
+      tradeExplainedPct: 0,
+      pullPct: 0,
+      replenishPct: 3.0,
+      incompleteTrades: false,
+      wallLost: false
+    });
+    assert.notEqual(d.state, "NO_TRADE");
+    assert.ok(!d.reasons.includes("INCOMPLETE_PUBLIC_TRADES"));
+  });
+
   it("thresholds are marked V1_PROVISIONAL", () => {
     assert.equal(H.V1_PROVISIONAL.wall_consume_pct, 0.65);
     assert.ok(H.RULE_VERSION.includes("provisional"));

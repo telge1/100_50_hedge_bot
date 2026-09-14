@@ -76,6 +76,9 @@ def build_router(*, require_auth: Callable) -> APIRouter:
                 accepted_above_sec=float(body.get("accepted_above_sec") or 0),
                 accepted_below_sec=float(body.get("accepted_below_sec") or 0),
                 min_qty_seen=body.get("min_qty_seen"),
+                avr_state=str(body["avr_state"]) if body.get("avr_state") not in (None, "") else None,
+                oi_at_trigger=body.get("oi_at_trigger"),
+                oi_current=body.get("oi_current"),
             )
         except Exception as exc:  # noqa: BLE001
             return _error(500, "metrics_failed", str(exc))

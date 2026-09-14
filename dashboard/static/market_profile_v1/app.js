@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-27 Wall Decision live adapters on real Market Profile route.
-  try { console.info("[mp] asset mp-27"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-28 Wall Decision adapters (exact book zone + trade semantics).
+  try { console.info("[mp] asset mp-28"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -2686,11 +2686,21 @@
   function applyOiPane(oiPayload) {
     var api = chartApi();
     if (!api) return;
+    try {
+      var series = ((((oiPayload || {}).series || [])[0] || {}).data) || [];
+      if (series.length) {
+        var last = series[series.length - 1];
+        var val = last && (last.value != null ? last.value : last[1]);
+        if (Number.isFinite(Number(val))) {
+          window.__mpLastOi = { value: Number(val), time: last.time != null ? last.time : null, atMs: Date.now() };
+        }
+      }
+    } catch (e) { /* ignore */ }
     if (typeof api.setOiPane === "function") {
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-27)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-28)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {

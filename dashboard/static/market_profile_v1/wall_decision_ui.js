@@ -139,18 +139,27 @@
 
   function readAvrFromFootprint() {
     try {
-      if (!root.FootprintCandles || typeof root.FootprintCandles.debugState !== "function") {
-        return { value: null, status: "DATA_UNAVAILABLE" };
-      }
-      var dbg = root.FootprintCandles.debugState();
-      var candles = (dbg && dbg.candles) || [];
-      if (!candles.length) return { value: null, status: "DATA_UNAVAILABLE" };
+      var FC = root.FootprintCandles;
+      if (!FC) return { value: null, status: "DATA_UNAVAILABLE" };
+      var st = FC._state;
+      var candles = st && st.payload && st.payload.candles;
+      if (!candles || !candles.length) return { value: null, status: "DATA_UNAVAILABLE" };
       var last = candles[candles.length - 1];
       var avr = last && last.avr;
-      var st = avr && (avr.final_state || avr.dominant_state);
-      return st ? { value: String(st), status: "ok" } : { value: null, status: "DATA_UNAVAILABLE" };
+      var name = avr && (avr.final_state || avr.dominant_state);
+      return name ? { value: String(name), status: "ok" } : { value: null, status: "DATA_UNAVAILABLE" };
     } catch (e) {
       return { value: null, status: "DATA_UNAVAILABLE" };
+    }
+  }
+
+  function readOiCurrent() {
+    try {
+      var oi = root.__mpLastOi;
+      if (!oi || oi.value == null || !Number.isFinite(Number(oi.value))) return null;
+      return Number(oi.value);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -227,7 +236,8 @@
       baselineQty: tw && tw.qty != null ? Number(tw.qty) : null,
       baselineNotional: tw && tw.notional != null ? Number(tw.notional) : null,
       minQtySeen: tw && tw.qty != null ? Number(tw.qty) : null,
-      startedAtMs: trig.atMs
+      startedAtMs: trig.atMs,
+      oiAtTrigger: readOiCurrent()
     };
     state.acceptAboveMs = 0;
     state.acceptBelowMs = 0;
@@ -261,6 +271,7 @@
     if (!state.bp || !state.bp.triggered || !state.session || state.analysisInflight) return;
     if (state.fixtureMode) return;
     state.analysisInflight = true;
+    var avrNow = readAvrFromFootprint();
     var body = {
       symbol: state.bp.symbol,
       breakpoint: state.bp.price,
@@ -274,7 +285,10 @@
       live_price: state.lastPrice,
       accepted_above_sec: state.acceptAboveMs / 1000,
       accepted_below_sec: state.acceptBelowMs / 1000,
-      min_qty_seen: state.session.minQtySeen
+      min_qty_seen: state.session.minQtySeen,
+      avr_state: avrNow.status === "ok" ? avrNow.value : null,
+      oi_at_trigger: state.session.oiAtTrigger,
+      oi_current: readOiCurrent()
     };
     fetch("/api/wall-decision/v1/live-metrics", {
       method: "POST",
@@ -304,7 +318,6 @@
             }
           }
         }
-        var avr = readAvrFromFootprint();
         var metrics = {
           wallSide: payload.wall_side || (state.bp && state.bp.wallSide),
           wallReducePct: payload.wall_reduce_pct,
@@ -318,25 +331,18 @@
           dataGap: !!payload.data_gap,
           stale: !!payload.stale,
           wallLost: !!payload.wall_lost,
+          // Only server-proven trade query failures — never invent incompleteness
+          // when trade_explained is legitimately 0 / unavailable for other reasons.
           incompleteTrades: !!payload.incomplete_trades,
           epochBoundary: !!payload.epoch_boundary,
           retestHeld: false
         };
-        // Decision-relevant gaps block READY (helpers already enforce).
-        if (payload.adapters && payload.adapters.trade_explained_pct === "DATA_UNAVAILABLE") {
-          metrics.incompleteTrades = true;
-        }
         state.decision = H.transitionDecision(
           (state.decision && state.decision.state) || "WALL_ATTACK",
           metrics
         );
-        if (avr.status === "ok") {
-          state.liveMetrics.avr_state = avr.value;
-          state.liveMetrics.adapters = state.liveMetrics.adapters || {};
-          state.liveMetrics.adapters.avr_state = "ok";
-        }
         renderPanel();
-        if (state.decision && (state.decision.state === "LONG_READY" || state.decision.state === "SHORT_READY" || state.decision.state === "NO_TRADE")) {
+        if (state.decision && (state.decision.state === "LONG_READY" || state.decision.state === "SHORT_READY" || state.decision.state === "NO_TRADE" || state.decision.state === "WALL_LOST")) {
           shadowPost();
         }
       })

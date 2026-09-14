@@ -1,7 +1,18 @@
 """Read-only live metrics for Wall Decision V1.
 
-Reuses research_charts orderbook_profile + trade_bubbles loaders.
-No new WebSockets, collectors, or private APIs. No order execution.
+Preferred sources (no new collectors / websockets):
+- Wall qty: OB1000 on-demand (depth 1000 first; full depth 0 only if needed)
+- Fallback major walls: research_charts.orderbook_profile (OB200/features)
+- Trades: ClickHouse orderbook_analysis.public_trades_canonical (bounded zone)
+- AVR / OI Δ: client-supplied from existing Footprint / OI panes (never invented)
+
+Diagnosis (session wd1_BTCUSDT_1789377952013000000):
+- Wall aktuell DATA UNAVAILABLE / WALL_LOST was set when OBP major-bar match
+  missed the locked tick even though a book-ready ladder covered the price →
+  correct value is 0, not unavailable.
+- INCOMPLETE_PUBLIC_TRADES was forced by UI whenever trade_explained_pct was
+  DATA_UNAVAILABLE, including the common case wall_reduce_pct==0 (wall grew /
+  no reduction). Trades were present (count>=1); incompleteness was wrong.
 """
 
 from __future__ import annotations
@@ -10,13 +21,12 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from .config import RULE_VERSION, V1_PROVISIONAL
+from .config import RULE_VERSION
 
-# Max lookback after trigger for metrics (seconds). Keep small — no full archives.
 MAX_WINDOW_S = 180
 PREROLL_S = 30
-STALE_WALL_S = 8.0
 WALL_PRICE_TOL_TICKS = 5
+BOOK_STALE_MS = 180_000
 
 
 def _utc_now() -> datetime:
@@ -28,7 +38,61 @@ def _f(v: Any) -> float | None:
         n = float(v)
     except (TypeError, ValueError):
         return None
-    return n if n == n else None  # noqa: PLR0124 — NaN check
+    return n if n == n else None  # noqa: PLR0124
+
+
+def _zone(target: dict[str, Any], tick: float) -> tuple[float, float]:
+    lo = _f(target.get("zone_lo"))
+    hi = _f(target.get("zone_hi"))
+    price = _f(target.get("price")) or 0.0
+    band = max(tick * WALL_PRICE_TOL_TICKS, tick)
+    if lo is None:
+        lo = price - band
+    if hi is None:
+        hi = price + band
+    if lo > hi:
+        lo, hi = hi, lo
+    return lo, hi
+
+
+def _level_price_size(level: Any) -> tuple[float, float] | None:
+    if isinstance(level, dict):
+        p = _f(level.get("price"))
+        s = _f(level.get("size") if level.get("size") is not None else level.get("qty"))
+        if p is None or s is None:
+            return None
+        return p, s
+    if isinstance(level, (list, tuple)) and len(level) >= 2:
+        p = _f(level[0])
+        s = _f(level[1])
+        if p is None or s is None:
+            return None
+        return p, s
+    return None
+
+
+def sum_zone_qty(levels: list[Any], lo: float, hi: float) -> float:
+    """Sum size for levels with price inside [lo, hi] inclusive."""
+    total = 0.0
+    for level in levels or []:
+        ps = _level_price_size(level)
+        if ps is None:
+            continue
+        p, s = ps
+        if lo - 1e-12 <= p <= hi + 1e-12:
+            total += max(0.0, s)
+    return total
+
+
+def book_side_range(levels: list[Any]) -> tuple[float | None, float | None]:
+    prices: list[float] = []
+    for level in levels or []:
+        ps = _level_price_size(level)
+        if ps is not None:
+            prices.append(ps[0])
+    if not prices:
+        return None, None
+    return min(prices), max(prices)
 
 
 def _match_wall(bars: list[dict[str, Any]], target: dict[str, Any], tick: float) -> dict[str, Any] | None:
@@ -54,20 +118,6 @@ def _match_wall(bars: list[dict[str, Any]], target: dict[str, Any], tick: float)
     return best
 
 
-def _zone(target: dict[str, Any], tick: float) -> tuple[float, float]:
-    lo = _f(target.get("zone_lo"))
-    hi = _f(target.get("zone_hi"))
-    price = _f(target.get("price")) or 0.0
-    band = max(tick * WALL_PRICE_TOL_TICKS, tick)
-    if lo is None:
-        lo = price - band
-    if hi is None:
-        hi = price + band
-    if lo > hi:
-        lo, hi = hi, lo
-    return lo, hi
-
-
 def _load_trades_in_zone(
     symbol: str,
     start: datetime,
@@ -75,7 +125,6 @@ def _load_trades_in_zone(
     lo: float,
     hi: float,
 ) -> list[dict[str, Any]]:
-    """Bounded zone query — avoids full-range trade_bubbles memory pressure."""
     import clickhouse_connect
     from clickhouse_connect.driver.exceptions import DatabaseError, OperationalError
     from research_charts.clickhouse_config import load_clickhouse_config
@@ -126,6 +175,186 @@ def _load_trades_in_zone(
     return out
 
 
+def _load_live_book_candidates(symbol: str) -> list[dict[str, Any]]:
+    """Load OB ladders with proven coverage first.
+
+    Depth 1000 is the primary wall source (dense near mid, low latency).
+    Depth 0 (full on-demand) is only a fallback — it can be sparse and falsely
+    report qty=0 for ticks that still exist on the OB1000 ladder.
+    """
+    from research_charts.ob1000_on_demand import freshness_from_payload, load_ob1000_levels
+
+    out: list[dict[str, Any]] = []
+    last_err: Exception | None = None
+    for depth in (1000, 0):
+        try:
+            payload = freshness_from_payload(load_ob1000_levels(symbol, depth=depth))
+            payload["_requested_depth"] = depth
+            out.append(payload)
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            continue
+    if not out and last_err is not None:
+        raise last_err
+    return out
+
+
+def _book_is_ready(book: dict[str, Any]) -> bool:
+    status = str(book.get("data_status") or "").lower()
+    if status in {"no_data", "error", ""} and not (book.get("bids") or book.get("asks")):
+        return False
+    fresh = str(book.get("freshness_state") or "").lower()
+    if fresh == "stale":
+        return False
+    ms = _f(book.get("freshness_ms"))
+    if ms is not None and ms > BOOK_STALE_MS:
+        return False
+    return bool(book.get("bids") or book.get("asks"))
+
+
+def resolve_wall_current_qty(
+    *,
+    symbol: str,
+    target_wall: dict[str, Any],
+    tick: float,
+) -> dict[str, Any]:
+    """Return wall qty at locked zone from live book, else OBP fallback.
+
+    If the book is ready and covers the locked price but the level is empty,
+    qty is 0 (not DATA_UNAVAILABLE).
+    """
+    lo, hi = _zone(target_wall, tick)
+    side = str(target_wall.get("side") or "").upper()
+    result: dict[str, Any] = {
+        "qty": None,
+        "adapter": "DATA_UNAVAILABLE",
+        "source": None,
+        "book_ready": False,
+        "wall_absent": False,
+        "stale": False,
+        "event_time": None,
+        "coverage": {},
+        "error": None,
+    }
+    price = _f(target_wall.get("price")) or lo
+
+    try:
+        books = _load_live_book_candidates(symbol)
+        result["coverage"]["live_book_attempts"] = [
+            {
+                "depth": b.get("_requested_depth"),
+                "data_status": b.get("data_status"),
+                "freshness_state": b.get("freshness_state"),
+                "freshness_ms": b.get("freshness_ms"),
+                "bid_levels": len(b.get("bids") or []),
+                "ask_levels": len(b.get("asks") or []),
+                "timestamp_utc": b.get("timestamp_utc"),
+                "source": b.get("source"),
+            }
+            for b in books
+        ]
+        chosen: dict[str, Any] | None = None
+        chosen_qty: float | None = None
+        chosen_absent = False
+        for book in books:
+            ready = _book_is_ready(book)
+            if not ready:
+                result["stale"] = result["stale"] or str(book.get("freshness_state") or "").lower() == "stale"
+                continue
+            levels = book.get("bids") if side == "BID" else book.get("asks") if side == "ASK" else []
+            mn, mx = book_side_range(levels or [])
+            if mn is None or mx is None:
+                continue
+            in_span = mn - 1e-9 <= price <= mx + 1e-9
+            covers = mn - 1e-9 <= lo and hi <= mx + 1e-9
+            if not (covers or in_span):
+                continue
+            qty = float(sum_zone_qty(list(levels or []), lo, hi))
+            # Prefer a book that still shows size at the locked zone; otherwise keep
+            # the first covering ladder (qty 0 = confirmed absence on that ladder).
+            if chosen is None or (qty > 0 and (chosen_qty or 0) <= 0):
+                chosen = book
+                chosen_qty = qty
+                chosen_absent = qty <= 0.0
+                if qty > 0:
+                    break
+        if chosen is not None and chosen_qty is not None:
+            result["coverage"]["live_book"] = {
+                "depth": chosen.get("_requested_depth"),
+                "data_status": chosen.get("data_status"),
+                "freshness_state": chosen.get("freshness_state"),
+                "freshness_ms": chosen.get("freshness_ms"),
+                "bid_levels": len(chosen.get("bids") or []),
+                "ask_levels": len(chosen.get("asks") or []),
+                "timestamp_utc": chosen.get("timestamp_utc"),
+                "source": chosen.get("source"),
+            }
+            result["event_time"] = chosen.get("timestamp_utc")
+            result["book_ready"] = True
+            result["qty"] = float(chosen_qty)
+            result["wall_absent"] = chosen_absent
+            result["adapter"] = "ok"
+            result["source"] = "ob1000_on_demand"
+            return result
+        if books:
+            book = books[0]
+            result["coverage"]["live_book"] = result["coverage"]["live_book_attempts"][0]
+            result["event_time"] = book.get("timestamp_utc")
+            result["book_ready"] = _book_is_ready(book)
+            if result["stale"]:
+                result["adapter"] = "STALE_DATA"
+                result["error"] = "book_not_ready"
+            else:
+                result["adapter"] = "DATA_UNAVAILABLE"
+                result["error"] = "price_outside_book_coverage"
+        else:
+            result["adapter"] = "DATA_UNAVAILABLE"
+            result["error"] = "book_not_ready"
+    except Exception as exc:  # noqa: BLE001
+        result["error"] = f"live_book:{exc}"
+        result["adapter"] = "DATA_GAP"
+
+    # Fallback: major-wall OBP (cannot prove absence → only positive matches)
+    try:
+        from research_charts.orderbook_profile import load_orderbook_profile
+
+        now = _utc_now()
+        obp = load_orderbook_profile(
+            symbol=symbol,
+            start=now - timedelta(seconds=5),
+            end=now + timedelta(seconds=1),
+            at=now,
+            mode="snapshot_at",
+            max_bars_per_side=24,
+        )
+        bars = list(obp.get("bars") or [])
+        result["coverage"]["orderbook_profile"] = {
+            "bar_count": len(bars),
+            "source": obp.get("source") or obp.get("mode"),
+            "warning": obp.get("warning"),
+        }
+        if result["event_time"] is None:
+            result["event_time"] = obp.get("as_of") or obp.get("timestamp")
+        matched = _match_wall(bars, target_wall, tick)
+        if matched is not None:
+            qty = _f(matched.get("qty"))
+            result["qty"] = qty
+            result["adapter"] = "ok"
+            result["source"] = "orderbook_profile_major"
+            result["wall_absent"] = bool(qty is not None and qty <= 0)
+            return result
+        # OBP miss after live-book failure: still unavailable (major list ≠ full book)
+        if result["adapter"] in {"DATA_GAP", "DATA_UNAVAILABLE", "STALE_DATA"}:
+            return result
+    except Exception as exc:  # noqa: BLE001
+        result["error"] = (result.get("error") or "") + f"|obp:{exc}"
+        if result["adapter"] == "ok":
+            pass
+        else:
+            result["adapter"] = "DATA_GAP"
+    return result
+
+
 def compute_live_metrics(
     *,
     symbol: str,
@@ -139,9 +368,10 @@ def compute_live_metrics(
     accepted_above_sec: float = 0.0,
     accepted_below_sec: float = 0.0,
     min_qty_seen: float | None = None,
+    avr_state: str | None = None,
+    oi_at_trigger: float | None = None,
+    oi_current: float | None = None,
 ) -> dict[str, Any]:
-    """Synchronous metrics assembly using existing CH/archive loaders."""
-    from research_charts.orderbook_profile import load_orderbook_profile
     from research_charts.trade_bubbles import tick_size
 
     sym = str(symbol or "").strip().upper()
@@ -187,60 +417,54 @@ def compute_live_metrics(
     if not target_wall:
         out["wall_lost"] = True
         out["adapters"]["target_wall"] = "DATA_UNAVAILABLE"
-        out["adapters"]["avr_state"] = "DATA_UNAVAILABLE"
+        out["adapters"]["avr_state"] = "DATA_UNAVAILABLE" if not avr_state else "ok"
         out["adapters"]["oi_delta"] = "DATA_UNAVAILABLE"
+        if avr_state:
+            out["avr_state"] = str(avr_state)
         return out
 
-    # --- Wall snapshot (OBP) ---
-    end = now + timedelta(seconds=1)
-    start = now - timedelta(seconds=5)
-    try:
-        obp = load_orderbook_profile(
-            symbol=sym,
-            start=start,
-            end=end,
-            at=now,
-            mode="snapshot_at",
-            max_bars_per_side=12,
-        )
-        bars = list(obp.get("bars") or [])
-        as_of = obp.get("as_of") or obp.get("timestamp")
-        out["event_time"] = as_of
-        out["coverage"]["orderbook_profile"] = {
-            "bar_count": len(bars),
-            "source": obp.get("source") or obp.get("mode"),
-            "warning": obp.get("warning"),
-        }
-        matched = _match_wall(bars, target_wall, tick)
-        if matched is None:
-            out["wall_lost"] = True
-            out["adapters"]["wall_current"] = "WALL_LOST"
-        else:
-            qty = _f(matched.get("qty"))
-            out["wall_current_qty"] = qty
-            out["adapters"]["wall_current"] = "ok"
-            if matched.get("carried_forward") and float(matched.get("samples") or 0) <= 1:
-                out["stale"] = True
-            base = _f(baseline_qty)
-            if base is not None and base > 0 and qty is not None:
-                reduce = max(0.0, (base - qty) / base)
-                out["wall_reduce_pct"] = reduce
-                out["adapters"]["wall_reduce_pct"] = "ok"
-            else:
-                out["adapters"]["wall_reduce_pct"] = "DATA_UNAVAILABLE"
-            floor = _f(min_qty_seen)
-            if floor is not None and qty is not None and floor > 0 and qty > floor:
-                out["replenish_pct"] = (qty - floor) / floor
-                out["adapters"]["replenish_pct"] = "ok"
-            else:
-                out["replenish_pct"] = 0.0 if qty is not None else None
-                out["adapters"]["replenish_pct"] = "ok" if qty is not None else "DATA_UNAVAILABLE"
-    except Exception as exc:  # noqa: BLE001 — isolate analysis failures
+    wall = resolve_wall_current_qty(symbol=sym, target_wall=target_wall, tick=tick)
+    out["coverage"].update(wall.get("coverage") or {})
+    out["event_time"] = wall.get("event_time")
+    out["adapters"]["wall_current"] = wall.get("adapter")
+    out["adapters"]["wall_source"] = wall.get("source")
+    if wall.get("error"):
+        out["errors"].append(str(wall["error"]))
+    if wall.get("stale"):
+        out["stale"] = True
+    if wall.get("adapter") == "DATA_GAP":
         out["data_gap"] = True
-        out["errors"].append(f"orderbook_profile:{exc}")
-        out["adapters"]["wall_current"] = "DATA_GAP"
 
-    # --- Public trades in wall zone (bounded window) ---
+    qty = _f(wall.get("qty"))
+    if qty is not None:
+        out["wall_current_qty"] = qty
+        # Absent on a ready book ⇒ decision WALL_LOST, but qty is 0 (displayable).
+        if wall.get("wall_absent"):
+            out["wall_lost"] = True
+        base = _f(baseline_qty)
+        if base is not None and base > 0:
+            out["wall_reduce_pct"] = max(0.0, (base - qty) / base)
+            out["adapters"]["wall_reduce_pct"] = "ok"
+        else:
+            out["adapters"]["wall_reduce_pct"] = "DATA_UNAVAILABLE"
+        floor = _f(min_qty_seen)
+        if floor is not None and floor > 0 and qty > floor:
+            out["replenish_pct"] = (qty - floor) / floor
+        else:
+            out["replenish_pct"] = 0.0
+        out["adapters"]["replenish_pct"] = "ok"
+    else:
+        # Unreadable book — do not invent 0
+        out["adapters"]["wall_reduce_pct"] = "DATA_UNAVAILABLE"
+        out["adapters"]["replenish_pct"] = "DATA_UNAVAILABLE"
+        if out["stale"]:
+            out["wall_lost"] = False  # STALE_DATA path preferred over WALL_LOST
+        elif out["data_gap"]:
+            pass
+        else:
+            out["wall_lost"] = True
+
+    # --- Public trades ---
     t0 = triggered_at or (now - timedelta(seconds=PREROLL_S))
     if t0.tzinfo is None:
         t0 = t0.replace(tzinfo=timezone.utc)
@@ -249,25 +473,21 @@ def compute_live_metrics(
     if (win_end - win_start).total_seconds() > MAX_WINDOW_S + PREROLL_S:
         win_start = win_end - timedelta(seconds=MAX_WINDOW_S + PREROLL_S)
     lo, hi = _zone(target_wall, tick)
+    trades_ok = False
+    buy_n = sell_n = buy_qty = sell_qty = 0.0
     try:
         trades = _load_trades_in_zone(sym, win_start, win_end, lo, hi)
-        buy_n = 0.0
-        sell_n = 0.0
-        buy_qty = 0.0
-        sell_qty = 0.0
+        trades_ok = True
         for tr in trades:
-            px = _f(tr.get("price"))
-            if px is None or px < lo or px > hi:
-                continue
             notion = _f(tr.get("notional")) or 0.0
-            qty = _f(tr.get("size")) or 0.0
-            side = str(tr.get("side") or "").strip()
-            if side.lower() == "buy":
+            q = _f(tr.get("size")) or 0.0
+            side = str(tr.get("side") or "").strip().lower()
+            if side == "buy":
                 buy_n += notion
-                buy_qty += qty
-            elif side.lower() == "sell":
+                buy_qty += q
+            elif side == "sell":
                 sell_n += notion
-                sell_qty += qty
+                sell_qty += q
         total_n = buy_n + sell_n
         out["aggressor_buy_notional"] = buy_n
         out["aggressor_sell_notional"] = sell_n
@@ -276,42 +496,59 @@ def compute_live_metrics(
             out["aggressor_sell_share"] = sell_n / total_n
             out["adapters"]["aggressor"] = "ok"
         else:
-            out["adapters"]["aggressor"] = "DATA_UNAVAILABLE"
+            # Zero trades in zone is a valid observation, not incompleteness.
+            out["aggressor_buy_share"] = 0.0
+            out["aggressor_sell_share"] = 0.0
+            out["adapters"]["aggressor"] = "ok"
+            out["adapters"]["aggressor_note"] = "zero_trades_in_zone"
         out["coverage"]["public_trades"] = {
             "count": len(trades),
             "window_start": win_start.isoformat().replace("+00:00", "Z"),
             "window_end": win_end.isoformat().replace("+00:00", "Z"),
             "zone_lo": lo,
             "zone_hi": hi,
+            "query_ok": True,
         }
-        wall_side = str(target_wall.get("side") or "").upper()
-        attack_qty = buy_qty if wall_side == "ASK" else sell_qty if wall_side == "BID" else 0.0
-        base = _f(baseline_qty)
-        cur = _f(out.get("wall_current_qty"))
-        if base is not None and cur is not None and base > cur:
-            removed = base - cur
-            if removed > 0:
-                explained = min(1.0, max(0.0, attack_qty / removed))
-                out["trade_explained_pct"] = explained
-                reduce = out.get("wall_reduce_pct")
-                if reduce is not None:
-                    out["pull_pct"] = max(0.0, float(reduce) - explained)
-                out["adapters"]["trade_explained_pct"] = "ok"
-                out["adapters"]["pull_pct"] = "ok"
-            else:
-                out["adapters"]["trade_explained_pct"] = "DATA_UNAVAILABLE"
-                out["incomplete_trades"] = True
-        else:
-            if not trades:
-                out["incomplete_trades"] = True
-            out["adapters"]["trade_explained_pct"] = "DATA_UNAVAILABLE"
-            out["adapters"]["pull_pct"] = "DATA_UNAVAILABLE"
     except Exception as exc:  # noqa: BLE001
         out["incomplete_trades"] = True
         out["errors"].append(f"public_trades:{exc}")
         out["adapters"]["trade_explained_pct"] = "DATA_UNAVAILABLE"
         out["adapters"]["aggressor"] = "DATA_GAP"
+        out["adapters"]["pull_pct"] = "DATA_UNAVAILABLE"
+        out["coverage"]["public_trades"] = {"query_ok": False, "error": str(exc)}
 
+    if trades_ok:
+        wall_side = str(target_wall.get("side") or "").upper()
+        attack_qty = buy_qty if wall_side == "ASK" else sell_qty if wall_side == "BID" else 0.0
+        base = _f(baseline_qty)
+        cur = _f(out.get("wall_current_qty"))
+        reduce = _f(out.get("wall_reduce_pct"))
+        if cur is None or base is None:
+            out["adapters"]["trade_explained_pct"] = "DATA_UNAVAILABLE"
+            out["adapters"]["pull_pct"] = "DATA_UNAVAILABLE"
+            out["adapters"]["trade_explained_note"] = "missing_baseline_or_current"
+        elif reduce is not None and reduce <= 0:
+            # Wall did not shrink — explained/pull are 0, not incomplete.
+            out["trade_explained_pct"] = 0.0
+            out["pull_pct"] = 0.0
+            out["adapters"]["trade_explained_pct"] = "ok"
+            out["adapters"]["pull_pct"] = "ok"
+            out["adapters"]["trade_explained_note"] = "no_wall_reduction"
+        else:
+            removed = max(0.0, (base or 0.0) - (cur or 0.0))
+            if removed > 0:
+                explained = min(1.0, max(0.0, attack_qty / removed))
+                out["trade_explained_pct"] = explained
+                out["pull_pct"] = max(0.0, float(reduce or 0.0) - explained)
+                out["adapters"]["trade_explained_pct"] = "ok"
+                out["adapters"]["pull_pct"] = "ok"
+            else:
+                out["trade_explained_pct"] = 0.0
+                out["pull_pct"] = 0.0
+                out["adapters"]["trade_explained_pct"] = "ok"
+                out["adapters"]["pull_pct"] = "ok"
+
+    # Price reaction
     tp = _f(trigger_price)
     lp = _f(live_price)
     if tp is not None and lp is not None and tp > 0:
@@ -333,14 +570,23 @@ def compute_live_metrics(
         out["adapters"]["speed_bps_s"] = "DATA_UNAVAILABLE"
         out["adapters"]["efficiency_bps_per_mio"] = "DATA_UNAVAILABLE"
 
-    out["avr_state"] = None
-    out["oi_delta"] = None
-    out["adapters"]["avr_state"] = "DATA_UNAVAILABLE"
-    out["adapters"]["oi_delta"] = "DATA_UNAVAILABLE"
-    out["adapters"]["note"] = (
-        "AVR/OI require frontend context from existing footprint/OI panes; "
-        "not synthesized server-side."
-    )
+    # AVR / OI from client panes only
+    if avr_state:
+        out["avr_state"] = str(avr_state)
+        out["adapters"]["avr_state"] = "ok"
+    else:
+        out["avr_state"] = None
+        out["adapters"]["avr_state"] = "DATA_UNAVAILABLE"
+
+    oi0 = _f(oi_at_trigger)
+    oi1 = _f(oi_current)
+    if oi0 is not None and oi1 is not None:
+        out["oi_delta"] = oi1 - oi0
+        out["adapters"]["oi_delta"] = "ok"
+    else:
+        out["oi_delta"] = None
+        out["adapters"]["oi_delta"] = "DATA_UNAVAILABLE"
+
     return out
 
 

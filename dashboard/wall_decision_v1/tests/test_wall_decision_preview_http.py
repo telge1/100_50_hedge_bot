@@ -48,7 +48,7 @@ def test_preview_market_profile_is_real_page_not_fixture():
     assert "wall_decision_helpers.js" in html
     assert "FIXTURE / REPLAY PREVIEW" not in html
     assert "wall_decision_preview" not in html
-    assert "mp-27" in html or "asset_v" in html or "?v=" in html
+    assert "mp-28" in html or "asset_v" in html or "?v=" in html
 
 
 def test_preview_config_api_marks_non_execution():
