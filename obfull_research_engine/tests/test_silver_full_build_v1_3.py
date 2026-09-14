@@ -635,7 +635,7 @@ def test_complete_chunk_is_skipped_without_replay(tmp_path, monkeypatch):
     client.chunks[chunk.chunk_key] = ("COMPLETE", epoch.epoch_hash, plan_hash)
     client.chunk_rows[chunk.chunk_key] = {
         "level_change_count": 545214,
-        "state_count": 8999,
+        "state_count": 9000,
         "source_record_count": 12,
     }
     monkeypatch.setattr(runner, "iter_bronze_records", lambda *_args, **_kwargs: iter([]))
@@ -649,7 +649,7 @@ def test_complete_chunk_is_skipped_without_replay(tmp_path, monkeypatch):
     )
     assert result["status"] == "SKIPPED_ALREADY_COMPLETE"
     assert result["level_change_count"] == 545214
-    assert result["state_count"] == 8999
+    assert result["state_count"] == 9000
     assert client.inserts == []
 
 
@@ -1049,7 +1049,7 @@ def test_persist_batch_sizes_keep_identical_row_ids(tmp_path):
         chunk_index=1,
         epoch=epoch,
         analysis_start_ns=0,
-        analysis_end_ns=60_000_000_000,
+        analysis_end_ns=1_100_000_000,
         warmup_ns=0,
     )
     chunk.materialize_ids()
@@ -1179,7 +1179,7 @@ def test_persist_buffers_clear_and_counts_use_replay_totals(tmp_path):
         chunk_index=1,
         epoch=epoch,
         analysis_start_ns=0,
-        analysis_end_ns=15 * 60 * 1_000_000_000,
+        analysis_end_ns=700_000_000,
         warmup_ns=0,
     )
     chunk.materialize_ids()
@@ -1263,7 +1263,7 @@ def test_progress_log_matches_ledger_and_uses_cumulative_timing(tmp_path, monkey
     for chunk, lc, st in zip(
         chunks,
         (545214, 573228, 377759, 363705),
-        (8999, 8999, 8999, 8999),
+        (9000, 9000, 9000, 9000),
     ):
         client.chunks[chunk.chunk_key] = ("COMPLETE", epoch.epoch_hash, plan.epoch_plan_hash)
         client.chunk_rows[chunk.chunk_key] = {
@@ -1290,7 +1290,7 @@ def test_progress_log_matches_ledger_and_uses_cumulative_timing(tmp_path, monkey
     result = runner.run_build(client, config, plan, stop=runner.StopState())
     lines = [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
     assert [row["level_changes"] for row in lines] == [545214, 573228, 377759, 363705]
-    assert [row["states_100ms"] for row in lines] == [8999, 8999, 8999, 8999]
+    assert [row["states_100ms"] for row in lines] == [9000, 9000, 9000, 9000]
     assert all(row["status"] == "SKIPPED_ALREADY_COMPLETE" for row in lines)
     assert lines[0]["chunk_elapsed_s"] == 10.0
     assert lines[0]["total_elapsed_s"] == 10.0
@@ -1305,7 +1305,7 @@ def test_progress_log_matches_ledger_and_uses_cumulative_timing(tmp_path, monkey
     assert lines[3]["eta_seconds"] == 0.0
     assert lines[3]["remaining_chunks"] == 0
     assert lines[3]["cumulative_level_changes"] == 545214 + 573228 + 377759 + 363705
-    assert lines[3]["cumulative_states_100ms"] == 8999 * 4
+    assert lines[3]["cumulative_states_100ms"] == 9000 * 4
     assert lines[3]["eta_utc"] is not None
     assert result["skipped_chunks"] == 4
 
@@ -1817,7 +1817,7 @@ def test_multi_flush_within_chunk_stays_on_write_client(tmp_path):
         chunk_index=1,
         epoch=epoch,
         analysis_start_ns=0,
-        analysis_end_ns=15 * 60 * 1_000_000_000,
+        analysis_end_ns=300_000_000,
         warmup_ns=0,
     )
     chunk.materialize_ids()

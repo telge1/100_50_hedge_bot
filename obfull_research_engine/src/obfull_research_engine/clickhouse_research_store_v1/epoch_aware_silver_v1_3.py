@@ -46,6 +46,42 @@ INSERT_BATCH_SIZE = 10_000
 INSERT_BATCH_MAX_BYTES = 12 * 1024 * 1024  # ~12 MiB packed payload budget per insert
 
 
+def floor_bucket_ns(ns: int) -> int:
+    return (int(ns) // BUCKET_NS) * BUCKET_NS
+
+
+def ceil_bucket_ns(ns: int) -> int:
+    return ((int(ns) + BUCKET_NS - 1) // BUCKET_NS) * BUCKET_NS
+
+
+def iter_analysis_bucket_starts(analysis_start_ns: int, analysis_end_ns: int) -> Iterable[int]:
+    """Canonical grid: ceil(start) .. while start < end, step 100ms."""
+    bucket_ns = ceil_bucket_ns(analysis_start_ns)
+    end_ns = int(analysis_end_ns)
+    while bucket_ns < end_ns:
+        yield bucket_ns
+        bucket_ns += BUCKET_NS
+
+
+def analysis_bucket_count(analysis_start_ns: int, analysis_end_ns: int) -> int:
+    return sum(1 for _ in iter_analysis_bucket_starts(analysis_start_ns, analysis_end_ns))
+
+
+def evaluation_end_ns(analysis_end_ns: int, epoch_safe_end_ns: int) -> int:
+    """Exclusive event-time bound needed to evaluate buckets with start < analysis_end.
+
+    Full buckets need events with ``event_time < bucket_end``. The last planned
+    start is ``floor((analysis_end-1)/100ms)*100ms`` when that is ``< analysis_end``;
+    its end is ``ceil_bucket_ns(analysis_end)`` when ``analysis_end`` is off-grid,
+    else ``analysis_end``. Never past ``epoch.safe_end_ns``.
+    """
+    end = int(analysis_end_ns)
+    if end <= 0:
+        return end
+    needed = ((end - 1) // BUCKET_NS + 1) * BUCKET_NS
+    return min(needed, int(epoch_safe_end_ns))
+
+
 class EpochSilverError(RuntimeError):
     """Hard-stop error carrying a STOP_* verdict."""
 
@@ -916,6 +952,15 @@ class ReplayResult:
     level_change_hash_apply_order: str
     timings_s: dict[str, float]
     hash_profile: dict[str, Any] = field(default_factory=dict)
+    level_change_count: int | None = None
+    state_count: int | None = None
+    evaluation_end_ns: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.level_change_count is None:
+            self.level_change_count = len(self.level_changes)
+        if self.state_count is None:
+            self.state_count = len(self.states)
 
 
 def replay_epoch_window(
@@ -927,8 +972,23 @@ def replay_epoch_window(
     analysis_end_ns: int,
     build_id: str,
     use_book_hash_cache: bool = True,
+    level_change_sink: Any | None = None,
+    retain_level_changes: bool | None = None,
+    state_sink: Any | None = None,
+    retain_states: bool | None = None,
 ) -> ReplayResult:
-    """Replay one already-validated epoch; never crosses its boundaries."""
+    """Replay one already-validated epoch; never crosses its boundaries.
+
+    Bucket contract (aligned with ``aggregation_100ms`` / planner):
+    - Grid: ``ceil(analysis_start)`` while ``bucket_start < analysis_end``, step 100ms.
+    - State at ``bucket_start`` includes every delta with ``event_time < bucket_end``.
+    - Artificial chunk ends may extend the *read/apply* window to
+      ``evaluation_end_ns`` (still within ``epoch.safe_end_ns``) so a terminal
+      partial grid bucket is evaluated with true deltas; LCs outside
+      ``[analysis_start, analysis_end)`` are never emitted.
+    - True epoch ends never read past ``safe_end_ns``; the terminal bucket is
+      finalized with hold-forward of the last causal book inside the epoch.
+    """
     if not (
         _resume_precedes_analysis(epoch, resume_record, analysis_start_ns)
         and analysis_end_ns <= epoch.safe_end_ns
@@ -939,37 +999,66 @@ def replay_epoch_window(
     started = time.monotonic()
     state = _apply_anchor(resume_record)
     resume_key = _record_key(resume_record)
+    keep_lc = True if retain_level_changes is None else bool(retain_level_changes)
+    if level_change_sink is not None and retain_level_changes is None:
+        keep_lc = False
+    keep_states = True if retain_states is None else bool(retain_states)
+    if state_sink is not None and retain_states is None:
+        keep_states = False
     level_changes: list[dict[str, Any]] = []
     states: list[dict[str, Any]] = []
     source_records = delta_records = 0
+    level_change_count = 0
+    state_count = 0
     apply_order = message_order = 0
     end_key: tuple[int, int] | None = None
-    last_bucket_end_ns = int(analysis_start_ns)
+    last_emitted_start: int | None = None
     hash_apply = hashlib.sha256()
     hash_cache = BookHashCache(enabled=use_book_hash_cache)
     level_change_s = bucket_s = delta_apply_s = json_conversion_s = 0.0
+    eval_end = evaluation_end_ns(analysis_end_ns, epoch.safe_end_ns)
+
+    def _emit_level_change(row: dict[str, Any]) -> None:
+        nonlocal level_change_count
+        hash_apply.update(_canonical_bytes(row))
+        level_change_count += 1
+        if keep_lc:
+            level_changes.append(row)
+        if level_change_sink is not None:
+            level_change_sink(row)
+
+    def _emit_state(row: dict[str, Any]) -> None:
+        nonlocal state_count
+        state_count += 1
+        if keep_states:
+            states.append(row)
+        if state_sink is not None:
+            state_sink(row)
 
     def emit_due(before_ns: int) -> None:
-        nonlocal last_bucket_end_ns, bucket_s
+        """Emit every analysis bucket whose causal ready-at is ``<= before_ns``."""
+        nonlocal last_emitted_start, bucket_s
         t0 = time.monotonic()
-        b = _floor_bucket(
-            _ns_to_dt(max(analysis_start_ns, last_bucket_end_ns)), 100
+        cur = (
+            ceil_bucket_ns(analysis_start_ns)
+            if last_emitted_start is None
+            else last_emitted_start + BUCKET_NS
         )
-        while True:
-            end = b + timedelta(milliseconds=100)
-            start_ns = _dt_to_ns(b)
-            end_ns = _dt_to_ns(end)
-            if start_ns < analysis_start_ns:
-                b = end
-                continue
-            if end_ns > before_ns or end_ns > analysis_end_ns:
+        while cur < analysis_end_ns:
+            bucket_end = cur + BUCKET_NS
+            # Full bucket: ready at bucket_end. Truncated terminal at epoch end:
+            # ready at safe_end / analysis_end when bucket_end would cross it.
+            ready_at = bucket_end if bucket_end <= analysis_end_ns else analysis_end_ns
+            if bucket_end > epoch.safe_end_ns:
+                ready_at = min(ready_at, epoch.safe_end_ns)
+            # Terminal artificial chunk: need events through evaluation_end.
+            if analysis_end_ns < bucket_end <= eval_end:
+                ready_at = bucket_end
+            if before_ns < ready_at:
                 break
-            if end_ns <= last_bucket_end_ns:
-                b = end
-                continue
             row = _metric_row(
                 state=state,
-                bucket_start=b,
+                bucket_start=_ns_to_dt(cur),
                 replay_epoch=1,
                 symbol=epoch.symbol,
                 silver_build_id=build_id,
@@ -977,29 +1066,19 @@ def replay_epoch_window(
                 book_hash_override=hash_cache.get(state),
             )
             row["epoch_id"] = epoch.epoch_id
-            states.append(row)
-            last_bucket_end_ns = end_ns
-            b = end
+            _emit_state(row)
+            last_emitted_start = cur
+            cur += BUCKET_NS
+            if state_count % 2048 == 0:
+                _check_rss()
         bucket_s += time.monotonic() - t0
 
-    for record in records:
+    def _apply_record(record: BronzeRecord, *, emit_lc: bool) -> None:
+        nonlocal apply_order, message_order, end_key, delta_records
+        nonlocal level_change_s, delta_apply_s, json_conversion_s, source_records
         key = _record_key(record)
-        if key <= resume_key:
-            continue
-        if key < (epoch.anchor_segment_chain_index, epoch.anchor_record_ordinal):
-            continue
-        if record.message_type == "gap_marker":
-            raise EpochSilverError(
-                "STOP_EPOCH_BOUNDARY_VIOLATION: gap encountered inside selected epoch"
-            )
-        if record.message_type != "delta":
-            continue
         event_ns = int(record.event_time_ns)
-        if event_ns >= analysis_end_ns:
-            emit_due(analysis_end_ns)
-            break
         source_records += 1
-        emit_due(event_ns)
         json_started = time.perf_counter()
         payload = _payload(record)
         data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
@@ -1007,13 +1086,12 @@ def replay_epoch_window(
             state, data.get("b") or [], data.get("a") or []
         )
         json_conversion_s += time.perf_counter() - json_started
-        in_analysis = analysis_start_ns <= event_ns < analysis_end_ns
         bid_changes: list[dict[str, Any]] = []
         ask_changes: list[dict[str, Any]] = []
         apply_order_before = apply_order
         message_order += 1
         t_lc = time.monotonic()
-        if in_analysis:
+        if emit_lc:
             delta_records += 1
             bid_changes, apply_order = _emit_side_changes(
                 side="bid",
@@ -1068,21 +1146,55 @@ def replay_epoch_window(
             )
         if outcome is not DeltaOutcome.APPLIED:
             apply_order = apply_order_before
-            continue
-        if outcome is DeltaOutcome.APPLIED and in_analysis:
-            effective_changes = bid_changes + ask_changes
-            for row in effective_changes:
+            return
+        if emit_lc:
+            for row in bid_changes + ask_changes:
                 row["epoch_id"] = epoch.epoch_id
                 row["canonical_segment_chain_index"] = key[0]
-                level_changes.append(row)
-                hash_apply.update(_canonical_bytes(row))
-        if outcome is DeltaOutcome.APPLIED:
-            if changes_book:
-                hash_cache.mark_dirty()
-            else:
-                hash_cache.mark_no_op()
+                _emit_level_change(row)
+        if changes_book:
+            hash_cache.mark_dirty()
+        else:
+            hash_cache.mark_no_op()
         end_key = key
-    emit_due(analysis_end_ns)
+        if level_change_count % 8192 == 0:
+            _check_rss()
+
+    for record in records:
+        key = _record_key(record)
+        if key <= resume_key:
+            continue
+        if key < (epoch.anchor_segment_chain_index, epoch.anchor_record_ordinal):
+            continue
+        if record.message_type == "gap_marker":
+            raise EpochSilverError(
+                "STOP_EPOCH_BOUNDARY_VIOLATION: gap encountered inside selected epoch"
+            )
+        if record.message_type != "delta":
+            continue
+        event_ns = int(record.event_time_ns)
+        if event_ns >= eval_end:
+            emit_due(event_ns)
+            break
+        emit_due(event_ns)
+        # LCs only inside the analysis window. Warm-up before analysis_start and
+        # terminal evaluation past analysis_end apply book updates without LC.
+        in_analysis = analysis_start_ns <= event_ns < analysis_end_ns
+        _apply_record(record, emit_lc=in_analysis)
+    emit_due(eval_end if eval_end > analysis_end_ns else analysis_end_ns)
+    expected = analysis_bucket_count(analysis_start_ns, analysis_end_ns)
+    if state_count != expected:
+        raise EpochSilverError(
+            "STOP_SILVER_BUCKET_COUNT_MISMATCH: "
+            f"emitted={state_count} expected={expected} "
+            f"window=[{analysis_start_ns},{analysis_end_ns}) eval_end={eval_end}"
+        )
+    for sink in (level_change_sink, state_sink):
+        if sink is None:
+            continue
+        flush = getattr(sink, "flush", None)
+        if callable(flush):
+            flush()
     return ReplayResult(
         level_changes=level_changes,
         states=states,
@@ -1099,6 +1211,9 @@ def replay_epoch_window(
             "delta_apply": round(delta_apply_s, 6),
         },
         hash_profile=hash_cache.profile.to_dict(),
+        level_change_count=level_change_count,
+        state_count=state_count,
+        evaluation_end_ns=eval_end,
     )
 
 

@@ -37,6 +37,7 @@ from .epoch_aware_silver_v1_3 import (
     _hash,
     _record_key,
     _text,
+    analysis_bucket_count,
     clean_segment_start_ranks,
     discover_epochs,
     epoch_apply_bounds,
@@ -84,6 +85,10 @@ DEFAULT_BRONZE_LOCK_PATH = Path(
 DEFAULT_LOCK_PATH = Path(
     "/home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/"
     "obfull_research_engine/runs/silver_full_build_v1_3/build.lock"
+)
+DEFAULT_REPAIR_LOCK_PATH = Path(
+    "/home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/"
+    "obfull_research_engine/runs/silver_bucket_boundary_repair_v1_3/repair.lock"
 )
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 CHUNK_STATUSES = frozenset(
@@ -787,6 +792,27 @@ def _raise_clickhouse_stream_error(exc: BaseException) -> None:
     raise SilverBuildError(f"STOP_SILVER_CH_QUERY_NOT_STREAMING: {exc}") from exc
 
 
+def _is_python_memory_limit(exc: BaseException) -> bool:
+    text = str(exc)
+    return (
+        "STOP_SILVER_MEMORY_LIMIT" in text
+        or "STOP_SILVER_RUNNER_SAFETY_RSS_LIMIT" in text
+        or "STOP_SILVER_RUNNER_SAFETY_MEMORY_LIMIT" in text
+    )
+
+
+def _ledger_status_for_error(exc: BaseException) -> str:
+    if isinstance(exc, ControlledInterrupt):
+        return "INTERRUPTED"
+    if _is_clickhouse_session_locked(exc) or _is_python_memory_limit(exc):
+        return "INTERRUPTED"
+    if _is_clickhouse_memory_error(exc) or (
+        isinstance(exc, SilverBuildError) and "STOP_SILVER_CH_MEMORY_LIMIT" in str(exc)
+    ):
+        return "INTERRUPTED"
+    return "FAILED"
+
+
 def _map_clickhouse_operational_error(exc: BaseException) -> SilverBuildError:
     if _is_clickhouse_memory_error(exc):
         return SilverBuildError(f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}")
@@ -1364,6 +1390,179 @@ def _flush_insert_rows(
     _check_rss()
 
 
+class _StreamingLevelChangeSink:
+    """Byte-/row-capped LC insert sink used during replay to bound Python RSS."""
+
+    def __init__(
+        self,
+        client: Any,
+        config: BuildConfig,
+        *,
+        chunk: ChunkPlan,
+        version_ms: int,
+        batch_size: int,
+        batch_max_bytes: int,
+    ) -> None:
+        self._client = client
+        self._config = config
+        self._chunk = chunk
+        self._version_ms = version_ms
+        self._batch_size = batch_size
+        self._batch_max_bytes = batch_max_bytes
+        self._columns = [
+            "row_id",
+            "build_id",
+            "chunk_key",
+            "epoch_id",
+            "epoch_hash",
+            "chain_version",
+            "canonical_chain_hash",
+            "symbol",
+            "canonical_segment_chain_index",
+            "source_segment_sha256",
+            "record_ordinal",
+            "apply_order",
+            "event_time_ns",
+            "receive_time_ns",
+            "payload",
+            "version_ms",
+        ]
+        self._buffers: list[list[Any]] = [[] for _ in self._columns]
+        self._bytes = 0
+        self.insert_calls = 0
+        self.rows = 0
+
+    def __call__(self, row: dict[str, Any]) -> None:
+        payload = json.dumps(row, separators=(",", ":"))
+        payload_len = len(payload)
+        if self._buffers[0] and (
+            len(self._buffers[0]) >= self._batch_size
+            or self._bytes + payload_len > self._batch_max_bytes
+        ):
+            self.flush()
+        row_id = level_change_row_id(
+            chunk_key=self._chunk.chunk_key,
+            segment_rank=int(row["canonical_segment_chain_index"]),
+            record_ordinal=int(row["source_record_ordinal"]),
+            apply_order=int(row["apply_order"]),
+        )
+        values = [
+            row_id,
+            self._chunk.build_id,
+            self._chunk.chunk_key,
+            self._chunk.epoch.epoch_id,
+            self._chunk.epoch.epoch_hash,
+            self._chunk.epoch.chain_version,
+            self._chunk.epoch.canonical_chain_hash,
+            self._chunk.epoch.symbol,
+            row["canonical_segment_chain_index"],
+            row.get("source_segment_sha256", "0" * 64),
+            row["source_record_ordinal"],
+            row["apply_order"],
+            row["event_time_ns"],
+            row.get("receive_time_ns", row["event_time_ns"]),
+            payload,
+            self._version_ms,
+        ]
+        for buf, value in zip(self._buffers, values):
+            buf.append(value)
+        self._bytes += payload_len
+        self.rows += 1
+
+    def flush(self) -> None:
+        if not self._buffers[0]:
+            return
+        _flush_insert_rows(
+            self._client,
+            table=f"{self._config.output_database}.{LEVEL_CHANGES_TABLE}",
+            column_names=self._columns,
+            columns=self._buffers,
+        )
+        self.insert_calls += 1
+        for buf in self._buffers:
+            buf.clear()
+        self._bytes = 0
+
+
+class _StreamingStateSink:
+    """Byte-/row-capped 100ms-state insert sink used during replay."""
+
+    def __init__(
+        self,
+        client: Any,
+        config: BuildConfig,
+        *,
+        chunk: ChunkPlan,
+        version_ms: int,
+        batch_size: int,
+        batch_max_bytes: int,
+    ) -> None:
+        self._client = client
+        self._config = config
+        self._chunk = chunk
+        self._version_ms = version_ms
+        self._batch_size = batch_size
+        self._batch_max_bytes = batch_max_bytes
+        self._columns = [
+            "row_id",
+            "build_id",
+            "chunk_key",
+            "epoch_id",
+            "epoch_hash",
+            "chain_version",
+            "canonical_chain_hash",
+            "symbol",
+            "bucket_start_ns",
+            "payload",
+            "version_ms",
+        ]
+        self._buffers: list[list[Any]] = [[] for _ in self._columns]
+        self._bytes = 0
+        self.insert_calls = 0
+        self.rows = 0
+
+    def __call__(self, row: dict[str, Any]) -> None:
+        bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
+        payload = json.dumps(row, separators=(",", ":"))
+        payload_len = len(payload)
+        if self._buffers[0] and (
+            len(self._buffers[0]) >= self._batch_size
+            or self._bytes + payload_len > self._batch_max_bytes
+        ):
+            self.flush()
+        values = [
+            state_row_id(chunk_key=self._chunk.chunk_key, bucket_start_ns=bucket_ns),
+            self._chunk.build_id,
+            self._chunk.chunk_key,
+            self._chunk.epoch.epoch_id,
+            self._chunk.epoch.epoch_hash,
+            self._chunk.epoch.chain_version,
+            self._chunk.epoch.canonical_chain_hash,
+            self._chunk.epoch.symbol,
+            bucket_ns,
+            payload,
+            self._version_ms,
+        ]
+        for buf, value in zip(self._buffers, values):
+            buf.append(value)
+        self._bytes += payload_len
+        self.rows += 1
+
+    def flush(self) -> None:
+        if not self._buffers[0]:
+            return
+        _flush_insert_rows(
+            self._client,
+            table=f"{self._config.output_database}.{METRICS_TABLE}",
+            column_names=self._columns,
+            columns=self._buffers,
+        )
+        self.insert_calls += 1
+        for buf in self._buffers:
+            buf.clear()
+        self._bytes = 0
+
+
 def _persist_chunk_outputs(
     client: Any,
     config: BuildConfig,
@@ -1372,145 +1571,171 @@ def _persist_chunk_outputs(
     replay: ReplayResult,
     batch_size: int | None = None,
     batch_max_bytes: int | None = None,
+    level_changes_already_persisted: bool = False,
+    states_already_persisted: bool = False,
+    lc_insert_calls: int = 0,
+    state_insert_calls: int = 0,
+    version_ms: int | None = None,
 ) -> dict[str, Any]:
     """Persist LC + 100ms states in byte-capped batches; return output hash + stats."""
     batch_size = int(batch_size or INSERT_BATCH_SIZE)
     batch_max_bytes = int(batch_max_bytes or INSERT_BATCH_MAX_BYTES)
     if batch_size <= 0:
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_INSERT_BATCH_INVALID")
-    version_ms = int(time.time() * 1000)
-    lc_columns = [
-        "row_id",
-        "build_id",
-        "chunk_key",
-        "epoch_id",
-        "epoch_hash",
-        "chain_version",
-        "canonical_chain_hash",
-        "symbol",
-        "canonical_segment_chain_index",
-        "source_segment_sha256",
-        "record_ordinal",
-        "apply_order",
-        "event_time_ns",
-        "receive_time_ns",
-        "payload",
-        "version_ms",
-    ]
-    lc_buffers: list[list[Any]] = [[] for _ in lc_columns]
-    lc_bytes = 0
-    lc_insert_calls = 0
-    lc_table = f"{config.output_database}.{LEVEL_CHANGES_TABLE}"
-
-    def flush_lc() -> None:
-        nonlocal lc_bytes, lc_insert_calls
-        if not lc_buffers[0]:
-            return
-        _flush_insert_rows(
-            client, table=lc_table, column_names=lc_columns, columns=lc_buffers
+    version_ms = int(version_ms if version_ms is not None else time.time() * 1000)
+    lc_insert_calls = int(lc_insert_calls)
+    st_insert_calls = int(state_insert_calls)
+    level_change_count = int(
+        getattr(replay, "level_change_count", None)
+        if getattr(replay, "level_change_count", None) is not None
+        else len(replay.level_changes)
+    )
+    state_count = int(
+        getattr(replay, "state_count", None)
+        if getattr(replay, "state_count", None) is not None
+        else len(replay.states)
+    )
+    expected_states = analysis_bucket_count(
+        chunk.analysis_start_ns, chunk.analysis_end_ns
+    )
+    if state_count != expected_states:
+        raise SilverBuildError(
+            "STOP_SILVER_BUCKET_COUNT_MISMATCH: "
+            f"states={state_count} expected={expected_states}"
         )
-        lc_insert_calls += 1
-        for buf in lc_buffers:
-            buf.clear()
+
+    if not level_changes_already_persisted:
+        lc_columns = [
+            "row_id",
+            "build_id",
+            "chunk_key",
+            "epoch_id",
+            "epoch_hash",
+            "chain_version",
+            "canonical_chain_hash",
+            "symbol",
+            "canonical_segment_chain_index",
+            "source_segment_sha256",
+            "record_ordinal",
+            "apply_order",
+            "event_time_ns",
+            "receive_time_ns",
+            "payload",
+            "version_ms",
+        ]
+        lc_buffers: list[list[Any]] = [[] for _ in lc_columns]
         lc_bytes = 0
+        lc_table = f"{config.output_database}.{LEVEL_CHANGES_TABLE}"
 
-    for row in replay.level_changes:
-        payload = json.dumps(row, separators=(",", ":"))
-        payload_len = len(payload)
-        if lc_buffers[0] and (
-            len(lc_buffers[0]) >= batch_size or lc_bytes + payload_len > batch_max_bytes
-        ):
-            flush_lc()
-        row_id = level_change_row_id(
-            chunk_key=chunk.chunk_key,
-            segment_rank=int(row["canonical_segment_chain_index"]),
-            record_ordinal=int(row["source_record_ordinal"]),
-            apply_order=int(row["apply_order"]),
-        )
-        values = [
-            row_id,
-            chunk.build_id,
-            chunk.chunk_key,
-            chunk.epoch.epoch_id,
-            chunk.epoch.epoch_hash,
-            chunk.epoch.chain_version,
-            chunk.epoch.canonical_chain_hash,
-            chunk.epoch.symbol,
-            row["canonical_segment_chain_index"],
-            row.get("source_segment_sha256", "0" * 64),
-            row["source_record_ordinal"],
-            row["apply_order"],
-            row["event_time_ns"],
-            row.get("receive_time_ns", row["event_time_ns"]),
-            payload,
-            version_ms,
+        def flush_lc() -> None:
+            nonlocal lc_bytes, lc_insert_calls
+            if not lc_buffers[0]:
+                return
+            _flush_insert_rows(
+                client, table=lc_table, column_names=lc_columns, columns=lc_buffers
+            )
+            lc_insert_calls += 1
+            for buf in lc_buffers:
+                buf.clear()
+            lc_bytes = 0
+
+        for row in replay.level_changes:
+            payload = json.dumps(row, separators=(",", ":"))
+            payload_len = len(payload)
+            if lc_buffers[0] and (
+                len(lc_buffers[0]) >= batch_size or lc_bytes + payload_len > batch_max_bytes
+            ):
+                flush_lc()
+            row_id = level_change_row_id(
+                chunk_key=chunk.chunk_key,
+                segment_rank=int(row["canonical_segment_chain_index"]),
+                record_ordinal=int(row["source_record_ordinal"]),
+                apply_order=int(row["apply_order"]),
+            )
+            values = [
+                row_id,
+                chunk.build_id,
+                chunk.chunk_key,
+                chunk.epoch.epoch_id,
+                chunk.epoch.epoch_hash,
+                chunk.epoch.chain_version,
+                chunk.epoch.canonical_chain_hash,
+                chunk.epoch.symbol,
+                row["canonical_segment_chain_index"],
+                row.get("source_segment_sha256", "0" * 64),
+                row["source_record_ordinal"],
+                row["apply_order"],
+                row["event_time_ns"],
+                row.get("receive_time_ns", row["event_time_ns"]),
+                payload,
+                version_ms,
+            ]
+            for buf, value in zip(lc_buffers, values):
+                buf.append(value)
+            lc_bytes += payload_len
+        flush_lc()
+
+    if not states_already_persisted:
+        state_columns = [
+            "row_id",
+            "build_id",
+            "chunk_key",
+            "epoch_id",
+            "epoch_hash",
+            "chain_version",
+            "canonical_chain_hash",
+            "symbol",
+            "bucket_start_ns",
+            "payload",
+            "version_ms",
         ]
-        for buf, value in zip(lc_buffers, values):
-            buf.append(value)
-        lc_bytes += payload_len
-    flush_lc()
-
-    state_columns = [
-        "row_id",
-        "build_id",
-        "chunk_key",
-        "epoch_id",
-        "epoch_hash",
-        "chain_version",
-        "canonical_chain_hash",
-        "symbol",
-        "bucket_start_ns",
-        "payload",
-        "version_ms",
-    ]
-    st_buffers: list[list[Any]] = [[] for _ in state_columns]
-    st_bytes = 0
-    st_insert_calls = 0
-    st_table = f"{config.output_database}.{METRICS_TABLE}"
-
-    def flush_states() -> None:
-        nonlocal st_bytes, st_insert_calls
-        if not st_buffers[0]:
-            return
-        _flush_insert_rows(
-            client, table=st_table, column_names=state_columns, columns=st_buffers
-        )
-        st_insert_calls += 1
-        for buf in st_buffers:
-            buf.clear()
+        st_buffers: list[list[Any]] = [[] for _ in state_columns]
         st_bytes = 0
+        st_table = f"{config.output_database}.{METRICS_TABLE}"
 
-    for row in replay.states:
-        bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
-        payload = json.dumps(row, separators=(",", ":"))
-        payload_len = len(payload)
-        if st_buffers[0] and (
-            len(st_buffers[0]) >= batch_size or st_bytes + payload_len > batch_max_bytes
-        ):
-            flush_states()
-        values = [
-            state_row_id(chunk_key=chunk.chunk_key, bucket_start_ns=bucket_ns),
-            chunk.build_id,
-            chunk.chunk_key,
-            chunk.epoch.epoch_id,
-            chunk.epoch.epoch_hash,
-            chunk.epoch.chain_version,
-            chunk.epoch.canonical_chain_hash,
-            chunk.epoch.symbol,
-            bucket_ns,
-            payload,
-            version_ms,
-        ]
-        for buf, value in zip(st_buffers, values):
-            buf.append(value)
-        st_bytes += payload_len
-    flush_states()
+        def flush_states() -> None:
+            nonlocal st_bytes, st_insert_calls
+            if not st_buffers[0]:
+                return
+            _flush_insert_rows(
+                client, table=st_table, column_names=state_columns, columns=st_buffers
+            )
+            st_insert_calls += 1
+            for buf in st_buffers:
+                buf.clear()
+            st_bytes = 0
+
+        for row in replay.states:
+            bucket_ns = int(row["bucket_start_ms"]) * 1_000_000
+            payload = json.dumps(row, separators=(",", ":"))
+            payload_len = len(payload)
+            if st_buffers[0] and (
+                len(st_buffers[0]) >= batch_size or st_bytes + payload_len > batch_max_bytes
+            ):
+                flush_states()
+            values = [
+                state_row_id(chunk_key=chunk.chunk_key, bucket_start_ns=bucket_ns),
+                chunk.build_id,
+                chunk.chunk_key,
+                chunk.epoch.epoch_id,
+                chunk.epoch.epoch_hash,
+                chunk.epoch.chain_version,
+                chunk.epoch.canonical_chain_hash,
+                chunk.epoch.symbol,
+                bucket_ns,
+                payload,
+                version_ms,
+            ]
+            for buf, value in zip(st_buffers, values):
+                buf.append(value)
+            st_bytes += payload_len
+        flush_states()
 
     output_hash = _hash(
         {
             "level_change_apply_hash": replay.level_change_hash_apply_order,
-            "level_change_count": len(replay.level_changes),
-            "state_count": len(replay.states),
+            "level_change_count": level_change_count,
+            "state_count": state_count,
             "last_apply_key": replay.end_apply_key,
         }
     )
@@ -1520,8 +1745,9 @@ def _persist_chunk_outputs(
         "insert_calls_states": st_insert_calls,
         "batch_size": batch_size,
         "batch_max_bytes": batch_max_bytes,
-        "level_change_count": len(replay.level_changes),
-        "state_count": len(replay.states),
+        "level_change_count": level_change_count,
+        "state_count": state_count,
+        "version_ms": version_ms,
     }
 
 
@@ -1610,6 +1836,10 @@ def build_one_chunk(
         status="RUNNING",
     )
     bronze_stream: Any | None = None
+    replay: ReplayResult | None = None
+    lc_sink: _StreamingLevelChangeSink | None = None
+    state_sink: _StreamingStateSink | None = None
+    version_ms = int(time.time() * 1000)
     try:
         start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
         try:
@@ -1629,6 +1859,22 @@ def build_one_chunk(
             except EpochSilverError as exc:
                 raise SilverBuildError(str(exc)) from exc
             stop.check()
+            lc_sink = _StreamingLevelChangeSink(
+                clients.write,
+                config,
+                chunk=chunk,
+                version_ms=version_ms,
+                batch_size=INSERT_BATCH_SIZE,
+                batch_max_bytes=INSERT_BATCH_MAX_BYTES,
+            )
+            state_sink = _StreamingStateSink(
+                clients.write,
+                config,
+                chunk=chunk,
+                version_ms=version_ms,
+                batch_size=INSERT_BATCH_SIZE,
+                batch_max_bytes=INSERT_BATCH_MAX_BYTES,
+            )
             try:
                 replay = replay_epoch_window(
                     replay_stream,
@@ -1637,6 +1883,10 @@ def build_one_chunk(
                     analysis_start_ns=chunk.analysis_start_ns,
                     analysis_end_ns=chunk.analysis_end_ns,
                     build_id=chunk.build_id,
+                    level_change_sink=lc_sink,
+                    retain_level_changes=False,
+                    state_sink=state_sink,
+                    retain_states=False,
                 )
             except EpochSilverError as exc:
                 raise SilverBuildError(str(exc)) from exc
@@ -1647,12 +1897,22 @@ def build_one_chunk(
             if bronze_stream is not None:
                 _close_streaming_iterator(bronze_stream)
                 bronze_stream = None
+        if replay is None or lc_sink is None or state_sink is None:
+            raise SilverBuildError("STOP_SILVER_REPLAY_INCOMPLETE")
         stop.check()
         persist_stats = _persist_chunk_outputs(
-            clients.write, config, chunk=chunk, replay=replay
+            clients.write,
+            config,
+            chunk=chunk,
+            replay=replay,
+            level_changes_already_persisted=True,
+            states_already_persisted=True,
+            lc_insert_calls=lc_sink.insert_calls,
+            state_insert_calls=state_sink.insert_calls,
+            version_ms=version_ms,
         )
-        level_change_count = len(replay.level_changes)
-        state_count = len(replay.states)
+        level_change_count = int(persist_stats["level_change_count"])
+        state_count = int(persist_stats["state_count"])
         _verify_chunk_inserts(
             clients.verify,
             config,
@@ -1684,6 +1944,7 @@ def build_one_chunk(
             "insert_calls_states": persist_stats["insert_calls_states"],
             "batch_size": persist_stats["batch_size"],
             "session_ids": clients.session_ids(),
+            "evaluation_end_ns": replay.evaluation_end_ns,
         }
     except ControlledInterrupt as exc:
         # Newer append-only ledger version; resume rebuilds RUNNING/INTERRUPTED/FAILED.
@@ -1698,9 +1959,7 @@ def build_one_chunk(
         )
         raise
     except SilverBuildError as exc:
-        ledger_status = (
-            "INTERRUPTED" if _is_clickhouse_session_locked(exc) else "FAILED"
-        )
+        ledger_status = _ledger_status_for_error(exc)
         _write_chunk_status(
             clients.write,
             config,
@@ -1713,9 +1972,7 @@ def build_one_chunk(
         raise
     except Exception as exc:  # noqa: BLE001
         mapped = _map_clickhouse_operational_error(exc)
-        ledger_status = (
-            "INTERRUPTED" if _is_clickhouse_session_locked(mapped) else "FAILED"
-        )
+        ledger_status = _ledger_status_for_error(mapped)
         try:
             _write_chunk_status(
                 clients.write,
@@ -1990,6 +2247,7 @@ def preflight(
     check_lock: bool = True,
     bronze_probe: dict[str, Any] | None = None,
     require_bronze_ready: bool = True,
+    enforce_bucket_repair_gate: bool = False,
 ) -> dict[str, Any]:
     validate_input_database(config.input_database)
     validate_output_database(config.output_database)
@@ -2020,6 +2278,24 @@ def preflight(
         raise SilverBuildError("STOP_SILVER_VERIFY_SCHEMA_MISSING")
     if check_lock:
         BuildLock.inspect_existing(config.lock_path)
+        if config.output_database == DEFAULT_OUTPUT_DATABASE:
+            BuildLock.inspect_existing(DEFAULT_REPAIR_LOCK_PATH)
+    repair_gate = None
+    if (
+        enforce_bucket_repair_gate
+        and config.output_database == DEFAULT_OUTPUT_DATABASE
+        and schema_exists
+    ):
+        from .silver_bucket_boundary_repair_v1_3 import (
+            assert_production_bucket_repair_verified,
+        )
+
+        assert_production_bucket_repair_verified(
+            client,
+            chain_version=config.chain_version,
+            output_database=config.output_database,
+        )
+        repair_gate = "VERIFIED_OR_NO_COMPLETE_HOLES"
     return {
         "status": "PASS",
         "mode": "READ_ONLY_PREFLIGHT",
@@ -2032,6 +2308,7 @@ def preflight(
         "available_memory_bytes": available,
         "bronze": bronze,
         "lock_status": "FREE",
+        "bucket_repair_gate": repair_gate,
     }
 
 
@@ -2216,6 +2493,7 @@ def execute(
                         check_lock=False,
                         bronze_probe=bronze_probe,
                         require_bronze_ready=bool(args.run or args.verify_only),
+                        enforce_bucket_repair_gate=bool(args.run),
                     )
                     if args.init_schema:
                         init_schema(clients.write, config.output_database)
@@ -2253,9 +2531,13 @@ def execute(
                     return payload
                 except BaseException as exc:
                     interrupted = isinstance(exc, ControlledInterrupt)
-                    memory_limited = _is_clickhouse_memory_error(exc) or (
-                        isinstance(exc, SilverBuildError)
-                        and "STOP_SILVER_CH_MEMORY_LIMIT" in str(exc)
+                    memory_limited = (
+                        _is_clickhouse_memory_error(exc)
+                        or (
+                            isinstance(exc, SilverBuildError)
+                            and "STOP_SILVER_CH_MEMORY_LIMIT" in str(exc)
+                        )
+                        or _is_python_memory_limit(exc)
                     )
                     session_locked = _is_clickhouse_session_locked(exc)
                     status = "INTERRUPTED" if interrupted else "FAILED"

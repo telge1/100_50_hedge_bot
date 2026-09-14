@@ -1,7 +1,11 @@
 # BTC Silver v1.3 Full-Build Runner
 
-Status: prepared but not started. Silver DML requires an explicit `--run` flag,
-a fully verified Bronze input, and no active Bronze import process.
+Status: builder stopped after `STOP_SILVER_MEMORY_LIMIT` on chunk
+`4dd543b356b0dfe78a4deaa893c291bbf5acbae6c2991d3ce50d45527b9b4126`.
+Before any productive `--run --resume`, complete the append-only bucket-boundary
+repair (see [BTC_SILVER_V1_3_BUCKET_BOUNDARY_REPAIR.md](BTC_SILVER_V1_3_BUCKET_BOUNDARY_REPAIR.md)).
+Full `--run` hard-stops with `STOP_SILVER_FULL_RESUME_UNTIL_REPAIR_VERIFIED`
+while COMPLETE chunks still have missing terminal 100ms states.
 
 ## Immutable contract
 
@@ -18,8 +22,18 @@ a fully verified Bronze input, and no active Bronze import process.
 - Proven chunk size: `15` market minutes
 - Full-build output warmup: `0` minutes (exchange snapshot is the book anchor)
 - Optional replay warm-up prefix for bounded pilots: pass `--warmup-minutes` explicitly
+- Bucket contract: `[bucket_start, bucket_start+100ms)`; state includes every
+  delta with `event_time < bucket_end`. Planner and emitter share
+  `ceil(start) while start < end`. Artificial chunk ends may extend the
+  *read/apply* window to `evaluation_end_ns` within the same epoch; LCs stay
+  inside `[analysis_start, analysis_end)`.
+- Expected full plan bucket count remains `5,619,393`
+- Bounded memory: LC and state inserts stream in batches during replay
+  (no full chunk LC materialization). Python RSS cap stays `1536` MiB.
+  Memory aborts mark the chunk `INTERRUPTED` (fail-closed).
 
 Do not start Silver while the Bronze full import is still running.
+Do not start Silver resume until bucket repair is `REPAIR_VERIFIED`.
 
 ## Parallel analysis while building
 
