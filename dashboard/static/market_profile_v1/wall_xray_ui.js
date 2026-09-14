@@ -471,7 +471,18 @@
     if (!panel) return;
     panel.hidden = false;
     state.panelOpen = true;
+    var body = $("wdPanelBody");
+    var minBtn = $("wdPanelMin");
+    if (body && body.hidden) {
+      // keep user collapse; only ensure panel chrome visible
+    }
     renderPanel();
+  }
+
+  function closePanel() {
+    var panel = $("wdPanel");
+    if (panel) panel.hidden = true;
+    state.panelOpen = false;
   }
 
   function renderRadarHtml(radar) {
@@ -657,6 +668,7 @@
       stopXray: stopXray,
       startXrayFromWall: startXrayFromWall,
       onXrayClick: onXrayClick,
+      onPanelClosed: closePanel,
       getState: function () {
         return {
           toolActive: state.toolActive,
@@ -664,7 +676,8 @@
           radar: state.radar,
           lastPrice: state.lastPrice,
           liveMetrics: state.liveMetrics,
-          lastClickStatus: state.lastClickStatus
+          lastClickStatus: state.lastClickStatus,
+          panelOpen: state.panelOpen
         };
       }
     };

@@ -893,7 +893,9 @@
   z-index: 40;
   width: min(380px, calc(100% - 24px));
   max-height: calc(100% - 24px);
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: rgba(18, 22, 30, 0.94);
   border: 1px solid #3a4252;
   border-radius: 6px;
@@ -911,6 +913,23 @@
   cursor: grab;
   border-bottom: 1px solid #2a2e39;
   user-select: none;
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(18, 22, 30, 0.98);
+}
+
+.wd-panel-head > strong {
+  flex: 0 0 auto;
+}
+
+.wd-panel-head > .wd-state {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wd-panel-head:active {
@@ -921,6 +940,7 @@
   margin-left: auto;
   display: inline-flex;
   gap: 4px;
+  flex: 0 0 auto;
 }
 
 .wd-icon-btn {
@@ -936,6 +956,13 @@
 
 .wd-panel-body {
   padding: 8px 10px 10px;
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.wd-panel-body[hidden] {
+  display: none !important;
 }
 
 .wd-row {

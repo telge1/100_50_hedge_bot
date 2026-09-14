@@ -592,6 +592,11 @@
     var panel = $("wdPanel");
     if (panel) panel.hidden = true;
     state.panelOpen = false;
+    try {
+      if (root.__mpWallXray && typeof root.__mpWallXray.onPanelClosed === "function") {
+        root.__mpWallXray.onPanelClosed();
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function renderPanel() {
@@ -729,17 +734,23 @@
     var minBtn = $("wdPanelMin");
     if (minBtn && !minBtn._wdBound) {
       minBtn._wdBound = true;
-      minBtn.addEventListener("click", function () {
+      minBtn.addEventListener("click", function (ev) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
         var body = $("wdPanelBody");
         if (!body) return;
         body.hidden = !body.hidden;
         minBtn.setAttribute("aria-expanded", body.hidden ? "false" : "true");
+        minBtn.title = body.hidden ? "Ausklappen" : "Einklappen";
+        minBtn.textContent = body.hidden ? "+" : "–";
       });
     }
     var closeBtn = $("wdPanelClose");
     if (closeBtn && !closeBtn._wdBound) {
       closeBtn._wdBound = true;
-      closeBtn.addEventListener("click", closePanel);
+      closeBtn.addEventListener("click", function (ev) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        closePanel();
+      });
     }
     var clearBtn = $("wdClearBp");
     if (clearBtn && !clearBtn._wdBound) {
