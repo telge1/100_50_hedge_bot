@@ -1420,7 +1420,8 @@ def test_resume_skips_complete_and_rebuilds_running_zero(tmp_path, monkeypatch):
     seen: list[str] = []
 
     def _fake_build(client_arg, config_arg, *, run_id, epoch_plan_hash, chunk, stop):
-        existing = runner._chunk_status(client_arg, config_arg, chunk.chunk_key)
+        ch = runner._as_session_clients(client_arg).write
+        existing = runner._chunk_status(ch, config_arg, chunk.chunk_key)
         assert existing is not None
         status = existing[0]
         if status == "COMPLETE":
@@ -1435,7 +1436,7 @@ def test_resume_skips_complete_and_rebuilds_running_zero(tmp_path, monkeypatch):
         assert status in {"RUNNING", "INTERRUPTED", "FAILED"}
         seen.append("REBUILD")
         runner._write_chunk_status(
-            client_arg,
+            ch,
             config_arg,
             run_id=run_id,
             epoch_plan_hash=epoch_plan_hash,
@@ -1578,3 +1579,352 @@ def test_eta_uses_all_completed_market_minutes(tmp_path, monkeypatch, capsys):
     assert lines[2]["eta_s"] == 0.0
     assert lines[2]["remaining_chunks"] == 0
     assert lines[2]["cumulative_level_changes"] == 33
+
+class SessionAwareFakeClient(FakeClient):
+    """Fake client that reproduces SESSION_IS_LOCKED when stream+query share a session."""
+
+    def __init__(self, *, session_id: str, **kwargs):
+        super().__init__(**kwargs)
+        self._session_id = session_id
+        self.stream_open = False
+        self.ops: list[str] = []
+
+    def get_client_setting(self, name: str):
+        if name == "session_id":
+            return self._session_id
+        return None
+
+    def _guard(self, op: str) -> None:
+        self.ops.append(op)
+        if self.stream_open and op != "stream":
+            raise RuntimeError(
+                "Received ClickHouse exception, code: 373, "
+                f"Session {self._session_id} is locked by a concurrent client "
+                "(SESSION_IS_LOCKED)"
+            )
+
+    def query(self, sql, parameters=None):
+        self._guard("query")
+        return super().query(sql, parameters=parameters)
+
+    def insert(self, table, rows, column_names=None, column_oriented=False, settings=None):
+        self._guard("insert")
+        return super().insert(
+            table,
+            rows,
+            column_names=column_names,
+            column_oriented=column_oriented,
+            settings=settings,
+        )
+
+    def query_row_block_stream(self, sql, parameters=None, settings=None):
+        self._guard("stream")
+        parent = self
+        base = super().query_row_block_stream(sql, parameters=parameters, settings=settings)
+
+        class _GuardedStream:
+            def __enter__(_self):
+                parent.stream_open = True
+                return base.__enter__()
+
+            def __exit__(_self, *args):
+                parent.stream_open = False
+                return base.__exit__(*args)
+
+            def __iter__(_self):
+                return iter(base)
+
+        return _GuardedStream()
+
+
+def test_code_373_maps_to_session_locked_verdict():
+    with pytest.raises(runner.SilverBuildError, match="STOP_SILVER_CH_SESSION_LOCKED"):
+        runner._raise_clickhouse_stream_error(
+            RuntimeError(
+                "Code: 373. DB::Exception: Session abc is locked (SESSION_IS_LOCKED)"
+            )
+        )
+    mapped = runner._map_clickhouse_operational_error(
+        RuntimeError("code: 373 SESSION_IS_LOCKED")
+    )
+    assert "STOP_SILVER_CH_SESSION_LOCKED" in str(mapped)
+    assert runner._is_clickhouse_session_locked(mapped)
+
+
+def test_shared_client_stream_and_insert_is_detected(tmp_path):
+    client = SessionAwareFakeClient(session_id="shared-session")
+    client.stream_blocks = [[(1,)]]
+    stream_ctx = client.query_row_block_stream("SELECT 1")
+    with stream_ctx:
+        next(iter(stream_ctx))
+        with pytest.raises(RuntimeError, match="SESSION_IS_LOCKED"):
+            client.insert("db.t", [[1]], column_names=["x"])
+
+
+def test_isolated_clients_allow_stream_and_flush(tmp_path):
+    read = SessionAwareFakeClient(session_id="read-session")
+    write = SessionAwareFakeClient(session_id="write-session")
+    verify = SessionAwareFakeClient(session_id="verify-session")
+    clients = runner.SilverSessionClients(read=read, write=write, verify=verify)
+    clients.assert_isolated()
+    read.stream_blocks = [[(1,)]]
+    stream_ctx = read.query_row_block_stream("SELECT 1")
+    with stream_ctx:
+        next(iter(stream_ctx))
+        write.insert("db.ob_level_changes_v1_3", [["r"]], column_names=["row_id"])
+        verify.query(
+            f"SELECT count() FROM db.{runner.LEVEL_CHANGES_TABLE} FINAL WHERE chunk_key = {{chunk_key:String}}",
+            parameters={"chunk_key": "x"},
+        )
+    assert "insert" in write.ops
+    assert "query" in verify.ops
+    assert read.stream_open is False
+
+
+def test_session_clients_reject_duplicate_sessions():
+    shared = SessionAwareFakeClient(session_id="same")
+    other = SessionAwareFakeClient(session_id="same")
+    third = SessionAwareFakeClient(session_id="other")
+    clients = runner.SilverSessionClients(read=shared, write=other, verify=third)
+    with pytest.raises(runner.SilverBuildError, match="STOP_SILVER_CH_SESSION_LOCKED"):
+        clients.assert_isolated()
+
+
+def test_build_one_chunk_uses_write_not_read_for_ledger_and_verify(tmp_path, monkeypatch):
+    read = SessionAwareFakeClient(session_id="read-a")
+    write = SessionAwareFakeClient(session_id="write-a")
+    verify = SessionAwareFakeClient(session_id="verify-a")
+    # Mirror ledger/row state onto write for chunk status reads.
+    clients = runner.SilverSessionClients(read=read, write=write, verify=verify)
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    payload = json.dumps({"data": {"u": 1, "seq": 1, "b": [["100", "1"]], "a": [["101", "1"]]}})
+    read.stream_blocks = [[
+        ("r" * 64, "BTCUSDT", "snapshot", 0, 0, 1, 1, 1, 1, SHA_A, 1, "d" * 64, payload, 1),
+        (
+            "s" * 64,
+            "BTCUSDT",
+            "delta",
+            1_000_000_000,
+            1_000_000_000,
+            2,
+            2,
+            1,
+            1,
+            SHA_A,
+            2,
+            "d" * 64,
+            json.dumps({"data": {"u": 2, "seq": 2, "b": [["100", "2"]], "a": []}}),
+            1,
+        ),
+    ]]
+
+    # Keep verify counts in sync with write inserts.
+    original_insert = write.insert
+
+    def _insert(table, rows, column_names=None, column_oriented=False, settings=None):
+        original_insert(
+            table,
+            rows,
+            column_names=column_names,
+            column_oriented=column_oriented,
+            settings=settings,
+        )
+        verify.level_changes = set(write.level_changes)
+        verify.metrics = set(write.metrics)
+        verify.chunks = dict(write.chunks)
+        verify.chunk_rows = dict(write.chunk_rows)
+
+    write.insert = _insert  # type: ignore[method-assign]
+    # _chunk_status / version_ms read from write client
+    result = runner.build_one_chunk(
+        clients,
+        _config(tmp_path, resume=True, warmup_minutes=0),
+        run_id="r" * 64,
+        epoch_plan_hash=plan.epoch_plan_hash,
+        chunk=chunk,
+        stop=runner.StopState(),
+    )
+    assert result["status"] == "COMPLETE"
+    assert any(op == "stream" for op in read.ops)
+    assert any(table.endswith(runner.CHUNKS_TABLE) for table in write.inserts)
+    assert any(table.endswith(runner.LEVEL_CHANGES_TABLE) for table in write.inserts)
+    assert "query" in verify.ops
+    assert "insert" not in read.ops
+    assert read.stream_open is False
+    assert result["session_ids"]["read"] == "read-a"
+    assert result["session_ids"]["write"] == "write-a"
+    assert result["session_ids"]["verify"] == "verify-a"
+
+
+def test_multi_flush_within_chunk_stays_on_write_client(tmp_path):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    replay = SimpleNamespace(
+        level_changes=[
+            {
+                "canonical_segment_chain_index": 1,
+                "source_segment_sha256": "a" * 64,
+                "source_record_ordinal": i,
+                "apply_order": i,
+                "event_time_ns": i * 1000,
+                "receive_time_ns": i * 1000,
+            }
+            for i in range(1, 6)
+        ],
+        states=[
+            {"bucket_start_ms": i * 100}
+            for i in range(1, 4)
+        ],
+        level_change_hash_apply_order="f" * 64,
+        end_apply_key=(1, 5),
+        source_records=5,
+    )
+    stats = runner._persist_chunk_outputs(
+        client,
+        _config(tmp_path),
+        chunk=chunk,
+        replay=replay,
+        batch_size=2,
+        batch_max_bytes=10**9,
+    )
+    assert stats["insert_calls_level_changes"] >= 3
+    assert stats["insert_calls_states"] >= 2
+    assert stats["level_change_count"] == 5
+    assert stats["state_count"] == 3
+
+
+def test_session_locked_marks_chunk_interrupted(tmp_path, monkeypatch):
+    client = FakeClient()
+    epoch = EpochDefinition(
+        epoch_id="e" * 64,
+        epoch_hash="h" * 64,
+        chain_version=CHAIN_VERSION,
+        canonical_chain_hash=CHAIN_HASH,
+        symbol="BTCUSDT",
+        anchor_type="exchange_snapshot",
+        anchor_provenance="exchange_websocket_original_payload",
+        anchor_event_time_ns=0,
+        anchor_receive_time_ns=0,
+        anchor_u=1,
+        anchor_seq=1,
+        anchor_segment_chain_index=1,
+        anchor_record_ordinal=1,
+        safe_start_ns=0,
+        safe_end_ns=60 * 60 * 1_000_000_000,
+        terminating_reason="COMPLETE",
+        preceding_gap_id="",
+        status="COMPLETE",
+        apply_end_segment_chain_index=1,
+        apply_end_record_ordinal=100,
+    )
+    chunk = runner.ChunkPlan(
+        epoch_index=1,
+        chunk_index=1,
+        epoch=epoch,
+        analysis_start_ns=0,
+        analysis_end_ns=15 * 60 * 1_000_000_000,
+        warmup_ns=0,
+    )
+    chunk.materialize_ids()
+    plan = runner.BuildPlan(epochs=[epoch], gaps=[])
+    plan.finalize()
+    client.stream_blocks = [[
+        (
+            "r" * 64, "BTCUSDT", "snapshot", 0, 0, 1, 1, 1, 1, SHA_A, 1, "d" * 64,
+            json.dumps({"data": {"u": 1, "seq": 1, "b": [["100", "1"]], "a": [["101", "1"]]}}),
+            1,
+        )
+    ]]
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("Code: 373. SESSION_IS_LOCKED")
+
+    monkeypatch.setattr(runner, "_persist_chunk_outputs", _boom)
+    with pytest.raises(runner.SilverBuildError, match="STOP_SILVER_CH_SESSION_LOCKED"):
+        runner.build_one_chunk(
+            client,
+            _config(tmp_path, resume=True),
+            run_id="r" * 64,
+            epoch_plan_hash=plan.epoch_plan_hash,
+            chunk=chunk,
+            stop=runner.StopState(),
+        )
+    assert client.chunks[chunk.chunk_key][0] == "INTERRUPTED"
+
+
+def test_close_streaming_iterator_closes_generator():
+    closed = {"value": False}
+
+    def _gen():
+        try:
+            yield 1
+            yield 2
+        finally:
+            closed["value"] = True
+
+    it = _gen()
+    assert next(it) == 1
+    runner._close_streaming_iterator(it)
+    assert closed["value"] is True

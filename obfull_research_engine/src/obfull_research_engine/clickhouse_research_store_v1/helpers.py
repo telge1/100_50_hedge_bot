@@ -209,7 +209,20 @@ def load_clickhouse_env() -> None:
         break
 
 
-def get_clickhouse_client() -> Any:
+def get_clickhouse_client(
+    *,
+    session_id: str | None = None,
+    role: str | None = None,
+) -> Any:
+    """Open a ClickHouse HTTP client with an explicit, unique session.
+
+    ``role`` (e.g. ``read`` / ``write`` / ``verify``) forces a dedicated
+    ``session_id`` so a Bronze streaming result cannot lock Silver DML on the
+    same session. Callers that need concurrent stream + insert MUST use
+    separate clients (separate sessions).
+    """
+    import uuid
+
     import clickhouse_connect
 
     load_clickhouse_env()
@@ -217,21 +230,46 @@ def get_clickhouse_client() -> Any:
     port = int(os.environ.get("CLICKHOUSE_HTTP_PORT") or os.environ.get("CLICKHOUSE_PORT") or "8123")
     user = os.environ.get("CLICKHOUSE_USER", "default")
     password = os.environ.get("CLICKHOUSE_PASSWORD", "")
-    client = clickhouse_connect.get_client(
-        host=host,
-        port=port,
-        username=user,
-        password=password,
-        connect_timeout=10,
-        send_receive_timeout=60,
-        settings={"session_timezone": "UTC"},
-    )
+    resolved_session = session_id
+    if resolved_session is None and role is not None:
+        resolved_session = f"silver-v1_3-{role}-{uuid.uuid4()}"
+    client_kwargs: dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "username": user,
+        "password": password,
+        "connect_timeout": 10,
+        "send_receive_timeout": 60,
+        "settings": {"session_timezone": "UTC"},
+    }
+    if resolved_session is not None:
+        client_kwargs["session_id"] = resolved_session
+        client_kwargs["autogenerate_session_id"] = False
+    client = clickhouse_connect.get_client(**client_kwargs)
     # Defense in depth: naive strings must not be interpreted as Europe/Paris.
     try:
         client.command("SET session_timezone = 'UTC'")
     except Exception:  # noqa: BLE001
         pass
+    if role is not None:
+        try:
+            client.command("SET max_threads = 1")
+        except Exception:  # noqa: BLE001
+            pass
     return client
+
+
+def client_session_id(client: Any) -> str:
+    """Best-effort session_id from a clickhouse_connect client."""
+    getter = getattr(client, "get_client_setting", None)
+    if callable(getter):
+        try:
+            value = getter("session_id")
+            if value:
+                return str(value)
+        except Exception:  # noqa: BLE001
+            pass
+    return str(getattr(client, "session_id", "") or "")
 
 
 def ns_to_utc_datetime(ns: int) -> datetime:

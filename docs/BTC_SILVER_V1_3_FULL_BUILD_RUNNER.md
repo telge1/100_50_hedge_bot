@@ -161,6 +161,20 @@ env PYTHONPATH=/home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/ob
   --lock-path /home/telgenbuescher/projects/orderbook_analyse_ch_research_v1/obfull_research_engine/runs/silver_full_build_v1_3/build.lock
 ```
 
+## ClickHouse session isolation
+
+The full builder opens three dedicated ClickHouse HTTP clients:
+
+- `read` – Bronze `query_row_block_stream` only
+- `write` – Silver inserts and chunk-ledger updates
+- `verify` – post-insert count checks and resource probes
+
+Each client has its own `session_id`. `replay_epoch_window` may stop at
+`analysis_end_ns` before the Bronze stream is exhausted; the runner always
+closes the Bronze generator before any write/verify query. ClickHouse code
+373 / `SESSION_IS_LOCKED` maps to `STOP_SILVER_CH_SESSION_LOCKED` and leaves
+the chunk ledger in a resume-capable `INTERRUPTED` state.
+
 ## Runtime expectation
 
 The pre-run estimate from the proven epoch-aware pilot is approximately

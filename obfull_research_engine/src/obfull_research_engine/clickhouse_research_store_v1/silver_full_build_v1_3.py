@@ -48,7 +48,12 @@ from .epoch_aware_silver_v1_3 import (
     state_row_id,
     validate_epoch_window,
 )
-from .helpers import current_rss_bytes, get_clickhouse_client, iso_to_ns_exact
+from .helpers import (
+    client_session_id,
+    current_rss_bytes,
+    get_clickhouse_client,
+    iso_to_ns_exact,
+)
 from .silver_replay import BronzeRecord, bronze_row_from_ch
 
 EXPECTED_BRANCH = "research/clickhouse-defense-store-v1"
@@ -109,6 +114,95 @@ class SilverBuildError(RuntimeError):
 
 class ControlledInterrupt(SilverBuildError):
     """Raised after SIGINT/SIGTERM requests a controlled stop."""
+
+
+@dataclass
+class SilverSessionClients:
+    """Dedicated ClickHouse clients so Bronze streams never lock Silver DML.
+
+    ``read`` owns Bronze ``query_row_block_stream`` results.
+    ``write`` owns Silver inserts and chunk-ledger updates.
+    ``verify`` owns post-insert count/hash checks and resource probes.
+    """
+
+    read: Any
+    write: Any
+    verify: Any
+    shared_legacy: bool = False
+
+    def session_ids(self) -> dict[str, str]:
+        return {
+            "read": client_session_id(self.read),
+            "write": client_session_id(self.write),
+            "verify": client_session_id(self.verify),
+        }
+
+    def assert_isolated(self) -> None:
+        if self.shared_legacy:
+            return
+        ids = self.session_ids()
+        read_id, write_id, verify_id = ids["read"], ids["write"], ids["verify"]
+        if not read_id or not write_id or not verify_id:
+            raise SilverBuildError(
+                "STOP_SILVER_CH_SESSION_LOCKED: missing session_id on isolated clients"
+            )
+        if len({read_id, write_id, verify_id}) != 3:
+            raise SilverBuildError(
+                "STOP_SILVER_CH_SESSION_LOCKED: read/write/verify sessions are not unique "
+                f"(read={read_id}, write={write_id}, verify={verify_id})"
+            )
+        if self.read is self.write or self.read is self.verify or self.write is self.verify:
+            raise SilverBuildError(
+                "STOP_SILVER_CH_SESSION_LOCKED: read/write/verify must be distinct clients"
+            )
+
+    def close(self) -> None:
+        seen: set[int] = set()
+        for client in (self.read, self.write, self.verify):
+            marker = id(client)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            closer = getattr(client, "close", None)
+            if callable(closer):
+                try:
+                    closer()
+                except Exception:  # noqa: BLE001
+                    pass
+
+
+def open_silver_session_clients() -> SilverSessionClients:
+    """Create three role-scoped clients with distinct ClickHouse sessions."""
+    clients = SilverSessionClients(
+        read=get_clickhouse_client(role="read"),
+        write=get_clickhouse_client(role="write"),
+        verify=get_clickhouse_client(role="verify"),
+        shared_legacy=False,
+    )
+    clients.assert_isolated()
+    return clients
+
+
+def _as_session_clients(client_or_bundle: Any) -> SilverSessionClients:
+    if isinstance(client_or_bundle, SilverSessionClients):
+        return client_or_bundle
+    return SilverSessionClients(
+        read=client_or_bundle,
+        write=client_or_bundle,
+        verify=client_or_bundle,
+        shared_legacy=True,
+    )
+
+
+def _close_streaming_iterator(iterator: Any) -> None:
+    """Close a Bronze generator so its ``query_row_block_stream`` context exits."""
+    closer = getattr(iterator, "close", None)
+    if not callable(closer):
+        return
+    try:
+        closer()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @dataclass(frozen=True)
@@ -675,10 +769,30 @@ def _is_clickhouse_memory_error(exc: BaseException) -> bool:
     return "241" in text or "MEMORY_LIMIT_EXCEEDED" in text
 
 
+def _is_clickhouse_session_locked(exc: BaseException) -> bool:
+    text = str(exc)
+    return (
+        "SESSION_IS_LOCKED" in text
+        or "Code: 373" in text
+        or "code: 373" in text
+        or "STOP_SILVER_CH_SESSION_LOCKED" in text
+    )
+
+
 def _raise_clickhouse_stream_error(exc: BaseException) -> None:
     if _is_clickhouse_memory_error(exc):
         raise SilverBuildError(f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}") from exc
+    if _is_clickhouse_session_locked(exc):
+        raise SilverBuildError(f"STOP_SILVER_CH_SESSION_LOCKED: {exc}") from exc
     raise SilverBuildError(f"STOP_SILVER_CH_QUERY_NOT_STREAMING: {exc}") from exc
+
+
+def _map_clickhouse_operational_error(exc: BaseException) -> SilverBuildError:
+    if _is_clickhouse_memory_error(exc):
+        return SilverBuildError(f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}")
+    if _is_clickhouse_session_locked(exc):
+        return SilverBuildError(f"STOP_SILVER_CH_SESSION_LOCKED: {exc}")
+    return SilverBuildError(f"STOP_SILVER_RUNNER_SAFETY_UNEXPECTED: {exc}")
 
 
 def _bronze_payload_select(payload_mode: str) -> str:
@@ -1462,7 +1576,8 @@ def build_one_chunk(
     chunk: ChunkPlan,
     stop: StopState,
 ) -> dict[str, Any]:
-    existing = _chunk_status(client, config, chunk.chunk_key)
+    clients = _as_session_clients(client)
+    existing = _chunk_status(clients.write, config, chunk.chunk_key)
     if existing is not None:
         (
             status,
@@ -1487,54 +1602,66 @@ def build_one_chunk(
             raise SilverBuildError("STOP_SILVER_RESUME_INCOMPLETE_REQUIRES_RESUME")
 
     _write_chunk_status(
-        client,
+        clients.write,
         config,
         run_id=run_id,
         epoch_plan_hash=epoch_plan_hash,
         chunk=chunk,
         status="RUNNING",
     )
+    bronze_stream: Any | None = None
     try:
         start_apply, end_apply = epoch_apply_bounds(chunk.epoch)
         try:
-            resume_record, replay_stream = split_resume_and_replay_stream(
-                iter_bronze_records(
-                    client,
-                    config,
-                    start_apply_key=start_apply,
-                    end_apply_key=end_apply,
-                    payload_mode=BRONZE_PAYLOAD_FULL,
-                ),
-                epoch=chunk.epoch,
-                analysis_start_ns=chunk.analysis_start_ns,
+            bronze_stream = iter_bronze_records(
+                clients.read,
+                config,
+                start_apply_key=start_apply,
+                end_apply_key=end_apply,
+                payload_mode=BRONZE_PAYLOAD_FULL,
             )
-        except EpochSilverError as exc:
-            raise SilverBuildError(str(exc)) from exc
+            try:
+                resume_record, replay_stream = split_resume_and_replay_stream(
+                    bronze_stream,
+                    epoch=chunk.epoch,
+                    analysis_start_ns=chunk.analysis_start_ns,
+                )
+            except EpochSilverError as exc:
+                raise SilverBuildError(str(exc)) from exc
+            stop.check()
+            try:
+                replay = replay_epoch_window(
+                    replay_stream,
+                    epoch=chunk.epoch,
+                    resume_record=resume_record,
+                    analysis_start_ns=chunk.analysis_start_ns,
+                    analysis_end_ns=chunk.analysis_end_ns,
+                    build_id=chunk.build_id,
+                )
+            except EpochSilverError as exc:
+                raise SilverBuildError(str(exc)) from exc
+        finally:
+            # Replay may break early at analysis_end_ns while the Bronze HTTP
+            # stream is still open. Close it before any write/verify query on
+            # a shared legacy client, and always before returning.
+            if bronze_stream is not None:
+                _close_streaming_iterator(bronze_stream)
+                bronze_stream = None
         stop.check()
-        try:
-            replay = replay_epoch_window(
-                replay_stream,
-                epoch=chunk.epoch,
-                resume_record=resume_record,
-                analysis_start_ns=chunk.analysis_start_ns,
-                analysis_end_ns=chunk.analysis_end_ns,
-                build_id=chunk.build_id,
-            )
-        except EpochSilverError as exc:
-            raise SilverBuildError(str(exc)) from exc
-        stop.check()
-        persist_stats = _persist_chunk_outputs(client, config, chunk=chunk, replay=replay)
+        persist_stats = _persist_chunk_outputs(
+            clients.write, config, chunk=chunk, replay=replay
+        )
         level_change_count = len(replay.level_changes)
         state_count = len(replay.states)
         _verify_chunk_inserts(
-            client,
+            clients.verify,
             config,
             chunk=chunk,
             level_change_count=level_change_count,
             state_count=state_count,
         )
         _write_chunk_status(
-            client,
+            clients.write,
             config,
             run_id=run_id,
             epoch_plan_hash=epoch_plan_hash,
@@ -1556,11 +1683,12 @@ def build_one_chunk(
             "insert_calls_level_changes": persist_stats["insert_calls_level_changes"],
             "insert_calls_states": persist_stats["insert_calls_states"],
             "batch_size": persist_stats["batch_size"],
+            "session_ids": clients.session_ids(),
         }
     except ControlledInterrupt as exc:
         # Newer append-only ledger version; resume rebuilds RUNNING/INTERRUPTED/FAILED.
         _write_chunk_status(
-            client,
+            clients.write,
             config,
             run_id=run_id,
             epoch_plan_hash=epoch_plan_hash,
@@ -1570,16 +1698,40 @@ def build_one_chunk(
         )
         raise
     except SilverBuildError as exc:
+        ledger_status = (
+            "INTERRUPTED" if _is_clickhouse_session_locked(exc) else "FAILED"
+        )
         _write_chunk_status(
-            client,
+            clients.write,
             config,
             run_id=run_id,
             epoch_plan_hash=epoch_plan_hash,
             chunk=chunk,
-            status="FAILED",
+            status=ledger_status,
             stop_reason=str(exc),
         )
         raise
+    except Exception as exc:  # noqa: BLE001
+        mapped = _map_clickhouse_operational_error(exc)
+        ledger_status = (
+            "INTERRUPTED" if _is_clickhouse_session_locked(mapped) else "FAILED"
+        )
+        try:
+            _write_chunk_status(
+                clients.write,
+                config,
+                run_id=run_id,
+                epoch_plan_hash=epoch_plan_hash,
+                chunk=chunk,
+                status=ledger_status,
+                stop_reason=str(mapped),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        raise mapped from exc
+    finally:
+        if bronze_stream is not None:
+            _close_streaming_iterator(bronze_stream)
 
 
 def run_build(
@@ -1590,6 +1742,9 @@ def run_build(
     stop: StopState | None = None,
 ) -> dict[str, Any]:
     stop = stop or StopState()
+    clients = _as_session_clients(client)
+    if not clients.shared_legacy:
+        clients.assert_isolated()
     run_id = make_run_id(config, plan.epoch_plan_hash)
     plan.chunks = plan_epoch_chunks(
         plan.epochs,
@@ -1599,7 +1754,7 @@ def run_build(
     if not plan.chunks:
         raise SilverBuildError("STOP_SILVER_EPOCH_PLAN_EMPTY: no safe chunks")
 
-    existing_run = client.query(
+    existing_run = clients.write.query(
         f"""
         SELECT epoch_plan_hash, status
         FROM {config.output_database}.{RUNS_TABLE} FINAL
@@ -1612,7 +1767,7 @@ def run_build(
         if stored_hash != plan.epoch_plan_hash:
             raise SilverBuildError("STOP_SILVER_EPOCH_PLAN_CHANGED: run hash mismatch")
 
-    persist_epochs_and_gaps(client, config, plan)
+    persist_epochs_and_gaps(clients.write, config, plan)
     started = time.monotonic()
     wall_started = datetime.now(timezone.utc)
     completed = skipped = 0
@@ -1621,12 +1776,13 @@ def run_build(
     cumulative_states = 0
     completed_market_minutes = 0.0
     progress: list[dict[str, Any]] = []
+    session_ids = clients.session_ids()
     for position, chunk in enumerate(plan.chunks, 1):
         stop.check()
-        _check_resources(client, config)
+        _check_resources(clients.verify, config)
         chunk_started = time.monotonic()
         result = build_one_chunk(
-            client,
+            clients,
             config,
             run_id=run_id,
             epoch_plan_hash=plan.epoch_plan_hash,
@@ -1692,6 +1848,9 @@ def run_build(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 3
             ),
             "status": status,
+            "session_ids": result.get("session_ids") or session_ids,
+            "insert_calls_level_changes": result.get("insert_calls_level_changes"),
+            "insert_calls_states": result.get("insert_calls_states"),
         }
         progress.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
@@ -1705,6 +1864,7 @@ def run_build(
                     "chunks_processed": position,
                     "chunks_total": len(plan.chunks),
                     "last_progress": row,
+                    "session_ids": session_ids,
                 },
             )
 
@@ -1716,7 +1876,7 @@ def run_build(
             "progress": progress,
         }
     )
-    client.insert(
+    clients.write.insert(
         f"{config.output_database}.{RUNS_TABLE}",
         [[
             run_id,
@@ -1768,6 +1928,7 @@ def run_build(
         "rows_inserted": total_rows,
         "elapsed_s": round(time.monotonic() - started, 3),
         "progress": progress,
+        "session_ids": session_ids,
     }
 
 
@@ -2009,26 +2170,36 @@ def execute(
     if (args.check_only or args.verify_only or args.epoch_plan_only) and args.init_schema:
         raise SilverBuildError("STOP_SILVER_RUNNER_SAFETY_READ_ONLY_MODE_WITH_DDL")
     config = config_from_args(args)
-    own_client = client is None
-    client = client or get_clickhouse_client()
+    own_clients = False
+    if client is None:
+        if args.run:
+            clients = open_silver_session_clients()
+        else:
+            # Read-only / schema modes still use a dedicated session, but only one.
+            single = get_clickhouse_client(role="admin")
+            clients = _as_session_clients(single)
+        own_clients = True
+    else:
+        clients = _as_session_clients(client)
+    admin = clients.write
     try:
         if args.check_only:
-            report = preflight(client, config, bronze_probe=bronze_probe)
+            report = preflight(admin, config, bronze_probe=bronze_probe)
             print(json.dumps(report, indent=2, sort_keys=True), flush=True)
             return report
         if args.epoch_plan_only:
-            preflight_report = preflight(client, config, bronze_probe=bronze_probe)
-            metadata = load_segment_metadata(client, config)
-            profile = profile_epoch_plan(client, config, metadata)
+            preflight_report = preflight(admin, config, bronze_probe=bronze_probe)
+            metadata = load_segment_metadata(clients.read, config)
+            profile = profile_epoch_plan(clients.read, config, metadata)
             payload = {"preflight": preflight_report, "epoch_plan": profile}
             _write_report(config.report_path, payload)
             print(json.dumps(payload, indent=2, sort_keys=True), flush=True)
             return payload
         if args.verify_only:
             preflight_report = preflight(
-                client, config, require_output_schema=True, bronze_probe=bronze_probe
+                admin, config, require_output_schema=True, bronze_probe=bronze_probe
             )
-            result = verify_build(client, config)
+            result = verify_build(clients.verify, config)
             payload = {"preflight": preflight_report, "verify": result}
             print(json.dumps(payload, indent=2, sort_keys=True), flush=True)
             return payload
@@ -2039,7 +2210,7 @@ def execute(
             with BuildLock(config.lock_path, _lock_metadata(config)):
                 try:
                     preflight_report = preflight(
-                        client,
+                        admin,
                         config,
                         require_output_schema=not args.init_schema,
                         check_lock=False,
@@ -2047,7 +2218,7 @@ def execute(
                         require_bronze_ready=bool(args.run or args.verify_only),
                     )
                     if args.init_schema:
-                        init_schema(client, config.output_database)
+                        init_schema(clients.write, config.output_database)
                     if not args.run:
                         payload = {
                             "status": "SCHEMA_INITIALIZED",
@@ -2056,10 +2227,10 @@ def execute(
                         _write_report(config.report_path, payload)
                         print(json.dumps(payload, indent=2, sort_keys=True), flush=True)
                         return payload
-                    if not target_schema_exists(client, config.output_database):
+                    if not target_schema_exists(clients.verify, config.output_database):
                         raise SilverBuildError("STOP_SILVER_VERIFY_SCHEMA_MISSING")
-                    metadata = load_segment_metadata(client, config)
-                    plan = build_epoch_plan(client, config, metadata)
+                    metadata = load_segment_metadata(clients.read, config)
+                    plan = build_epoch_plan(clients.read, config, metadata)
                     _write_report(
                         config.report_path,
                         {
@@ -2068,10 +2239,11 @@ def execute(
                             "epoch_plan_hash": plan.epoch_plan_hash,
                             "epochs": len(plan.epochs),
                             "gaps": len(plan.gaps),
+                            "session_ids": clients.session_ids(),
                             "started_at": _now_iso(),
                         },
                     )
-                    result = run_build(client, config, plan, stop=stop)
+                    result = run_build(clients, config, plan, stop=stop)
                     payload = {
                         "verdict": "BTC_SILVER_V1_3_FULL_BUILD_COMPLETE",
                         "preflight": preflight_report,
@@ -2085,8 +2257,9 @@ def execute(
                         isinstance(exc, SilverBuildError)
                         and "STOP_SILVER_CH_MEMORY_LIMIT" in str(exc)
                     )
+                    session_locked = _is_clickhouse_session_locked(exc)
                     status = "INTERRUPTED" if interrupted else "FAILED"
-                    if memory_limited and not interrupted:
+                    if (memory_limited or session_locked) and not interrupted:
                         status = "INTERRUPTED"
                     _write_report(
                         config.report_path,
@@ -2096,22 +2269,18 @@ def execute(
                             "signal": stop.signal_number,
                             "failed_at": _now_iso(),
                             "memory_limited": memory_limited,
+                            "session_locked": session_locked,
+                            "session_ids": clients.session_ids(),
                         },
                     )
                     if isinstance(exc, SilverBuildError):
                         raise
-                    if _is_clickhouse_memory_error(exc):
-                        raise SilverBuildError(
-                            f"STOP_SILVER_CH_MEMORY_LIMIT: {exc}"
-                        ) from exc
-                    raise SilverBuildError(
-                        f"STOP_SILVER_RUNNER_SAFETY_UNEXPECTED: {exc}"
-                    ) from exc
+                    raise _map_clickhouse_operational_error(exc) from exc
         finally:
             _restore_signal_handlers(previous)
     finally:
-        if own_client:
-            client.close()
+        if own_clients:
+            clients.close()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
