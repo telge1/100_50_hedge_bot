@@ -13,19 +13,12 @@ from .adapters.bronze_baseline import (
 from .models import BaselineBookState
 from .ports import (
     AnalysisDependencies,
-    AvrRepository,
     BookLevel,
     LevelChangeEvent,
-    MarketProfileRepository,
     MidState,
-    OpenInterestRepository,
-    PublicTradesRepository,
-    ReadinessRepository,
     ReadinessResult,
-    SilverLevelChangesRepository,
-    SilverMetricsRepository,
 )
-from .trades import DedupStats, XRayTrade, dedup_trades_by_id
+from .trades import XRayTrade
 from .time_windows import dt_to_ns
 
 
@@ -43,6 +36,8 @@ class FakeReadinessRepository:
 class FakeSilverMetricsRepository:
     mid_series: list[MidState] = field(default_factory=list)
     minute_rows: list[dict[str, Any]] = field(default_factory=list)
+    book_hashes: dict[int, str] = field(default_factory=dict)
+    default_book_hash: str | None = None
     calls: list[dict[str, Any]] = field(default_factory=list)
 
     def load_mid_series(
@@ -55,18 +50,40 @@ class FakeSilverMetricsRepository:
     ) -> list[MidState]:
         self.calls.append(
             {
+                "op": "load_mid_series",
                 "symbol": symbol,
                 "start_ns": start_ns,
                 "end_ns": end_ns,
                 "chunk_keys": chunk_keys,
             }
         )
-        # Half-open filter
         return [
             m
             for m in self.mid_series
             if start_ns <= m.bucket_start_ns < end_ns
         ]
+
+    def load_book_hash_at_bucket(
+        self,
+        *,
+        symbol: str,
+        bucket_start_ns: int,
+        chunk_keys: tuple[str, ...],
+    ) -> str | None:
+        self.calls.append(
+            {
+                "op": "load_book_hash_at_bucket",
+                "symbol": symbol,
+                "bucket_start_ns": bucket_start_ns,
+                "chunk_keys": chunk_keys,
+            }
+        )
+        if bucket_start_ns in self.book_hashes:
+            return self.book_hashes[bucket_start_ns]
+        for m in self.mid_series:
+            if m.bucket_start_ns == bucket_start_ns and m.book_hash:
+                return m.book_hash
+        return self.default_book_hash
 
     def load_minute_rows(
         self,
@@ -95,6 +112,8 @@ class FakeSilverLevelChangesRepository:
         start_ns: int,
         end_ns: int,
         chunk_keys: tuple[str, ...],
+        price_min: float,
+        price_max: float,
     ) -> list[LevelChangeEvent]:
         self.calls.append(
             {
@@ -102,10 +121,15 @@ class FakeSilverLevelChangesRepository:
                 "start_ns": start_ns,
                 "end_ns": end_ns,
                 "chunk_keys": chunk_keys,
+                "price_min": price_min,
+                "price_max": price_max,
             }
         )
         return [
-            e for e in self.events if start_ns <= e.event_time_ns < end_ns
+            e
+            for e in self.events
+            if start_ns <= e.event_time_ns < end_ns
+            and float(price_min) <= float(e.price) <= float(price_max)
         ]
 
 
@@ -116,16 +140,15 @@ class FakePublicTradesRepository:
 
     def load_trades(
         self, *, symbol: str, start_ns: int, end_ns: int
-    ) -> tuple[list[XRayTrade], DedupStats]:
+    ) -> list[XRayTrade]:
         self.calls.append(
             {"symbol": symbol, "start_ns": start_ns, "end_ns": end_ns}
         )
-        windowed = [
+        return [
             t
             for t in self.trades
             if start_ns <= dt_to_ns(t.trade_ts) < end_ns
         ]
-        return dedup_trades_by_id(windowed)
 
 
 @dataclass
@@ -159,6 +182,7 @@ def make_fake_deps(
     trades: Sequence[XRayTrade] | None = None,
     bronze_records: Sequence[BronzeRecordFull] | None = None,
     expected_book_hash: str | None = None,
+    book_hashes: dict[int, str] | None = None,
     mp_profile: dict[str, Any] | None = None,
     enforce_continuity: bool = False,
 ) -> AnalysisDependencies:
@@ -186,7 +210,6 @@ def make_fake_deps(
                 unresolved_reason="UNRESOLVED_BASELINE",
             )
         )
-    # Wrap baseline to inject expected hash from caller context via attribute
     if isinstance(baseline_repo, FixtureBaselineBookRepository):
         baseline_repo._expected_override = expected_book_hash  # type: ignore[attr-defined]
 
@@ -204,6 +227,8 @@ def make_fake_deps(
         metrics=FakeSilverMetricsRepository(
             mid_series=list(mid_series or []),
             minute_rows=list(minute_rows or []),
+            book_hashes=dict(book_hashes or {}),
+            default_book_hash=expected_book_hash,
         ),
         level_changes=FakeSilverLevelChangesRepository(
             events=list(level_changes or [])

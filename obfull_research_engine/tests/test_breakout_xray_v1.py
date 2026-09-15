@@ -371,7 +371,7 @@ def test_bronze_fullbook_gap_and_mismatch_and_remove():
         enforce_continuity=True,
     )
     assert mismatch.complete is False
-    assert mismatch.unresolved_reason == "UNRESOLVED_BASELINE"
+    assert mismatch.unresolved_reason == "UNRESOLVED_BASELINE_HASH_MISMATCH"
 
     gap = replay_baseline_fullbook(
         symbol="BTCUSDT",
@@ -787,30 +787,42 @@ def test_mock_metrics_sql_params_and_normalize():
     rows = [
         {
             "bucket_start_ns": 1000,
-            "mid": 1.0,
-            "spread": 0.1,
-            "best_bid": 0.9,
-            "best_ask": 1.1,
-            "book_hash": "h",
-            "bid_level_count": 2,
-            "ask_level_count": 2,
+            "chunk_key": "c1",
+            "payload": json.dumps(
+                {
+                    "mid": 1.0,
+                    "spread": 0.1,
+                    "best_bid": 0.9,
+                    "best_ask": 1.1,
+                    "book_hash": "h",
+                    "bid_level_count": 2,
+                    "ask_level_count": 2,
+                }
+            ),
         },
         {
             "bucket_start_ns": 1000 + MS100,
-            "mid": 1.01,
-            "spread": 0.1,
-            "best_bid": 0.91,
-            "best_ask": 1.11,
-            "book_hash": "h2",
-            "bid_level_count": 2,
-            "ask_level_count": 2,
+            "chunk_key": "c1",
+            "payload": json.dumps(
+                {
+                    "mid": 1.01,
+                    "spread": 0.1,
+                    "best_bid": 0.91,
+                    "best_ask": 1.11,
+                    "book_hash": "h2",
+                    "bid_level_count": 2,
+                    "ask_level_count": 2,
+                }
+            ),
         },
     ]
     client.query.return_value = rows
     lock = Path("/tmp/xray_test_nolock_metrics")
     if lock.exists():
         lock.unlink()
-    repo = LiveSilverMetricsRepository(client, database="db", lock_path=lock)
+    repo = LiveSilverMetricsRepository(
+        client, database="research_full_ob_silver_v1_3", lock_path=lock, require_lock_gate=False
+    )
     out = repo.load_mid_series(
         symbol="BTCUSDT",
         start_ns=1000,
@@ -819,8 +831,7 @@ def test_mock_metrics_sql_params_and_normalize():
     )
     assert len(out) == 2
     call_kw = client.query.call_args
-    sql = call_kw.args[0] if call_kw.args else call_kw.kwargs.get("sql")
-    assert "chunk_key IN" in metrics_mid_sql()
+    assert "chunk_key IN" in metrics_mid_sql(database="research_full_ob_silver_v1_3")
     params = call_kw.kwargs["parameters"]
     assert params["chunk_keys"] == ["c1", "c2"]
     assert params["start_ns"] == 1000
@@ -859,8 +870,9 @@ def test_mock_trades_sql_and_dedup_report():
     lock = Path("/tmp/xray_test_nolock_trades")
     if lock.exists():
         lock.unlink()
-    repo = LivePublicTradesRepository(client, database="db", lock_path=lock)
-    trades, stats = repo.load_trades(symbol="BTCUSDT", start_ns=1, end_ns=9)
+    repo = LivePublicTradesRepository(client, lock_path=lock, require_lock_gate=False)
+    raw = repo.load_trades(symbol="BTCUSDT", start_ns=1, end_ns=9)
+    trades, stats = dedup_trades_by_id(raw)
     assert len(trades) == 1
     assert stats.duplicate_rows == 1
     assert stats.largest_buy["notional"] == 20_006_882.5

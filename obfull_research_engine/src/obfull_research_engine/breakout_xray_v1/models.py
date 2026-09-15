@@ -128,9 +128,11 @@ class BaselineBookState:
     hash: str | None
     unresolved_reason: str | None = None
     levels_in_band: tuple[dict[str, Any], ...] = ()
+    bronze_bound_mode: str | None = None  # apply_keys | chain_index_fallback
+    baseline_validation_status: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "baseline_state_source": self.source,
             "baseline_state_timestamp": None
             if self.timestamp is None
@@ -141,6 +143,11 @@ class BaselineBookState:
             "unresolved_reason": self.unresolved_reason,
             "levels_in_band_count": len(self.levels_in_band),
         }
+        if self.bronze_bound_mode is not None:
+            out["bronze_bound_mode"] = self.bronze_bound_mode
+        if self.baseline_validation_status is not None:
+            out["baseline_validation_status"] = self.baseline_validation_status
+        return out
 
 
 @dataclass(frozen=True)

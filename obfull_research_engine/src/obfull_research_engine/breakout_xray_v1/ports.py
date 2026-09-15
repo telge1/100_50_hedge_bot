@@ -43,6 +43,10 @@ class LevelChangeEvent:
     new_size: float
     old_size: float | None = None
     notional_usdt: float | None = None
+    chunk_key: str | None = None
+    apply_order: int | None = None
+    source_record_ordinal: int | None = None
+    record_provenance: dict[str, Any] = field(default_factory=dict)
 
     @property
     def event_time(self) -> datetime:
@@ -65,6 +69,10 @@ class ReadinessResult:
     chunk_keys: tuple[str, ...] = ()
     level_change_count: int = 0
     state_count: int = 0
+    chain_version: str = ""
+    chain_hash: str = ""
+    safe_start_ns: int | None = None
+    safe_end_ns: int | None = None
     detail: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -79,6 +87,10 @@ class ReadinessResult:
             "chunk_keys": list(self.chunk_keys),
             "level_change_count": self.level_change_count,
             "state_count": self.state_count,
+            "chain_version": self.chain_version,
+            "chain_hash": self.chain_hash,
+            "safe_start_ns": self.safe_start_ns,
+            "safe_end_ns": self.safe_end_ns,
             "detail": self.detail,
         }
 
@@ -112,6 +124,16 @@ class SilverMetricsRepository(Protocol):
         chunk_keys: tuple[str, ...],
     ) -> list[MidState]: ...
 
+    def load_book_hash_at_bucket(
+        self,
+        *,
+        symbol: str,
+        bucket_start_ns: int,
+        chunk_keys: tuple[str, ...],
+    ) -> str | None:
+        """Return book_hash for exact bucket_start_ns, or None if missing."""
+        ...
+
 
 @runtime_checkable
 class SilverLevelChangesRepository(Protocol):
@@ -122,6 +144,8 @@ class SilverLevelChangesRepository(Protocol):
         start_ns: int,
         end_ns: int,
         chunk_keys: tuple[str, ...],
+        price_min: float,
+        price_max: float,
     ) -> list[LevelChangeEvent]: ...
 
 
@@ -129,7 +153,9 @@ class SilverLevelChangesRepository(Protocol):
 class PublicTradesRepository(Protocol):
     def load_trades(
         self, *, symbol: str, start_ns: int, end_ns: int
-    ) -> tuple[list[XRayTrade], DedupStats]: ...
+    ) -> list[XRayTrade]:
+        """Return raw trades; core performs public_trade_index dedup."""
+        ...
 
 
 @runtime_checkable
