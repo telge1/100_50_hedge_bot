@@ -33,6 +33,8 @@ from orderbook_analyse.orderbook_v2_live.on_demand_lease import (
     LeaseManager,
     PILOT_SYMBOLS,
 )
+from orderbook_analyse.orderbook_v2_live.full_ob_event_fanout import FullObEventFanout
+from orderbook_analyse.orderbook_v2_live.full_ob_case_archive import FullObCaseArchiveHub
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,15 @@ class FullBookOnDemandManager:
         self.max_rest_align_attempts = int(os.environ.get("OB_V3_FULL_BOOK_ALIGN_ATTEMPTS") or "12")
         self.lock_hold_ns_last: int = 0
         self.lock_hold_ns_max: int = 0
+        # Research read-only delta fanout (no second Bybit WS).
+        self.event_fanout = FullObEventFanout()
+        self.event_fanout.attach(self)
+        # Case-scoped Full-OB raw archive (same SegmentWriter format; refcounted).
+        self.case_archive = FullObCaseArchiveHub()
+        self.case_archive.attach(self)
+        # Permanent keeper symbols must not be torn down by EMA case release.
+        for _sym in ("BTCUSDT", "DOGEUSDT"):
+            self.case_archive.register_static_keeper(_sym)
 
     def _note_lock_hold(self, t0_ns: int) -> None:
         import time as _time
@@ -118,6 +129,14 @@ class FullBookOnDemandManager:
             self.lock_hold_ns_max = held
 
     def close(self) -> None:
+        try:
+            self.case_archive.shutdown()
+        except Exception:
+            logger.exception("full_ob_case_archive_shutdown_failed")
+        try:
+            self.event_fanout.shutdown()
+        except Exception:
+            logger.exception("full_ob_event_fanout_shutdown_failed")
         try:
             self._http.close()
         except Exception:
@@ -225,6 +244,13 @@ class FullBookOnDemandManager:
                 notify = ("live", outcome.value)
         self._note_lock_hold(t0)
         if notify is not None:
+            if notify[0] in {"u_reset"} or (
+                notify[0] == "live" and notify[1] in {DeltaOutcome.GAP.value, DeltaOutcome.U_RESET.value}
+            ):
+                try:
+                    self.event_fanout.bump_generation(sym)
+                except Exception:
+                    logger.exception("fanout_bump_generation_failed symbol=%s", sym)
             self._notify_observers(
                 symbol=sym,
                 payload=payload,
@@ -353,6 +379,10 @@ class FullBookOnDemandManager:
         symbol, payload, recv_ns = pending
         from datetime import datetime, timezone
 
+        try:
+            self.event_fanout.note_snapshot_ready(symbol)
+        except Exception:
+            logger.exception("fanout_note_snapshot_ready_failed symbol=%s", symbol)
         self._notify_observers(
             symbol=symbol,
             payload=payload,
@@ -383,8 +413,24 @@ class FullBookOnDemandManager:
             return out
 
         if not self.enabled:
+            # Fanout / case-archive read-only ops remain available for local research tooling
+            # even if the manager is config-disabled (no WS). Lease/snapshot still blocked.
+            for hub in (self.event_fanout, self.case_archive):
+                hub_resp = hub.handle_request(req)
+                if hub_resp is not None:
+                    hub_resp.setdefault("depth", FULL_DEPTH)
+                    hub_resp.setdefault("book_mode", "full")
+                    hub_resp.setdefault("subscription_state", "fanout")
+                    return hub_resp
             return base(ok=False, error="disabled", subscription_state="error")
         try:
+            for hub in (self.event_fanout, self.case_archive):
+                hub_resp = hub.handle_request(req)
+                if hub_resp is not None:
+                    hub_resp.setdefault("depth", FULL_DEPTH)
+                    hub_resp.setdefault("book_mode", "full")
+                    hub_resp.setdefault("subscription_state", "fanout")
+                    return hub_resp
             if op == "acquire":
                 if not symbol or not lease_id:
                     raise ValueError("symbol_and_lease_required")
