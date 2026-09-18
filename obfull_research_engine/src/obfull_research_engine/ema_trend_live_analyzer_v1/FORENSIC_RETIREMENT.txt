@@ -1,0 +1,5 @@
+Active worktree retirement of ema_trend_analyzer_v1 (2026-09-18):
+Moved to /home/telgenbuescher/backups/ema_trend_analyzer_v1_forensic_20260918T123443Z/removed_from_active_worktree/
+Forensic backup SHA256_MANIFEST 22/22 verified before move.
+Package was never tracked on research/mp-qdh-trigger-validation-v1-20260918 (untracked only).
+Invalid INJ run preserved: obfull_research_engine/runs/ema_trend_analyzer_single_signal_v1_20260918/
