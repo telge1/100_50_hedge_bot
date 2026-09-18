@@ -6,9 +6,21 @@
 ## 1. Active entry-point
 
 ```bash
-PYTHONPATH=obfull_research_engine/src:/home/telgenbuescher/projects/orderbook_analyse/src \
-  python -m obfull_research_engine.mp_qdh_first_touch_study_v1
+PYTHONPATH=obfull_research_engine/src:/path/to/orderbook_analyse/src \
+  python -m obfull_research_engine.mp_qdh_first_touch_study_v1 \
+    --source-run-dir /absolute/path/to/mp_edge_event_batch_v1_20260916
 ```
+
+Or via environment:
+
+```bash
+export OBFULL_RESEARCH_SOURCE_RUN_DIR=/absolute/path/to/mp_edge_event_batch_v1_20260916
+python -m obfull_research_engine.mp_qdh_first_touch_study_v1
+```
+
+**Source-run priority:** `--source-run-dir` > `OBFULL_RESEARCH_SOURCE_RUN_DIR` > repo-local `obfull_research_engine/runs/mp_edge_event_batch_v1_20260916` only if that directory exists.
+
+`runs/` stays gitignored. Do not copy or commit historical batch CSVs into the worktree. Unit tests are self-contained; the historical 282→120→115 check is an optional `@pytest.mark.integration` test.
 
 Call graph:
 
@@ -18,6 +30,7 @@ Smoke only:
 
 ```bash
 python -m obfull_research_engine.mp_qdh_first_touch_study_v1 --smoke-only \
+  --source-run-dir "$OBFULL_RESEARCH_SOURCE_RUN_DIR" \
   --smoke-out-dir obfull_research_engine/runs/<smoke_dir>
 ```
 
