@@ -1,0 +1,47 @@
+"""ema_trend_live_analyzer_v1 — live Full-OB delta + PT research analyzer (no trading).
+
+Does NOT import ema_trend_analyzer_v1 (forensic only).
+"""
+
+from __future__ import annotations
+
+PACKAGE_NAME = "ema_trend_live_analyzer_v1"
+STUDY_ID = "EMA_TREND_LIVE_ANALYZER_V1"
+SCHEMA_VERSION = "ema_trend_live_analyzer_v1"
+CONTRACT_VERSION = "1.0.0-prerollout-20260918"
+ENGINE_VERSION = "canonical_wall_flow_qdh_base_v1+flow_v2"
+
+PHASE = "LIVE_DELTA_EXACT"
+MAX_ACCEPTED_CASES = 1
+MAX_SIGNALS = 1
+MAX_DYNAMIC_FULL_OB = 1
+WARMUP_REQUIRED = False
+HISTORICAL_FULL_OB_WARMUP_REQUIRED = False
+FULL_OB_REQUIRED = True
+PUBLIC_TRADES_REQUIRED = True
+MP_REQUIRED = False
+LIVE_TRADING = False
+ALLOW_CLICKHOUSE_WRITES = False
+ALLOW_MYSQL_WRITES = False
+NO_LIVE_TRADE = True
+
+FULL_OB_OBSERVATION_SECONDS = 300
+OUTCOME_HORIZON_SECONDS = 21600
+OUTCOME_HORIZON_MIN = 360
+FIRST_EARLY_EVIDENCE_SECONDS = 1
+FIRST_CANDIDATE_ELIGIBLE_SECONDS = 5
+FEATURE_HORIZONS_S = (1, 5, 15, 30, 60, 180, 300)
+BOOK_STATE_MS = 100
+
+FULL_OB_DELTA_STREAM_AVAILABLE = True
+FULL_OB_DELTA_STREAM_STATUS = "FULL_OB_DELTA_STREAM_VIA_FANOUT"
+ARCHIVE_ENABLED = True
+PUBLIC_TRADES_SOURCE = "orderbook_analysis.public_trades_canonical"
+PUBLIC_TRADES_MODE = "watermark_poll"
+SECOND_BYBIT_OB_WS = False
+SECOND_PUBLIC_TRADE_WS = False
+
+DECISION_STATUS = "NOT_CALIBRATED"
+RESEARCH_STATUS = "UNRESOLVED_RESEARCH"
+
+DEFAULT_RUN_REL = "obfull_research_engine/runs/ema_trend_live_phase3_phase9_v1_20260918"
