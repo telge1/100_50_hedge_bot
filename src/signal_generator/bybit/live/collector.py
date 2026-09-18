@@ -185,6 +185,7 @@ class Live1mCollector:
         self._public_trade_queue_maxsize = public_trade_queue_maxsize
         self._public_trade_batch_size = public_trade_batch_size
         self._trade_buffer = None
+        self._trade_fanout = None
         self.health.public_trades_enabled = self.enable_public_trades
         self.health.public_trade_symbols = list(self.public_trade_symbols)
 
@@ -290,7 +291,19 @@ class Live1mCollector:
                 op.enqueue(candle.symbol, ensure_utc(candle.close_time))
 
     async def _on_public_trade(self, trade) -> None:
-        """Enqueue live public trade; never raise into the kline WS path."""
+        """Fanout (research) then CH buffer; never raise into the kline WS path.
+
+        No second Bybit WS. Fanout is non-blocking and isolated from insert failures.
+        """
+        import time as _time
+
+        fanout = self._ensure_trade_fanout()
+        if fanout is not None:
+            try:
+                fanout.on_trade(trade, receive_time_ns=_time.time_ns())
+            except Exception:  # noqa: BLE001
+                logger.exception("public trade fanout failed")
+
         buf = self._trade_buffer
         if buf is None:
             return
@@ -300,6 +313,22 @@ class Live1mCollector:
         except Exception as exc:  # noqa: BLE001
             logger.exception("public trade enqueue failed: %s", exc)
             self.health.public_trade_last_error = str(exc)[:300]
+
+    def _ensure_trade_fanout(self):
+        """Lazy-create read-only research fanout (no second WS, no CH writes)."""
+        if not self.enable_public_trades or not self.public_trade_symbols:
+            return None
+        if self._trade_fanout is None:
+            from signal_generator.bybit.live.public_trade_event_fanout import (
+                PublicTradeEventFanout,
+            )
+
+            self._trade_fanout = PublicTradeEventFanout()
+        return self._trade_fanout
+
+    def trade_fanout(self):
+        """Expose fanout for control API / tests."""
+        return self._ensure_trade_fanout()
 
     def _ensure_trade_buffer(self):
         if not self.enable_public_trades or not self.public_trade_symbols:
@@ -313,6 +342,8 @@ class Live1mCollector:
                 queue_maxsize=self._public_trade_queue_maxsize,
                 batch_size=self._public_trade_batch_size,
             )
+            # Ensure fanout exists whenever the live trade path is armed.
+            self._ensure_trade_fanout()
         return self._trade_buffer
 
     def _assert_public_trade_subscription_set(self) -> None:
@@ -575,6 +606,9 @@ class Live1mCollector:
                 trade_buf.start()
                 trade_buf.note_reconnect()
                 self.health.apply_public_trade_metrics(trade_buf.metrics.to_dict())
+            fanout = self._ensure_trade_fanout()
+            if fanout is not None:
+                fanout.note_reconnect()
 
             self._ws = self.ws_factory(
                 self.symbols,

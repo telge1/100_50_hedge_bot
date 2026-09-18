@@ -93,6 +93,38 @@ class CollectorControlService:
             "previous_symbols": current,
         }
 
+    def trade_fanout_op(self, op: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Localhost trade-fanout IPC (no public route semantics beyond 127.0.0.1 bind)."""
+        body = body or {}
+        collector = self.get_collector() if self.get_collector else None
+        if collector is None or not hasattr(collector, "trade_fanout"):
+            return {"ok": False, "error": "collector_unavailable"}
+        fanout = collector.trade_fanout()
+        if fanout is None:
+            return {"ok": False, "error": "trade_fanout_disabled"}
+        if op == "create_trade_subscriber":
+            return fanout.create_subscriber(
+                symbol=body.get("symbol"),
+                symbols=body.get("symbols"),
+                max_queue=body.get("max_queue"),
+                subscriber_id=body.get("subscriber_id"),
+            )
+        if op == "poll_trade_events":
+            return fanout.poll_events(
+                subscriber_id=str(body.get("subscriber_id") or ""),
+                cursor=body.get("cursor"),
+                limit=int(body.get("limit") or 256),
+            )
+        if op == "trade_subscriber_heartbeat":
+            return fanout.heartbeat(str(body.get("subscriber_id") or ""))
+        if op == "remove_trade_subscriber":
+            return fanout.remove_subscriber(str(body.get("subscriber_id") or ""))
+        if op == "trade_fanout_status":
+            return fanout.status()
+        if op == "trade_fanout_cleanup":
+            return fanout.timeout_cleanup()
+        return {"ok": False, "error": f"unknown_op:{op}"}
+
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
     body = json.dumps(payload, default=str).encode("utf-8")
@@ -119,6 +151,9 @@ def make_handler(service: CollectorControlService) -> type[BaseHTTPRequestHandle
                     return
                 if path == "/api/collector/status":
                     _json_response(self, 200, service.status())
+                    return
+                if path == "/api/trade_fanout/trade_fanout_status":
+                    _json_response(self, 200, service.trade_fanout_op("trade_fanout_status", {}))
                     return
                 if path == "/api/collector/desired_state":
                     _json_response(self, 200, service.get_desired())
@@ -161,6 +196,19 @@ def make_handler(service: CollectorControlService) -> type[BaseHTTPRequestHandle
                         return
                     payload = service.ensure_symbol(str(symbol))
                     _json_response(self, 200, payload)
+                    return
+                trade_ops = {
+                    "/api/trade_fanout/create_trade_subscriber": "create_trade_subscriber",
+                    "/api/trade_fanout/poll_trade_events": "poll_trade_events",
+                    "/api/trade_fanout/trade_subscriber_heartbeat": "trade_subscriber_heartbeat",
+                    "/api/trade_fanout/remove_trade_subscriber": "remove_trade_subscriber",
+                    "/api/trade_fanout/trade_fanout_status": "trade_fanout_status",
+                    "/api/trade_fanout/trade_fanout_cleanup": "trade_fanout_cleanup",
+                }
+                if path in trade_ops:
+                    payload = service.trade_fanout_op(trade_ops[path], body)
+                    code = 200 if payload.get("ok") else 400
+                    _json_response(self, code, payload)
                     return
                 _json_response(self, 404, {"error": "not_found", "path": path})
             except ValueError as exc:
