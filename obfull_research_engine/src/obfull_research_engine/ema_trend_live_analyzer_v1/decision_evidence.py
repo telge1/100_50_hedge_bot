@@ -48,12 +48,16 @@ class CandidateFSM:
         archive_ok: bool,
         features: dict[str, Any],
         now: datetime,
+        trade_fanout_ok: bool = True,
     ) -> CandidateState:
         if not archive_ok:
             self._set("BLOCKED_RAW_ARCHIVE", at=now, reason="archive_coverage_invalid")
             return self.state
         if not coverage_ok:
             self._set("BLOCKED_COVERAGE", at=now, reason="queue_or_sequence_invalid")
+            return self.state
+        if not trade_fanout_ok:
+            self._set("BLOCKED_COVERAGE", at=now, reason="BLOCKED_LIVE_TRADES")
             return self.state
 
         scores = score_evidence(self.threshold_side, features)
