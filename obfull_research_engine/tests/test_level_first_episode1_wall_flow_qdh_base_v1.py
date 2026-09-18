@@ -7,8 +7,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ENGINE_ROOT.parent
+_shadow = str(REPO_ROOT / "src")
+while _shadow in sys.path:
+    sys.path.remove(_shadow)
 sys.path.insert(0, str(ENGINE_ROOT / "src"))
-sys.path.insert(0, str(ENGINE_ROOT.parent / "src"))
+_ORDERBOOK_SRC = Path("/home/telgenbuescher/projects/orderbook_analyse/src")
+if _ORDERBOOK_SRC.is_dir():
+    sys.path.insert(0, str(_ORDERBOOK_SRC))
 
 from obfull_research_engine.level_first_episode1_wall_flow_qdh_base_v1 import (  # noqa: E402
     M_LIQ,

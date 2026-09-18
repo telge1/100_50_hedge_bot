@@ -4,7 +4,7 @@ Attribution interval rule (documented, Bybit L2 research):
   - Book queue observations at the wall (exact or band aggregate) define nodes.
   - Interval i is exchange-time half-open (t_i, t_{i+1}] where t are book
     event_times (ties broken by apply_order, then source_event_id).
-  - Buy-taker trades against an ask wall with price in the view's price rule
+  - Aggressive taker trades against the wall (Buy vs ask, Sell vs bid) with price in view
     and exchange_event_time in (t_i, t_{i+1}] are attributed to the interval
     that ends at book state i+1.
   - Same-millisecond trades: sorted by (exchange_event_time, trade_id).
@@ -122,6 +122,28 @@ def _price_in_view(price: float, *, view: ViewKind, wall_price: float, band_low:
     return float(band_low) - 1e-12 <= float(price) <= float(band_high) + 1e-12
 
 
+def is_wall_attack_trade(
+    trade: CanonicalTrade,
+    *,
+    view: ViewKind,
+    wall_price: float,
+    band_low: float,
+    band_high: float,
+    wall_side: str = WALL_SIDE,
+) -> bool:
+    """True if trade is an aggressive attack against the defended wall side."""
+    side = str(wall_side).lower()
+    if side == "ask":
+        if trade.taker_side != "Buy":
+            return False
+    elif side == "bid":
+        if trade.taker_side != "Sell":
+            return False
+    else:
+        raise ValueError(f"unsupported wall_side={wall_side!r}")
+    return _price_in_view(trade.price, view=view, wall_price=wall_price, band_low=band_low, band_high=band_high)
+
+
 def is_ask_wall_attack_trade(
     trade: CanonicalTrade,
     *,
@@ -131,11 +153,24 @@ def is_ask_wall_attack_trade(
     band_high: float,
     wall_side: str = WALL_SIDE,
 ) -> bool:
-    if wall_side != "ask":
-        raise NotImplementedError("Episode-1 implementation covers ask wall only")
-    if trade.taker_side != "Buy":
-        return False
-    return _price_in_view(trade.price, view=view, wall_price=wall_price, band_low=band_low, band_high=band_high)
+    """Backward-compatible alias; supports ask and bid via ``is_wall_attack_trade``."""
+    return is_wall_attack_trade(
+        trade,
+        view=view,
+        wall_price=wall_price,
+        band_low=band_low,
+        band_high=band_high,
+        wall_side=wall_side,
+    )
+
+
+def attack_aggressor_side(wall_side: str) -> str:
+    side = str(wall_side).lower()
+    if side == "ask":
+        return "Buy"
+    if side == "bid":
+        return "Sell"
+    raise ValueError(f"unsupported wall_side={wall_side!r}")
 
 
 def _recv_dt(row: dict[str, Any]) -> datetime | None:
@@ -440,7 +475,7 @@ def attribute_intervals(
                 continue
             if ts >= analysis_end_exclusive:
                 continue
-            if not is_ask_wall_attack_trade(
+            if not is_wall_attack_trade(
                 tr, view=view, wall_price=wall_price, band_low=band_low, band_high=band_high, wall_side=wall_side
             ):
                 continue
@@ -546,7 +581,7 @@ def attribute_intervals(
                 residual_pull_qty=mb.residual_pull_qty,
                 net_depletion_qty=mb.net_depletion_qty,
                 aggregate_queue_survival_proxy=mb.aggregate_queue_survival_proxy,
-                aggressor_side="Buy",
+                aggressor_side=attack_aggressor_side(wall_side),
                 attribution_rule_version=ATTRIBUTION_RULE_VERSION,
                 attribution_confidence=conf,
                 mass_balance_error=mb.mass_balance_error,

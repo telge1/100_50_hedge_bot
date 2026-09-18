@@ -79,7 +79,8 @@ def update_aggressor(
     slow = ewma_update(state.slow_hit_rate, hit_rate, dt_s=dt, half_life_s=slow_half_life_ms / 1000.0)
     persistence = fast / (slow + EPSILON)
     total_side = buy_hit_qty + sell_hit_qty
-    same_side = (buy_hit_qty / total_side) if total_side > EPSILON else 1.0
+    # Attributed hits are already attack-side filtered; ratio is dominant side share.
+    same_side = (max(buy_hit_qty, sell_hit_qty) / total_side) if total_side > EPSILON else 1.0
     samples = sorted(interarrival_ms_samples)
     tsl = None
     if state.last_hit_exchange_time is not None:

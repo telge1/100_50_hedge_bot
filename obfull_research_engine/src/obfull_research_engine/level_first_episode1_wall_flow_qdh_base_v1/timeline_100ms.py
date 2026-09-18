@@ -33,8 +33,11 @@ def build_feature_timeline(
     queue_exact_at_wall_touch: float,
     queue_band_at_wall_touch: float,
     wall_price: float = WALL_PRICE,
+    wall_side: str = "ask",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Aggregate attribution onto existing 100ms states (causal, no backfill)."""
+    wall_side_l = str(wall_side).lower()
+    attack_dir = 1 if wall_side_l == "ask" else -1
     # Index valid events by bucket start of interval_end
     def index_events(events: list[WallFlowEvent]) -> dict[datetime, list[WallFlowEvent]]:
         out: dict[datetime, list[WallFlowEvent]] = {}
@@ -53,7 +56,7 @@ def build_feature_timeline(
     agg_band = AggressorState()
     qdh_exact = QdhState()
     qdh_band = QdhState()
-    price_st = PriceResponseState(direction=1)
+    price_st = PriceResponseState(direction=attack_dir)
     # Seed microprice at wall touch from first state with available_at >= wall_touch
     seeded = False
     cum_refill = 0.0
@@ -124,6 +127,12 @@ def build_feature_timeline(
                 inter.append((b - a).total_seconds() * 1000.0)
 
         if bend > wall_touch_at or state_avail >= wall_touch_at:
+            if wall_side_l == "ask":
+                buy_b, sell_b = sb["hit_qty"], 0.0
+                buy_x, sell_x = sx["hit_qty"], 0.0
+            else:
+                buy_b, sell_b = 0.0, sb["hit_qty"]
+                buy_x, sell_x = 0.0, sx["hit_qty"]
             agg_band = update_aggressor(
                 agg_band,
                 hit_qty=sb["hit_qty"],
@@ -132,8 +141,8 @@ def build_feature_timeline(
                 interval_duration_s=dur,
                 exchange_time=bend,
                 interarrival_ms_samples=inter,
-                buy_hit_qty=sb["hit_qty"],
-                sell_hit_qty=0.0,
+                buy_hit_qty=buy_b,
+                sell_hit_qty=sell_b,
             )
             agg_exact = update_aggressor(
                 agg_exact,
@@ -143,8 +152,8 @@ def build_feature_timeline(
                 interval_duration_s=dur,
                 exchange_time=bend,
                 interarrival_ms_samples=inter,
-                buy_hit_qty=sx["hit_qty"],
-                sell_hit_qty=0.0,
+                buy_hit_qty=buy_x,
+                sell_hit_qty=sell_x,
             )
             cum_refill += sb["net_refill_qty"]
             cum_pull += sb["residual_pull_qty"]
@@ -246,8 +255,8 @@ def build_feature_timeline(
             "hit_qty_exact": sx["hit_qty"],
             "hit_notional_exact": sx["hit_notional"],
             "hit_trade_count_exact": sx["hit_trade_count"],
-            "buy_hit_qty": sb["hit_qty"],
-            "sell_hit_qty": 0.0,
+            "buy_hit_qty": (sb["hit_qty"] if wall_side_l == "ask" else 0.0),
+            "sell_hit_qty": (0.0 if wall_side_l == "ask" else sb["hit_qty"]),
             "net_refill_qty": sb["net_refill_qty"],
             "residual_pull_qty": sb["residual_pull_qty"],
             "net_depletion_qty": sb["net_depletion_qty"],
