@@ -110,9 +110,22 @@
     state.planHash = null;
     state.planRequest = null;
     const btn = $("soApplyBtn");
-    if (btn) btn.disabled = true;
+    if (btn) {
+      btn.disabled = false;
+      btn.setAttribute("aria-disabled", "true");
+      btn.classList.add("so-btn-needs-plan");
+    }
     show($("soPlanBody"), false);
     show($("soPlanEmpty"), true);
+  }
+
+  function markPlanReady() {
+    const btn = $("soApplyBtn");
+    if (btn) {
+      btn.disabled = false;
+      btn.setAttribute("aria-disabled", "false");
+      btn.classList.remove("so-btn-needs-plan");
+    }
   }
 
   function syncDaysUi() {
@@ -155,7 +168,7 @@
   function stageLabelStatus(status) {
     const s = String(status || "").toUpperCase();
     if (s === "SUCCEEDED") return "erfolgreich";
-    if (s === "RUNNING") return "läuft";
+    if (s === "RUNNING") return "läuft…";
     if (s === "FAILED") return "fehlgeschlagen";
     if (s === "WAITING") return "wartet auf Archiv";
     if (s === "PENDING") return "wartet";
@@ -164,36 +177,113 @@
     return s || "wartet";
   }
 
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function formatClock(iso) {
+    if (!iso) return "–";
+    try {
+      const d = new Date(String(iso).endsWith("Z") || String(iso).includes("+") ? iso : iso + "Z");
+      if (Number.isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString("de-DE", { hour12: false });
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  function elapsedLabel(isoStart, isoEnd) {
+    if (!isoStart) return "";
+    try {
+      const start = new Date(String(isoStart).endsWith("Z") || String(isoStart).includes("+") ? isoStart : isoStart + "Z");
+      const end = isoEnd
+        ? new Date(String(isoEnd).endsWith("Z") || String(isoEnd).includes("+") ? isoEnd : isoEnd + "Z")
+        : new Date();
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "";
+      const sec = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+      if (sec < 60) return sec + "s";
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      if (m < 60) return m + "m " + s + "s";
+      const h = Math.floor(m / 60);
+      return h + "h " + (m % 60) + "m";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function setStatusBanner(headline) {
+    const banner = $("soProgressHeadline");
+    const title = $("soStatusTitle");
+    const sub = $("soStatusSub");
+    if (!banner || !title || !sub) return;
+    if (!headline) {
+      show(banner, false);
+      banner.className = "so-status-banner so-tone-idle";
+      return;
+    }
+    const tone = headline.tone || "idle";
+    banner.className = "so-status-banner so-tone-" + tone;
+    title.textContent = headline.title || "";
+    sub.textContent = headline.subtitle || "";
+    show(banner, true);
+  }
+
   function renderJob(job) {
     if (!job) return;
+    const card = $("soProgressCard");
+    if (card) {
+      card.classList.toggle("is-active", !!job.active);
+    }
+
+    const headline = job.headline || null;
+    setStatusBanner(headline);
+
+    const elapsed = elapsedLabel(job.created_at, job.done ? job.updated_at : null);
     const meta = [
-      "job_id: " + (job.job_id || "–"),
-      "Symbol: " + (job.symbol || "–"),
-      "Status: " + (job.status || "–"),
-      "Start: " + (job.created_at || "–"),
-      "Update: " + (job.updated_at || "–"),
-      "Fortschritt: " + (job.progress_pct != null ? job.progress_pct + "%" : "–"),
-      "Verdict: " + (job.final_verdict || "–"),
-    ];
-    if (job.rollback_status) meta.push("Rollback: " + job.rollback_status);
-    if (job.error_code) meta.push("error_code: " + job.error_code);
+      "Symbol " + (job.symbol || "–"),
+      "Status " + (job.status || "–"),
+      job.progress_pct != null ? job.progress_pct + "%" : null,
+      elapsed ? "Dauer " + elapsed : null,
+      "Start " + formatClock(job.created_at),
+      "Update " + formatClock(job.updated_at),
+      job.final_verdict ? "Verdict " + job.final_verdict : null,
+    ].filter(Boolean);
     $("soProgressMeta").textContent = meta.join(" · ");
 
     const pct = Math.max(0, Math.min(100, Number(job.progress_pct) || 0));
     show($("soBarWrap"), true);
+    show($("soPctRow"), true);
     $("soBar").style.width = pct + "%";
+    $("soBar").classList.toggle("is-running", !!job.active && !job.done);
+    $("soPctLabel").textContent = pct + "%";
+    const doneN = job.stages_done != null ? job.stages_done : null;
+    const totalN = job.stages_total != null ? job.stages_total : null;
+    $("soStageCount").textContent =
+      doneN != null && totalN
+        ? doneN + "/" + totalN + " Schritte"
+        : job.current_stage_label
+          ? "aktuell: " + job.current_stage_label
+          : "";
+    show($("soLivePulse"), !!job.active && !job.done);
 
     const ul = $("soStages");
     ul.innerHTML = "";
     (job.stages || []).forEach(function (st) {
       const li = document.createElement("li");
       li.className = stageClass(st.status);
+      const extra = st.detail_summary || st.error_message || "";
       li.innerHTML =
         "<span>" +
-        (st.label || st.name) +
+        escapeHtml(st.label || st.name) +
         "</span><span>" +
-        stageLabelStatus(st.status) +
-        "</span>";
+        escapeHtml(stageLabelStatus(st.status)) +
+        "</span>" +
+        (extra ? "<span class='so-stage-extra'>" + escapeHtml(extra) + "</span>" : "");
       ul.appendChild(li);
     });
 
@@ -204,8 +294,48 @@
       show($("soArchiveHint"), false);
     }
 
-    if (job.error_message) setError("soJobError", job.error_message);
-    else setError("soJobError", "");
+    const doneEl = $("soJobDone");
+    if (job.done && headline && headline.tone === "ok") {
+      show(doneEl, true);
+      doneEl.textContent =
+        (headline.title || "Fertig") +
+        (headline.subtitle ? "\n" + headline.subtitle : "");
+    } else {
+      show(doneEl, false);
+      if (doneEl) doneEl.textContent = "";
+    }
+
+    if (job.error_message && (job.status === "FAILED" || job.status === "ROLLED_BACK" || headline && headline.tone === "fail")) {
+      setError("soJobError", job.error_message);
+    } else {
+      setError("soJobError", "");
+    }
+  }
+
+  function showQueuedPlaceholder(jobId) {
+    const symbol = String(jobId || "").split("_")[0] || "Symbol";
+    renderJob({
+      job_id: jobId,
+      symbol: symbol,
+      status: "QUEUED",
+      progress_pct: 2,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      active: true,
+      done: false,
+      stages: [],
+      stages_done: 0,
+      stages_total: 0,
+      headline: {
+        tone: "run",
+        title: symbol + ": Job gestartet",
+        subtitle: "In der Queue — Worker übernimmt gleich. Status aktualisiert sich automatisch.",
+      },
+    });
+    const card = $("soProgressCard");
+    if (card && card.scrollIntoView) {
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function renderPlan(payload) {
@@ -233,7 +363,7 @@
     state.planId = payload.plan_id;
     state.planHash = payload.plan_hash;
     state.planRequest = req;
-    $("soApplyBtn").disabled = false;
+    markPlanReady();
   }
 
   function stopPolling() {
@@ -250,13 +380,16 @@
 
   async function pollJob() {
     if (!state.jobId) return;
-    if (state.pollTimer) {
-      /* single-flight: clear handle before await */
-    }
     const { status, data } = await api(
       "/api/datenverwaltung/symbole/jobs/" + encodeURIComponent(state.jobId)
     );
     if (status === 404) {
+      state.pollFail += 1;
+      if (state.pollFail <= 8) {
+        showQueuedPlaceholder(state.jobId);
+        schedulePoll(1500);
+        return;
+      }
       stopPolling();
       setError("soJobError", "Job nicht gefunden");
       return;
@@ -269,16 +402,23 @@
     }
     state.pollFail = 0;
     renderJob(data);
-    const active =
-      data.status === "RUNNING" ||
-      data.status === "WAITING_FOR_ARCHIVE" ||
-      data.active === true;
-    if (active && data.status !== "SUCCEEDED" && data.status !== "FAILED" && data.status !== "ROLLED_BACK" && data.status !== "PARTIAL_LIVE_ONLY" && data.status !== "PLANNED") {
-      schedulePoll(2000);
+    const terminal = {
+      SUCCEEDED: true,
+      FAILED: true,
+      ROLLED_BACK: true,
+      PARTIAL_LIVE_ONLY: true,
+      PLANNED: true,
+      COMPLETED: true,
+    };
+    const st = String(data.status || "").toUpperCase();
+    if (data.active || st === "RUNNING" || st === "WAITING_FOR_ARCHIVE" || st === "QUEUED" || st === "CLAIMED") {
+      schedulePoll(st === "WAITING_FOR_ARCHIVE" ? 8000 : 2000);
       return;
     }
-    if (data.status === "RUNNING" || data.status === "WAITING_FOR_ARCHIVE") {
-      schedulePoll(data.status === "WAITING_FOR_ARCHIVE" ? 8000 : 2000);
+    if (terminal[st] || data.done) {
+      stopPolling();
+      loadHistory();
+      loadOverview();
       return;
     }
     stopPolling();
@@ -289,12 +429,14 @@
   function resumeJob(jobId) {
     if (!jobId) return;
     state.jobId = jobId;
+    state.pollFail = 0;
     try {
       localStorage.setItem(STORAGE_KEY, jobId);
     } catch (e) {}
     const url = new URL(window.location.href);
     url.searchParams.set("job_id", jobId);
     window.history.replaceState({}, "", url.toString());
+    showQueuedPlaceholder(jobId);
     stopPolling();
     pollJob();
   }
@@ -303,8 +445,8 @@
     setError("soFormError", "");
     const payload = formPayload();
     if (!/^[A-Z0-9]{2,20}USDT$/.test(payload.symbol)) {
-      setError("soFormError", "Ungültiges Symbol (z. B. AAPLUSDT)");
-      return;
+      setError("soFormError", "Ungültiges Symbol (z. B. AVAUSDT)");
+      return false;
     }
     $("soPlanBtn").disabled = true;
     try {
@@ -315,21 +457,26 @@
       if (!data || !data.success) {
         setError("soFormError", (data && (data.error_message || data.error)) || "Plan fehlgeschlagen (" + status + ")");
         invalidatePlan();
-        return;
+        return false;
       }
       renderPlan(data);
       if (data.job) renderJob(data.job);
+      return true;
     } catch (e) {
       setError("soFormError", "Netzwerkfehler beim Plan");
       invalidatePlan();
+      return false;
     } finally {
       $("soPlanBtn").disabled = false;
     }
   }
 
   function openConfirm() {
-    if (!state.planId || !state.planHash) return;
-    const p = formPayload();
+    if (!state.planId || !state.planHash || !state.planRequest) {
+      setError("soFormError", "Zuerst „Nur prüfen / Plan anzeigen“ ausführen — oder erneut auf „Symbol hinzufügen“ klicken.");
+      return;
+    }
+    const p = state.planRequest;
     const summary = [
       "Modus: " + (p.purpose === "extend_history" ? "History vergrößern" : "Symbol hinzufügen"),
       "Symbol: " + p.symbol,
@@ -345,13 +492,29 @@
     show($("soConfirmModal"), true);
   }
 
+  async function onApplyClick() {
+    setError("soFormError", "");
+    // Ohne Plan: zuerst prüfen, dann Bestätigung — sonst wirkt der Button „tot“.
+    if (!state.planId || !state.planHash || !state.planRequest) {
+      const ok = await runPlan();
+      if (!ok) return;
+    }
+    openConfirm();
+  }
+
   async function confirmApply() {
     if (state.applying) return;
+    if (!state.planId || !state.planHash || !state.planRequest) {
+      setError("soFormError", "Kein gültiger Plan — bitte zuerst „Nur prüfen / Plan anzeigen“.");
+      return;
+    }
     state.applying = true;
     $("soConfirmOk").disabled = true;
     setError("soFormError", "");
     try {
-      const body = Object.assign(formPayload(), {
+      // Apply the exact planned request — re-reading the form caused 409 PLAN_HASH_MISMATCH
+      // when Historie/Checkboxen nach dem Plan noch geändert wurden.
+      const body = Object.assign({}, state.planRequest, {
         confirm: true,
         plan_id: state.planId,
         plan_hash: state.planHash,
@@ -362,10 +525,26 @@
       });
       show($("soConfirmModal"), false);
       if (!data || !data.success) {
-        setError(
-          "soFormError",
-          (data && (data.error_message || data.error)) || "Apply fehlgeschlagen (" + status + ")"
-        );
+        const code = data && data.error;
+        let msg =
+          (data && (data.error_message || data.error)) || "Apply fehlgeschlagen (" + status + ")";
+        if (code === "PLAN_HASH_MISMATCH") {
+          msg =
+            "Plan stimmt nicht mehr mit dem Formular überein. Bitte erneut „Nur prüfen / Plan anzeigen“, dann hinzufügen.";
+          invalidatePlan();
+        } else if (code === "PLAN_EXPIRED_OR_UNKNOWN" || code === "PLAN_REQUIRED") {
+          msg = "Plan abgelaufen oder fehlt. Bitte erneut prüfen.";
+          invalidatePlan();
+        } else if (
+          code === "ONBOARDING_LOCK_HELD" ||
+          code === "ONBOARDING_JOB_ALREADY_RUNNING" ||
+          code === "QUEUE_BUSY"
+        ) {
+          msg =
+            (data && data.error_message) ||
+            "Ein anderes Symbol-Onboarding läuft noch. Bitte warten und danach erneut versuchen.";
+        }
+        setError("soFormError", msg);
         return;
       }
       resumeJob(data.job_id);
@@ -490,8 +669,12 @@
     $("soModeExtend").addEventListener("click", function () {
       setMode("extend_history");
     });
-    $("soPlanBtn").addEventListener("click", runPlan);
-    $("soApplyBtn").addEventListener("click", openConfirm);
+    $("soPlanBtn").addEventListener("click", function () {
+      runPlan();
+    });
+    $("soApplyBtn").addEventListener("click", function () {
+      onApplyClick();
+    });
     $("soConfirmCancel").addEventListener("click", function () {
       show($("soConfirmModal"), false);
     });

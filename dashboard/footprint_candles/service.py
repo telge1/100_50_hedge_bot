@@ -12,7 +12,6 @@ from research_charts.clickhouse_config import load_clickhouse_config
 
 from .aggregation import build_candle
 from .contracts import (
-    BUCKET_STEP,
     CANDLE_SECONDS,
     CANDLES_FQN,
     DEFAULT_BUFFER_SECONDS,
@@ -20,10 +19,14 @@ from .contracts import (
     MAX_RANGE_SECONDS,
     QUERY_TIMEOUT_S,
     SUPPORTED_MODE,
-    SUPPORTED_SYMBOL,
     SUPPORTED_TIMEFRAME,
     TRADES_FQN,
     CoverageStatus,
+)
+from .bucket_policy import (
+    is_supported_symbol,
+    resolve_bucket_step,
+    validate_bucket_step,
 )
 from .coverage import (
     CandleTradePresence,
@@ -57,10 +60,10 @@ def validate_request(
     end: int,
 ) -> dict[str, Any]:
     sym = str(symbol or "").strip().upper()
-    if sym != SUPPORTED_SYMBOL:
+    if not is_supported_symbol(sym):
         raise FootprintRequestError(
             "unsupported_symbol",
-            f"Footprint MVP supports only {SUPPORTED_SYMBOL}",
+            "Footprint pilot supports BTCUSDT and INJUSDT only",
         )
     tf = str(timeframe or "").strip().lower()
     if tf != SUPPORTED_TIMEFRAME:
@@ -77,9 +80,18 @@ def validate_request(
     try:
         step = float(bucket_step)
     except (TypeError, ValueError) as exc:
-        raise FootprintRequestError("bad_bucket_step", "bucket_step must be 5.0") from exc
-    if abs(step - float(BUCKET_STEP)) > 1e-12:
-        raise FootprintRequestError("bad_bucket_step", "bucket_step must be 5.0")
+        want = resolve_bucket_step(sym)
+        raise FootprintRequestError(
+            "bad_bucket_step", f"bucket_step must be {want} for {sym}"
+        ) from exc
+    try:
+        step_d = validate_bucket_step(sym, step)
+    except (KeyError, ValueError) as exc:
+        want = resolve_bucket_step(sym)
+        raise FootprintRequestError(
+            "bad_bucket_step", f"bucket_step must be {want} for {sym}"
+        ) from exc
+    step = float(step_d)
 
     try:
         a = int(start)
@@ -106,7 +118,7 @@ def validate_request(
         "symbol": sym,
         "timeframe": tf,
         "mode": md,
-        "bucket_step": float(BUCKET_STEP),
+        "bucket_step": float(step),
         "start": a,
         "end": b,
     }
@@ -326,6 +338,7 @@ def load_footprint(
                         by_idx={},
                         coverage=cov.value,
                         sources=sources,
+                        bucket_step=req["bucket_step"],
                     ).to_dict()
                 )
             else:
@@ -339,6 +352,7 @@ def load_footprint(
                         by_idx=levels,
                         coverage=cov.value,
                         sources=sources,
+                        bucket_step=req["bucket_step"],
                     ).to_dict()
                 )
 

@@ -14,10 +14,10 @@ from .origin import post_guard
 from .overview import build_overview
 from .plans import compute_plan_hash, load_plan, plan_matches_form, store_plan
 from .rate_limit import allow_post
-from .sanitization import job_list_row, sanitize_job, validate_job_id
+from .sanitization import job_list_row, sanitize_job, sanitize_queue_job, validate_job_id
 from .schemas import parse_onboard_form
 from .service_adapter import get_job, list_job_files, run_plan
-from .worker_client import enqueue_apply
+from .worker_client import enqueue_apply, read_queue_status
 
 
 async def _read_json_body(request: Request) -> tuple[dict[str, Any] | None, JSONResponse | None]:
@@ -150,7 +150,33 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         if not record:
             return JSONResponse({"success": False, "error": "PLAN_EXPIRED_OR_UNKNOWN"}, status_code=400)
         if not plan_matches_form(record, form, plan_hash):
-            return JSONResponse({"success": False, "error": "PLAN_HASH_MISMATCH"}, status_code=409)
+            # Prefer the stored plan request — client form may have drifted; hash is enough.
+            stored = record.get("request") if isinstance(record.get("request"), dict) else None
+            if str(record.get("plan_hash") or "") == plan_hash and stored:
+                form2, ferr2 = parse_onboard_form(stored)
+                if ferr2 or form2 is None or not plan_matches_form(record, form2, plan_hash):
+                    return JSONResponse(
+                        {
+                            "success": False,
+                            "error": "PLAN_HASH_MISMATCH",
+                            "error_message": (
+                                "Plan stimmt nicht mehr. Bitte erneut „Nur prüfen / Plan anzeigen“."
+                            ),
+                        },
+                        status_code=409,
+                    )
+                form = form2
+            else:
+                return JSONResponse(
+                    {
+                        "success": False,
+                        "error": "PLAN_HASH_MISMATCH",
+                        "error_message": (
+                            "Plan stimmt nicht mehr. Bitte erneut „Nur prüfen / Plan anzeigen“."
+                        ),
+                    },
+                    status_code=409,
+                )
 
         payload, status = enqueue_apply(
             form=form,
@@ -197,9 +223,12 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return JSONResponse({"success": False, "error": "INVALID_JOB_ID"}, status_code=400)
         try:
             job = get_job(safe)
+            return JSONResponse(sanitize_job(job))
         except FileNotFoundError:
+            q = read_queue_status(safe)
+            if q:
+                return JSONResponse(sanitize_queue_job(safe, q))
             return JSONResponse({"success": False, "error": "JOB_NOT_FOUND"}, status_code=404)
-        return JSONResponse(sanitize_job(job))
 
     @router.get("/api/datenverwaltung/symbole/overview")
     async def api_overview(user: dict = Depends(_admin_user)):

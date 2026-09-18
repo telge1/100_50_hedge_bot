@@ -25,6 +25,8 @@ from .config import RULE_VERSION
 
 MAX_WINDOW_S = 180
 PREROLL_S = 30
+# Rolling window for Kontrolle buy/sell % (near real-time).
+AGGRESSOR_LIVE_S = 20
 WALL_PRICE_TOL_TICKS = 5
 BOOK_STALE_MS = 180_000
 
@@ -32,6 +34,76 @@ BOOK_STALE_MS = 180_000
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
+
+def _aggressor_from_trades(
+    trades: list[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+    live_s: float = AGGRESSOR_LIVE_S,
+) -> dict[str, Any]:
+    """Session totals for explained/pull; live shares for Kontrolle UI."""
+    buy_n = sell_n = buy_qty = sell_qty = 0.0
+    live_buy_n = live_sell_n = 0.0
+    live_count = 0
+    cutoff = None
+    if now is not None and live_s and live_s > 0:
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        cutoff = now - timedelta(seconds=float(live_s))
+    for tr in trades:
+        notion = _f(tr.get("notional")) or 0.0
+        q = _f(tr.get("size")) or 0.0
+        side = str(tr.get("side") or "").strip().lower()
+        ts = tr.get("trade_ts")
+        in_live = True
+        if cutoff is not None and ts is not None:
+            if getattr(ts, "tzinfo", None) is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            in_live = ts >= cutoff
+        if side == "buy":
+            buy_n += notion
+            buy_qty += q
+            if in_live:
+                live_buy_n += notion
+                live_count += 1
+        elif side == "sell":
+            sell_n += notion
+            sell_qty += q
+            if in_live:
+                live_sell_n += notion
+                live_count += 1
+    total_n = buy_n + sell_n
+    live_total = live_buy_n + live_sell_n
+    # Kontrolle uses the short live window; fall back to session if live empty
+    # but session has tape (startup / quiet tape).
+    ctrl_buy = live_buy_n
+    ctrl_sell = live_sell_n
+    ctrl_total = live_total
+    ctrl_note = "live_window"
+    if ctrl_total <= 0 and total_n > 0:
+        ctrl_buy = buy_n
+        ctrl_sell = sell_n
+        ctrl_total = total_n
+        ctrl_note = "session_fallback"
+    elif ctrl_total <= 0:
+        ctrl_note = "zero_trades_in_zone"
+    return {
+        "buy_n": buy_n,
+        "sell_n": sell_n,
+        "buy_qty": buy_qty,
+        "sell_qty": sell_qty,
+        "live_buy_n": live_buy_n,
+        "live_sell_n": live_sell_n,
+        "live_count": live_count,
+        "ctrl_buy_n": ctrl_buy,
+        "ctrl_sell_n": ctrl_sell,
+        "ctrl_total": ctrl_total,
+        "ctrl_note": ctrl_note,
+        "buy_share": (ctrl_buy / ctrl_total) if ctrl_total > 0 else 0.0,
+        "sell_share": (ctrl_sell / ctrl_total) if ctrl_total > 0 else 0.0,
+        "session_buy_share": (buy_n / total_n) if total_n > 0 else 0.0,
+        "session_sell_share": (sell_n / total_n) if total_n > 0 else 0.0,
+    }
 
 def _f(v: Any) -> float | None:
     try:
@@ -524,33 +596,27 @@ def compute_live_metrics(
     try:
         trades = _load_trades_in_zone(sym, win_start, win_end, lo, hi)
         trades_ok = True
-        for tr in trades:
-            notion = _f(tr.get("notional")) or 0.0
-            q = _f(tr.get("size")) or 0.0
-            side = str(tr.get("side") or "").strip().lower()
-            if side == "buy":
-                buy_n += notion
-                buy_qty += q
-            elif side == "sell":
-                sell_n += notion
-                sell_qty += q
-        total_n = buy_n + sell_n
-        out["aggressor_buy_notional"] = buy_n
-        out["aggressor_sell_notional"] = sell_n
-        if total_n > 0:
-            out["aggressor_buy_share"] = buy_n / total_n
-            out["aggressor_sell_share"] = sell_n / total_n
-            out["adapters"]["aggressor"] = "ok"
-        else:
-            # Zero trades in zone is a valid observation, not incompleteness.
-            out["aggressor_buy_share"] = 0.0
-            out["aggressor_sell_share"] = 0.0
-            out["adapters"]["aggressor"] = "ok"
-            out["adapters"]["aggressor_note"] = "zero_trades_in_zone"
+        agg = _aggressor_from_trades(trades, now=now, live_s=AGGRESSOR_LIVE_S)
+        buy_n = float(agg["buy_n"])
+        sell_n = float(agg["sell_n"])
+        buy_qty = float(agg["buy_qty"])
+        sell_qty = float(agg["sell_qty"])
+        # Kontrolle / UI shares = rolling live window (fallback session).
+        out["aggressor_buy_notional"] = float(agg["ctrl_buy_n"])
+        out["aggressor_sell_notional"] = float(agg["ctrl_sell_n"])
+        out["aggressor_buy_share"] = float(agg["buy_share"])
+        out["aggressor_sell_share"] = float(agg["sell_share"])
+        out["aggressor_window_s"] = float(AGGRESSOR_LIVE_S)
+        out["adapters"]["aggressor"] = "ok"
+        out["adapters"]["aggressor_note"] = agg["ctrl_note"]
+        out["adapters"]["aggressor_session_buy_share"] = agg["session_buy_share"]
+        out["adapters"]["aggressor_session_sell_share"] = agg["session_sell_share"]
         out["coverage"]["public_trades"] = {
             "count": len(trades),
+            "live_count": agg["live_count"],
             "window_start": win_start.isoformat().replace("+00:00", "Z"),
             "window_end": win_end.isoformat().replace("+00:00", "Z"),
+            "live_window_s": AGGRESSOR_LIVE_S,
             "zone_lo": lo,
             "zone_hi": hi,
             "query_ok": True,

@@ -6,7 +6,7 @@
     <title>Symbol hinzufügen - Datenverwaltung</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/stoch.css?v=10">
-    <link rel="stylesheet" href="/static/css/symbol_onboarding.css?v=2">
+    <link rel="stylesheet" href="/static/css/symbol_onboarding.css?v=5">
 </head>
 <body>
     <div class="dashboard-container">
@@ -29,7 +29,7 @@
                     <p class="so-hint">LLD / Liquidity Location braucht vor allem <strong>Candles 1m</strong>: ~7–17 Tage für 5m/15m-Charts, <strong>30 Tage</strong> komfortabel, <strong>90 Tage</strong> deckt bis ~1h-Packs ab (4h bräuchte deutlich mehr).</p>
                 </div>
                 <div class="stoch-page-header-actions">
-                    <a class="stoch-btn stoch-btn-ghost" href="/stoch-signale">← Stoch-Signale</a>
+                    <a class="stoch-btn stoch-btn-ghost" href="/stoch-signale">← Datenhub</a>
                 </div>
             </div>
 
@@ -76,7 +76,7 @@
 
                         <div class="so-actions">
                             <button type="button" class="stoch-btn" id="soPlanBtn">Nur prüfen / Plan anzeigen</button>
-                            <button type="button" class="stoch-btn" id="soApplyBtn" disabled>Symbol hinzufügen</button>
+                            <button type="button" class="stoch-btn so-btn-needs-plan" id="soApplyBtn" aria-disabled="true">Symbol hinzufügen</button>
                         </div>
                     </div>
                 </section>
@@ -90,15 +90,25 @@
                 </section>
             </div>
 
-            <section class="stoch-card so-card" id="soProgressCard">
+            <section class="stoch-card so-card so-progress-card" id="soProgressCard">
                 <div class="stoch-card-summary">D. Jobfortschritt</div>
                 <div class="stoch-card-body">
-                    <div id="soProgressMeta" class="so-muted">Kein aktiver Job.</div>
+                    <div id="soProgressHeadline" class="so-status-banner so-tone-idle" hidden>
+                        <div class="so-status-title" id="soStatusTitle">Kein aktiver Job</div>
+                        <div class="so-status-sub" id="soStatusSub"></div>
+                    </div>
+                    <div id="soProgressMeta" class="so-muted">Kein aktiver Job. Nach „Symbol hinzufügen“ erscheint hier der Live-Status.</div>
                     <div class="so-progress-bar-wrap" id="soBarWrap" hidden>
                         <div class="so-progress-bar" id="soBar"></div>
                     </div>
+                    <div class="so-progress-pct-row" id="soPctRow" hidden>
+                        <strong id="soPctLabel">0%</strong>
+                        <span id="soStageCount" class="so-muted"></span>
+                        <span id="soLivePulse" class="so-live-pulse" hidden>Live</span>
+                    </div>
                     <ul class="so-stages" id="soStages"></ul>
                     <div class="so-archive-hint" id="soArchiveHint" hidden></div>
+                    <div class="so-ok" id="soJobDone" hidden></div>
                     <div class="so-error" id="soJobError" hidden></div>
                 </div>
             </section>
@@ -170,7 +180,7 @@
         </div>
     </div>
 
-    <script src="/static/js/symbol_onboarding.js?v=2"></script>
+    <script src="/static/js/symbol_onboarding.js?v=6"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

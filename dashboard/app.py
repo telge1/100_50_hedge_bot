@@ -3439,6 +3439,65 @@ async def stoch_signale_page(request: Request, user: dict = Depends(require_auth
     ))
 
 
+@app.get("/daten-signale")
+async def daten_signale_redirect(request: Request, user: dict = Depends(require_auth)):
+    """Umbrella URL → Datenhub."""
+    target = "/stoch-signale"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/ema-signale", response_class=HTMLResponse)
+async def ema_signale_page(
+    request: Request,
+    page: int = Query(0, ge=0, description="Zero-based signal page"),
+    page_size: int = Query(50, ge=1, le=500, description="Signals per page"),
+    symbol: str | None = Query(None),
+    direction: str | None = Query(None),
+    state: str | None = Query(None, description="CREATED|COMPLETED|CANCELLED|ERROR"),
+    start_time: str | None = Query(None, description="Start datetime filter (UTC)"),
+    end_time: str | None = Query(None, description="End datetime filter (UTC)"),
+    user: dict = Depends(require_auth),
+):
+    """EMA-59 Band Signale aus dem Signal-Generator (thr × 3, 17.09.2026)."""
+    from ema_sg_signals.feed import paginated_live_signals
+
+    payload = paginated_live_signals(
+        symbol=symbol,
+        direction=direction,
+        state=state,
+        start_time=start_time,
+        end_time=end_time,
+        page=page,
+        page_size=page_size,
+    )
+    pagination = payload.get("pagination") or {}
+    signals = payload.get("signals") or []
+    return HTMLResponse(render_template(
+        "ema_signale.html",
+        {
+            "request": request,
+            "user": user,
+            "signals": signals,
+            "symbols": payload.get("symbols") or [],
+            "summary": payload.get("page_summary") or {},
+            "pagination": pagination,
+            "feed_ready": bool(payload.get("feed_ready")),
+            "feed_message": payload.get("message") or "",
+            "banner": payload.get("banner") or {},
+            "window_label": payload.get("window_label") or "",
+            "filter_symbol": (symbol or "").strip().upper(),
+            "filter_direction": (direction or "").strip().upper(),
+            "filter_state": (state or "").strip().upper(),
+            "filter_start_time": start_time or "",
+            "filter_end_time": end_time or "",
+            "page_size": pagination.get("page_size") or page_size,
+            "signal_page": pagination.get("page") or 0,
+        },
+    ))
+
+
 @app.get("/stoch-profite", response_class=HTMLResponse)
 async def stoch_profite_page(request: Request, user: dict = Depends(require_auth)):
     """Stoch / Wave-Fade Profite – Template-Scaffolding bis der Live-Feed angebunden ist."""

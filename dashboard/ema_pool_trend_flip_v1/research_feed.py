@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -377,3 +378,150 @@ def load_research_klines(signal_id: str, environ: dict | None = None) -> dict[st
             "chart": mapped,
             "message": str(exc),
         }
+
+
+def _parse_bound(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    text = text.replace(" ", "T")
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _row_ts(row: dict[str, Any]) -> datetime | None:
+    return _parse_bound(
+        row.get("signal_time") or row.get("entry_time") or row.get("candle_close_time")
+    )
+
+
+def _utc_label(value: Any) -> str:
+    dt = _parse_bound(str(value) if value is not None else None)
+    if dt is None:
+        text = str(value or "").strip()
+        return text.replace("T", " ").replace("Z", " UTC") if text else "–"
+    return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _display_row(row: dict[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    ts = row.get("signal_time") or row.get("entry_time") or row.get("candle_close_time")
+    out["signal_time_label"] = _utc_label(ts)
+    pnl = row.get("net_pnl_pct")
+    if pnl is None:
+        pnl = row.get("pnl_pct")
+    try:
+        pnl_f = None if pnl is None else float(pnl)
+    except (TypeError, ValueError):
+        pnl_f = None
+    if pnl_f is None:
+        out["pnl_label"] = "–"
+        out["pnl_class"] = ""
+    else:
+        out["pnl_label"] = f"{pnl_f:+.2f}%"
+        out["pnl_class"] = "stoch-pnl-pos" if pnl_f > 0 else ("stoch-pnl-neg" if pnl_f < 0 else "")
+    out["direction_label"] = str(
+        row.get("direction") or row.get("trade_direction") or row.get("executed_direction") or ""
+    ).upper()
+    out["result_label"] = str(row.get("display_result") or row.get("result") or row.get("outcome") or "–")
+    result_u = out["result_label"].upper()
+    if result_u == "WIN":
+        out["result_chip"] = "stoch-chip-tp"
+    elif result_u == "LOSS":
+        out["result_chip"] = "stoch-chip-sl"
+    elif result_u == "OPEN":
+        out["result_chip"] = "stoch-chip-open"
+    else:
+        out["result_chip"] = "stoch-chip-none"
+    return out
+
+
+def paginated_signals_page(
+    *,
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    direction: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    page: int = 0,
+    page_size: int = 50,
+    environ: dict | None = None,
+) -> dict[str, Any]:
+    """Filter/sort/paginate EMA research signals for the Ema-Signal page."""
+    payload = research_signals_response(
+        symbol=None,
+        timeframe=timeframe,
+        direction=None,
+        environ=environ,
+    )
+    rows = [r for r in (payload.get("signals") or []) if isinstance(r, dict)]
+    symbols = sorted({str(r.get("symbol") or "").upper() for r in rows if r.get("symbol")})
+    want_symbol = str(symbol or "").strip().upper()
+    want_direction = str(direction or "").strip().upper()
+    start_dt = _parse_bound(start_time)
+    end_dt = _parse_bound(end_time)
+    filtered: list[dict[str, Any]] = []
+    for row in rows:
+        if want_symbol and str(row.get("symbol") or "").upper() != want_symbol:
+            continue
+        row_dir = str(
+            row.get("direction") or row.get("trade_direction") or row.get("executed_direction") or ""
+        ).upper()
+        if want_direction and row_dir != want_direction:
+            continue
+        ts = _row_ts(row)
+        if start_dt is not None and (ts is None or ts < start_dt):
+            continue
+        if end_dt is not None and (ts is None or ts > end_dt):
+            continue
+        filtered.append(row)
+    filtered.sort(key=lambda r: _row_ts(r) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    try:
+        size = max(1, min(int(page_size or 50), 500))
+    except (TypeError, ValueError):
+        size = 50
+    try:
+        page_n = max(0, int(page or 0))
+    except (TypeError, ValueError):
+        page_n = 0
+    total = len(filtered)
+    total_pages = (total + size - 1) // size if size else 0
+    if total_pages:
+        page_n = min(page_n, total_pages - 1)
+    start_idx = page_n * size
+    paged = [_display_row(r) for r in filtered[start_idx : start_idx + size]]
+    wins = sum(1 for r in filtered if str(r.get("display_result") or r.get("result") or "").upper() == "WIN")
+    losses = sum(1 for r in filtered if str(r.get("display_result") or r.get("result") or "").upper() == "LOSS")
+    open_n = sum(1 for r in filtered if str(r.get("display_result") or r.get("result") or "").upper() == "OPEN")
+    pagination = {
+        "page": page_n,
+        "page_size": size,
+        "total_filtered": total,
+        "total_filtered_trades": total,
+        "total_pages": total_pages,
+        "has_prev": page_n > 0,
+        "has_next": page_n + 1 < total_pages,
+    }
+    payload["signals"] = paged
+    payload["items"] = paged
+    payload["total"] = total
+    payload["page"] = page_n
+    payload["page_size"] = size
+    payload["pagination"] = pagination
+    payload["symbols"] = symbols
+    payload["page_summary"] = {
+        "signals": total,
+        "wins": wins,
+        "losses": losses,
+        "open": open_n,
+    }
+    return payload

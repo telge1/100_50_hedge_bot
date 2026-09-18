@@ -612,20 +612,67 @@ def _book_to_snap(
     }
 
 
-def _snap_from_on_demand_ob1000(symbol: str, at_u: datetime) -> dict[str, Any] | None:
-    """Build a walls-compatible book snap from the live OB1000 on-demand WS book."""
+def _ensure_walls_on_demand_lease(symbol: str) -> str | None:
+    """Acquire/refresh a stable Walls lease so any USDT coin gets a live OB1000 book.
+
+    Releases the previous process-local Walls lease when the symbol changes so
+    chart symbol switches do not pile up OB1000 on-demand topics until TTL.
+    """
     try:
-        from research_charts.ob1000_on_demand import PILOT_SYMBOLS, load_ob1000_levels
+        from research_charts.ob1000_on_demand import (
+            Ob1000CapacityError,
+            Ob1000CollectorUnavailableError,
+            Ob1000DisabledError,
+            lease_acquire,
+            lease_release,
+        )
     except ImportError:
         return None
     sym = str(symbol or "").strip().upper()
-    if sym not in PILOT_SYMBOLS:
+    if not sym:
         return None
+    prev = getattr(_ensure_walls_on_demand_lease, "_prev_symbol", None)
+    if prev and prev != sym:
+        try:
+            lease_release(lease_id=f"walls-live-{prev}", depth=1000)
+        except Exception:
+            pass
+    lid = f"walls-live-{sym}"
     try:
-        payload = load_ob1000_levels(sym)
+        lease_acquire(symbol=sym, session_id=lid, lease_id=lid, depth=1000)
+        _ensure_walls_on_demand_lease._prev_symbol = sym  # type: ignore[attr-defined]
+        return lid
+    except (Ob1000DisabledError, Ob1000CollectorUnavailableError, Ob1000CapacityError, ValueError):
+        return None
     except Exception:
         return None
-    if str(payload.get("data_status") or "") == "no_data":
+
+
+def _snap_from_on_demand_ob1000(symbol: str, at_u: datetime) -> dict[str, Any] | None:
+    """Build a walls-compatible book snap from the live OB1000 on-demand WS book."""
+    try:
+        from research_charts.ob1000_on_demand import load_ob1000_levels
+    except ImportError:
+        return None
+    sym = str(symbol or "").strip().upper()
+    lease_id = _ensure_walls_on_demand_lease(sym)
+    payload: dict[str, Any] | None = None
+    try:
+        for _attempt in range(6):
+            payload = load_ob1000_levels(sym, lease_id=lease_id)
+            if str(payload.get("data_status") or "") != "no_data":
+                raw_bids = payload.get("bids") or []
+                raw_asks = payload.get("asks") or []
+                if raw_bids and raw_asks:
+                    break
+            # Cold subscribe for non-keeper symbols needs a short settle.
+            time.sleep(0.35)
+        else:
+            if payload is None:
+                return None
+    except Exception:
+        return None
+    if payload is None or str(payload.get("data_status") or "") == "no_data":
         return None
     raw_bids = payload.get("bids") or []
     raw_asks = payload.get("asks") or []
@@ -706,20 +753,10 @@ def replay_book_as_of(
         if od is not None:
             return od
 
-    hist_roots, parser_version, archive_source = resolve_archive_roots_for_replay(
-        symbol, roots=roots
-    )
-
-    # Live tip fallback: REST OB1000 if on-demand book not ready yet.
+    # Live tip REST fallback must run before archive resolve — non-keeper coins
+    # (AAVE, …) have no local OB1000 archive and would otherwise hard-fail.
     if live_tip and allow_rest_live_fallback:
         try:
-            cov = coverage_bounds(
-                symbol, roots=hist_roots, parser_version=parser_version
-            )
-            if cov is None:
-                cov_start = cov_end = at_u
-            else:
-                cov_start, cov_end = cov
             rest = _fetch_rest_orderbook(symbol, limit=1000)
             return _book_to_snap(
                 symbol=symbol,
@@ -728,15 +765,18 @@ def replay_book_as_of(
                 book_ts=rest["book_ts"],
                 clamped=False,
                 live_open=True,
-                cov_start=cov_start,
-                cov_end=cov_end,
+                cov_start=at_u,
+                cov_end=at_u,
                 segment="bybit_rest_orderbook_1000",
                 events_applied=int(rest["events_applied"]),
                 source="bybit_rest_orderbook_1000",
             )
         except Ob200WallsError:
-            # Fall through to local archive replay.
             pass
+
+    hist_roots, parser_version, archive_source = resolve_archive_roots_for_replay(
+        symbol, roots=roots
+    )
 
     closed = list_closed_segments(hist_roots, symbol, parser_version=parser_version)
     opens = list_open_segments(hist_roots, symbol, parser_version=parser_version)

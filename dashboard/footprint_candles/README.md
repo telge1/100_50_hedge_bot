@@ -2,14 +2,25 @@
 
 Read-only research overlay for the Market Profile page.
 
-## Supported (V1)
+## Supported (V1 + INJ pilot)
 
 | Setting | Value |
 |---------|-------|
-| Symbol | `BTCUSDT` only |
+| Symbols | `BTCUSDT`, `INJUSDT` (pilot) |
 | Candle TF | `5m` only |
 | Mode | `DISPLAY` only |
-| `bucket_step` | `5.0` (fixed; zoom never changes buckets) |
+| `bucket_step` | per symbol via `bucket_policy.py` (BTC=`5`, INJ=`0.001`) |
+
+### Bucket formula (roll-out)
+
+```
+raw = price * (5 / 77000)          # BTC-calibrated relative step
+step = nice_multiple(raw, tick)    # round up to 1|2|5×10^k ≥ tick
+```
+
+Optional: also compute `nice_multiple(median_5m_range / 20, tick)` and compare.
+INJUSDT locks to `0.001` (≈1 tick ≈20 levels per typical 5m candle).
+
 
 ## API time limits
 

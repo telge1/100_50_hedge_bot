@@ -17,6 +17,7 @@ from footprint_candles.contracts import (  # noqa: E402
     STACKED_MIN_LEVELS,
     SUPPORTED_MODE,
     SUPPORTED_SYMBOL,
+    SUPPORTED_SYMBOLS,
     SUPPORTED_TIMEFRAME,
     bucket_bounds,
     bucket_index_for_price,
@@ -26,6 +27,7 @@ from footprint_candles.contracts import (  # noqa: E402
 
 def test_mvp_locks():
     assert SUPPORTED_SYMBOL == "BTCUSDT"
+    assert "INJUSDT" in SUPPORTED_SYMBOLS
     assert SUPPORTED_TIMEFRAME == "5m"
     assert SUPPORTED_MODE == "DISPLAY"
     assert BUCKET_STEP == Decimal("5")

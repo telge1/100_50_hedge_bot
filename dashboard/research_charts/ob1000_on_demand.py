@@ -16,10 +16,12 @@ FULL_DEPTH = 0
 SOURCE_NAME = "orderbook_v3_live_on_demand"
 
 CONNECT_TIMEOUT_SEC = 2.0
-READ_TIMEOUT_SEC = 3.0
+# Cold subscribe of a new USDT symbol can take several seconds under keeper load.
+READ_TIMEOUT_SEC = 20.0
 WRITE_TIMEOUT_SEC = 3.0
 MAX_RESPONSE_BYTES = 8_388_608
 
+_USDT_RE = __import__("re").compile(r"^[A-Z0-9]{2,20}USDT$")
 _ON_DEMAND_ENV_KEYS = (
     "OB_V3_ON_DEMAND_ENABLE",
     "OB_V3_ON_DEMAND_SOCKET_PATH",
@@ -145,10 +147,38 @@ def _call_collector(request: dict[str, Any]) -> dict[str, Any]:
     return resp
 
 
+def resolve_keeper_symbols() -> frozenset[str]:
+    """Always-on OB1000 archive symbols (config), not a gate for Walls leases."""
+    try:
+        import sys
+
+        oa = _orderbook_analyse_root()
+        src = oa / "src"
+        if src.is_dir() and str(src) not in sys.path:
+            sys.path.insert(0, str(src))
+        from orderbook_analyse.orderbook_v2_live.on_demand_lease import (  # type: ignore
+            resolve_ob1000_keeper_symbols,
+        )
+
+        return frozenset(resolve_ob1000_keeper_symbols())
+    except Exception:
+        cfg = _orderbook_analyse_root() / "config" / "ob1000_live_symbols.json"
+        if cfg.is_file():
+            try:
+                data = json.loads(cfg.read_text(encoding="utf-8"))
+                raw = data.get("symbols") if isinstance(data, dict) else data
+                if isinstance(raw, list) and raw:
+                    return frozenset(str(s).strip().upper() for s in raw if str(s).strip())
+            except (OSError, ValueError, TypeError):
+                pass
+        return PILOT_SYMBOLS
+
+
 def _normalize_symbol(symbol: str) -> str:
+    """Any Bybit linear USDT symbol — Walls toggle starts on-demand collector WS."""
     sym = str(symbol or "").strip().upper()
-    if sym not in PILOT_SYMBOLS:
-        raise ValueError("symbol_not_in_pilot")
+    if not _USDT_RE.match(sym):
+        raise ValueError("invalid_symbol")
     return sym
 
 

@@ -34,9 +34,10 @@ def accumulate_trade(
     side: str,
     size: float,
     notional: float,
+    bucket_step: Decimal | float | str | None = None,
 ) -> None:
     """Fold one deduplicated trade into per-bucket aggs."""
-    idx = bucket_index_for_price(price)
+    idx = bucket_index_for_price(price, bucket_step)
     row = levels.get(idx)
     if row is None:
         row = RawLevelAgg(bucket_index=idx)
@@ -136,6 +137,7 @@ def build_levels_from_raw(
     by_idx: dict[int, RawLevelAgg],
     *,
     highlight_imbalances: bool,
+    bucket_step: Decimal | float | str | None = None,
 ) -> tuple[list[FootprintLevel], float, float, float | None, int | None]:
     """Build sorted levels + candle deltas + vPOC."""
     if not by_idx:
@@ -158,7 +160,7 @@ def build_levels_from_raw(
     candle_delta_notional = 0.0
     for idx in indices:
         raw = by_idx[idx]
-        lo, hi = bucket_bounds(idx)
+        lo, hi = bucket_bounds(idx, bucket_step)
         delta_s = raw.ask_size - raw.bid_size
         delta_n = raw.ask_notional - raw.bid_notional
         candle_delta_size += delta_s
@@ -185,7 +187,7 @@ def build_levels_from_raw(
 
     vpoc_price = None
     if vpoc_idx is not None:
-        lo, hi = bucket_bounds(vpoc_idx)
+        lo, hi = bucket_bounds(vpoc_idx, bucket_step)
         vpoc_price = (lo + hi) / 2.0
     return levels, candle_delta_size, candle_delta_notional, vpoc_price, vpoc_idx
 
@@ -223,12 +225,13 @@ def build_candle(
     by_idx: dict[int, RawLevelAgg],
     coverage: str,
     sources: list[str] | None = None,
+    bucket_step: Decimal | float | str | None = None,
 ) -> FootprintCandle:
     from .coverage import allows_imbalance_highlight
 
     highlight = allows_imbalance_highlight(coverage)
     levels, d_s, d_n, vpoc_px, vpoc_idx = build_levels_from_raw(
-        by_idx, highlight_imbalances=highlight
+        by_idx, highlight_imbalances=highlight, bucket_step=bucket_step
     )
     trade_count = sum(r.trade_count for r in by_idx.values())
     incomplete = coverage != "COMPLETE"

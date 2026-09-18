@@ -20,8 +20,10 @@ from .contracts import (
     STACKED_MIN_LEVELS,
     SUPPORTED_MODE,
     SUPPORTED_SYMBOL,
+    SUPPORTED_SYMBOLS,
     SUPPORTED_TIMEFRAME,
 )
+from .bucket_policy import display_steps_for_raw, pilot_meta, resolve_bucket_step
 from .response_contracts import (
     DEFAULT_THRESHOLDS,
     RESPONSE_ENGINE_ID,
@@ -49,10 +51,17 @@ def build_router(*, require_auth: Callable) -> APIRouter:
             "asset_v": ASSET_V,
             "supported": {
                 "symbol": SUPPORTED_SYMBOL,
+                "symbols": sorted(SUPPORTED_SYMBOLS),
                 "timeframe": SUPPORTED_TIMEFRAME,
                 "mode": SUPPORTED_MODE,
                 "bucket_step": float(BUCKET_STEP),
+                "bucket_steps": pilot_meta()["steps"],
+                "display_steps": {
+                    sym: display_steps_for_raw(step)
+                    for sym, step in pilot_meta()["steps"].items()
+                },
             },
+            "bucket_policy": pilot_meta(),
             "imbalance": {
                 "ratio": IMBALANCE_RATIO,
                 "min_compare_size": MIN_COMPARE_SIZE,
@@ -90,18 +99,34 @@ def build_router(*, require_auth: Callable) -> APIRouter:
         symbol: str = Query(...),
         timeframe: str = Query(SUPPORTED_TIMEFRAME),
         mode: str = Query(SUPPORTED_MODE),
-        bucket_step: float = Query(float(BUCKET_STEP)),
+        bucket_step: float | None = Query(
+            None,
+            description="Optional; defaults to pilot step for symbol (BTC=5, INJ=0.001)",
+        ),
         start: int = Query(..., alias="from", description="UTC unix seconds inclusive"),
         end: int = Query(..., alias="to", description="UTC unix seconds exclusive"),
         avr: int = Query(1, description="1=embed AVR summaries, 0=skip"),
     ) -> Any:
         try:
+            sym = str(symbol or "").strip().upper()
+            try:
+                step = (
+                    float(bucket_step)
+                    if bucket_step is not None
+                    else float(resolve_bucket_step(sym))
+                )
+            except KeyError:
+                return _error(
+                    400,
+                    "unsupported_symbol",
+                    "Footprint pilot supports BTCUSDT and INJUSDT only",
+                )
             payload = await asyncio.to_thread(
                 load_footprint,
                 symbol=symbol,
                 timeframe=timeframe,
                 mode=mode,
-                bucket_step=bucket_step,
+                bucket_step=step,
                 start=start,
                 end=end,
                 include_avr=bool(int(avr)),

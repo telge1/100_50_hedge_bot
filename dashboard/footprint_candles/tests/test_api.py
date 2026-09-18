@@ -120,6 +120,8 @@ def test_meta_endpoint():
     body = r.json()
     assert body["success"] is True
     assert body["supported"]["symbol"] == "BTCUSDT"
+    assert "INJUSDT" in body["supported"]["symbols"]
+    assert body["supported"]["bucket_steps"]["INJUSDT"] == 0.001
     assert body["supported"]["timeframe"] == "5m"
 
 

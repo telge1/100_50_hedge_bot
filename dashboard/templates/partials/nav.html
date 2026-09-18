@@ -1,6 +1,5 @@
         <div class="dashboard-navigation">
             <a href="/dashboard" class="nav-link{% if nav_active == 'dashboard' %} active{% endif %}">📊 Dashboard</a>
-            <a href="/live-orderbook" class="nav-link{% if nav_active == 'live-orderbook' %} active{% endif %}">📡 Live Orderbook</a>
             <a href="/position-calculator" class="nav-link nav-link-position-calculator{% if nav_active == 'position-calculator' %} active{% endif %}">🧮 Position Calculator</a>
             <div class="nav-dropdown{% if nav_active and nav_active.startswith('profit-verlauf') %} is-active{% endif %}">
                 <a href="/profit-verlauf" class="nav-link{% if nav_active and nav_active.startswith('profit-verlauf') %} active{% endif %}">📈 Profit-Verlauf</a>
@@ -18,6 +17,12 @@
                 </div>
             </div>
             <a href="/price-alert" class="nav-link{% if nav_active == 'price-alert' %} active{% endif %}">🔔 Price Alert</a>
-            <a href="/stoch-signale" class="nav-link{% if nav_active == 'stoch-signale' %} active{% endif %}">📉 Stoch-Signale</a>
+            <div class="nav-dropdown{% if nav_active and (nav_active.startswith('daten-signale') or nav_active == 'stoch-signale') %} is-active{% endif %}">
+                <a href="/stoch-signale" class="nav-link{% if nav_active and (nav_active.startswith('daten-signale') or nav_active == 'stoch-signale') %} active{% endif %}">📉 Daten & Signale</a>
+                <div class="nav-dropdown-menu" role="menu" aria-label="Daten & Signale">
+                    <a href="/stoch-signale" class="nav-dropdown-link{% if nav_active == 'daten-signale-datenhub' or nav_active == 'stoch-signale' %} active{% endif %}" role="menuitem">Datenhub</a>
+                    <a href="/ema-signale" class="nav-dropdown-link{% if nav_active == 'daten-signale-ema-signal' %} active{% endif %}" role="menuitem">Ema-Signal</a>
+                </div>
+            </div>
             <a href="/stoch-profite" class="nav-link{% if nav_active == 'stoch-profite' %} active{% endif %}">💰 Stoch-Profite</a>
         </div>

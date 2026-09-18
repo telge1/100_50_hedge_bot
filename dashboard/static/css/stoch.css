@@ -146,6 +146,9 @@
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
 }
 
 .stoch-btn:hover {
@@ -286,6 +289,61 @@
     margin-top: 12px;
     color: #9ca3af;
     font-size: 0.85rem;
+}
+
+.stoch-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: end;
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+
+.stoch-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 150px;
+}
+
+.stoch-filter-field label {
+    color: #9ca3af;
+    font-size: 0.82rem;
+}
+
+.stoch-filter-input,
+.stoch-filter-select {
+    background: #0b1220;
+    color: #e5e7eb;
+    border: 1px solid #1f2937;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 0.9rem;
+}
+
+.stoch-filter-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.stoch-filter-pagination-info {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    min-width: 180px;
+    text-align: right;
+}
+
+.stoch-filter-bar .stoch-btn[disabled],
+.stoch-filter-pagination .stoch-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .stoch-modal-backdrop {

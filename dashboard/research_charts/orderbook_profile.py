@@ -576,8 +576,12 @@ def load_orderbook_profile(
     if mode_s in {"snapshot_at", "ob200", "features"} and at_u >= end_u:
         at_u = end_u - timedelta(milliseconds=1)
 
+    # Live tip: always try multi-walls (on-demand OB1000 / REST) even without a
+    # local archive, so Walls works for any USDT coin when toggled on.
+    now_utc = datetime.now(timezone.utc)
+    live_tip = abs((now_utc - at_u).total_seconds()) < 180
     prefer_ob200 = mode_s == "ob200" or (
-        mode_s == "snapshot_at" and has_ob200_archive(sym)
+        mode_s == "snapshot_at" and (has_ob200_archive(sym) or live_tip)
     )
     source_tag = "ob200" if prefer_ob200 else mode_s
 
@@ -631,7 +635,7 @@ def load_orderbook_profile(
     payload["bid_count"] = sum(1 for b in bars if b["side"] == "BID")
     payload["ask_count"] = sum(1 for b in bars if b["side"] == "ASK")
     payload["as_of"] = unix_utc(at_u) if mode_s != "history" else None
-    if not bars and not has_ob200_archive(sym):
+    if not bars and not has_ob200_archive(sym) and not live_tip:
         payload["warning"] = "no_ob200_archive"
         payload["notes"] = [
             f"No local OB200 raw archive for {sym}.",

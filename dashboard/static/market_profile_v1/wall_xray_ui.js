@@ -15,14 +15,22 @@
     radarSort: "distance",
     lastPrice: null,
     liveMetrics: null,
+    metricsUpdatedAtMs: null,
+    pollAbort: null,
+    pollStartedAtMs: null,
     panelOpen: false,
     analysisTimer: null,
     analysisInflight: false,
     acceptAboveMs: 0,
     acceptBelowMs: 0,
     lastAcceptTs: null,
-    lastClickStatus: null
+    lastClickStatus: null,
+    showDetails: false,
+    showRadar: false
   };
+
+  var POLL_MS = 1000;
+  var POLL_STALE_MS = 2500;
 
   function $(id) {
     return document.getElementById(id);
@@ -383,14 +391,22 @@
       clearInterval(state.analysisTimer);
       state.analysisTimer = null;
     }
+    if (state.pollAbort) {
+      try {
+        state.pollAbort.abort();
+      } catch (e) { /* ignore */ }
+      state.pollAbort = null;
+    }
+    state.analysisInflight = false;
+    state.pollStartedAtMs = null;
   }
 
   function startAnalysisLoop() {
     stopAnalysisLoop();
-    pollLiveMetrics();
+    pollLiveMetrics(true);
     state.analysisTimer = setInterval(function () {
-      pollLiveMetrics();
-    }, 2000);
+      pollLiveMetrics(false);
+    }, POLL_MS);
   }
 
   function stopXray(reason) {
@@ -508,15 +524,29 @@
     renderPanel();
   }
 
-  function pollLiveMetrics() {
-    if (!state.session || !state.session.target || state.analysisInflight) return;
+  function pollLiveMetrics(force) {
+    if (!state.session || !state.session.target) return;
+    if (state.analysisInflight) {
+      var age = state.pollStartedAtMs != null ? Date.now() - state.pollStartedAtMs : 0;
+      if (!force && age < POLL_STALE_MS) return;
+      if (state.pollAbort) {
+        try {
+          state.pollAbort.abort();
+        } catch (e) { /* ignore */ }
+      }
+    }
     state.analysisInflight = true;
+    state.pollStartedAtMs = Date.now();
+    var ac = typeof AbortController !== "undefined" ? new AbortController() : null;
+    state.pollAbort = ac;
     ensureBookFeed();
     var tw = state.session.target;
     var avrNow = readAvr();
     var bridge = root.__mpObBookBridge;
     var leaseId = bridge && typeof bridge.leaseId === "function" ? bridge.leaseId() : null;
     var clientQty = clientWallQtyForTarget(tw);
+    // Prefer OB1000 for metrics latency even if chart Levels=FULL (client qty still used).
+    var prefDepth = bookDepth() === 0 ? 1000 : bookDepth() === 200 ? 1000 : bookDepth();
     var body = {
       symbol: state.session.symbol,
       breakpoint: tw.price,
@@ -541,16 +571,18 @@
       oi_at_trigger: null,
       oi_current: readOiCurrent(),
       xray: true,
-      preferred_depth: bookDepth() === 200 ? 1000 : bookDepth(),
+      preferred_depth: prefDepth,
       lease_id: leaseId,
       client_wall_qty: clientQty
     };
-    fetch("/api/wall-decision/v1/live-metrics", {
+    var fetchOpts = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify(body)
-    })
+    };
+    if (ac) fetchOpts.signal = ac.signal;
+    fetch("/api/wall-decision/v1/live-metrics", fetchOpts)
       .then(function (res) {
         return res.ok ? res.json() : null;
       })
@@ -558,19 +590,20 @@
         if (!payload || payload.success === false) {
           // Soft-fail with client qty so UI is not blank at contact.
           if (clientQty != null) {
-            state.liveMetrics = {
+            state.liveMetrics = Object.assign({}, state.liveMetrics || {}, {
               wall_current_qty: clientQty,
               wall_reduce_pct:
                 state.session.baselineQty > 0
                   ? Math.max(0, (state.session.baselineQty - clientQty) / state.session.baselineQty)
                   : null,
-              trade_explained_pct: null,
-              pull_pct: null,
-              replenish_pct: null,
               data_gap: true,
-              adapters: { wall_current: "ok", wall_source: "client_chart_wall" },
+              adapters: Object.assign({}, (state.liveMetrics && state.liveMetrics.adapters) || {}, {
+                wall_current: "ok",
+                wall_source: "client_chart_wall"
+              }),
               errors: ["LIVE_METRICS_HTTP_FAILED"]
-            };
+            });
+            state.metricsUpdatedAtMs = Date.now();
             renderPanel();
             return;
           }
@@ -584,6 +617,7 @@
           return;
         }
         state.liveMetrics = payload;
+        state.metricsUpdatedAtMs = Date.now();
         if (payload.wall_current_qty == null && clientQty != null) {
           payload.wall_current_qty = clientQty;
           if (state.session.baselineQty > 0) {
@@ -620,14 +654,18 @@
         renderPanel();
         shadowPost();
       })
-      .catch(function () {
+      .catch(function (err) {
+        if (err && err.name === "AbortError") return;
         if (clientQty != null) {
-          state.liveMetrics = {
+          state.liveMetrics = Object.assign({}, state.liveMetrics || {}, {
             wall_current_qty: clientQty,
             data_gap: true,
-            adapters: { wall_source: "client_chart_wall" },
+            adapters: Object.assign({}, (state.liveMetrics && state.liveMetrics.adapters) || {}, {
+              wall_source: "client_chart_wall"
+            }),
             errors: ["LIVE_METRICS_FETCH_ERROR"]
-          };
+          });
+          state.metricsUpdatedAtMs = Date.now();
           renderPanel();
           return;
         }
@@ -640,7 +678,11 @@
         renderPanel();
       })
       .then(function () {
-        state.analysisInflight = false;
+        if (state.pollAbort === ac) {
+          state.analysisInflight = false;
+          state.pollStartedAtMs = null;
+          state.pollAbort = null;
+        }
       });
   }
 
@@ -756,76 +798,260 @@
   function renderPanel() {
     var body = $("wdPanelBody");
     var title = $("wdPanelState");
+    var headStrong = document.querySelector("#wdPanelHead > strong");
     if (!body) return;
     var s = state.session;
     var m = state.liveMetrics || {};
-    var stateName = (s && (s.status || s.phase)) || state.lastClickStatus || "DISARMED";
+    var stateName = (s && (s.status || s.phase)) || state.lastClickStatus || "IDLE";
+    if (headStrong) headStrong.textContent = "XRAY";
     if (title) {
-      title.textContent = s ? X.decisionLabel(stateName) : state.lastClickStatus || "XRAY IDLE";
+      title.textContent = s ? X.decisionLabel(stateName) : state.lastClickStatus || "IDLE · Wall tippen";
       title.className = "wd-state wd-tone-" + X.decisionTone(stateName);
     }
+    var panel = $("wdPanel");
+    if (panel) panel.classList.add("wd-panel--xray");
+
+    function valOrDash(v) {
+      if (v == null || v === "" || v === "DATA UNAVAILABLE" || v === "N/A") return "–";
+      return v;
+    }
     function row(k, v) {
+      var show = valOrDash(v);
+      if (show === "–" && (k === "AVR" || k === "OI Δ" || k === "Session")) return "";
       return (
         '<div class="wd-row"><span class="wd-k">' +
         k +
         '</span><span class="wd-v">' +
-        (v == null || v === "" ? "N/A" : v) +
+        show +
         "</span></div>"
       );
     }
+
     var tw = s && s.target;
     var roles = s && s.roles;
+    var bias = (s && s.bias) || "NO_TRADE";
+    var phase = (s && s.phase) || (s ? "MONITORING" : "IDLE");
+    var distPct =
+      s && s.distance_bps != null ? fmtBpsAsPct(Math.abs(s.distance_bps), 3) : "–";
+    var approach =
+      s && s.approach === "approaching"
+        ? "→ näher"
+        : s && s.approach === "moving_away"
+          ? "← weg"
+          : s && s.approach
+            ? s.approach
+            : "–";
+    var warn =
+      (s && s.warnings && s.warnings.length && s.warnings[0]) ||
+      (roles && roles.LARGER_WALL_BEHIND ? "LARGER_WALL_BEHIND" : "") ||
+      (stateName === "PRIMARY_WALL_LOST" || phase === "WALL_LOST" ? "PRIMARY_WALL_LOST" : "");
+
+    var fight = X.classifyWallFight({
+      locked: !!s,
+      side: tw && tw.side,
+      phase: phase,
+      metrics: {
+        wallReducePct: m.wall_reduce_pct,
+        tradeExplainedPct: m.trade_explained_pct,
+        pullPct: m.pull_pct,
+        replenishPct: m.replenish_pct,
+        aggressorBuyShare: m.aggressor_buy_share,
+        aggressorSellShare: m.aggressor_sell_share
+      }
+    });
+
+    function pctBar(pct) {
+      if (pct == null || !Number.isFinite(Number(pct))) return 0;
+      return Math.max(0, Math.min(100, Math.round(Number(pct) * 100)));
+    }
+
     var html = "";
-    html += row("Mode", s ? "XRAY ACTIVE" : "XRAY IDLE");
-    html += row("Wall-Quelle", bookDepthLabel() + (bookDepth() === 0 ? " (Levels)" : " (OBP+Levels)"));
-    if (!s) {
-      html += row("Hinweis", "Major/Q95 oder Top-Wall anklicken · bei Kontakt Auto-Lock · OB1000/FULL umschalten");
-      html += row("Live-Metriken", "warten auf Target-Lock (sonst keine Contact-Daten)");
-    }
-    if (state.lastClickStatus && !s) html += row("Click", state.lastClickStatus);
-    html += row("Symbol", s && s.symbol);
-    html += row("Session", s && s.sessionId);
-    html += row("Target", tw ? tw.side + " · " + tw.id : "–");
-    html += row("Wall-Zone", tw ? tw.zone_lo + "–" + tw.zone_hi : "–");
-    html += row(
-      "Distanz",
-      s && s.distance_bps != null
-        ? fmtNum(s.distance_abs, 2) + " / " + fmtBpsAsPct(s.distance_bps, 3)
-        : "–"
-    );
-    html += row("Approach", s && s.approach);
-    html += row("Phase", s && s.phase);
-    html += row("Bias", s && s.bias);
-    html += row("Reasons", s && s.reasons ? s.reasons.join(", ") : "–");
-    html += row("Start", s && s.startNote);
-    html += row("Wall-Baseline", s && s.baselineQty != null ? s.baselineQty : "–");
+    html += '<div class="xr-focus">';
+    html +=
+      '<div class="xr-verdict xr-verdict--' +
+      fight.tone +
+      '"><div class="xr-verdict-label">' +
+      fight.label +
+      '</div><div class="xr-verdict-sub">' +
+      fight.sub +
+      "</div></div>";
+
+    html += '<div class="xr-gauge" title="links=Absorb · rechts=Break">';
+    html += '<span class="xr-gauge-l">ABSORB</span>';
+    html += '<div class="xr-gauge-track"><span class="xr-gauge-fill" style="width:' +
+      Math.max(4, Math.min(100, fight.gauge || 50)) +
+      '%"></span><span class="xr-gauge-knob" style="left:' +
+      Math.max(4, Math.min(96, fight.gauge || 50)) +
+      '%"></span></div>';
+    html += '<span class="xr-gauge-r">BREAK</span>';
+    html += "</div>";
+
     if (s) {
-      html += row("Wall aktuell", m.wall_current_qty != null ? m.wall_current_qty : "DATA UNAVAILABLE");
-      html += row("Wall-Abbau %", fmtPct(m.wall_reduce_pct));
-      html += row("Trades erklärt %", fmtPct(m.trade_explained_pct));
-      html += row("Pull-Anteil", fmtPct(m.pull_pct));
-      html += row("Replenishment", fmtPct(m.replenish_pct));
-      html += row(
-        "Agg Buy/Sell",
-        m.aggressor_buy_notional != null
-          ? fmtNum(m.aggressor_buy_notional, 0) + " / " + fmtNum(m.aggressor_sell_notional, 0)
-          : "DATA UNAVAILABLE"
-      );
-      html += row("AVR", m.avr_state != null ? m.avr_state : "DATA UNAVAILABLE");
-      html += row("OI Δ", m.oi_delta != null ? m.oi_delta : "DATA UNAVAILABLE");
-      html += row("Wall-Source", (m.adapters && m.adapters.wall_source) || "–");
+      html += '<div class="xr-fight">';
+      html +=
+        '<div class="xr-fight-row"><span class="xr-f-k">Wall-Rest</span><span class="xr-f-v">' +
+        (fight.remainPct != null ? (fight.remainPct * 100).toFixed(0) + "%" : "–") +
+        "</span></div>";
+      html +=
+        '<div class="xr-bar xr-bar-remain"><span style="width:' +
+        pctBar(fight.remainPct) +
+        '%"></span></div>';
+
+      html +=
+        '<div class="xr-fight-row"><span class="xr-f-k">Abbau</span><span class="xr-f-v">' +
+        (fight.reducePct != null
+          ? "−" + (fight.reducePct * 100).toFixed(0) + "% · Trade/Pull"
+          : "–") +
+        "</span></div>";
+      if (fight.tradeFrac != null) {
+        html +=
+          '<div class="xr-bar xr-bar-split"><span class="xr-split-trade" style="width:' +
+          pctBar(fight.tradeFrac) +
+          '%"></span><span class="xr-split-pull" style="width:' +
+          pctBar(fight.pullFrac) +
+          '%"></span></div>';
+        html +=
+          '<div class="xr-split-legend"><span class="xr-leg-trade">Trade</span><span class="xr-leg-pull">Pull</span></div>';
+      } else {
+        html += '<div class="xr-bar"><span style="width:0%"></span></div>';
+      }
+
+      html +=
+        '<div class="xr-fight-row"><span class="xr-f-k">Kontrolle</span><span class="xr-f-v xr-ctrl-' +
+        String(fight.control || "NONE").toLowerCase() +
+        '">' +
+        (fight.controlLabel || "–") +
+        "</span></div>";
+      var winS =
+        m.aggressor_window_s != null
+          ? Number(m.aggressor_window_s)
+          : m.coverage && m.coverage.public_trades && m.coverage.public_trades.live_window_s != null
+            ? Number(m.coverage.public_trades.live_window_s)
+            : 20;
+      var ageMs =
+        state.metricsUpdatedAtMs != null ? Math.max(0, Date.now() - state.metricsUpdatedAtMs) : null;
+      var ageTxt =
+        ageMs == null ? "…" : ageMs < 1500 ? "live" : "vor " + (ageMs / 1000).toFixed(1) + "s";
+      if (fight.buyShare != null && fight.sellShare != null && fight.buyShare + fight.sellShare > 1e-9) {
+        html +=
+          '<div class="xr-bar xr-bar-ctrl"><span class="xr-ctrl-buy" style="width:' +
+          pctBar(fight.buyShare) +
+          '%"></span><span class="xr-ctrl-sell" style="width:' +
+          pctBar(fight.sellShare) +
+          '%"></span></div>';
+        html +=
+          '<div class="xr-ctrl-legend"><span class="xr-leg-buy">Käufer ' +
+          (fight.buyShare * 100).toFixed(0) +
+          '%</span><span class="xr-leg-sell">Verkäufer ' +
+          (fight.sellShare * 100).toFixed(0) +
+          "%</span></div>";
+        html +=
+          '<div class="xr-ctrl-meta">Agg ' +
+          winS +
+          "s · " +
+          ageTxt +
+          "</div>";
+      } else {
+        html += '<div class="xr-bar"><span style="width:0%"></span></div>';
+        html +=
+          '<div class="xr-ctrl-legend xr-ctrl-empty">Agg B/S in Zone: noch 0% / 0%</div>';
+        html +=
+          '<div class="xr-ctrl-meta">Agg ' + winS + "s · " + ageTxt + "</div>";
+      }
+      html += "</div>";
     }
-    html += row("Warnings", s && s.warnings && s.warnings.length ? s.warnings.join(", ") : "–");
-    if (roles) {
-      html += row("FRONT", roles.FRONT_WALL ? roles.FRONT_WALL.id : "–");
-      html += row("BACKSTOP", roles.BACKSTOP_WALL ? roles.BACKSTOP_WALL.id : "–");
-      html += row("DOMINANT", roles.DOMINANT_WALL ? roles.DOMINANT_WALL.id : "–");
-      html += row("LARGER_BEHIND", roles.LARGER_WALL_BEHIND ? "YES · x" + fmtNum(roles.larger_wall_behind_ratio, 2) : "NO");
+
+    html += '<div class="xr-focus-grid">';
+    html +=
+      '<div class="xr-focus-cell"><span class="xr-f-k">Distanz</span><span class="xr-f-v">' +
+      distPct +
+      "</span></div>";
+    html +=
+      '<div class="xr-focus-cell"><span class="xr-f-k">Trend</span><span class="xr-f-v">' +
+      approach +
+      "</span></div>";
+    html +=
+      '<div class="xr-focus-cell"><span class="xr-f-k">Bias</span><span class="xr-f-v">' +
+      bias.replace("_BIAS", "").replace("NO_TRADE", "–") +
+      "</span></div>";
+    html +=
+      '<div class="xr-focus-cell"><span class="xr-f-k">Phase</span><span class="xr-f-v">' +
+      phase +
+      "</span></div>";
+    html += "</div>";
+
+    if (tw) {
+      html +=
+        '<div class="xr-focus-target">' +
+        fight.wallLabel +
+        " · " +
+        fmtNum(tw.zone_lo, 1) +
+        "–" +
+        fmtNum(tw.zone_hi, 1) +
+        " · " +
+        bookDepthLabel() +
+        "</div>";
+    } else {
+      html +=
+        '<div class="xr-focus-target xr-focus-hint">Wall tippen oder Kontakt abwarten · ' +
+        bookDepthLabel() +
+        "</div>";
     }
-    html += row("Datenstatus", m.data_gap ? "DATA GAP" : m.stale ? "STALE" : m.incomplete_trades ? "TRADES INCOMPLETE" : "OK");
-    html += "<p class='wd-note'>XRAY V1 · read-only · keine Orderausführung · BP-Modus bleibt optional</p>";
+    if (warn) {
+      html += '<div class="xr-focus-warn">' + warn + "</div>";
+    }
+    html += "</div>";
+
+    html +=
+      '<details class="xr-more"' +
+      (state.showDetails ? " open" : "") +
+      '><summary>Details</summary><div class="xr-more-body">';
+    if (s) {
+      html += row("Wall aktuell", m.wall_current_qty);
+      html += row("Abbau", fmtPct(m.wall_reduce_pct));
+      html += row("Trades %", fmtPct(m.trade_explained_pct));
+      html += row("Pull", fmtPct(m.pull_pct));
+      html += row("Replenish", fmtPct(m.replenish_pct));
+      if (m.aggressor_buy_notional != null) {
+        html += row(
+          "Agg B/S",
+          fmtNum(m.aggressor_buy_notional, 0) + " / " + fmtNum(m.aggressor_sell_notional, 0)
+        );
+      }
+      if (m.avr_state != null) html += row("AVR", m.avr_state);
+      if (m.oi_delta != null) html += row("OI Δ", m.oi_delta);
+      if (roles) {
+        if (roles.BACKSTOP_WALL) html += row("Backstop", roles.BACKSTOP_WALL.price);
+        if (roles.LARGER_WALL_BEHIND) {
+          html += row("Behind x", fmtNum(roles.larger_wall_behind_ratio, 2));
+        }
+      }
+      html += row("Feed", (m.adapters && m.adapters.wall_source) || bookDepthLabel());
+    } else if (state.lastClickStatus) {
+      html += row("Click", state.lastClickStatus);
+    }
+    html += "</div></details>";
+
+    html +=
+      '<details class="xr-more"' +
+      (state.showRadar ? " open" : "") +
+      '><summary>Radar</summary><div class="xr-more-body">';
     html += renderRadarHtml(state.radar);
+    html += "</div></details>";
+
     body.innerHTML = html;
+
+    var det = body.querySelectorAll("details.xr-more");
+    if (det[0]) {
+      det[0].addEventListener("toggle", function () {
+        state.showDetails = !!det[0].open;
+      });
+    }
+    if (det[1]) {
+      det[1].addEventListener("toggle", function () {
+        state.showRadar = !!det[1].open;
+      });
+    }
 
     var sd = $("xrSortDist");
     var ss = $("xrSortSize");
@@ -852,6 +1078,15 @@
           if (String(cands[i].id) === String(id)) {
             wall = cands[i];
             break;
+          }
+        }
+        if (!wall && state.radar) {
+          var all = (state.radar.ask || []).concat(state.radar.bid || []);
+          for (var j = 0; j < all.length; j += 1) {
+            if (String(all[j].id) === String(id) && all[j].major) {
+              wall = all[j];
+              break;
+            }
           }
         }
         if (wall) startXrayFromWall(wall);

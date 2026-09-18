@@ -702,6 +702,184 @@
     return "armed";
   }
 
+  /**
+   * Glance model for absorb vs break.
+   * ASK: aggressive buys hit the sell wall → absorb (holds) or break (through).
+   * BID: aggressive sells hit the buy wall → same.
+   */
+  function classifyWallFight(opts) {
+    opts = opts || {};
+    var side = String(opts.side || "").toUpperCase();
+    var phase = String(opts.phase || "IDLE").toUpperCase();
+    var m = opts.metrics || {};
+    var reduce = num(m.wallReducePct != null ? m.wallReducePct : m.wall_reduce_pct);
+    var explained = num(
+      m.tradeExplainedPct != null ? m.tradeExplainedPct : m.trade_explained_pct
+    );
+    var pull = num(m.pullPct != null ? m.pullPct : m.pull_pct);
+    var replenish = num(m.replenishPct != null ? m.replenishPct : m.replenish_pct);
+    var buyShare = num(
+      m.aggressorBuyShare != null ? m.aggressorBuyShare : m.aggressor_buy_share
+    );
+    var sellShare = num(
+      m.aggressorSellShare != null ? m.aggressorSellShare : m.aggressor_sell_share
+    );
+    var attackShare = side === "ASK" ? buyShare : side === "BID" ? sellShare : null;
+    var attackLabel = side === "ASK" ? "Agg-Käufe" : side === "BID" ? "Agg-Verkäufe" : "Agg";
+    var wallLabel =
+      side === "ASK" ? "ASK-WALL ↑" : side === "BID" ? "BID-WALL ↓" : "WALL";
+    var remainPct = reduce != null ? Math.max(0, Math.min(1, 1 - reduce)) : null;
+
+    var control = "NONE";
+    var controlLabel = "keine Agg-Trades";
+    if (buyShare != null && sellShare != null && buyShare + sellShare > 1e-9) {
+      if (buyShare >= 0.58) {
+        control = "BUYERS";
+        controlLabel = "Käufer kontrollieren";
+      } else if (sellShare >= 0.58) {
+        control = "SELLERS";
+        controlLabel = "Verkäufer kontrollieren";
+      } else {
+        control = "BALANCED";
+        controlLabel = "ausgeglichen";
+      }
+    }
+
+    var tradeFrac = null;
+    var pullFrac = null;
+    if (reduce != null && reduce > 1e-9) {
+      var ex = explained != null ? Math.max(0, Math.min(1, explained)) : 0;
+      tradeFrac = Math.max(0, Math.min(1, ex));
+      if (pull != null) {
+        pullFrac = Math.max(0, Math.min(1, pull / reduce));
+      } else {
+        pullFrac = Math.max(0, 1 - tradeFrac);
+      }
+      var sum = tradeFrac + pullFrac;
+      if (sum > 1.001) {
+        tradeFrac = tradeFrac / sum;
+        pullFrac = pullFrac / sum;
+      }
+    }
+
+    var verdict = "WATCH";
+    var label = "BEOBACHTEN";
+    var sub = wallLabel + " gelockt";
+    var tone = "watch";
+
+    if (!opts.locked) {
+      return {
+        verdict: "IDLE",
+        label: "KEINE WALL",
+        sub: "Major-Wall tippen oder Kontakt abwarten",
+        tone: "idle",
+        wallLabel: wallLabel,
+        attackLabel: attackLabel,
+        attackShare: null,
+        buyShare: null,
+        sellShare: null,
+        control: "NONE",
+        controlLabel: "keine Agg-Trades",
+        remainPct: null,
+        reducePct: null,
+        tradeFrac: null,
+        pullFrac: null,
+        replenishPct: null,
+        gauge: 50,
+        side: side || null
+      };
+    }
+
+    if (phase === "WALL_LOST" || phase === "PRIMARY_WALL_LOST") {
+      verdict = "LOST";
+      label = "WALL WEG";
+      sub = "Ziel verloren — neu tippen";
+      tone = "lost";
+    } else if (phase === "ACCEPTED_THROUGH") {
+      verdict = "BROKEN";
+      label = "DURCHBRUCH";
+      sub =
+        side === "ASK"
+          ? "Agg-Käufe haben ASK durchbrochen"
+          : "Agg-Verkäufe haben BID durchbrochen";
+      tone = "break";
+    } else if (phase === "CONSUMED") {
+      verdict = "BREAKING";
+      label = "WIRD VERZEHRT";
+      sub =
+        side === "ASK"
+          ? "Trades fressen ASK — Acceptance abwarten"
+          : "Trades fressen BID — Acceptance abwarten";
+      tone = "break";
+    } else if (phase === "DEFENDED" || phase === "REPLENISHED") {
+      verdict = "ABSORB";
+      label = "ABSORBIERT";
+      sub =
+        side === "ASK"
+          ? "Agg-Käufe treffen — ASK hält / nachfüllt"
+          : "Agg-Verkäufe treffen — BID hält / nachfüllt";
+      tone = "absorb";
+    } else if (phase === "PULLED") {
+      verdict = "PULLED";
+      label = "GEZOGEN";
+      sub = "Abbau ohne genug Trades (Pull)";
+      tone = "pull";
+    } else if (phase === "CONTACT") {
+      verdict = "WATCH";
+      label = "KONTAKT";
+      sub =
+        side === "ASK"
+          ? "Agg-Käufe vs ASK — absorb oder break?"
+          : "Agg-Verkäufe vs BID — absorb oder break?";
+      tone = "watch";
+    } else if (phase === "APPROACHING") {
+      verdict = "WATCH";
+      label = "ANNÄHERUNG";
+      sub = "Preis läuft auf " + wallLabel + " zu";
+      tone = "watch";
+    } else if (phase === "DATA_GAP") {
+      verdict = "WATCH";
+      label = "DATENLÜCKE";
+      sub = "Live-Metriken unvollständig";
+      tone = "lost";
+    }
+
+    var gauge = 50;
+    if (verdict === "ABSORB") gauge = 16;
+    else if (verdict === "BROKEN") gauge = 94;
+    else if (verdict === "BREAKING") gauge = 74;
+    else if (verdict === "PULLED") gauge = 58;
+    else if (verdict === "LOST") gauge = 88;
+    else if (reduce != null) {
+      var exG = explained != null ? explained : 0.5;
+      var repG = replenish != null ? replenish : 0;
+      gauge = Math.round(
+        Math.max(8, Math.min(92, 28 + reduce * 55 + exG * 25 - repG * 35))
+      );
+    }
+
+    return {
+      verdict: verdict,
+      label: label,
+      sub: sub,
+      tone: tone,
+      wallLabel: wallLabel,
+      attackLabel: attackLabel,
+      attackShare: attackShare,
+      buyShare: buyShare,
+      sellShare: sellShare,
+      control: control,
+      controlLabel: controlLabel,
+      remainPct: remainPct,
+      reducePct: reduce,
+      tradeFrac: tradeFrac,
+      pullFrac: pullFrac,
+      replenishPct: replenish,
+      gauge: gauge,
+      side: side || null
+    };
+  }
+
   return {
     RULE_VERSION: RULE_VERSION,
     XRAY_STORAGE_KEY: XRAY_STORAGE_KEY,
@@ -717,6 +895,7 @@
     refreshPrimaryPresence: refreshPrimaryPresence,
     computeBias: computeBias,
     computeApproach: computeApproach,
+    classifyWallFight: classifyWallFight,
     distanceBps: distanceBps,
     snapshotTarget: snapshotTarget,
     decisionLabel: decisionLabel,

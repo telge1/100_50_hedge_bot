@@ -694,8 +694,8 @@
 (function () {
   "use strict";
 
-  // Cache-bust: mp-37 X-Ray auto-lock on contact + OBP/Levels merge.
-  try { console.info("[mp] asset mp-37"); } catch (e) { /* ignore */ }
+  // Cache-bust: mp-43 Walls on-demand lease for any USDT (no archive required).
+  try { console.info("[mp] asset mp-43"); } catch (e) { /* ignore */ }
 
   var STORAGE_KEY = "mp_v1_settings";
 
@@ -1258,6 +1258,7 @@
       heartbeatTimer: null,
       uiState: "DISABLED"
     },
+    lastObSymbol: null,
     obpRefreshTimer: null,
     oblRefreshTimer: null,
     obpGen: 0,
@@ -1426,7 +1427,11 @@
   function parseOb1000ApiError(err) {
     if (!err) return null;
     var msg = String(err.message || err);
-    if (msg.indexOf("symbol_not_in_pilot") >= 0) return { code: "symbol_not_in_pilot", status: 400 };
+    if (msg.indexOf("symbol_not_in_pilot") >= 0 ||
+        msg.indexOf("invalid_symbol") >= 0 ||
+        msg.indexOf("invalid_symbol_syntax") >= 0) {
+      return { code: "symbol_not_in_pilot", status: 400 };
+    }
     if (msg.indexOf("unknown_lease") >= 0 || msg.indexOf("no_active_lease") >= 0) {
       return { code: "unknown_lease", status: 409 };
     }
@@ -1842,8 +1847,17 @@
     if (!obState.obp.enabled) {
       stopOrderbookProfileRefresh();
       clearOrderbookProfile();
+      releaseWallsLiveLease(currentSymbol());
+      // Keep Levels lease if Levels still on; otherwise release walls-only lease via stop.
+      if (!isOnDemandBookMode()) {
+        stopOb1000Lease();
+      }
       return;
     }
+    // Walls alone must start on-demand OB1000 for any USDT coin (not only archive keepers).
+    ensureOb1000Lease(currentSymbol(), { force: false }).then(function (ok) {
+      if (ok) startOb1000Heartbeat();
+    });
     startOrderbookProfileRefresh();
     scheduleOrderbookProfile();
   }
@@ -1932,17 +1946,58 @@
     if (obState.obl.enabled) applyOrderbookLevelsSettings(obState.obl, true);
   }
 
+  function releaseWallsLiveLease(symbol) {
+    var sym = String(symbol || "").trim().toUpperCase();
+    if (!sym) return Promise.resolve();
+    return postJson("/api/research/ob1000/lease", {
+      op: "release",
+      lease_id: "walls-live-" + sym,
+      depth: 1000
+    }).catch(function () {});
+  }
+
+  function releaseWallsLiveLeaseBestEffort(symbol) {
+    var sym = String(symbol || "").trim().toUpperCase();
+    if (!sym) return;
+    var body = {
+      op: "release",
+      lease_id: "walls-live-" + sym,
+      depth: 1000
+    };
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(
+          "/api/research/ob1000/lease",
+          new Blob([JSON.stringify(body)], { type: "application/json" })
+        );
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   function onOrderbookSymbolOrViewChange() {
+    var sym = String(currentSymbol() || "").trim().toUpperCase();
+    var prev = obState.lastObSymbol ? String(obState.lastObSymbol).toUpperCase() : "";
+    // Drop previous coin's Walls OB1000 lease immediately on symbol switch
+    // (otherwise walls-live-{old} only dies after TTL and topics pile up).
+    if (prev && sym && prev !== sym) {
+      releaseWallsLiveLease(prev);
+    }
+    if (sym) obState.lastObSymbol = sym;
+
     if (obState.obp && obState.obp.enabled) scheduleOrderbookProfile();
     if (obState.obl && obState.obl.enabled) {
       if (isOnDemandBookMode()) {
-        ensureOb1000Lease(currentSymbol()).then(function () {
+        // ensureOb1000Lease releases the prior Levels/FULL lease when symbol changes
+        ensureOb1000Lease(sym).then(function () {
           startOb1000Heartbeat();
           scheduleOrderbookLevels();
         });
       } else {
         scheduleOrderbookLevels();
       }
+    } else if (prev && sym && prev !== sym && !isOnDemandBookMode()) {
+      // Levels off: still release any Levels lease left from an earlier session
+      stopOb1000Lease();
     }
   }
   /* ---- ORDERBOOK_HOOK end ---- */
@@ -2707,7 +2762,7 @@
       api.setOiPane(oiPayload || { id: "open_interest", visible: false });
       return;
     }
-    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-36)", "error");
+    setStatus("Chart-Renderer ohne OI-Pane — hart refreshen (mp-43)", "error");
   }
 
   function fetchOpenInterest(symbol, timeframe, range) {
@@ -3791,6 +3846,7 @@
     });
     window.addEventListener("pagehide", function () {
       releaseOb1000LeaseBestEffort();
+      releaseWallsLiveLeaseBestEffort(obState.lastObSymbol || currentSymbol());
     });
     sendJson("/api/research/workspace").then(function (snap) {
       applyWorkspace(snap);

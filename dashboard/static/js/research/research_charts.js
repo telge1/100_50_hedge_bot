@@ -1440,7 +1440,11 @@
   function parseOb1000ApiError(err) {
     if (!err) return null;
     const msg = String(err.message || err);
-    if (msg.indexOf("symbol_not_in_pilot") >= 0) return { code: "symbol_not_in_pilot", status: 400 };
+    if (msg.indexOf("symbol_not_in_pilot") >= 0 ||
+        msg.indexOf("invalid_symbol") >= 0 ||
+        msg.indexOf("invalid_symbol_syntax") >= 0) {
+      return { code: "symbol_not_in_pilot", status: 400 };
+    }
     if (msg.indexOf("unknown_lease") >= 0 || msg.indexOf("no_active_lease") >= 0) {
       return { code: "unknown_lease", status: 409 };
     }
@@ -1465,7 +1469,7 @@
       CAPACITY: prefix + " CAPACITY",
       OFFLINE: prefix + " COLLECTOR OFFLINE",
       NO_DATA: prefix + " NO DATA",
-      NOT_PILOT: prefix + " nur BTC/DOGE",
+      NOT_PILOT: prefix + " ungültiges Symbol",
     };
     return map[code] || code;
   }
@@ -1812,7 +1816,7 @@
       if (!leased) {
         const uiState = state.obl1000.uiState || "NO_DATA";
         if (uiState === "NOT_PILOT") {
-          setStatus(oblDepthLabel(reqDepth) + " Pilot: nur BTCUSDT / DOGEUSDT (aktuell " + reqSymbol + ")", "empty");
+          setStatus(oblDepthLabel(reqDepth) + " ungültiges Symbol (aktuell " + reqSymbol + ")", "empty");
         }
         const live = api(pane);
         if (live && live.setOrderbookLevels) {
@@ -1909,7 +1913,7 @@
         const uiState = computeOb1000UiState(null, parsed);
         state.obl1000.uiState = uiState;
         if (uiState === "NOT_PILOT") {
-          setStatus(oblDepthLabel(reqDepth) + " Pilot: nur BTCUSDT / DOGEUSDT (aktuell " + reqSymbol + ")", "empty");
+          setStatus(oblDepthLabel(reqDepth) + " ungültiges Symbol (aktuell " + reqSymbol + ")", "empty");
         }
         // Keep last painted book on transient errors (except explicit not-pilot/offline/disabled).
         if (uiState === "NOT_PILOT" || uiState === "OFFLINE" || uiState === "DISABLED" || uiState === "CAPACITY") {
@@ -1997,7 +2001,7 @@
       if (body && body.warning === "no_ob200_archive") {
         setStatus(
           "Orderbook Walls: kein OB200-Archiv für " + String(state.symbol || "") +
-            " (nur BTCUSDT/DOGEUSDT)",
+            " (USDT linear)",
           "empty"
         );
       } else if (body && body.warning === "no_wall_data") {

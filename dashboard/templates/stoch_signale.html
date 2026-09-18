@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stoch-Signale - Multi-Symbol Hedge Bot</title>
+    <title>Datenhub - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/stoch.css?v=10">
 </head>
@@ -18,7 +18,7 @@
             </div>
         </div>
 
-        {% set nav_active = 'stoch-signale' %}
+        {% set nav_active = 'daten-signale-datenhub' %}
         {% include "partials/nav.html" %}
 
         <div class="dashboard-content">
@@ -30,7 +30,7 @@
                         <div class="stoch-research-banner-sub">Frozen Tier-A setup + 1m timing trigger</div>
                         <div class="stoch-research-banner-flag">PRODUCTION STRATEGY UNCHANGED</div>
                     </div>
-                    <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-warn">RESEARCH</span></h1>
+                    <h1>📉 Datenhub <span class="stoch-chip stoch-chip-warn">RESEARCH</span></h1>
                     <p>Anzeige: <strong>1m timing entries / pending states</strong> (nicht die produktive Frozen-Baseline-Entry-Liste). Quelle: <code>DASHBOARD_SIGNAL_SOURCE=RESEARCH_1M_TIMING</code>.</p>
                     {% else %}
                     <div class="stoch-baseline-banner" id="stochBaselineBanner">
@@ -38,7 +38,7 @@
                         <div class="stoch-baseline-banner-sub">BASELINE_IMMEDIATE · SL_FIRST · NO_BE50</div>
                         <div class="stoch-baseline-banner-flag">GLOBAL_FROZEN_TIER_A · wave_fade_no_be50_v1</div>
                     </div>
-                    <h1>📉 Stoch-Signale <span class="stoch-chip stoch-chip-live">FROZEN</span></h1>
+                    <h1>📉 Datenhub <span class="stoch-chip stoch-chip-live">FROZEN</span></h1>
                     <p>Aktive Anzeige: <strong>FROZEN_BASELINE</strong> (<code>DASHBOARD_SIGNAL_SOURCE=FROZEN_BASELINE</code>). Exit-Policy <strong>NO_BE50</strong>. Keine Research-1m-Entries. PnL = gross.</p>
                     <div class="stoch-research-banner" id="stochPoolResearchBanner" style="display:none;" hidden>
                         <div class="stoch-research-banner-title">RESEARCH / BACKTEST ONLY</div>
@@ -123,7 +123,7 @@
                 </div>
             </details>
 
-            <details class="stoch-card" id="collectorStatusCard" open>
+            <details class="stoch-card" id="collectorStatusCard">
                 <summary class="stoch-card-summary">Collector Status</summary>
                 <div class="stoch-card-body">
                     <div class="stoch-collector-error" id="collectorStatusError" style="display:none;"></div>
@@ -212,7 +212,7 @@
                 </div>
             </details>
 
-            <details class="stoch-card" id="universe51CoverageCard" open>
+            <details class="stoch-card" id="universe51CoverageCard">
                 <summary class="stoch-card-summary">Historisches 51-Coin-Universe (read-only)</summary>
                 <div class="stoch-card-body">
                     <p class="stoch-universe51-note">

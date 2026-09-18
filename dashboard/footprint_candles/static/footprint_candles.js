@@ -1,14 +1,13 @@
-/* Footprint candles overlay — BTCUSDT / 5m / DISPLAY.
+/* Footprint candles overlay — BTCUSDT + INJUSDT pilot / 5m / DISPLAY.
  * Adaptive display buckets + separated history/forming stores.
  * Lives in dashboard/footprint_candles; market_profile_v1 only hosts hooks.
  */
 (function (global) {
   "use strict";
 
-  var SUPPORTED_SYMBOL = "BTCUSDT";
+  var SUPPORTED_SYMBOLS = { BTCUSDT: true, INJUSDT: true };
   var SUPPORTED_TF = "5m";
-  var BUCKET_STEP = 5.0;
-  var RAW_STEP = 5.0;
+  var PILOT_BUCKET_STEPS = { BTCUSDT: 5.0, INJUSDT: 0.001 };
   var MODE = "DISPLAY";
   var BUFFER_S = 900;
   var DEBOUNCE_MS = 200;
@@ -19,10 +18,24 @@
   var COMPACT_BAR = 28;
   var FULL_LEVEL_H = 11;
   var DELTA_LEVEL_H = 3;
-  var DISPLAY_STEPS = [5, 10, 15, 20, 25, 50];
   var IMBALANCE_RATIO = 3.0;
   var MIN_COMPARE_SIZE = 0.01;
   var STACKED_MIN_LEVELS = 3;
+
+  function rawStepForSymbol(symbol) {
+    var sym = String(symbol || "").toUpperCase();
+    return PILOT_BUCKET_STEPS[sym] != null ? PILOT_BUCKET_STEPS[sym] : null;
+  }
+
+  function displayStepsForRaw(raw) {
+    var r = Number(raw);
+    if (!(r > 0)) return [];
+    return [1, 2, 3, 4, 5, 10].map(function (m) { return r * m; });
+  }
+
+  function isSupportedSymbol(symbol) {
+    return !!SUPPORTED_SYMBOLS[String(symbol || "").toUpperCase()];
+  }
 
   var COLORS = {
     bid: "rgba(239, 83, 80, 0.85)",
@@ -93,7 +106,7 @@
     enabled: false,
     chart: null,
     candleSeries: null,
-    symbol: SUPPORTED_SYMBOL,
+    symbol: "BTCUSDT",
     timeframe: SUPPORTED_TF,
     /* Merged view for draw / panel / legacy tests */
     payload: null,
@@ -122,7 +135,7 @@
     selectedLabel: "Aktuelle Candle",
     crosshairUnsub: null,
     lastRenderMode: "fallback",
-    lastDisplayStep: RAW_STEP,
+    lastDisplayStep: 5.0,
     lastDebug: null,
     lastDrawStats: null,
     /* Forming bucket tracking + closed-candle finalize */
@@ -261,13 +274,15 @@
     return Math.floor(p / step + 1e-12) * step;
   }
 
-  function chooseDisplayStep(pxPerRaw5, minRowPx) {
-    var px = Number(pxPerRaw5);
+  function chooseDisplayStep(pxPerRaw, minRowPx, rawStep) {
+    var px = Number(pxPerRaw);
     var need = Number(minRowPx);
-    if (!(px > 0) || !(need > 0)) return null;
-    for (var i = 0; i < DISPLAY_STEPS.length; i += 1) {
-      var step = DISPLAY_STEPS[i];
-      var rowPx = px * (step / RAW_STEP);
+    var raw = rawStep != null ? Number(rawStep) : 5.0;
+    if (!(px > 0) || !(need > 0) || !(raw > 0)) return null;
+    var steps = displayStepsForRaw(raw);
+    for (var i = 0; i < steps.length; i += 1) {
+      var step = steps[i];
+      var rowPx = px * (step / raw);
       if (rowPx + 1e-9 >= need) return step;
     }
     return null;
@@ -356,21 +371,22 @@
   }
 
   /**
-   * Aggregate raw $5 levels into a display step. Does not mutate input.
-   * When displayStep > RAW_STEP, raw imbalance flags are suppressed and
+   * Aggregate raw bucket levels into a display step. Does not mutate input.
+   * When displayStep > rawStep, raw imbalance flags are suppressed and
    * recomputed on the aggregated grid (or left false if unsafe).
    */
-  function aggregateLevelsForDisplay(rawLevels, displayStep) {
-    var step = Number(displayStep) || RAW_STEP;
+  function aggregateLevelsForDisplay(rawLevels, displayStep, rawStepOpt) {
+    var rawStep = rawStepOpt != null ? Number(rawStepOpt) : (rawStepForSymbol(state.symbol) || 5.0);
+    var step = Number(displayStep) || rawStep;
     var levels = rawLevels || [];
     if (!levels.length) {
       return { levels: [], displayStep: step, vpocLow: null };
     }
-    if (step <= RAW_STEP + 1e-9) {
+    if (step <= rawStep + 1e-12) {
       var copied = levels.map(function (lv) {
         return Object.assign({}, lv);
       });
-      return { levels: copied, displayStep: RAW_STEP, vpocLow: null };
+      return { levels: copied, displayStep: rawStep, vpocLow: null };
     }
 
     var groups = {};
@@ -437,24 +453,26 @@
 
   /**
    * Choose render mode + display step from measured geometry.
-   * opts.levelHeight = pixel height of one raw $5 bucket (preferred).
-   * opts.pxPerRaw5 alias; opts.barSpacing / barWidth.
+   * opts.levelHeight = pixel height of one raw bucket (preferred).
+   * opts.pxPerRaw5 alias; opts.barSpacing / barWidth; opts.rawStep.
    */
   function chooseRenderPlan(opts) {
     opts = opts || {};
     var bs = opts.barSpacing != null ? Number(opts.barSpacing) : barWidthPx();
+    var raw = opts.rawStep != null ? Number(opts.rawStep) : (rawStepForSymbol(state.symbol) || 5.0);
     var px =
       opts.pxPerRaw5 != null
         ? Number(opts.pxPerRaw5)
         : opts.levelHeight != null
           ? Number(opts.levelHeight)
           : 0;
+    var steps = displayStepsForRaw(raw);
 
     function tryMode(mode, minRow, minBar) {
       if (!(bs + 1e-9 >= minBar)) return null;
-      var step = chooseDisplayStep(px, minRow);
+      var step = chooseDisplayStep(px, minRow, raw);
       if (step == null) return null;
-      return { mode: mode, displayStep: step, pxPerRaw5: px, barSpacing: bs };
+      return { mode: mode, displayStep: step, pxPerRaw5: px, barSpacing: bs, rawStep: raw };
     }
 
     /* FULL: tall enough (after adaptive) + wide enough for Bid×Ask text */
@@ -470,31 +488,33 @@
     if (compact) return compact;
 
     /* Last resort compact: largest step still may draw vPOC tick + badge */
-    if (bs + 1e-9 >= COMPACT_BAR && px > 0) {
-      var last = DISPLAY_STEPS[DISPLAY_STEPS.length - 1];
-      return { mode: "compact", displayStep: last, pxPerRaw5: px, barSpacing: bs };
+    if (bs + 1e-9 >= COMPACT_BAR && px > 0 && steps.length) {
+      var last = steps[steps.length - 1];
+      return { mode: "compact", displayStep: last, pxPerRaw5: px, barSpacing: bs, rawStep: raw };
     }
 
-    return { mode: "fallback", displayStep: null, pxPerRaw5: px, barSpacing: bs };
+    return { mode: "fallback", displayStep: null, pxPerRaw5: px, barSpacing: bs, rawStep: raw };
   }
 
   function measurePxPerRaw5(samplePrice) {
     if (!state.candleSeries) return 0;
     var p = Number(samplePrice);
     if (!isFinite(p)) return 0;
+    var raw = rawStepForSymbol(state.symbol) || 5.0;
     var y0 = priceToY(p);
-    var y1 = priceToY(p + RAW_STEP);
+    var y1 = priceToY(p + raw);
     if (y0 == null || y1 == null) return 0;
     return Math.abs(y1 - y0);
   }
 
   function statusForPlan(plan, coverage) {
     var cov = coverage || "UNKNOWN";
+    var raw = (plan && plan.rawStep != null) ? plan.rawStep : (rawStepForSymbol(state.symbol) || 5.0);
     if (!plan || plan.mode === "fallback") return { text: "Mehr hineinzoomen", kind: "warn" };
-    var rawLabel = "Raw $" + RAW_STEP;
+    var rawLabel = "Raw $" + raw;
     if (plan.mode === "compact") {
       /* Compact draws no price-row text — only mention Display if aggregation used for vPOC */
-      if (plan.displayStep && plan.displayStep > RAW_STEP + 1e-9) {
+      if (plan.displayStep && plan.displayStep > raw + 1e-12) {
         return { text: "Compact · " + rawLabel + " · Display $" + plan.displayStep, kind: "warn" };
       }
       return { text: "Compact · " + rawLabel, kind: "warn" };
@@ -883,9 +903,26 @@
 
   function modeSupported() {
     return (
-      String(state.symbol || "").toUpperCase() === SUPPORTED_SYMBOL &&
+      isSupportedSymbol(state.symbol) &&
       String(state.timeframe || "").toLowerCase() === SUPPORTED_TF
     );
+  }
+
+  function unsupportedReason() {
+    var sym = String(state.symbol || "").toUpperCase();
+    var tf = String(state.timeframe || "").toLowerCase();
+    var badSym = !isSupportedSymbol(sym);
+    var badTf = tf !== SUPPORTED_TF;
+    if (badSym && badTf) {
+      return "Footprint: nur BTCUSDT/INJUSDT · 5m (aktuell " + (sym || "?") + " · " + (tf || "?") + ")";
+    }
+    if (badSym) {
+      return "Footprint: Symbol nicht im Pilot (nur BTCUSDT/INJUSDT, aktuell " + (sym || "?") + ")";
+    }
+    if (badTf) {
+      return "Footprint: Kerzen-TF muss 5m sein (aktuell " + (tf || "?") + ")";
+    }
+    return "Footprint: Modus nicht unterstützt";
   }
 
   function getBarSpacing() {
@@ -1152,7 +1189,7 @@
     if (!enabled) return "off";
     if (
       unsupported ||
-      String(symbol || "").toUpperCase() !== SUPPORTED_SYMBOL ||
+      (!isSupportedSymbol(symbol)) ||
       String(timeframe || "").toLowerCase() !== SUPPORTED_TF
     ) {
       return "unsupported";
@@ -1305,12 +1342,12 @@
       if (
         bridge &&
         typeof bridge.publishFromCandle === "function" &&
-        String(state.symbol || "").toUpperCase() === SUPPORTED_SYMBOL &&
+        isSupportedSymbol(state.symbol) &&
         String(state.timeframe || "").toLowerCase() === SUPPORTED_TF
       ) {
         for (var i = candles.length - 1; i >= 0; i -= 1) {
           if (candles[i] && candles[i].avr) {
-            bridge.publishFromCandle(candles[i], state.symbol || SUPPORTED_SYMBOL);
+            bridge.publishFromCandle(candles[i], state.symbol || "BTCUSDT");
             break;
           }
         }
@@ -1674,8 +1711,8 @@
     if (state.unsupported || !modeSupported()) {
       ctx.fillStyle = COLORS.hint;
       ctx.font = "12px DejaVu Sans Mono, monospace";
-      ctx.fillText("Footprint für diesen Modus noch nicht verfügbar (nur BTCUSDT / 5m)", 12, 24);
-      setStatus("Footprint: Modus nicht unterstützt", "warn");
+      ctx.fillText(unsupportedReason(), 12, 24);
+      setStatus(unsupportedReason(), "warn");
       syncCandleBodiesForMode("unsupported", genAtDraw);
       return;
     }
@@ -1727,9 +1764,10 @@
       return;
     }
 
-    plan = chooseRenderPlan({ barSpacing: bs, pxPerRaw5: samplePx });
+    var rawStep = rawStepForSymbol(state.symbol) || 5.0;
+    plan = chooseRenderPlan({ barSpacing: bs, pxPerRaw5: samplePx, rawStep: rawStep });
     state.lastRenderMode = plan.mode;
-    state.lastDisplayStep = plan.displayStep || RAW_STEP;
+    state.lastDisplayStep = plan.displayStep || rawStep;
 
     if (plan.mode === "fallback") {
       ctx.fillStyle = COLORS.hint;
@@ -1745,7 +1783,7 @@
       return;
     }
 
-    var displayStep = plan.displayStep || RAW_STEP;
+    var displayStep = plan.displayStep || rawStep;
     var mode = plan.mode;
 
     /* Legend */
@@ -1754,14 +1792,14 @@
     ctx.textAlign = "left";
     if (mode === "compact") {
       ctx.fillText(
-        displayStep > RAW_STEP + 1e-9
-          ? "Compact · Raw $" + RAW_STEP + " · Display $" + displayStep
-          : "Compact · Raw $" + RAW_STEP,
+        displayStep > rawStep + 1e-12
+          ? "Compact · Raw $" + rawStep + " · Display $" + displayStep
+          : "Compact · Raw $" + rawStep,
         12,
         14
       );
     } else {
-      ctx.fillText("Raw $" + RAW_STEP + " · Display $" + displayStep, 12, 14);
+      ctx.fillText("Raw $" + rawStep + " · Display $" + displayStep, 12, 14);
     }
 
     for (i = 0; i < payload.candles.length; i += 1) {
@@ -1783,7 +1821,7 @@
       var sil = null;
 
       if (rawLevels.length) {
-        var agg = aggregateLevelsForDisplay(rawLevels, displayStep);
+        var agg = aggregateLevelsForDisplay(rawLevels, displayStep, rawStep);
         levels = agg.levels || [];
       }
 
@@ -1979,14 +2017,17 @@
   /* ---------- Fetch ---------- */
 
   function buildParams(from, to) {
-    return new URLSearchParams({
-      symbol: SUPPORTED_SYMBOL,
+    var sym = String(state.symbol || "").toUpperCase();
+    var step = rawStepForSymbol(sym);
+    var params = {
+      symbol: sym,
       timeframe: SUPPORTED_TF,
       mode: MODE,
-      bucket_step: String(BUCKET_STEP),
       from: String(Math.floor(from)),
       to: String(Math.ceil(to))
-    });
+    };
+    if (step != null) params.bucket_step = String(step);
+    return new URLSearchParams(params);
   }
 
   function fetchHistory(range) {
@@ -2170,6 +2211,7 @@
       state.payload = null;
       state.historyCandles = [];
       state.historyMeta = null;
+      setStatus(unsupportedReason(), "warn");
       scheduleDraw();
       return;
     }
@@ -2293,6 +2335,7 @@
       clearContextStore();
       restoreCandleBodies();
       syncAvrLegend();
+      setStatus(unsupportedReason(), "warn");
       scheduleDraw();
       return;
     }
@@ -2407,7 +2450,10 @@
     _pushStripSegment: pushStripSegment,
     _syncAvrLegend: syncAvrLegend,
     _clearContextStore: clearContextStore,
-    _DISPLAY_STEPS: DISPLAY_STEPS,
+    _DISPLAY_STEPS: displayStepsForRaw(5.0),
+    _displayStepsForRaw: displayStepsForRaw,
+    _rawStepForSymbol: rawStepForSymbol,
+    _PILOT_BUCKET_STEPS: PILOT_BUCKET_STEPS,
     _FULL_BAR: FULL_BAR,
     _DELTA_BAR: DELTA_BAR,
     _COMPACT_BAR: COMPACT_BAR,

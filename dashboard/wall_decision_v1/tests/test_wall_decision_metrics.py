@@ -10,6 +10,7 @@ if str(DASHBOARD) not in sys.path:
     sys.path.insert(0, str(DASHBOARD))
 
 from wall_decision_v1.metrics import (  # noqa: E402
+    _aggressor_from_trades,
     _match_wall,
     _zone,
     book_side_range,
@@ -193,3 +194,19 @@ def test_confirmed_zero_on_covering_ob1000(monkeypatch):
     assert out["qty"] == 0.0
     assert out["adapter"] == "ok"
     assert out["wall_absent"] is True
+
+
+def test_aggressor_live_window_ignores_old_tape():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 9, 14, 12, 0, 0, tzinfo=timezone.utc)
+    trades = [
+        {"side": "buy", "notional": 70.0, "size": 1.0, "trade_ts": now - timedelta(seconds=5)},
+        {"side": "sell", "notional": 30.0, "size": 1.0, "trade_ts": now - timedelta(seconds=3)},
+        {"side": "sell", "notional": 900.0, "size": 1.0, "trade_ts": now - timedelta(seconds=120)},
+    ]
+    out = _aggressor_from_trades(trades, now=now, live_s=20)
+    assert abs(out["buy_share"] - 0.7) < 1e-9
+    assert abs(out["sell_share"] - 0.3) < 1e-9
+    assert out["ctrl_note"] == "live_window"
+    assert out["session_buy_share"] < 0.2

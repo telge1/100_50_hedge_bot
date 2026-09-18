@@ -444,3 +444,78 @@ describe("Safety / AVR isolation / BP mode intact", () => {
     assert.equal(locked.state.status, "ARMED");
   });
 });
+
+describe("classifyWallFight absorb vs break", () => {
+  it("maps DEFENDED ASK to ABSORBIERT", () => {
+    const f = X.classifyWallFight({
+      locked: true,
+      side: "ASK",
+      phase: "DEFENDED",
+      metrics: {
+        wallReducePct: 0.2,
+        tradeExplainedPct: 0.5,
+        replenishPct: 0.4,
+        aggressorBuyShare: 0.8
+      }
+    });
+    assert.equal(f.verdict, "ABSORB");
+    assert.equal(f.label, "ABSORBIERT");
+    assert.match(f.sub, /ASK/);
+    assert.ok(f.gauge < 40);
+  });
+
+  it("maps CONSUMED then ACCEPTED_THROUGH to break path", () => {
+    const breaking = X.classifyWallFight({
+      locked: true,
+      side: "BID",
+      phase: "CONSUMED",
+      metrics: { wallReducePct: 0.8, tradeExplainedPct: 0.7, aggressorSellShare: 0.75 }
+    });
+    assert.equal(breaking.verdict, "BREAKING");
+    assert.equal(breaking.label, "WIRD VERZEHRT");
+    const broken = X.classifyWallFight({
+      locked: true,
+      side: "BID",
+      phase: "ACCEPTED_THROUGH",
+      metrics: { wallReducePct: 0.95, tradeExplainedPct: 0.8 }
+    });
+    assert.equal(broken.verdict, "BROKEN");
+    assert.equal(broken.label, "DURCHBRUCH");
+    assert.ok(broken.gauge > 80);
+  });
+
+  it("splits trade vs pull on reduce", () => {
+    const f = X.classifyWallFight({
+      locked: true,
+      side: "ASK",
+      phase: "CONTACT",
+      metrics: { wallReducePct: 0.5, tradeExplainedPct: 0.6, pullPct: 0.2 }
+    });
+    assert.equal(f.remainPct, 0.5);
+    assert.ok(Math.abs(f.tradeFrac - 0.6) < 1e-9);
+  });
+
+  it("shows buyer vs seller control percentages", () => {
+    const f = X.classifyWallFight({
+      locked: true,
+      side: "ASK",
+      phase: "CONTACT",
+      metrics: {
+        wallReducePct: 0.1,
+        aggressorBuyShare: 0.72,
+        aggressorSellShare: 0.28
+      }
+    });
+    assert.equal(f.control, "BUYERS");
+    assert.match(f.controlLabel, /Käufer/);
+    assert.equal(f.buyShare, 0.72);
+    assert.equal(f.sellShare, 0.28);
+    const sellers = X.classifyWallFight({
+      locked: true,
+      side: "BID",
+      phase: "CONTACT",
+      metrics: { aggressorBuyShare: 0.3, aggressorSellShare: 0.7 }
+    });
+    assert.equal(sellers.control, "SELLERS");
+  });
+});

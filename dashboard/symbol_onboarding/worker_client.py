@@ -181,6 +181,9 @@ def enqueue_apply(
         return {
             "success": False,
             "error": "ONBOARDING_JOB_ALREADY_RUNNING",
+            "error_message": (
+                f"Onboarding-Job läuft bereits ({active}). Bitte warten."
+            ),
             "job_id": active,
         }, 409
 
@@ -191,14 +194,42 @@ def enqueue_apply(
         try:
             payload = _read_json(lock_file)
             pid = payload.get("pid")
-            if pid_alive(pid if isinstance(pid, int) else None):
+            lock_job = str(payload.get("job_id") or "")
+            # Stale lock: OA service / worker left .onboarding.lock after SUCCEEDED.
+            # Only block if the job is still actively running (not terminal).
+            job_path = jobs_dir(environ) / f"{lock_job}.json" if lock_job else None
+            job_status = ""
+            if job_path is not None and job_path.is_file():
+                try:
+                    job_status = str((_read_json(job_path) or {}).get("status") or "")
+                except Exception:  # noqa: BLE001
+                    job_status = ""
+            terminal = {
+                "SUCCEEDED",
+                "FAILED",
+                "ROLLED_BACK",
+                "PARTIAL_LIVE_ONLY",
+                "PLANNED",
+                "COMPLETED",
+            }
+            if job_status.upper() in terminal or not lock_job:
+                lock_file.unlink(missing_ok=True)
+            elif pid_alive(pid if isinstance(pid, int) else None):
+                # Queue consumer PIDs stay alive forever — only treat as held when
+                # the locked job is still non-terminal.
                 return {
                     "success": False,
                     "error": "ONBOARDING_LOCK_HELD",
-                    "job_id": payload.get("job_id"),
+                    "error_message": (
+                        f"Onboarding-Sperre aktiv (Job {lock_job or 'unbekannt'}). "
+                        "Bitte warten oder Support prüfen."
+                    ),
+                    "job_id": lock_job or None,
                 }, 409
+            else:
+                lock_file.unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
-            pass
+            lock_file.unlink(missing_ok=True)
 
     if mode not in {"apply", "fixture"}:
         return {"success": False, "error": "BAD_MODE"}, 400

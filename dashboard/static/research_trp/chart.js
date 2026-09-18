@@ -3766,7 +3766,7 @@
           CAPACITY: depthLabel + " CAPACITY",
           OFFLINE: depthLabel + " COLLECTOR OFFLINE",
           NO_DATA: depthLabel + " NO DATA",
-          NOT_PILOT: depthLabel + " nur BTC/DOGE",
+          NOT_PILOT: depthLabel + " ungültiges Symbol",
         };
         headerFresh.className = "ob-levels-fresh " + String(oblPayload.ui_state).toLowerCase();
         if (priceDesync) {

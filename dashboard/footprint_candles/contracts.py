@@ -7,11 +7,16 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-# --- MVP lock ---
-SUPPORTED_SYMBOL = "BTCUSDT"
+# --- MVP lock (BTC kept; INJUSDT added via bucket_policy pilot) ---
+from .bucket_policy import (  # noqa: E402
+    BUCKET_STEP,
+    SUPPORTED_SYMBOL,
+    SUPPORTED_SYMBOLS,
+    resolve_bucket_step,
+)
+
 SUPPORTED_TIMEFRAME = "5m"
 SUPPORTED_MODE = "DISPLAY"
-BUCKET_STEP = Decimal("5")
 TICK_SIZE = Decimal("0.1")
 CANDLE_SECONDS = 300
 
@@ -100,17 +105,34 @@ class FootprintCandle:
         }
 
 
-def bucket_index_for_price(price: Decimal | float | str) -> int:
+def bucket_index_for_price(
+    price: Decimal | float | str,
+    bucket_step: Decimal | float | str | None = None,
+) -> int:
     """Global bucket index: floor(price / bucket_step), Decimal-stable."""
     p = price if isinstance(price, Decimal) else Decimal(str(price))
-    step = BUCKET_STEP
+    step = (
+        bucket_step
+        if bucket_step is not None
+        else BUCKET_STEP
+    )
+    step_d = step if isinstance(step, Decimal) else Decimal(str(step))
     # Integer division toward -inf for positive crypto prices.
-    return int(p // step)
+    return int(p // step_d)
 
 
-def bucket_bounds(bucket_index: int) -> tuple[float, float]:
-    lo = float(Decimal(bucket_index) * BUCKET_STEP)
-    hi = float(Decimal(bucket_index + 1) * BUCKET_STEP)
+def bucket_bounds(
+    bucket_index: int,
+    bucket_step: Decimal | float | str | None = None,
+) -> tuple[float, float]:
+    step = (
+        bucket_step
+        if bucket_step is not None
+        else BUCKET_STEP
+    )
+    step_d = step if isinstance(step, Decimal) else Decimal(str(step))
+    lo = float(Decimal(bucket_index) * step_d)
+    hi = float(Decimal(bucket_index + 1) * step_d)
     return lo, hi
 
 

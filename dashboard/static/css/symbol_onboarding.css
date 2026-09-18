@@ -92,7 +92,7 @@
 }
 
 .so-progress-bar-wrap {
-  height: 10px;
+  height: 12px;
   background: #1e293b;
   border-radius: 999px;
   overflow: hidden;
@@ -102,7 +102,99 @@
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, #22c55e, #38bdf8);
-  transition: width 0.25s ease;
+  transition: width 0.35s ease;
+}
+
+.so-progress-bar.is-running {
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee, #38bdf8);
+  background-size: 200% 100%;
+  animation: so-bar-shine 1.6s linear infinite;
+}
+
+@keyframes so-bar-shine {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.so-progress-pct-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.so-status-banner {
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.so-status-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: #e2e8f0;
+}
+
+.so-status-sub {
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.so-tone-run {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(12, 74, 110, 0.35);
+}
+.so-tone-run .so-status-title { color: #7dd3fc; }
+
+.so-tone-ok {
+  border-color: rgba(74, 222, 128, 0.55);
+  background: rgba(20, 83, 45, 0.35);
+}
+.so-tone-ok .so-status-title { color: #86efac; }
+
+.so-tone-fail {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.35);
+}
+.so-tone-fail .so-status-title { color: #fca5a5; }
+
+.so-tone-wait {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(120, 53, 15, 0.3);
+}
+.so-tone-wait .so-status-title { color: #fcd34d; }
+
+.so-tone-idle {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.so-live-pulse {
+  color: #7dd3fc;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.so-live-pulse::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  animation: so-pulse 1.4s ease-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes so-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
 }
 
 .so-stages {
@@ -114,20 +206,43 @@
 }
 
 .so-stages li {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
   font-size: 0.85rem;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-radius: 4px;
   background: rgba(15, 23, 42, 0.55);
 }
 
+.so-stages li .so-stage-extra {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
 .so-stage-ok { color: #86efac; }
-.so-stage-run { color: #7dd3fc; }
+.so-stage-run {
+  color: #7dd3fc;
+  outline: 1px solid rgba(56, 189, 248, 0.35);
+}
 .so-stage-fail { color: #fca5a5; }
 .so-stage-wait { color: #fcd34d; }
 .so-stage-skip { color: #94a3b8; }
+
+.so-ok {
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.4);
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.so-progress-card.is-active {
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
 
 .so-archive-hint {
   margin-top: 8px;
@@ -190,4 +305,12 @@
 
 .so-mode-btn.is-active {
   outline: 1px solid rgba(56, 189, 248, 0.55);
+}
+
+/* Soft hint: still clickable — click runs plan first, then confirm. */
+.so-btn-needs-plan {
+  opacity: 0.85;
+}
+.so-btn-needs-plan::after {
+  content: none;
 }

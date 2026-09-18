@@ -7,7 +7,7 @@ logic live here — not inside the market-profile package.
 from __future__ import annotations
 
 FORMAT_VERSION = "dashboard/footprint_candles/v1"
-ASSET_V = "fp-1"
+ASSET_V = "fp-2"
 API_PREFIX = "/api/footprint-candles"
 
 __all__ = ["FORMAT_VERSION", "ASSET_V", "API_PREFIX"]
