@@ -20,6 +20,8 @@ _ORDERBOOK_SRC = Path("/home/telgenbuescher/projects/orderbook_analyse/src")
 if _ORDERBOOK_SRC.is_dir():
     sys.path.insert(0, str(_ORDERBOOK_SRC))
 
+import pytest  # noqa: E402
+
 from obfull_research_engine.breakout_xray_v1.ports import LevelChangeEvent  # noqa: E402
 from obfull_research_engine.level_first_episode1_wall_flow_qdh_base_v1.canonical_trades import (  # noqa: E402
     build_canonical_trades,
@@ -108,6 +110,8 @@ def test_03_resolve_requires_matching_epoch_fields_present():
     batch = repo / "obfull_research_engine/runs/mp_edge_event_batch_v1_20260916"
     if not batch.is_dir():
         batch = ENGINE_ROOT / "runs/mp_edge_event_batch_v1_20260916"
+    if not batch.is_dir():
+        pytest.skip("historical batch run dir not present (gitignored); set OBFULL_RESEARCH_SOURCE_RUN_DIR for integration")
     resolved, audit = resolve_pilot_events(batch_dir=batch)
     assert audit["ok"] is True
     assert len(resolved) == 6

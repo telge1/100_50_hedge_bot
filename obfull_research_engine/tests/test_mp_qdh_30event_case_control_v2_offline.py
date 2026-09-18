@@ -38,6 +38,11 @@ from obfull_research_engine.mp_qdh_30event_case_control_v2.run_study import _pur
 
 
 def test_frozen_universe_matches_v1_hashes():
+    from obfull_research_engine.mp_qdh_30event_case_control_v2 import V1_RUN_REL
+
+    v1 = REPO_ROOT / V1_RUN_REL
+    if not (v1 / "frozen_event_universe.csv").exists():
+        pytest.skip("v1 frozen 30-event artifacts missing (gitignored runs/)")
     f = load_and_verify_frozen_universe(REPO_ROOT)
     assert f["event_list_sha256"] == EXPECTED_EVENT_LIST_SHA256
     assert f["pair_list_sha256"] == EXPECTED_PAIR_LIST_SHA256
