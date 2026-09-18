@@ -45,6 +45,7 @@ CONTRACT_SOURCE_RELPATHS: tuple[str, ...] = tuple(
             "mp_qdh_first_touch_study_v1/run_cli.py",
             "mp_qdh_first_touch_study_v1/run_smoke.py",
             "mp_qdh_first_touch_study_v1/run_study.py",
+            "mp_qdh_first_touch_study_v1/source_run.py",
             "mp_qdh_first_touch_study_v1/typed_timeline.py",
             "mp_qdh_first_touch_study_v1/universe.py",
             # V2 flow
@@ -94,14 +95,24 @@ CONTRACT_SOURCE_RELPATHS: tuple[str, ...] = tuple(
 LEGACY_PARAM_ONLY_CONTRACT_HASH = (
     "2bbd0ec0712d298ed866ee79e55c4858d835de66f51795426a70d33d0d9faa10"
 )
+# Freeze tag contract (before external source-run resolver)
+LEGACY_FREEZE_V1_CONTRACT_HASH = (
+    "6287f655ba5a4a643f6d2bde31fbe34cb062b5628edba5aa0ccba59753618248"
+)
 
 CONTRACT_BODY: dict[str, Any] = {
     "package": PACKAGE_NAME,
-    "contract_version": "1.1.0-freeze",
+    "contract_version": "1.2.0-external-source-run",
     "schema_version": SCHEMA_VERSION,
     "typed_timeline_schema": TYPED_TIMELINE_SCHEMA_VERSION,
     "footprint_schema": FOOTPRINT_SCHEMA_VERSION,
     "hash_policy": "sha256_bytes_of_listed_sources_plus_parameter_body",
+    "source_run_resolution": {
+        "priority": ["cli_source_run_dir", "OBFULL_RESEARCH_SOURCE_RUN_DIR", "default_repo_relative_if_exists"],
+        "required_files": ["events_all.csv", "episodes.csv", "batch_windows.csv"],
+        "path_not_in_contract_hash": True,
+        "content_sha256_as_run_metadata": True,
+    },
     "confidence_split": {
         "flow_attribution_confidence": ["HIGH", "MEDIUM", "LOW", "BLOCKED"],
         "availability_confidence": [
@@ -245,11 +256,12 @@ def validate_checkpoint_contract(
     got = checkpoint.get("contract_hash")
     if not got:
         return {"ok": False, "reason": "STALE_CHECKPOINT_REJECTED", "detail": "missing_contract_hash"}
-    if str(got) == LEGACY_PARAM_ONLY_CONTRACT_HASH and str(expected_hash) != LEGACY_PARAM_ONLY_CONTRACT_HASH:
+    legacy = {LEGACY_PARAM_ONLY_CONTRACT_HASH, LEGACY_FREEZE_V1_CONTRACT_HASH}
+    if str(got) in legacy and str(expected_hash) not in legacy:
         return {
             "ok": False,
             "reason": "STALE_CHECKPOINT_REJECTED",
-            "detail": "legacy_param_only_contract_hash",
+            "detail": f"legacy_contract_hash={got}",
         }
     if str(got) != str(expected_hash):
         return {

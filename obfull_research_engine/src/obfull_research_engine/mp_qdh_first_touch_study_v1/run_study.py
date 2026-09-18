@@ -27,7 +27,6 @@ from obfull_research_engine.mp_qdh_canonical_integration_v1.event_load import (
 
 from . import (
     ALLOW_CLICKHOUSE_WRITES,
-    BATCH_RUN_REL,
     CONTRACT_VERSION,
     PACKAGE_NAME,
     SCHEMA_VERSION,
@@ -37,6 +36,7 @@ from . import (
 from .analyze_event import analyze_first_touch_event, load_or_reject_checkpoint
 from .contract import CONTRACT_HASH
 from .run_smoke import run_smoke
+from .source_run import resolve_source_run_dir
 from .universe import build_first_touch_universe, write_universe
 
 
@@ -614,6 +614,7 @@ def run_study(
     smoke_out: Path | None = None,
     resume: bool = True,
     max_events: int | None = None,
+    source_run_dir: Path | None = None,
 ) -> dict[str, Any]:
     if ALLOW_CLICKHOUSE_WRITES:
         raise RuntimeError("CH writes forbidden")
@@ -635,8 +636,11 @@ def run_study(
     )
     log = logging.getLogger("first_touch_study")
 
+    resolved = resolve_source_run_dir(source_run_dir=source_run_dir, repo_root=repo)
+    assert resolved is not None
+
     if require_smoke:
-        smoke = run_smoke(repo_root=repo, out_dir=smoke_out)
+        smoke = run_smoke(repo_root=repo, out_dir=smoke_out, source_run_dir=resolved.source_run_dir)
         if not smoke.get("ok"):
             atomic_write_json(
                 out / "run_manifest.json",
@@ -649,14 +653,19 @@ def run_study(
             )
             return {"verdict": "FIRST_TOUCH_STUDY_BLOCKED", "ok": False, "out_dir": str(out)}
 
-    uni = build_first_touch_universe(repo)
+    uni = build_first_touch_universe(repo, source_run_dir=resolved.source_run_dir)
     write_universe(out, uni)
     atomic_write_json(
         out / "phase0_contract.json",
-        {"contract_hash": CONTRACT_HASH, "contract_version": CONTRACT_VERSION, "schema_version": SCHEMA_VERSION},
+        {
+            "contract_hash": CONTRACT_HASH,
+            "contract_version": CONTRACT_VERSION,
+            "schema_version": SCHEMA_VERSION,
+            "source_run": uni.get("source_run"),
+        },
     )
 
-    batch = repo / BATCH_RUN_REL
+    batch = resolved.source_run_dir
     events = load_events_csv(batch)
     windows = load_windows_csv(batch)
     client = get_clickhouse_client()

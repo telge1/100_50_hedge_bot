@@ -20,9 +20,10 @@ from obfull_research_engine.mp_qdh_canonical_integration_v1.event_load import (
     load_windows_csv,
 )
 
-from . import ALLOW_CLICKHOUSE_WRITES, BATCH_RUN_REL, PACKAGE_NAME
+from . import ALLOW_CLICKHOUSE_WRITES, PACKAGE_NAME
 from .analyze_event import analyze_first_touch_event
 from .contract import CONTRACT_BODY, CONTRACT_HASH, validate_checkpoint_contract
+from .source_run import resolve_source_run_dir
 from .universe import build_first_touch_universe, write_universe
 
 
@@ -47,7 +48,12 @@ def select_smoke_events(uni: dict[str, Any]) -> list[dict[str, Any]]:
     return chosen
 
 
-def run_smoke(*, repo_root: Path | None = None, out_dir: Path | None = None) -> dict[str, Any]:
+def run_smoke(
+    *,
+    repo_root: Path | None = None,
+    out_dir: Path | None = None,
+    source_run_dir: Path | None = None,
+) -> dict[str, Any]:
     if ALLOW_CLICKHOUSE_WRITES:
         raise RuntimeError("CH writes forbidden")
     t0 = time.monotonic()
@@ -60,10 +66,12 @@ def run_smoke(*, repo_root: Path | None = None, out_dir: Path | None = None) -> 
     ckpt_dir = out / "checkpoints"
     ckpt_dir.mkdir(exist_ok=True)
 
-    uni = build_first_touch_universe(repo)
+    resolved = resolve_source_run_dir(source_run_dir=source_run_dir, repo_root=repo)
+    assert resolved is not None
+    uni = build_first_touch_universe(repo, source_run_dir=resolved.source_run_dir)
     write_universe(out, uni)
     smoke_rows = select_smoke_events(uni)
-    batch = repo / BATCH_RUN_REL
+    batch = resolved.source_run_dir
     events = load_events_csv(batch)
     windows = load_windows_csv(batch)
 
