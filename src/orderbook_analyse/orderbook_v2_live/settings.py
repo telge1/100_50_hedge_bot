@@ -48,6 +48,7 @@ class LiveCollectorSettings:
     reconnect_initial_sec: float = 1.0
     reconnect_max_sec: float = 8.0
     depth: int = 200
+    primary_depth_enabled: bool = True  # False = do not subscribe orderbook.{depth}.*
     exchange: str = "bybit"
     market: str = "linear"
     ada_only_pilot: bool = True
@@ -60,6 +61,8 @@ class LiveCollectorSettings:
     shutdown_flush_timeout_sec: float = 10.0
 
     def orderbook_topics(self) -> list[str]:
+        if not self.primary_depth_enabled:
+            return []
         return [f"orderbook.{self.depth}.{s}" for s in self.symbols]
 
 
@@ -85,6 +88,14 @@ def _raw_archive_env_enabled() -> bool:
     }
 
 
+def _ob1000_archive_env_enabled() -> bool:
+    return (os.environ.get("OB_V3_OB1000_RAW_ARCHIVE_ENABLE") or "false").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
 def load_raw_archive_only_settings(
     *,
     dotenv_path: Path | None = None,
@@ -92,13 +103,16 @@ def load_raw_archive_only_settings(
     confirm_raw_archive_symbols: bool = False,
     health_path: Path | None = None,
 ) -> LiveCollectorSettings:
-    """Settings for archive-only mode: raw OB200 segments, no ClickHouse features."""
+    """Settings for archive-only mode: OB1000 and/or OB200 raw segments, no CH features."""
     path = dotenv_path or (PROJECT_ROOT / ".env")
     if path.is_file():
         load_dotenv(path, override=False)
-    if not _raw_archive_env_enabled():
+    ob200_on = _raw_archive_env_enabled()
+    ob1000_on = _ob1000_archive_env_enabled()
+    if not ob200_on and not ob1000_on:
         raise LiveCollectorConfigError(
-            "raw-archive-only requires OB_V3_RAW_ARCHIVE_ENABLE=true"
+            "raw-archive-only requires OB_V3_RAW_ARCHIVE_ENABLE=true "
+            "and/or OB_V3_OB1000_RAW_ARCHIVE_ENABLE=true"
         )
     if not symbols_raw or not symbols_raw.strip():
         raise LiveCollectorConfigError("raw-archive-only requires explicit --symbols")
@@ -132,6 +146,8 @@ def load_raw_archive_only_settings(
         ),
         health_path=health_path,
         ada_only_pilot=False,
+        # When OB200 archive is off, do not subscribe orderbook.200.* at all.
+        primary_depth_enabled=ob200_on,
         subscribe_chunk_size=int(os.environ.get("OB_V3_SUBSCRIBE_CHUNK") or 10),
         queue_capacity=int(os.environ.get("OB_V3_QUEUE_CAPACITY") or 2048),
         insert_batch_size=int(os.environ.get("OB_V3_INSERT_BATCH") or 100),
@@ -207,10 +223,12 @@ def redact_settings(settings: LiveCollectorSettings) -> dict[str, object]:
         "pid_path": str(settings.pid_path),
         "ada_only_pilot": settings.ada_only_pilot,
         "depth": settings.depth,
+        "primary_depth_enabled": settings.primary_depth_enabled,
         "subscribe_chunk_size": settings.subscribe_chunk_size,
         "queue_capacity": settings.queue_capacity,
         "insert_batch_size": settings.insert_batch_size,
         "raw_archive_enabled": _raw_archive_enabled(settings.symbols),
+        "ob1000_raw_archive_enabled": _ob1000_archive_env_enabled(),
     }
 
 

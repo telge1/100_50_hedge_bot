@@ -49,11 +49,13 @@ def serialize_market_payload(
     *,
     received_at: datetime,
     depth: int = 200,
+    format_version: str = FORMAT_VERSION,
+    parser_version: str = PARSER_VERSION,
 ) -> bytes:
     """Preserve native Bybit WS payload (snapshot/delta) for replayer compatibility."""
     record = dict(payload)
-    record.setdefault("format_version", FORMAT_VERSION)
-    record.setdefault("parser_version", PARSER_VERSION)
+    record.setdefault("format_version", format_version)
+    record.setdefault("parser_version", parser_version)
     record.setdefault("depth", depth)
     record["local_receive_ts"] = utc_iso(received_at)
     return orjson.dumps(record) + b"\n"
@@ -67,12 +69,14 @@ def serialize_lifecycle(
     received_at: datetime | None = None,
     depth: int = 200,
     details: dict[str, Any] | None = None,
+    format_version: str = FORMAT_VERSION,
+    parser_version: str = PARSER_VERSION,
 ) -> bytes:
     now = ts or datetime.now(timezone.utc)
     record: dict[str, Any] = {
         "archive_event": event_type,
-        "format_version": FORMAT_VERSION,
-        "parser_version": PARSER_VERSION,
+        "format_version": format_version,
+        "parser_version": parser_version,
         "depth": depth,
         "ts": int(now.timestamp() * 1000),
         "local_receive_ts": utc_iso(received_at or now),
@@ -92,13 +96,15 @@ def serialize_rotation_checkpoint(
     ts_ms: int,
     received_at: datetime,
     depth: int = 200,
+    format_version: str = FORMAT_VERSION,
+    parser_version: str = PARSER_VERSION,
 ) -> bytes:
     record = {
         "topic": topic,
         "type": "rotation_checkpoint",
         "source": "local_book_state",
-        "format_version": FORMAT_VERSION,
-        "parser_version": PARSER_VERSION,
+        "format_version": format_version,
+        "parser_version": parser_version,
         "depth": depth,
         "ts": ts_ms,
         "cts": None,

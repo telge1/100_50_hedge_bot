@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import random
 import signal
 import time
@@ -109,6 +110,7 @@ class OrderbookV3LiveCollector:
                 shutdown_flush_timeout_sec=settings.shutdown_flush_timeout_sec,
             )
         self.raw_archive = raw_archive
+        self.ob1000_raw_archive: RawArchiveManager | None = None
         self.runtimes: dict[str, SymbolRuntime] = {}
         self.collector_state = "STARTING"
         self.connected = False
@@ -126,6 +128,7 @@ class OrderbookV3LiveCollector:
         self._chunk_ack = False
         self._unsub_ack = False
         self._archive_rotation_bucket: dict[str, str] = {}
+        self._ob1000_archive_rotation_bucket: dict[str, str] = {}
         self.exit_code = 0
         self._on_demand_socket = None
         from orderbook_analyse.orderbook_v2_live.on_demand_manager import (
@@ -136,9 +139,15 @@ class OrderbookV3LiveCollector:
             FullBookOnDemandManager,
             load_full_book_settings,
         )
+        from orderbook_analyse.orderbook_v2_live.full_ob_continuous_raw_archive.config import (
+            load_full_ob_continuous_raw_archive_settings,
+        )
 
         od_cfg = load_on_demand_settings()
         full_cfg = load_full_book_settings()
+        self._full_ob_raw_archive_settings = load_full_ob_continuous_raw_archive_settings()
+        if self._full_ob_raw_archive_settings.enabled:
+            full_cfg["enabled"] = True
         self.on_demand: OnDemandDepthManager | None = None
         self.full_book: FullBookOnDemandManager | None = None
         if od_cfg["enabled"]:
@@ -155,6 +164,7 @@ class OrderbookV3LiveCollector:
                 send_chunk=self._send_chunk,
                 confirmed_topics=self.confirmed_topics,
                 settings=full_cfg,
+                ws_pump=self._pump_ws_during_full_book_sync,
             )
         if self.on_demand is not None or self.full_book is not None:
             from orderbook_analyse.orderbook_v2_live.on_demand_socket import (
@@ -165,7 +175,7 @@ class OrderbookV3LiveCollector:
             sock_path = self.on_demand.socket_path if self.on_demand is not None else resolve_socket_path()
             self._on_demand_socket = OnDemandSocketServer(
                 sock_path,
-                self._dispatch_on_demand_request,
+                self._dispatch_on_demand_request_async,
             )
 
         self.full_ob_flight_recorder = None
@@ -210,8 +220,111 @@ class OrderbookV3LiveCollector:
         except Exception:
             logger.exception("full_ob_flight_recorder_init_failed")
 
+        # Full-OB RO cache bridge (default DISABLED — requires FULL_OB_CACHE_BRIDGE_ENABLED).
+        self.full_ob_cache_bridge = None
+        try:
+            from orderbook_analyse.orderbook_v2_live.full_ob_cache_bridge import (
+                FullObCacheBridge,
+                load_cache_bridge_settings,
+            )
+
+            bridge_settings = load_cache_bridge_settings()
+            if (
+                bridge_settings.enabled
+                and self.full_book is not None
+                and self.full_ob_flight_recorder is not None
+            ):
+                fr = self.full_ob_flight_recorder
+                fb = self.full_book
+
+                def _book_snap(symbol: str):
+                    rt = fb.runtimes.get(symbol.upper())
+                    if rt is None:
+                        return None
+                    with fb._book_lock:
+                        return rt.book.copy_consistent_snapshot()
+
+                def _runtime_meta(symbol: str) -> dict[str, Any]:
+                    rt = fb.runtimes.get(symbol.upper())
+                    if rt is None:
+                        return {}
+                    last_ns = rt.book.last_receive_time_ns
+                    freshness = None
+                    if last_ns is not None:
+                        freshness = max(0, int((time.time_ns() - int(last_ns)) / 1_000_000))
+                    return {
+                        "gap_count": int(rt.gap_count),
+                        "reconnect_count": int(rt.reconnect_count),
+                        "event_ts_ms": rt.book.event_ts_ms,
+                        "last_receive_time_ns": last_ns,
+                        "freshness_ms": freshness,
+                    }
+
+                bridge = FullObCacheBridge(
+                    bridge_settings,
+                    collector_instance_id=f"collector-{os.getpid()}",
+                    collector_start_time=self.process_start_time,
+                    get_ring_snapshot=fr.bridge_ring_snapshot,
+                    get_ring_meta=fr.bridge_ring_meta,
+                    get_book_snapshot=_book_snap,
+                    get_runtime_meta=_runtime_meta,
+                )
+
+                def _bridge_observer(**kwargs: Any) -> None:
+                    runtime = kwargs.get("runtime")
+                    symbol = str(kwargs.get("symbol") or "")
+                    if runtime is None or not symbol:
+                        return
+                    with fb._book_lock:
+                        snap = runtime.book.copy_consistent_snapshot()
+                    bridge.on_book_update(symbol, snap)
+
+                fb.add_observer(_bridge_observer)
+                self.full_ob_cache_bridge = bridge
+        except Exception:
+            logger.exception("full_ob_cache_bridge_init_failed")
+
+        # Continuous Full-OB raw archive (default DISABLED).
+        self.full_ob_continuous_raw_archive = None
+        if self._full_ob_raw_archive_settings.enabled and self.full_book is not None:
+            try:
+                from orderbook_analyse.orderbook_v2_live.full_ob_continuous_raw_archive import (
+                    ARCHIVE_FATAL_EXIT_CODE,
+                    FullObContinuousRawArchive,
+                )
+
+                def _archive_fatal(reason: str) -> None:
+                    def _stop_for_archive_failure() -> None:
+                        self.exit_code = ARCHIVE_FATAL_EXIT_CODE
+                        self.fail_closed = True
+                        self.collector_state = "ERROR"
+                        self.last_error = f"full_ob_raw_archive:{reason}"
+                        self.request_stop()
+                        if self._ws is not None:
+                            asyncio.create_task(self._ws.close())
+
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        _stop_for_archive_failure()
+                        return
+                    loop.call_soon_threadsafe(_stop_for_archive_failure)
+
+                archive = FullObContinuousRawArchive(
+                    self._full_ob_raw_archive_settings,
+                    collector_instance_id=f"collector-{os.getpid()}",
+                    fatal_callback=_archive_fatal,
+                )
+                archive.attach(self.full_book)
+                self.full_ob_continuous_raw_archive = archive
+            except Exception:
+                logger.exception("full_ob_continuous_raw_archive_init_failed")
+                # Keep collector usable when archive init fails while disabled-path
+                # remains the default; enabled failures stay visible via logs/health.
+                self.full_ob_continuous_raw_archive = None
+
     def _dispatch_on_demand_request(self, req: dict[str, Any]) -> dict[str, Any]:
-        """Route Unix-socket control by depth: 0=full book, 1000=OB1000."""
+        """Sync route (tests / fallback). Prefer async dispatch on the event loop."""
         from orderbook_analyse.orderbook_v2_live.full_book_state import FULL_DEPTH
 
         try:
@@ -237,7 +350,46 @@ class OrderbookV3LiveCollector:
                 "depth": depth,
                 "subscription_state": "error",
             }
-        return self.on_demand.handle_request(req)
+        # Sync callers (unit tests) only — never call from the collector event loop.
+        import asyncio
+
+        coro = self.on_demand.handle_request(req)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+        raise RuntimeError("use_async_dispatch_on_event_loop")
+
+    async def _dispatch_on_demand_request_async(self, req: dict[str, Any]) -> dict[str, Any]:
+        """Async socket dispatch — never block the WS/health event loop on FULL snapshots."""
+        import asyncio
+
+        from orderbook_analyse.orderbook_v2_live.full_book_state import FULL_DEPTH
+
+        try:
+            depth = int(req.get("depth", 1000))
+        except (TypeError, ValueError):
+            depth = 1000
+        if depth == FULL_DEPTH:
+            if self.full_book is None:
+                return {
+                    "request_id": req.get("request_id"),
+                    "ok": False,
+                    "error": "disabled",
+                    "depth": FULL_DEPTH,
+                    "book_mode": "full",
+                    "subscription_state": "error",
+                }
+            return await asyncio.to_thread(self.full_book.handle_request, req)
+        if self.on_demand is None:
+            return {
+                "request_id": req.get("request_id"),
+                "ok": False,
+                "error": "disabled",
+                "depth": depth,
+                "subscription_state": "error",
+            }
+        return await self.on_demand.handle_request(req)
 
     def request_stop(self) -> None:
         self.collector_state = "STOPPING"
@@ -246,6 +398,11 @@ class OrderbookV3LiveCollector:
     def _reset_runtimes(self, skip_map: dict[str, dict[str, Any]] | None = None) -> None:
         skip_map = skip_map or {}
         self.runtimes = {}
+        if not getattr(self.settings, "primary_depth_enabled", True):
+            # OB200 primary path disabled — OB1000/Full-OB keepers own subscriptions.
+            if self.connected:
+                self.collector_state = "LIVE"
+            return
         for symbol in self.settings.symbols:
             info = skip_map.get(symbol) or {}
             skip_ms = info.get("skip_before_ms")
@@ -315,6 +472,7 @@ class OrderbookV3LiveCollector:
         if self.full_book is not None and self.full_book.handle_message(payload, received_at):
             return
         if self.on_demand is not None and self.on_demand.handle_message(payload, received_at):
+            self._maybe_archive_ob1000(payload, received_at)
             return
         topic = str(payload.get("topic") or "")
         expected = {f"orderbook.{self.settings.depth}.{s}": s for s in self.settings.symbols}
@@ -326,6 +484,55 @@ class OrderbookV3LiveCollector:
             rt.pending_raw.append((payload, received_at))
             return
         self._ingest_ready(rt, payload, received_at)
+
+    def _maybe_archive_ob1000(self, payload: dict[str, Any], received_at: datetime) -> None:
+        arch = getattr(self, "ob1000_raw_archive", None)
+        if arch is None or not arch.enabled:
+            return
+        from orderbook_analyse.orderbook_v2_live.depth import parse_orderbook_topic
+
+        parsed = parse_orderbook_topic(str(payload.get("topic") or ""))
+        if parsed is None:
+            return
+        symbol, depth = parsed
+        if depth != 1000:
+            return
+        ts_ms = int(payload.get("ts") or 0)
+        self._maybe_rotate_ob1000_archive(symbol, received_at, ts_ms)
+        arch.try_enqueue_market(symbol, payload, received_at)
+
+    def _maybe_rotate_ob1000_archive(
+        self,
+        symbol: str,
+        received_at: datetime,
+        ts_ms: int,
+    ) -> None:
+        """Hourly OB1000 rotation must start with a rotation_checkpoint (no delta-only opens)."""
+        arch = getattr(self, "ob1000_raw_archive", None)
+        if arch is None or not arch.enabled:
+            return
+        on_demand = getattr(self, "on_demand", None)
+        if on_demand is None:
+            return
+        rt = on_demand.runtimes.get((symbol.upper(), 1000))
+        if rt is None:
+            return
+        book = rt.clock.last_valid_book
+        if book is None or not book.is_valid:
+            return
+        bucket = arch._rotation_bucket(received_at)
+        prev = self._ob1000_archive_rotation_bucket.get(symbol)
+        if prev is not None and prev != bucket:
+            # Enqueue checkpoint BEFORE the crossing market event so the new
+            # segment's first replayable line is a rotation_checkpoint.
+            arch.try_enqueue_checkpoint(
+                symbol,
+                book,
+                ts_ms=ts_ms,
+                received_at=received_at,
+                topic=f"orderbook.1000.{symbol}",
+            )
+        self._ob1000_archive_rotation_bucket[symbol] = bucket
 
     def _ingest_ready(self, rt: SymbolRuntime, payload: dict[str, Any], received_at: datetime) -> None:
         symbol = rt.symbol
@@ -445,6 +652,9 @@ class OrderbookV3LiveCollector:
             state = "ERROR"
         elif not self.connected:
             state = self.collector_state
+        elif not clocks:
+            # Primary depth disabled: LIVE while connected (OB1000/Full keepers).
+            state = self.collector_state if self.collector_state == "STOPPING" else "LIVE"
         elif waiting == len(clocks) and clocks:
             state = "WAITING_FOR_SNAPSHOT"
         elif waiting:
@@ -455,7 +665,21 @@ class OrderbookV3LiveCollector:
             state = self.collector_state
         per_symbol = []
         for symbol in self.settings.symbols:
-            rt = self.runtimes[symbol]
+            rt = self.runtimes.get(symbol)
+            if rt is None:
+                per_symbol.append(
+                    {
+                        "symbol": symbol,
+                        "state": "PRIMARY_DEPTH_DISABLED",
+                        "subscribed": False,
+                        "subscription_confirmed": False,
+                        "snapshot_received": False,
+                        "book_valid": False,
+                        "messages_received": 0,
+                        "last_error": "",
+                    }
+                )
+                continue
             c = rt.clock
             first = None
             if c.first_valid_live_bucket_ms is not None:
@@ -546,12 +770,18 @@ class OrderbookV3LiveCollector:
             payload["feature_writer_enabled"] = False
         if self.raw_archive is not None:
             payload.update(self.raw_archive.health_dict())
+        if getattr(self, "ob1000_raw_archive", None) is not None:
+            payload.update(self.ob1000_raw_archive.health_dict())
         if self.on_demand is not None:
             payload.update(self.on_demand.health_dict())
         if self.full_book is not None:
             payload.update(self.full_book.health_dict())
         if getattr(self, "full_ob_flight_recorder", None) is not None:
             payload.update(self.full_ob_flight_recorder.health_dict())
+        if getattr(self, "full_ob_cache_bridge", None) is not None:
+            payload.update(self.full_ob_cache_bridge.health_dict())
+        if getattr(self, "full_ob_continuous_raw_archive", None) is not None:
+            payload.update(self.full_ob_continuous_raw_archive.health_dict())
         return payload
 
     def _log_health(self) -> None:
@@ -599,6 +829,30 @@ class OrderbookV3LiveCollector:
         if payload.get("topic"):
             self._last_market_mono = time.monotonic()
             self.handle_orderbook_message(payload, received_at)
+
+    async def _pump_ws_during_full_book_sync(self, ws) -> None:
+        """Drain Bybit WS while Full-OB REST snapshot runs in a worker thread.
+
+        Orderbook applies take ``full_book._book_lock``; the REST align thread holds
+        that lock for a long time. Handling those messages on the event loop would
+        block every Unix-socket client (OB1000/FULL Levels). Offload topic messages.
+        """
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=0.25)
+        except asyncio.TimeoutError:
+            return
+        received_at = utc_now()
+        try:
+            payload = orjson.loads(raw)
+        except Exception:
+            return
+        if not isinstance(payload, dict):
+            return
+        if payload.get("topic"):
+            self._last_market_mono = time.monotonic()
+            await asyncio.to_thread(self.handle_orderbook_message, payload, received_at)
+            return
+        await self._handle_raw(raw)
 
     async def _send_chunk(self, ws, op: str, args: list[str]) -> None:
         ack_attr = "_chunk_ack" if op == "subscribe" else "_unsub_ack"
@@ -648,6 +902,11 @@ class OrderbookV3LiveCollector:
     async def _session(self, deadline: float | None) -> None:
         ping_every = self.settings.ping_interval_sec
         hb_every = self.settings.heartbeat_interval_sec
+        # OB1000/Full archive mode can pause the recv loop briefly during REST
+        # align / heavy ticks; give pong more headroom than primary OB200.
+        ping_timeout = self.settings.ping_timeout_sec
+        if not self.settings.primary_depth_enabled:
+            ping_timeout = max(ping_timeout, 60.0)
         self._last_pong_mono = None
         self._last_ping_mono = None
         self._last_market_mono = None
@@ -659,12 +918,19 @@ class OrderbookV3LiveCollector:
             self.collector_state = "WAITING_FOR_SNAPSHOT"
             if self.raw_archive is not None and self.raw_archive.enabled:
                 self.raw_archive.note_lifecycle("CONNECT")
+            if getattr(self, "ob1000_raw_archive", None) is not None and self.ob1000_raw_archive.enabled:
+                self.ob1000_raw_archive.note_lifecycle("CONNECT")
             if self.on_demand is not None:
                 self.on_demand.on_reconnect()
             if self.full_book is not None:
                 self.full_book.on_reconnect(
                     reason=str(getattr(self, "last_error", None) or "transport_reconnect")
                 )
+            if getattr(self, "full_ob_cache_bridge", None) is not None:
+                try:
+                    self.full_ob_cache_bridge.mark_reconnect()
+                except Exception:
+                    logger.exception("full_ob_cache_bridge_mark_reconnect_failed")
             for rt in self.runtimes.values():
                 rt.clock.begin_resync()
                 rt.dropping_until_subscribe_ack = True
@@ -705,12 +971,25 @@ class OrderbookV3LiveCollector:
                             ms = int(bs.timestamp() * 1000)
                             rt.clock.note_enqueued(ms)
                 if self._last_ping_mono is not None and self._last_pong_mono is None:
-                    if now - self._last_ping_mono >= self.settings.ping_timeout_sec:
+                    if now - self._last_ping_mono >= ping_timeout:
                         raise DeadConnection("pong_timeout")
-                if self._last_market_mono is not None:
-                    if now - self._last_market_mono >= self.settings.stale_data_sec:
+                if (
+                    self.settings.primary_depth_enabled
+                    and self._last_market_mono is not None
+                ):
+                    # Full-OB REST align pauses the session recv loop unless pumped;
+                    # never treat that window as a dead market.
+                    full_syncing = bool(
+                        self.full_book is not None and self.full_book.sync_inflight()
+                    )
+                    if (
+                        not full_syncing
+                        and now - self._last_market_mono >= self.settings.stale_data_sec
+                    ):
                         self.collector_state = "STALE"
                         raise DeadConnection("stale_market_data")
+                # raw-archive OB1000/Full mode (primary depth disabled): rely on
+                # ping/pong + on-demand/full ticks instead of primary stale timer.
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=0.25)
                     await self._handle_raw(raw)
@@ -723,7 +1002,14 @@ class OrderbookV3LiveCollector:
                     await ws.send(orjson.dumps({"op": "ping"}).decode())
                     next_ping = now + ping_every
                 if now >= next_hb:
-                    self._log_health()
+                    # Huge health payloads must not stall WS reads (pong_timeout).
+                    # Single-flight: unbounded to_thread tasks saturated the pool and
+                    # delayed Full-OB REST aligns / socket replies.
+                    prev = getattr(self, "_health_task", None)
+                    if prev is None or prev.done():
+                        self._health_task = asyncio.create_task(
+                            asyncio.to_thread(self._log_health)
+                        )
                     next_hb = now + hb_every
                 if self.on_demand is not None:
                     await self.on_demand.tick(ws)
@@ -731,6 +1017,8 @@ class OrderbookV3LiveCollector:
                     await self.full_book.tick(ws)
                 if getattr(self, "full_ob_flight_recorder", None) is not None:
                     self.full_ob_flight_recorder.tick()
+                if getattr(self, "full_ob_continuous_raw_archive", None) is not None:
+                    self.full_ob_continuous_raw_archive.tick()
             try:
                 await ws.close()
             except Exception:
@@ -739,6 +1027,8 @@ class OrderbookV3LiveCollector:
         self.connected = False
         if self.raw_archive is not None and self.raw_archive.enabled:
             self.raw_archive.note_lifecycle("DISCONNECT")
+        if getattr(self, "ob1000_raw_archive", None) is not None and self.ob1000_raw_archive.enabled:
+            self.ob1000_raw_archive.note_lifecycle("DISCONNECT")
 
     async def run(self) -> dict[str, Any]:
         self.live_start_time = utc_now()
@@ -761,8 +1051,18 @@ class OrderbookV3LiveCollector:
         self._reset_runtimes(skip_map)
         if self.raw_archive is not None and self.raw_archive.enabled:
             self.raw_archive.start()
+        if getattr(self, "ob1000_raw_archive", None) is not None and self.ob1000_raw_archive.enabled:
+            self.ob1000_raw_archive.start()
         if self._on_demand_socket is not None:
             await self._on_demand_socket.start()
+        if getattr(self, "full_ob_cache_bridge", None) is not None:
+            try:
+                await self.full_ob_cache_bridge.start()
+            except Exception:
+                logger.exception("full_ob_cache_bridge_start_failed")
+        if getattr(self, "full_ob_continuous_raw_archive", None) is not None:
+            self.full_ob_continuous_raw_archive.ensure_keeper_leases()
+            self.full_ob_continuous_raw_archive.start()
         if not self.archive_only:
             self._writer_task = asyncio.create_task(self.writer.run())
         deadline = None if self.duration_sec <= 0 else time.monotonic() + self.duration_sec
@@ -787,6 +1087,10 @@ class OrderbookV3LiveCollector:
                     self.collector_state = "RECONNECTING"
                     if self.raw_archive is not None and self.raw_archive.enabled:
                         self.raw_archive.note_lifecycle("RECONNECT", details={"reason": reason})
+                    if getattr(self, "ob1000_raw_archive", None) is not None and self.ob1000_raw_archive.enabled:
+                        self.ob1000_raw_archive.note_lifecycle(
+                            "RECONNECT", details={"reason": reason}
+                        )
                     logger.warning("reconnect after %s", reason)
                     self._log_health()
                     jitter = random.random() * backoff * 0.2
@@ -805,8 +1109,15 @@ class OrderbookV3LiveCollector:
                     )
                 except Exception:
                     logger.exception("full_ob_flight_recorder_shutdown_failed")
+            if getattr(self, "full_ob_cache_bridge", None) is not None:
+                try:
+                    await self.full_ob_cache_bridge.stop()
+                except Exception:
+                    logger.exception("full_ob_cache_bridge_stop_failed")
             if self._on_demand_socket is not None:
                 await self._on_demand_socket.stop()
+            if getattr(self, "full_ob_continuous_raw_archive", None) is not None:
+                self.full_ob_continuous_raw_archive.stop(clean=self.exit_code == 0)
             if self.full_book is not None:
                 self.full_book.close()
             flushed = True
@@ -816,13 +1127,16 @@ class OrderbookV3LiveCollector:
                 flushed = True
             if self.raw_archive is not None and self.raw_archive.enabled:
                 await self.raw_archive.stop()
+            if getattr(self, "ob1000_raw_archive", None) is not None and self.ob1000_raw_archive.enabled:
+                await self.ob1000_raw_archive.stop()
             self.collector_state = "STOPPED"
             self.connected = False
             self._log_health()
             if not flushed or self.fail_closed or (
                 not self.archive_only and self.writer.state == "ERROR"
             ):
-                self.exit_code = 1
+                if self.exit_code == 0:
+                    self.exit_code = 1
         return self.health_payload()
 
 
@@ -878,14 +1192,30 @@ async def async_main(argv: list[str] | None = None) -> int:
         lock.acquire()
     collector = OrderbookV3LiveCollector(settings, duration_sec=args.duration, archive_only=archive_only)
     raw_settings = load_raw_archive_settings(collector_symbols=settings.symbols)
+    from orderbook_analyse.orderbook_v2_live.raw_archive.config import (
+        load_ob1000_raw_archive_settings,
+    )
+
+    ob1000_settings = load_ob1000_raw_archive_settings(collector_symbols=settings.symbols)
     if archive_only:
-        if not raw_settings.enabled:
-            raise RuntimeError("raw-archive-only requires OB_V3_RAW_ARCHIVE_ENABLE=true")
-        if not raw_settings.symbols:
-            raise RuntimeError("raw-archive-only requires OB_V3_RAW_ARCHIVE_SYMBOLS")
-        collector.raw_archive = RawArchiveManager(raw_settings, depth=settings.depth)
+        if not raw_settings.enabled and not ob1000_settings.enabled:
+            raise RuntimeError(
+                "raw-archive-only requires OB_V3_RAW_ARCHIVE_ENABLE and/or "
+                "OB_V3_OB1000_RAW_ARCHIVE_ENABLE"
+            )
+        if raw_settings.enabled and not raw_settings.symbols:
+            raise RuntimeError("OB_V3_RAW_ARCHIVE_ENABLE=true requires OB_V3_RAW_ARCHIVE_SYMBOLS")
+        if ob1000_settings.enabled and not ob1000_settings.symbols:
+            raise RuntimeError(
+                "OB_V3_OB1000_RAW_ARCHIVE_ENABLE=true requires OB_V3_OB1000_RAW_ARCHIVE_SYMBOLS "
+                "or OB_V3_RAW_ARCHIVE_SYMBOLS"
+            )
+        if raw_settings.enabled:
+            collector.raw_archive = RawArchiveManager(raw_settings, depth=settings.depth)
     elif raw_settings.enabled:
         collector.raw_archive = RawArchiveManager(raw_settings, depth=settings.depth)
+    if ob1000_settings.enabled:
+        collector.ob1000_raw_archive = RawArchiveManager(ob1000_settings)
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, collector.request_stop)

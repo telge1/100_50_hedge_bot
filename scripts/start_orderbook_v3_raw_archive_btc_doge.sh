@@ -17,20 +17,34 @@ fi
 
 export PYTHONPATH=src
 export PYTHONUNBUFFERED=1
-export OB_V3_RAW_ARCHIVE_ENABLE=true
-export OB_V3_RAW_ARCHIVE_SYMBOLS=BTCUSDT,DOGEUSDT
+# shellcheck source=scripts/_ob1000_symbols.sh
+source "$ROOT/scripts/_ob1000_symbols.sh"
+OB_SYMBOLS="$(ob1000_resolve_symbols "$ROOT")"
+
+# OB200 raw archive DISABLED — Fight/edge work uses OB1000 only.
+export OB_V3_RAW_ARCHIVE_ENABLE=false
+export OB_V3_RAW_ARCHIVE_SYMBOLS="$OB_SYMBOLS"
 export OB_V3_RAW_ARCHIVE_ROOT="${OB_V3_RAW_ARCHIVE_ROOT:-$ROOT/data/orderbook_raw_shadow/ob200_v3}"
 export OB_V3_RAW_ARCHIVE_ROTATION="${OB_V3_RAW_ARCHIVE_ROTATION:-hour}"
 export OB_V3_RAW_ARCHIVE_RETENTION_DAYS="${OB_V3_RAW_ARCHIVE_RETENTION_DAYS:-0}"
 export OB_V3_RAW_ARCHIVE_WARN_FREE_DISK_GB="${OB_V3_RAW_ARCHIVE_WARN_FREE_DISK_GB:-20}"
 export OB_V3_RAW_ARCHIVE_MIN_FREE_DISK_GB="${OB_V3_RAW_ARCHIVE_MIN_FREE_DISK_GB:-5}"
 
+# OB1000 raw archive — primary L2 history for fight edge coverage.
+export OB_V3_OB1000_RAW_ARCHIVE_ENABLE="${OB_V3_OB1000_RAW_ARCHIVE_ENABLE:-true}"
+export OB_V3_OB1000_RAW_ARCHIVE_SYMBOLS="$OB_SYMBOLS"
+export OB_V3_OB1000_RAW_ARCHIVE_ROOT="${OB_V3_OB1000_RAW_ARCHIVE_ROOT:-$ROOT/data/orderbook_raw_shadow/ob1000_v1}"
+export OB_V3_OB1000_RAW_ARCHIVE_ROTATION="${OB_V3_OB1000_RAW_ARCHIVE_ROTATION:-hour}"
+export OB_V3_OB1000_RAW_ARCHIVE_RETENTION_DAYS="${OB_V3_OB1000_RAW_ARCHIVE_RETENTION_DAYS:-0}"
+export OB_V3_OB1000_RAW_ARCHIVE_WARN_FREE_DISK_GB="${OB_V3_OB1000_RAW_ARCHIVE_WARN_FREE_DISK_GB:-20}"
+export OB_V3_OB1000_RAW_ARCHIVE_MIN_FREE_DISK_GB="${OB_V3_OB1000_RAW_ARCHIVE_MIN_FREE_DISK_GB:-5}"
+
 # Prefer explicit on-demand enable; .env also loaded by collector settings.
 export OB_V3_ON_DEMAND_ENABLE="${OB_V3_ON_DEMAND_ENABLE:-true}"
 export OB_V3_ON_DEMAND_KEEPER="${OB_V3_ON_DEMAND_KEEPER:-true}"
 export OB_V3_ON_DEMAND_SOCKET_PATH="${OB_V3_ON_DEMAND_SOCKET_PATH:-/run/user/$(id -u)/orderbook_ob1000.sock}"
 
-# Full-OB Edge Flight Recorder shadow pilot (BTC/DOGE only).
+# Full-OB Edge Flight Recorder shadow pilot.
 # Do NOT pre-export ENABLE=false: that blocks collector dotenv (.env) from enabling FR.
 # Prefer an already-exported value; else adopt ENABLE from .env if present; else leave unset.
 export OB_V3_FULL_BOOK_ENABLE="${OB_V3_FULL_BOOK_ENABLE:-true}"
@@ -45,8 +59,9 @@ if [[ -z "${OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE:-}" && -f "$ROOT/.env" ]]; then
     export OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE
   fi
 fi
-export OB_V3_FULL_OB_FR_SYMBOLS="${OB_V3_FULL_OB_FR_SYMBOLS:-BTCUSDT,DOGEUSDT}"
+export OB_V3_FULL_OB_FR_SYMBOLS="${OB_V3_FULL_OB_FR_SYMBOLS:-$OB_SYMBOLS}"
 export OB_V3_FULL_OB_FR_ROOT="${OB_V3_FULL_OB_FR_ROOT:-$ROOT/data/orderbook_raw_shadow/full_ob_edge_flight_recorder}"
+export FULL_OB_CACHE_BRIDGE_SYMBOLS="${FULL_OB_CACHE_BRIDGE_SYMBOLS:-$OB_SYMBOLS}"
 _fr_echo="${OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE:-unset(dotenv)}"
 
 LOG="logs/orderbook_v3_raw_archive_btc_doge.nohup.log"
@@ -63,11 +78,11 @@ fi
 
 nohup .venv/bin/python -m orderbook_analyse.orderbook_v2_live \
   --mode raw-archive-only \
-  --symbols BTCUSDT,DOGEUSDT \
+  --symbols "$OB_SYMBOLS" \
   --confirm-raw-archive-symbols \
   --health-file "$HEALTH" \
   --log-level INFO \
   >>"$LOG" 2>&1 &
 NEWPID=$!
 echo "$NEWPID" >"$PIDFILE"
-echo "started pid=$NEWPID log=$LOG health=$HEALTH fr_enable=${_fr_echo} fr_root=${OB_V3_FULL_OB_FR_ROOT}"
+echo "started pid=$NEWPID symbols=$OB_SYMBOLS log=$LOG health=$HEALTH fr_enable=${_fr_echo} fr_root=${OB_V3_FULL_OB_FR_ROOT}"

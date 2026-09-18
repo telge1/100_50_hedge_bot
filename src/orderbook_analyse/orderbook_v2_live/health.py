@@ -44,6 +44,14 @@ def write_health_line(path: Path | None, payload: dict[str, Any]) -> None:
     if path is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Cap growth: a multi-GB ndjson stalls the collector (disk + parse).
+    try:
+        if path.is_file() and path.stat().st_size > 32 * 1024 * 1024:
+            rotated = path.with_suffix(path.suffix + ".prev")
+            rotated.unlink(missing_ok=True)
+            path.replace(rotated)
+    except OSError:
+        pass
     clean = json.loads(json.dumps(payload, default=str))
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(clean, separators=(",", ":")) + "\n")

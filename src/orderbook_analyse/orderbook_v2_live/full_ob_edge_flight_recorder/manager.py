@@ -170,6 +170,32 @@ class FullObEdgeFlightRecorder:
             self._buffers[sym] = b
         return b
 
+    def bridge_ring_snapshot(self, symbol: str) -> list:
+        """Read-only copy of ringbuffer items for cache-bridge freeze (no flush)."""
+        return self._buf(symbol).snapshot()
+
+    def bridge_ring_meta(self, symbol: str) -> dict:
+        """Ringbuffer coverage metadata for cache-bridge status/freeze gates."""
+        buf = self._buf(symbol)
+        items = buf.snapshot()
+        if not items:
+            return {
+                "message_count": 0,
+                "overflow_count": int(buf.overflow_count),
+                "buffer_start_ns": None,
+                "buffer_end_ns": None,
+                "coverage_seconds": 0.0,
+            }
+        start_ns = int(items[0].receive_time_ns)
+        end_ns = int(items[-1].receive_time_ns)
+        return {
+            "message_count": len(items),
+            "overflow_count": int(buf.overflow_count),
+            "buffer_start_ns": start_ns,
+            "buffer_end_ns": end_ns,
+            "coverage_seconds": max(0.0, (end_ns - start_ns) / 1e9),
+        }
+
     def _next_ordinal(self, symbol: str) -> int:
         sym = symbol.upper()
         n = self._record_ordinal.get(sym, 0) + 1

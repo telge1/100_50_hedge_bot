@@ -37,11 +37,13 @@ class RawQueueItem:
 
 
 class RawArchiveManager:
-    """Non-blocking raw OB200 archival sidecar for the live collector."""
+    """Non-blocking raw OB archival sidecar for the live collector."""
 
-    def __init__(self, settings: RawArchiveSettings, *, depth: int = 200) -> None:
+    def __init__(self, settings: RawArchiveSettings, *, depth: int | None = None) -> None:
         self.settings = settings
-        self.depth = depth
+        self.depth = int(depth if depth is not None else settings.depth)
+        self.format_version = settings.format_version
+        self.parser_version = settings.parser_version
         self.metrics = RawArchiveMetrics()
         self._queue: asyncio.Queue[RawQueueItem | None] = asyncio.Queue(
             maxsize=settings.queue_size
@@ -95,6 +97,9 @@ class RawArchiveManager:
             start_utc=ts,
             compression=self.settings.compression,
             compression_level=self.settings.compression_level,
+            depth=self.depth,
+            format_version=self.format_version,
+            parser_version=self.parser_version,
         )
         writer.open()
         self._writers[symbol] = writer
@@ -124,6 +129,8 @@ class RawArchiveManager:
                     ts=end_ts,
                     received_at=end_ts,
                     depth=self.depth,
+                    format_version=self.format_version,
+                    parser_version=self.parser_version,
                 )
                 writer.write_line(line, kind="marker")
             writer.close(end_utc=end_ts, git_head=self._git_head)
@@ -171,7 +178,13 @@ class RawArchiveManager:
             self.metrics.deltas += 1
         if sequence is not None:
             self.metrics.note_sequence(sequence)
-        line = serialize_market_payload(payload, received_at=received_at, depth=self.depth)
+        line = serialize_market_payload(
+            payload,
+            received_at=received_at,
+            depth=self.depth,
+            format_version=self.format_version,
+            parser_version=self.parser_version,
+        )
         item = RawQueueItem(
             symbol=symbol,
             payload=line,
@@ -205,6 +218,8 @@ class RawArchiveManager:
             ts_ms=ts_ms,
             received_at=received_at,
             depth=self.depth,
+            format_version=self.format_version,
+            parser_version=self.parser_version,
         )
         item = RawQueueItem(
             symbol=symbol,
@@ -248,6 +263,8 @@ class RawArchiveManager:
             received_at=now,
             depth=self.depth,
             details=details,
+            format_version=self.format_version,
+            parser_version=self.parser_version,
         )
         sym = symbol or "__global__"
         item = RawQueueItem(symbol=sym, payload=line, kind="marker", received_at=now)
@@ -318,6 +335,11 @@ class RawArchiveManager:
             current_qsize=self._queue.qsize(),
         )
         payload["raw_free_disk_gb"] = self._disk_free_gb
+        payload["raw_archive_depth"] = self.depth
+        payload["raw_archive_parser_version"] = self.parser_version
+        nest = self.settings.health_nest_key
+        if nest:
+            return {nest: payload}
         return payload
 
     async def rotate_with_checkpoint(
@@ -346,6 +368,8 @@ class RawArchiveManager:
             ts_ms=ts_ms,
             received_at=received_at,
             depth=self.depth,
+            format_version=self.format_version,
+            parser_version=self.parser_version,
         )
         writer.write_line(line, kind="rotation_checkpoint", sequence=book.last_seq)
         self.metrics.checkpoint_count += 1

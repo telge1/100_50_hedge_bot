@@ -89,8 +89,10 @@ class FullBookState:
         receive_time_ns: int | None = None,
         mark_ready: bool = True,
     ) -> None:
-        self.bids = {_f(p): _f(q) for p, q in _iter_levels(bids) if _f(q) > 0}
-        self.asks = {_f(p): _f(q) for p, q in _iter_levels(asks) if _f(q) > 0}
+        # Chunked parse so a 10k+ level Full-OB REST seed yields the GIL and
+        # does not starve the collector asyncio loop / Unix control socket.
+        self.bids = _levels_to_map(bids)
+        self.asks = _levels_to_map(asks)
         self.update_id = int(u) if u is not None else None
         self.seq = int(seq) if seq is not None else None
         self.event_ts_ms = int(ts_ms) if ts_ms is not None else None
@@ -184,6 +186,29 @@ class FullBookState:
 
 def _f(v: Any) -> float:
     return float(v)
+
+
+_GIL_YIELD_EVERY = 512
+
+
+def _levels_to_map(levels: list) -> dict[float, float]:
+    """Parse Bybit levels into price->size, yielding the GIL periodically."""
+    import time as _time
+
+    out: dict[float, float] = {}
+    for i, row in enumerate(levels or []):
+        if isinstance(row, (list, tuple)) and len(row) >= 2:
+            p, q = row[0], row[1]
+        elif isinstance(row, dict):
+            p, q = row.get("price"), row.get("size") or row.get("qty")
+        else:
+            continue
+        fq = _f(q)
+        if fq > 0:
+            out[_f(p)] = fq
+        if i and i % _GIL_YIELD_EVERY == 0:
+            _time.sleep(0)
+    return out
 
 
 def _iter_levels(levels: list) -> list[tuple[Any, Any]]:

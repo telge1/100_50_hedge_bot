@@ -17,6 +17,7 @@ from orderbook_analyse.orderbook_v2_live.on_demand_lease import (
     LeaseKey,
     LeaseManager,
     PILOT_SYMBOLS,
+    resolve_ob1000_keeper_symbols,
 )
 from orderbook_analyse.orderbook_v2_live.on_demand_snapshot import build_snapshot_payload
 from orderbook_analyse.orderbook_v2_live.on_demand_socket import resolve_socket_path
@@ -46,14 +47,21 @@ class OnDemandRuntime:
 def load_on_demand_settings() -> dict[str, Any]:
     enabled = (os.environ.get("OB_V3_ON_DEMAND_ENABLE") or "false").lower() in {"1", "true", "yes"}
     keeper = (os.environ.get("OB_V3_ON_DEMAND_KEEPER") or "true").lower() in {"1", "true", "yes"}
+    keeper_symbols = resolve_ob1000_keeper_symbols()
+    max_active = int(os.environ.get("OB_V3_ON_DEMAND_MAX_ACTIVE") or "4")
+    # Keepers need one topic per live symbol; leave headroom for chart leases.
+    max_active = max(max_active, len(keeper_symbols) + 2)
     return {
         "enabled": enabled,
         "keeper_enabled": keeper,
-        "max_active_topics": int(os.environ.get("OB_V3_ON_DEMAND_MAX_ACTIVE") or "4"),
+        "max_active_topics": max_active,
         "heartbeat_sec": float(os.environ.get("OB_V3_ON_DEMAND_HEARTBEAT_SEC") or "15"),
         "lease_ttl_sec": float(os.environ.get("OB_V3_ON_DEMAND_LEASE_TTL_SEC") or "45"),
         "socket_path": resolve_socket_path(),
-        "pilot_symbols": PILOT_SYMBOLS,
+        "keeper_symbols": keeper_symbols,
+        "pilot_symbols": keeper_symbols,
+        "allow_any_linear_usdt": (os.environ.get("OB_V3_ON_DEMAND_ALLOW_ANY_USDT") or "true").lower()
+        in {"1", "true", "yes"},
     }
 
 
@@ -77,11 +85,15 @@ class OnDemandDepthManager:
         self._send_chunk = send_chunk
         self._confirmed_topics = confirmed_topics
         self.socket_path: Path = Path(cfg["socket_path"])
+        self.keeper_symbols = frozenset(
+            cfg.get("keeper_symbols") or cfg.get("pilot_symbols") or PILOT_SYMBOLS
+        )
         self.leases = LeaseManager(
             heartbeat_sec=cfg["heartbeat_sec"],
             lease_ttl_sec=cfg["lease_ttl_sec"],
             max_active_topics=cfg["max_active_topics"],
-            pilot_symbols=frozenset(cfg["pilot_symbols"]),
+            pilot_symbols=self.keeper_symbols,
+            allow_any_linear_usdt=bool(cfg.get("allow_any_linear_usdt", True)),
         )
         self.runtimes: dict[tuple[str, int], OnDemandRuntime] = {}
         self._inflight_subscribe: set[tuple[str, int]] = set()
@@ -162,6 +174,12 @@ class OnDemandDepthManager:
 
     def _runtime_state(self, symbol: str, depth: int = LEASE_DEPTH) -> str:
         key = LeaseKey(symbol.upper(), depth)
+        # Active leases win over grace/stopped — re-acquire must not look dead.
+        if self.leases.active_count(key) > 0:
+            rt = self.runtimes.get((symbol.upper(), depth))
+            if rt is None:
+                return "starting"
+            return rt.subscription_state or "starting"
         grace_until = self._grace_until.get(key)
         if grace_until is not None:
             if datetime.now(timezone.utc) < grace_until:
@@ -227,6 +245,8 @@ class OnDemandDepthManager:
                     session_id=lease_id,
                     lease_id=lease_id,
                 )
+                # Cancel pending grace unsubscribe so a re-open keeps the hot book.
+                self._grace_until.pop(LeaseKey(lease.symbol, lease.depth), None)
                 state = self._runtime_state(lease.symbol, lease.depth)
                 if state == "stopped":
                     state = "starting"
@@ -373,47 +393,40 @@ class OnDemandDepthManager:
                 "asks": [],
                 "data_status": "no_data",
             }
+        # Capture references under lock; build payload outside so asyncio socket
+        # responses are not blocked while sorting 1000 levels.
         with self._book_lock:
             book = rt.clock.last_valid_book
-            if book is None or not book.is_valid:
-                return {
-                    "timestamp_utc": None,
-                    "source": "orderbook_v3_live_on_demand",
-                    "coverage": "on_demand",
-                    "freshness_state": "unknown",
-                    "bids": [],
-                    "asks": [],
-                    "subscription_state": rt.subscription_state,
-                    "data_status": "no_data",
-                }
-            if rt.last_event_timestamp is None:
-                return {
-                    "timestamp_utc": None,
-                    "source": "orderbook_v3_live_on_demand",
-                    "coverage": "on_demand",
-                    "freshness_state": "unknown",
-                    "bids": [],
-                    "asks": [],
-                    "subscription_state": rt.subscription_state,
-                    "data_status": "no_data",
-                }
-            now = datetime.now(timezone.utc)
-            freshness_ms = max(0, int((now - rt.last_event_timestamp).total_seconds() * 1000))
-            if freshness_ms <= 15_000:
-                freshness_state = "fresh"
-            elif freshness_ms <= 180_000:
-                freshness_state = "delayed"
-            else:
-                freshness_state = "stale"
-            return build_snapshot_payload(
-                symbol=sym,
-                depth=LEASE_DEPTH,
-                book=book,
-                timestamp_utc=rt.last_event_timestamp,
-                subscription_state=rt.subscription_state,
-                freshness_state=freshness_state,
-                freshness_ms=freshness_ms,
-            )
+            sub_state = rt.subscription_state
+            event_ts = rt.last_event_timestamp
+        if book is None or not book.is_valid or event_ts is None:
+            return {
+                "timestamp_utc": None,
+                "source": "orderbook_v3_live_on_demand",
+                "coverage": "on_demand",
+                "freshness_state": "unknown",
+                "bids": [],
+                "asks": [],
+                "subscription_state": sub_state,
+                "data_status": "no_data",
+            }
+        now = datetime.now(timezone.utc)
+        freshness_ms = max(0, int((now - event_ts).total_seconds() * 1000))
+        if freshness_ms <= 15_000:
+            freshness_state = "fresh"
+        elif freshness_ms <= 180_000:
+            freshness_state = "delayed"
+        else:
+            freshness_state = "stale"
+        return build_snapshot_payload(
+            symbol=sym,
+            depth=LEASE_DEPTH,
+            book=book,
+            timestamp_utc=event_ts,
+            subscription_state=sub_state,
+            freshness_state=freshness_state,
+            freshness_ms=freshness_ms,
+        )
 
     async def subscribe_key(self, ws, key: LeaseKey) -> None:
         topic = orderbook_topic(key.symbol, key.depth)
@@ -472,14 +485,14 @@ class OnDemandDepthManager:
                 rt.pending_raw.clear()
 
     def ensure_keeper_leases(self) -> None:
-        """Keep pilot OB1000 subscribed continuously (same pattern as Full-OB FR keeper).
+        """Keep registered OB1000 live symbols subscribed continuously.
 
-        Renews leases every tick so ``orderbook.1000.{BTC,DOGE}`` stay hot for
-        research Walls/Levels without requiring an open chart tab.
+        Renews leases every tick so ``orderbook.1000.{symbol}`` stay hot for
+        raw archive + research Walls/Levels (symbols from ob1000 live SoT).
         """
         if not self.enabled or not self.keeper_enabled:
             return
-        for sym in sorted(self.leases.pilot_symbols):
+        for sym in sorted(self.keeper_symbols):
             lid = f"{KEEPER_LEASE_PREFIX}{sym}"
             try:
                 self.leases.acquire(symbol=sym, session_id=lid, lease_id=lid)
@@ -499,7 +512,10 @@ class OnDemandDepthManager:
         for key, until in list(self._grace_until.items()):
             if now >= until:
                 del self._grace_until[key]
-                await self.unsubscribe_key(ws, key)
+                # Re-acquire during grace cancels unsubscribe; never tear down
+                # a topic that still has an open lease.
+                if self.leases.active_count(key) <= 0:
+                    await self.unsubscribe_key(ws, key)
         for key in self.leases.active_keys():
             if (key.symbol, key.depth) not in self._inflight_subscribe:
                 await self.subscribe_key(ws, key)

@@ -11,7 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 
-from orderbook_analyse.orderbook_v2_live.raw_archive.config import FORMAT_VERSION, PARSER_VERSION
+from orderbook_analyse.orderbook_v2_live.raw_archive.config import (
+    FORMAT_VERSION,
+    PARSER_VERSION,
+)
 
 try:
     import zstandard as zstd
@@ -58,12 +61,18 @@ class SegmentWriter:
         start_utc: datetime,
         compression: str = "zstd",
         compression_level: int = 3,
+        depth: int = 200,
+        format_version: str = FORMAT_VERSION,
+        parser_version: str = PARSER_VERSION,
     ) -> None:
         self.symbol = symbol.upper()
         self.directory = directory
         self.start_utc = start_utc
         self.compression = compression
         self.compression_level = compression_level
+        self.depth = int(depth)
+        self.format_version = format_version
+        self.parser_version = parser_version
         self.stats = SegmentStats(symbol=self.symbol, start_utc=start_utc)
         self._open_path = self._open_filename()
         self._fh: BinaryIO | None = None
@@ -77,7 +86,7 @@ class SegmentWriter:
     def _open_filename(self) -> Path:
         stamp = self._stamp(self.start_utc)
         ext = "zst" if self.compression == "zstd" else "ndjson"
-        name = f"{self.symbol}_{stamp}_open_{PARSER_VERSION}.{ext}.tmp"
+        name = f"{self.symbol}_{stamp}_open_{self.parser_version}.{ext}.tmp"
         return self.directory / name
 
     def _refresh_replay_source(self) -> None:
@@ -194,7 +203,7 @@ class SegmentWriter:
         ext = "zst" if self.compression == "zstd" else "ndjson"
         final_name = (
             f"{self.symbol}_{self._stamp(self.start_utc)}_{self._stamp(end_utc)}"
-            f"_{PARSER_VERSION}.{ext}"
+            f"_{self.parser_version}.{ext}"
         )
         final_path = self.directory / final_name
         os.replace(self._open_path, final_path)
@@ -203,9 +212,9 @@ class SegmentWriter:
         self._refresh_replay_source()
 
         manifest = {
-            "format_version": FORMAT_VERSION,
-            "parser_version": PARSER_VERSION,
-            "depth": 200,
+            "format_version": self.format_version,
+            "parser_version": self.parser_version,
+            "depth": self.depth,
             "symbol": self.symbol,
             "start_utc": self.start_utc.isoformat().replace("+00:00", "Z"),
             "end_utc": end_utc.isoformat().replace("+00:00", "Z"),

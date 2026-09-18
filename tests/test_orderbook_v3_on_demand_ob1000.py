@@ -370,6 +370,64 @@ def test_grace_then_unsubscribe(tmp_path: Path):
     asyncio.run(_run())
 
 
+def test_reacquire_during_grace_cancels_unsubscribe(tmp_path: Path):
+    async def _run() -> None:
+        calls: list[tuple[str, list[str]]] = []
+
+        async def send_chunk(ws, op, args):
+            calls.append((op, list(args)))
+
+        mgr = OnDemandDepthManager(
+            exchange="bybit",
+            market="linear",
+            send_chunk=send_chunk,
+            confirmed_topics=["orderbook.1000.ETHUSDT"],
+            settings=_manager_settings(tmp_path, lease_ttl_sec=0.05),
+        )
+        await mgr.handle_request(
+            {
+                "request_id": "a1",
+                "operation": "acquire",
+                "lease_id": "eth-1",
+                "symbol": "ETHUSDT",
+                "depth": 1000,
+            }
+        )
+        await mgr.tick(object())
+        await mgr.handle_request(
+            {"request_id": "rel", "operation": "release", "lease_id": "eth-1", "depth": 1000}
+        )
+        # Re-open while grace is active — must cancel pending unsubscribe.
+        acq = await mgr.handle_request(
+            {
+                "request_id": "a2",
+                "operation": "acquire",
+                "lease_id": "eth-2",
+                "symbol": "ETHUSDT",
+                "depth": 1000,
+            }
+        )
+        assert acq["ok"] is True
+        assert LeaseKey("ETHUSDT", ON_DEMAND_DEPTH) not in mgr._grace_until
+        # Advance past original grace window; lease must stay subscribed.
+        await asyncio.sleep(0.06)
+        # Heartbeat so expire_due does not drop the re-acquired lease in tick.
+        await mgr.handle_request(
+            {
+                "request_id": "hb",
+                "operation": "heartbeat",
+                "lease_id": "eth-2",
+                "symbol": "ETHUSDT",
+                "depth": 1000,
+            }
+        )
+        await mgr.tick(object())
+        assert ("unsubscribe", ["orderbook.1000.ETHUSDT"]) not in calls
+        assert mgr.leases.active_count(LeaseKey("ETHUSDT", ON_DEMAND_DEPTH)) == 1
+
+    asyncio.run(_run())
+
+
 def test_keeper_leases_keep_pilot_subscribed(tmp_path: Path):
     async def _run() -> None:
         calls: list[tuple[str, list[str]]] = []
@@ -402,6 +460,42 @@ def test_keeper_leases_keep_pilot_subscribed(tmp_path: Path):
         assert ("unsubscribe", ["orderbook.1000.DOGEUSDT"]) not in calls
 
     asyncio.run(_run())
+
+def test_keeper_leases_include_registered_nvda(tmp_path: Path):
+    async def _run() -> None:
+        calls: list[tuple[str, list[str]]] = []
+
+        async def send_chunk(ws, op, args):
+            calls.append((op, list(args)))
+
+        mgr = OnDemandDepthManager(
+            exchange="bybit",
+            market="linear",
+            send_chunk=send_chunk,
+            confirmed_topics=[],
+            settings=_manager_settings(
+                tmp_path,
+                keeper_enabled=True,
+                lease_ttl_sec=0.05,
+                max_active_topics=8,
+                pilot_symbols={"BTCUSDT", "DOGEUSDT", "NVDAUSDT"},
+            ),
+        )
+        await mgr.tick(object())
+        flat = [t for op, args in calls if op == "subscribe" for t in args]
+        assert "orderbook.1000.BTCUSDT" in flat
+        assert "orderbook.1000.DOGEUSDT" in flat
+        assert "orderbook.1000.NVDAUSDT" in flat
+
+    asyncio.run(_run())
+
+
+def test_resolve_ob1000_keeper_symbols_from_env(monkeypatch: pytest.MonkeyPatch):
+    from orderbook_analyse.orderbook_v2_live.on_demand_lease import resolve_ob1000_keeper_symbols
+
+    monkeypatch.setenv("OB_V3_OB1000_RAW_ARCHIVE_SYMBOLS", "BTCUSDT,DOGEUSDT,NVDAUSDT")
+    assert resolve_ob1000_keeper_symbols() == frozenset({"BTCUSDT", "DOGEUSDT", "NVDAUSDT"})
+
 
 def test_stale_socket_removed(tmp_path: Path):
     sock_path = tmp_path / "ob1000.sock"

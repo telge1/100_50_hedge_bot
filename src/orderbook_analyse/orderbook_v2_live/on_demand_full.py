@@ -17,6 +17,7 @@ from orderbook_analyse.orderbook_v2_live.full_book_state import (
     MAX_UI_BARS_PER_SIDE,
     RPI_INCLUDED_IN_FULL_OB,
     FullBookState,
+    _levels_to_map as _levels_to_map_outside,
     aggregate_full_book,
     full_orderbook_topic,
     parse_full_orderbook_topic,
@@ -37,7 +38,7 @@ from orderbook_analyse.orderbook_v2_live.on_demand_lease import (
 logger = logging.getLogger(__name__)
 
 BYBIT_REST_FULL_OB = "https://api.bybit.com/v5/market/full_orderbook"
-MAX_FULL_TOPICS = 2
+MAX_FULL_TOPICS = 3  # archive keepers BTC+DOGE + 1 charting symbol (Walls/Levels FULL)
 SOURCE_NAME = "orderbook_v3_live_full_on_demand"
 
 
@@ -60,12 +61,17 @@ class FullBookRuntime:
 def load_full_book_settings() -> dict[str, Any]:
     enabled = (os.environ.get("OB_V3_ON_DEMAND_ENABLE") or "false").lower() in {"1", "true", "yes"}
     full_enabled = (os.environ.get("OB_V3_FULL_BOOK_ENABLE") or "true").lower() in {"1", "true", "yes"}
+    from orderbook_analyse.orderbook_v2_live.on_demand_lease import resolve_ob1000_keeper_symbols
+
+    keeper_symbols = resolve_ob1000_keeper_symbols()
     return {
         "enabled": enabled and full_enabled,
         "max_active_topics": int(os.environ.get("OB_V3_FULL_BOOK_MAX_ACTIVE") or str(MAX_FULL_TOPICS)),
         "heartbeat_sec": float(os.environ.get("OB_V3_ON_DEMAND_HEARTBEAT_SEC") or "15"),
         "lease_ttl_sec": float(os.environ.get("OB_V3_ON_DEMAND_LEASE_TTL_SEC") or "45"),
-        "pilot_symbols": PILOT_SYMBOLS,
+        "pilot_symbols": keeper_symbols,
+        "allow_any_linear_usdt": (os.environ.get("OB_V3_ON_DEMAND_ALLOW_ANY_USDT") or "true").lower()
+        in {"1", "true", "yes"},
         "clip_pct": float(os.environ.get("OB_V3_FULL_BOOK_CLIP_PCT") or str(DEFAULT_CLIP_PCT)),
         "max_ui_bars": int(os.environ.get("OB_V3_FULL_BOOK_UI_BARS") or str(MAX_UI_BARS_PER_SIDE)),
         "rest_url": os.environ.get("OB_V3_FULL_BOOK_REST_URL") or BYBIT_REST_FULL_OB,
@@ -82,12 +88,15 @@ class FullBookOnDemandManager:
         send_chunk: Callable,
         confirmed_topics: list[str],
         settings: dict[str, Any] | None = None,
+        ws_pump: Callable | None = None,
     ) -> None:
         cfg = settings or load_full_book_settings()
         self.enabled = bool(cfg["enabled"])
         self.market = market
         self._send_chunk = send_chunk
         self._confirmed_topics = confirmed_topics
+        # Optional async callback(ws) to drain Bybit WS while REST snapshot runs.
+        self._ws_pump = ws_pump
         self.clip_pct = float(cfg["clip_pct"])
         self.max_ui_bars = int(cfg["max_ui_bars"])
         self.rest_url = str(cfg["rest_url"])
@@ -95,7 +104,8 @@ class FullBookOnDemandManager:
             heartbeat_sec=cfg["heartbeat_sec"],
             lease_ttl_sec=cfg["lease_ttl_sec"],
             max_active_topics=cfg["max_active_topics"],
-            pilot_symbols=cfg["pilot_symbols"],
+            pilot_symbols=frozenset(cfg["pilot_symbols"]),
+            allow_any_linear_usdt=bool(cfg.get("allow_any_linear_usdt", True)),
         )
         # Patch lease depth validation for FULL_DEPTH via wrapper methods.
         self.runtimes: dict[str, FullBookRuntime] = {}
@@ -108,6 +118,10 @@ class FullBookOnDemandManager:
         self.max_rest_align_attempts = int(os.environ.get("OB_V3_FULL_BOOK_ALIGN_ATTEMPTS") or "12")
         self.lock_hold_ns_last: int = 0
         self.lock_hold_ns_max: int = 0
+
+    def sync_inflight(self) -> bool:
+        """True while a Full-OB subscribe/REST align is in progress."""
+        return bool(self._inflight)
 
     def _note_lock_hold(self, t0_ns: int) -> None:
         import time as _time
@@ -181,14 +195,19 @@ class FullBookOnDemandManager:
         cts_ms = payload.get("cts") or data.get("cts")
         notify: tuple[str, str | None] | None = None
         t0 = _time.perf_counter_ns()
-        with self._book_lock:
+        # Avoid parking the event-loop thread on a long REST align lock hold.
+        acquired = self._book_lock.acquire(blocking=False)
+        if not acquired:
+            acquired = self._book_lock.acquire(blocking=True, timeout=0.05)
+        if not acquired:
+            rt.subscription_state = "syncing"
+            return True
+        try:
             # Pre-ready: buffer deltas only (Full-OB WS has no snapshot).
             if not rt.book.book_ready:
                 if u is None or seq is None:
-                    self._note_lock_hold(t0)
                     return True
                 if msg_type == "snapshot":
-                    self._note_lock_hold(t0)
                     return True
                 status = rt.sync_buffer.push(u=u, seq=seq, payload=payload)
                 rt.pending_deltas = [d.payload for d in rt.sync_buffer.items]
@@ -223,7 +242,9 @@ class FullBookOnDemandManager:
                 elif outcome is DeltaOutcome.APPLIED:
                     rt.subscription_state = "live"
                 notify = ("live", outcome.value)
-        self._note_lock_hold(t0)
+        finally:
+            self._note_lock_hold(t0)
+            self._book_lock.release()
         if notify is not None:
             self._notify_observers(
                 symbol=sym,
@@ -252,6 +273,7 @@ class FullBookOnDemandManager:
 
         rt.subscription_state = "syncing"
         last_err = "NO_VALID_INITIAL_SNAPSHOT"
+
         for _attempt in range(self.max_rest_align_attempts):
             result = self._fetch_rest_snapshot(rt.symbol)
             snap_u = result.get("u")
@@ -259,6 +281,9 @@ class FullBookOnDemandManager:
             if snap_u is None or snap_seq is None:
                 last_err = "snapshot_missing_u_or_seq"
                 continue
+            # Parse levels outside the book lock so the asyncio loop can run.
+            bids_map = _levels_to_map_outside(result.get("b") or [])
+            asks_map = _levels_to_map_outside(result.get("a") or [])
             need_more = False
             with self._book_lock:
                 align = align_snapshot_to_buffer(
@@ -273,19 +298,30 @@ class FullBookOnDemandManager:
                     need_more = True
                 else:
                     recv_ns = _time.time_ns()
-                    rt.book.apply_snapshot(
-                        bids=result.get("b") or [],
-                        asks=result.get("a") or [],
-                        u=int(snap_u),
-                        seq=int(snap_seq),
-                        ts_ms=result.get("ts") or result.get("cts"),
-                        cts_ms=result.get("cts"),
-                        receive_time_ns=recv_ns,
-                        mark_ready=True,
+                    rt.book.bids = bids_map
+                    rt.book.asks = asks_map
+                    rt.book.update_id = int(snap_u)
+                    rt.book.seq = int(snap_seq)
+                    rt.book.event_ts_ms = (
+                        int(result["ts"])
+                        if result.get("ts") is not None
+                        else (int(result["cts"]) if result.get("cts") is not None else None)
                     )
+                    rt.book.cts_ms = int(result["cts"]) if result.get("cts") is not None else None
+                    rt.book.last_event_at = datetime.now(timezone.utc)
+                    rt.book.last_receive_time_ns = recv_ns
+                    rt.book.snapshot_loaded = True
+                    rt.book.book_ready = True
                     rt.last_rest_snapshot = dict(result)
                     applied_ok = True
-                    for delta in align.remaining:
+                    for di, delta in enumerate(align.remaining):
+                        if di and di % 64 == 0:
+                            # Release lock briefly so socket/WS handlers can progress.
+                            self._book_lock.release()
+                            try:
+                                _time.sleep(0)
+                            finally:
+                                self._book_lock.acquire()
                         data = delta.payload.get("data") or {}
                         out = rt.book.apply_delta(
                             bids=data.get("b") or [],
@@ -317,8 +353,6 @@ class FullBookOnDemandManager:
                         rt.resync_needed = False
                         rt.subscription_state = "live"
                         rt.last_error = ""
-                        # Notify FR outside lock: full REST seed for RESYNC/INITIAL checkpoint.
-                        # Snapshot dict already held on runtime; no JSON/zstd here.
                         snap_payload = {
                             "topic": full_orderbook_topic(rt.symbol),
                             "type": "snapshot",
@@ -548,10 +582,17 @@ class FullBookOnDemandManager:
                 await self._send_chunk(ws, "subscribe", [topic])
                 self._confirmed_topics.append(topic)
             rt.subscription_confirmed = True
-            # REST snapshot in thread to avoid blocking event loop.
+            # REST snapshot in thread; keep draining WS so stale_market_data
+            # does not fire while the session loop awaits alignment.
             import asyncio
 
-            await asyncio.to_thread(self._apply_rest_snapshot, rt)
+            rest_task = asyncio.create_task(asyncio.to_thread(self._apply_rest_snapshot, rt))
+            while not rest_task.done():
+                if self._ws_pump is not None:
+                    await self._ws_pump(ws)
+                else:
+                    await asyncio.sleep(0.05)
+            await rest_task
             self.flush_pending_resync_notify()
             if rt.book.book_ready:
                 rt.subscription_state = "live"

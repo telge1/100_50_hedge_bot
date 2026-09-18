@@ -1,0 +1,9 @@
+{
+  "name": "ob1000_live_symbols",
+  "note": "Live OB1000 / Full-OB archive symbols. No exchange history backfill — collection starts at live enable. Managed by symbol_onboarding.",
+  "symbols": [
+    "BTCUSDT",
+    "DOGEUSDT",
+    "NVDAUSDT"
+  ]
+}

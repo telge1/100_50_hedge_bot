@@ -1,19 +1,32 @@
 #!/usr/bin/env bash
-# Foreground Full-OB / raw-archive collector for systemd Type=simple.
-# Same env contract as start_orderbook_v3_raw_archive_btc_doge.sh, but exec (no nohup).
+# Foreground Full-OB / OB1000 raw-archive collector for systemd Type=simple.
+# Symbols come from config/ob1000_live_symbols.json (or OB_V3_OB1000_RAW_ARCHIVE_SYMBOLS).
+# OB200 raw archive stays disabled.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=scripts/_ob1000_symbols.sh
+source "$ROOT/scripts/_ob1000_symbols.sh"
+OB_SYMBOLS="$(ob1000_resolve_symbols "$ROOT")"
 
 export PYTHONPATH=src
 export PYTHONUNBUFFERED=1
-export OB_V3_RAW_ARCHIVE_ENABLE=true
-export OB_V3_RAW_ARCHIVE_SYMBOLS=BTCUSDT,DOGEUSDT
+# OB200 raw archive DISABLED — Fight/edge work uses OB1000 only.
+export OB_V3_RAW_ARCHIVE_ENABLE=false
+export OB_V3_RAW_ARCHIVE_SYMBOLS="$OB_SYMBOLS"
 export OB_V3_RAW_ARCHIVE_ROOT="${OB_V3_RAW_ARCHIVE_ROOT:-$ROOT/data/orderbook_raw_shadow/ob200_v3}"
 export OB_V3_RAW_ARCHIVE_ROTATION="${OB_V3_RAW_ARCHIVE_ROTATION:-hour}"
 export OB_V3_RAW_ARCHIVE_RETENTION_DAYS="${OB_V3_RAW_ARCHIVE_RETENTION_DAYS:-0}"
 export OB_V3_RAW_ARCHIVE_WARN_FREE_DISK_GB="${OB_V3_RAW_ARCHIVE_WARN_FREE_DISK_GB:-20}"
 export OB_V3_RAW_ARCHIVE_MIN_FREE_DISK_GB="${OB_V3_RAW_ARCHIVE_MIN_FREE_DISK_GB:-5}"
+
+export OB_V3_OB1000_RAW_ARCHIVE_ENABLE="${OB_V3_OB1000_RAW_ARCHIVE_ENABLE:-true}"
+export OB_V3_OB1000_RAW_ARCHIVE_SYMBOLS="$OB_SYMBOLS"
+export OB_V3_OB1000_RAW_ARCHIVE_ROOT="${OB_V3_OB1000_RAW_ARCHIVE_ROOT:-$ROOT/data/orderbook_raw_shadow/ob1000_v1}"
+export OB_V3_OB1000_RAW_ARCHIVE_ROTATION="${OB_V3_OB1000_RAW_ARCHIVE_ROTATION:-hour}"
+export OB_V3_OB1000_RAW_ARCHIVE_RETENTION_DAYS="${OB_V3_OB1000_RAW_ARCHIVE_RETENTION_DAYS:-0}"
+export OB_V3_OB1000_RAW_ARCHIVE_WARN_FREE_DISK_GB="${OB_V3_OB1000_RAW_ARCHIVE_WARN_FREE_DISK_GB:-20}"
+export OB_V3_OB1000_RAW_ARCHIVE_MIN_FREE_DISK_GB="${OB_V3_OB1000_RAW_ARCHIVE_MIN_FREE_DISK_GB:-5}"
 
 export OB_V3_ON_DEMAND_ENABLE="${OB_V3_ON_DEMAND_ENABLE:-true}"
 export OB_V3_ON_DEMAND_KEEPER="${OB_V3_ON_DEMAND_KEEPER:-true}"
@@ -30,17 +43,19 @@ if [[ -z "${OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE:-}" && -f "$ROOT/.env" ]]; then
     export OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE
   fi
 fi
-export OB_V3_FULL_OB_FR_SYMBOLS="${OB_V3_FULL_OB_FR_SYMBOLS:-BTCUSDT,DOGEUSDT}"
+export OB_V3_FULL_OB_FR_SYMBOLS="${OB_V3_FULL_OB_FR_SYMBOLS:-$OB_SYMBOLS}"
 export OB_V3_FULL_OB_FR_ROOT="${OB_V3_FULL_OB_FR_ROOT:-$ROOT/data/orderbook_raw_shadow/full_ob_edge_flight_recorder}"
+export FULL_OB_CACHE_BRIDGE_SYMBOLS="${FULL_OB_CACHE_BRIDGE_SYMBOLS:-$OB_SYMBOLS}"
 
 HEALTH="logs/orderbook_v3_raw_archive_btc_doge.health.ndjson"
 PIDFILE="logs/orderbook_v3_raw_archive_only.pid"
-# systemd owns the process; keep pidfile in sync for operators / old scripts.
 echo "$$" >"$PIDFILE"
+
+echo "ob1000/full-ob symbols=$OB_SYMBOLS" >&2
 
 exec .venv/bin/python -m orderbook_analyse.orderbook_v2_live \
   --mode raw-archive-only \
-  --symbols BTCUSDT,DOGEUSDT \
+  --symbols "$OB_SYMBOLS" \
   --confirm-raw-archive-symbols \
   --health-file "$HEALTH" \
   --log-level INFO

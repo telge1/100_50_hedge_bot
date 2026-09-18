@@ -1,0 +1,10 @@
+{
+  "name": "ob1000_tick_sizes",
+  "note": "Tick sizes for OB1000 live symbols beyond the BTC/DOGE Phase-2 pilot map. Managed by scripts/add_symbol.py.",
+  "tick_sizes": {
+    "NVDAUSDT": "0.01",
+    "AAPLUSDT": "0.01",
+    "AVAUSDT": "0.0001",
+    "LSKUSDT": "0.00001"
+  }
+}
