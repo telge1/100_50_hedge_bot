@@ -1,26 +1,36 @@
 [Unit]
-Description=Bybit Live 1m Collector + Shadow Signals (signal_generator)
+Description=Bybit Live 1m candles + public trades collector (signal_generator)
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=30
 
 [Service]
 Type=simple
 WorkingDirectory=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves
 EnvironmentFile=-/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.env
-# Supervisor lives inside run_live_collector_service.py:
-# - desired_state=RUNNING → restart collector after crash
-# - desired_state=STOPPED → stay idle (no immediate collector restart)
-# Process-level Restart=on-failure only recovers the supervisor itself.
+Environment=PYTHONUNBUFFERED=1
+# Supervisor inside run_live_collector_service.py:
+# - desired_state=RUNNING → restart inner collector after crash
+# - desired_state=STOPPED → stay idle (process kept alive for systemd Restart=always)
+# Process-level Restart=always recovers the whole supervisor after OOM/kill/exit.
 ExecStart=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python \
   scripts/run_live_collector_service.py \
   --live-universe config/live_universe.json \
+  --candle-universe /home/telgenbuescher/projects/orderbook_analyse/config/universe_tradeable_51.json \
   --api-host 127.0.0.1 \
   --api-port 8787 \
-  --default-desired RUNNING
-Restart=on-failure
-RestartSec=5
+  --default-desired RUNNING \
+  --enable-public-trades \
+  --public-trade-queue-maxsize 100000 \
+  --public-trade-batch-size 2000 \
+  --public-trade-spool-dir results/live_collector/public_trade_spool
+Restart=always
+RestartSec=2
 KillSignal=SIGTERM
-TimeoutStopSec=60
+TimeoutStopSec=90
+StandardOutput=append:/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/logs/bybit_live_1m_collector.systemd.log
+StandardError=append:/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/logs/bybit_live_1m_collector.systemd.log
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

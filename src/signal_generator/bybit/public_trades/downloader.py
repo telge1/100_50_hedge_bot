@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import time
 from collections.abc import Iterator
 from datetime import date
@@ -128,6 +129,17 @@ def assert_disk_free(path: Path, *, minimum: int = DISK_FREE_MIN_BYTES) -> int:
             f"free disk {free} bytes below hard-stop {minimum} bytes",
         )
     return free
+
+
+def sha256_file(path: Path, *, chunk_size: int = DEFAULT_CHUNK) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        while True:
+            chunk = fh.read(chunk_size)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def verify_gzip_file(path: Path) -> None:

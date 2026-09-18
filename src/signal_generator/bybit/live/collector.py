@@ -94,8 +94,9 @@ class Live1mCollector:
         signal_symbols: Sequence[str] | None = None,
         enable_public_trades: bool = False,
         public_trade_symbols: Sequence[str] | None = None,
-        public_trade_queue_maxsize: int = 5000,
-        public_trade_batch_size: int = 500,
+        public_trade_queue_maxsize: int = 100_000,
+        public_trade_batch_size: int = 2_000,
+        public_trade_spool_dir: str | Path | None = None,
     ) -> None:
         assert_shadow_only()
         if candle_symbols is None:
@@ -184,7 +185,15 @@ class Live1mCollector:
             self.public_trade_symbols = pt_syms
         self._public_trade_queue_maxsize = public_trade_queue_maxsize
         self._public_trade_batch_size = public_trade_batch_size
+        self._public_trade_spool_dir = (
+            Path(public_trade_spool_dir)
+            if public_trade_spool_dir
+            else Path("results/live_collector/public_trade_spool")
+        )
         self._trade_buffer = None
+        # Dedicated CH session for public-trade inserts (never share with candle/
+        # recovery paths — clickhouse-connect forbids concurrent session use).
+        self._ch_public: ClickHouseClient | None = None
         self.health.public_trades_enabled = self.enable_public_trades
         self.health.public_trade_symbols = list(self.public_trade_symbols)
 
@@ -295,8 +304,21 @@ class Live1mCollector:
         if buf is None:
             return
         try:
+            if buf.metrics.writer_fatal:
+                self.health.set_state(
+                    CollectorState.ERROR, reason="public_trade_writer_fatal"
+                )
+                self.health.public_trade_last_error = buf.metrics.last_error
+                self._stop.set()
+                return
             buf.enqueue(trade)
             self.health.apply_public_trade_metrics(buf.metrics.to_dict())
+            if buf.metrics.writer_fatal:
+                self.health.set_state(
+                    CollectorState.ERROR, reason="public_trade_fail_closed"
+                )
+                self.health.public_trade_last_error = buf.metrics.last_error
+                self._stop.set()
         except Exception as exc:  # noqa: BLE001
             logger.exception("public trade enqueue failed: %s", exc)
             self.health.public_trade_last_error = str(exc)[:300]
@@ -307,13 +329,23 @@ class Live1mCollector:
         if self._trade_buffer is None:
             from signal_generator.bybit.live.trade_buffer import PublicTradeInsertBuffer
 
-            repo = CanonicalPublicTradeRepository(self.ch)
+            if self._ch_public is None:
+                self._ch_public = ClickHouseClient.from_settings(self._ch_settings)
+            repo = CanonicalPublicTradeRepository(self._ch_public)
             self._trade_buffer = PublicTradeInsertBuffer(
                 repo,
                 queue_maxsize=self._public_trade_queue_maxsize,
                 batch_size=self._public_trade_batch_size,
+                spool_dir=self._public_trade_spool_dir,
             )
         return self._trade_buffer
+
+    async def _stop_trade_buffer(self) -> None:
+        """Stop public insert worker; keep buffer instance for reconnect start()."""
+        if self._trade_buffer is None:
+            return
+        await self._trade_buffer.stop()
+        self.health.apply_public_trade_metrics(self._trade_buffer.metrics.to_dict())
 
     def _assert_public_trade_subscription_set(self) -> None:
         """Guard immediately before WS subscribe; do not derive from candles."""
@@ -596,6 +628,8 @@ class Live1mCollector:
                     await stale_task
                 except asyncio.CancelledError:
                     pass
+                # Stop public inserts before recovery/reconnect reuses CPU/CH.
+                await self._stop_trade_buffer()
                 self._ws = None
 
             if self._stop.is_set():
@@ -624,9 +658,13 @@ class Live1mCollector:
             sh.state = SymbolRuntimeState.STOPPED
         await self._stop_signal_pool()
         await asyncio.to_thread(self.buffer.flush)
-        if self._trade_buffer is not None:
-            await self._trade_buffer.stop()
-            self.health.apply_public_trade_metrics(self._trade_buffer.metrics.to_dict())
+        await self._stop_trade_buffer()
+        if self._ch_public is not None:
+            try:
+                self._ch_public.close()
+            except Exception:  # noqa: BLE001
+                logger.exception("failed closing public-trade ClickHouse client")
+            self._ch_public = None
         # Final blocking catch-up — watermark SoT; short because STOP must stay snappy
         if self.enable_signals:
             try:
@@ -716,12 +754,17 @@ class Live1mCollector:
 def install_signal_handlers(
     collector: Live1mCollector, loop: asyncio.AbstractEventLoop
 ) -> None:
+    """Graceful collector stop. Does not replace supervisor-level handlers if already set."""
+
     def _handler() -> None:
-        logger.info("signal received → graceful stop")
+        logger.info("signal received → graceful collector stop")
         collector.request_stop()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
+            # Prefer chaining: if a handler exists, asyncio replaces it — so also
+            # request_stop here; supervisor must register AFTER collector start
+            # or re-register. Collector stop is always safe.
             loop.add_signal_handler(sig, _handler)
         except NotImplementedError:  # pragma: no cover - Windows
             signal.signal(sig, lambda *_: collector.request_stop())

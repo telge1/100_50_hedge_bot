@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Sequence
 
 import clickhouse_connect
@@ -11,11 +12,21 @@ from signal_generator.config import ClickHouseSettings, get_clickhouse_settings
 
 
 class ClickHouseClient:
-    """Small wrapper around clickhouse-connect focused on inserts + queries."""
+    """Small wrapper around clickhouse-connect focused on inserts + queries.
+
+    clickhouse-connect sessions are not safe for concurrent queries. This wrapper
+    serializes command/query/insert/ping on a per-instance RLock so callers that
+    share one client across asyncio.to_thread / worker threads do not trip
+    ``ProgrammingError: concurrent queries within the same session``.
+
+    Parallel writers still need separate ``ClickHouseClient`` instances (e.g.
+    candle path vs live public-trade inserts).
+    """
 
     def __init__(self, client: Client, *, database: str) -> None:
         self._client = client
         self.database = database
+        self._lock = threading.RLock()
 
     @classmethod
     def from_settings(cls, settings: ClickHouseSettings) -> ClickHouseClient:
@@ -33,10 +44,12 @@ class ClickHouseClient:
         return self._client
 
     def command(self, sql: str, parameters: dict[str, Any] | None = None) -> Any:
-        return self._client.command(sql, parameters=parameters)
+        with self._lock:
+            return self._client.command(sql, parameters=parameters)
 
     def query(self, sql: str, parameters: dict[str, Any] | None = None) -> Any:
-        return self._client.query(sql, parameters=parameters)
+        with self._lock:
+            return self._client.query(sql, parameters=parameters)
 
     def insert(
         self,
@@ -57,17 +70,20 @@ class ClickHouseClient:
         }
         if settings:
             kwargs["settings"] = settings
-        return self._client.insert(**kwargs)
+        with self._lock:
+            return self._client.insert(**kwargs)
 
     def ping(self) -> tuple[str, str, str]:
-        result = self._client.query(
-            "SELECT version(), currentDatabase(), currentUser()"
-        )
+        with self._lock:
+            result = self._client.query(
+                "SELECT version(), currentDatabase(), currentUser()"
+            )
         row = result.result_rows[0]
         return str(row[0]), str(row[1]), str(row[2])
 
     def close(self) -> None:
-        self._client.close()
+        with self._lock:
+            self._client.close()
 
     def __enter__(self) -> ClickHouseClient:
         return self

@@ -19,8 +19,10 @@ from signal_generator.bybit.public_trades.csv_parse import (
 from signal_generator.bybit.public_trades.downloader import (
     DISK_FREE_MIN_BYTES,
     HttpxTransport,
+    PublicTradeDownloadError,
     assert_disk_free,
     download_day_file,
+    sha256_file,
 )
 from signal_generator.bybit.public_trades.importer import (
     FileParseStats,
@@ -88,10 +90,18 @@ def check_sources(
                 ok += 1
                 if cl_int:
                     total_cl += cl_int
+            elif resp.status_code == 404:
+                manifest.set_status(
+                    row,
+                    "ARCHIVE_UNAVAILABLE",
+                    http_status=404,
+                    error="HTTP 404",
+                )
+                missing += 1
             else:
                 manifest.set_status(
                     row,
-                    "MISSING" if resp.status_code == 404 else "FAILED",
+                    "FAILED",
                     http_status=resp.status_code,
                     error=f"HTTP {resp.status_code}",
                 )
@@ -182,11 +192,33 @@ class BackfillRunner:
         if row.status == "AUDITED":
             logger.info("skip AUDITED %s %s", row.symbol, row.utc_date)
             return row
+        if row.status == "ARCHIVE_UNAVAILABLE":
+            logger.info("skip ARCHIVE_UNAVAILABLE %s %s", row.symbol, row.utc_date)
+            return row
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         assert_disk_free(self.cache_dir)
         day = date.fromisoformat(row.utc_date)
         symbol = row.symbol
-        path = self._download(row, symbol, day)
+        try:
+            path = self._download(row, symbol, day)
+        except PublicTradeDownloadError as exc:
+            if exc.status == "SOURCE_FILE_MISSING":
+                if row.status in {"PENDING", "AVAILABLE", "FAILED", "MISSING"}:
+                    self.manifest.set_status(
+                        row,
+                        "ARCHIVE_UNAVAILABLE",
+                        error=str(exc)[:400],
+                        http_status=404,
+                    )
+                else:
+                    row.status = "ARCHIVE_UNAVAILABLE"
+                    row.error = str(exc)[:400]
+                    self.manifest.save()
+                return row
+            raise
+        digest = sha256_file(path)
+        row.sha256 = digest
+        self.manifest.save()
         day_start, day_end = utc_day_bounds(day)
         existing_day = self.repo.physical_and_logical_counts(
             symbols=(symbol,), start=day_start, end=day_end
@@ -242,6 +274,7 @@ class BackfillRunner:
             min_event_time=stats.min_trade_ts.isoformat() if stats.min_trade_ts else "",
             max_event_time=stats.max_trade_ts.isoformat() if stats.max_trade_ts else "",
             compressed_bytes=path.stat().st_size,
+            sha256=digest,
             error="",
         )
         if stats.empty_trade_id:
@@ -304,8 +337,12 @@ class BackfillRunner:
                     "DOWNLOADED",
                     compressed_bytes=cached.stat().st_size,
                     http_status=200,
+                    sha256=sha256_file(cached),
                     error="",
                 )
+            elif not row.sha256:
+                row.sha256 = sha256_file(cached)
+                self.manifest.save()
             return cached
         if not row.download_started_at:
             if row.status == "PENDING":
@@ -324,16 +361,19 @@ class BackfillRunner:
             transport=self.transport,
             disk_free_fn=assert_disk_free,
         )
+        digest = sha256_file(path)
         if row.status in {"PENDING", "AVAILABLE", "FAILED", "MISSING"}:
             self.manifest.set_status(
                 row,
                 "DOWNLOADED",
                 compressed_bytes=path.stat().st_size,
                 http_status=200,
+                sha256=digest,
                 error="",
             )
         else:
             row.compressed_bytes = path.stat().st_size
+            row.sha256 = digest
             self.manifest.save()
         return path
 
@@ -385,3 +425,48 @@ def seed_pilot_audited(
                 audit_finished_at=datetime.now(timezone.utc).isoformat(),
                 error="seeded_from_pilot",
             )
+
+
+def seed_full_canonical_days(
+    manifest: BackfillManifestStore,
+    coverage_rows: list[dict[str, Any]],
+) -> int:
+    """AUDITED only for archive-backed days whose event window covers the UTC day.
+
+    Partial ClickHouse data (e.g. live-only morning hole) is never treated as complete.
+    """
+    from signal_generator.bybit.public_trades.window import classify_symbol_day
+
+    seeded = 0
+    by_key = {(str(r["symbol"]).upper(), str(r["utc_day"])): r for r in coverage_rows}
+    for row in manifest.as_rows():
+        if row.status == "AUDITED":
+            continue
+        meta = by_key.get((row.symbol.upper(), row.utc_date))
+        if meta is None:
+            continue
+        klass = classify_symbol_day(
+            logical_unique=int(meta.get("logical_unique") or 0),
+            min_ts=meta.get("min_ts"),
+            max_ts=meta.get("max_ts"),
+            sources=list(meta.get("sources") or []),
+            day=date.fromisoformat(row.utc_date),
+        )
+        if klass != "ALREADY_AUDITED":
+            continue
+        if row.status not in {"PENDING", "AVAILABLE"}:
+            continue
+        manifest.set_status(
+            row,
+            "AUDITED",
+            parsed_rows=int(meta.get("logical_unique") or 0),
+            source_rows=int(meta.get("logical_unique") or 0),
+            skipped_existing_rows=int(meta.get("logical_unique") or 0),
+            min_event_time=str(meta.get("min_ts") or ""),
+            max_event_time=str(meta.get("max_ts") or ""),
+            audit_finished_at=datetime.now(timezone.utc).isoformat(),
+            error="seeded_from_full_canonical_day",
+        )
+        seeded += 1
+    return seeded
+

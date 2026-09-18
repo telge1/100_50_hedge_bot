@@ -138,8 +138,14 @@ class HealthState:
     public_trade_reconnect_count: int = 0
     public_trade_queue_depth: int = 0
     public_trade_queue_maxsize: int = 0
+    public_trade_queue_high_watermark: int = 0
     public_trade_dropped_events: int = 0
     public_trade_insert_failures: int = 0
+    public_trade_spool_batches_written: int = 0
+    public_trade_spool_batches_replayed: int = 0
+    public_trade_spool_bytes_used: int = 0
+    public_trade_writer_alive: bool = False
+    public_trade_writer_fatal: bool = False
     public_trade_last_error: str | None = None
     _signal_metrics_provider: Callable[[], dict[str, Any]] | None = field(
         default=None, repr=False, compare=False
@@ -367,8 +373,14 @@ class HealthState:
                 "reconnect_count": self.public_trade_reconnect_count,
                 "queue_depth": self.public_trade_queue_depth,
                 "queue_maxsize": self.public_trade_queue_maxsize,
+                "queue_high_watermark": self.public_trade_queue_high_watermark,
                 "dropped_events": self.public_trade_dropped_events,
                 "insert_failures": self.public_trade_insert_failures,
+                "spool_batches_written": self.public_trade_spool_batches_written,
+                "spool_batches_replayed": self.public_trade_spool_batches_replayed,
+                "spool_bytes_used": self.public_trade_spool_bytes_used,
+                "writer_alive": self.public_trade_writer_alive,
+                "writer_fatal": self.public_trade_writer_fatal,
                 "last_error": self.public_trade_last_error,
             },
             "symbols": [
@@ -416,6 +428,18 @@ class HealthState:
         self.public_trade_reconnect_count = int(metrics.get("reconnect_count") or 0)
         self.public_trade_queue_depth = int(metrics.get("queue_depth") or 0)
         self.public_trade_queue_maxsize = int(metrics.get("queue_maxsize") or 0)
+        self.public_trade_queue_high_watermark = int(
+            metrics.get("queue_high_watermark") or 0
+        )
         self.public_trade_dropped_events = int(metrics.get("dropped_events") or 0)
         self.public_trade_insert_failures = int(metrics.get("insert_failures") or 0)
+        self.public_trade_spool_batches_written = int(
+            metrics.get("spool_batches_written") or 0
+        )
+        self.public_trade_spool_batches_replayed = int(
+            metrics.get("spool_batches_replayed") or 0
+        )
+        self.public_trade_spool_bytes_used = int(metrics.get("spool_bytes_used") or 0)
+        self.public_trade_writer_alive = bool(metrics.get("writer_alive"))
+        self.public_trade_writer_fatal = bool(metrics.get("writer_fatal"))
         self.public_trade_last_error = metrics.get("last_error")

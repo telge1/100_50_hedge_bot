@@ -17,17 +17,35 @@ STATUSES = (
     "AUDITED",
     "FAILED",
     "MISSING",
+    "ARCHIVE_UNAVAILABLE",
 )
 
 ALLOWED_TRANSITIONS = {
-    "PENDING": frozenset({"AVAILABLE", "MISSING", "FAILED", "PENDING", "AUDITED", "DOWNLOADED"}),
-    "AVAILABLE": frozenset({"DOWNLOADED", "FAILED", "AVAILABLE", "AUDITED"}),
+    "PENDING": frozenset(
+        {
+            "AVAILABLE",
+            "MISSING",
+            "ARCHIVE_UNAVAILABLE",
+            "FAILED",
+            "PENDING",
+            "AUDITED",
+            "DOWNLOADED",
+        }
+    ),
+    "AVAILABLE": frozenset(
+        {"DOWNLOADED", "FAILED", "AVAILABLE", "AUDITED", "ARCHIVE_UNAVAILABLE", "MISSING"}
+    ),
     "DOWNLOADED": frozenset({"VERIFIED", "FAILED", "DOWNLOADED"}),
     "VERIFIED": frozenset({"IMPORTED", "FAILED", "VERIFIED"}),
     "IMPORTED": frozenset({"AUDITED", "FAILED", "IMPORTED", "VERIFIED"}),
     "AUDITED": frozenset({"AUDITED"}),
-    "FAILED": frozenset({"PENDING", "AVAILABLE", "DOWNLOADED", "VERIFIED", "IMPORTED", "FAILED"}),
+    "FAILED": frozenset(
+        {"PENDING", "AVAILABLE", "DOWNLOADED", "VERIFIED", "IMPORTED", "FAILED"}
+    ),
     "MISSING": frozenset({"PENDING", "AVAILABLE", "MISSING", "FAILED", "DOWNLOADED"}),
+    "ARCHIVE_UNAVAILABLE": frozenset(
+        {"PENDING", "AVAILABLE", "ARCHIVE_UNAVAILABLE", "FAILED"}
+    ),
 }
 
 BACKFILL_MANIFEST_FIELDS = [
@@ -53,6 +71,7 @@ BACKFILL_MANIFEST_FIELDS = [
     "download_started_at",
     "import_finished_at",
     "audit_finished_at",
+    "sha256",
     "updated_at",
 ]
 
@@ -89,6 +108,7 @@ class BackfillManifestRow:
     download_started_at: str = ""
     import_finished_at: str = ""
     audit_finished_at: str = ""
+    sha256: str = ""
     updated_at: str = field(default_factory=_utcnow)
 
     @property
@@ -135,6 +155,7 @@ class BackfillManifestStore:
                     download_started_at=raw.get("download_started_at") or "",
                     import_finished_at=raw.get("import_finished_at") or "",
                     audit_finished_at=raw.get("audit_finished_at") or "",
+                    sha256=raw.get("sha256") or "",
                     updated_at=raw.get("updated_at") or _utcnow(),
                 )
                 self.rows[row.key] = row

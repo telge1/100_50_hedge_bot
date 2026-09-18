@@ -109,8 +109,14 @@ def build_parser() -> argparse.ArgumentParser:
             "insert into orderbook_analysis.public_trades_canonical. Default off."
         ),
     )
-    p.add_argument("--public-trade-queue-maxsize", type=int, default=5000)
-    p.add_argument("--public-trade-batch-size", type=int, default=500)
+    p.add_argument("--public-trade-queue-maxsize", type=int, default=100_000)
+    p.add_argument("--public-trade-batch-size", type=int, default=2_000)
+    p.add_argument(
+        "--public-trade-spool-dir",
+        type=str,
+        default="results/live_collector/public_trade_spool",
+        help="Durable overflow WAL for public trades when the in-memory queue saturates.",
+    )
     p.add_argument(
         "--lock-file",
         type=Path,
@@ -266,6 +272,10 @@ async def run_supervised(args: argparse.Namespace) -> int:
                 service.health = idle_health
                 idle_health.desired_state = ds
                 idle_health.set_state(CollectorState.STOPPED, reason="desired_STOPPED")
+                # Idle-wait (do not exit): systemd Restart=always would otherwise
+                # restart-loop on intentional STOPPED. SIGTERM still sets stop_main
+                # via handlers registered above / re-armed after collector start.
+                logger.info("desired_state=%s → idle wait", ds)
                 try:
                     await asyncio.wait_for(stop_main.wait(), timeout=2.0)
                     break
@@ -308,11 +318,22 @@ async def run_supervised(args: argparse.Namespace) -> int:
                 signal_shutdown_drain_s=args.signal_shutdown_drain_s,
                 public_trade_queue_maxsize=args.public_trade_queue_maxsize,
                 public_trade_batch_size=args.public_trade_batch_size,
+                public_trade_spool_dir=args.public_trade_spool_dir,
                 **symbol_kwargs,
             )
             collector.health.invalid_symbols = invalid_meta
             service.health = collector.health
             install_signal_handlers(collector, loop)
+            # Re-arm supervisor SIGTERM/SIGINT so process can exit (collector
+            # handlers alone only stop the inner run loop).
+            for sig_name in ("SIGINT", "SIGTERM"):
+                sig = getattr(signal_mod, sig_name, None)
+                if sig is None:
+                    continue
+                try:
+                    loop.add_signal_handler(sig, _sig)
+                except NotImplementedError:
+                    pass
             logger.info(
                 "collector start candle_symbols=%s signal_symbols=%s "
                 "public_trade_symbols=%s db=%s desired=%s",

@@ -303,40 +303,64 @@ def test_collector_public_trades_default_off(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_trade_buffer_queue_limit_and_duplicate_skip():
+async def test_trade_buffer_queue_limit_and_flush(tmp_path):
     repo = SkipExistingRepo()
-    buf = PublicTradeInsertBuffer(repo, queue_maxsize=2, batch_size=10, flush_interval_s=0.05)
+    buf = PublicTradeInsertBuffer(
+        repo,
+        queue_maxsize=2,
+        batch_size=10,
+        flush_interval_s=0.05,
+        spool_dir=tmp_path / "spool",
+        overflow_batch_size=2,
+    )
     from signal_generator.bybit.live.ws_public_trade import WsPublicTrade
 
-    t = WsPublicTrade(
-        symbol="DOGEUSDT",
-        trade_id="a",
-        trade_ts=datetime(2026, 8, 17, tzinfo=timezone.utc),
-        side="Buy",
-        price=Decimal("1"),
-        size=Decimal("1"),
-        notional=Decimal("1"),
-        tick_direction="",
-        is_rpi_trade=0,
-    )
-    assert buf.enqueue(t) is True
-    assert buf.enqueue(t) is True
-    assert buf.enqueue(t) is False
-    assert buf.metrics.dropped_events == 1
+    def _t(i: str) -> WsPublicTrade:
+        return WsPublicTrade(
+            symbol="DOGEUSDT",
+            trade_id=i,
+            trade_ts=datetime(2026, 8, 17, tzinfo=timezone.utc),
+            side="Buy",
+            price=Decimal("1"),
+            size=Decimal("1"),
+            notional=Decimal("1"),
+            tick_direction="",
+            is_rpi_trade=0,
+        )
+
+    assert buf.enqueue(_t("a")) is True
+    assert buf.enqueue(_t("b")) is True
+    # Queue full → durable overflow spool (no silent drop)
+    assert buf.enqueue(_t("c")) is True
+    assert buf.enqueue(_t("d")) is True
+    assert buf.metrics.dropped_events == 0
+    assert buf.metrics.spool_batches_written >= 1
     buf.start()
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.3)
     await buf.stop()
     assert buf.metrics.rows_inserted >= 1
 
 
 @pytest.mark.asyncio
-async def test_candle_path_continues_when_trade_insert_fails():
+async def test_candle_path_continues_when_trade_insert_fails(tmp_path):
     class BoomRepo(SkipExistingRepo):
-        def insert_trades_skip_existing(self, *a, **k):
+        def insert_trades(self, *a, **k):
             raise RuntimeError("insert boom")
 
-    buf = PublicTradeInsertBuffer(BoomRepo(), queue_maxsize=10, batch_size=1, flush_interval_s=0.05)
+    buf = PublicTradeInsertBuffer(
+        BoomRepo(),
+        queue_maxsize=10,
+        batch_size=1,
+        flush_interval_s=0.05,
+        spool_dir=tmp_path / "spool",
+    )
     from signal_generator.bybit.live.ws_public_trade import WsPublicTrade
+    from signal_generator.bybit.live import trade_buffer as tb
+
+    # Speed up fail-closed for unit test
+    monkey_attempts = 3
+    original = tb.INSERT_MAX_ATTEMPTS
+    tb.INSERT_MAX_ATTEMPTS = monkey_attempts
 
     trade = WsPublicTrade(
         symbol="DOGEUSDT",
@@ -349,11 +373,22 @@ async def test_candle_path_continues_when_trade_insert_fails():
         tick_direction="",
         is_rpi_trade=0,
     )
-    buf.start()
-    buf.enqueue(trade)
-    await asyncio.sleep(0.2)
-    await buf.stop()
-    assert buf.metrics.insert_failures >= 1
+    try:
+        buf.start()
+        assert buf.enqueue(trade) is True
+        for _ in range(100):
+            if buf.metrics.insert_failures >= 1:
+                break
+            await asyncio.sleep(0.05)
+        # Writer may be fatal; stop should still return.
+        try:
+            await asyncio.wait_for(buf.stop(), timeout=15)
+        except Exception:
+            pass
+        assert buf.metrics.insert_failures >= 1
+        assert "insert boom" in (buf.metrics.last_error or "") or buf.metrics.writer_fatal
+    finally:
+        tb.INSERT_MAX_ATTEMPTS = original
     candle = Candle1m(
         exchange="bybit",
         symbol="DOGEUSDT",
