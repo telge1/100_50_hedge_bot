@@ -6,6 +6,9 @@ Does NOT import ema_trend_analyzer_v1 (forensic only).
 from __future__ import annotations
 
 PACKAGE_NAME = "ema_trend_live_analyzer_v1"
+ALLOWED_RUN_PREFIX = "ema_trend_live_"
+FORBIDDEN_RUN_PREFIX = "ema_trend_analyzer_"
+RETIRED_PACKAGE = "ema_trend_analyzer_v1"
 STUDY_ID = "EMA_TREND_LIVE_ANALYZER_V1"
 SCHEMA_VERSION = "ema_trend_live_analyzer_v1"
 CONTRACT_VERSION = "1.0.0-prerollout-20260918"
