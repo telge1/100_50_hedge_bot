@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6425,
+  "detail_count": 6425,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T01:00:00"
+      ],
+      "signal_id": "13d2adbd-3060-5e08-b49d-85cadd9e7e08"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T02:00:00"
+      ],
+      "signal_id": "881a2e79-650f-5b7c-8ffe-182e98f409da"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T03:15:00"
+      ],
+      "signal_id": "c4249595-c4e6-5ff1-abac-9306ac551e16"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T04:30:00"
+      ],
+      "signal_id": "31a24f6c-a0d4-5905-9dd0-4bb9fd7b0d57"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:00:00"
+      ],
+      "signal_id": "fc53ca84-2dbb-5af9-b08f-b82bc06abc62"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T06:45:00"
+      ],
+      "signal_id": "348cea84-18a1-5be0-86a0-0d82d4bd23c7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T08:00:00"
+      ],
+      "signal_id": "6e976573-17eb-54da-978b-ed7de767a9a0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T09:30:00"
+      ],
+      "signal_id": "b2bc0360-eff0-594d-8f83-846d99589de8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T11:45:00"
+      ],
+      "signal_id": "00f79153-75cc-5888-a8af-c1a65d1bbe82"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:00:00"
+      ],
+      "signal_id": "df43aa21-c0ff-57ac-a8d9-6f5c0e728d70"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T14:15:00"
+      ],
+      "signal_id": "1768eb19-e2ff-5ab0-8dbd-b49cdd7daff0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T15:15:00"
+      ],
+      "signal_id": "a5e7d109-10ae-5e5c-8578-2cb246cf7210"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T16:30:00"
+      ],
+      "signal_id": "c520b9e1-dfbc-51a2-872a-fd4e3f6d7cec"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T18:45:00"
+      ],
+      "signal_id": "301647fa-02d2-5103-9390-cd2af79b3ef6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T20:30:00"
+      ],
+      "signal_id": "a32670d4-6e8f-5103-bb77-a35fc2a4fee2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T21:45:00"
+      ],
+      "signal_id": "970c68e1-06d4-528c-a92f-0dee5d2a79df"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T22:45:00"
+      ],
+      "signal_id": "b82ebcc4-2146-5647-8655-9b58d0d154f8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T23:45:00"
+      ],
+      "signal_id": "58ec0ec3-817d-5a70-a883-b67df25baabe"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T01:45:00"
+      ],
+      "signal_id": "2a9875a3-100b-5925-a9c0-12e4ee2efed2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:15:00"
+      ],
+      "signal_id": "b32c6c55-0a87-5da5-9afc-a58e30e567a8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T05:45:00"
+      ],
+      "signal_id": "187f9eb9-34e5-5cee-99ba-7cd96f80132d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T08:00:00"
+      ],
+      "signal_id": "f423195a-14aa-5e33-a7ac-f158e6f3c33a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T10:15:00"
+      ],
+      "signal_id": "8f999c21-3439-5113-be19-4c1dfff7abb6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T12:00:00"
+      ],
+      "signal_id": "f3c21937-a961-5c17-be43-a2d46f6f21c5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T13:15:00"
+      ],
+      "signal_id": "1cc2c117-ebb7-53d6-9101-8be4885fbeda"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T14:15:00"
+      ],
+      "signal_id": "f6fb379c-1bd3-517d-ad2f-e95cf328d020"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T15:45:00"
+      ],
+      "signal_id": "bd7c2f58-f4ab-5644-9e77-4fd34cc282fb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:00:00"
+      ],
+      "signal_id": "b1cf75ce-0858-5daf-bb60-845969c5dae1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T18:15:00"
+      ],
+      "signal_id": "63746fa7-de36-569e-a6c5-bdf55608afd6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T19:30:00"
+      ],
+      "signal_id": "003d06e1-86b9-5fb7-ad65-8125eb2425bc"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T20:15:00"
+      ],
+      "signal_id": "2635b134-aecd-5b8e-8717-4f5db89dff1a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T21:00:00"
+      ],
+      "signal_id": "86a61439-b0fb-5462-a705-e76077a9eaa8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T22:45:00"
+      ],
+      "signal_id": "b61c3f50-9c97-5fb7-bfec-472bbb50a2be"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T00:00:00"
+      ],
+      "signal_id": "4098f9c8-bc01-5195-87e4-51f4dc1c29ad"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T00:45:00"
+      ],
+      "signal_id": "e216ad21-fcd4-5575-b06d-07d6ba4f2b0b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T01:30:00"
+      ],
+      "signal_id": "9820a5b8-4f5a-5415-972e-c875acd40885"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T02:45:00"
+      ],
+      "signal_id": "a95684f2-0c31-583c-9b6c-295ae1869734"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T04:30:00"
+      ],
+      "signal_id": "665f8006-7ed5-5e80-9fcc-8e3ecfdeedac"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T05:45:00"
+      ],
+      "signal_id": "6c84b0ab-63bd-543f-904a-cc062ca62ca5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T06:30:00"
+      ],
+      "signal_id": "f942038a-cc6d-564b-97ed-ce05480d49a4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:45:00"
+      ],
+      "signal_id": "dc7a0436-9431-57c7-bcc7-ead35410a6c0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T09:00:00"
+      ],
+      "signal_id": "668507e5-63ec-51c8-80e0-ca489851a84d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T10:15:00"
+      ],
+      "signal_id": "2a87a3d9-c7e1-5cd8-bcfd-fa9fdbf80f53"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T11:15:00"
+      ],
+      "signal_id": "b3463049-cf72-5175-830c-91cf0cd6d9ec"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T13:45:00"
+      ],
+      "signal_id": "e1cc0b1d-78c1-5f11-b203-c2697ac4cb93"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T15:30:00"
+      ],
+      "signal_id": "1604b90a-564f-5051-a584-3876c6063d80"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T17:45:00"
+      ],
+      "signal_id": "263e4df8-ceb7-50c4-82f9-7055c0d7f632"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T18:30:00"
+      ],
+      "signal_id": "c93d9100-88fa-54ab-b788-ba6049dea8ab"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T20:30:00"
+      ],
+      "signal_id": "174209ff-7ce5-5e7c-b6ed-b234c9677f70"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "LTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T21:30:00"
+      ],
+      "signal_id": "cc7af45c-d0c2-5418-a91b-7d87c0b20f35"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6425,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6425,
+  "research_keys": 6425,
+  "research_only": 6425,
+  "scope_symbol": "LTCUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32"
+}

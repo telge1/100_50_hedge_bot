@@ -1,0 +1,99 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/SOLUSDT/3684fec3922047a7a5c5f9d181d4c26a",
+      "raw_total": 4996,
+      "runner_run_id": "3684fec3922047a7a5c5f9d181d4c26a",
+      "signals_path": "coin_runs/SOLUSDT/3684fec3922047a7a5c5f9d181d4c26a/signals.jsonl",
+      "symbol": "SOLUSDT",
+      "tier_a_total": 625
+    },
+    {
+      "artifact_reference": "coin_runs/HYPEUSDT/3d4776a352924faab0cfe08900f1069a",
+      "raw_total": 5077,
+      "runner_run_id": "3d4776a352924faab0cfe08900f1069a",
+      "signals_path": "coin_runs/HYPEUSDT/3d4776a352924faab0cfe08900f1069a/signals.jsonl",
+      "symbol": "HYPEUSDT",
+      "tier_a_total": 990
+    },
+    {
+      "artifact_reference": "coin_runs/XAUTUSDT/c4dbe6e28d7849d2b82395fe70f27d9f",
+      "raw_total": 5052,
+      "runner_run_id": "c4dbe6e28d7849d2b82395fe70f27d9f",
+      "signals_path": "coin_runs/XAUTUSDT/c4dbe6e28d7849d2b82395fe70f27d9f/signals.jsonl",
+      "symbol": "XAUTUSDT",
+      "tier_a_total": 228
+    },
+    {
+      "artifact_reference": "coin_runs/ZECUSDT/975211a7c4ba4d678ec68d00fb5b6842",
+      "raw_total": 5050,
+      "runner_run_id": "975211a7c4ba4d678ec68d00fb5b6842",
+      "signals_path": "coin_runs/ZECUSDT/975211a7c4ba4d678ec68d00fb5b6842/signals.jsonl",
+      "symbol": "ZECUSDT",
+      "tier_a_total": 1158
+    },
+    {
+      "artifact_reference": "coin_runs/LINKUSDT/569bd0cc3bd64dc0bedbc03d3b1af32a",
+      "raw_total": 5032,
+      "runner_run_id": "569bd0cc3bd64dc0bedbc03d3b1af32a",
+      "signals_path": "coin_runs/LINKUSDT/569bd0cc3bd64dc0bedbc03d3b1af32a/signals.jsonl",
+      "symbol": "LINKUSDT",
+      "tier_a_total": 650
+    },
+    {
+      "artifact_reference": "coin_runs/DOGEUSDT/4b8d678f7aed48668c9a827fc827a230",
+      "raw_total": 5057,
+      "runner_run_id": "4b8d678f7aed48668c9a827fc827a230",
+      "signals_path": "coin_runs/DOGEUSDT/4b8d678f7aed48668c9a827fc827a230/signals.jsonl",
+      "symbol": "DOGEUSDT",
+      "tier_a_total": 611
+    },
+    {
+      "artifact_reference": "coin_runs/BNBUSDT/b9a79f2aa6134954a516d124c3852f25",
+      "raw_total": 5033,
+      "runner_run_id": "b9a79f2aa6134954a516d124c3852f25",
+      "signals_path": "coin_runs/BNBUSDT/b9a79f2aa6134954a516d124c3852f25/signals.jsonl",
+      "symbol": "BNBUSDT",
+      "tier_a_total": 375
+    },
+    {
+      "artifact_reference": "coin_runs/SUIUSDT/6f87542f111249638d6e6fca2da47159",
+      "raw_total": 5045,
+      "runner_run_id": "6f87542f111249638d6e6fca2da47159",
+      "signals_path": "coin_runs/SUIUSDT/6f87542f111249638d6e6fca2da47159/signals.jsonl",
+      "symbol": "SUIUSDT",
+      "tier_a_total": 808
+    },
+    {
+      "artifact_reference": "coin_runs/ADAUSDT/ac8a36172b8543f68c6802422d4609c3",
+      "raw_total": 5018,
+      "runner_run_id": "ac8a36172b8543f68c6802422d4609c3",
+      "signals_path": "coin_runs/ADAUSDT/ac8a36172b8543f68c6802422d4609c3/signals.jsonl",
+      "symbol": "ADAUSDT",
+      "tier_a_total": 740
+    },
+    {
+      "artifact_reference": "coin_runs/AVAXUSDT/b3336d944ee54fa4b5e4909871f06855",
+      "raw_total": 5046,
+      "runner_run_id": "b3336d944ee54fa4b5e4909871f06855",
+      "signals_path": "coin_runs/AVAXUSDT/b3336d944ee54fa4b5e4909871f06855/signals.jsonl",
+      "symbol": "AVAXUSDT",
+      "tier_a_total": 717
+    }
+  ],
+  "hashes": {
+    "coin_runs/ADAUSDT/ac8a36172b8543f68c6802422d4609c3/signals.jsonl": "573d18b8c1444c5747a248fdbe8a5cb1461bd8bfb41c720359754b2d4ad40e1f",
+    "coin_runs/AVAXUSDT/b3336d944ee54fa4b5e4909871f06855/signals.jsonl": "d42529e10f916808fddd75ee36ca49f7b26a5d770030a727033010d08e9db182",
+    "coin_runs/BNBUSDT/b9a79f2aa6134954a516d124c3852f25/signals.jsonl": "9156b6b5447aac83bde902bea7d765619390a68ca4d8fe282d448b54e50e3214",
+    "coin_runs/DOGEUSDT/4b8d678f7aed48668c9a827fc827a230/signals.jsonl": "adfabfa648c26db9cef1d53c48a2e8e5a4528fba69a56001caa29147de3cb18b",
+    "coin_runs/HYPEUSDT/3d4776a352924faab0cfe08900f1069a/signals.jsonl": "fd5ce62f0538ae202c880eb1752bb3658a7cfe7d141234d905cadf0e1875c6f1",
+    "coin_runs/LINKUSDT/569bd0cc3bd64dc0bedbc03d3b1af32a/signals.jsonl": "02e8be016b4bb5f432e22f2d95bc6f8c767783c335a8eae6d88992180b11d09e",
+    "coin_runs/SOLUSDT/3684fec3922047a7a5c5f9d181d4c26a/signals.jsonl": "b8e904c6b70ba0d9e0291ba6ea7a1b6fa8d028096d9a7acdea0b7454addeeb68",
+    "coin_runs/SUIUSDT/6f87542f111249638d6e6fca2da47159/signals.jsonl": "3dd61fdd26219ccf66d05cb5316a244241eb44f444d6e588d11a435732518f87",
+    "coin_runs/XAUTUSDT/c4dbe6e28d7849d2b82395fe70f27d9f/signals.jsonl": "e556d1e44527d134a1c7c3c1d6be3006548ffd84da6364f1039580329ec1fb27",
+    "coin_runs/ZECUSDT/975211a7c4ba4d678ec68d00fb5b6842/signals.jsonl": "2771e6fdd27f9f0d691b51898229730190a6431600e9671773dc09c7cf29c2b9",
+    "combined_summary.json": "e29b9d97babc43bb54f4e1ebd45c4d26a78bc7c543f6891db76a949a1f5ccc7d",
+    "request.json": "6dd5cb8326a60047b8967c829b09c0f0d3a7584da4448ae9b9783d98c5ab2b64",
+    "status.json": "c53c4a2f36fa9bc3b20f6a2e84f5bd7cdf965c40984d27a273a195b32ae5a575"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "pass1_statuses": [
+    "IDEMPOTENT_SKIP",
+    "IDEMPOTENT_SKIP",
+    "COMPLETE",
+    "COMPLETE"
+  ],
+  "pass2_statuses": [
+    "IDEMPOTENT_SKIP",
+    "IDEMPOTENT_SKIP",
+    "IDEMPOTENT_SKIP",
+    "IDEMPOTENT_SKIP"
+  ],
+  "pass2_all_idempotent_skip": true,
+  "pass1_verdict": "PILOT_PASS",
+  "pass2_verdict": "PILOT_PASS",
+  "verdict": "IDEMPOTENCY_PASS"
+}

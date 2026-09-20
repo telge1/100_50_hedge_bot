@@ -1,0 +1,13 @@
+{
+  "evaluation_id": "a7ee209579ac49d79be12c009ef37731",
+  "execution_dedup_applied": false,
+  "exit_policy": "FROZEN_BE50",
+  "fixed_strategy_version": "wave_fade_frozen_f16ae32",
+  "requested_at": "2026-08-15T17:47:25Z",
+  "selected_symbols": [
+    "AAVEUSDT",
+    "1000BONKUSDT"
+  ],
+  "signal_scope": "TIER_A_ONLY",
+  "source_job_id": "8e86d1527a4749a79531d787cf67a032"
+}

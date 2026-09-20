@@ -1,0 +1,404 @@
+{
+  "premove_wall_film_score_v2": {
+    "schema_version": "doge_premove_wall_film_score_v2",
+    "config": {
+      "barrier_bps": 25,
+      "film_start_offset_s": 30,
+      "film_end_offset_s": 8,
+      "min_break_gap_s": 120,
+      "max_wall_rank": 5,
+      "score_version": "v2_ask_front_clear_vacuum"
+    },
+    "semantics": {
+      "event": "independent first \u00b125 bps break",
+      "film_window": "[break-30s, break-8s]",
+      "dedup": "min gap 120s between break times",
+      "walls": "connected walls with rank <= 5",
+      "score_version": "v2_ask_front_clear_vacuum"
+    },
+    "evaluation": {
+      "score_version": "v2_ask_front_clear_vacuum",
+      "score_freeze": {
+        "ask_front_cleared_weight": 2.0,
+        "ask_vacuum_scale_bps": 10.0,
+        "bid_vacuum_scale_bps": 10.0,
+        "excluded_from_v1": [
+          "distinct_ask_walls_pulled",
+          "distinct_ask_walls_filled",
+          "distinct_bid_walls_refilled",
+          "distinct_bid_walls_following",
+          "distinct_ask_walls_following"
+        ],
+        "motivation": "V1 descriptive contrasts on 18h showed ask_front_cleared and vacuum changes separating UP vs DOWN; V2 freezes that feature family without retuning V1 staircase."
+      },
+      "event_counts": {
+        "UP": 64,
+        "DOWN": 72,
+        "total": 136
+      },
+      "feature_contrasts": {
+        "film_mid_return_bps": {
+          "up": {
+            "n": 64,
+            "mean": 3.389257,
+            "median": 3.305967
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.423199,
+            "median": -1.18998
+          },
+          "mean_diff_up_minus_down": 5.812456
+        },
+        "ask_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": 1.533484,
+            "median": -0.017041
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.662263,
+            "median": 0.00992
+          },
+          "mean_diff_up_minus_down": 4.195747
+        },
+        "bid_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -2.461537,
+            "median": -0.03566
+          },
+          "down": {
+            "n": 72,
+            "mean": 2.386668,
+            "median": 0.015431
+          },
+          "mean_diff_up_minus_down": -4.848205
+        },
+        "nearest_ask_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -1.333124,
+            "median": -0.463602
+          },
+          "down": {
+            "n": 72,
+            "mean": 1.208721,
+            "median": 0.170956
+          },
+          "mean_diff_up_minus_down": -2.541845
+        },
+        "nearest_bid_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -0.107715,
+            "median": -0.000124
+          },
+          "down": {
+            "n": 72,
+            "mean": -1.397553,
+            "median": -0.273798
+          },
+          "mean_diff_up_minus_down": 1.289838
+        },
+        "distinct_ask_walls_pulled": {
+          "up": {
+            "n": 64,
+            "mean": 7.828125,
+            "median": 7.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 6.569444,
+            "median": 6.0
+          },
+          "mean_diff_up_minus_down": 1.258681
+        },
+        "distinct_ask_walls_filled": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.388889,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.486111
+        },
+        "distinct_bid_walls_refilled": {
+          "up": {
+            "n": 64,
+            "mean": 0.46875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.208333,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.260417
+        },
+        "distinct_bid_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 12.046875,
+            "median": 8.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 10.361111,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 1.685764
+        },
+        "distinct_ask_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 13.140625,
+            "median": 11.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 9.541667,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 3.598958
+        },
+        "executed_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 26092.278368,
+            "median": 470.8008
+          },
+          "down": {
+            "n": 72,
+            "mean": 16742.611345,
+            "median": 113.83596
+          },
+          "mean_diff_up_minus_down": 9349.667023
+        },
+        "pull_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 10333354.64854,
+            "median": 7727565.11299
+          },
+          "down": {
+            "n": 72,
+            "mean": 6715293.938643,
+            "median": 5699755.6891
+          },
+          "mean_diff_up_minus_down": 3618060.709897
+        },
+        "ask_pull_events": {
+          "up": {
+            "n": 64,
+            "mean": 330.828125,
+            "median": 237.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 252.375,
+            "median": 223.0
+          },
+          "mean_diff_up_minus_down": 78.453125
+        },
+        "ask_fill_events": {
+          "up": {
+            "n": 64,
+            "mean": 1.796875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.680556,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 1.116319
+        },
+        "bid_refill_events": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.375,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.5
+        },
+        "ask_front_cleared_pull_and_fill": {
+          "up": {
+            "n": 64,
+            "successes": 41,
+            "rate": 0.640625,
+            "wilson_low": 0.518206,
+            "wilson_high": 0.747118
+          },
+          "down": {
+            "n": 72,
+            "successes": 26,
+            "rate": 0.361111,
+            "wilson_low": 0.259815,
+            "wilson_high": 0.476477
+          },
+          "rate_diff_up_minus_down": 0.279514
+        },
+        "bullish_support_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        },
+        "bearish_pressure_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        }
+      },
+      "score_summary": {
+        "up_mean": 1.680752,
+        "down_mean": 0.217329,
+        "mean_diff_up_minus_down": 1.463423,
+        "sign_hit_rate": 0.639706,
+        "sign_hit_wilson_low": 0.556204,
+        "sign_hit_wilson_high": 0.715532,
+        "correct": 87,
+        "n": 136,
+        "mean_per_hour_sign_hit_rate": 0.656195,
+        "hours_with_events": 17,
+        "ask_front_cleared_rate_diff_up_minus_down": 0.279514
+      },
+      "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+      "pass_criteria": {
+        "min_events_30": true,
+        "up_score_gt_down_score": true,
+        "sign_hit_wilson_low_gt_0_55": true
+      }
+    },
+    "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+    "interpretation": "Pre-move film score v2_ask_front_clear_vacuum separates UP vs DOWN above the pre-registered gate."
+  },
+  "chronological_holdout": {
+    "discovery_first_10h": {
+      "hours": [
+        "20260906T100000Z",
+        "20260907T230000Z",
+        "20260908T050000Z",
+        "20260909T070000Z",
+        "20260910T060000Z",
+        "20260910T180000Z",
+        "20260910T220000Z",
+        "20260911T050000Z",
+        "20260912T030000Z",
+        "20260912T190000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 36,
+          "DOWN": 45,
+          "total": 81
+        },
+        "score_summary": {
+          "up_mean": 1.878117,
+          "down_mean": 0.84565,
+          "mean_diff_up_minus_down": 1.032467,
+          "sign_hit_rate": 0.592593,
+          "sign_hit_wilson_low": 0.483761,
+          "sign_hit_wilson_high": 0.693039,
+          "correct": 48,
+          "n": 81,
+          "mean_per_hour_sign_hit_rate": 0.605275,
+          "hours_with_events": 10,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.177778
+        },
+        "verdict": "FAIL_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": false
+        }
+      }
+    },
+    "confirmation_last_8h": {
+      "hours": [
+        "20260913T070000Z",
+        "20260913T210000Z",
+        "20260914T210000Z",
+        "20260916T050000Z",
+        "20260917T230000Z",
+        "20260918T090000Z",
+        "20260918T130000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 28,
+          "DOWN": 27,
+          "total": 55
+        },
+        "score_summary": {
+          "up_mean": 1.426997,
+          "down_mean": -0.829873,
+          "mean_diff_up_minus_down": 2.25687,
+          "sign_hit_rate": 0.709091,
+          "sign_hit_wilson_low": 0.57859,
+          "sign_hit_wilson_high": 0.81229,
+          "correct": 39,
+          "n": 55,
+          "mean_per_hour_sign_hit_rate": 0.728938,
+          "hours_with_events": 7,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.416667
+        },
+        "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": true
+        }
+      }
+    }
+  },
+  "sample_expand_attempt": {
+    "stale_only_gap_audit_passed": 26,
+    "landscape_analyze_succeeded": 0,
+    "blockers": [
+      "replay_continuity_failure:ignored_decreasing_seq",
+      "book_not_ready_at_cut"
+    ],
+    "note": "Sequence audit alone is insufficient; FullBookState replay rejects these GAP hours. No R12 sample expansion this round.",
+    "r12_status_unchanged": "INSUFFICIENT_SAMPLE (4 matched on 18 COMPLETE hours)"
+  },
+  "honesty": {
+    "v2_motivation": "Feature family chosen from V1 descriptive contrasts on the same 18h sample; coefficients not searched (kept V1 scales).",
+    "contamination_risk": "Overall PASS is on the motivating sample; chronological first-10h split alone fails the Wilson gate.",
+    "confirmation_split": "last 8h PASS (hit 70.9%, Wilson low 57.9%) \u2014 supportive but not a fully independent future holdout."
+  }
+}

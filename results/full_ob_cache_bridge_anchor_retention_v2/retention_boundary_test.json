@@ -1,0 +1,12 @@
+{
+  "contract_id": "full_ob_cache_bridge_anchor_retention_v2",
+  "delta_retention_sec": 600,
+  "checkpoint_interval_sec": 60,
+  "safety_margin_sec": 30,
+  "safety_margin_derivation": "worst-case phase offset \u2248 interval (60s) + 30s recv/wall/store skew",
+  "checkpoint_retention_sec": 690.0,
+  "max_checkpoints_floor": 14,
+  "worst_case_offset_ns": 59999000000,
+  "equal_window_anchor_at_edge_with_late_only_ck": false,
+  "v2_window_retains_edge_anchor_after_600s": true
+}

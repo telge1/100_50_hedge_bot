@@ -1,0 +1,44 @@
+{
+  "0": {
+    "max_inside_gap_seconds": 0,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "1": {
+    "max_inside_gap_seconds": 1,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "2": {
+    "max_inside_gap_seconds": 2,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "5": {
+    "max_inside_gap_seconds": 5,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "10": {
+    "max_inside_gap_seconds": 10,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "30": {
+    "max_inside_gap_seconds": 30,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  },
+  "60": {
+    "max_inside_gap_seconds": 60,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 0,
+    "clusters": []
+  }
+}

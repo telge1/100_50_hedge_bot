@@ -1,0 +1,170 @@
+{
+  "0": {
+    "max_inside_gap_seconds": 0,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "1": {
+    "max_inside_gap_seconds": 1,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "2": {
+    "max_inside_gap_seconds": 2,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "5": {
+    "max_inside_gap_seconds": 5,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "10": {
+    "max_inside_gap_seconds": 10,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "30": {
+    "max_inside_gap_seconds": 30,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  },
+  "60": {
+    "max_inside_gap_seconds": 60,
+    "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY",
+    "cluster_count": 1,
+    "clusters": [
+      {
+        "edge": "UPPER",
+        "visit_count": 1,
+        "visit_ids": [
+          "ev_9d2c5b9f04ec"
+        ],
+        "start_ts": "2026-08-30T16:30:00.144Z",
+        "end_ts": "2026-08-30T16:59:59.898Z",
+        "duration_seconds": 1799.754,
+        "outside_excursions": 1,
+        "reclaims": 0,
+        "taker_delta_quote": 22284308.676699728,
+        "quote_notional": 119154480.92409933,
+        "min_price": 78980.0,
+        "max_price": 79367.5,
+        "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+      }
+    ]
+  }
+}

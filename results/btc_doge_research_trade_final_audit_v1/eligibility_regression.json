@@ -1,0 +1,42 @@
+{
+  "cases": [
+    {
+      "exit_code": 4,
+      "expected_eligibility": "DATA_PARTIAL_FACTS_ONLY",
+      "expected_exit": 4,
+      "mode": "standard",
+      "note": null,
+      "observed_eligibility": "DATA_PARTIAL_FACTS_ONLY",
+      "pass": true,
+      "require_complete": true,
+      "symbol": "BTCUSDT",
+      "timestamp": "2026-08-27T06:42:23Z"
+    },
+    {
+      "exit_code": 3,
+      "expected_eligibility": "DATA_NOT_AVAILABLE",
+      "expected_exit": 3,
+      "mode": "standard",
+      "note": null,
+      "observed_eligibility": "DATA_NOT_AVAILABLE",
+      "pass": true,
+      "require_complete": true,
+      "symbol": "BTCUSDT",
+      "timestamp": "2026-06-01T12:00:00Z"
+    },
+    {
+      "exit_code": 0,
+      "expected_eligibility": "CONTEXT_PARTIAL",
+      "expected_exit": 0,
+      "mode": "oi_context",
+      "note": "OI day-tag PARTIAL visible; effective window density COMPLETE \u2192 DATA_COMPLETE acceptable",
+      "observed_eligibility": "DATA_COMPLETE",
+      "pass": true,
+      "require_complete": false,
+      "symbol": "BTCUSDT",
+      "timestamp": "2026-08-31T19:00:00Z"
+    }
+  ],
+  "contract_version": "research_public_trades_contract_v2",
+  "pass": true
+}

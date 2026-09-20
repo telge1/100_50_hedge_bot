@@ -1,0 +1,49 @@
+{
+  "reaches_n": 120,
+  "presence_at_reach": {
+    "has_wall_25bps": 80,
+    "giant_notional_still": 73,
+    "has_wall_50bps": 109,
+    "no_wall_25bps": 40,
+    "no_wall_50bps": 11
+  },
+  "all": {
+    "n": 120,
+    "outcomes": {
+      "BOUNCE_AWAY": 66,
+      "BREAK_THROUGH": 52,
+      "SIDEWAYS_NEAR_WALL": 2
+    },
+    "bounce_rate": 0.55,
+    "break_rate": 0.43333333333333335
+  },
+  "wall_gone_25bps": {
+    "n": 40,
+    "outcomes": {
+      "BREAK_THROUGH": 38,
+      "BOUNCE_AWAY": 2
+    },
+    "bounce_rate": 0.05,
+    "break_rate": 0.95
+  },
+  "any_wall_25bps": {
+    "n": 80,
+    "outcomes": {
+      "BOUNCE_AWAY": 64,
+      "BREAK_THROUGH": 14,
+      "SIDEWAYS_NEAR_WALL": 2
+    },
+    "bounce_rate": 0.8,
+    "break_rate": 0.175
+  },
+  "giant_still_100k_25bps": {
+    "n": 73,
+    "outcomes": {
+      "BOUNCE_AWAY": 64,
+      "BREAK_THROUGH": 9
+    },
+    "bounce_rate": 0.8767123287671232,
+    "break_rate": 0.1232876712328767
+  },
+  "median_delay_h": 81.37777777777778
+}

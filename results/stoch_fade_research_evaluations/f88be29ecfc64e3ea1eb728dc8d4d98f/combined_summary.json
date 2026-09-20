@@ -1,0 +1,147 @@
+{
+  "be50_activated_count": 0,
+  "be50_exit_count": 0,
+  "by_direction": {
+    "LONG": {
+      "losses": 1897,
+      "open": 48,
+      "signals": 4779,
+      "wins": 2834
+    },
+    "SHORT": {
+      "losses": 1744,
+      "open": 70,
+      "signals": 4603,
+      "wins": 2789
+    }
+  },
+  "by_symbol": {
+    "ADAUSDT": {
+      "losses": 392,
+      "open": 3,
+      "signals": 988,
+      "wins": 593
+    },
+    "BNBUSDT": {
+      "losses": 219,
+      "open": 21,
+      "signals": 564,
+      "wins": 324
+    },
+    "DOGEUSDT": {
+      "losses": 357,
+      "open": 5,
+      "signals": 884,
+      "wins": 522
+    },
+    "HYPEUSDT": {
+      "losses": 524,
+      "open": 1,
+      "signals": 1393,
+      "wins": 868
+    },
+    "LINKUSDT": {
+      "losses": 360,
+      "open": 3,
+      "signals": 891,
+      "wins": 528
+    },
+    "SOLUSDT": {
+      "losses": 364,
+      "open": 6,
+      "signals": 894,
+      "wins": 524
+    },
+    "SUIUSDT": {
+      "losses": 450,
+      "open": 1,
+      "signals": 1114,
+      "wins": 663
+    },
+    "XAUTUSDT": {
+      "losses": 119,
+      "open": 61,
+      "signals": 332,
+      "wins": 152
+    },
+    "XRPUSDT": {
+      "losses": 321,
+      "open": 17,
+      "signals": 779,
+      "wins": 441
+    },
+    "ZECUSDT": {
+      "losses": 535,
+      "open": 0,
+      "signals": 1543,
+      "wins": 1008
+    }
+  },
+  "by_timeframe": {
+    "15m": {
+      "losses": 1844,
+      "open": 63,
+      "signals": 5209,
+      "wins": 3302
+    },
+    "1h": {
+      "losses": 538,
+      "open": 11,
+      "signals": 1317,
+      "wins": 768
+    },
+    "30m": {
+      "losses": 1092,
+      "open": 43,
+      "signals": 2537,
+      "wins": 1402
+    },
+    "4h": {
+      "losses": 167,
+      "open": 1,
+      "signals": 319,
+      "wins": 151
+    }
+  },
+  "execution_dedup_applied": false,
+  "exit_policy": "NO_BE50",
+  "exit_reason_counts": {
+    "OPEN": 118,
+    "SL": 3641,
+    "TP": 5623
+  },
+  "gross_loss_pct": -4623.0,
+  "gross_profit_pct": 8246.0,
+  "intrabar_policy": "SL_FIRST",
+  "losses": 3641,
+  "open": 118,
+  "outcome_engine": "evaluate_signal_no_be50",
+  "pnl_basis": "gross",
+  "side_effect_flags": {
+    "cleanup_enabled": false,
+    "live_orders_enabled": false,
+    "publish_enabled": false,
+    "writes_to_clickhouse": false,
+    "writes_to_processing_state": false,
+    "writes_to_signal_outcomes": false,
+    "writes_to_signals": false
+  },
+  "signal_scope": "TIER_A_ONLY",
+  "signals": 9382,
+  "successful_coins": [
+    "XRPUSDT",
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT"
+  ],
+  "total_pnl_pct": 3623.0,
+  "win_rate_denominator": "wins+losses (OPEN excluded)",
+  "win_rate_pct": 60.697322970639036,
+  "wins": 5623
+}

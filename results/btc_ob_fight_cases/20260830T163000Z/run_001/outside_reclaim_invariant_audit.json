@@ -1,0 +1,14 @@
+{
+  "contract_version": "outside_reclaim_v1",
+  "canonical_reclaim_contract": "reclaim_event_contract_v3",
+  "passed": true,
+  "violation_count": 0,
+  "violations": [],
+  "outside_excursion_count": 1,
+  "reclaim_count": 0,
+  "unique_reclaim_cross_timestamps": 0,
+  "open_excursion_count": 1,
+  "phase2a_reclaim_bug_documented": null,
+  "phase2a_reclaim_count": 0,
+  "legacy_global_first_reclaim_enabled": false
+}

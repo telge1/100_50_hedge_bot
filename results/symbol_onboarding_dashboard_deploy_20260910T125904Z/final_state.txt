@@ -1,0 +1,16 @@
+=== FINAL ===
+MainPID=759160
+NRestarts=0
+ActiveState=active
+SubState=running
+FragmentPath=/home/telgenbuescher/.config/systemd/user/dashboard.service
+MainPID=759300
+NRestarts=0
+ActiveState=active
+SubState=running
+FragmentPath=/home/telgenbuescher/.config/systemd/user/symbol-onboarding-worker.service
+MainPID=0
+NRestarts=117
+ActiveState=inactive
+UnitFileState=enabled
+LISTEN 0      2048         0.0.0.0:3000       0.0.0.0:*    users:(("python",pid=759160,fd=17))          

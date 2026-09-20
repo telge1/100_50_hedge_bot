@@ -1,0 +1,44 @@
+[
+  {
+    "ts": "2026-09-04T00:41:07.360189Z",
+    "from": "IDLE",
+    "to": "ARMED",
+    "reason": "arm_distance"
+  },
+  {
+    "ts": "2026-09-04T00:41:07.360189Z",
+    "from": "ARMED",
+    "to": "SUBSCRIBING",
+    "reason": "activate_full_ob"
+  },
+  {
+    "ts": "2026-09-04T00:41:07.360189Z",
+    "from": "SUBSCRIBING",
+    "to": "SYNCING",
+    "reason": "await_sync"
+  },
+  {
+    "ts": "2026-09-04T00:41:07.360189Z",
+    "from": "SYNCING",
+    "to": "BOOK_READY",
+    "reason": "already_ready"
+  },
+  {
+    "ts": "2026-09-04T00:41:07.360189Z",
+    "from": "BOOK_READY",
+    "to": "ARMED",
+    "reason": "arm_distance"
+  },
+  {
+    "ts": "2026-09-04T00:42:00.551317Z",
+    "from": "ARMED",
+    "to": "CAPTURING",
+    "reason": "event_start"
+  },
+  {
+    "ts": "2026-09-04T00:43:00.566105Z",
+    "from": "CAPTURING",
+    "to": "FIGHT_ACTIVE",
+    "reason": "acceptance"
+  }
+]

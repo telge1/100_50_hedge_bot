@@ -1,0 +1,25 @@
+{
+  "builder_version": "liquidity_destination_episode_builder_v1",
+  "candidate_count": 10016,
+  "candidate_end_utc": "2026-08-31T23:01:00.000Z",
+  "candidate_start_utc": "2026-08-25T00:05:00.000Z",
+  "contract_version": "liquidity_destination_episode_contract_v1",
+  "eligible_episode_count": 879,
+  "excluded_candidate_count": 9137,
+  "exclusion_counts": {
+    "DUPLICATE_OR_OVERLAPPING_EPISODE": 9070,
+    "MISSING_LOWER_TARGET": 23,
+    "MISSING_UPPER_TARGET": 44
+  },
+  "horizon_minutes": 60,
+  "outcome_counts": {
+    "LOWER_FIRST": 411,
+    "NEITHER_WITHIN_HORIZON": 64,
+    "UPPER_FIRST": 404
+  },
+  "price_source": "btc_doge_research.research_public_trades",
+  "require_complete": true,
+  "research_only": true,
+  "symbol": "BTCUSDT",
+  "target_source": "LLD_POOL"
+}

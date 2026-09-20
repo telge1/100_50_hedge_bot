@@ -1,0 +1,50 @@
+{
+  "allow_bounded_expand": true,
+  "candidate_count": 360,
+  "candidate_window_end_utc": "2026-08-25T06:05:00.000Z",
+  "candidate_window_start_utc": "2026-08-25T00:05:00.000Z",
+  "checks": {
+    "causal_targets": true,
+    "chronological": true,
+    "complete_horizons": true,
+    "core_hashes_valid": true,
+    "empirical_first_2h_episode_parity": true,
+    "empirical_first_2h_exclusion_parity": true,
+    "exit_code_zero": true,
+    "finite_values": true,
+    "known_outcomes": true,
+    "non_overlap": true,
+    "prefix_parity": true,
+    "representative_2h_idempotence": true,
+    "synthetic_chunk_size_parity": true,
+    "unique_episode_ids": true
+  },
+  "core_fingerprint_sha256": "009048ed15801cb890eb7a91cc0e002d949416760f4dd1782fe90c8852709bff",
+  "eligible_episode_count": 41,
+  "excluded_candidate_count": 319,
+  "exclusion_counts": {
+    "DUPLICATE_OR_OVERLAPPING_EPISODE": 305,
+    "MISSING_UPPER_TARGET": 14
+  },
+  "horizon_minutes": 60,
+  "internal_chunk_count": 3,
+  "interpretation": "Factual dataset engineering only; no bias, prediction, edge, profitability, threshold, strategy, or trading analysis.",
+  "max_window_hours": 6,
+  "nice": 10,
+  "outcome_counts": {
+    "LOWER_FIRST": 7,
+    "NEITHER_WITHIN_HORIZON": 3,
+    "UPPER_FIRST": 31
+  },
+  "resources": {
+    "cpu_percent": 43,
+    "maximum_resident_set_kb": 95388,
+    "system_cpu_seconds": 0.03,
+    "user_cpu_seconds": 5.2,
+    "wall_seconds": 12.13
+  },
+  "single_worker": true,
+  "status": "PASS",
+  "symbol": "BTCUSDT",
+  "trade_chunk_hours": 2
+}

@@ -1,0 +1,22 @@
+{
+  "generated_at_utc": "2026-09-05T16:10:58Z",
+  "env_file": "/home/telgenbuescher/projects/orderbook_analyse/.env",
+  "env_sha256_before": "b1d4763a432cb4865f0068a3bc3904455baf24f2682d780c491822887a2d462c",
+  "env_sha256_after": "a1054818a2f3bd3fcd528f69ccb8762a89ecff2401bf81bc1fd59b0c16c26950",
+  "activated_keys": [
+    "FULL_OB_CACHE_BRIDGE_ENABLED=true",
+    "FULL_OB_CACHE_BRIDGE_SOCKET_PATH=/run/user/1000/full_ob_cache_bridge.sock",
+    "FULL_OB_CACHE_BRIDGE_DUMP_ROOT=/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_cache_bridge_dumps",
+    "FULL_OB_CACHE_BRIDGE_SYMBOLS=BTCUSDT,DOGEUSDT",
+    "FULL_OB_CACHE_BRIDGE_MAX_PRE_ROLL_SEC=600",
+    "FULL_OB_CACHE_BRIDGE_MAX_PAYLOAD_BYTES=100663296",
+    "FULL_OB_CACHE_BRIDGE_MAX_CONCURRENT=1",
+    "FULL_OB_CACHE_BRIDGE_MIN_INTERVAL_SEC=2",
+    "FULL_OB_CACHE_BRIDGE_CHECKPOINT_INTERVAL_SEC=60"
+  ],
+  "socket_path": "/run/user/1000/full_ob_cache_bridge.sock",
+  "dump_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_cache_bridge_dumps",
+  "tcp": false,
+  "max_payload_mib": 96,
+  "max_pre_roll_sec": 600
+}

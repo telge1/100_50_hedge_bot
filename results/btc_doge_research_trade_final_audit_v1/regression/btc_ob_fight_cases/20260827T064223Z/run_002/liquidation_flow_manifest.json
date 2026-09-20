@@ -1,0 +1,118 @@
+{
+  "contract_version": "liquidation_flow_facts_v1",
+  "frozen": true,
+  "event_key_version": "event_key_v1",
+  "event_key_fields": [
+    "exchange",
+    "symbol",
+    "event_ms",
+    "position_side_raw",
+    "size",
+    "bankruptcy_price"
+  ],
+  "event_key_format": "{exchange}|{symbol}|{event_ms}|{position_side_raw}|{size}|{bankruptcy_price}",
+  "bybit_side_mapping": {
+    "Buy": {
+      "position_side_raw": "Buy",
+      "liquidated_position_side": "LIQUIDATED_LONG",
+      "forced_trade_direction": "FORCED_SELL"
+    },
+    "Sell": {
+      "position_side_raw": "Sell",
+      "liquidated_position_side": "LIQUIDATED_SHORT",
+      "forced_trade_direction": "FORCED_BUY"
+    }
+  },
+  "bybit_documentation_url": "https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation",
+  "attribution_method": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+  "sensitivity_windows_ms": [
+    100,
+    250,
+    500,
+    1000
+  ],
+  "units": {
+    "executed_base_size": "BTC base asset",
+    "bankruptcy_reference_quote": "USD quote (v × bankruptcy_price; reference only)",
+    "taker_buy_base": "BTC base asset",
+    "taker_sell_base": "BTC base asset",
+    "taker_buy_quote": "USD quote notional",
+    "taker_sell_quote": "USD quote notional",
+    "taker_delta_quote": "USD quote notional (buy_quote − sell_quote)",
+    "execution_price": "UNKNOWN — not stored",
+    "execution_notional": "UNKNOWN — not stored"
+  },
+  "input_sources": {
+    "liquidations": "orderbook_analysis.all_liquidations",
+    "public_trades": "orderbook_analysis.public_trades_canonical",
+    "open_interest": "orderbook_analysis.open_interest_5s"
+  },
+  "superseded_explanatory_audit": {
+    "contract": "btc_ob_fight_explanatory_audit_v1",
+    "do_not_use_for_research": true,
+    "superseded_by": "liquidation_flow_facts_v1",
+    "reason": "overlapping-window double counting and denominator mismatch",
+    "superseded_output_marker_file": "SUPERSEDED.json",
+    "historical_outputs_preserved": true
+  },
+  "forbidden_research_input_paths": [
+    "results/btc_ob_fight_explanatory_audit_20260831_1900_v1",
+    "research/btc_ob_fight_explanatory_audit/association.py"
+  ],
+  "required_sensitivity_metrics": [
+    "allocated_liquidation_base",
+    "total_taker_buy_base",
+    "allocated_liquidation_share_of_total_taker_buy_base",
+    "union_window_taker_buy_base",
+    "liquidation_capacity_coverage_pct",
+    "remaining_unattributed_taker_buy_base"
+  ],
+  "required_phase_fields": [
+    "phase_role",
+    "usable_for_live_signal"
+  ],
+  "bankruptcy_reference_field": "bankruptcy_reference_quote",
+  "execution_fields_always_null": [
+    "execution_price",
+    "execution_notional"
+  ],
+  "git_head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "utc_window": {
+    "start": "2026-08-27T06:12:23Z",
+    "end": "2026-08-27T07:12:23Z",
+    "anchor": "2026-08-27T06:42:23Z"
+  },
+  "attribution_algorithm": {
+    "method": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+    "windows_ms": [
+      100,
+      250,
+      500,
+      1000
+    ],
+    "short_liquidation_matches": "Taker Buy only",
+    "long_liquidation_matches": "Taker Sell only",
+    "global_trade_capacity": "single-use per trade_id; partial allocation allowed",
+    "tie_break": "smallest |Δt| then trade_ts then trade_id",
+    "price_match_required": false,
+    "exchange_seq_used": false
+  },
+  "dedup_and_coverage": {
+    "liquidation_dedup_key": "event_key",
+    "raw_liquidation_row_count": null,
+    "unique_liquidation_event_count": null,
+    "duplicate_liquidation_event_count": null,
+    "public_trade_dedup": "trade_id"
+  },
+  "input_fingerprint_sha256": "e613dc61bc08f12dd2a772a223b085c3a9d37d731339c1429f1af372d0adf4a2",
+  "output_fingerprint_sha256": "4101b7721bb6bb538bc18250bff5893f093a534ec33e5075e03bd50fdd0bac28",
+  "volume_identity": "total_taker_buy_base = allocated_liquidation_base + remaining_unattributed_taker_buy_base",
+  "forbidden": [
+    "subtract_liquidation_quote_from_taker_delta",
+    "label_bankruptcy_reference_quote_as_execution_notional",
+    "equate_event_count_with_position_count",
+    "direct_id_association_without_shared_field",
+    "double_allocate_same_trade_volume",
+    "load_superseded_explanatory_audit_outputs"
+  ]
+}

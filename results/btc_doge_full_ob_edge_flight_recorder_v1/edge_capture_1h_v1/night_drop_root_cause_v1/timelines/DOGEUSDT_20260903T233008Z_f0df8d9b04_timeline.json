@@ -1,0 +1,2432 @@
+{
+  "event": "DOGEUSDT_20260903T233008Z_f0df8d9b04",
+  "event_manifest_excerpt": {
+    "fight_event_id": "DOGEUSDT_20260903T233008Z_f0df8d9b04",
+    "symbol": null,
+    "trigger_ts": "2026-09-03T23:30:08.359952Z",
+    "trigger_reason": null,
+    "status": null,
+    "outcome_status": "UNRESOLVED_AT_CAPTURE_LIMIT",
+    "research_eligible": false,
+    "queue_drop_count": 112683,
+    "u_gap_count": 0,
+    "extension_count": 208769,
+    "hard_capture_end_ts": "2026-09-04T02:30:08.359952Z",
+    "actual_final_ts": "2026-09-04T02:30:08.360306Z",
+    "cross_in_ts": null,
+    "finalization_reason": "INCOMPLETE_QUEUE_DROP",
+    "coverage_status": null,
+    "incomplete_reasons": [
+      "QUEUE_DROP"
+    ],
+    "first_u": null,
+    "last_u": null,
+    "delta_count": null,
+    "started_at": null,
+    "ended_at": null,
+    "prebuffer_seconds": null
+  },
+  "n_segments": 6,
+  "total_persisted_records": 3279,
+  "persisted_first_u": 4190312,
+  "persisted_last_u": 4246969,
+  "persisted_u_gap_count": 333,
+  "persisted_missing_u_estimate": 53379,
+  "capture_completeness_ratio": 0.057873557132267286,
+  "cross_segment_gaps": [
+    {
+      "after": 0,
+      "before": 1,
+      "missing_from": 4201715,
+      "missing_to": 4202324,
+      "n": 610
+    },
+    {
+      "after": 1,
+      "before": 2,
+      "missing_from": 4211222,
+      "missing_to": 4211331,
+      "n": 110
+    },
+    {
+      "after": 2,
+      "before": 3,
+      "missing_from": 4220243,
+      "missing_to": 4220631,
+      "n": 389
+    },
+    {
+      "after": 3,
+      "before": 4,
+      "missing_from": 4228851,
+      "missing_to": 4229639,
+      "n": 789
+    },
+    {
+      "after": 4,
+      "before": 5,
+      "missing_from": 4237851,
+      "missing_to": 4238459,
+      "n": 609
+    }
+  ],
+  "persisted_gap_intervals_sample": [
+    [
+      4193256,
+      4193415,
+      160
+    ],
+    [
+      4193417,
+      4193515,
+      99
+    ],
+    [
+      4193517,
+      4193615,
+      99
+    ],
+    [
+      4193617,
+      4193715,
+      99
+    ],
+    [
+      4193717,
+      4193815,
+      99
+    ],
+    [
+      4193817,
+      4194305,
+      489
+    ],
+    [
+      4194307,
+      4194505,
+      199
+    ],
+    [
+      4194507,
+      4194680,
+      174
+    ],
+    [
+      4194682,
+      4194816,
+      135
+    ],
+    [
+      4194818,
+      4194916,
+      99
+    ],
+    [
+      4194918,
+      4195106,
+      189
+    ],
+    [
+      4195108,
+      4195306,
+      199
+    ],
+    [
+      4195308,
+      4195381,
+      74
+    ],
+    [
+      4195383,
+      4195406,
+      24
+    ],
+    [
+      4195408,
+      4195607,
+      200
+    ],
+    [
+      4195609,
+      4195917,
+      309
+    ],
+    [
+      4195919,
+      4196017,
+      99
+    ],
+    [
+      4196019,
+      4196117,
+      99
+    ],
+    [
+      4196119,
+      4196818,
+      700
+    ],
+    [
+      4196820,
+      4196918,
+      99
+    ],
+    [
+      4196920,
+      4197018,
+      99
+    ],
+    [
+      4197020,
+      4197483,
+      464
+    ],
+    [
+      4197485,
+      4197508,
+      24
+    ],
+    [
+      4197510,
+      4197519,
+      10
+    ],
+    [
+      4197521,
+      4197608,
+      88
+    ],
+    [
+      4197610,
+      4197619,
+      10
+    ],
+    [
+      4197621,
+      4197719,
+      99
+    ],
+    [
+      4197721,
+      4197909,
+      189
+    ],
+    [
+      4197911,
+      4198220,
+      310
+    ],
+    [
+      4198222,
+      4198320,
+      99
+    ],
+    [
+      4198322,
+      4198510,
+      189
+    ],
+    [
+      4198512,
+      4198710,
+      199
+    ],
+    [
+      4198712,
+      4198810,
+      99
+    ],
+    [
+      4198812,
+      4198821,
+      10
+    ],
+    [
+      4198823,
+      4198921,
+      99
+    ],
+    [
+      4198923,
+      4199012,
+      90
+    ],
+    [
+      4199014,
+      4199021,
+      8
+    ],
+    [
+      4199023,
+      4199121,
+      99
+    ],
+    [
+      4199123,
+      4199210,
+      88
+    ],
+    [
+      4199212,
+      4199221,
+      10
+    ],
+    [
+      4199223,
+      4199321,
+      99
+    ],
+    [
+      4199323,
+      4199411,
+      89
+    ],
+    [
+      4199413,
+      4199611,
+      199
+    ],
+    [
+      4199613,
+      4200222,
+      610
+    ],
+    [
+      4200224,
+      4200322,
+      99
+    ],
+    [
+      4200324,
+      4200823,
+      500
+    ],
+    [
+      4200825,
+      4200923,
+      99
+    ],
+    [
+      4200925,
+      4201023,
+      99
+    ],
+    [
+      4201025,
+      4201713,
+      689
+    ],
+    [
+      4201715,
+      4202324,
+      610
+    ]
+  ],
+  "segments": [
+    {
+      "segment_index": 0,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04",
+      "manifest": {
+        "continuation_index": 0,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4185752,
+        "last_u": 4202315,
+        "delta_count": 2993,
+        "queue_drops": 60623,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 2993,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 2993
+      },
+      "persisted_first_u": 4190312,
+      "persisted_last_u": 4201714,
+      "source_u_span_estimate": 11403,
+      "persisted_missing_u_estimate": 8410,
+      "persisted_u_gap_count": 49,
+      "persisted_gap_intervals": [
+        {
+          "from": 4193256,
+          "to": 4193415,
+          "n": 160
+        },
+        {
+          "from": 4193417,
+          "to": 4193515,
+          "n": 99
+        },
+        {
+          "from": 4193517,
+          "to": 4193615,
+          "n": 99
+        },
+        {
+          "from": 4193617,
+          "to": 4193715,
+          "n": 99
+        },
+        {
+          "from": 4193717,
+          "to": 4193815,
+          "n": 99
+        },
+        {
+          "from": 4193817,
+          "to": 4194305,
+          "n": 489
+        },
+        {
+          "from": 4194307,
+          "to": 4194505,
+          "n": 199
+        },
+        {
+          "from": 4194507,
+          "to": 4194680,
+          "n": 174
+        },
+        {
+          "from": 4194682,
+          "to": 4194816,
+          "n": 135
+        },
+        {
+          "from": 4194818,
+          "to": 4194916,
+          "n": 99
+        },
+        {
+          "from": 4194918,
+          "to": 4195106,
+          "n": 189
+        },
+        {
+          "from": 4195108,
+          "to": 4195306,
+          "n": 199
+        },
+        {
+          "from": 4195308,
+          "to": 4195381,
+          "n": 74
+        },
+        {
+          "from": 4195383,
+          "to": 4195406,
+          "n": 24
+        },
+        {
+          "from": 4195408,
+          "to": 4195607,
+          "n": 200
+        },
+        {
+          "from": 4195609,
+          "to": 4195917,
+          "n": 309
+        },
+        {
+          "from": 4195919,
+          "to": 4196017,
+          "n": 99
+        },
+        {
+          "from": 4196019,
+          "to": 4196117,
+          "n": 99
+        },
+        {
+          "from": 4196119,
+          "to": 4196818,
+          "n": 700
+        },
+        {
+          "from": 4196820,
+          "to": 4196918,
+          "n": 99
+        },
+        {
+          "from": 4196920,
+          "to": 4197018,
+          "n": 99
+        },
+        {
+          "from": 4197020,
+          "to": 4197483,
+          "n": 464
+        },
+        {
+          "from": 4197485,
+          "to": 4197508,
+          "n": 24
+        },
+        {
+          "from": 4197510,
+          "to": 4197519,
+          "n": 10
+        },
+        {
+          "from": 4197521,
+          "to": 4197608,
+          "n": 88
+        },
+        {
+          "from": 4197610,
+          "to": 4197619,
+          "n": 10
+        },
+        {
+          "from": 4197621,
+          "to": 4197719,
+          "n": 99
+        },
+        {
+          "from": 4197721,
+          "to": 4197909,
+          "n": 189
+        },
+        {
+          "from": 4197911,
+          "to": 4198220,
+          "n": 310
+        },
+        {
+          "from": 4198222,
+          "to": 4198320,
+          "n": 99
+        },
+        {
+          "from": 4198322,
+          "to": 4198510,
+          "n": 189
+        },
+        {
+          "from": 4198512,
+          "to": 4198710,
+          "n": 199
+        },
+        {
+          "from": 4198712,
+          "to": 4198810,
+          "n": 99
+        },
+        {
+          "from": 4198812,
+          "to": 4198821,
+          "n": 10
+        },
+        {
+          "from": 4198823,
+          "to": 4198921,
+          "n": 99
+        },
+        {
+          "from": 4198923,
+          "to": 4199012,
+          "n": 90
+        },
+        {
+          "from": 4199014,
+          "to": 4199021,
+          "n": 8
+        },
+        {
+          "from": 4199023,
+          "to": 4199121,
+          "n": 99
+        },
+        {
+          "from": 4199123,
+          "to": 4199210,
+          "n": 88
+        },
+        {
+          "from": 4199212,
+          "to": 4199221,
+          "n": 10
+        }
+      ],
+      "persisted_gap_intervals_total": 49,
+      "capture_completeness_ratio": 0.2624747873366658,
+      "first_ts": 1788477607534,
+      "last_ts": 1788479887934,
+      "zst_bytes": 300292
+    },
+    {
+      "segment_index": 1,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_001",
+      "manifest": {
+        "continuation_index": 1,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4202316,
+        "last_u": 4211315,
+        "delta_count": 58,
+        "queue_drops": 48891,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 58,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 58
+      },
+      "persisted_first_u": 4202325,
+      "persisted_last_u": 4211221,
+      "source_u_span_estimate": 8897,
+      "persisted_missing_u_estimate": 8839,
+      "persisted_u_gap_count": 57,
+      "persisted_gap_intervals": [
+        {
+          "from": 4202326,
+          "to": 4202424,
+          "n": 99
+        },
+        {
+          "from": 4202426,
+          "to": 4202524,
+          "n": 99
+        },
+        {
+          "from": 4202526,
+          "to": 4202624,
+          "n": 99
+        },
+        {
+          "from": 4202626,
+          "to": 4203089,
+          "n": 464
+        },
+        {
+          "from": 4203091,
+          "to": 4203114,
+          "n": 24
+        },
+        {
+          "from": 4203116,
+          "to": 4203589,
+          "n": 474
+        },
+        {
+          "from": 4203591,
+          "to": 4203714,
+          "n": 124
+        },
+        {
+          "from": 4203716,
+          "to": 4203825,
+          "n": 110
+        },
+        {
+          "from": 4203827,
+          "to": 4203925,
+          "n": 99
+        },
+        {
+          "from": 4203927,
+          "to": 4204025,
+          "n": 99
+        },
+        {
+          "from": 4204027,
+          "to": 4204125,
+          "n": 99
+        },
+        {
+          "from": 4204127,
+          "to": 4204225,
+          "n": 99
+        },
+        {
+          "from": 4204227,
+          "to": 4204626,
+          "n": 400
+        },
+        {
+          "from": 4204628,
+          "to": 4204726,
+          "n": 99
+        },
+        {
+          "from": 4204728,
+          "to": 4204826,
+          "n": 99
+        },
+        {
+          "from": 4204828,
+          "to": 4204926,
+          "n": 99
+        },
+        {
+          "from": 4204928,
+          "to": 4205026,
+          "n": 99
+        },
+        {
+          "from": 4205028,
+          "to": 4205126,
+          "n": 99
+        },
+        {
+          "from": 4205128,
+          "to": 4205616,
+          "n": 489
+        },
+        {
+          "from": 4205618,
+          "to": 4205627,
+          "n": 10
+        },
+        {
+          "from": 4205629,
+          "to": 4205716,
+          "n": 88
+        },
+        {
+          "from": 4205718,
+          "to": 4205727,
+          "n": 10
+        },
+        {
+          "from": 4205729,
+          "to": 4205791,
+          "n": 63
+        },
+        {
+          "from": 4205793,
+          "to": 4205816,
+          "n": 24
+        },
+        {
+          "from": 4205818,
+          "to": 4206317,
+          "n": 500
+        },
+        {
+          "from": 4206319,
+          "to": 4206517,
+          "n": 199
+        },
+        {
+          "from": 4206519,
+          "to": 4206628,
+          "n": 110
+        },
+        {
+          "from": 4206630,
+          "to": 4206728,
+          "n": 99
+        },
+        {
+          "from": 4206730,
+          "to": 4206828,
+          "n": 99
+        },
+        {
+          "from": 4206830,
+          "to": 4207519,
+          "n": 690
+        },
+        {
+          "from": 4207521,
+          "to": 4207729,
+          "n": 209
+        },
+        {
+          "from": 4207731,
+          "to": 4207818,
+          "n": 88
+        },
+        {
+          "from": 4207820,
+          "to": 4207829,
+          "n": 10
+        },
+        {
+          "from": 4207831,
+          "to": 4207918,
+          "n": 88
+        },
+        {
+          "from": 4207920,
+          "to": 4207929,
+          "n": 10
+        },
+        {
+          "from": 4207931,
+          "to": 4208018,
+          "n": 88
+        },
+        {
+          "from": 4208020,
+          "to": 4208029,
+          "n": 10
+        },
+        {
+          "from": 4208031,
+          "to": 4208175,
+          "n": 145
+        },
+        {
+          "from": 4208177,
+          "to": 4208331,
+          "n": 155
+        },
+        {
+          "from": 4208333,
+          "to": 4208499,
+          "n": 167
+        }
+      ],
+      "persisted_gap_intervals_total": 57,
+      "capture_completeness_ratio": 0.006519051365628864,
+      "first_ts": 1788480010134,
+      "last_ts": 1788481789335,
+      "zst_bytes": 10270
+    },
+    {
+      "segment_index": 2,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_002",
+      "manifest": {
+        "continuation_index": 2,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4211316,
+        "last_u": 4220315,
+        "delta_count": 56,
+        "queue_drops": 114166,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 56,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 56
+      },
+      "persisted_first_u": 4211332,
+      "persisted_last_u": 4220242,
+      "source_u_span_estimate": 8911,
+      "persisted_missing_u_estimate": 8855,
+      "persisted_u_gap_count": 55,
+      "persisted_gap_intervals": [
+        {
+          "from": 4211333,
+          "to": 4211431,
+          "n": 99
+        },
+        {
+          "from": 4211433,
+          "to": 4212032,
+          "n": 600
+        },
+        {
+          "from": 4212034,
+          "to": 4212121,
+          "n": 88
+        },
+        {
+          "from": 4212123,
+          "to": 4212132,
+          "n": 10
+        },
+        {
+          "from": 4212134,
+          "to": 4212232,
+          "n": 99
+        },
+        {
+          "from": 4212234,
+          "to": 4212297,
+          "n": 64
+        },
+        {
+          "from": 4212299,
+          "to": 4212322,
+          "n": 24
+        },
+        {
+          "from": 4212324,
+          "to": 4212497,
+          "n": 174
+        },
+        {
+          "from": 4212499,
+          "to": 4212522,
+          "n": 24
+        },
+        {
+          "from": 4212524,
+          "to": 4212822,
+          "n": 299
+        },
+        {
+          "from": 4212824,
+          "to": 4212833,
+          "n": 10
+        },
+        {
+          "from": 4212835,
+          "to": 4212922,
+          "n": 88
+        },
+        {
+          "from": 4212924,
+          "to": 4212933,
+          "n": 10
+        },
+        {
+          "from": 4212935,
+          "to": 4213123,
+          "n": 189
+        },
+        {
+          "from": 4213125,
+          "to": 4213423,
+          "n": 299
+        },
+        {
+          "from": 4213425,
+          "to": 4213523,
+          "n": 99
+        },
+        {
+          "from": 4213525,
+          "to": 4213734,
+          "n": 210
+        },
+        {
+          "from": 4213736,
+          "to": 4213834,
+          "n": 99
+        },
+        {
+          "from": 4213836,
+          "to": 4214424,
+          "n": 589
+        },
+        {
+          "from": 4214426,
+          "to": 4214499,
+          "n": 74
+        },
+        {
+          "from": 4214501,
+          "to": 4214835,
+          "n": 335
+        },
+        {
+          "from": 4214837,
+          "to": 4214935,
+          "n": 99
+        },
+        {
+          "from": 4214937,
+          "to": 4215035,
+          "n": 99
+        },
+        {
+          "from": 4215037,
+          "to": 4215135,
+          "n": 99
+        },
+        {
+          "from": 4215137,
+          "to": 4215225,
+          "n": 89
+        },
+        {
+          "from": 4215227,
+          "to": 4215325,
+          "n": 99
+        },
+        {
+          "from": 4215327,
+          "to": 4215836,
+          "n": 510
+        },
+        {
+          "from": 4215838,
+          "to": 4215936,
+          "n": 99
+        },
+        {
+          "from": 4215938,
+          "to": 4216126,
+          "n": 189
+        },
+        {
+          "from": 4216128,
+          "to": 4216537,
+          "n": 410
+        },
+        {
+          "from": 4216539,
+          "to": 4216637,
+          "n": 99
+        },
+        {
+          "from": 4216639,
+          "to": 4216737,
+          "n": 99
+        },
+        {
+          "from": 4216739,
+          "to": 4216827,
+          "n": 89
+        },
+        {
+          "from": 4216829,
+          "to": 4216837,
+          "n": 9
+        },
+        {
+          "from": 4216839,
+          "to": 4216937,
+          "n": 99
+        },
+        {
+          "from": 4216939,
+          "to": 4217428,
+          "n": 490
+        },
+        {
+          "from": 4217430,
+          "to": 4217528,
+          "n": 99
+        },
+        {
+          "from": 4217530,
+          "to": 4217538,
+          "n": 9
+        },
+        {
+          "from": 4217540,
+          "to": 4217628,
+          "n": 89
+        },
+        {
+          "from": 4217630,
+          "to": 4217638,
+          "n": 9
+        }
+      ],
+      "persisted_gap_intervals_total": 55,
+      "capture_completeness_ratio": 0.006284367635506678,
+      "first_ts": 1788481811534,
+      "last_ts": 1788483593535,
+      "zst_bytes": 10177
+    },
+    {
+      "segment_index": 3,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_003",
+      "manifest": {
+        "continuation_index": 3,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4220316,
+        "last_u": 4229315,
+        "delta_count": 58,
+        "queue_drops": 113594,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 58,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 58
+      },
+      "persisted_first_u": 4220632,
+      "persisted_last_u": 4228850,
+      "source_u_span_estimate": 8219,
+      "persisted_missing_u_estimate": 8161,
+      "persisted_u_gap_count": 56,
+      "persisted_gap_intervals": [
+        {
+          "from": 4220633,
+          "to": 4220842,
+          "n": 210
+        },
+        {
+          "from": 4220844,
+          "to": 4220942,
+          "n": 99
+        },
+        {
+          "from": 4220944,
+          "to": 4221042,
+          "n": 99
+        },
+        {
+          "from": 4221044,
+          "to": 4221142,
+          "n": 99
+        },
+        {
+          "from": 4221144,
+          "to": 4221232,
+          "n": 89
+        },
+        {
+          "from": 4221234,
+          "to": 4221332,
+          "n": 99
+        },
+        {
+          "from": 4221334,
+          "to": 4221432,
+          "n": 99
+        },
+        {
+          "from": 4221434,
+          "to": 4221943,
+          "n": 510
+        },
+        {
+          "from": 4221945,
+          "to": 4222043,
+          "n": 99
+        },
+        {
+          "from": 4222045,
+          "to": 4222133,
+          "n": 89
+        },
+        {
+          "from": 4222135,
+          "to": 4222143,
+          "n": 9
+        },
+        {
+          "from": 4222145,
+          "to": 4222233,
+          "n": 89
+        },
+        {
+          "from": 4222235,
+          "to": 4222243,
+          "n": 9
+        },
+        {
+          "from": 4222245,
+          "to": 4222333,
+          "n": 89
+        },
+        {
+          "from": 4222335,
+          "to": 4222343,
+          "n": 9
+        },
+        {
+          "from": 4222345,
+          "to": 4223044,
+          "n": 700
+        },
+        {
+          "from": 4223046,
+          "to": 4223144,
+          "n": 99
+        },
+        {
+          "from": 4223146,
+          "to": 4223244,
+          "n": 99
+        },
+        {
+          "from": 4223246,
+          "to": 4223334,
+          "n": 89
+        },
+        {
+          "from": 4223336,
+          "to": 4223344,
+          "n": 9
+        },
+        {
+          "from": 4223346,
+          "to": 4223444,
+          "n": 99
+        },
+        {
+          "from": 4223446,
+          "to": 4223934,
+          "n": 489
+        },
+        {
+          "from": 4223937,
+          "to": 4224034,
+          "n": 98
+        },
+        {
+          "from": 4224036,
+          "to": 4224245,
+          "n": 210
+        },
+        {
+          "from": 4224247,
+          "to": 4224345,
+          "n": 99
+        },
+        {
+          "from": 4224347,
+          "to": 4224445,
+          "n": 99
+        },
+        {
+          "from": 4224447,
+          "to": 4224545,
+          "n": 99
+        },
+        {
+          "from": 4224547,
+          "to": 4224635,
+          "n": 89
+        },
+        {
+          "from": 4224637,
+          "to": 4224835,
+          "n": 199
+        },
+        {
+          "from": 4224837,
+          "to": 4224837,
+          "n": 1
+        },
+        {
+          "from": 4224839,
+          "to": 4225246,
+          "n": 408
+        },
+        {
+          "from": 4225248,
+          "to": 4225346,
+          "n": 99
+        },
+        {
+          "from": 4225348,
+          "to": 4226036,
+          "n": 689
+        },
+        {
+          "from": 4226038,
+          "to": 4226136,
+          "n": 99
+        },
+        {
+          "from": 4226138,
+          "to": 4226236,
+          "n": 99
+        },
+        {
+          "from": 4226238,
+          "to": 4226447,
+          "n": 210
+        },
+        {
+          "from": 4226449,
+          "to": 4226547,
+          "n": 99
+        },
+        {
+          "from": 4226549,
+          "to": 4226647,
+          "n": 99
+        },
+        {
+          "from": 4226649,
+          "to": 4226737,
+          "n": 89
+        },
+        {
+          "from": 4226739,
+          "to": 4226747,
+          "n": 9
+        }
+      ],
+      "persisted_gap_intervals_total": 56,
+      "capture_completeness_ratio": 0.007056819564423896,
+      "first_ts": 1788483671535,
+      "last_ts": 1788485315135,
+      "zst_bytes": 10836
+    },
+    {
+      "segment_index": 4,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_004",
+      "manifest": {
+        "continuation_index": 4,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4229316,
+        "last_u": 4238315,
+        "delta_count": 53,
+        "queue_drops": 113225,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 53,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 53
+      },
+      "persisted_first_u": 4229640,
+      "persisted_last_u": 4237850,
+      "source_u_span_estimate": 8211,
+      "persisted_missing_u_estimate": 8158,
+      "persisted_u_gap_count": 51,
+      "persisted_gap_intervals": [
+        {
+          "from": 4229641,
+          "to": 4229650,
+          "n": 10
+        },
+        {
+          "from": 4229652,
+          "to": 4229750,
+          "n": 99
+        },
+        {
+          "from": 4229752,
+          "to": 4229850,
+          "n": 99
+        },
+        {
+          "from": 4229852,
+          "to": 4230240,
+          "n": 389
+        },
+        {
+          "from": 4230242,
+          "to": 4230340,
+          "n": 99
+        },
+        {
+          "from": 4230342,
+          "to": 4230551,
+          "n": 210
+        },
+        {
+          "from": 4230553,
+          "to": 4230651,
+          "n": 99
+        },
+        {
+          "from": 4230653,
+          "to": 4230751,
+          "n": 99
+        },
+        {
+          "from": 4230753,
+          "to": 4230851,
+          "n": 99
+        },
+        {
+          "from": 4230853,
+          "to": 4230951,
+          "n": 99
+        },
+        {
+          "from": 4230953,
+          "to": 4231051,
+          "n": 99
+        },
+        {
+          "from": 4231053,
+          "to": 4231242,
+          "n": 190
+        },
+        {
+          "from": 4231244,
+          "to": 4231341,
+          "n": 98
+        },
+        {
+          "from": 4231343,
+          "to": 4231441,
+          "n": 99
+        },
+        {
+          "from": 4231443,
+          "to": 4231542,
+          "n": 100
+        },
+        {
+          "from": 4231544,
+          "to": 4231742,
+          "n": 199
+        },
+        {
+          "from": 4231744,
+          "to": 4231752,
+          "n": 9
+        },
+        {
+          "from": 4231754,
+          "to": 4231852,
+          "n": 99
+        },
+        {
+          "from": 4231854,
+          "to": 4232242,
+          "n": 389
+        },
+        {
+          "from": 4232244,
+          "to": 4232342,
+          "n": 99
+        },
+        {
+          "from": 4232344,
+          "to": 4232443,
+          "n": 100
+        },
+        {
+          "from": 4232445,
+          "to": 4232553,
+          "n": 109
+        },
+        {
+          "from": 4232555,
+          "to": 4232653,
+          "n": 99
+        },
+        {
+          "from": 4232655,
+          "to": 4232753,
+          "n": 99
+        },
+        {
+          "from": 4232755,
+          "to": 4232853,
+          "n": 99
+        },
+        {
+          "from": 4232855,
+          "to": 4233043,
+          "n": 189
+        },
+        {
+          "from": 4233046,
+          "to": 4233143,
+          "n": 98
+        },
+        {
+          "from": 4233145,
+          "to": 4233654,
+          "n": 510
+        },
+        {
+          "from": 4233656,
+          "to": 4233754,
+          "n": 99
+        },
+        {
+          "from": 4233756,
+          "to": 4234044,
+          "n": 289
+        },
+        {
+          "from": 4234046,
+          "to": 4234455,
+          "n": 410
+        },
+        {
+          "from": 4234457,
+          "to": 4234555,
+          "n": 99
+        },
+        {
+          "from": 4234557,
+          "to": 4234645,
+          "n": 89
+        },
+        {
+          "from": 4234647,
+          "to": 4234655,
+          "n": 9
+        },
+        {
+          "from": 4234657,
+          "to": 4235446,
+          "n": 790
+        },
+        {
+          "from": 4235448,
+          "to": 4235456,
+          "n": 9
+        },
+        {
+          "from": 4235458,
+          "to": 4235556,
+          "n": 99
+        },
+        {
+          "from": 4235558,
+          "to": 4236047,
+          "n": 490
+        },
+        {
+          "from": 4236049,
+          "to": 4236147,
+          "n": 99
+        },
+        {
+          "from": 4236149,
+          "to": 4236457,
+          "n": 309
+        }
+      ],
+      "persisted_gap_intervals_total": 51,
+      "capture_completeness_ratio": 0.006454755815369626,
+      "first_ts": 1788485473134,
+      "last_ts": 1788487115134,
+      "zst_bytes": 9579
+    },
+    {
+      "segment_index": 5,
+      "directory": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/events/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_005",
+      "manifest": {
+        "continuation_index": 5,
+        "status": null,
+        "started_at": null,
+        "ended_at": null,
+        "first_u": 4238316,
+        "last_u": 4247315,
+        "delta_count": 61,
+        "queue_drops": 112683,
+        "bytes_written": null,
+        "u_gap_count": 0,
+        "coverage": null,
+        "segment_finalization_reason": null,
+        "keys": [
+          "actual_final_ts",
+          "bootstrap_persistent_capture",
+          "bootstrap_status",
+          "buffer_overflow",
+          "completion_status",
+          "config",
+          "continuation_index",
+          "contract_version",
+          "data_quality",
+          "data_sources",
+          "dedup_key",
+          "delta_count",
+          "distance_to_edge_bps",
+          "edge",
+          "edge_entry_crossed",
+          "edge_price",
+          "edge_price_at_trigger",
+          "edge_type",
+          "event_directory",
+          "event_end",
+          "event_id",
+          "event_start",
+          "extension_count",
+          "extension_reason",
+          "fight_event_id",
+          "finalization_reason",
+          "first_cts",
+          "first_seq",
+          "first_u",
+          "flush_count",
+          "gap_count",
+          "hard_capture_end_ts",
+          "incomplete_reasons",
+          "last_cts",
+          "last_seq",
+          "last_u",
+          "level_update_count",
+          "market_price_at_trigger",
+          "minimum_capture_end_ts",
+          "normal_end_ts",
+          "outcome_status",
+          "post_trigger_seconds_actual",
+          "pre_trigger_seconds_actual",
+          "prebuffer_start_ns",
+          "previous_segment_sha256",
+          "prior_zone_state",
+          "profile_contract_version",
+          "profile_cutoff",
+          "profile_cutoff_ts",
+          "profile_session_start",
+          "queue_drop_count",
+          "queue_drops",
+          "reconnect_count",
+          "relevant_edge",
+          "research_eligible",
+          "result_ts",
+          "retouch_count",
+          "rpi_included",
+          "schema_version",
+          "segment_count",
+          "segment_first_u",
+          "segment_last_u",
+          "segment_sha256",
+          "segments",
+          "sha256",
+          "snapshot_ask_levels",
+          "snapshot_bid_levels",
+          "snapshot_timestamp",
+          "stale_update_count",
+          "storage_root",
+          "symbol",
+          "symbol_event_id",
+          "timing_contract",
+          "total_capture_seconds",
+          "trade_count",
+          "trigger_quality",
+          "trigger_reason",
+          "trigger_receive_time_ns",
+          "trigger_seq",
+          "trigger_source",
+          "trigger_time",
+          "trigger_ts",
+          "trigger_u",
+          "trigger_zone_state",
+          "u_gap_count"
+        ]
+      },
+      "persisted_record_count": 61,
+      "record_sample_keys": [
+        "apply_outcome",
+        "cts",
+        "data",
+        "flight_phase",
+        "level_update_count",
+        "local_receive_time_ns",
+        "topic",
+        "ts",
+        "type"
+      ],
+      "type_counts": {
+        "delta": 61
+      },
+      "persisted_first_u": 4238460,
+      "persisted_last_u": 4246969,
+      "source_u_span_estimate": 8510,
+      "persisted_missing_u_estimate": 8449,
+      "persisted_u_gap_count": 60,
+      "persisted_gap_intervals": [
+        {
+          "from": 4238461,
+          "to": 4238550,
+          "n": 90
+        },
+        {
+          "from": 4238552,
+          "to": 4238559,
+          "n": 8
+        },
+        {
+          "from": 4238561,
+          "to": 4238650,
+          "n": 90
+        },
+        {
+          "from": 4238652,
+          "to": 4238659,
+          "n": 8
+        },
+        {
+          "from": 4238661,
+          "to": 4238750,
+          "n": 90
+        },
+        {
+          "from": 4238752,
+          "to": 4238849,
+          "n": 98
+        },
+        {
+          "from": 4238851,
+          "to": 4238950,
+          "n": 100
+        },
+        {
+          "from": 4238952,
+          "to": 4239050,
+          "n": 99
+        },
+        {
+          "from": 4239052,
+          "to": 4239160,
+          "n": 109
+        },
+        {
+          "from": 4239162,
+          "to": 4239260,
+          "n": 99
+        },
+        {
+          "from": 4239262,
+          "to": 4239360,
+          "n": 99
+        },
+        {
+          "from": 4239362,
+          "to": 4239451,
+          "n": 90
+        },
+        {
+          "from": 4239453,
+          "to": 4239550,
+          "n": 98
+        },
+        {
+          "from": 4239552,
+          "to": 4239751,
+          "n": 200
+        },
+        {
+          "from": 4239753,
+          "to": 4239951,
+          "n": 199
+        },
+        {
+          "from": 4239953,
+          "to": 4239961,
+          "n": 9
+        },
+        {
+          "from": 4239963,
+          "to": 4240061,
+          "n": 99
+        },
+        {
+          "from": 4240063,
+          "to": 4240151,
+          "n": 89
+        },
+        {
+          "from": 4240153,
+          "to": 4240452,
+          "n": 300
+        },
+        {
+          "from": 4240454,
+          "to": 4240552,
+          "n": 99
+        },
+        {
+          "from": 4240554,
+          "to": 4241153,
+          "n": 600
+        },
+        {
+          "from": 4241155,
+          "to": 4241162,
+          "n": 8
+        },
+        {
+          "from": 4241164,
+          "to": 4241262,
+          "n": 99
+        },
+        {
+          "from": 4241264,
+          "to": 4241362,
+          "n": 99
+        },
+        {
+          "from": 4241364,
+          "to": 4241462,
+          "n": 99
+        },
+        {
+          "from": 4241464,
+          "to": 4242054,
+          "n": 591
+        },
+        {
+          "from": 4242056,
+          "to": 4242153,
+          "n": 98
+        },
+        {
+          "from": 4242155,
+          "to": 4242263,
+          "n": 109
+        },
+        {
+          "from": 4242265,
+          "to": 4242363,
+          "n": 99
+        },
+        {
+          "from": 4242365,
+          "to": 4242463,
+          "n": 99
+        },
+        {
+          "from": 4242465,
+          "to": 4242753,
+          "n": 289
+        },
+        {
+          "from": 4242755,
+          "to": 4243055,
+          "n": 301
+        },
+        {
+          "from": 4243057,
+          "to": 4243328,
+          "n": 272
+        },
+        {
+          "from": 4243330,
+          "to": 4243464,
+          "n": 135
+        },
+        {
+          "from": 4243466,
+          "to": 4243564,
+          "n": 99
+        },
+        {
+          "from": 4243566,
+          "to": 4243856,
+          "n": 291
+        },
+        {
+          "from": 4243858,
+          "to": 4243965,
+          "n": 108
+        },
+        {
+          "from": 4243967,
+          "to": 4244065,
+          "n": 99
+        },
+        {
+          "from": 4244067,
+          "to": 4244165,
+          "n": 99
+        },
+        {
+          "from": 4244167,
+          "to": 4244256,
+          "n": 90
+        }
+      ],
+      "persisted_gap_intervals_total": 60,
+      "capture_completeness_ratio": 0.007168037602820212,
+      "first_ts": 1788487237134,
+      "last_ts": 1788488938935,
+      "zst_bytes": 8848
+    }
+  ],
+  "event_manifest_all_keys": [
+    "actual_final_ts",
+    "bootstrap_persistent_capture",
+    "bootstrap_status",
+    "data_quality",
+    "dedup_key",
+    "distance_to_edge_bps",
+    "edge",
+    "edge_entry_crossed",
+    "edge_price",
+    "edge_price_at_trigger",
+    "edge_type",
+    "event_manifest_sha256",
+    "extension_count",
+    "extension_reason",
+    "fight_event_id",
+    "finalization_reason",
+    "hard_capture_end_ts",
+    "incomplete_reasons",
+    "market_price_at_trigger",
+    "minimum_capture_end_ts",
+    "normal_end_ts",
+    "outcome_status",
+    "post_trigger_seconds_actual",
+    "pre_trigger_seconds_actual",
+    "prior_zone_state",
+    "profile_contract_version",
+    "profile_cutoff_ts",
+    "profile_session_start",
+    "queue_drop_count",
+    "replay_status",
+    "research_eligible",
+    "result_ts",
+    "retouch_count",
+    "segment_count",
+    "segments",
+    "stale_update_count",
+    "symbol_event_id",
+    "timing_contract",
+    "total_capture_seconds",
+    "trigger_quality",
+    "trigger_receive_time_ns",
+    "trigger_seq",
+    "trigger_source",
+    "trigger_ts",
+    "trigger_u",
+    "trigger_zone_state",
+    "u_gap_count"
+  ],
+  "plan_segments": [
+    {
+      "continuation_index": 0,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04",
+      "next_segment_expected": true,
+      "previous_segment_sha256": null,
+      "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+      "segment_first_ts": "2026-09-03T23:20:07.534000Z",
+      "segment_first_u": 4185752,
+      "segment_last_ts": "2026-09-04T00:00:08.134000Z",
+      "segment_last_u": 4202315,
+      "segment_sha256": "3311217b4d4d0befe8bc2bb5586b98fbd855a01ff7734563c1bf0f355ce983ef"
+    },
+    {
+      "continuation_index": 1,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_001",
+      "next_segment_expected": true,
+      "previous_segment_sha256": "3311217b4d4d0befe8bc2bb5586b98fbd855a01ff7734563c1bf0f355ce983ef",
+      "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+      "segment_first_ts": "2026-09-04T00:00:08.334000Z",
+      "segment_first_u": 4202316,
+      "segment_last_ts": "2026-09-04T00:30:08.134000Z",
+      "segment_last_u": 4211315,
+      "segment_sha256": "47527cb58dd1cbefc41f2a038045a0951da6ac8a4c7bf5068d19b9179d76ee2e"
+    },
+    {
+      "continuation_index": 2,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_002",
+      "next_segment_expected": true,
+      "previous_segment_sha256": "47527cb58dd1cbefc41f2a038045a0951da6ac8a4c7bf5068d19b9179d76ee2e",
+      "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+      "segment_first_ts": "2026-09-04T00:30:08.334000Z",
+      "segment_first_u": 4211316,
+      "segment_last_ts": "2026-09-04T01:00:08.134000Z",
+      "segment_last_u": 4220315,
+      "segment_sha256": "b73b6082acd748025a0fd3532355d3e52bf859ba332d75e476b2fa9c815b61fb"
+    },
+    {
+      "continuation_index": 3,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_003",
+      "next_segment_expected": true,
+      "previous_segment_sha256": "b73b6082acd748025a0fd3532355d3e52bf859ba332d75e476b2fa9c815b61fb",
+      "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+      "segment_first_ts": "2026-09-04T01:00:08.334000Z",
+      "segment_first_u": 4220316,
+      "segment_last_ts": "2026-09-04T01:30:08.134000Z",
+      "segment_last_u": 4229315,
+      "segment_sha256": "6760b58d5b771df6eff5da60559d0e3426aa654b9751a4a73019c4eca8a9908d"
+    },
+    {
+      "continuation_index": 4,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_004",
+      "next_segment_expected": true,
+      "previous_segment_sha256": "6760b58d5b771df6eff5da60559d0e3426aa654b9751a4a73019c4eca8a9908d",
+      "segment_finalization_reason": "SEGMENT_TIME_LIMIT",
+      "segment_first_ts": "2026-09-04T01:30:08.334000Z",
+      "segment_first_u": 4229316,
+      "segment_last_ts": "2026-09-04T02:00:08.135000Z",
+      "segment_last_u": 4238315,
+      "segment_sha256": "b6089ecc832e36ef68a5c4f5e8e538b6994961cbe79fd7ce79e4ee964e820e08"
+    },
+    {
+      "continuation_index": 5,
+      "directory": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T233008Z_f0df8d9b04/cont_005",
+      "next_segment_expected": false,
+      "previous_segment_sha256": "b6089ecc832e36ef68a5c4f5e8e538b6994961cbe79fd7ce79e4ee964e820e08",
+      "segment_finalization_reason": "MAX_CAPTURE_DURATION_REACHED",
+      "segment_first_ts": "2026-09-04T02:00:08.334000Z",
+      "segment_first_u": 4238316,
+      "segment_last_ts": "2026-09-04T02:30:08.134000Z",
+      "segment_last_u": 4247315,
+      "segment_sha256": "60726df8f3ade99551fe3ee645cd2be34d6e649a67bca0b5af1c09e3a66ff6ac"
+    }
+  ]
+}

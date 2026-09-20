@@ -1,0 +1,523 @@
+{
+  "premove_trade_landscape_v3": {
+    "schema_version": "doge_premove_trade_landscape_v3",
+    "config": {
+      "barrier_bps": 25,
+      "film_start_offset_s": 30,
+      "film_end_offset_s": 8,
+      "min_break_gap_s": 120,
+      "max_wall_rank": 5,
+      "score_version": "v3_landscape_plus_public_trades"
+    },
+    "semantics": {
+      "event": "independent first \u00b125 bps break",
+      "film_window": "[break-30s, break-8s]",
+      "dedup": "min gap 120s between break times",
+      "walls": "connected walls with rank <= 5",
+      "score_version": "v3_landscape_plus_public_trades"
+    },
+    "evaluation": {
+      "score_version": "v3_landscape_plus_public_trades",
+      "score_freeze": {
+        "v2": {
+          "ask_front_cleared_weight": 2.0,
+          "ask_vacuum_scale_bps": 10.0,
+          "bid_vacuum_scale_bps": 10.0,
+          "excluded_from_v1": [
+            "distinct_ask_walls_pulled",
+            "distinct_ask_walls_filled",
+            "distinct_bid_walls_refilled",
+            "distinct_bid_walls_following",
+            "distinct_ask_walls_following"
+          ],
+          "motivation": "V1 descriptive contrasts on 18h showed ask_front_cleared and vacuum changes separating UP vs DOWN; V2 freezes that feature family without retuning V1 staircase."
+        },
+        "v3": {
+          "includes_v2": true,
+          "wall_ask_exec_log_scale": 10.0,
+          "wall_bid_exec_log_scale": 10.0,
+          "tape_buy_log_scale": 10.0,
+          "tape_sell_log_scale": 10.0,
+          "ask_fill_dominates_weight": 1.0,
+          "motivation": "Combine V2 vacuum/front-clear landscape with exact-price wall fills and raw public-trade tape imbalance in the same T-30\u2026T-8 window."
+        }
+      },
+      "event_counts": {
+        "UP": 64,
+        "DOWN": 72,
+        "total": 136
+      },
+      "feature_contrasts": {
+        "film_mid_return_bps": {
+          "up": {
+            "n": 64,
+            "mean": 3.389257,
+            "median": 3.305967
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.423199,
+            "median": -1.18998
+          },
+          "mean_diff_up_minus_down": 5.812456
+        },
+        "ask_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": 1.533484,
+            "median": -0.017041
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.662263,
+            "median": 0.00992
+          },
+          "mean_diff_up_minus_down": 4.195747
+        },
+        "bid_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -2.461537,
+            "median": -0.03566
+          },
+          "down": {
+            "n": 72,
+            "mean": 2.386668,
+            "median": 0.015431
+          },
+          "mean_diff_up_minus_down": -4.848205
+        },
+        "nearest_ask_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -1.333124,
+            "median": -0.463602
+          },
+          "down": {
+            "n": 72,
+            "mean": 1.208721,
+            "median": 0.170956
+          },
+          "mean_diff_up_minus_down": -2.541845
+        },
+        "nearest_bid_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -0.107715,
+            "median": -0.000124
+          },
+          "down": {
+            "n": 72,
+            "mean": -1.397553,
+            "median": -0.273798
+          },
+          "mean_diff_up_minus_down": 1.289838
+        },
+        "distinct_ask_walls_pulled": {
+          "up": {
+            "n": 64,
+            "mean": 7.828125,
+            "median": 7.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 6.569444,
+            "median": 6.0
+          },
+          "mean_diff_up_minus_down": 1.258681
+        },
+        "distinct_ask_walls_filled": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.388889,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.486111
+        },
+        "distinct_bid_walls_refilled": {
+          "up": {
+            "n": 64,
+            "mean": 0.46875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.208333,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.260417
+        },
+        "distinct_bid_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 12.046875,
+            "median": 8.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 10.361111,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 1.685764
+        },
+        "distinct_ask_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 13.140625,
+            "median": 11.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 9.541667,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 3.598958
+        },
+        "executed_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 26092.278368,
+            "median": 470.8008
+          },
+          "down": {
+            "n": 72,
+            "mean": 16742.611345,
+            "median": 113.83596
+          },
+          "mean_diff_up_minus_down": 9349.667023
+        },
+        "ask_executed_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 13259.141485,
+            "median": 93.70704
+          },
+          "down": {
+            "n": 72,
+            "mean": 1684.079929,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 11575.061556
+        },
+        "bid_executed_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 12833.136882,
+            "median": 17.37477
+          },
+          "down": {
+            "n": 72,
+            "mean": 15058.531416,
+            "median": 29.89674
+          },
+          "mean_diff_up_minus_down": -2225.394534
+        },
+        "pull_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 10333354.64854,
+            "median": 7727565.11299
+          },
+          "down": {
+            "n": 72,
+            "mean": 6715293.938643,
+            "median": 5699755.6891
+          },
+          "mean_diff_up_minus_down": 3618060.709897
+        },
+        "tape_buy_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 30362.668322,
+            "median": 6626.35878
+          },
+          "down": {
+            "n": 72,
+            "mean": 7712.907383,
+            "median": 1076.03196
+          },
+          "mean_diff_up_minus_down": 22649.760939
+        },
+        "tape_sell_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 21729.200405,
+            "median": 3057.94256
+          },
+          "down": {
+            "n": 72,
+            "mean": 25517.205829,
+            "median": 4562.72768
+          },
+          "mean_diff_up_minus_down": -3788.005424
+        },
+        "tape_imbalance": {
+          "up": {
+            "n": 63,
+            "mean": 0.397076,
+            "median": 0.60801
+          },
+          "down": {
+            "n": 69,
+            "mean": -0.412997,
+            "median": -0.682793
+          },
+          "mean_diff_up_minus_down": 0.810073
+        },
+        "ask_pull_events": {
+          "up": {
+            "n": 64,
+            "mean": 330.828125,
+            "median": 237.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 252.375,
+            "median": 223.0
+          },
+          "mean_diff_up_minus_down": 78.453125
+        },
+        "ask_fill_events": {
+          "up": {
+            "n": 64,
+            "mean": 1.796875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.680556,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 1.116319
+        },
+        "bid_refill_events": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.375,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.5
+        },
+        "ask_front_cleared_pull_and_fill": {
+          "up": {
+            "n": 64,
+            "successes": 41,
+            "rate": 0.640625,
+            "wilson_low": 0.518206,
+            "wilson_high": 0.747118
+          },
+          "down": {
+            "n": 72,
+            "successes": 26,
+            "rate": 0.361111,
+            "wilson_low": 0.259815,
+            "wilson_high": 0.476477
+          },
+          "rate_diff_up_minus_down": 0.279514
+        },
+        "ask_fill_dominates": {
+          "up": {
+            "n": 64,
+            "successes": 25,
+            "rate": 0.390625,
+            "wilson_low": 0.280554,
+            "wilson_high": 0.513083
+          },
+          "down": {
+            "n": 72,
+            "successes": 13,
+            "rate": 0.180556,
+            "wilson_low": 0.108667,
+            "wilson_high": 0.284806
+          },
+          "rate_diff_up_minus_down": 0.210069
+        },
+        "bullish_support_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        },
+        "bearish_pressure_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        },
+        "public_tape_available": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 72,
+            "rate": 1.0,
+            "wilson_low": 0.949347,
+            "wilson_high": 1.0
+          },
+          "rate_diff_up_minus_down": 0.0
+        }
+      },
+      "score_summary": {
+        "up_mean": 2.391399,
+        "down_mean": -0.007216,
+        "mean_diff_up_minus_down": 2.398616,
+        "sign_hit_rate": 0.698529,
+        "sign_hit_wilson_low": 0.616821,
+        "sign_hit_wilson_high": 0.76933,
+        "correct": 95,
+        "n": 136,
+        "mean_per_hour_sign_hit_rate": 0.730328,
+        "hours_with_events": 17,
+        "ask_front_cleared_rate_diff_up_minus_down": 0.279514
+      },
+      "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+      "pass_criteria": {
+        "min_events_30": true,
+        "up_score_gt_down_score": true,
+        "sign_hit_wilson_low_gt_0_55": true
+      }
+    },
+    "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+    "interpretation": "Pre-move film score v3_landscape_plus_public_trades separates UP vs DOWN above the pre-registered gate."
+  },
+  "premove_wall_film_score_v2_reference": {
+    "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+    "score_summary": {
+      "up_mean": 1.680752,
+      "down_mean": 0.217329,
+      "mean_diff_up_minus_down": 1.463423,
+      "sign_hit_rate": 0.639706,
+      "sign_hit_wilson_low": 0.556204,
+      "sign_hit_wilson_high": 0.715532,
+      "correct": 87,
+      "n": 136,
+      "mean_per_hour_sign_hit_rate": 0.656195,
+      "hours_with_events": 17,
+      "ask_front_cleared_rate_diff_up_minus_down": 0.279514
+    }
+  },
+  "chronological_holdout_v3": {
+    "discovery_first_10h": {
+      "hours": [
+        "20260906T100000Z",
+        "20260907T230000Z",
+        "20260908T050000Z",
+        "20260909T070000Z",
+        "20260910T060000Z",
+        "20260910T180000Z",
+        "20260910T220000Z",
+        "20260911T050000Z",
+        "20260912T030000Z",
+        "20260912T190000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 36,
+          "DOWN": 45,
+          "total": 81
+        },
+        "score_summary": {
+          "up_mean": 2.576478,
+          "down_mean": 0.676031,
+          "mean_diff_up_minus_down": 1.900447,
+          "sign_hit_rate": 0.62963,
+          "sign_hit_wilson_low": 0.520835,
+          "sign_hit_wilson_high": 0.726685,
+          "correct": 51,
+          "n": 81,
+          "mean_per_hour_sign_hit_rate": 0.633608,
+          "hours_with_events": 10,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.177778
+        },
+        "verdict": "FAIL_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": false
+        }
+      }
+    },
+    "confirmation_last_8h": {
+      "hours": [
+        "20260913T070000Z",
+        "20260913T210000Z",
+        "20260914T210000Z",
+        "20260916T050000Z",
+        "20260917T230000Z",
+        "20260918T090000Z",
+        "20260918T130000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 28,
+          "DOWN": 27,
+          "total": 55
+        },
+        "score_summary": {
+          "up_mean": 2.153441,
+          "down_mean": -1.145961,
+          "mean_diff_up_minus_down": 3.299403,
+          "sign_hit_rate": 0.8,
+          "sign_hit_wilson_low": 0.676349,
+          "sign_hit_wilson_high": 0.884479,
+          "correct": 44,
+          "n": 55,
+          "mean_per_hour_sign_hit_rate": 0.868498,
+          "hours_with_events": 7,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.416667
+        },
+        "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": true
+        }
+      }
+    }
+  },
+  "public_tape_events_available": 136,
+  "honesty": {
+    "trade_sources": [
+      "exact-price wall attribution (EXECUTED_LIKELY ask/bid notional)",
+      "raw public-trade tape buy/sell notional in the same film window"
+    ],
+    "note": "V3 freezes V2 landscape scales and adds log1p trade terms /10 plus ask_fill_dominates; no coefficient search. Same-sample motivation risk remains; use chrono holdout."
+  }
+}

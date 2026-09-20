@@ -1,0 +1,34 @@
+{
+  "candidate_count": 120,
+  "candidate_window_end_utc": "2026-08-30T17:00:00Z",
+  "candidate_window_start_utc": "2026-08-30T15:00:00Z",
+  "causal_checks_passed": true,
+  "database_access": "bounded read-only SELECT; no writes",
+  "eligible_episode_count": 17,
+  "excluded_candidate_count": 103,
+  "exclusion_counts": {
+    "DUPLICATE_OR_OVERLAPPING_EPISODE": 103
+  },
+  "horizon_minutes": 60,
+  "idempotence": {
+    "core_fingerprint_equal": true,
+    "core_fingerprint_sha256": "268b3e42f19f99a56f991af4c1a7f8c8fb9235a1d526e75f9727850bee8c5b23",
+    "core_hashes_equal": true
+  },
+  "non_overlap_check_passed": true,
+  "outcome_counts": {
+    "LOWER_FIRST": 8,
+    "NEITHER_WITHIN_HORIZON": 1,
+    "UPPER_FIRST": 8
+  },
+  "research_only": true,
+  "resources": {
+    "elapsed_seconds": 4.16,
+    "maximum_resident_set_kb": 73008.0,
+    "system_seconds": 0.02,
+    "user_seconds": 1.67
+  },
+  "single_process": true,
+  "symbol": "BTCUSDT",
+  "verdict": "SMOKE_COMPLETE"
+}

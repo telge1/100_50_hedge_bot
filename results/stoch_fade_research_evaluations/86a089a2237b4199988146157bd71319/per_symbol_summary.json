@@ -1,0 +1,308 @@
+{
+  "1000BONKUSDT": {
+    "losses": 492,
+    "open": 0,
+    "signals": 1279,
+    "wins": 787
+  },
+  "1000PEPEUSDT": {
+    "losses": 450,
+    "open": 1,
+    "signals": 1201,
+    "wins": 750
+  },
+  "AAVEUSDT": {
+    "losses": 475,
+    "open": 1,
+    "signals": 1212,
+    "wins": 736
+  },
+  "ADAUSDT": {
+    "losses": 392,
+    "open": 3,
+    "signals": 992,
+    "wins": 597
+  },
+  "ALGOUSDT": {
+    "losses": 474,
+    "open": 2,
+    "signals": 1212,
+    "wins": 736
+  },
+  "APTUSDT": {
+    "losses": 466,
+    "open": 0,
+    "signals": 1260,
+    "wins": 794
+  },
+  "ARBUSDT": {
+    "losses": 482,
+    "open": 0,
+    "signals": 1259,
+    "wins": 777
+  },
+  "ATOMUSDT": {
+    "losses": 408,
+    "open": 3,
+    "signals": 982,
+    "wins": 571
+  },
+  "AVAXUSDT": {
+    "losses": 367,
+    "open": 1,
+    "signals": 945,
+    "wins": 577
+  },
+  "BNBUSDT": {
+    "losses": 220,
+    "open": 21,
+    "signals": 566,
+    "wins": 325
+  },
+  "BTCUSDT": {
+    "losses": 227,
+    "open": 21,
+    "signals": 541,
+    "wins": 293
+  },
+  "CRVUSDT": {
+    "losses": 468,
+    "open": 0,
+    "signals": 1218,
+    "wins": 750
+  },
+  "DOGEUSDT": {
+    "losses": 357,
+    "open": 5,
+    "signals": 885,
+    "wins": 523
+  },
+  "DOTUSDT": {
+    "losses": 424,
+    "open": 0,
+    "signals": 1070,
+    "wins": 646
+  },
+  "ENAUSDT": {
+    "losses": 512,
+    "open": 0,
+    "signals": 1388,
+    "wins": 876
+  },
+  "ETHUSDT": {
+    "losses": 324,
+    "open": 11,
+    "signals": 780,
+    "wins": 445
+  },
+  "FARTCOINUSDT": {
+    "losses": 579,
+    "open": 0,
+    "signals": 1629,
+    "wins": 1050
+  },
+  "HBARUSDT": {
+    "losses": 365,
+    "open": 7,
+    "signals": 918,
+    "wins": 546
+  },
+  "HYPEUSDT": {
+    "losses": 524,
+    "open": 1,
+    "signals": 1394,
+    "wins": 869
+  },
+  "ICPUSDT": {
+    "losses": 464,
+    "open": 2,
+    "signals": 1212,
+    "wins": 746
+  },
+  "INJUSDT": {
+    "losses": 492,
+    "open": 0,
+    "signals": 1357,
+    "wins": 865
+  },
+  "JTOUSDT": {
+    "losses": 596,
+    "open": 0,
+    "signals": 1594,
+    "wins": 998
+  },
+  "KAITOUSDT": {
+    "losses": 524,
+    "open": 0,
+    "signals": 1416,
+    "wins": 892
+  },
+  "LINKUSDT": {
+    "losses": 361,
+    "open": 3,
+    "signals": 896,
+    "wins": 532
+  },
+  "LITUSDT": {
+    "losses": 648,
+    "open": 0,
+    "signals": 1953,
+    "wins": 1305
+  },
+  "LTCUSDT": {
+    "losses": 275,
+    "open": 10,
+    "signals": 712,
+    "wins": 427
+  },
+  "MNTUSDT": {
+    "losses": 328,
+    "open": 10,
+    "signals": 750,
+    "wins": 412
+  },
+  "NEARUSDT": {
+    "losses": 467,
+    "open": 0,
+    "signals": 1294,
+    "wins": 827
+  },
+  "ONDOUSDT": {
+    "losses": 512,
+    "open": 0,
+    "signals": 1322,
+    "wins": 810
+  },
+  "OPUSDT": {
+    "losses": 482,
+    "open": 0,
+    "signals": 1297,
+    "wins": 815
+  },
+  "PAXGUSDT": {
+    "losses": 124,
+    "open": 59,
+    "signals": 348,
+    "wins": 165
+  },
+  "PENGUUSDT": {
+    "losses": 520,
+    "open": 0,
+    "signals": 1473,
+    "wins": 953
+  },
+  "PUMPFUNUSDT": {
+    "losses": 586,
+    "open": 0,
+    "signals": 1619,
+    "wins": 1033
+  },
+  "RENDERUSDT": {
+    "losses": 512,
+    "open": 0,
+    "signals": 1402,
+    "wins": 890
+  },
+  "SHIB1000USDT": {
+    "losses": 360,
+    "open": 4,
+    "signals": 910,
+    "wins": 546
+  },
+  "SOLUSDT": {
+    "losses": 364,
+    "open": 6,
+    "signals": 896,
+    "wins": 526
+  },
+  "SUIUSDT": {
+    "losses": 451,
+    "open": 1,
+    "signals": 1118,
+    "wins": 666
+  },
+  "TAOUSDT": {
+    "losses": 486,
+    "open": 0,
+    "signals": 1391,
+    "wins": 905
+  },
+  "TIAUSDT": {
+    "losses": 534,
+    "open": 0,
+    "signals": 1438,
+    "wins": 904
+  },
+  "TRUMPUSDT": {
+    "losses": 405,
+    "open": 0,
+    "signals": 1031,
+    "wins": 626
+  },
+  "TRXUSDT": {
+    "losses": 96,
+    "open": 95,
+    "signals": 282,
+    "wins": 91
+  },
+  "UNIUSDT": {
+    "losses": 435,
+    "open": 1,
+    "signals": 1132,
+    "wins": 696
+  },
+  "WIFUSDT": {
+    "losses": 488,
+    "open": 0,
+    "signals": 1370,
+    "wins": 882
+  },
+  "WLDUSDT": {
+    "losses": 520,
+    "open": 0,
+    "signals": 1441,
+    "wins": 921
+  },
+  "WLFIUSDT": {
+    "losses": 391,
+    "open": 4,
+    "signals": 1098,
+    "wins": 703
+  },
+  "XAUTUSDT": {
+    "losses": 119,
+    "open": 61,
+    "signals": 332,
+    "wins": 152
+  },
+  "XLMUSDT": {
+    "losses": 422,
+    "open": 3,
+    "signals": 1064,
+    "wins": 639
+  },
+  "XMRUSDT": {
+    "losses": 416,
+    "open": 1,
+    "signals": 1226,
+    "wins": 809
+  },
+  "XPLUSDT": {
+    "losses": 589,
+    "open": 0,
+    "signals": 1746,
+    "wins": 1157
+  },
+  "XRPUSDT": {
+    "losses": 321,
+    "open": 17,
+    "signals": 780,
+    "wins": 442
+  },
+  "ZECUSDT": {
+    "losses": 536,
+    "open": 0,
+    "signals": 1546,
+    "wins": 1010
+  }
+}

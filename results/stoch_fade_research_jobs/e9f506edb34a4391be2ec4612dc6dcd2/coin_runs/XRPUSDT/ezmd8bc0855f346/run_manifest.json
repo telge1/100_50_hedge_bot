@@ -1,0 +1,24 @@
+{
+  "compiler": "compile_candidate_discovery_v2",
+  "computation_mode": "ema_only",
+  "coverage_status": "OK",
+  "data_basis": "candles_1m",
+  "effective_end": "2026-08-27T08:44:00Z",
+  "effective_start": "2026-07-28T08:45:00Z",
+  "oa_repo": "/home/telgenbuescher/projects/orderbook_analyse",
+  "orderbook_loaded": false,
+  "result_contract_version": "ezm_stoch_signale_candidates/v1",
+  "run_id": "ezmd8bc0855f346",
+  "run_intent": "candidate_discovery",
+  "runner_kind": "ezm_continuous_discovery",
+  "selected_symbol": "XRPUSDT",
+  "selected_symbols": [
+    "XRPUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-27T08:45:00Z",
+  "signal_start": "2026-07-28T08:45:00Z",
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "strategy_spec_hash": "e5fc667fdd4ae5f8c3c58e2583e17b61a6f19c37e94fc4c717c3fafdf3189f58",
+  "touch_price_basis": "candle_ohlc_1m",
+  "trade_compiler_used": false
+}

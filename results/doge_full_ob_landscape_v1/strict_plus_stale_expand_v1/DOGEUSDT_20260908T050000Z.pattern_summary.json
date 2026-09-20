@@ -1,0 +1,17 @@
+{
+  "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+  "utc_hour": "2026-09-08T05:00:00Z",
+  "pattern_count": 81,
+  "pattern_counts": {
+    "COMPRESSION": 56,
+    "BULLISH_STAIRCASE": 6,
+    "BEARISH_STAIRCASE": 19
+  },
+  "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260908T050000Z.patterns.jsonl",
+  "semantics": {
+    "staircase_and_compression": "causal evidence through detected_at",
+    "trap_and_absorption": "post-event confirmed; not live signals",
+    "cooldown_seconds": 30,
+    "unknown_policy": "no label unless every minimum condition passes"
+  }
+}

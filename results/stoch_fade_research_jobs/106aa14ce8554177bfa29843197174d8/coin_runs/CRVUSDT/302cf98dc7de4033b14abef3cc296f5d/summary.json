@@ -1,0 +1,9 @@
+{
+  "raw_total": 6354,
+  "run_id": "302cf98dc7de4033b14abef3cc296f5d",
+  "statuses": {
+    "CRVUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1218
+}

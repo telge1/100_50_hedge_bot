@@ -1,0 +1,22 @@
+{
+  "coverage_status": "DATA_INCOMPLETE",
+  "effective_end": null,
+  "effective_start": null,
+  "incomplete_reason": "missing:orderbook_ob200_v3_raw",
+  "missing_sources": [
+    "orderbook_ob200_v3_raw:DATA_INCOMPLETE",
+    "liquidity_locations:OPTIONAL_UNAVAILABLE"
+  ],
+  "result_contract_version": "ezm_stoch_signale_candidates/v1",
+  "run_id": "ezmcbb8600dd392",
+  "run_intent": "candidate_discovery",
+  "runner_kind": "ezm_continuous_discovery",
+  "selected_symbol": "XRPUSDT",
+  "selected_symbols": [
+    "XRPUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-26T18:18:00Z",
+  "signal_start": "2026-08-19T18:18:00Z",
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "strategy_spec_hash": "e5fc667fdd4ae5f8c3c58e2583e17b61a6f19c37e94fc4c717c3fafdf3189f58"
+}

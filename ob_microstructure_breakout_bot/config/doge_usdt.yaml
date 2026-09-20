@@ -1,0 +1,31 @@
+# DOGEUSDT thresholds seeded from calibration (2026-09 research).
+# Numbers are starting filters — refine after more labeled cases.
+#
+# Reference anchors (long):
+#   Tier2: 13:15-13:20 confirm delta ~ +234k, OB 5bps bid/ask ~ 2.8x
+#   Tier1: 19/09 09:35-10:25 accepted but moderate
+#   Tier0: 14:25-14:30 failed long, next window flipped hard negative
+
+symbol: DOGEUSDT
+
+# Confirm-window public-trade delta (USDT notional)
+fakeout_max_confirm_delta: 50000.0
+tier1_min_confirm_delta: 100000.0
+tier2_min_confirm_delta: 200000.0
+
+# Order-book 5bps bid/ask ratio (bid_notional / ask_notional)
+tier1_min_bid_ask_ratio_5bps: 1.05
+tier2_min_bid_ask_ratio_5bps: 2.0
+
+# If follow-through window delta is below this (more negative), treat as fakeout
+fakeout_followthrough_flip_delta: -100000.0
+
+# Context windows (minutes)
+context_lookback_minutes: 30
+confirm_window_minutes: 5
+followthrough_candles: 2
+
+# Trend ride (EMA200):
+# - Ignore brief price / EMA9 dips into EMA200 while EMA20 stays above EMA200 and EMA59
+# - Exit only on EMA20<EMA59, EMA59<EMA200, or EMA20<EMA200 + sell/OB confirmation
+

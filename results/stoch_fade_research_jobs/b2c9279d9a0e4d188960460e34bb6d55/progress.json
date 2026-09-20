@@ -1,0 +1,52 @@
+{
+  "coins": [
+    {
+      "artifact_reference": null,
+      "duration_seconds": 79.077,
+      "effective_end": "2026-08-26T21:38:00Z",
+      "effective_start": "2026-07-27T21:39:00Z",
+      "error_code": null,
+      "finished_at": "2026-08-26T21:41:05Z",
+      "message": "candidates=0 markers=0",
+      "missing_sources": [],
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "4h": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "5m": {
+          "raw": 0,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 0,
+      "returncode": null,
+      "runner_run_id": "ezma5aeb0f078c1",
+      "started_at": "2026-08-26T21:39:46Z",
+      "state": "COMPLETED",
+      "symbol": "XRPUSDT",
+      "tier_a_total": 0,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ]
+}

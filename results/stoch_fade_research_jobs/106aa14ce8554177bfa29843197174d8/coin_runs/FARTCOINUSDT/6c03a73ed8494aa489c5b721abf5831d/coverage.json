@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6292,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "FARTCOINUSDT",
+      "tier_a_count": 1629,
+      "warmup_complete": false
+    }
+  ]
+}

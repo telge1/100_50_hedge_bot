@@ -1,0 +1,434 @@
+(base) telgenbuescher@server-telgenbuescher:~/projects/orderbook_analyse/results/fractal_wave_fade_manual_10_trade_report$ cat manual_10_trades.md
+# Manual 10-Trade Audit Report
+
+- Audit: `fractal_wave_fade_manual_10_trade_report_v1`
+- Window: **2026-07-01 00:00:00 UTC** → **2026-07-31 23:59:59 UTC** (PRIMARY_JULY_2026)
+- Trades selected: **10** (chronological)
+- Local equity start: ACTIVE=1000.0, RESERVE=0.0; cashout=0.3, reimbursement coverage=1.0
+- Note: local equity is **sample-only** from 1000 USDT — not historical portfolio equity at these dates.
+
+## Control table
+
+| # | Time | Symbol | Side | Entry | TP | SL | Exit | Reason | Net % | Active After | Reserve |
+|---|------|--------|------|-------|----|----|------|--------|-------|--------------|---------|
+| 1 | 2026-07-01 04:31:00 UTC | DOGEUSDT | SHORT | 0.07249 | 0.0717651 | 0.0732149 | 0.0717651 | TP | +0.89 | 1006.23 | 2.67 |
+| 2 | 2026-07-03 14:01:00 UTC | DOGEUSDT | SHORT | 0.07631 | 0.0747838 | 0.0774546 | 0.0774546 | SL | -1.61 | 992.70 | 0.00 |
+| 3 | 2026-07-03 19:46:00 UTC | DOGEUSDT | SHORT | 0.0773 | 0.076527 | 0.078073 | 0.078073 | SL | -1.11 | 981.68 | 0.00 |
+| 4 | 2026-07-07 14:46:00 UTC | APTUSDT | LONG | 0.6334 | 0.639734 | 0.627066 | 0.639734 | TP | +0.89 | 987.80 | 2.62 |
+| 5 | 2026-07-14 13:16:00 UTC | DOGEUSDT | SHORT | 0.07328 | 0.0725472 | 0.0740128 | 0.0740128 | SL | -1.11 | 979.45 | 0.00 |
+| 6 | 2026-07-18 01:31:00 UTC | APTUSDT | SHORT | 0.6255 | 0.61299 | 0.634882 | 0.61299 | TP | +1.89 | 992.41 | 5.55 |
+| 7 | 2026-07-22 14:31:00 UTC | APTUSDT | SHORT | 0.6085 | 0.59633 | 0.617627 | 0.617627 | SL | -1.61 | 981.99 | 0.00 |
+| 8 | 2026-07-24 04:01:00 UTC | DOGEUSDT | LONG | 0.06935 | 0.072124 | 0.067963 | 0.072124 | TP | +3.89 | 1008.73 | 11.46 |
+| 9 | 2026-07-30 23:46:00 UTC | APTUSDT | LONG | 0.569 | 0.57469 | 0.56331 | 0.57469 | TP | +0.89 | 1015.01 | 14.15 |
+| 10 | 2026-07-31 07:01:00 UTC | APTUSDT | LONG | 0.5638 | 0.575076 | 0.555343 | 0.555343 | SL | -1.61 | 1012.82 | 0.00 |
+
+--------------------------------------------------
+TRADE 1
+--------------------------------------------------
+trade_id: 6392
+Symbol: DOGEUSDT
+Side: SHORT
+Signal TF: 15m  → highest: 15m
+
+Signal context:
+  15m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0348
+
+Signal:             2026-07-01 04:30:00 UTC
+Signal available:   2026-07-01 04:30:00 UTC
+Entry:              2026-07-01 04:31:00 UTC
+Entry price:        0.07249
+
+Initial TP: 0.0717651 (+1.00%)  SL: 0.0732149 (-1.00%)
+Final   TP: 0.0717651 (+1.00%)  SL: 0.0732149 (-1.00%)
+Upgrades: 0  sequence: 15m
+
+Exit:               2026-07-01 06:21:00 UTC
+Exit price:         0.0717651
+Exit reason:        TP
+Holding:            110.0 min
+
+Gross:              +1.00%
+Fees:               -0.11%
+Net:                +0.89%
+
+Local equity (sample from 1000):
+  before  ACTIVE=1000.00  RESERVE=0.00  TOTAL=1000.00
+  raw_trade_pnl:     +8.9000
+  Cashout 30%:       2.6700
+  after   ACTIVE=1006.23  RESERVE=2.67  TOTAL=1008.90
+  HISTORICAL_FULL_PATH before: ACTIVE=5986543004.28  RESERVE=80754395.79
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 2
+--------------------------------------------------
+trade_id: 6402
+Symbol: DOGEUSDT
+Side: SHORT
+Signal TF: 15m  → highest: 1h
+
+Signal context:
+  15m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0614
+
+Signal:             2026-07-03 14:00:00 UTC
+Signal available:   2026-07-03 14:00:00 UTC
+Entry:              2026-07-03 14:01:00 UTC
+Entry price:        0.07631
+
+Initial TP: 0.0755469 (+1.00%)  SL: 0.0770731 (-1.00%)
+Final   TP: 0.0747838 (+2.00%)  SL: 0.0774546 (-1.50%)
+Upgrades: 1  sequence: 15m->1h
+
+Exit:               2026-07-03 19:38:00 UTC
+Exit price:         0.0774546
+Exit reason:        SL
+Holding:            337.0 min
+
+Gross:              -1.50%
+Fees:               -0.11%
+Net:                -1.61%
+
+Local equity (sample from 1000):
+  before  ACTIVE=1006.23  RESERVE=2.67  TOTAL=1008.90
+  raw_trade_pnl:     -16.2003
+  Loss:              -16.2003
+  Reimbursement:     2.6700
+  after   ACTIVE=992.70  RESERVE=0.00  TOTAL=992.70
+  HISTORICAL_FULL_PATH before: ACTIVE=6086227139.04  RESERVE=0.00
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+  notes: P5A_UPGRADE_PRESENT
+
+--------------------------------------------------
+TRADE 3
+--------------------------------------------------
+trade_id: 6403
+Symbol: DOGEUSDT
+Side: SHORT
+Signal TF: 15m  → highest: 15m
+
+Signal context:
+  15m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0194
+
+Signal:             2026-07-03 19:45:00 UTC
+Signal available:   2026-07-03 19:45:00 UTC
+Entry:              2026-07-03 19:46:00 UTC
+Entry price:        0.0773
+
+Initial TP: 0.076527 (+1.00%)  SL: 0.078073 (-1.00%)
+Final   TP: 0.076527 (+1.00%)  SL: 0.078073 (-1.00%)
+Upgrades: 0  sequence: 15m
+
+Exit:               2026-07-03 20:36:00 UTC
+Exit price:         0.078073
+Exit reason:        SL
+Holding:            50.0 min
+
+Gross:              -1.00%
+Fees:               -0.11%
+Net:                -1.11%
+
+Local equity (sample from 1000):
+  before  ACTIVE=992.70  RESERVE=0.00  TOTAL=992.70
+  raw_trade_pnl:     -11.0190
+  Loss:              -11.0190
+  Reimbursement:     0.0000
+  after   ACTIVE=981.68  RESERVE=0.00  TOTAL=981.68
+  HISTORICAL_FULL_PATH before: ACTIVE=5988238882.10  RESERVE=0.00
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 4
+--------------------------------------------------
+trade_id: 6411
+Symbol: APTUSDT
+Side: LONG
+Signal TF: 15m  → highest: 15m
+
+Signal context:
+  15m DOWN Wave → LONG Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.1451
+
+Signal:             2026-07-07 14:45:00 UTC
+Signal available:   2026-07-07 14:45:00 UTC
+Entry:              2026-07-07 14:46:00 UTC
+Entry price:        0.6334
+
+Initial TP: 0.639734 (+1.00%)  SL: 0.627066 (-1.00%)
+Final   TP: 0.639734 (+1.00%)  SL: 0.627066 (-1.00%)
+Upgrades: 0  sequence: 15m
+
+Exit:               2026-07-07 14:52:00 UTC
+Exit price:         0.639734
+Exit reason:        TP
+Holding:            6.0 min
+
+Gross:              +1.00%
+Fees:               -0.11%
+Net:                +0.89%
+
+Local equity (sample from 1000):
+  before  ACTIVE=981.68  RESERVE=0.00  TOTAL=981.68
+  raw_trade_pnl:     +8.7370
+  Cashout 30%:       2.6211
+  after   ACTIVE=987.80  RESERVE=2.62  TOTAL=990.42
+  HISTORICAL_FULL_PATH before: ACTIVE=6353136674.99  RESERVE=35551932.88
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 5
+--------------------------------------------------
+trade_id: 6423
+Symbol: DOGEUSDT
+Side: SHORT
+Signal TF: 15m  → highest: 15m
+
+Signal context:
+  15m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0260
+
+Signal:             2026-07-14 13:15:00 UTC
+Signal available:   2026-07-14 13:15:00 UTC
+Entry:              2026-07-14 13:16:00 UTC
+Entry price:        0.07328
+
+Initial TP: 0.0725472 (+1.00%)  SL: 0.0740128 (-1.00%)
+Final   TP: 0.0725472 (+1.00%)  SL: 0.0740128 (-1.00%)
+Upgrades: 0  sequence: 15m
+
+Exit:               2026-07-14 13:23:00 UTC
+Exit price:         0.0740128
+Exit reason:        SL
+Holding:            7.0 min
+
+Gross:              -1.00%
+Fees:               -0.11%
+Net:                -1.11%
+
+Local equity (sample from 1000):
+  before  ACTIVE=987.80  RESERVE=2.62  TOTAL=990.42
+  raw_trade_pnl:     -10.9645
+  Loss:              -10.9645
+  Reimbursement:     2.6211
+  after   ACTIVE=979.45  RESERVE=0.00  TOTAL=979.45
+  HISTORICAL_FULL_PATH before: ACTIVE=7054037096.84  RESERVE=0.00
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 6
+--------------------------------------------------
+trade_id: 6430
+Symbol: APTUSDT
+Side: SHORT
+Signal TF: 30m  → highest: 30m
+
+Signal context:
+  30m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.3664
+
+Signal:             2026-07-18 01:30:00 UTC
+Signal available:   2026-07-18 01:30:00 UTC
+Entry:              2026-07-18 01:31:00 UTC
+Entry price:        0.6255
+
+Initial TP: 0.61299 (+2.00%)  SL: 0.634882 (-1.50%)
+Final   TP: 0.61299 (+2.00%)  SL: 0.634882 (-1.50%)
+Upgrades: 0  sequence: 30m
+
+Exit:               2026-07-18 06:34:00 UTC
+Exit price:         0.61299
+Exit reason:        TP
+Holding:            303.0 min
+
+Gross:              +2.00%
+Fees:               -0.11%
+Net:                +1.89%
+
+Local equity (sample from 1000):
+  before  ACTIVE=979.45  RESERVE=0.00  TOTAL=979.45
+  raw_trade_pnl:     +18.5117
+  Cashout 30%:       5.5535
+  after   ACTIVE=992.41  RESERVE=5.55  TOTAL=997.96
+  HISTORICAL_FULL_PATH before: ACTIVE=6755125324.74  RESERVE=0.00
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 7
+--------------------------------------------------
+trade_id: 6440
+Symbol: APTUSDT
+Side: SHORT
+Signal TF: 30m  → highest: 30m
+
+Signal context:
+  30m UP Wave → SHORT Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0352
+
+Signal:             2026-07-22 14:30:00 UTC
+Signal available:   2026-07-22 14:30:00 UTC
+Entry:              2026-07-22 14:31:00 UTC
+Entry price:        0.6085
+
+Initial TP: 0.59633 (+2.00%)  SL: 0.617627 (-1.50%)
+Final   TP: 0.59633 (+2.00%)  SL: 0.617627 (-1.50%)
+Upgrades: 0  sequence: 30m
+
+Exit:               2026-07-22 16:08:00 UTC
+Exit price:         0.617627
+Exit reason:        SL
+Holding:            97.0 min
+
+Gross:              -1.50%
+Fees:               -0.11%
+Net:                -1.61%
+
+Local equity (sample from 1000):
+  before  ACTIVE=992.41  RESERVE=5.55  TOTAL=997.96
+  raw_trade_pnl:     -15.9778
+  Loss:              -15.9778
+  Reimbursement:     5.5535
+  after   ACTIVE=981.99  RESERVE=0.00  TOTAL=981.99
+  HISTORICAL_FULL_PATH before: ACTIVE=7047180359.47  RESERVE=76232132.76
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 8
+--------------------------------------------------
+trade_id: 6444
+Symbol: DOGEUSDT
+Side: LONG
+Signal TF: 4h  → highest: 4h
+
+Signal context:
+  4h DOWN Wave → LONG Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.1503
+
+Signal:             2026-07-24 04:00:00 UTC
+Signal available:   2026-07-24 04:00:00 UTC
+Entry:              2026-07-24 04:01:00 UTC
+Entry price:        0.06935
+
+Initial TP: 0.072124 (+4.00%)  SL: 0.067963 (-2.00%)
+Final   TP: 0.072124 (+4.00%)  SL: 0.067963 (-2.00%)
+Upgrades: 0  sequence: 4h
+
+Exit:               2026-07-25 16:44:00 UTC
+Exit price:         0.072124
+Exit reason:        TP
+Holding:            2203.0 min
+
+Gross:              +4.00%
+Fees:               -0.11%
+Net:                +3.89%
+
+Local equity (sample from 1000):
+  before  ACTIVE=981.99  RESERVE=0.00  TOTAL=981.99
+  raw_trade_pnl:     +38.1993
+  Cashout 30%:       11.4598
+  after   ACTIVE=1008.73  RESERVE=11.46  TOTAL=1020.19
+  HISTORICAL_FULL_PATH before: ACTIVE=7121069214.69  RESERVE=39849256.78
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 9
+--------------------------------------------------
+trade_id: 6459
+Symbol: APTUSDT
+Side: LONG
+Signal TF: 15m  → highest: 15m
+
+Signal context:
+  15m DOWN Wave → LONG Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.0485
+
+Signal:             2026-07-30 23:45:00 UTC
+Signal available:   2026-07-30 23:45:00 UTC
+Entry:              2026-07-30 23:46:00 UTC
+Entry price:        0.569
+
+Initial TP: 0.57469 (+1.00%)  SL: 0.56331 (-1.00%)
+Final   TP: 0.57469 (+1.00%)  SL: 0.56331 (-1.00%)
+Upgrades: 0  sequence: 15m
+
+Exit:               2026-07-31 01:09:00 UTC
+Exit price:         0.57469
+Exit reason:        TP
+Holding:            83.0 min
+
+Gross:              +1.00%
+Fees:               -0.11%
+Net:                +0.89%
+
+Local equity (sample from 1000):
+  before  ACTIVE=1008.73  RESERVE=11.46  TOTAL=1020.19
+  raw_trade_pnl:     +8.9777
+  Cashout 30%:       2.6933
+  after   ACTIVE=1015.01  RESERVE=14.15  TOTAL=1029.16
+  HISTORICAL_FULL_PATH before: ACTIVE=7744249093.38  RESERVE=60945471.42
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+TRADE 10
+--------------------------------------------------
+trade_id: 6460
+Symbol: APTUSDT
+Side: LONG
+Signal TF: 1h  → highest: 1h
+
+Signal context:
+  1h DOWN Wave → LONG Fade
+  Tier A | TREND_ALIGNED | Q4 | DE=0.1196
+
+Signal:             2026-07-31 07:00:00 UTC
+Signal available:   2026-07-31 07:00:00 UTC
+Entry:              2026-07-31 07:01:00 UTC
+Entry price:        0.5638
+
+Initial TP: 0.575076 (+2.00%)  SL: 0.555343 (-1.50%)
+Final   TP: 0.575076 (+2.00%)  SL: 0.555343 (-1.50%)
+Upgrades: 0  sequence: 1h
+
+Exit:               2026-07-31 13:48:00 UTC
+Exit price:         0.555343
+Exit reason:        SL
+Holding:            407.0 min
+
+Gross:              -1.50%
+Fees:               -0.11%
+Net:                -1.61%
+
+Local equity (sample from 1000):
+  before  ACTIVE=1015.01  RESERVE=14.15  TOTAL=1029.16
+  raw_trade_pnl:     -16.3417
+  Loss:              -16.3417
+  Reimbursement:     14.1531
+  after   ACTIVE=1012.82  RESERVE=0.00  TOTAL=1012.82
+  HISTORICAL_FULL_PATH before: ACTIVE=7792495765.23  RESERVE=81622616.50
+
+Verification: PASS  (entry=True exit=True tp_sl=True upgrade=True)
+
+--------------------------------------------------
+ACCOUNTING INVARIANT CHECK
+--------------------------------------------------
+A) Cashout only from profit:           True
+B) Reimbursement only from reserve:    True
+C) Reserve↔Active preserves total:     True
+D) total_after = total_before + pnl:   True
+E) Fees in net, not double-counted:    True
+F) Cashout not treated as loss:        True
+G) Reimbursement not new profit:       True
+
+**ACCOUNTING_INVARIANTS_PASS**
+
+(base) telgenbuescher@server-telgenbuescher:~/projects/orderbook_analyse/results/fractal_wave_fade_manual_10_trade_report$ 

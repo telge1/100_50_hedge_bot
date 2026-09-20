@@ -1,0 +1,13 @@
+{
+  "builder_version": "liquidity_destination_episode_builder_v1",
+  "contract_version": "liquidity_destination_episode_contract_v1",
+  "core_artifact_sha256": {
+    "contract.json": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3",
+    "episodes.csv": "2d1217b46d490bed10377add4318563e461eefb6a509a943631e9d5e8d0b08af",
+    "excluded_candidates.csv": "6f3cc74882250c7a5556552ca544ee7bf3673be88832758ce63f55c329c38d76",
+    "summary.json": "6a64c31056ea15714b960495a0adaf14d3fed52482568f769e0ae9925ae6504a"
+  },
+  "core_fingerprint_sha256": "e2f05258a578618c3a8da2a2a4c2826adb0651145c7320d3f7d1715b9c8efb86",
+  "generated_at_utc": "2026-09-05T12:58:05.613Z",
+  "research_only": true
+}

@@ -1,0 +1,13 @@
+=== collectors ===
+MainPID=697262
+NRestarts=0
+ActiveState=active
+MainPID=699562
+NRestarts=0
+ActiveState=active
+MainPID=650673
+NRestarts=0
+ActiveState=active
+MainPID=650840
+NRestarts=0
+ActiveState=active

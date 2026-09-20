@@ -1,0 +1,19 @@
+{
+  "at": "2026-08-15T18:48:00Z",
+  "kind": "snapshot_before",
+  "source_hashes": {
+    "coin_runs/ADAUSDT/d88b00131f6140cfb7367ea398f593bd/signals.jsonl": "66a99cab758805be0b992992a00df27a730b584a34e31430231fdcd4a9219893",
+    "coin_runs/BNBUSDT/065a5ff93482448ba5debe68a904a87e/signals.jsonl": "64ee033f2a972b1b54c390a7105bc452c0e83d382a24189313b2e99dd571657f",
+    "coin_runs/DOGEUSDT/780d3d1c1ab443bb8f9e462f0d691f7a/signals.jsonl": "a15ddf7bf224812c69c22ced9ac4536e66fd4c5b64e548bff2765f0bc98558f2",
+    "coin_runs/HYPEUSDT/3e514b77ee6242bc862211b85ae38a9a/signals.jsonl": "0fbbc475872cce6d8307c66f551387f4971f4a6125898a350f50dbf52a0ded54",
+    "coin_runs/LINKUSDT/4d67ae45c88248ce9bd385b7f5b69e44/signals.jsonl": "e80dcd5eeae5727bc9fd7fbab3e8abf9a93c28b68d98b90b5eac58d16dcd0c7d",
+    "coin_runs/SOLUSDT/f8c5ea95db8844ab93b177fe2284066a/signals.jsonl": "b18fbc7368b0d1f1694d76767fb209e07c7cd00c04a7f1127aeba82d4ba11405",
+    "coin_runs/SUIUSDT/ce3998b3b19845caa44498dbaa3228ab/signals.jsonl": "9fe7c5ff4ea965dadc569d9130245cfe2406b69da9c06a00fd8c0b7f735a0fd5",
+    "coin_runs/XAUTUSDT/7d55b824d3c54e11a82e121a1e62d184/signals.jsonl": "bc2d7843f5a944db82dc08025b344b65d1508099afdb3f3e904e9abf758a21fb",
+    "coin_runs/XRPUSDT/cbc666337cc343a089939ebea1320894/signals.jsonl": "a711d2ef8abd10070db8b873cae3f765d44ca79c2201d6b92888bb87c6e384dc",
+    "coin_runs/ZECUSDT/e75d3f7d16a245758e7c74f12414ddd6/signals.jsonl": "beeed47139264f28bc2bc0e4462565c4ca5ce6433a488e2bd2567b25d865a4de",
+    "combined_summary.json": "7d66390f5378319a2d5f0bb0e7cc442237db23787bbc7861eb01a476a34894a3",
+    "request.json": "34bba45d00054f70fd4fa12d41b5fcac88f84299f01664d858be86c60bfe9df3",
+    "status.json": "f820856165c461534903ad50d2fc9b231956d49eb2d3c2f64fb29435cfe6cad1"
+  }
+}

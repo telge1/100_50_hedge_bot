@@ -1,0 +1,9 @@
+{
+  "raw_total": 5032,
+  "run_id": "569bd0cc3bd64dc0bedbc03d3b1af32a",
+  "statuses": {
+    "LINKUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 650
+}

@@ -1,0 +1,96 @@
+{
+  "builder_changed": false,
+  "committed": false,
+  "contract_changed": false,
+  "dataset_fingerprint_sha256": "9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8",
+  "evaluation_contract_sha256": "185691763f9b11f0602c832c99a6b5210642684d10a3f61360236dab42f85a0c",
+  "files": {
+    "results/liquidity_destination_bias_phase_2_baselines/ABSCHLUSSBERICHT.md": {
+      "bytes": 5743,
+      "sha256": "27bfa28e924e9e2bfe54a9a5863ae595666cf294af0d8258aad4cd4631f8491a"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/baseline_metrics.csv": {
+      "bytes": 10251,
+      "sha256": "1a0d35635153a30b83140c48d0886245a17684b8f9496b6887bea866785d6b4c"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/confusion_matrices.json": {
+      "bytes": 61290,
+      "sha256": "759dfb610b85ce0d7867b9d6c46cb854dd108110cbf1a61bbbe3118b64bffd87"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/daily_stability.csv": {
+      "bytes": 3582,
+      "sha256": "481d31e9e8c6eb0d6a35a392bc95c047fb619ed8f91543b01afeb078138eebe4"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/directional_metrics.csv": {
+      "bytes": 8704,
+      "sha256": "fa8b1419ea5399dd2b96e246db77926d5a601297ea566927a6ce515fa824509b"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/distance_diagnostics.csv": {
+      "bytes": 1928,
+      "sha256": "9d07345bb0a44ebac2587ea5d69d789e63fa375c2df168436d59dc7b29b66e69"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/evaluation_summary.json": {
+      "bytes": 43180,
+      "sha256": "09df9e19c10d32f1f218cd608763361c8fbfa78511bac289db3820f552a80748"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_check/split_inventory.csv": {
+      "bytes": 536,
+      "sha256": "305e948b1d1264d48d171eed33daa3f7da859624ad7f390d93360519bf4637db"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/_repro_stdout.txt": {
+      "bytes": 844,
+      "sha256": "5ea51a23a4937a80f6340220d23977fc60aa314fa046aa1355c48119fc410fdb"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/baseline_metrics.csv": {
+      "bytes": 10251,
+      "sha256": "1a0d35635153a30b83140c48d0886245a17684b8f9496b6887bea866785d6b4c"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/cli_stdout.txt": {
+      "bytes": 831,
+      "sha256": "3642d8e8822a36898fb3ec1608b4b90422077a8360d135c8cbf6f8e90452cae8"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/confusion_matrices.json": {
+      "bytes": 61290,
+      "sha256": "759dfb610b85ce0d7867b9d6c46cb854dd108110cbf1a61bbbe3118b64bffd87"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/daily_stability.csv": {
+      "bytes": 3582,
+      "sha256": "481d31e9e8c6eb0d6a35a392bc95c047fb619ed8f91543b01afeb078138eebe4"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/dataset_freeze_manifest.json": {
+      "bytes": 1381,
+      "sha256": "3c93131e6a414110e7169bc62807ddc5d2fbc1a45f253db783f441337eb07105"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/directional_metrics.csv": {
+      "bytes": 8704,
+      "sha256": "fa8b1419ea5399dd2b96e246db77926d5a601297ea566927a6ce515fa824509b"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/distance_diagnostics.csv": {
+      "bytes": 1928,
+      "sha256": "9d07345bb0a44ebac2587ea5d69d789e63fa375c2df168436d59dc7b29b66e69"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/evaluation_contract_frozen_v1.yaml": {
+      "bytes": 3034,
+      "sha256": "185691763f9b11f0602c832c99a6b5210642684d10a3f61360236dab42f85a0c"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/evaluation_summary.json": {
+      "bytes": 43180,
+      "sha256": "09df9e19c10d32f1f218cd608763361c8fbfa78511bac289db3820f552a80748"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/split_inventory.csv": {
+      "bytes": 536,
+      "sha256": "305e948b1d1264d48d171eed33daa3f7da859624ad7f390d93360519bf4637db"
+    },
+    "results/liquidity_destination_bias_phase_2_baselines/test_results.txt": {
+      "bytes": 1141,
+      "sha256": "be62c00e7e8cd370dc9454551001a04e14c3d457ab040e3343479a2aff1399c7"
+    }
+  },
+  "generated_at_utc": "2026-09-05T13:36:59.199321Z",
+  "git_branch": "feature/btc-doge-research-db",
+  "git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "manifest_version": "liquidity_destination_phase_2_artifact_manifest_v1",
+  "phase1d_changed": false,
+  "pushed": false,
+  "verdict": "LIQUIDITY_DESTINATION_BASELINES_V1_DISTANCE_ONLY_STRONG_CAUTION"
+}

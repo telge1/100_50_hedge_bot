@@ -1,0 +1,62 @@
+{
+  "backups": [
+    {
+      "name": "ob_loser_aug27_later_computed",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_loser_aug27_later_computed.jsonl",
+      "row_count": 3599,
+      "sha256": "a835297a88c8be71b3b3cb70867f69571a1a74d4edd09ecbb1fd195aa865fb0d",
+      "sql": "\n      SELECT * FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-27 06:00:00' AND snapshot_ts<'2026-08-27 07:00:00'\n        AND build_id='a1d4e666513df0efb7651f88d7981228d1aed8243eb8ef49eec765b14cb9ad9f'\n        AND computed_at = toDateTime64('2026-09-02 22:26:17.690219', 6, 'UTC')\n    "
+    },
+    {
+      "name": "ob_loser_aug24_partial_coverage",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_loser_aug24_partial_coverage.jsonl",
+      "row_count": 726,
+      "sha256": "b3bb0dc43eed38cb3e76678c45063356b80bb662db5f2638bb4791dbefb4a5c3",
+      "sql": "\n      SELECT * FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-24 22:47:54' AND snapshot_ts<'2026-08-24 23:00:00'\n        AND build_id='137e352f56179931c3b9d31971be720a2176a3c550e9017fd171397376b77340'\n        AND coverage_status='PARTIAL'\n        AND computed_at = toDateTime64('2026-09-02 20:15:37.783290', 6, 'UTC')\n    "
+    },
+    {
+      "name": "ob_loser_golden_nonplan_build",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_loser_golden_nonplan_build.jsonl",
+      "row_count": 3600,
+      "sha256": "7a50af339ed631a5b12e17a5893cf1e5b3f739c6aa29549e6f6246060b174e8a",
+      "sql": "\n      SELECT * FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-31 18:00:00' AND snapshot_ts<'2026-08-31 19:00:00'\n        AND build_id='ed650f8048cea17b8ecc921b0108f7308696e581504a9c891dff824256fdc0d1'\n    "
+    },
+    {
+      "name": "batch_runs_orphan_doge",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/batch_runs_orphan_doge.jsonl",
+      "row_count": 2,
+      "sha256": "1d2418c7593bbf42c1879b8e9a105c2d8a7a38192f7cf5fbb02a6c9c56e9e3c2",
+      "sql": "\n      SELECT * FROM btc_doge_research.research_batch_runs\n      WHERE batch_id='fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_'\n    "
+    },
+    {
+      "name": "batch_runs_dup_hours",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/batch_runs_dup_hours.jsonl",
+      "row_count": 14,
+      "sha256": "b5bd620914717bcedad9c552a7c2daeeb83e072fba4e940944dc6945f289f328",
+      "sql": "\n      SELECT * FROM btc_doge_research.research_batch_runs\n      WHERE batch_id IN (\n        'fh:BTCUSDT:OB200:20260827T060000Z:20260827T070000Z:BYBIT_OB200_',\n        'fh:BTCUSDT:OB200:20260824T224754Z:20260824T230000Z:BYBIT_OB200_',\n        'fh:BTCUSDT:OB200:20260831T180000Z:20260831T190000Z:BYBIT_OB200_'\n      )\n      ORDER BY batch_id, started_at, status\n    "
+    },
+    {
+      "name": "ob_winner_keys_aug27",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_winner_keys_aug27.jsonl",
+      "row_count": 3599,
+      "sha256": "8fef13c34e2ae7cadce469a4a8647fa5060b6b947c88a8d326a0d7ba2b7469ae",
+      "sql": "\n      SELECT symbol, snapshot_ts, build_id, coverage_status, computed_at, mid, source_update_id\n      FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-27 06:00:00' AND snapshot_ts<'2026-08-27 07:00:00'\n        AND computed_at = toDateTime64('2026-09-02 22:25:42.262015', 6, 'UTC')\n    "
+    },
+    {
+      "name": "ob_winner_keys_aug24",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_winner_keys_aug24.jsonl",
+      "row_count": 726,
+      "sha256": "18fe8cc772c1cace3d2613460a3978decaf76e468e14307a90b9016be661cc00",
+      "sql": "\n      SELECT symbol, snapshot_ts, build_id, coverage_status, computed_at, mid, source_update_id\n      FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-24 22:47:54' AND snapshot_ts<'2026-08-24 23:00:00'\n        AND coverage_status='COMPLETE'\n        AND computed_at = toDateTime64('2026-09-02 22:26:12.385553', 6, 'UTC')\n    "
+    },
+    {
+      "name": "ob_winner_keys_golden",
+      "path": "results/btc_doge_research_db_reconciliation_v1/backups/ob_winner_keys_golden.jsonl",
+      "row_count": 3600,
+      "sha256": "60115fcabc0090b3eb519fe07aaacd9829dd32f129235a0a801f795307d3643d",
+      "sql": "\n      SELECT symbol, snapshot_ts, build_id, coverage_status, computed_at, mid, source_update_id\n      FROM btc_doge_research.research_ob200_snapshots_1s\n      WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-31 18:00:00' AND snapshot_ts<'2026-08-31 19:00:00'\n        AND build_id='ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51'\n    "
+    }
+  ],
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "generated_at": "2026-09-03T07:04:05.271157Z"
+}

@@ -1,0 +1,45 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT/f06ea4d92aaf46dca97fc9f9ca0cdfca",
+      "duration_seconds": 30.008,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:43:17Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 15,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 4,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 8,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 1
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "f06ea4d92aaf46dca97fc9f9ca0cdfca",
+      "started_at": "2026-08-15T15:42:47Z",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ]
+}

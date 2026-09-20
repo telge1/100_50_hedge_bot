@@ -1,0 +1,9 @@
+{
+  "raw_total": 6285,
+  "run_id": "7eaac9697dc849028dd3d2659a22d6c6",
+  "statuses": {
+    "TRXUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 282
+}

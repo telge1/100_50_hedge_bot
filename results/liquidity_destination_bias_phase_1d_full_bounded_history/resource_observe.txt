@@ -1,0 +1,42 @@
+=== BEFORE BTC ===
+ 14:48:16 up 18 days,  2:32,  3 users,  load average: 0,80, 1,59, 1,43
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       3,8Gi       702Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       859Mi
+start_utc=2026-09-05T12:48:16Z
+=== AFTER BTC exit=0 ===
+ 14:52:55 up 18 days,  2:36,  3 users,  load average: 6,42, 4,43, 2,69
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       4,3Gi       353Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       866Mi
+end_utc=2026-09-05T12:52:55Z
+=== BEFORE DOGE ===
+ 14:53:28 up 18 days,  2:37,  3 users,  load average: 4,14, 4,10, 2,64
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       3,8Gi       832Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       866Mi
+doge_start_utc=2026-09-05T12:53:28Z
+=== AFTER DOGE exit=0 ===
+ 14:55:30 up 18 days,  2:39,  3 users,  load average: 3,41, 3,76, 2,69
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       4,0Gi       531Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       867Mi
+doge_end_utc=2026-09-05T12:55:30Z
+=== BEFORE DOGE ===
+ 14:56:04 up 18 days,  2:39,  4 users,  load average: 2,83, 3,56, 2,66
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       3,9Gi       482Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       869Mi
+doge_start_utc=2026-09-05T12:56:04Z
+=== AFTER DOGE exit=0 ===
+ 14:58:05 up 18 days,  2:41,  4 users,  load average: 3,27, 3,48, 2,75
+               total        used        free      shared  buff/cache   available
+Mem:            17Gi       4,0Gi       431Mi       107Mi        13Gi        13Gi
+Swap:          2,0Gi       1,2Gi       791Mi
+doge_end_utc=2026-09-05T12:58:05Z
+=== BEFORE BTC IDEMPOTENCE ===
+ 14:58:39 up 18 days,  2:42,  4 users,  load average: 2,47, 3,26, 2,70
+idem_start_utc=2026-09-05T12:58:39Z
+=== AFTER BTC IDEMPOTENCE exit=0 ===
+ 15:03:18 up 18 days,  2:47,  4 users,  load average: 6,40, 4,99, 3,58
+idem_end_utc=2026-09-05T13:03:18Z

@@ -1,0 +1,2 @@
+Created symlink /home/telgenbuescher/.config/systemd/user/default.target.wants/dashboard.service → /home/telgenbuescher/.config/systemd/user/dashboard.service.
+Created symlink /home/telgenbuescher/.config/systemd/user/default.target.wants/symbol-onboarding-worker.service → /home/telgenbuescher/.config/systemd/user/symbol-onboarding-worker.service.

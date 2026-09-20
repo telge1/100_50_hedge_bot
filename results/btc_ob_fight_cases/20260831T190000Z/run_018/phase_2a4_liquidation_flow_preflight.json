@@ -1,0 +1,159 @@
+{
+  "preflight_version": "phase_2a4_liquidation_flow_preflight_v2_frozen",
+  "contract_version": "liquidation_flow_facts_v1",
+  "contract_frozen": true,
+  "git_head_at_preflight": "cda980879529717a11fb71631a73d283868ddad3",
+  "frozen_schema": {
+    "contract_version": "liquidation_flow_facts_v1",
+    "frozen": true,
+    "event_key_version": "event_key_v1",
+    "event_key_fields": [
+      "exchange",
+      "symbol",
+      "event_ms",
+      "position_side_raw",
+      "size",
+      "bankruptcy_price"
+    ],
+    "event_key_format": "{exchange}|{symbol}|{event_ms}|{position_side_raw}|{size}|{bankruptcy_price}",
+    "bybit_side_mapping": {
+      "Buy": {
+        "position_side_raw": "Buy",
+        "liquidated_position_side": "LIQUIDATED_LONG",
+        "forced_trade_direction": "FORCED_SELL"
+      },
+      "Sell": {
+        "position_side_raw": "Sell",
+        "liquidated_position_side": "LIQUIDATED_SHORT",
+        "forced_trade_direction": "FORCED_BUY"
+      }
+    },
+    "bybit_documentation_url": "https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation",
+    "attribution_method": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+    "sensitivity_windows_ms": [
+      100,
+      250,
+      500,
+      1000
+    ],
+    "units": {
+      "executed_base_size": "BTC base asset",
+      "bankruptcy_reference_quote": "USD quote (v × bankruptcy_price; reference only)",
+      "taker_buy_base": "BTC base asset",
+      "taker_sell_base": "BTC base asset",
+      "taker_buy_quote": "USD quote notional",
+      "taker_sell_quote": "USD quote notional",
+      "taker_delta_quote": "USD quote notional (buy_quote − sell_quote)",
+      "execution_price": "UNKNOWN — not stored",
+      "execution_notional": "UNKNOWN — not stored"
+    },
+    "input_sources": {
+      "liquidations": "orderbook_analysis.all_liquidations",
+      "public_trades": "orderbook_analysis.public_trades_canonical",
+      "open_interest": "orderbook_analysis.open_interest_5s"
+    },
+    "superseded_explanatory_audit": {
+      "contract": "btc_ob_fight_explanatory_audit_v1",
+      "do_not_use_for_research": true,
+      "superseded_by": "liquidation_flow_facts_v1",
+      "reason": "overlapping-window double counting and denominator mismatch",
+      "superseded_output_marker_file": "SUPERSEDED.json",
+      "historical_outputs_preserved": true
+    },
+    "forbidden_research_input_paths": [
+      "results/btc_ob_fight_explanatory_audit_20260831_1900_v1",
+      "research/btc_ob_fight_explanatory_audit/association.py"
+    ],
+    "required_sensitivity_metrics": [
+      "allocated_liquidation_base",
+      "total_taker_buy_base",
+      "allocated_liquidation_share_of_total_taker_buy_base",
+      "union_window_taker_buy_base",
+      "liquidation_capacity_coverage_pct",
+      "remaining_unattributed_taker_buy_base"
+    ],
+    "required_phase_fields": [
+      "phase_role",
+      "usable_for_live_signal"
+    ],
+    "bankruptcy_reference_field": "bankruptcy_reference_quote",
+    "execution_fields_always_null": [
+      "execution_price",
+      "execution_notional"
+    ]
+  },
+  "bybit_documentation_url": "https://bybit-exchange.github.io/docs/v5/websocket/public/all-liquidation",
+  "bybit_side_mapping": {
+    "Buy": {
+      "position_side_raw": "Buy",
+      "liquidated_position_side": "LIQUIDATED_LONG",
+      "forced_trade_direction": "FORCED_SELL"
+    },
+    "Sell": {
+      "position_side_raw": "Sell",
+      "liquidated_position_side": "LIQUIDATED_SHORT",
+      "forced_trade_direction": "FORCED_BUY"
+    }
+  },
+  "side_mapping_note": "S = position side (NOT taker aggressor)",
+  "event_key_version": "event_key_v1",
+  "event_key_fields": [
+    "exchange",
+    "symbol",
+    "event_ms",
+    "position_side_raw",
+    "size",
+    "bankruptcy_price"
+  ],
+  "event_key_format": "{exchange}|{symbol}|{event_ms}|{position_side_raw}|{size}|{bankruptcy_price}",
+  "input_sources": {
+    "liquidations": "orderbook_analysis.all_liquidations",
+    "public_trades": "orderbook_analysis.public_trades_canonical",
+    "open_interest": "orderbook_analysis.open_interest_5s"
+  },
+  "units": {
+    "executed_base_size": "BTC base asset",
+    "bankruptcy_reference_quote": "USD quote (v × bankruptcy_price; reference only)",
+    "taker_buy_base": "BTC base asset",
+    "taker_sell_base": "BTC base asset",
+    "taker_buy_quote": "USD quote notional",
+    "taker_sell_quote": "USD quote notional",
+    "taker_delta_quote": "USD quote notional (buy_quote − sell_quote)",
+    "execution_price": "UNKNOWN — not stored",
+    "execution_notional": "UNKNOWN — not stored"
+  },
+  "attribution_windows_ms": [
+    100,
+    250,
+    500,
+    1000
+  ],
+  "forbidden_research_input_paths": [
+    "results/btc_ob_fight_explanatory_audit_20260831_1900_v1",
+    "research/btc_ob_fight_explanatory_audit/association.py"
+  ],
+  "superseded_explanatory_audit": {
+    "contract": "btc_ob_fight_explanatory_audit_v1",
+    "do_not_use_for_research": true,
+    "superseded_by": "liquidation_flow_facts_v1",
+    "reason": "overlapping-window double counting and denominator mismatch",
+    "superseded_output_marker_file": "SUPERSEDED.json",
+    "historical_outputs_preserved": true
+  },
+  "canonical_pipeline_does_not_load": [
+    "results/btc_ob_fight_explanatory_audit_20260831_1900_v1",
+    "liquidation_trade_association_sensitivity.csv from explanatory audit"
+  ],
+  "integrated_module": "research/btc_ob_fight/liquidation_flow_facts.py",
+  "integrated_contract_module": "research/btc_ob_fight/liquidation_flow_contract.py",
+  "run_017_reference": {
+    "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/20260831T190000Z/run_017",
+    "exists": true,
+    "unchanged_by_this_phase": true
+  },
+  "explanatory_audit_output": {
+    "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_explanatory_audit_20260831_1900_v1",
+    "exists": true,
+    "superseded_marker": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_explanatory_audit_20260831_1900_v1/SUPERSEDED.json"
+  }
+}

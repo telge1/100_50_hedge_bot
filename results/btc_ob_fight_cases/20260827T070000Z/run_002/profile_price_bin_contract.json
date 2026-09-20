@@ -1,0 +1,43 @@
+{
+  "contract_version": "profile_price_bin_contract_v1",
+  "price_step": 10.0,
+  "orderbook_tick_size": 0.1,
+  "bin_index_rule": "floor(price / price_step)",
+  "interval_semantics": "[LOWER,UPPER)",
+  "level_representation": {
+    "poc": "CENTER",
+    "vah": "UPPER_EDGE",
+    "val": "LOWER_EDGE",
+    "vvah": "UPPER_EDGE",
+    "vval": "LOWER_EDGE",
+    "display_price_in_rows": "CENTER"
+  },
+  "tpo_bin_orientation": "same_as_volume",
+  "volume_bin_orientation": "same_as_tpo",
+  "rounding_rule": "floor_to_bin_index_no_float_equality",
+  "orderbook_tick_to_bin": "tick_price maps to bin via floor(price/step)",
+  "source_references": [
+    "orderbook_analyse.market_profile.loader.fetch_volume_at_price",
+    "orderbook_analyse.market_profile.profile.compute_value_area",
+    "research.btc_ob_fight.tpo_profile.price_to_bin_index",
+    "research.btc_ob_fight.volume_profile._aggregate_bins"
+  ],
+  "tpo_vah_bin": null,
+  "tpo_val_bin": null,
+  "volume_vvah_bin": null,
+  "volume_vval_bin": null,
+  "upper_profile_edge_zone": {
+    "price_low": null,
+    "price_high": null,
+    "bin_indices": []
+  },
+  "lower_profile_edge_zone": {
+    "price_low": null,
+    "price_high": null,
+    "bin_indices": []
+  },
+  "first_outside_bins": {
+    "upper": {},
+    "lower": {}
+  }
+}

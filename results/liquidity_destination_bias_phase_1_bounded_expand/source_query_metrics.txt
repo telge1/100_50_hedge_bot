@@ -1,0 +1,4 @@
+BTCUSDT bucket_count= 9938 coverage_start= 2026-08-25 00:00:00+00:00 coverage_end= 2026-08-25 03:05:00+00:00 source_complete= True longest_no_trade_seconds= 6.0
+symbol=BTCUSDT elapsed_seconds=2.21 user_seconds=0.09 system_seconds=0.00 maxrss_kb=45628
+DOGEUSDT bucket_count= 6368 coverage_start= 2026-08-25 00:00:00+00:00 coverage_end= 2026-08-25 03:04:59+00:00 source_complete= True longest_no_trade_seconds= 21.0
+symbol=DOGEUSDT elapsed_seconds=0.35 user_seconds=0.09 system_seconds=0.01 maxrss_kb=44324

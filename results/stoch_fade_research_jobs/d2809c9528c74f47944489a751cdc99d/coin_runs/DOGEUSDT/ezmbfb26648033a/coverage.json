@@ -1,0 +1,102 @@
+{
+  "closed_segments": 36,
+  "discovery_end": "2026-08-26T09:40:08.283000Z",
+  "discovery_start": "2026-08-24T22:47:53Z",
+  "ema200_warmup_needed_before": "2026-08-24T06:07:53Z",
+  "incomplete_reason": "",
+  "intersection_end": "2026-08-26T09:40:08.283000Z",
+  "intersection_start": "2026-08-24T22:47:53Z",
+  "open_tmp_ignored": 1,
+  "outcome_horizon_s": 14400,
+  "outcome_path_end": "2026-08-26T10:09:00Z",
+  "segment_files": [
+    "DOGEUSDT_20260824T224753Z_20260824T230000Z_ob200_v3.zst",
+    "DOGEUSDT_20260824T230000Z_20260825T000000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T000000Z_20260825T010000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T010000Z_20260825T020000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T020000Z_20260825T030000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T030000Z_20260825T040000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T040000Z_20260825T050000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T050000Z_20260825T060000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T060000Z_20260825T070000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T070000Z_20260825T080000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T080000Z_20260825T090000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T090000Z_20260825T100000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T100000Z_20260825T110000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T110000Z_20260825T120000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T120000Z_20260825T130000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T130000Z_20260825T140000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T140000Z_20260825T150000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T150000Z_20260825T160000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T160000Z_20260825T170000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T170000Z_20260825T180000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T180000Z_20260825T190000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T190000Z_20260825T200000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T200000Z_20260825T210000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T210000Z_20260825T220000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T220000Z_20260825T230000Z_ob200_v3.zst",
+    "DOGEUSDT_20260825T230000Z_20260826T000000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T000000Z_20260826T010000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T010000Z_20260826T020000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T020000Z_20260826T030000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T030000Z_20260826T040000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T040000Z_20260826T050000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T050000Z_20260826T060000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T060000Z_20260826T070000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T070000Z_20260826T080000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T080000Z_20260826T090000Z_ob200_v3.zst",
+    "DOGEUSDT_20260826T090000Z_20260826T100000Z_ob200_v3.zst"
+  ],
+  "sources": [
+    {
+      "max_ts": "2026-08-26T10:00:00Z",
+      "min_ts": "2026-08-24T22:47:53Z",
+      "n_rows": 36,
+      "notes": "closed_segments=36; open_tmp_ignored=1",
+      "source": "orderbook_ob200_v3_raw",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T10:09:00Z",
+      "min_ts": "2025-12-11T00:00:00Z",
+      "n_rows": 372130,
+      "notes": "",
+      "source": "candles_1m",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T10:09:52.106000Z",
+      "min_ts": "2026-07-19T00:00:00.482000Z",
+      "n_rows": 11323522,
+      "notes": "",
+      "source": "public_trades_native",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T10:10:15Z",
+      "min_ts": "2026-08-18T16:02:05Z",
+      "n_rows": 133999,
+      "notes": "derived_from_open_interest_5s",
+      "source": "open_interest_1m",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T09:40:08.283000Z",
+      "min_ts": "2026-08-18T16:38:48.563000Z",
+      "n_rows": 2747,
+      "notes": "",
+      "source": "liquidations",
+      "status": "OK"
+    },
+    {
+      "max_ts": null,
+      "min_ts": null,
+      "n_rows": 0,
+      "notes": "optional",
+      "source": "liquidity_locations",
+      "status": "OPTIONAL_UNAVAILABLE"
+    }
+  ],
+  "status": "OK",
+  "symbol": "DOGEUSDT"
+}

@@ -1,0 +1,11 @@
+{
+  "completed": 662,
+  "failed_segments": 0,
+  "importable_segments": 662,
+  "ready_segments": 472,
+  "remaining_segments": 0,
+  "runner_pid": 1248597,
+  "skipped_segments": 190,
+  "status": "COMPLETED",
+  "updated_at": "2026-09-02T23:08:14.252810Z"
+}

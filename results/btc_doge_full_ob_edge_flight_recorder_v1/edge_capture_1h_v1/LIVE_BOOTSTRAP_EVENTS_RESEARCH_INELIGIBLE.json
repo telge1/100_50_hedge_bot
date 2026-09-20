@@ -1,0 +1,21 @@
+{
+  "annotated_at": "2026-09-03T20:34:18.557797Z",
+  "live_pid": 1481866,
+  "note": "Annotation only. Live event files were NOT modified/deleted.",
+  "events": [
+    {
+      "fight_event_id": "BTCUSDT_20260903T195209Z_e8cb0f6198",
+      "data_quality": "INCOMPLETE_QUEUE_DROP",
+      "trigger_quality": "BOOTSTRAP_NOT_REAL_CROSS",
+      "research_eligible": false,
+      "bootstrap_status": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+    },
+    {
+      "fight_event_id": "DOGEUSDT_20260903T195209Z_dc0458f57a",
+      "data_quality": "INCOMPLETE_QUEUE_DROP",
+      "trigger_quality": "BOOTSTRAP_NOT_REAL_CROSS",
+      "research_eligible": false,
+      "bootstrap_status": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE"
+    }
+  ]
+}

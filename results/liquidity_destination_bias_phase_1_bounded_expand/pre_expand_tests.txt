@@ -1,0 +1,18 @@
+PHASE 1B PRE-EXPAND TESTS
+generated_at_utc=2026-09-05T11:35:50Z
+=== Phase-1 unit tests ===
+...................                                                      [100%]
+19 passed in 0.02s
+elapsed_seconds=0.14 maxrss_kb=37820
+=== compile/invariant import ===
+contract_invariants=PASS
+=== Existing 9 LLD/causality tests ===
+.........                                                                [100%]
+=============================== warnings summary ===============================
+tests/test_liquidity_location_pool_causality_fix_v2.py:85
+  /home/telgenbuescher/projects/orderbook_analyse/tests/test_liquidity_location_pool_causality_fix_v2.py:85: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+9 passed, 1 warning in 0.78s
+elapsed_seconds=0.94 maxrss_kb=151592

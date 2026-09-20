@@ -1,0 +1,29 @@
+{
+  "after": {
+    "contract.py": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+    "contract_frozen_v1.yaml": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+    "generated_contract.json": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+  },
+  "before": {
+    "contract.py": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+    "contract_frozen_v1.yaml": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+    "generated_contract.json": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+  },
+  "contract_version": "liquidity_destination_episode_contract_v1",
+  "manifest_version": "liquidity_destination_phase_1c_contract_freeze_v1",
+  "technical_changes_excluded_from_contract": [
+    "research/liquidity_destination_bias/builder.py",
+    "research/liquidity_destination_bias/cli.py"
+  ],
+  "unchanged": true,
+  "verified_semantics": {
+    "causality": "available_at <= T0",
+    "horizon_minutes": 60,
+    "lower_touch": "BID upper edge",
+    "minimum_persistence_seconds": 60,
+    "overlap": "one active episode per symbol",
+    "price_path": "Public-Trade-1s",
+    "target_source": "LLD_POOL",
+    "upper_touch": "ASK lower edge"
+  }
+}

@@ -1,0 +1,91 @@
+=== help ===
+usage: build_liquidity_destination_episodes.py [-h] --symbol
+                                               {BTCUSDT,DOGEUSDT} --start
+                                               START --end END
+                                               --horizon-minutes
+                                               HORIZON_MINUTES --output-dir
+                                               OUTPUT_DIR [--require-complete]
+                                               [--max-episodes MAX_EPISODES]
+                                               [--target-source {LLD_POOL}]
+                                               [--allow-bounded-expand]
+                                               [--max-window-hours MAX_WINDOW_HOURS]
+                                               [--chunk-hours TRADE_CHUNK_SECONDS]
+                                               [--log-level LOG_LEVEL]
+
+Build frozen causal liquidity-destination episodes (research only).
+
+options:
+  -h, --help            show this help message and exit
+  --symbol {BTCUSDT,DOGEUSDT}
+  --start START
+  --end END
+  --horizon-minutes HORIZON_MINUTES
+  --output-dir OUTPUT_DIR
+  --require-complete
+  --max-episodes MAX_EPISODES
+  --target-source {LLD_POOL}
+  --allow-bounded-expand
+                        Explicitly permit a run longer than two hours. The run
+                        remains single-worker and uses bounded read-only trade
+                        chunks.
+  --max-window-hours MAX_WINDOW_HOURS
+                        Required safety ceiling with --allow-bounded-expand;
+                        must be in (0,168] and at least the requested
+                        candidate window.
+  --chunk-hours TRADE_CHUNK_SECONDS
+                        Internal sequential trade-query chunk size in hours,
+                        in (0,2]. Smaller values reduce peak RAM but add
+                        bounded query overlap.
+  --log-level LOG_LEVEL
+=== no_flag ===
+Traceback (most recent call last):
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/scripts/build_liquidity_destination_episodes.py", line 16, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/cli.py", line 80, in main
+    config = BuildConfig(
+             ^^^^^^^^^^^^
+  File "<string>", line 13, in __init__
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/builder.py", line 83, in __post_init__
+    raise ValueError("Phase-1 candidate window is limited to two hours")
+ValueError: Phase-1 candidate window is limited to two hours
+exit_code=1
+=== no_limit ===
+Traceback (most recent call last):
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/scripts/build_liquidity_destination_episodes.py", line 16, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/cli.py", line 80, in main
+    config = BuildConfig(
+             ^^^^^^^^^^^^
+  File "<string>", line 13, in __init__
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/builder.py", line 75, in __post_init__
+    raise ValueError(
+ValueError: bounded expand requires max-window-hours in (0,168]
+exit_code=1
+=== above_limit ===
+Traceback (most recent call last):
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/scripts/build_liquidity_destination_episodes.py", line 16, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/cli.py", line 80, in main
+    config = BuildConfig(
+             ^^^^^^^^^^^^
+  File "<string>", line 13, in __init__
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/builder.py", line 79, in __post_init__
+    raise ValueError("requested window exceeds max-window-hours")
+ValueError: requested window exceeds max-window-hours
+exit_code=1
+=== invalid_limit ===
+Traceback (most recent call last):
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/scripts/build_liquidity_destination_episodes.py", line 16, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/cli.py", line 80, in main
+    config = BuildConfig(
+             ^^^^^^^^^^^^
+  File "<string>", line 13, in __init__
+  File "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/research/liquidity_destination_bias/builder.py", line 75, in __post_init__
+    raise ValueError(
+ValueError: bounded expand requires max-window-hours in (0,168]
+exit_code=1

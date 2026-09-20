@@ -1,0 +1,49 @@
+{
+  "segment_audits": [
+    {
+      "symbol": "BTCUSDT",
+      "segment_start": "2026-08-31T18:30:00Z",
+      "segment_end": "2026-08-31T19:30:00Z",
+      "source_row_count": 80738,
+      "source_unique_trade_ids": 80738,
+      "research_row_count": 80738,
+      "research_unique_trade_ids": 80738,
+      "exact_timestamp_matches": 80738,
+      "shifted_matches": 0,
+      "field_mismatches": 0,
+      "source_min_ts": "2026-08-31T18:30:00.465000Z",
+      "source_max_ts": "2026-08-31T19:29:56.684000Z",
+      "research_min_ts": "2026-08-31T18:30:00.465000Z",
+      "research_max_ts": "2026-08-31T19:29:56.684000Z",
+      "status": "PASS",
+      "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "segment_start": "2026-08-29T11:45:00Z",
+      "segment_end": "2026-08-29T12:30:00Z",
+      "source_row_count": 4275,
+      "source_unique_trade_ids": 4275,
+      "research_row_count": 0,
+      "research_unique_trade_ids": 0,
+      "exact_timestamp_matches": 0,
+      "shifted_matches": 0,
+      "field_mismatches": 0,
+      "source_min_ts": "2026-08-29T11:45:15.086000Z",
+      "source_max_ts": "2026-08-29T12:29:34.701000Z",
+      "research_min_ts": "1970-01-01T00:00:00Z",
+      "research_max_ts": "1970-01-01T00:00:00Z",
+      "status": "FAIL",
+      "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323"
+    }
+  ],
+  "shift_distribution": [
+    {
+      "symbol": "BTCUSDT",
+      "delta_seconds": 0,
+      "row_count": 80738,
+      "classification": "EXACT_TIMESTAMP"
+    }
+  ],
+  "all_pass": false
+}

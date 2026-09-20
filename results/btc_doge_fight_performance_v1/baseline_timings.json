@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-09-03T13:03:45Z",
+  "baseline": {
+    "btc_warm_s": [
+      36.721
+    ],
+    "btc_warm_note": "from baseline/btc_warm1 after rematerialization, source-pure",
+    "doge_warm_s_preflight": 22.31,
+    "coverage_only_preflight_s": 0.1,
+    "audit_reported_btc_s": 39.7,
+    "audit_reported_doge_s": 22.31
+  },
+  "final_warm": {
+    "btc": [
+      9.794,
+      9.782,
+      9.83,
+      10.086,
+      9.936
+    ],
+    "doge": [
+      5.558,
+      5.525
+    ],
+    "coverage_only": [
+      0.112
+    ]
+  }
+}

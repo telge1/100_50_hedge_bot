@@ -1,0 +1,349 @@
+{
+  "tpo_profile_status": "COMPUTED_SEPARATELY",
+  "contract_version": "tpo_profile_facts_v1",
+  "provenance": {
+    "profile_kind": "TPO_BRACKET",
+    "source": "btc_doge_research.research_public_trades",
+    "weighting": "DISTINCT_BRACKET_PRESENCE",
+    "bracket_minutes": 30,
+    "bracket_alignment": "SESSION_START",
+    "partial_bracket_policy": "INCLUDE_CAUSAL_PARTIAL_BRACKET",
+    "anchor_exclusive": true,
+    "trade_size_used_as_weight": false,
+    "chart_timeframe_dependency": false,
+    "engine": "research.btc_ob_fight.tpo_profile",
+    "algorithm_source": "orderbook_analyse.market_profile.profile (compute_value_area, find_nodes on tpo_count weights)",
+    "session_start_utc": "2026-08-30T13:30:00Z",
+    "cutoff_utc": "2026-08-31T13:00:00Z",
+    "profile_session_id": "us_developing_to_anchor",
+    "price_increment": 5e-05,
+    "value_area_percentage": 0.7,
+    "target_bins": 160,
+    "trade_cutoff_rule": "session_start <= trade_ts < anchor_cutoff",
+    "dedup_key": "trade_id",
+    "poc_tie_break_rule": "max_tpo_count_then_center_bin_index",
+    "value_area_tie_break_rule": "expand_toward_larger_neighbor_tpo_count",
+    "oa_volume_path_not_used_for_tpo": true,
+    "orderbook_tick_size": 1e-05,
+    "symbol": "DOGEUSDT"
+  },
+  "coverage": {
+    "session_start_utc": "2026-08-30T13:30:00Z",
+    "cutoff_utc": "2026-08-31T13:00:00Z",
+    "raw_trade_rows_in_session": 344715,
+    "dedup_removed_duplicates": 0,
+    "deduped_trade_rows_used": 344715,
+    "future_trade_count_excluded": 4684,
+    "min_trade_ts": "2026-08-30T13:30:03.614Z",
+    "max_trade_ts": "2026-08-31T12:59:59.982Z",
+    "profile_session_id": "us_developing_to_anchor"
+  },
+  "brackets": {
+    "bracket_minutes": 30,
+    "full_count": 47,
+    "partial_count": 0,
+    "total_count": 47,
+    "total_tpo_marks": 641
+  },
+  "integrity": {
+    "status": "PASS",
+    "checks": {
+      "row_tpo_sum_equals_bracket_touches": true,
+      "row_tpo_sum_equals_total_marks": true,
+      "bracket_touch_sum_equals_total_marks": true,
+      "each_bracket_counts_bins_at_most_once": true,
+      "no_trade_after_anchor": true,
+      "value_area_level_order": true,
+      "value_area_share_target_met": true,
+      "all_values_finite": true,
+      "partial_brackets_causal": true,
+      "price_step_positive": true
+    },
+    "totals": {
+      "total_tpo_marks": 641,
+      "row_tpo_sum": 641,
+      "bracket_touch_sum": 641,
+      "bracket_count": 47
+    }
+  },
+  "prefix_parity": {
+    "status": "PASS",
+    "extra_post_anchor_trades_added": 50,
+    "fast_path": "session_trades_already_causal"
+  },
+  "trade_size_invariance": {
+    "status": "PASS",
+    "scaled_factor": 17.0
+  },
+  "tpoc": {
+    "tpoc_price": 0.082675,
+    "tpoc_tpo_count": 16.0,
+    "tpoc_bin_index": 1653,
+    "tpoc_tie_break_rule": "max_tpo_count_then_center_bin_index"
+  },
+  "value_area": {
+    "value_area_percentage": 0.7,
+    "total_tpo_marks": 641,
+    "target_value_area_marks": 448.7,
+    "actual_value_area_marks": 451.0,
+    "actual_value_area_share": 0.7035881435257411,
+    "tpoc_vah": 0.08505,
+    "tpoc_val": 0.0814,
+    "included_bin_count": 73,
+    "value_area_tie_break_rule": "expand_toward_larger_neighbor_tpo_count"
+  },
+  "hvn_candidates": [
+    {
+      "node_type": "HVN",
+      "price": 0.082125,
+      "tpo_count": 12,
+      "tpo_share": 0.0187207488299532,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 0.082325,
+      "tpo_count": 8,
+      "tpo_share": 0.0124804992199688,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 0.082675,
+      "tpo_count": 16,
+      "tpo_share": 0.0249609984399376,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 0.085575,
+      "tpo_count": 10,
+      "tpo_share": 0.015600624024960999,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 0.085825,
+      "tpo_count": 8,
+      "tpo_share": 0.0124804992199688,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    }
+  ],
+  "lvn_candidates": [
+    {
+      "node_type": "LVN",
+      "price": 0.080775,
+      "tpo_count": 1,
+      "tpo_share": 0.0015600624024961,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.080925,
+      "tpo_count": 1,
+      "tpo_share": 0.0015600624024961,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.081075,
+      "tpo_count": 1,
+      "tpo_share": 0.0015600624024961,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.081225,
+      "tpo_count": 1,
+      "tpo_share": 0.0015600624024961,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.083175,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.083325,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.08347500000000001,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.083625,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.083925,
+      "tpo_count": 2,
+      "tpo_share": 0.0031201248049922,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.084075,
+      "tpo_count": 2,
+      "tpo_share": 0.0031201248049922,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.084275,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.084425,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.084575,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 0.085075,
+      "tpo_count": 3,
+      "tpo_share": 0.0046801872074883,
+      "heuristic_contract_version": "tpo_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    }
+  ],
+  "tpo_profile_cutoff_utc": "2026-08-31T13:00:00Z",
+  "future_trade_count_used": 0,
+  "tpo_profile_computed_separately": true
+}

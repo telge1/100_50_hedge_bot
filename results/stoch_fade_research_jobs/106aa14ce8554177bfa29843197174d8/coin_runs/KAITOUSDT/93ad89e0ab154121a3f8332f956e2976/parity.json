@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6409,
+  "detail_count": 6409,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T01:30:00"
+      ],
+      "signal_id": "3862aa22-04db-5b86-89cb-9be30a69140c"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T03:45:00"
+      ],
+      "signal_id": "3f7d1b77-de5c-5c33-b91a-9542027e0f70"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T05:00:00"
+      ],
+      "signal_id": "66590305-3542-54bc-9674-f01766d775f6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:15:00"
+      ],
+      "signal_id": "97acb131-df97-5d0e-b432-479b37fd51d4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T07:00:00"
+      ],
+      "signal_id": "d6dd43d8-a354-5f27-b546-5138ede5ef2f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T08:00:00"
+      ],
+      "signal_id": "6f373fdc-1282-57de-98c0-707ab03c855f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T08:45:00"
+      ],
+      "signal_id": "4637264c-413a-5bad-8079-f0b7dd92b5b5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T09:45:00"
+      ],
+      "signal_id": "5efe5644-bb15-5e71-9396-73813b279ddf"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T11:00:00"
+      ],
+      "signal_id": "6eb30377-10f8-539e-9d40-0c045d034818"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:00:00"
+      ],
+      "signal_id": "86297c5e-c0b0-557d-af79-8e2fdc809780"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T14:45:00"
+      ],
+      "signal_id": "d5327366-5673-5ec4-8926-01095c9852b8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T16:45:00"
+      ],
+      "signal_id": "5cd0fe25-b2e9-5900-9c76-76e70992cd22"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T17:30:00"
+      ],
+      "signal_id": "3465f419-e750-59f8-9653-62cb7e3fa5cd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T18:45:00"
+      ],
+      "signal_id": "7be4e7ac-c090-5a45-b07f-67b6bcbf0874"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T19:30:00"
+      ],
+      "signal_id": "a4b2f0ce-ff84-57e6-b2ee-babfb31af851"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T20:15:00"
+      ],
+      "signal_id": "67e20a00-6763-5dbf-8074-193ccafdf8c6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T21:00:00"
+      ],
+      "signal_id": "4eb3911e-90e4-511e-a978-fe929cc09aa6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T21:45:00"
+      ],
+      "signal_id": "86d119a0-d4e9-58a2-9067-4303beca6f57"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T23:15:00"
+      ],
+      "signal_id": "90ed1345-2c1a-540c-abfc-b184ca901cf8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T01:00:00"
+      ],
+      "signal_id": "b49552f3-bbda-5db0-b886-347a192cafef"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T02:15:00"
+      ],
+      "signal_id": "6a1a119d-ba70-5cd8-848e-1235a6a11d44"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:00:00"
+      ],
+      "signal_id": "f64b01d7-1559-5376-b197-b930a50a724a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T06:30:00"
+      ],
+      "signal_id": "98ac9bc6-4630-5423-943b-df551f86bf57"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T07:45:00"
+      ],
+      "signal_id": "eac60a52-ffeb-5c09-9cef-1e4a0bbcd69b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T08:45:00"
+      ],
+      "signal_id": "2c2a9f1f-3ed0-5b54-af7d-b990cc2b0dba"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T10:30:00"
+      ],
+      "signal_id": "31dfcb5e-9012-5694-850f-e4fc3b625740"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T12:15:00"
+      ],
+      "signal_id": "89f0e66d-6fa6-54a6-b487-43c9b0afe035"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T14:15:00"
+      ],
+      "signal_id": "26441da6-8a62-5a3f-8638-6af476379ee8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:45:00"
+      ],
+      "signal_id": "117b690e-55d3-5bb1-a75b-057823e873d3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T19:30:00"
+      ],
+      "signal_id": "2dd3b941-ae56-5e8d-9c2e-d8eaebab4229"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T20:30:00"
+      ],
+      "signal_id": "e81de365-ebf5-5d75-bf41-4a3384646566"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T21:15:00"
+      ],
+      "signal_id": "3a400159-d2ee-550b-aa5d-ac2808ec34f1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T22:00:00"
+      ],
+      "signal_id": "238df2d5-e834-5b14-9469-f6095a410719"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T22:45:00"
+      ],
+      "signal_id": "d180a654-0035-5345-b3b7-1910c121fcfc"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T23:45:00"
+      ],
+      "signal_id": "4540fc82-8d1f-5169-b8b5-cf072af8c86f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T01:15:00"
+      ],
+      "signal_id": "7d6a35b9-ca20-5104-9e70-02ebf693abf2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T04:45:00"
+      ],
+      "signal_id": "af20fc29-3ca9-5858-b2cb-b1050fedd5fa"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T06:15:00"
+      ],
+      "signal_id": "b0098c96-0016-5a7f-9fec-bf2a45c2b7ee"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:30:00"
+      ],
+      "signal_id": "ca5f7729-58b6-5284-8038-f962993279c0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T10:15:00"
+      ],
+      "signal_id": "ea34056e-149a-5905-9a9c-fec80e4376fa"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T12:45:00"
+      ],
+      "signal_id": "00b53063-1c57-5dfd-8842-ab42e481c51b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T15:30:00"
+      ],
+      "signal_id": "b055a784-94aa-5077-9528-dc99c1e251c5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T16:45:00"
+      ],
+      "signal_id": "18bd3f00-a7cc-5e4f-8601-8a7e5c9bc060"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T17:45:00"
+      ],
+      "signal_id": "bae4c7ce-650a-5fd0-ba6a-32298959876a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T18:45:00"
+      ],
+      "signal_id": "bd3319f8-6e2b-50b7-8f2e-9c7652e11402"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T20:30:00"
+      ],
+      "signal_id": "fb2ad546-0692-5bae-bbe8-406fab395903"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T22:15:00"
+      ],
+      "signal_id": "344a3a0f-ba8e-5674-a0d1-af094fbc66d3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T23:00:00"
+      ],
+      "signal_id": "0b9ffc59-97d7-5893-92e4-d37351fe3d6d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-04T01:15:00"
+      ],
+      "signal_id": "0c28eb50-a872-5812-8c03-28e4bd7d3e52"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "KAITOUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-04T04:30:00"
+      ],
+      "signal_id": "924609ae-b5a7-509e-86f0-f2c7b839824a"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6409,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6409,
+  "research_keys": 6409,
+  "research_only": 6409,
+  "scope_symbol": "KAITOUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32"
+}

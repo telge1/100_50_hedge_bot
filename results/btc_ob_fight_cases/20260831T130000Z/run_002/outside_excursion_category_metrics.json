@@ -1,0 +1,50 @@
+{
+  "raw_outside_excursions": {
+    "count": 0,
+    "unique_start_timestamps": 0,
+    "unique_reclaim_timestamps": 0,
+    "zero_duration_count": 0,
+    "duration": {
+      "count": 0
+    },
+    "base_volume": 0,
+    "quote_volume": 0,
+    "taker_buy_quote": 0,
+    "taker_sell_quote": 0,
+    "taker_delta_quote": 0,
+    "reclaim_count": 0,
+    "open_count": 0
+  },
+  "canonical_outside_excursions": {
+    "count": 0,
+    "unique_start_timestamps": 0,
+    "unique_reclaim_timestamps": 0,
+    "zero_duration_count": 0,
+    "duration": {
+      "count": 0
+    },
+    "base_volume": 0,
+    "quote_volume": 0,
+    "taker_buy_quote": 0,
+    "taker_sell_quote": 0,
+    "taker_delta_quote": 0,
+    "reclaim_count": 0,
+    "open_count": 0
+  },
+  "ambiguous_same_timestamp_excursions": {
+    "count": 0,
+    "unique_start_timestamps": 0,
+    "unique_reclaim_timestamps": 0,
+    "zero_duration_count": 0,
+    "duration": {
+      "count": 0
+    },
+    "base_volume": 0,
+    "quote_volume": 0,
+    "taker_buy_quote": 0,
+    "taker_sell_quote": 0,
+    "taker_delta_quote": 0,
+    "reclaim_count": 0,
+    "open_count": 0
+  }
+}

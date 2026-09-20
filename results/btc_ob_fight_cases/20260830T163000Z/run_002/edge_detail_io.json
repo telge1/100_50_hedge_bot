@@ -1,0 +1,7 @@
+{
+  "heavy_detail_csv": false,
+  "edge_book_coverage_rows": 43212,
+  "depth_sample_rows": 710,
+  "same_timestamp_groups": 6409,
+  "note": "per-sample edge/book CSVs omitted for research-db performance; summaries retained"
+}

@@ -1,0 +1,51 @@
+{
+  "contract_version": "anchor_profile_context_v1",
+  "symbol": "BTCUSDT",
+  "anchor_utc": "2026-08-30T16:00:00Z",
+  "anchor_price": 78791.6,
+  "anchor_price_tick": 787916,
+  "anchor_context": "ANCHOR_INSIDE_BOTH_PROFILES",
+  "observation_context": "ALREADY_INSIDE_AT_ANCHOR",
+  "classify": {
+    "state": "INSIDE_BOTH_PROFILES",
+    "state_group": "INSIDE_BOTH_PROFILES",
+    "direction": "NEUTRAL",
+    "price": 78791.6,
+    "price_tick": 787916,
+    "relevant_edge_price": null,
+    "distance_bps_from_relevant_edge": null
+  },
+  "levels": {
+    "tpo_poc": 78763.75,
+    "tpo_vah": 78900.0,
+    "tpo_val": 78727.5,
+    "volume_vpoc": 78831.25,
+    "volume_vvah": 78910.0,
+    "volume_vval": 78737.5
+  },
+  "edges": {
+    "inner_upper_edge": 78900.0,
+    "outer_upper_edge": 78910.0,
+    "inner_lower_edge": 78737.5,
+    "outer_lower_edge": 78727.5,
+    "upper_inner_edge_tick": 789000,
+    "upper_outer_edge_tick": 789100,
+    "lower_inner_edge_tick": 787375,
+    "lower_outer_edge_tick": 787275
+  },
+  "prior_window": {
+    "start_utc": "2026-08-30T15:30:00Z",
+    "end_utc": "2026-08-30T16:00:00Z",
+    "end_exclusive": true,
+    "rule": "session_start_not_required; lookback = [anchor - before_minutes, anchor)"
+  },
+  "prior_edge_cross": {
+    "status": "NOT_APPLICABLE",
+    "reason": "ANCHOR_NOT_OUTSIDE_BOTH",
+    "anchor_context": "ANCHOR_INSIDE_BOTH_PROFILES"
+  },
+  "interpretation_status": "NOT_EVALUATED",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null
+}

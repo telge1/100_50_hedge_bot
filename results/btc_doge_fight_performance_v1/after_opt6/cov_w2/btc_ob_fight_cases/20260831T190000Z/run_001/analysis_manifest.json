@@ -1,0 +1,91 @@
+{
+  "package_version": "0.2.0",
+  "schema_version": "btc_ob_fight_facts_v2_0",
+  "symbol": "BTCUSDT",
+  "data_source": "BTC_DOGE_RESEARCH_DB",
+  "database": "btc_doge_research",
+  "raw_archive_replay_used": false,
+  "mixed_sources_used": false,
+  "eligibility_contract": "fight_data_eligibility_contract_v1",
+  "eligibility_status": "DATA_COMPLETE",
+  "facts_computation_allowed": false,
+  "interpretation_allowed": false,
+  "trade_decision_eligible": false,
+  "mandatory_data_complete": true,
+  "context_data_complete": true,
+  "profile_causality_passed": true,
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "coverage_only": true,
+  "total_runtime_s": 0.115,
+  "instrument": {
+    "symbol": "BTCUSDT",
+    "tick_size": "0.1",
+    "quantity_step": "0.001",
+    "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+    "price_precision": 1,
+    "quantity_precision": 3,
+    "contract_type": "linear_perp",
+    "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+    "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+    "contract_version": "fight_instrument_contract_v1"
+  },
+  "query_timings": [
+    {
+      "source_name": "OB200_COVERAGE_META",
+      "elapsed_s": 0.00355,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_EVENT_SPAN",
+      "elapsed_s": 0.012781,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.002675,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PROFILE_TRADES_EVENT_SPAN",
+      "elapsed_s": 0.016527,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.003041,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "elapsed_s": 0.003882,
+      "row_count": 720,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "elapsed_s": 0.003896,
+      "row_count": 8,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "elapsed_s": 0.002926,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "BATCH_LIQUIDATIONS",
+      "elapsed_s": 0.004075,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    }
+  ],
+  "output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_fight_performance_v1/after_opt6/cov_w2/btc_ob_fight_cases/20260831T190000Z/run_001"
+}

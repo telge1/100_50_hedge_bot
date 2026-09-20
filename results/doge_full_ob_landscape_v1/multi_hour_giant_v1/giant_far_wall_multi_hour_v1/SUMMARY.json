@@ -1,0 +1,169 @@
+{
+  "schema_version": "doge_giant_far_wall_approach_v1_multi_hour",
+  "blocks": [
+    {
+      "block_id": "20260918T210000Z__20260918T230000Z",
+      "hours": [
+        "20260918T210000Z",
+        "20260918T220000Z",
+        "20260918T230000Z"
+      ],
+      "hour_count": 3,
+      "frame_count": 10800,
+      "mid_range_bps": 147.656384,
+      "track_n": 28,
+      "live_approaches": 4,
+      "birth_reaches": 0
+    },
+    {
+      "block_id": "20260919T030000Z__20260919T040000Z",
+      "hours": [
+        "20260919T030000Z",
+        "20260919T040000Z"
+      ],
+      "hour_count": 2,
+      "frame_count": 7200,
+      "mid_range_bps": 143.373287,
+      "track_n": 17,
+      "live_approaches": 0,
+      "birth_reaches": 0
+    },
+    {
+      "block_id": "20260919T060000Z__20260919T070000Z",
+      "hours": [
+        "20260919T060000Z",
+        "20260919T070000Z"
+      ],
+      "hour_count": 2,
+      "frame_count": 7200,
+      "mid_range_bps": 115.626987,
+      "track_n": 20,
+      "live_approaches": 1,
+      "birth_reaches": 0
+    }
+  ],
+  "semantics": {
+    "mode": "contiguous multi-hour tracking",
+    "giant_definition": "Q99 walls with notional>=100000.0 USDT and distance in [500.0,1000.0] bps (5\u201310%)",
+    "min_block_hours": 2
+  },
+  "evaluation": {
+    "config": {
+      "min_distance_bps": 500.0,
+      "max_distance_bps": 1000.0,
+      "min_notional_usdt": 100000.0,
+      "require_q99": true,
+      "identity_match_bps": 25.0,
+      "approach_bps": 25.0,
+      "touch_bps": 10.0,
+      "bounce_away_bps": 15.0,
+      "outcome_horizon_s": 300,
+      "min_gap_between_approaches_s": 120,
+      "include_disconnected": true
+    },
+    "track_counts": {
+      "n": 65,
+      "ever_approached_live_wall": 5,
+      "live_approach_rate": 0.076923,
+      "ever_birth_level_reached": 0,
+      "birth_level_reach_rate": 0.0,
+      "shifted_while_approaching": 36,
+      "shift_rate": 0.553846,
+      "median_min_distance_bps": 553.57244
+    },
+    "live_wall_approach_counts": {
+      "n": 5,
+      "outcomes": {
+        "SIDEWAYS_NEAR_WALL": 5
+      },
+      "shifted_while_approaching_rate": 1.0,
+      "bounce_away": {
+        "n": 0,
+        "rate": 0.0,
+        "wilson_low": 0.0,
+        "wilson_high": 0.434491
+      },
+      "break_through": {
+        "n": 0,
+        "rate": 0.0,
+        "wilson_low": 0.0,
+        "wilson_high": 0.434491
+      }
+    },
+    "birth_level_reach_counts": {
+      "n": 0,
+      "outcomes": {},
+      "wall_still_near_birth_level_rate": null,
+      "median_wall_shift_bps_from_birth": null,
+      "median_live_wall_distance_bps_at_reach": null,
+      "bounce_away": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      },
+      "break_through": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      }
+    },
+    "verdict": "INSUFFICIENT_SAMPLE",
+    "pass_criteria": {
+      "min_birth_level_reaches_20": false,
+      "birth_bounce_wilson_low_gt_0_55": false
+    }
+  },
+  "verdict": "CONDITIONAL_PASS_GIANT_STILL_PRESENT",
+  "interpretation": "Contiguous 2-3h COMPLETE blocks never reach 5-10% birth levels (mid range ~1-1.5%). Across 26 sparse COMPLETE hours, 120/499 giant birth levels are eventually revisited (median ~81h). Unconditional bounce is only 55% (FAIL gate). If a >=100k wall is STILL within 25bps at reach: bounce 87.7% (64/73, Wilson low>0.55 PASS). If wall is gone: break 95%. Live giants in multi-hour blocks shift ~55% and almost never stay glued into the near zone.",
+  "cross_sample_birth_level": {
+    "note": "Non-contiguous: mid later revisits price where a Q99>=100k wall was born at 5-10%. Gaps in COMPLETE hours mean this is not continuous film.",
+    "hours_n": 26,
+    "giant_births_n": 499,
+    "birth_reaches_n": 120,
+    "reach_rate": 0.24048096192384769,
+    "median_delay_h": 81.37777777777778,
+    "unconditional_outcomes": {
+      "BOUNCE_AWAY": 66,
+      "BREAK_THROUGH": 52,
+      "SIDEWAYS_NEAR_WALL": 2
+    },
+    "unconditional_bounce_wilson": {
+      "n": 66,
+      "rate": 0.55,
+      "wilson": [
+        0.46081381811060756,
+        0.6360841547837995
+      ]
+    },
+    "presence_at_reach": {
+      "has_wall_25bps": 80,
+      "giant_notional_still": 73,
+      "has_wall_50bps": 109,
+      "no_wall_25bps": 40,
+      "no_wall_50bps": 11
+    },
+    "conditional_giant_still_100k_25bps": {
+      "n": 73,
+      "outcomes": {
+        "BOUNCE_AWAY": 64,
+        "BREAK_THROUGH": 9
+      },
+      "bounce_rate": 0.8767123287671232,
+      "break_rate": 0.1232876712328767,
+      "bounce_wilson_low": 0.7819948926528207,
+      "bounce_wilson_high": 0.9337632383595474,
+      "pass_gate_wilson_low_gt_0_55": true
+    },
+    "conditional_wall_gone_25bps": {
+      "n": 40,
+      "outcomes": {
+        "BREAK_THROUGH": 38,
+        "BOUNCE_AWAY": 2
+      },
+      "bounce_rate": 0.05,
+      "break_rate": 0.95
+    }
+  }
+}

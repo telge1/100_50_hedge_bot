@@ -1,0 +1,9 @@
+{
+  "raw_total": 6380,
+  "run_id": "c2779bce88bf48b59bf8e3a3472fe28d",
+  "statuses": {
+    "INJUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1357
+}

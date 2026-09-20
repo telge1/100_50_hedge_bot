@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "scope": "PROFILE_EDGE_ZONE",
+      "side": "BID",
+      "event_count": 13,
+      "trade_associated_count": 0,
+      "unmatched_count": 13,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 95162473.0,
+      "affected_tick_count": 10,
+      "edge_visit_count": 0
+    },
+    {
+      "scope": "TPO_EDGE_BIN",
+      "side": "BID",
+      "event_count": 1,
+      "trade_associated_count": 0,
+      "unmatched_count": 1,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 6750520.0,
+      "affected_tick_count": 1,
+      "edge_visit_count": 0
+    }
+  ],
+  "total_events": 14
+}

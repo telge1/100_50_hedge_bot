@@ -1,0 +1,45 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/XRPUSDT/7af70b3052db441fa6832c4c06bb846a",
+      "duration_seconds": 34.513,
+      "error_code": null,
+      "finished_at": "2026-08-26T08:42:57Z",
+      "message": "",
+      "multi_tf_collision_count": 2,
+      "per_timeframe": {
+        "15m": {
+          "raw": 509,
+          "tier_a": 56
+        },
+        "1h": {
+          "raw": 131,
+          "tier_a": 15
+        },
+        "30m": {
+          "raw": 244,
+          "tier_a": 27
+        },
+        "4h": {
+          "raw": 34,
+          "tier_a": 3
+        }
+      },
+      "raw_total": 918,
+      "returncode": 0,
+      "runner_run_id": "7af70b3052db441fa6832c4c06bb846a",
+      "started_at": "2026-08-26T08:42:23Z",
+      "state": "COMPLETED",
+      "symbol": "XRPUSDT",
+      "tier_a_total": 101,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ]
+}

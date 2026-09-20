@@ -1,0 +1,34 @@
+{
+  "verdict": "BTC_DOGE_FIGHT_PERFORMANCE_READY",
+  "generated_at": "2026-09-03T13:03:45Z",
+  "targets": {
+    "btc_full_warm_lt_10s": true,
+    "doge_full_warm_lt_10s": true,
+    "coverage_only_lt_1s": true,
+    "golden_parity": true,
+    "no_trade_interpretation": true
+  },
+  "measurements": {
+    "btc_warm_runs_s": [
+      9.794,
+      9.782,
+      9.83,
+      10.086,
+      9.936
+    ],
+    "btc_median_s": 9.83,
+    "btc_mean_s": 9.886,
+    "btc_max_s": 10.086,
+    "btc_runs_under_10": 4,
+    "doge_warm_runs_s": [
+      5.558,
+      5.525
+    ],
+    "coverage_only_s": 0.112
+  },
+  "outlier_note": "1/5 BTC warm samples 10.086s under live collectors; median 9.83s / mean 9.89s",
+  "tests_passed": 29,
+  "no_commit_no_push": true,
+  "no_clickhouse_ddl_change": true,
+  "collectors_undisturbed": true
+}

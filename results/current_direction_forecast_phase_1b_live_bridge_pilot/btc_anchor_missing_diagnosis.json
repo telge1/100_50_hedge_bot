@@ -1,0 +1,17 @@
+{
+  "freeze_status": "BOOK_ANCHOR_MISSING",
+  "root_cause": "Bridge selects latest_at_or_before(max(target_start, first_ring_recv)). FR ring keeps deltas received before the oldest remaining periodic checkpoint, so no checkpoint satisfies receive_time_ns <= first_ring_recv. Freeze therefore returns BOOK_ANCHOR_MISSING with anchor=null.",
+  "evidence": {
+    "dump_anchor": null,
+    "message_count": 3000,
+    "dump_first_recv_ns": 1788624803361975150,
+    "dump_last_recv_ns": 1788625403163208254,
+    "actual_pre_roll_seconds": 599.801233104,
+    "live_checkpoint_count": 10,
+    "live_oldest_checkpoint_ns": 1788624919762457339,
+    "live_buffer_start_ns": 1788624895362318988,
+    "oldest_ck_minus_buffer_start_sec": 24.400138351
+  },
+  "authorized_second_freeze": false,
+  "code_fix_restart": "not_authorized_in_phase_1b_single_restart"
+}

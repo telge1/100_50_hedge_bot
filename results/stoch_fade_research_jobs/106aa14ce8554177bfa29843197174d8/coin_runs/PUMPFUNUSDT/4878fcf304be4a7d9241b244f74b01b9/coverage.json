@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6341,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "PUMPFUNUSDT",
+      "tier_a_count": 1619,
+      "warmup_complete": false
+    }
+  ]
+}

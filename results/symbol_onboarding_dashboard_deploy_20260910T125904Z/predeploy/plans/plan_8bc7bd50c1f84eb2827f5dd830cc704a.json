@@ -1,0 +1,58 @@
+{
+  "plan_id": "plan_8bc7bd50c1f84eb2827f5dd830cc704a",
+  "plan_hash": "60876be07641f77a545d1266b08f3b720fa45d34f010ee51ef5973454fdc70e8",
+  "created_at": "2026-09-10T13:00:13Z",
+  "expires_at_epoch": 1789047013.7250538,
+  "principal": "telge",
+  "request": {
+    "symbol": "AAPLUSDT",
+    "days": 7,
+    "candles_1m": true,
+    "open_interest_5m": true,
+    "public_trades": true,
+    "with_ob1000": false,
+    "restart_live": false
+  },
+  "plan_job_id": "AAPLUSDT_20260910T130013Z_874a422b",
+  "plan": {
+    "symbol": "AAPLUSDT",
+    "days": 7,
+    "apply": false,
+    "with_ob1000": false,
+    "restart_live": false,
+    "history_semantics": {
+      "candles_1m": "historical_backfill_supported",
+      "open_interest_5m": "historical_backfill_supported",
+      "public_trades": "historical_day_archives_when_available",
+      "ob1000": "live_only_from_activation",
+      "open_interest_5s": "live_only_from_activation",
+      "liquidations": "live_only_from_activation"
+    },
+    "instrument": {
+      "symbol": "AAPLUSDT",
+      "status": "Trading",
+      "category": "linear",
+      "quote_coin": "USDT",
+      "contract_type": "LinearPerpetual",
+      "tick_size": "0.01",
+      "qty_step": "0.01",
+      "min_order_qty": "0.01",
+      "min_notional": "5",
+      "orderbook_supported": true,
+      "base_coin": "AAPL",
+      "settle_coin": "USDT"
+    },
+    "paths": {
+      "universe": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/universe_tradeable_51.json",
+      "ob1000_symbols": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/ob1000_live_symbols.json",
+      "tick_sizes": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/ob1000_tick_sizes.json",
+      "ob1000_raw_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/data/orderbook_raw_shadow/ob1000_v1"
+    },
+    "notes": [
+      "Candles 1m / OI 5m / public trades: historical when archives exist",
+      "OB1000 / OI 5s / liquidations: live-only from activation"
+    ]
+  },
+  "status": "PLANNED",
+  "final_verdict": "ONE_COMMAND_SYMBOL_ONBOARDING_READY_DRY_RUN"
+}

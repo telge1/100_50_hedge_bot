@@ -1,0 +1,22 @@
+{
+  "fixed_strategy_version": "wave_fade_frozen_f16ae32",
+  "job_id": "8608d1b3551b4a858ac5482002d43e8f",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs",
+  "requested_at": "2026-08-15T18:37:38Z",
+  "selected_symbols": [
+    "XRPUSDT",
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-01T00:00:00Z",
+  "signal_start": "2026-01-01T00:00:00Z",
+  "universe_count": 51,
+  "universe_source": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/config/universe_tradeable_51.json"
+}

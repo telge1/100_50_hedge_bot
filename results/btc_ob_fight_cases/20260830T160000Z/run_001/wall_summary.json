@@ -1,0 +1,144 @@
+{
+  "contract_version": "wall_facts_v1",
+  "heuristic_contract_version": "wall_heuristics_v1",
+  "status": "UNFROZEN_HEURISTIC",
+  "book_samples_total": 3601,
+  "sample_gap_p50_seconds": 1.0,
+  "sample_gap_p95_seconds": 1.0,
+  "sample_gap_max_seconds": 1.0,
+  "wall_observations_total": 36010,
+  "ask_wall_observations": 18005,
+  "bid_wall_observations": 18005,
+  "unique_wall_tracks": 15483,
+  "ask_wall_tracks": 7836,
+  "bid_wall_tracks": 7647,
+  "unique_wall_price_levels": 3910,
+  "ask_unique_wall_price_levels": 2692,
+  "bid_unique_wall_price_levels": 2784,
+  "qty_decreases": {
+    "ask": 1740,
+    "bid": 1623
+  },
+  "trade_associated_decreases": {
+    "ask": 118,
+    "bid": 88
+  },
+  "unmatched_decreases": {
+    "ask": 1622,
+    "bid": 1535
+  },
+  "trade_associated_disappearances": {
+    "ask": 19,
+    "bid": 17
+  },
+  "unmatched_disappearances": {
+    "ask": 7812,
+    "bid": 7625
+  },
+  "refill_sequences_heuristic": {
+    "ask": 5385,
+    "bid": 3523
+  },
+  "tracks_visible_at_window_end": {
+    "ask": 5,
+    "bid": 5
+  },
+  "top_by_max_qty_to_median_ratio": [
+    {
+      "track_id": "ask_790040_20260830T161854_1a740a41",
+      "side": "ASK",
+      "price": 79004.0,
+      "max_qty_to_median_ratio": 9145.0
+    },
+    {
+      "track_id": "bid_790455_20260830T161353_c1dfc348",
+      "side": "BID",
+      "price": 79045.5,
+      "max_qty_to_median_ratio": 5181.0
+    },
+    {
+      "track_id": "ask_790125_20260830T161843_441fb07a",
+      "side": "ASK",
+      "price": 79012.5,
+      "max_qty_to_median_ratio": 5000.5
+    },
+    {
+      "track_id": "ask_789902_20260830T162128_b09a1f8a",
+      "side": "ASK",
+      "price": 78990.2,
+      "max_qty_to_median_ratio": 4947.5
+    },
+    {
+      "track_id": "ask_791000_20260830T162727_888d0618",
+      "side": "ASK",
+      "price": 79100.0,
+      "max_qty_to_median_ratio": 4355.0
+    }
+  ],
+  "top_by_observed_duration_seconds": [
+    {
+      "track_id": "bid_787336_20260830T155602_342ec62c",
+      "side": "BID",
+      "price": 78733.6,
+      "observed_duration_seconds": 103.0
+    },
+    {
+      "track_id": "ask_788225_20260830T154001_d44de1b1",
+      "side": "ASK",
+      "price": 78822.5,
+      "observed_duration_seconds": 92.0
+    },
+    {
+      "track_id": "ask_788277_20260830T160820_ed6488b6",
+      "side": "ASK",
+      "price": 78827.7,
+      "observed_duration_seconds": 68.0
+    },
+    {
+      "track_id": "ask_788500_20260830T154659_0472b0de",
+      "side": "ASK",
+      "price": 78850.0,
+      "observed_duration_seconds": 66.0
+    },
+    {
+      "track_id": "bid_787403_20260830T153500_933451d1",
+      "side": "BID",
+      "price": 78740.3,
+      "observed_duration_seconds": 60.0
+    }
+  ],
+  "top_by_matching_aggressor_notional": [
+    {
+      "track_id": "bid_790859_20260830T162502_26b7153a",
+      "side": "BID",
+      "price": 79085.9,
+      "matching_aggressor_notional": 1528730.4470000004
+    },
+    {
+      "track_id": "bid_790035_20260830T161830_97dff5e4",
+      "side": "BID",
+      "price": 79003.5,
+      "matching_aggressor_notional": 597029.4495
+    },
+    {
+      "track_id": "ask_789293_20260830T160458_13765813",
+      "side": "ASK",
+      "price": 78929.3,
+      "matching_aggressor_notional": 525432.3501
+    },
+    {
+      "track_id": "bid_790699_20260830T162449_f02a4f5d",
+      "side": "BID",
+      "price": 79069.9,
+      "matching_aggressor_notional": 500907.8165
+    },
+    {
+      "track_id": "ask_790794_20260830T162455_9fa10757",
+      "side": "ASK",
+      "price": 79079.4,
+      "matching_aggressor_notional": 472657.5738
+    }
+  ],
+  "trade_match_count": 7141,
+  "transition_count": 21872
+}

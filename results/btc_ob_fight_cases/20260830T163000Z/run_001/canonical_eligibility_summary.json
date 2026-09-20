@@ -1,0 +1,9 @@
+{
+  "raw_outside_count": 1,
+  "canonical_outside_count": 1,
+  "ambiguous_outside_count": 0,
+  "canonical_reclaim_count": 0,
+  "ambiguous_reclaim_candidate_count": 0,
+  "invariant_raw_equals_canonical_plus_ambiguous": true,
+  "invariant_canonical_reclaim_lte_canonical_outside": true
+}

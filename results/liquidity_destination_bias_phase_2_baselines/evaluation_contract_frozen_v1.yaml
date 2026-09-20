@@ -1,0 +1,97 @@
+evaluation_contract_version: liquidity_destination_baseline_eval_v1
+status: FROZEN_BEFORE_OUTCOME_EVALUATION
+research_only: true
+research_banner: RESEARCH_ONLY_NO_TRADE
+
+dataset:
+  root: results/liquidity_destination_bias_phase_1d_full_bounded_history
+  symbols: [BTCUSDT, DOGEUSDT]
+  source_files:
+    - BTCUSDT/episodes.csv
+    - DOGEUSDT/episodes.csv
+  dataset_fingerprint_sha256: 9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8
+  btc_episodes_sha256: ca3ba554e59653fbdbe03124d1558aa3f4f767c274c532c9c611d92abf4cf1a4
+  doge_episodes_sha256: 2d1217b46d490bed10377add4318563e461eefb6a509a943631e9d5e8d0b08af
+  episode_contract_version: liquidity_destination_episode_contract_v1
+  builder_version: liquidity_destination_episode_builder_v1
+
+temporal_splits_utc:
+  TRAIN:
+    start_inclusive: "2026-08-25T00:00:00Z"
+    end_exclusive: "2026-08-29T00:00:00Z"
+  VALIDATION:
+    start_inclusive: "2026-08-29T00:00:00Z"
+    end_exclusive: "2026-08-30T00:00:00Z"
+  TEST:
+    start_inclusive: "2026-08-30T00:00:00Z"
+    end_exclusive: null  # through end of closed Phase-1D coverage
+  assignment_field: t0_utc
+  random_split: false
+
+primary_target:
+  classes:
+    - UPPER_FIRST
+    - LOWER_FIRST
+    - NEITHER_WITHIN_HORIZON
+  ambiguous_policy: exclude_from_primary_metrics_and_report_separately
+  unknown_outcome_policy: fail_closed
+
+secondary_directional_metric:
+  included_classes: [UPPER_FIRST, LOWER_FIRST]
+  excluded_classes: [NEITHER_WITHIN_HORIZON, SIMULTANEOUS_OR_AMBIGUOUS]
+  not_primary: true
+
+baselines:
+  B0_TRAIN_MAJORITY:
+    description: most frequent TRAIN class overall
+    tie_break_order: [NEITHER_WITHIN_HORIZON, UPPER_FIRST, LOWER_FIRST]
+  B1_NEAREST_TARGET:
+    rule: nearer edge in bps; exact equality -> NEITHER_WITHIN_HORIZON
+  B2_INVERSE_NEAREST:
+    rule: opposite of nearest; exact equality -> NEITHER_WITHIN_HORIZON
+    role: negative_control
+  B3_DETERMINISTIC_HASH_CONTROL:
+    inputs: [dataset_fingerprint, episode_id]
+    hash: sha256
+    mapping: first byte mod 3 over frozen class order
+  B4_SYMBOL_TRAIN_MAJORITY:
+    description: most frequent TRAIN class within symbol
+    tie_break_order: [NEITHER_WITHIN_HORIZON, UPPER_FIRST, LOWER_FIRST]
+
+metrics:
+  primary:
+    - n
+    - accuracy
+    - balanced_accuracy
+    - macro_precision
+    - macro_recall
+    - macro_f1
+    - confusion_matrix
+    - prediction_distribution
+    - actual_class_distribution
+  secondary_directional:
+    - directional_accuracy
+    - balanced_directional_accuracy
+    - confusion_matrix
+    - excluded_neither_count
+  confidence:
+    wilson_accuracy_interval: true
+    daily_accuracy: true
+    best_worst_test_day: true
+  zero_division: treat_undefined_class_metric_as_0.0_with_warning
+  no_nan_infinity: true
+
+forbidden:
+  - orderflow_features
+  - ob_features
+  - oi
+  - liquidations
+  - market_profile
+  - machine_learning
+  - threshold_optimization
+  - now_evaluation
+  - dashboard
+  - trading
+  - builder_or_contract_changes
+  - episode_dataset_mutation
+  - validation_driven_baseline_selection_for_live_use

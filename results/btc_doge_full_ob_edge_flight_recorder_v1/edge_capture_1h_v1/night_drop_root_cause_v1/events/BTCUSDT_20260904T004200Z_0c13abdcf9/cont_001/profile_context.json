@@ -1,0 +1,12 @@
+{
+  "bracket_minutes": 30,
+  "causality": "trades_strictly_before_cutoff",
+  "completeness": "completed_window_only",
+  "cutoff": "2026-09-04T00:30:00+00:00",
+  "profile_id": "BTCUSDT_20260904T000000_003000",
+  "session_start": "2026-09-04T00:00:00+00:00",
+  "tpo_source": "volume_proxy_fallback",
+  "volume_poc": 81212.5,
+  "volume_vah": 81225.0,
+  "volume_val": 81090.0
+}

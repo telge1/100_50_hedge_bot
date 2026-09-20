@@ -1,0 +1,17 @@
+{
+  "applied_deltas": 20527,
+  "ask_levels": 21654,
+  "best_ask": 81464.2,
+  "best_bid": 81464.0,
+  "bid_levels": 40880,
+  "book_crossed": false,
+  "first_seq": 804699175253,
+  "first_u": 4107240,
+  "gap_at_u": null,
+  "last_seq": 804735499475,
+  "last_u": 4127768,
+  "ok": true,
+  "stale_or_dup": 2,
+  "status": "COMPLETE_REPLAYABLE",
+  "u_gap_count": 0
+}

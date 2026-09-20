@@ -1,0 +1,12 @@
+{
+  "settings": {
+    "causal_cutoff": "2026-08-30T16:30:00Z",
+    "profile_definition_uses_outcome": false,
+    "tpo_profile_engine": "research.btc_ob_fight.tpo_profile",
+    "volume_profile_engine": "research.btc_ob_fight.volume_profile",
+    "oa_volume_path_not_used_for_tpo": true
+  },
+  "session_start_utc": "2026-08-30T13:30:00Z",
+  "primary_session_id": "us_developing_to_anchor",
+  "profiles": {}
+}

@@ -1,0 +1,51 @@
+{
+  "all_ok": true,
+  "completed_at": "2026-09-03T07:09:42.933278Z",
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "global_duplicate_symbol_ts": 0,
+  "mutations": [
+    {
+      "id": "M1_DELETE_AUG27_DUP",
+      "ok": true,
+      "predicate_rows_after": 0,
+      "status": "ALREADY_APPLIED",
+      "window_rows_after": 3599,
+      "window_unique_after": 3599
+    },
+    {
+      "id": "M2_DELETE_AUG24_DUP",
+      "ok": true,
+      "predicate_rows_after": 0,
+      "predicate_rows_before": 726,
+      "sql": "ALTER TABLE btc_doge_research.research_ob200_snapshots_1s DELETE WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-24 22:47:54' AND snapshot_ts<'2026-08-24 23:00:00' AND build_id='137e352f56179931c3b9d31971be720a2176a3c550e9017fd171397376b77340' AND coverage_status='PARTIAL' AND computed_at=toDateTime64('2026-09-02 20:15:37.783290', 6, 'UTC')",
+      "window_rows_after": 726,
+      "window_rows_before": 1452,
+      "window_unique_after": 726,
+      "window_unique_before": 726
+    },
+    {
+      "id": "M3_DELETE_GOLDEN_NONPLAN_BUILD",
+      "ok": true,
+      "predicate_rows_after": 0,
+      "predicate_rows_before": 3600,
+      "sql": "ALTER TABLE btc_doge_research.research_ob200_snapshots_1s DELETE WHERE symbol='BTCUSDT' AND snapshot_ts>='2026-08-31 18:00:00' AND snapshot_ts<'2026-08-31 19:00:00' AND build_id='ed650f8048cea17b8ecc921b0108f7308696e581504a9c891dff824256fdc0d1'",
+      "window_rows_after": 3600,
+      "window_rows_before": 7200,
+      "window_unique_after": 3600,
+      "window_unique_before": 3600
+    },
+    {
+      "canonical_status": "PARTIAL",
+      "id": "M4_APPEND_ORPHAN_TERMINAL_PARTIAL",
+      "naive_argmax": "PARTIAL",
+      "ok": true,
+      "rows_after": 3,
+      "rows_before": 2
+    }
+  ],
+  "notes": [
+    "M1 already applied in prior attempt (aug27 predicate count=0, window=3599/3599)",
+    "system.mutations unavailable due to unrelated orderbook_analysis.orderbook_deltas attach failure; waited via row counts"
+  ],
+  "started_at": "2026-09-03T07:09:39.436815Z"
+}

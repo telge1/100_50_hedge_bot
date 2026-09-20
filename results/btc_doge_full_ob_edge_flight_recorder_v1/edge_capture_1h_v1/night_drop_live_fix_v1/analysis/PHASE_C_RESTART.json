@@ -1,0 +1,16 @@
+{
+  "old_pid": 1530387,
+  "new_pid": 1565672,
+  "start_ts": "2026-09-04T08:03:04.964068Z",
+  "collector_count": 1,
+  "oi_pid": 147111,
+  "symbols": [
+    "BTCUSDT",
+    "DOGEUSDT"
+  ],
+  "fix_markers_expected": [
+    "process_lifetime_queue_drops",
+    "current_writer_alive",
+    "persisted_capture_u_gap_count"
+  ]
+}

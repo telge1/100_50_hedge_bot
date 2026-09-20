@@ -1,0 +1,14 @@
+{
+  "job_id": "FIXTUREUSDT_20260910T130421Z_36e21a48",
+  "state": "COMPLETED",
+  "pid": 759105,
+  "consumer_pid": 759105,
+  "started_at": "2026-09-10T13:04:22Z",
+  "finished_at": "2026-09-10T13:04:34Z",
+  "error_code": null,
+  "message": "fixture completed",
+  "oa_job_id": "FIXTUREUSDT_20260910T130421Z_36e21a48",
+  "claimed_at": "2026-09-10T13:04:22Z",
+  "progress_pct": 100,
+  "oa_status": "FIXTURE_OK"
+}

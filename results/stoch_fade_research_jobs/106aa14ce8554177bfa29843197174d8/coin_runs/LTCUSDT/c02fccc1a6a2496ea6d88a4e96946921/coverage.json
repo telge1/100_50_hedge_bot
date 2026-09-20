@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6425,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "LTCUSDT",
+      "tier_a_count": 712,
+      "warmup_complete": false
+    }
+  ]
+}

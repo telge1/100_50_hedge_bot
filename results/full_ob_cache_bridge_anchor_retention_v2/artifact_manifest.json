@@ -1,0 +1,46 @@
+{
+  "generated_at_utc": "2026-09-05T17:01:00Z",
+  "verdict": "FULL_OB_CACHE_BRIDGE_ANCHOR_RETENTION_V2_READY_RESTART_REQUIRED",
+  "artifacts": {
+    "ABSCHLUSSBERICHT.md": {
+      "sha256": "2d1ace5ed97a40994803595d688976e84e0a9531ce6f7123be62e87b9cb888be",
+      "bytes": 2132
+    },
+    "CONTRACT.md": {
+      "sha256": "7ba448b618d5cceceabf73ff7edd6d2a44a0d64734ca40310ea3352c9f0784ca",
+      "bytes": 5068
+    },
+    "IMPLEMENTATION_REPORT.md": {
+      "sha256": "6176d8335e8cc8ba3510baa71564f65a9592a60489cf9d1e3f0c56104e83d924",
+      "bytes": 2063
+    },
+    "PHASE0_AUDIT.md": {
+      "sha256": "66ba2f7ed6454c16e9436324d47625297ef345a7751aff30846b72dd8104cf87",
+      "bytes": 4263
+    },
+    "TEST_REPORT.md": {
+      "sha256": "1e8ab0c9422f2bb48d1809e0bcc0f1d1444cfe2bda615de5d43da4e3006dde5c",
+      "bytes": 801
+    },
+    "exact_replay_parity.json": {
+      "sha256": "422e35358b1934d54b31ac1c4f646fe72aed3507ffd77b0ba0d3df697e9462b0",
+      "bytes": 742
+    },
+    "lock_and_memory_benchmark.json": {
+      "sha256": "3752efd043b868024033d710a6ec967a79a7a7cd06c37caadf8c7e42117eed24",
+      "bytes": 402
+    },
+    "multi_epoch_replay_test.json": {
+      "sha256": "216ce8066b36fe2b44373df167fbbfd36b30cd34e3be53d15c8ec4f00ecb3dc2",
+      "bytes": 202
+    },
+    "pytest_summary.txt": {
+      "sha256": "37ee3e07599d218e9a8ba0b3a9fb2b85b99a538edbae3628907cc1e9e9f1449e",
+      "bytes": 179
+    },
+    "retention_boundary_test.json": {
+      "sha256": "2ce691dc44f74f00696fdff6800e7f57147fe1fe8b075a1e191c623455a956ec",
+      "bytes": 477
+    }
+  }
+}

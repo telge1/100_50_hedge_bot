@@ -1,0 +1,18 @@
+PHASE 1C TEST RESULTS
+generated_at_utc=2026-09-05T12:27:04Z
+=== Existing Phase-1 tests plus new Phase-1C tests ===
+......................................                                   [100%]
+38 passed in 0.06s
+elapsed_seconds=0.19 maxrss_kb=38968
+=== Compile ===
+compile=PASS
+=== Existing 9 LLD/causality tests ===
+.........                                                                [100%]
+=============================== warnings summary ===============================
+tests/test_liquidity_location_pool_causality_fix_v2.py:85
+  /home/telgenbuescher/projects/orderbook_analyse/tests/test_liquidity_location_pool_causality_fix_v2.py:85: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+9 passed, 1 warning in 0.90s
+elapsed_seconds=1.07 maxrss_kb=154304

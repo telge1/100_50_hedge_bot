@@ -1,0 +1,99 @@
+{
+  "contract_version": "anchor_profile_context_v1",
+  "symbol": "BTCUSDT",
+  "anchor_utc": "2026-08-30T16:30:00Z",
+  "anchor_price": 79001.0,
+  "anchor_price_tick": 790010,
+  "anchor_context": "ANCHOR_OUTSIDE_BOTH_ABOVE",
+  "observation_context": "ALREADY_OUTSIDE_AT_ANCHOR",
+  "classify": {
+    "state": "OUTSIDE_BOTH_ABOVE",
+    "state_group": "OUTSIDE_BOTH_PROFILES",
+    "direction": "UPPER",
+    "price": 79001.0,
+    "price_tick": 790010,
+    "relevant_edge_price": 78945.0,
+    "distance_bps_from_relevant_edge": 7.088517866862445
+  },
+  "levels": {
+    "tpo_poc": 78852.5,
+    "tpo_vah": 78910.0,
+    "tpo_val": 78680.0,
+    "volume_vpoc": 78832.5,
+    "volume_vvah": 78945.0,
+    "volume_vval": 78645.0
+  },
+  "edges": {
+    "inner_upper_edge": 78910.0,
+    "outer_upper_edge": 78945.0,
+    "inner_lower_edge": 78680.0,
+    "outer_lower_edge": 78645.0,
+    "upper_inner_edge_tick": 789100,
+    "upper_outer_edge_tick": 789450,
+    "lower_inner_edge_tick": 786800,
+    "lower_outer_edge_tick": 786450
+  },
+  "prior_window": {
+    "start_utc": "2026-08-30T16:00:00Z",
+    "end_utc": "2026-08-30T16:30:00Z",
+    "end_exclusive": true,
+    "rule": "session_start_not_required; lookback = [anchor - before_minutes, anchor)"
+  },
+  "prior_edge_cross": {
+    "status": "PRIOR_CROSS_AMBIGUOUS_SAME_TIMESTAMP",
+    "edge": "UPPER",
+    "inner_edge_price": 78910.0,
+    "outer_edge_price": 78945.0,
+    "inner_edge_tick": 789100,
+    "outer_edge_tick": 789450,
+    "first_inner_cross": {
+      "cross_ts": "2026-08-30T16:04:08.664Z",
+      "cross_trade_id": "a81ca01b-8a18-57eb-9bd6-1baf8084a43b",
+      "cross_price": 78912.7,
+      "edge_tick": 789100,
+      "direction": "OUTWARD",
+      "state_before": "AT_OR_BELOW",
+      "state_after": "ABOVE",
+      "prev_trade_id": "fd132e45-d3de-557d-9bf7-b749f4452c6c",
+      "prev_price": 78909.4
+    },
+    "first_outer_cross": {
+      "cross_ts": "2026-08-30T16:04:44.369Z",
+      "cross_trade_id": "015d7769-ea89-514d-8cd7-72a759bfcc2e",
+      "cross_price": 78948.0,
+      "edge_tick": 789450,
+      "direction": "OUTWARD",
+      "state_before": "AT_OR_BELOW",
+      "state_after": "ABOVE",
+      "prev_trade_id": "7763190b-58bd-598a-b52e-f860e0843188",
+      "prev_price": 78940.0
+    },
+    "last_outer_cross": {
+      "cross_ts": "2026-08-30T16:13:07.159Z",
+      "cross_trade_id": "254d5bce-aab4-540c-a13a-3717136f1ac7",
+      "cross_price": 78959.4,
+      "edge_tick": 789450,
+      "direction": "OUTWARD",
+      "state_before": "AT_OR_BELOW",
+      "state_after": "ABOVE",
+      "prev_trade_id": "cd61c68f-4289-502e-8833-7fbf0caf5116",
+      "prev_price": 78940.9
+    },
+    "seconds_from_last_outer_cross_to_anchor": 1012.841,
+    "state_before_cross": "AT_OR_BELOW",
+    "state_after_cross": "ABOVE",
+    "remained_outside_until_anchor": true,
+    "public_trade_delta_quote_from_cross_to_anchor": 6142671.566500545,
+    "price_change_bps_from_cross_to_anchor": 5.268530409299694,
+    "trade_count_from_cross_to_anchor": 58222,
+    "same_timestamp_ambiguity": true,
+    "ordering_quality": "PRIOR_CROSS_AMBIGUOUS_SAME_TIMESTAMP",
+    "future_leakage": false,
+    "lookback_start_utc": "2026-08-30T16:00:00Z",
+    "lookback_end_utc": "2026-08-30T16:30:00Z"
+  },
+  "interpretation_status": "NOT_EVALUATED",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null
+}

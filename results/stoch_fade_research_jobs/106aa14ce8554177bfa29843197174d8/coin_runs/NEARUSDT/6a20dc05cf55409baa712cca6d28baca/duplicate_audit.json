@@ -1,0 +1,341 @@
+{
+  "execution_dedup_applied": false,
+  "pair_window_min": {
+    "15m|1h": 60,
+    "15m|30m": 30,
+    "15m|4h": 240,
+    "1h|4h": 240,
+    "30m|1h": 60,
+    "30m|4h": 240
+  },
+  "same_entry_mixed_direction": 0,
+  "same_entry_multi_tf_count": 72,
+  "same_entry_multi_tf_sample": {
+    "2026-01-01T19:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-08T07:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-12T03:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-15T04:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-16T09:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-25T20:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-01-30T07:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-01-31T19:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-02-02T16:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-02-03T19:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-02-10T07:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-02-14T17:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-02-26T23:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-02-27T07:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-03-02T04:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-05T02:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-14T01:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-16T06:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-16T23:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-27T13:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-03-29T22:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-04T13:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-08T09:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-14T00:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-06T09:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-05-06T13:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-07T10:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-08T04:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-10T20:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-05-12T17:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ]
+  },
+  "same_entry_same_direction": 72,
+  "tier_a_n": 1294
+}

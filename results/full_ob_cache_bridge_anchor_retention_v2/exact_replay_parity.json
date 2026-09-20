@@ -1,0 +1,21 @@
+{
+  "REPLAY_PARITY": true,
+  "data_complete": true,
+  "status": "DATA_COMPLETE",
+  "analysis_start_ns": 399400000000000,
+  "payload_replay_start_ns": 399399999000000,
+  "anchor_before_analysis": true,
+  "adverse_offset_sec_before_analysis": 0.001,
+  "final_u": 601,
+  "final_seq": 6010,
+  "bid_levels": 30000,
+  "ask_levels": 30000,
+  "total_levels": 60000,
+  "book_content_hash_match": true,
+  "best_bid": 1000.0,
+  "best_ask": 1000.01,
+  "crossed": false,
+  "dump_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/full_ob_cache_bridge_anchor_retention_v2/offline_dump/offline_parity_1788627579",
+  "payload_bytes": 1844753,
+  "payload_sha256": "e9a5ef8ffe3d8508803b1603df157ff837546747cadb0554621ba0ceaf044322"
+}

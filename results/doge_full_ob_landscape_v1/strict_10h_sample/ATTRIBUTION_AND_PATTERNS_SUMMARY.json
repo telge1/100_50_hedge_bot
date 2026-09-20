@@ -1,0 +1,591 @@
+{
+  "verdict": "PASS_DOGE_TRADE_ATTRIBUTION_AND_PATTERN_EVALUATION",
+  "hour_count": 10,
+  "connected_wall_attribution_counts": {
+    "ADD_WITHOUT_MATCHED_AGGRESSION": 882731,
+    "PULL_LIKELY": 881653,
+    "MIXED_PULL_FILL": 2977,
+    "INTERVAL_START_UNKNOWN": 1150,
+    "EXECUTED_LIKELY": 2685,
+    "REFILL_UNDER_AGGRESSION": 896
+  },
+  "pattern_counts": {
+    "COMPRESSION": 273,
+    "BULLISH_STAIRCASE": 114,
+    "BEARISH_STAIRCASE": 109,
+    "BID_ABSORPTION": 4,
+    "ASK_ABSORPTION": 1
+  },
+  "hours": [
+    {
+      "utc_hour": "2026-09-11T05:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-11T05:00:00Z",
+        "trade_count": 6239,
+        "level_change_count": 153886,
+        "class_counts": {
+          "PULL_LIKELY": 76418,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 76345,
+          "INTERVAL_START_UNKNOWN": 128,
+          "MIXED_PULL_FILL": 265,
+          "EXECUTED_LIKELY": 631,
+          "REFILL_UNDER_AGGRESSION": 99
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 761084856.220753,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 765287281.342523,
+          "INTERVAL_START_UNKNOWN": 1182744.92009,
+          "MIXED_PULL_FILL": 2111266.25052,
+          "EXECUTED_LIKELY": 1967330.70318,
+          "REFILL_UNDER_AGGRESSION": 187987.82523
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 55532,
+          "PULL_LIKELY": 56406,
+          "MIXED_PULL_FILL": 88,
+          "INTERVAL_START_UNKNOWN": 64,
+          "EXECUTED_LIKELY": 127,
+          "REFILL_UNDER_AGGRESSION": 22
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260911T050000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-11T05:00:00Z",
+        "pattern_count": 28,
+        "pattern_counts": {
+          "COMPRESSION": 25,
+          "BULLISH_STAIRCASE": 3
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260911T050000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-12T03:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-12T03:00:00Z",
+        "trade_count": 5483,
+        "level_change_count": 161528,
+        "class_counts": {
+          "PULL_LIKELY": 79504,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 80887,
+          "EXECUTED_LIKELY": 678,
+          "INTERVAL_START_UNKNOWN": 133,
+          "REFILL_UNDER_AGGRESSION": 84,
+          "MIXED_PULL_FILL": 242
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 580906863.591657,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 580940427.858233,
+          "EXECUTED_LIKELY": 1810116.9577,
+          "INTERVAL_START_UNKNOWN": 1196536.69415,
+          "REFILL_UNDER_AGGRESSION": 163026.59833,
+          "MIXED_PULL_FILL": 1585320.44841
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 60514,
+          "PULL_LIKELY": 60414,
+          "INTERVAL_START_UNKNOWN": 67,
+          "EXECUTED_LIKELY": 195,
+          "MIXED_PULL_FILL": 88,
+          "REFILL_UNDER_AGGRESSION": 23
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260912T030000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-12T03:00:00Z",
+        "pattern_count": 27,
+        "pattern_counts": {
+          "COMPRESSION": 25,
+          "BEARISH_STAIRCASE": 2
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260912T030000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-12T19:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-12T19:00:00Z",
+        "trade_count": 6022,
+        "level_change_count": 147621,
+        "class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 73600,
+          "PULL_LIKELY": 72784,
+          "INTERVAL_START_UNKNOWN": 408,
+          "EXECUTED_LIKELY": 564,
+          "MIXED_PULL_FILL": 195,
+          "REFILL_UNDER_AGGRESSION": 70
+        },
+        "class_abs_delta_notional_usdt": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 497956536.504299,
+          "PULL_LIKELY": 496069699.806381,
+          "INTERVAL_START_UNKNOWN": 1106551.99611,
+          "EXECUTED_LIKELY": 1575945.02506,
+          "MIXED_PULL_FILL": 1443025.47155,
+          "REFILL_UNDER_AGGRESSION": 116250.14342
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 49741,
+          "PULL_LIKELY": 49896,
+          "INTERVAL_START_UNKNOWN": 57,
+          "EXECUTED_LIKELY": 98,
+          "MIXED_PULL_FILL": 61,
+          "REFILL_UNDER_AGGRESSION": 12
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260912T190000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-12T19:00:00Z",
+        "pattern_count": 29,
+        "pattern_counts": {
+          "BULLISH_STAIRCASE": 1,
+          "COMPRESSION": 28
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260912T190000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-13T07:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-13T07:00:00Z",
+        "trade_count": 7407,
+        "level_change_count": 141715,
+        "class_counts": {
+          "PULL_LIKELY": 70104,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 70449,
+          "EXECUTED_LIKELY": 652,
+          "MIXED_PULL_FILL": 263,
+          "INTERVAL_START_UNKNOWN": 152,
+          "REFILL_UNDER_AGGRESSION": 95
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 675552945.579147,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 677941415.403218,
+          "EXECUTED_LIKELY": 2138286.61762,
+          "MIXED_PULL_FILL": 2692127.83339,
+          "INTERVAL_START_UNKNOWN": 1830315.01948,
+          "REFILL_UNDER_AGGRESSION": 243105.61621
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 49958,
+          "PULL_LIKELY": 50342,
+          "EXECUTED_LIKELY": 218,
+          "REFILL_UNDER_AGGRESSION": 42,
+          "MIXED_PULL_FILL": 122,
+          "INTERVAL_START_UNKNOWN": 86
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260913T070000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-13T07:00:00Z",
+        "pattern_count": 23,
+        "pattern_counts": {
+          "COMPRESSION": 20,
+          "BULLISH_STAIRCASE": 1,
+          "BEARISH_STAIRCASE": 2
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260913T070000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-13T21:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-13T21:00:00Z",
+        "trade_count": 3328,
+        "level_change_count": 127028,
+        "class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 64100,
+          "PULL_LIKELY": 62329,
+          "EXECUTED_LIKELY": 332,
+          "INTERVAL_START_UNKNOWN": 101,
+          "MIXED_PULL_FILL": 116,
+          "REFILL_UNDER_AGGRESSION": 50
+        },
+        "class_abs_delta_notional_usdt": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 477228382.140917,
+          "PULL_LIKELY": 480369056.558388,
+          "EXECUTED_LIKELY": 466565.07581,
+          "INTERVAL_START_UNKNOWN": 838224.05573,
+          "MIXED_PULL_FILL": 844600.93889,
+          "REFILL_UNDER_AGGRESSION": 119709.80269
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 41387,
+          "PULL_LIKELY": 41764,
+          "EXECUTED_LIKELY": 76,
+          "INTERVAL_START_UNKNOWN": 35,
+          "MIXED_PULL_FILL": 38,
+          "REFILL_UNDER_AGGRESSION": 14
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260913T210000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-13T21:00:00Z",
+        "pattern_count": 47,
+        "pattern_counts": {
+          "COMPRESSION": 19,
+          "BEARISH_STAIRCASE": 21,
+          "BULLISH_STAIRCASE": 7
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260913T210000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-14T21:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-14T21:00:00Z",
+        "trade_count": 14913,
+        "level_change_count": 295516,
+        "class_counts": {
+          "PULL_LIKELY": 144248,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 148855,
+          "INTERVAL_START_UNKNOWN": 301,
+          "EXECUTED_LIKELY": 1146,
+          "MIXED_PULL_FILL": 742,
+          "REFILL_UNDER_AGGRESSION": 224
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 1776381951.402629,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 1781259386.212015,
+          "INTERVAL_START_UNKNOWN": 2977224.91077,
+          "EXECUTED_LIKELY": 1980897.62945,
+          "MIXED_PULL_FILL": 6286988.33339,
+          "REFILL_UNDER_AGGRESSION": 993646.59945
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 108402,
+          "PULL_LIKELY": 107387,
+          "EXECUTED_LIKELY": 213,
+          "INTERVAL_START_UNKNOWN": 121,
+          "MIXED_PULL_FILL": 306,
+          "REFILL_UNDER_AGGRESSION": 71
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260914T210000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-14T21:00:00Z",
+        "pattern_count": 68,
+        "pattern_counts": {
+          "COMPRESSION": 44,
+          "BEARISH_STAIRCASE": 18,
+          "BULLISH_STAIRCASE": 6
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260914T210000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-16T05:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-16T05:00:00Z",
+        "trade_count": 9299,
+        "level_change_count": 247882,
+        "class_counts": {
+          "PULL_LIKELY": 122970,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 123011,
+          "EXECUTED_LIKELY": 973,
+          "MIXED_PULL_FILL": 595,
+          "INTERVAL_START_UNKNOWN": 203,
+          "REFILL_UNDER_AGGRESSION": 130
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 1354863876.894065,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 1360127409.201496,
+          "EXECUTED_LIKELY": 1825510.19287,
+          "MIXED_PULL_FILL": 5552644.16434,
+          "INTERVAL_START_UNKNOWN": 1930786.77299,
+          "REFILL_UNDER_AGGRESSION": 294262.92246
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 99296,
+          "PULL_LIKELY": 101133,
+          "INTERVAL_START_UNKNOWN": 104,
+          "MIXED_PULL_FILL": 274,
+          "EXECUTED_LIKELY": 248,
+          "REFILL_UNDER_AGGRESSION": 32
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260916T050000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-16T05:00:00Z",
+        "pattern_count": 52,
+        "pattern_counts": {
+          "BULLISH_STAIRCASE": 14,
+          "COMPRESSION": 31,
+          "BEARISH_STAIRCASE": 7
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260916T050000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-17T23:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-17T23:00:00Z",
+        "trade_count": 8766,
+        "level_change_count": 192335,
+        "class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 96375,
+          "PULL_LIKELY": 94711,
+          "MIXED_PULL_FILL": 298,
+          "INTERVAL_START_UNKNOWN": 146,
+          "EXECUTED_LIKELY": 711,
+          "REFILL_UNDER_AGGRESSION": 94
+        },
+        "class_abs_delta_notional_usdt": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 870536114.082054,
+          "PULL_LIKELY": 866837257.937899,
+          "MIXED_PULL_FILL": 4157435.96832,
+          "INTERVAL_START_UNKNOWN": 2064247.21115,
+          "EXECUTED_LIKELY": 3087477.16428,
+          "REFILL_UNDER_AGGRESSION": 434525.01478
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 75413,
+          "PULL_LIKELY": 75576,
+          "INTERVAL_START_UNKNOWN": 91,
+          "EXECUTED_LIKELY": 272,
+          "MIXED_PULL_FILL": 153,
+          "REFILL_UNDER_AGGRESSION": 34
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260917T230000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-17T23:00:00Z",
+        "pattern_count": 46,
+        "pattern_counts": {
+          "COMPRESSION": 19,
+          "BULLISH_STAIRCASE": 19,
+          "BEARISH_STAIRCASE": 8
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260917T230000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-18T09:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-18T09:00:00Z",
+        "trade_count": 24399,
+        "level_change_count": 338003,
+        "class_counts": {
+          "PULL_LIKELY": 164592,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 169672,
+          "EXECUTED_LIKELY": 1598,
+          "INTERVAL_START_UNKNOWN": 378,
+          "MIXED_PULL_FILL": 1235,
+          "REFILL_UNDER_AGGRESSION": 528
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 2001004281.372948,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 2014137420.965433,
+          "EXECUTED_LIKELY": 5113270.60281,
+          "INTERVAL_START_UNKNOWN": 5203990.30751,
+          "MIXED_PULL_FILL": 14294332.27779,
+          "REFILL_UNDER_AGGRESSION": 2221570.73753
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 135486,
+          "PULL_LIKELY": 133629,
+          "MIXED_PULL_FILL": 617,
+          "INTERVAL_START_UNKNOWN": 209,
+          "REFILL_UNDER_AGGRESSION": 179,
+          "EXECUTED_LIKELY": 463
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260918T090000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-18T09:00:00Z",
+        "pattern_count": 75,
+        "pattern_counts": {
+          "BULLISH_STAIRCASE": 29,
+          "BEARISH_STAIRCASE": 21,
+          "COMPRESSION": 24,
+          "BID_ABSORPTION": 1
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260918T090000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    },
+    {
+      "utc_hour": "2026-09-18T13:00:00Z",
+      "attribution": {
+        "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+        "utc_hour": "2026-09-18T13:00:00Z",
+        "trade_count": 40784,
+        "level_change_count": 508602,
+        "class_counts": {
+          "PULL_LIKELY": 247752,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 254285,
+          "MIXED_PULL_FILL": 2604,
+          "INTERVAL_START_UNKNOWN": 573,
+          "EXECUTED_LIKELY": 2354,
+          "REFILL_UNDER_AGGRESSION": 1034
+        },
+        "class_abs_delta_notional_usdt": {
+          "PULL_LIKELY": 3841558025.128236,
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 3856636151.767203,
+          "MIXED_PULL_FILL": 22380875.46352,
+          "INTERVAL_START_UNKNOWN": 7216943.56234,
+          "EXECUTED_LIKELY": 6207471.5547,
+          "REFILL_UNDER_AGGRESSION": 6260328.47531
+        },
+        "connected_wall_class_counts": {
+          "ADD_WITHOUT_MATCHED_AGGRESSION": 207002,
+          "PULL_LIKELY": 205106,
+          "MIXED_PULL_FILL": 1230,
+          "EXECUTED_LIKELY": 775,
+          "INTERVAL_START_UNKNOWN": 316,
+          "REFILL_UNDER_AGGRESSION": 467
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260918T130000Z.attributed_level_flow.jsonl.zst",
+        "semantics": {
+          "price_match": "exact execution price",
+          "time_interval": "(previous same-level book node,current book node]",
+          "trade_reuse": "impossible across non-overlapping same-level intervals",
+          "l2_limit": "gross add and cancel inside one interval are not identifiable"
+        }
+      },
+      "patterns": {
+        "verdict": "PASS_CONSERVATIVE_PATTERN_EVALUATION",
+        "utc_hour": "2026-09-18T13:00:00Z",
+        "pattern_count": 106,
+        "pattern_counts": {
+          "BULLISH_STAIRCASE": 34,
+          "COMPRESSION": 38,
+          "BEARISH_STAIRCASE": 30,
+          "BID_ABSORPTION": 3,
+          "ASK_ABSORPTION": 1
+        },
+        "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_10h_sample/DOGEUSDT_20260918T130000Z.patterns.jsonl",
+        "semantics": {
+          "staircase_and_compression": "causal evidence through detected_at",
+          "trap_and_absorption": "post-event confirmed; not live signals",
+          "cooldown_seconds": 30,
+          "unknown_policy": "no label unless every minimum condition passes"
+        }
+      }
+    }
+  ]
+}

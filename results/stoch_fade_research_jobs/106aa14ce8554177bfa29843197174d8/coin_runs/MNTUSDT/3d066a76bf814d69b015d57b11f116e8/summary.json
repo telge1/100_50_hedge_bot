@@ -1,0 +1,9 @@
+{
+  "raw_total": 6294,
+  "run_id": "3d066a76bf814d69b015d57b11f116e8",
+  "statuses": {
+    "MNTUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 750
+}

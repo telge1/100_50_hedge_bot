@@ -1,0 +1,113 @@
+{
+  "preflight_version": "phase_2a1_v1",
+  "q1_why_episode_count": {
+    "episode_count": 269,
+    "cause": "profile_state_changes_on_each_deduplicated_public_trade_post_anchor_crossing_edge_tick_boundary",
+    "state_change_source": "deduplicated_public_trade_chronological",
+    "not_candle_or_bucket": true,
+    "trade_count_observed": 37499
+  },
+  "q2_state_distribution": {
+    "INSIDE_BOTH_PROFILES": 18,
+    "BETWEEN_UPPER_PROFILE_EDGES": 134,
+    "OUTSIDE_BOTH_ABOVE": 117
+  },
+  "q3_duration_by_state": {
+    "INSIDE_BOTH_PROFILES": {
+      "count": 18,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 8.654,
+      "p90": 71.519,
+      "p95": 413.75,
+      "max": 664.03,
+      "total_seconds": 1182.963
+    },
+    "BETWEEN_UPPER_PROFILE_EDGES": {
+      "count": 134,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.003,
+      "p95": 1.028,
+      "max": 63.583,
+      "total_seconds": 249.502
+    },
+    "OUTSIDE_BOTH_ABOVE": {
+      "count": 117,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.338,
+      "max": 164.938,
+      "total_seconds": 363.815
+    }
+  },
+  "q4_duration_buckets": {
+    "under_100ms": 243,
+    "under_500ms": 5,
+    "under_1s": 3,
+    "under_2s": 1,
+    "under_5s": 1,
+    "under_10s": 3,
+    "under_30s": 2,
+    "at_least_30s": 11
+  },
+  "q5_outside_episodes_closed": {
+    "count": 117,
+    "all_closed": true,
+    "window_end_outside": 0
+  },
+  "q6_reclaim_chronological_cross": {
+    "phase2a_reclaim_count": 0,
+    "unique_cross_ts_in_phase2a": 0,
+    "phase2a_global_first_reclaim_bug": false
+  },
+  "q7_window_end_as_reclaim": {
+    "window_end_reclaim_count_phase2a": 0,
+    "note": "Phase 2A reclaim builder does not filter WINDOW_END; corrected in Phase 2A.1"
+  },
+  "q8_reclaim_equals_outside_count": {
+    "outside_count": 117,
+    "phase2a_reclaim_count": 0,
+    "equal": false,
+    "explanation_if_equal": "Phase 2A assigns one reclaim per outside episode via flawed global-first transition match"
+  },
+  "q9_state_change_data_source": "each_deduplicated_public_trade_sorted_by_ts_trade_id",
+  "q10_trade_dedup_and_sort": {
+    "deduplicated_by_trade_id": true,
+    "sort_key": "(ts, trade_id)",
+    "meta": {
+      "table": "orderbook_analysis.public_trades_canonical",
+      "raw_count": 850561,
+      "deduped_count": 850561,
+      "dedup_removed": 0,
+      "aggressor_semantics": "side=Buy/Sell is Bybit taker/aggressor",
+      "sort": "trade_ts, trade_id"
+    }
+  },
+  "q11_identical_timestamp_order": "deterministic_trade_id_tiebreak",
+  "q12_edge_event_ticks": [
+    790800,
+    791400
+  ],
+  "q13_exact_tick_only": {
+    "exact_level_ticks_only_in_phase2a": true,
+    "ticks_observed": [
+      790800,
+      791400
+    ]
+  },
+  "q14_ob_coverage_at_edges": "requires_phase_2a1_edge_book_coverage",
+  "q15_profile_edges_in_ob200": "requires_phase_2a1_edge_book_coverage",
+  "duration_sum_seconds": 1796.28,
+  "observation_window_seconds": 1800.0,
+  "trade_span_seconds": 1796.28,
+  "duration_sum_matches_window": false,
+  "duration_sum_matches_trade_span": true,
+  "transition_count": 268
+}

@@ -1,0 +1,83 @@
+{
+  "candle_filters": {
+    "database": "signal_generator",
+    "exchange": "bybit",
+    "final": true,
+    "interval": "1m",
+    "is_closed": 1,
+    "symbol": "XLMUSDT",
+    "table": "candles_1m",
+    "window": "[start, end)"
+  },
+  "candles": {
+    "count": 356262,
+    "max_open_time": "2026-08-15T09:41:00Z",
+    "min_open_time": "2025-12-11T00:00:00Z",
+    "symbol": "XLMUSDT",
+    "uniq_open_time": 356262
+  },
+  "captured_at": "2026-08-15T20:41:14.746865Z",
+  "files": {
+    "ema_research_registry.json": "30e04217472f0867431b49bb6a5e866d5121a2d7c3827d6fcb48b2c443548cbc",
+    "live_universe.json": "0b4faf44c57e48d81c25ad159563c757876ce6c5143aac60a3ca11333be9344c",
+    "pool_research_registry.json": "3979e6316c9750c086ef930f29f9721515e456eeec68db618b9a488fcf1d0b25",
+    "stoch_signale_default": "wave_fade_no_be50_v1"
+  },
+  "global_control_counts": {
+    "candles_1m": 19489391,
+    "signal_processing_state": 103,
+    "signals": 6382
+  },
+  "global_counts_are_not_coin_writes": true,
+  "global_table_counts": {
+    "candles_1m": 19489391,
+    "signal_processing_state": 103,
+    "signals": 6382
+  },
+  "label": "before",
+  "outcomes": {
+    "count": 0,
+    "error": null,
+    "scope": "symbol_via_signal_id_join",
+    "scope_symbol": "XLMUSDT",
+    "uniq_signal_id": 0
+  },
+  "scope_end_exclusive": "2026-08-01T20:09:00Z",
+  "scope_start": "2026-01-01T00:00:00Z",
+  "scope_symbol": "XLMUSDT",
+  "sg_root": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves",
+  "signals": {
+    "count": 0,
+    "max_generated_at": "1970-01-01T00:00:00Z",
+    "min_generated_at": "1970-01-01T00:00:00Z",
+    "symbol": "XLMUSDT",
+    "uniq_signal_id": 0
+  },
+  "symbol": "XLMUSDT",
+  "watermarks": [],
+  "window_candles": {
+    "count": 306489,
+    "count_by_exchange": [
+      {
+        "count": 306489,
+        "exchange": "bybit",
+        "uniq_open_time": 306489
+      }
+    ],
+    "database": "signal_generator",
+    "duplicate_count": 0,
+    "end": "2026-08-01T20:09:00Z",
+    "exchange": "bybit",
+    "final": true,
+    "internal_1m_gaps": 0,
+    "interval": "1m",
+    "is_closed": 1,
+    "max_open_time": "2026-08-01T20:08:00Z",
+    "min_open_time": "2026-01-01T00:00:00Z",
+    "start": "2026-01-01T00:00:00Z",
+    "symbol": "XLMUSDT",
+    "table": "candles_1m",
+    "uniq_open_time": 306489,
+    "window": "[start, end)"
+  }
+}

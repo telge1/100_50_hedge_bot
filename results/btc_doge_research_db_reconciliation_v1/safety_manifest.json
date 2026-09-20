@@ -1,0 +1,15 @@
+{
+  "collector_pids_after": [
+    "147111 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0",
+    "3946369 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "commit_push": false,
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "generated_at": "2026-09-03T07:12:22.768889Z",
+  "no_collector_dashboard_fight_changes": true,
+  "no_drop_truncate": true,
+  "no_full_history_rerun": true,
+  "no_partial_to_ready_promotion": true,
+  "no_source_gap_imputation": true,
+  "target_database_only": "btc_doge_research"
+}

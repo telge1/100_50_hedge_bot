@@ -1,0 +1,75 @@
+{
+  "data_source": "BTC_DOGE_RESEARCH_DB",
+  "database": "btc_doge_research",
+  "raw_archive_replay_used": false,
+  "mixed_sources_used": false,
+  "trade_tick_source": "btc_doge_research.research_public_trades",
+  "trade_source_mode": "RESEARCH_PUBLIC_TRADES",
+  "lineage_companion_used": false,
+  "research_trade_events_missing": false,
+  "ob_table": "btc_doge_research.research_ob200_snapshots_1s",
+  "oi_table": "btc_doge_research.research_open_interest_observations",
+  "liq_table": "btc_doge_research.research_liquidation_events",
+  "candles_table": "signal_generator.candles_1m",
+  "candles_classification": "COVERAGE_ONLY",
+  "ob_build_ids": [
+    "a1d4e666513df0efb7651f88d7981228d1aed8243eb8ef49eec765b14cb9ad9f",
+    "f782c3052a66f8c927e5bf5d62460f494e20b7a50a89be307cefde1c2f21cc72"
+  ],
+  "query_timings": [
+    {
+      "source_name": "OB200",
+      "elapsed_s": 0.437136,
+      "row_count": 3600,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_EVENT_SPAN",
+      "elapsed_s": 2.001914,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES",
+      "elapsed_s": 2.79958,
+      "row_count": 1365762,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "elapsed_s": 0.007222,
+      "row_count": 1436,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "elapsed_s": 0.004924,
+      "row_count": 63,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "elapsed_s": 0.002482,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "BATCH_LIQUIDATIONS",
+      "elapsed_s": 0.00769,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    }
+  ],
+  "instrument": {
+    "symbol": "BTCUSDT",
+    "tick_size": "0.1",
+    "quantity_step": "0.001",
+    "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+    "price_precision": 1,
+    "quantity_precision": 3,
+    "contract_type": "linear_perp",
+    "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+    "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+    "contract_version": "fight_instrument_contract_v1"
+  }
+}

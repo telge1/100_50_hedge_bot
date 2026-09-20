@@ -1,0 +1,9 @@
+{
+  "heavy_detail_csv": false,
+  "observation_count": 36010,
+  "track_count": 15483,
+  "transition_count": 21872,
+  "trade_match_count": 7141,
+  "legacy_wall_fact_count": 15483,
+  "note": "per-sample wall CSVs omitted for research-db performance; wall_summary retained"
+}

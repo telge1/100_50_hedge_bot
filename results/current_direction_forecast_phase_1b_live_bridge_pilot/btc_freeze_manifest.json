@@ -1,0 +1,36 @@
+{
+  "generated_at_utc": "2026-09-05T16:24:55Z",
+  "request_id": "phase1b_btc_freeze_20260905T162323Z",
+  "status": "BOOK_ANCHOR_MISSING",
+  "data_complete": false,
+  "exclusion_reasons": [
+    "BOOK_ANCHOR_MISSING"
+  ],
+  "dump_dir": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_cache_bridge_dumps/phase1b_btc_freeze_20260905T162323Z",
+  "payload_bytes": 9262210,
+  "payload_mib": 8.8331,
+  "payload_sha256": "4f183c2c58e4fd62ac49d9a2ed17c614da8d9db2d44c284e981a776a0be7fb49",
+  "manifest_sha256": "51855e9441075e9f6ce8e50303df45119fc15991b9fdeb0b11c2acd611070fd8",
+  "payload_hash_ok": true,
+  "manifest_hash_ok": true,
+  "all_recv_le_t0": true,
+  "feature_cutoff_le_t0": true,
+  "t0_utc": "2026-09-05T16:23:23.328089Z",
+  "t0_ns": 1788625403328088972,
+  "actual_pre_roll_seconds": 599.801233104,
+  "message_count": 3000,
+  "gap_count": 0,
+  "overflow_count": 0,
+  "reconnect_count": 0,
+  "anchor_type": "MISSING",
+  "anchor_present": false,
+  "file_modes": {
+    "dump_dir": "0o700",
+    "payload": "0o600",
+    "manifest": "0o600"
+  },
+  "tmp_leftovers": [],
+  "second_freeze_status": "REQUEST_BUSY",
+  "second_freeze_error": "rate_limited",
+  "payload_under_96mib": true
+}

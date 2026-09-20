@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 356262,
+      "error": null,
+      "raw_count": 7310,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "AAVEUSDT",
+      "tier_a_count": 1369,
+      "warmup_complete": false
+    }
+  ]
+}

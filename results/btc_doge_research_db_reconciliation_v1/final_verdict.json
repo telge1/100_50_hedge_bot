@@ -1,0 +1,22 @@
+{
+  "branch": "feature/btc-doge-research-db",
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "dirty_count": 69,
+  "fight_cli_note": "Research-DB is READY for COMPLETE windows with PARTIAL/SOURCE gates. Fight-CLI switch still requires implementing those eligibility gates before production cutover.",
+  "fight_cli_switch_allowed": false,
+  "generated_at": "2026-09-03T07:12:22.768889Z",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "invariants_pass": true,
+  "mutations_ok": true,
+  "no_commit_no_push": true,
+  "partial_disjoint": {
+    "OB200": 19,
+    "OPEN_INTEREST": 18,
+    "total": 37
+  },
+  "status_counts": {
+    "PARTIAL": 37,
+    "READY": 625
+  },
+  "verdict": "BTC_DOGE_RESEARCH_DB_READY_WITH_DOCUMENTED_SOURCE_GAPS"
+}

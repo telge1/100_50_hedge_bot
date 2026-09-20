@@ -1,0 +1,112 @@
+{
+  "0": {
+    "gross_loss_usdt": -88.5,
+    "gross_profit_usdt": 162.0,
+    "losses": 66,
+    "open": 1,
+    "profit_factor": 1.8305084745762712,
+    "realized_pnl_usdt": 73.5,
+    "trades": 166,
+    "win_rate": 0.6,
+    "wins": 99
+  },
+  "1": {
+    "gross_loss_usdt": -468.0,
+    "gross_profit_usdt": 855.0,
+    "losses": 361,
+    "open": 1,
+    "profit_factor": 1.8269230769230769,
+    "realized_pnl_usdt": 387.0,
+    "trades": 929,
+    "win_rate": 0.6109913793103449,
+    "wins": 567
+  },
+  "2": {
+    "gross_loss_usdt": -348.0,
+    "gross_profit_usdt": 561.0,
+    "losses": 272,
+    "open": 1,
+    "profit_factor": 1.6120689655172413,
+    "realized_pnl_usdt": 213.0,
+    "trades": 648,
+    "win_rate": 0.5795981452859351,
+    "wins": 375
+  },
+  "3": {
+    "gross_loss_usdt": -2.0,
+    "gross_profit_usdt": 5.0,
+    "losses": 1,
+    "open": 1,
+    "profit_factor": 2.5,
+    "realized_pnl_usdt": 3.0,
+    "trades": 4,
+    "win_rate": 0.6666666666666666,
+    "wins": 2
+  },
+  "4": {
+    "gross_loss_usdt": -351.5,
+    "gross_profit_usdt": 633.0,
+    "losses": 273,
+    "open": 1,
+    "profit_factor": 1.8008534850640114,
+    "realized_pnl_usdt": 281.5,
+    "trades": 700,
+    "win_rate": 0.6094420600858369,
+    "wins": 426
+  },
+  "5": {
+    "gross_loss_usdt": -725.5,
+    "gross_profit_usdt": 1349.0,
+    "losses": 564,
+    "open": 0,
+    "profit_factor": 1.859407305306685,
+    "realized_pnl_usdt": 623.5,
+    "trades": 1437,
+    "win_rate": 0.6075156576200418,
+    "wins": 873
+  },
+  "6": {
+    "gross_loss_usdt": -9.0,
+    "gross_profit_usdt": 7.0,
+    "losses": 7,
+    "open": 1,
+    "profit_factor": 0.7777777777777778,
+    "realized_pnl_usdt": -2.0,
+    "trades": 13,
+    "win_rate": 0.4166666666666667,
+    "wins": 5
+  },
+  "7": {
+    "gross_loss_usdt": 0.0,
+    "gross_profit_usdt": 1.0,
+    "losses": 0,
+    "open": 1,
+    "profit_factor": Infinity,
+    "realized_pnl_usdt": 1.0,
+    "trades": 2,
+    "win_rate": 1.0,
+    "wins": 1
+  },
+  "8": {
+    "gross_loss_usdt": -39.5,
+    "gross_profit_usdt": 68.0,
+    "losses": 30,
+    "open": 1,
+    "profit_factor": 1.7215189873417722,
+    "realized_pnl_usdt": 28.5,
+    "trades": 77,
+    "win_rate": 0.6052631578947368,
+    "wins": 46
+  },
+  "9": {
+    "gross_loss_usdt": -293.0,
+    "gross_profit_usdt": 520.0,
+    "losses": 234,
+    "open": 1,
+    "profit_factor": 1.7747440273037542,
+    "realized_pnl_usdt": 227.0,
+    "trades": 599,
+    "win_rate": 0.6086956521739131,
+    "wins": 364
+  }
+}

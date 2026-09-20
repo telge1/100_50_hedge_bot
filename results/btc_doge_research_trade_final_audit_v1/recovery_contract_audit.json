@@ -1,0 +1,8 @@
+{
+  "clickhouse_source_of_truth": true,
+  "contract_version": "research_public_trades_contract_v2",
+  "crash_after_insert_before_terminal": "ReplacingMergeTree + parity check + COMPLETE watermark",
+  "crash_before_insert": "CLAIMED/IN_PROGRESS watermark; resume re-claims segment",
+  "json_state_atomic": "research/btc_doge_research/atomic_json.py",
+  "pass": true
+}

@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "checks": {
+    "base_volume_conservation": true,
+    "quote_notional_conservation": true,
+    "trade_count_conservation": true,
+    "buy_sell_sum_equals_total": true,
+    "delta_equals_buy_minus_sell": true,
+    "no_trade_after_anchor": true,
+    "deduped_trade_count": 813062,
+    "value_area_level_order": true,
+    "all_values_finite": true,
+    "value_area_share_target_met": true
+  },
+  "totals": {
+    "trade_base_volume": 21512.315,
+    "row_base_volume": 21512.31500000021,
+    "trade_notional": 1687208600.989,
+    "row_notional": 1687208600.9889987,
+    "trade_count": 813062,
+    "row_trade_count": 813062
+  },
+  "tolerance_abs": 1e-06,
+  "tolerance_rel": 1e-09
+}

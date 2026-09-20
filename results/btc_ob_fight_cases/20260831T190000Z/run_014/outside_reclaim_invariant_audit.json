@@ -1,0 +1,16 @@
+{
+  "contract_version": "outside_reclaim_v1",
+  "passed": true,
+  "violation_count": 0,
+  "violations": [],
+  "outside_excursion_count": 117,
+  "reclaim_count": 117,
+  "open_excursion_count": 0,
+  "phase2a_reclaim_bug_documented": {
+    "type": "PHASE_2A_GLOBAL_FIRST_RECLAIM_BUG",
+    "description": "All outside episodes assigned same global first reclaim cross_ts",
+    "shared_cross_ts": "2026-08-31T19:10:58.515Z",
+    "affected_count": 117
+  },
+  "phase2a_reclaim_count": 117
+}

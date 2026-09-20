@@ -1,0 +1,17 @@
+{
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "contract_version": "research_public_trades_contract_v2",
+  "parts_summary": {
+    "canonical": true,
+    "fight_btc": true,
+    "fight_doge": true,
+    "idempotency": true,
+    "lineage": true,
+    "parity": true,
+    "preflight": null,
+    "regression": true,
+    "segments": null,
+    "utc": true
+  },
+  "verdict": "BTC_DOGE_RESEARCH_TRADE_REMATERIALIZATION_READY"
+}

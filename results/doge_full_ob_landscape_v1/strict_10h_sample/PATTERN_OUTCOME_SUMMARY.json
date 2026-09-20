@@ -1,0 +1,147 @@
+{
+  "verdict": "DESCRIPTIVE_ONLY_NOT_OOS",
+  "event_count": 501,
+  "patterns": {
+    "ASK_ABSORPTION": {
+      "count": 1,
+      "label_modes": {
+        "POST_EVENT_CONFIRMED": 1
+      },
+      "first_25bps_counts": {
+        "UP": 1
+      },
+      "first_25bps_eligible": 1,
+      "first_25bps_rates_pct": {
+        "UP": 100.0
+      },
+      "first_50bps_counts": {
+        "UP": 1
+      },
+      "first_50bps_eligible": 1,
+      "first_50bps_rates_pct": {
+        "UP": 100.0
+      }
+    },
+    "BEARISH_STAIRCASE": {
+      "count": 109,
+      "label_modes": {
+        "CAUSAL_AT_DETECTION": 109
+      },
+      "first_25bps_counts": {
+        "SIDEWAYS": 34,
+        "UP": 31,
+        "DOWN": 17,
+        "CENSORED": 27
+      },
+      "first_25bps_eligible": 82,
+      "first_25bps_rates_pct": {
+        "SIDEWAYS": 41.46,
+        "UP": 37.8,
+        "DOWN": 20.73
+      },
+      "first_50bps_counts": {
+        "SIDEWAYS": 57,
+        "CENSORED": 28,
+        "UP": 20,
+        "DOWN": 4
+      },
+      "first_50bps_eligible": 81,
+      "first_50bps_rates_pct": {
+        "SIDEWAYS": 70.37,
+        "UP": 24.69,
+        "DOWN": 4.94
+      }
+    },
+    "BID_ABSORPTION": {
+      "count": 4,
+      "label_modes": {
+        "POST_EVENT_CONFIRMED": 4
+      },
+      "first_25bps_counts": {
+        "UP": 3,
+        "DOWN": 1
+      },
+      "first_25bps_eligible": 4,
+      "first_25bps_rates_pct": {
+        "UP": 75.0,
+        "DOWN": 25.0
+      },
+      "first_50bps_counts": {
+        "UP": 2,
+        "DOWN": 1,
+        "SIDEWAYS": 1
+      },
+      "first_50bps_eligible": 4,
+      "first_50bps_rates_pct": {
+        "UP": 50.0,
+        "DOWN": 25.0,
+        "SIDEWAYS": 25.0
+      }
+    },
+    "BULLISH_STAIRCASE": {
+      "count": 114,
+      "label_modes": {
+        "CAUSAL_AT_DETECTION": 114
+      },
+      "first_25bps_counts": {
+        "DOWN": 18,
+        "SIDEWAYS": 39,
+        "CENSORED": 16,
+        "UP": 41
+      },
+      "first_25bps_eligible": 98,
+      "first_25bps_rates_pct": {
+        "DOWN": 18.37,
+        "SIDEWAYS": 39.8,
+        "UP": 41.84
+      },
+      "first_50bps_counts": {
+        "SIDEWAYS": 69,
+        "CENSORED": 20,
+        "UP": 21,
+        "DOWN": 4
+      },
+      "first_50bps_eligible": 94,
+      "first_50bps_rates_pct": {
+        "SIDEWAYS": 73.4,
+        "UP": 22.34,
+        "DOWN": 4.26
+      }
+    },
+    "COMPRESSION": {
+      "count": 273,
+      "label_modes": {
+        "CAUSAL_AT_DETECTION": 273
+      },
+      "first_25bps_counts": {
+        "SIDEWAYS": 123,
+        "DOWN": 48,
+        "CENSORED": 51,
+        "UP": 51
+      },
+      "first_25bps_eligible": 222,
+      "first_25bps_rates_pct": {
+        "SIDEWAYS": 55.41,
+        "DOWN": 21.62,
+        "UP": 22.97
+      },
+      "first_50bps_counts": {
+        "SIDEWAYS": 189,
+        "CENSORED": 56,
+        "DOWN": 4,
+        "UP": 24
+      },
+      "first_50bps_eligible": 217,
+      "first_50bps_rates_pct": {
+        "SIDEWAYS": 87.1,
+        "DOWN": 1.84,
+        "UP": 11.06
+      }
+    }
+  },
+  "caveats": [
+    "Overlapping 30-second windows and cooldown labels are not independent samples.",
+    "Trap and absorption labels use future confirmation and cannot be interpreted as live predictors.",
+    "Thresholds are pre-calibration research defaults, not out-of-sample validated."
+  ]
+}

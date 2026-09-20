@@ -1,0 +1,60 @@
+{
+  "compounding": false,
+  "considered_matching_evaluations": [
+    {
+      "evaluation_id": "367cd8b9ce074526a0d8839ebea2b74f",
+      "mtime_iso": "2026-08-16T05:12:31Z",
+      "sha256": "7b36d762e617767952f0e678504fba179566ea4785248c7f177a92c2ac2add2f",
+      "size_bytes": 66642166,
+      "source_job_id": "106aa14ce8554177bfa29843197174d8",
+      "window": {
+        "end": "2026-08-11T19:46:00Z",
+        "start": "2026-01-01T00:01:00Z"
+      }
+    },
+    {
+      "evaluation_id": "86a089a2237b4199988146157bd71319",
+      "mtime_iso": "2026-08-15T21:06:23Z",
+      "sha256": "8929effc9fdb39b7c7c46bf961b6fc61d745c98c95df8a37f8bb68b564a1f45d",
+      "size_bytes": 66642166,
+      "source_job_id": "106aa14ce8554177bfa29843197174d8",
+      "window": {
+        "end": "2026-08-11T19:46:00Z",
+        "start": "2026-01-01T00:01:00Z"
+      }
+    }
+  ],
+  "created_at": "2026-08-16T05:26:59Z",
+  "dedup_key": [
+    "symbol",
+    "entry_time"
+  ],
+  "dedup_timeframe_priority": [
+    "4h",
+    "1h",
+    "30m",
+    "15m"
+  ],
+  "event_order_rule": "Before processing an entry at T, close positions with exit_time < T only. Positions with exit_time == T remain open. Among signals sharing T, order is timeframe rank descending, then symbol ascending, then signal_id ascending. Free slots are assigned lowest index first.",
+  "exit_policy": "NO_BE50",
+  "fees_applied": false,
+  "initial_balance_usdt": 1000.0,
+  "intrabar_policy": "SL_FIRST",
+  "leverage": 1,
+  "live_orders_enabled": false,
+  "max_slots": 10,
+  "net_result_status": "NOT_EVALUATED_NO_AUTHORITATIVE_FEE_RATE",
+  "notional_per_trade_usdt": 100.0,
+  "pnl_basis": "gross",
+  "portfolio_policy": "TEN_FIXED_SLOTS_V1",
+  "publish_enabled": false,
+  "run_id": "102b9ef1f5344df48fc3d5765110d772",
+  "same_symbol_overlap_allowed": false,
+  "same_timestamp_fill_order": "entry_time asc, timeframe rank desc (4h>1h>30m>15m), symbol asc, signal_id asc; lowest free slot index first",
+  "signal_scope": "TIER_A_ONLY",
+  "signal_strategy_version": "wave_fade_frozen_f16ae32",
+  "slot_reuse_requires_strictly_after_exit": true,
+  "source_evaluation_id": "367cd8b9ce074526a0d8839ebea2b74f",
+  "source_job_id": "106aa14ce8554177bfa29843197174d8",
+  "writes_to_clickhouse": false
+}

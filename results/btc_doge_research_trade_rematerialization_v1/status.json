@@ -1,0 +1,436 @@
+{
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "engine": {
+    "exists": true,
+    "engine": "ReplacingMergeTree",
+    "sorting_key": "symbol, trade_id",
+    "partition_key": "(symbol, toYYYYMM(event_time))",
+    "total_rows": 19327206,
+    "columns": [
+      {
+        "name": "symbol",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "event_time",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "receive_time",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "trade_id",
+        "type": "String"
+      },
+      {
+        "name": "price",
+        "type": "Decimal(18, 8)"
+      },
+      {
+        "name": "base_size",
+        "type": "Decimal(24, 12)"
+      },
+      {
+        "name": "quote_notional",
+        "type": "Decimal(24, 8)"
+      },
+      {
+        "name": "taker_side",
+        "type": "Enum8('Buy' = 1, 'Sell' = 2)"
+      },
+      {
+        "name": "source",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "source_id",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "source_fingerprint",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "source_segment_start",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "source_segment_end",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "source_contract_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "processor_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "ingestion_batch_id",
+        "type": "String"
+      },
+      {
+        "name": "build_id",
+        "type": "String"
+      },
+      {
+        "name": "contract_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "record_version",
+        "type": "UInt64"
+      },
+      {
+        "name": "ingested_at",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "imported_at",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "quality_flags",
+        "type": "Array(LowCardinality(String))"
+      },
+      {
+        "name": "coverage_status",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "finalization_status",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "event_key",
+        "type": "String"
+      }
+    ],
+    "create_table_query": "CREATE TABLE btc_doge_research.research_public_trades (`symbol` LowCardinality(String), `event_time` DateTime64(3, 'UTC'), `receive_time` DateTime64(6, 'UTC'), `trade_id` String, `price` Decimal(18, 8), `base_size` Decimal(24, 12), `quote_notional` Decimal(24, 8), `taker_side` Enum8('Buy' = 1, 'Sell' = 2), `source` LowCardinality(String), `source_id` LowCardinality(String), `source_fingerprint` FixedString(64), `source_segment_start` DateTime64(3, 'UTC'), `source_segment_end` DateTime64(3, 'UTC'), `source_contract_version` LowCardinality(String), `processor_version` LowCardinality(String), `ingestion_batch_id` String, `build_id` String, `contract_version` LowCardinality(String), `record_version` UInt64, `ingested_at` DateTime64(6, 'UTC'), `imported_at` DateTime64(6, 'UTC'), `quality_flags` Array(LowCardinality(String)), `coverage_status` LowCardinality(String), `finalization_status` LowCardinality(String), `event_key` String) ENGINE = ReplacingMergeTree(record_version) PARTITION BY (symbol, toYYYYMM(event_time)) ORDER BY (symbol, trade_id) SETTINGS index_granularity = 8192 COMMENT 'research_public_trades_contract_v2; logical key (symbol, trade_id); event_time is trade_ts_utc'",
+    "has_record_version": true,
+    "is_v2": true
+  },
+  "watermarks": [
+    {
+      "symbol": "BTCUSDT",
+      "status": "COMPLETE",
+      "segments": 293,
+      "rows_written": 18986848
+    },
+    {
+      "symbol": "BTCUSDT",
+      "status": "IN_PROGRESS",
+      "segments": 1,
+      "rows_written": 0
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "status": "COMPLETE",
+      "segments": 26,
+      "rows_written": 366000
+    }
+  ],
+  "research_public_trades_rows_final": 19289707,
+  "invalid_shifted_present": true,
+  "run_state": {
+    "runner_pid": 1301223,
+    "launcher_pid": 1301163,
+    "runner_pid_alive": true,
+    "runner_lock_exists": true,
+    "runner_owner": {
+      "launcher_pid": 1301163,
+      "runner_pid": 1301223,
+      "runner_start_boot": 137913209,
+      "started_at": "2026-09-03T09:21:44.383345Z"
+    },
+    "heartbeat": {
+      "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+      "completed": 0,
+      "eta_seconds": null,
+      "rows_per_sec": 0.0,
+      "rows_written": 0,
+      "runner_pid": 1301223,
+      "segment_start": "2026-07-23T16:00:00Z",
+      "skipped": 113,
+      "status": "RUNNING",
+      "symbol": "BTCUSDT",
+      "updated_at": "2026-09-03T09:28:25.279031Z"
+    },
+    "progress": {
+      "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+      "completed": 0,
+      "eta_seconds": null,
+      "rows_per_sec": 0.0,
+      "rows_written": 0,
+      "segment_start": "2026-07-23T16:00:00Z",
+      "skipped": 113,
+      "status": "RUNNING",
+      "symbol": "BTCUSDT",
+      "updated_at": "2026-09-03T09:28:25.261167Z"
+    },
+    "file_watermarks": {
+      "DOGEUSDT|2026-08-29T11:00:00Z": {
+        "research_max_ts": "2026-08-29T11:59:22.990000Z",
+        "research_min_ts": "2026-08-29T11:00:00.505000Z",
+        "rows_written": 2776,
+        "source_fingerprint": "c5e2c5f72028a8dbdf0b84f87b1e294e8daedec2fc0087d3950d8f9d765f7ee7",
+        "source_max_ts": "2026-08-29T11:59:22.990000Z",
+        "source_min_ts": "2026-08-29T11:00:00.505000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:21:00.926470Z"
+      },
+      "DOGEUSDT|2026-08-30T13:00:00Z": {
+        "research_max_ts": "2026-08-30T13:59:59.903000Z",
+        "research_min_ts": "2026-08-30T13:00:00.054000Z",
+        "rows_written": 8624,
+        "source_fingerprint": "f2b083eabed92b0116c85acd1e40c8407cb3c30ed3c340f6dcfe1bf5bb582fdd",
+        "source_max_ts": "2026-08-30T13:59:59.903000Z",
+        "source_min_ts": "2026-08-30T13:00:00.054000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:25.342628Z"
+      },
+      "DOGEUSDT|2026-08-30T14:00:00Z": {
+        "research_max_ts": "2026-08-30T14:59:52.963000Z",
+        "research_min_ts": "2026-08-30T14:00:01.048000Z",
+        "rows_written": 8130,
+        "source_fingerprint": "e58775c6e3806a1c92310fb8aeb3472b477546c908c149362b4a4182aa50fac7",
+        "source_max_ts": "2026-08-30T14:59:52.963000Z",
+        "source_min_ts": "2026-08-30T14:00:01.048000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:26.110780Z"
+      },
+      "DOGEUSDT|2026-08-30T15:00:00Z": {
+        "research_max_ts": "2026-08-30T15:59:53.426000Z",
+        "research_min_ts": "2026-08-30T15:00:01.436000Z",
+        "rows_written": 9429,
+        "source_fingerprint": "9d6f0dcc33238fe39d2a6073b1146689d03776a52d701fa1054dfb7f95034385",
+        "source_max_ts": "2026-08-30T15:59:53.426000Z",
+        "source_min_ts": "2026-08-30T15:00:01.436000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:27.051685Z"
+      },
+      "DOGEUSDT|2026-08-30T16:00:00Z": {
+        "research_max_ts": "2026-08-30T16:59:59.607000Z",
+        "research_min_ts": "2026-08-30T16:00:01.708000Z",
+        "rows_written": 17525,
+        "source_fingerprint": "de6cb9ee42a9eaa755d66d8ea95ac353ba1535395b484fb2716c7d9bea92455a",
+        "source_max_ts": "2026-08-30T16:59:59.607000Z",
+        "source_min_ts": "2026-08-30T16:00:01.708000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:28.043589Z"
+      },
+      "DOGEUSDT|2026-08-30T17:00:00Z": {
+        "research_max_ts": "2026-08-30T17:59:59.373000Z",
+        "research_min_ts": "2026-08-30T17:00:00.047000Z",
+        "rows_written": 16652,
+        "source_fingerprint": "6cce0d78650b8098a54546a714f3e6ea935aef88d0f377d2f06894856e75a48b",
+        "source_max_ts": "2026-08-30T17:59:59.373000Z",
+        "source_min_ts": "2026-08-30T17:00:00.047000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:29.015989Z"
+      },
+      "DOGEUSDT|2026-08-30T18:00:00Z": {
+        "research_max_ts": "2026-08-30T18:59:55.433000Z",
+        "research_min_ts": "2026-08-30T18:00:00.593000Z",
+        "rows_written": 9823,
+        "source_fingerprint": "b2d6a73ae8b2ffb5d3c693f320f08e711b28ebcd660bff4c94800ebccde07637",
+        "source_max_ts": "2026-08-30T18:59:55.433000Z",
+        "source_min_ts": "2026-08-30T18:00:00.593000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:29.903780Z"
+      },
+      "DOGEUSDT|2026-08-30T19:00:00Z": {
+        "research_max_ts": "2026-08-30T19:59:54.449000Z",
+        "research_min_ts": "2026-08-30T19:00:06.923000Z",
+        "rows_written": 9056,
+        "source_fingerprint": "1a5f7ed8e500bf710db2cd5780987b3f19e14247db9c9f6dc6b1154a56330282",
+        "source_max_ts": "2026-08-30T19:59:54.449000Z",
+        "source_min_ts": "2026-08-30T19:00:06.923000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:30.739109Z"
+      },
+      "DOGEUSDT|2026-08-30T20:00:00Z": {
+        "research_max_ts": "2026-08-30T20:59:51.036000Z",
+        "research_min_ts": "2026-08-30T20:00:01.349000Z",
+        "rows_written": 16158,
+        "source_fingerprint": "fb10c98b1af6600a052e18586b31109aea9d1c72a201e5dc366810e465dac969",
+        "source_max_ts": "2026-08-30T20:59:51.036000Z",
+        "source_min_ts": "2026-08-30T20:00:01.349000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:31.776440Z"
+      },
+      "DOGEUSDT|2026-08-30T21:00:00Z": {
+        "research_max_ts": "2026-08-30T21:59:53.529000Z",
+        "research_min_ts": "2026-08-30T21:00:03.755000Z",
+        "rows_written": 22663,
+        "source_fingerprint": "694099fcb4c2f4c1eb7d77891acd05f7400bee39b1402849501e736d5f53b300",
+        "source_max_ts": "2026-08-30T21:59:53.529000Z",
+        "source_min_ts": "2026-08-30T21:00:03.755000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:32.835190Z"
+      },
+      "DOGEUSDT|2026-08-30T22:00:00Z": {
+        "research_max_ts": "2026-08-30T22:59:41.850000Z",
+        "research_min_ts": "2026-08-30T22:00:00.189000Z",
+        "rows_written": 28511,
+        "source_fingerprint": "b67368a489bb64490d490411afefcee48dc662d8869eedbba108e8b00666cf2d",
+        "source_max_ts": "2026-08-30T22:59:41.850000Z",
+        "source_min_ts": "2026-08-30T22:00:00.189000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:33.832345Z"
+      },
+      "DOGEUSDT|2026-08-30T23:00:00Z": {
+        "research_max_ts": "2026-08-30T23:59:59.231000Z",
+        "research_min_ts": "2026-08-30T23:00:00.396000Z",
+        "rows_written": 60898,
+        "source_fingerprint": "da77d3771cfb18904a0340a1f576f2cc1828861b20be8ce7f4f203b1e46cdc4f",
+        "source_max_ts": "2026-08-30T23:59:59.231000Z",
+        "source_min_ts": "2026-08-30T23:00:00.396000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:35.064889Z"
+      },
+      "DOGEUSDT|2026-08-31T00:00:00Z": {
+        "research_max_ts": "2026-08-31T00:59:30.444000Z",
+        "research_min_ts": "2026-08-31T00:00:00.323000Z",
+        "rows_written": 17714,
+        "source_fingerprint": "6db2952a973a668d30e9bf57928e5531131a9c417fb9bab8ee48f2bc4aef51d6",
+        "source_max_ts": "2026-08-31T00:59:30.444000Z",
+        "source_min_ts": "2026-08-31T00:00:00.323000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:35.922854Z"
+      },
+      "DOGEUSDT|2026-08-31T01:00:00Z": {
+        "research_max_ts": "2026-08-31T01:59:59.879000Z",
+        "research_min_ts": "2026-08-31T01:00:01.121000Z",
+        "rows_written": 16534,
+        "source_fingerprint": "3ea1f3d8fc614c737a4e74f1f1d8263e850ea34ace895b3a52ce74ca5d6a30ea",
+        "source_max_ts": "2026-08-31T01:59:59.879000Z",
+        "source_min_ts": "2026-08-31T01:00:01.121000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:36.917870Z"
+      },
+      "DOGEUSDT|2026-08-31T02:00:00Z": {
+        "research_max_ts": "2026-08-31T02:59:56.960000Z",
+        "research_min_ts": "2026-08-31T02:00:00.474000Z",
+        "rows_written": 12841,
+        "source_fingerprint": "cbe0027843e775c45728ed685396d64974217406ddb30cb225fba960e7ad860f",
+        "source_max_ts": "2026-08-31T02:59:56.960000Z",
+        "source_min_ts": "2026-08-31T02:00:00.474000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:37.749698Z"
+      },
+      "DOGEUSDT|2026-08-31T03:00:00Z": {
+        "research_max_ts": "2026-08-31T03:59:57.827000Z",
+        "research_min_ts": "2026-08-31T03:00:00.578000Z",
+        "rows_written": 10411,
+        "source_fingerprint": "a25e80a31bd59f1c801da5bf75d1fc67cce08cf08e80441574dc86c9e6d7fa9a",
+        "source_max_ts": "2026-08-31T03:59:57.827000Z",
+        "source_min_ts": "2026-08-31T03:00:00.578000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:38.662214Z"
+      },
+      "DOGEUSDT|2026-08-31T04:00:00Z": {
+        "research_max_ts": "2026-08-31T04:59:38.243000Z",
+        "research_min_ts": "2026-08-31T04:00:00.507000Z",
+        "rows_written": 7879,
+        "source_fingerprint": "e4ab124a83bec2d3e96fe60524a573cafb18c39ebde50e9963d948039b5b7664",
+        "source_max_ts": "2026-08-31T04:59:38.243000Z",
+        "source_min_ts": "2026-08-31T04:00:00.507000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:39.646120Z"
+      },
+      "DOGEUSDT|2026-08-31T05:00:00Z": {
+        "research_max_ts": "2026-08-31T05:59:56.350000Z",
+        "research_min_ts": "2026-08-31T05:00:02.264000Z",
+        "rows_written": 12642,
+        "source_fingerprint": "e18d964cd7090eaeee20fd08906aa2ca6adfc8012e7b9396e9ec83fd5031902d",
+        "source_max_ts": "2026-08-31T05:59:56.350000Z",
+        "source_min_ts": "2026-08-31T05:00:02.264000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:40.514764Z"
+      },
+      "DOGEUSDT|2026-08-31T06:00:00Z": {
+        "research_max_ts": "2026-08-31T06:59:55.919000Z",
+        "research_min_ts": "2026-08-31T06:00:01.043000Z",
+        "rows_written": 8336,
+        "source_fingerprint": "5aa1e48cf40398bc58d717c00f65ea0a274686b3b3fe610a061aa797c4221771",
+        "source_max_ts": "2026-08-31T06:59:55.919000Z",
+        "source_min_ts": "2026-08-31T06:00:01.043000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:41.424830Z"
+      },
+      "DOGEUSDT|2026-08-31T07:00:00Z": {
+        "research_max_ts": "2026-08-31T07:59:52.108000Z",
+        "research_min_ts": "2026-08-31T07:00:01.292000Z",
+        "rows_written": 7006,
+        "source_fingerprint": "9cdde2c6ceee96f25548503811f641a7ff49bc9c8b491d38e64c6e778f2709e4",
+        "source_max_ts": "2026-08-31T07:59:52.108000Z",
+        "source_min_ts": "2026-08-31T07:00:01.292000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:42.338155Z"
+      },
+      "DOGEUSDT|2026-08-31T08:00:00Z": {
+        "research_max_ts": "2026-08-31T08:59:49.416000Z",
+        "research_min_ts": "2026-08-31T08:00:00.121000Z",
+        "rows_written": 8621,
+        "source_fingerprint": "db9f94a60c108d2b9ac813e770a047c2571c5afe468cde9fcaf0402ae062a0c8",
+        "source_max_ts": "2026-08-31T08:59:49.416000Z",
+        "source_min_ts": "2026-08-31T08:00:00.121000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:43.077276Z"
+      },
+      "DOGEUSDT|2026-08-31T09:00:00Z": {
+        "research_max_ts": "2026-08-31T09:59:50.096000Z",
+        "research_min_ts": "2026-08-31T09:00:00.572000Z",
+        "rows_written": 9124,
+        "source_fingerprint": "43e8fee640f6749a53fff499092d615709af4c6cdd6c4e36821d5b99c7038558",
+        "source_max_ts": "2026-08-31T09:59:50.096000Z",
+        "source_min_ts": "2026-08-31T09:00:00.572000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:43.930861Z"
+      },
+      "DOGEUSDT|2026-08-31T10:00:00Z": {
+        "research_max_ts": "2026-08-31T10:59:50.741000Z",
+        "research_min_ts": "2026-08-31T10:00:00.740000Z",
+        "rows_written": 8638,
+        "source_fingerprint": "8ecc4eca36a1b57c949f6db4e70a432ae2b7fa5056ab0f0dab7254ed368eb786",
+        "source_max_ts": "2026-08-31T10:59:50.741000Z",
+        "source_min_ts": "2026-08-31T10:00:00.740000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:44.867634Z"
+      },
+      "DOGEUSDT|2026-08-31T11:00:00Z": {
+        "research_max_ts": "2026-08-31T11:59:58.698000Z",
+        "research_min_ts": "2026-08-31T11:00:04.677000Z",
+        "rows_written": 5857,
+        "source_fingerprint": "4b141217b32f8e6d4458627d72ba24c7e470ba04cb203b569b2e3923407fa4bf",
+        "source_max_ts": "2026-08-31T11:59:58.698000Z",
+        "source_min_ts": "2026-08-31T11:00:04.677000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:45.791830Z"
+      },
+      "DOGEUSDT|2026-08-31T12:00:00Z": {
+        "research_max_ts": "2026-08-31T12:59:59.982000Z",
+        "research_min_ts": "2026-08-31T12:00:00.083000Z",
+        "rows_written": 14619,
+        "source_fingerprint": "3955956532223e0d0c81522a466bd5955ed614c74ecf0c48d6461e418c9204f0",
+        "source_max_ts": "2026-08-31T12:59:59.982000Z",
+        "source_min_ts": "2026-08-31T12:00:00.083000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:22:46.695338Z"
+      },
+      "DOGEUSDT|2026-08-31T13:00:00Z": {
+        "research_max_ts": "2026-08-31T13:59:56.671000Z",
+        "research_min_ts": "2026-08-31T13:00:01.269000Z",
+        "rows_written": 15533,
+        "source_fingerprint": "1973148b39eb794a35b31d1d23c4062a1bb084f29266ffa32584d78a575c4213",
+        "source_max_ts": "2026-08-31T13:59:56.671000Z",
+        "source_min_ts": "2026-08-31T13:00:01.269000Z",
+        "status": "COMPLETE",
+        "updated_at": "2026-09-03T09:21:00.476089Z"
+      }
+    }
+  }
+}

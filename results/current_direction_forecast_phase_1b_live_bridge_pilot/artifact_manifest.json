@@ -1,0 +1,72 @@
+{
+  "generated_at_utc": "2026-09-05T16:29:04Z",
+  "verdict": "CURRENT_DIRECTION_FULL_OB_BRIDGE_LIVE_V1_READY_WITH_GAPS",
+  "artifacts": {
+    "ABSCHLUSSBERICHT.md": {
+      "sha256": "895826cf0e307a0d0625d04cd1eb1e6ae2b60026352d4265efcd666938ff42ca",
+      "bytes": 5068
+    },
+    "preflight.json": {
+      "sha256": "b80a6113e2ac10355d32c76b8eb3c9db663d5bf84758011df70198a6981a4e1c",
+      "bytes": 807
+    },
+    "config_activation_manifest.json": {
+      "sha256": "442a0514d4d2cefcbfc740625afe0f77e3a8b539eae350aa307ae1fb2ea5d8e3",
+      "bytes": 1140
+    },
+    "service_restart_report.json": {
+      "sha256": "e5e4caa25794b9ee685e891d82ab07dfc83fddad7e613c9066077ec69486c176",
+      "bytes": 696
+    },
+    "warmup_samples.csv": {
+      "sha256": "ac1984212e7bccb655a76f6008cc9670a19bfbe820a683737fde861beeb833f0",
+      "bytes": 2883
+    },
+    "bridge_status.json": {
+      "sha256": "8eb47ff56480a53d3b698fce040eb173518895680d6d784d11e6a2ee5301366a",
+      "bytes": 2313
+    },
+    "btc_freeze_manifest.json": {
+      "sha256": "eea7b4593c15af9ea938c37c39f9124c7ff60dac32fd410e3d734ec378be1c9d",
+      "bytes": 1215
+    },
+    "btc_replay_parity.json": {
+      "sha256": "8a279051dff92f49c3da471842230852ebc219f1efaae43ccabf53484408b7db",
+      "bytes": 238
+    },
+    "resource_metrics.csv": {
+      "sha256": "89eb284b4e04428ac885c50f32aff52e5e740d2dd2f55e3cf1f72c40b97645cb",
+      "bytes": 2284
+    },
+    "post_freeze_health.json": {
+      "sha256": "1be2a6a61a2c58e4948c8c25ae3a42f19626a340cef4f6142839a64478ca09d8",
+      "bytes": 1088
+    },
+    "btc_anchor_missing_diagnosis.json": {
+      "sha256": "5d2c3437ddac04b3768edae4033290ef2e07484bbd5aabf7ed2c05847d1ff6ad",
+      "bytes": 846
+    },
+    "btc_freeze_response.json": {
+      "sha256": "0ce5830957dd0ed72e4871030a877caf68270e1fe6e12f47cc036f39bb2000d3",
+      "bytes": 1368
+    },
+    "btc_second_freeze_response.json": {
+      "sha256": "4621d6c564b2c164aee996623c0d9d42be4a718e3951ae91f22c9e4f4d04134a",
+      "bytes": 195
+    },
+    "warmup_gate.json": {
+      "sha256": "ed7f7f1c0f3cbf42e4297b51b0acf8b9ed8a2ec48707cb378623d02e3b777797",
+      "bytes": 143
+    },
+    "final_git_checks.txt": {
+      "sha256": "27d35487c60f808731573586674087d872382d76f61aa83f143f2d866d0cae55",
+      "bytes": 2234
+    }
+  },
+  "external_dump": {
+    "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_cache_bridge_dumps/phase1b_btc_freeze_20260905T162323Z",
+    "payload_sha256": "4f183c2c58e4fd62ac49d9a2ed17c614da8d9db2d44c284e981a776a0be7fb49",
+    "manifest_sha256": "51855e9441075e9f6ce8e50303df45119fc15991b9fdeb0b11c2acd611070fd8",
+    "copied_into_git": false
+  }
+}

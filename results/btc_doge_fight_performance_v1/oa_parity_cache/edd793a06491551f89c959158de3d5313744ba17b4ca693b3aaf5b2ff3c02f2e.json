@@ -1,0 +1,1 @@
+{"cache_hit": false, "cache_key": "edd793a06491551f89c959158de3d5313744ba17b4ca693b3aaf5b2ff3c02f2e", "local_vpoc": 78565.0, "local_vvah": 79140.0, "local_vval": 78190.0, "note": "OA aggregates in CH; local pipeline dedups trade_id in Python first", "oa_poc": 78565.0, "oa_vah": 79140.0, "oa_val": 78190.0, "price_step_local": 10.0, "price_step_oa": 10.0, "status": "EXACT"}

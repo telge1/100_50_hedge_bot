@@ -1,0 +1,34 @@
+{
+  "schema_version": "btc_ob_fight_facts_v2_2",
+  "fight_fact_contract": "fight_fact_contract_v1",
+  "interpretation_status": "NOT_EVALUATED_DATA_PARTIAL",
+  "manifest": {
+    "profile_state_episode_count": 0,
+    "outside_episode_count": 0,
+    "edge_consumption_count": 0,
+    "post_trade_refill_count": 0,
+    "reclaim_count": 0,
+    "ambiguous_reclaim_candidate_count": 0,
+    "raw_outside_count": 0,
+    "reclaim_contract": "reclaim_event_contract_v3",
+    "edge_visit_count": 0,
+    "outside_excursion_count": 0,
+    "canonical_outside_excursion_count": 0,
+    "ambiguous_outside_excursion_count": 0,
+    "retest_proximity_count": 0
+  },
+  "frozen_profile_edges": {
+    "contract_version": "profile_edge_state_v1",
+    "profile_state": "INVALID_PROFILE_GEOMETRY",
+    "invalid_reason": "missing_levels:tpo_vah,tpo_val,volume_vvah,volume_vval",
+    "levels": {
+      "tpo_poc": null,
+      "tpo_vah": null,
+      "tpo_val": null,
+      "volume_vpoc": null,
+      "volume_vvah": null,
+      "volume_vval": null
+    },
+    "frozen_at_anchor_utc": "2026-08-27T07:00:00Z"
+  }
+}

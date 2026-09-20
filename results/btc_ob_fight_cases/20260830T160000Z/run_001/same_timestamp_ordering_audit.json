@@ -1,0 +1,26 @@
+{
+  "contract_version": "same_timestamp_ordering_audit_v1",
+  "observation_start_utc": "2026-08-30T16:00:00Z",
+  "observation_end_utc": "2026-08-30T16:30:00Z",
+  "total_trades": 80828,
+  "unique_timestamps": 15688,
+  "timestamp_groups_with_multiple_trades": 8807,
+  "max_trades_per_timestamp": 585,
+  "groups_with_multiple_prices": 3810,
+  "groups_with_multiple_profile_states": 14,
+  "groups_with_inner_edge_cross": 7199,
+  "groups_with_outer_edge_cross": 7144,
+  "zero_duration_episode_count": 382,
+  "outside_reclaim_transitions_at_duplicate_timestamp": 5,
+  "available_ordering_fields": [
+    "trade_ts",
+    "trade_id"
+  ],
+  "trade_id_semantics": "ClickHouse canonical trade_id string; lexicographic sort is deterministic but not proven exchange execution order",
+  "exchange_execution_order_field_present": false,
+  "ordering_policy_applied": "DETERMINISTIC_TRADE_ID_LEXICOGRAPHIC",
+  "exchange_order_proven": false,
+  "canonical_policy": "AMBIGUOUS_MULTI_STATE groups do not invent intra-group reclaim chronology",
+  "source_table": null,
+  "deduped_trade_count": null
+}

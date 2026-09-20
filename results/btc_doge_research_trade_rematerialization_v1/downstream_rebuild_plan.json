@@ -1,0 +1,5 @@
+{
+  "fight_cli_profiles": "BUILT_CAUSALLY_FROM_RESEARCH_PUBLIC_TRADES_EVENTS",
+  "derived_tpo_volume_tables": "NOT_DECISIONABLE_NO_FORCED_REBUILD",
+  "research_public_trades": "REMATERIALIZE_V2_SERVER_SIDE"
+}

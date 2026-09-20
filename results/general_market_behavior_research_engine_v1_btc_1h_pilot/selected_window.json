@@ -1,0 +1,13 @@
+{
+  "verdict_pending": true,
+  "symbol": "BTCUSDT",
+  "utc_hour": "2026-09-06T10:00:00Z",
+  "source_window_start": "2026-09-06T10:00:00Z",
+  "source_window_end": "2026-09-06T11:00:00Z",
+  "segment_path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_v1/BTCUSDT/2026/09/06/BTCUSDT_20260906T100000Z_eb3cbb7ffd1f_full_ob_continuous_raw_archive_v1.ndjson.zst",
+  "full_wall_clock_coverage": true,
+  "replay_chain_complete": true,
+  "bucket_kind": "[state_ts, state_ts+1s)",
+  "causal_cut": "event_time < state_ts + 1s",
+  "seventeen_z_status": "NOT_SELECTED \u2014 replayable only from ~17:39Z, not full wall-clock hour"
+}

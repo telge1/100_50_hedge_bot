@@ -1,0 +1,27 @@
+{
+  "BTCUSDT": {
+    "passed": true,
+    "prefix_parity_passed": true
+  },
+  "DOGEUSDT": {
+    "passed": true
+  },
+  "engineering_gate": {
+    "both_touch_classes_present": true,
+    "contract_builder_unchanged": true,
+    "minimum_100_eligible": true,
+    "minimum_3_utc_days": true,
+    "no_critical_coverage_gap": true,
+    "passed": true,
+    "prefix_parity_passed": true,
+    "quality_gate_passed": true,
+    "resources_controlled": true
+  },
+  "overall": {
+    "contract_unchanged": true,
+    "critical_quality_violation": false,
+    "idempotence_passed": true,
+    "passed": true,
+    "prefix_parity_passed": true
+  }
+}

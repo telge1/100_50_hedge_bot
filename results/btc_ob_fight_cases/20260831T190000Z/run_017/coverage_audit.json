@@ -1,0 +1,110 @@
+{
+  "symbol": "BTCUSDT",
+  "window_utc": {
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T19:30:00Z"
+  },
+  "anchor_utc": "2026-08-31T19:00:00Z",
+  "ob200": {
+    "source": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT",
+    "engine": "filesystem ob200_v3.zst hour archives via research/btc_ob_fight/ob_replay.py",
+    "hours_needed": [
+      {
+        "hour": "2026-08-31T18:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T180000Z_20260831T190000Z_ob200_v3.zst",
+        "bytes": 10200356,
+        "ok": true
+      },
+      {
+        "hour": "2026-08-31T19:00:00Z",
+        "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst",
+        "bytes": 9431995,
+        "ok": true
+      }
+    ],
+    "all_hours_ok": true,
+    "depth": 200
+  },
+  "ob200_replay_probes": {
+    "window_start": {
+      "ok": true,
+      "as_of": "2026-08-31T18:29:59Z",
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "genuine_200": true,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T180000Z_20260831T190000Z_ob200_v3.zst"
+    },
+    "anchor": {
+      "ok": true,
+      "as_of": "2026-08-31T18:59:59Z",
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "genuine_200": true,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst"
+    },
+    "window_end": {
+      "ok": true,
+      "as_of": "2026-08-31T19:29:58Z",
+      "bid_levels": 200,
+      "ask_levels": 200,
+      "genuine_200": true,
+      "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/08/31/BTCUSDT_20260831T190000Z_20260831T200000Z_ob200_v3.zst"
+    }
+  },
+  "public_trades": {
+    "table": "orderbook_analysis.public_trades_canonical",
+    "count": 80738,
+    "min_ts": "2026-08-31T18:30:00.465000Z",
+    "max_ts": "2026-08-31T19:29:56.684000Z",
+    "uniq_trade_id": 80738,
+    "buy_count": 40927,
+    "sell_count": 39811,
+    "sum_notional": 169022988.2729,
+    "dedup_ok": true
+  },
+  "candles_1m": {
+    "table": "signal_generator.candles_1m",
+    "count": 60,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T19:29:00Z",
+    "expected_minutes": 60,
+    "complete": true
+  },
+  "open_interest_5s": {
+    "table": "orderbook_analysis.open_interest_5s",
+    "count": 720,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T19:29:55Z",
+    "resolution": "5s"
+  },
+  "liquidations": {
+    "table": "orderbook_analysis.all_liquidations",
+    "by_side": [
+      {
+        "side": "LIQUIDATED_LONG",
+        "count": 1,
+        "notional": 78.7603
+      },
+      {
+        "side": "LIQUIDATED_SHORT",
+        "count": 59,
+        "notional": 490938.9752
+      }
+    ],
+    "price_column": "bankruptcy_price"
+  },
+  "trade_load": {
+    "table": "orderbook_analysis.public_trades_canonical",
+    "raw_count": 850561,
+    "deduped_count": 850561,
+    "dedup_removed": 0,
+    "aggressor_semantics": "side=Buy/Sell is Bybit taker/aggressor",
+    "sort": "trade_ts, trade_id"
+  },
+  "profile_session": {
+    "session_start_utc": "2026-08-31T13:30:00Z",
+    "anchor_cutoff_utc": "2026-08-31T19:00:00Z",
+    "trade_load_start_utc": "2026-08-31T13:30:00Z",
+    "session_id": "us_developing_to_anchor"
+  }
+}

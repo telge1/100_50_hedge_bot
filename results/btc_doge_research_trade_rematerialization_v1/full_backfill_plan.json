@@ -1,0 +1,18 @@
+{
+  "segment_count": 2112,
+  "nonempty_segments": 2100,
+  "expected_source_unique_trades": 82031289,
+  "already_written_watermark_rows": 19352848,
+  "remaining_approx": 62678441,
+  "estimated_target_bytes_gb": 15.28,
+  "disk_free_gb": 366.08,
+  "estimated_runtime_seconds": 31339.2,
+  "estimated_runtime_minutes": 522.3,
+  "safe_batch": "1 UTC hour / segment",
+  "estimated_ram_mb": "<512 (server-side INSERT SELECT)",
+  "nohup_required": true,
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "contract_version": "research_public_trades_contract_v2",
+  "history_start": "2026-07-19T00:00:00Z",
+  "history_end": "2026-09-01T00:00:00Z"
+}

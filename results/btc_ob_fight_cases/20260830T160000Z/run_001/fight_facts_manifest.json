@@ -1,0 +1,54 @@
+{
+  "schema_version": "btc_ob_fight_facts_v2_2",
+  "fight_fact_contract": "fight_fact_contract_v1",
+  "interpretation_status": "NOT_EVALUATED",
+  "manifest": {
+    "profile_state_episode_count": 406,
+    "outside_episode_count": 126,
+    "edge_consumption_count": 19,
+    "post_trade_refill_count": 0,
+    "reclaim_count": 2,
+    "ambiguous_reclaim_candidate_count": 123,
+    "raw_outside_count": 126,
+    "reclaim_contract": "reclaim_event_contract_v3",
+    "edge_visit_count": 105,
+    "outside_excursion_count": 126,
+    "canonical_outside_excursion_count": 8,
+    "ambiguous_outside_excursion_count": 118,
+    "retest_proximity_count": 2
+  },
+  "frozen_profile_edges": {
+    "contract_version": "profile_edge_state_v1",
+    "profile_state": "VALID",
+    "levels": {
+      "tpo_poc": 78763.75,
+      "tpo_vah": 78900.0,
+      "tpo_val": 78727.5,
+      "volume_vpoc": 78831.25,
+      "volume_vvah": 78910.0,
+      "volume_vval": 78737.5
+    },
+    "upper_inner_edge": 78900.0,
+    "upper_outer_edge": 78910.0,
+    "lower_inner_edge": 78737.5,
+    "lower_outer_edge": 78727.5,
+    "upper_edge_zone": {
+      "low": 78900.0,
+      "high": 78910.0
+    },
+    "lower_edge_zone": {
+      "low": 78727.5,
+      "high": 78737.5
+    },
+    "fair_zone": {
+      "low": 78737.5,
+      "high": 78900.0
+    },
+    "tick_size": 0.1,
+    "upper_inner_edge_tick": 789000,
+    "upper_outer_edge_tick": 789100,
+    "lower_inner_edge_tick": 787375,
+    "lower_outer_edge_tick": 787275,
+    "frozen_at_anchor_utc": "2026-08-30T16:00:00Z"
+  }
+}

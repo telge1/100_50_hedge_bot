@@ -1,0 +1,6 @@
+OB_V3_FULL_BOOK_ENABLE=true
+OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE=true
+OB_V3_FULL_OB_FR_ROOT=/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder
+OB_V3_FULL_OB_FR_SYMBOLS=BTCUSDT,DOGEUSDT
+OB_V3_ON_DEMAND_ENABLE=true
+OB_V3_RAW_ARCHIVE_SYMBOLS=BTCUSDT,DOGEUSDT

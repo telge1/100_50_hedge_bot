@@ -1,0 +1,12 @@
+{
+  "active_EXACT_0_SECONDS": 82031289,
+  "active_OTHER_TIMESTAMP_SHIFT": 0,
+  "active_SHIFT_MINUS_7200": 0,
+  "active_SHIFT_PLUS_7200": 0,
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "contract_version": "research_public_trades_contract_v2",
+  "field_mismatches_on_joined_keys": 0,
+  "hour_mismatches": 0,
+  "non_zero_shift_classes": [],
+  "pass": true
+}

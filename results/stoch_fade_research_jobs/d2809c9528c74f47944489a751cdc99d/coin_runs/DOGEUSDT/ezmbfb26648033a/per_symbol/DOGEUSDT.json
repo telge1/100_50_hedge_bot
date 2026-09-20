@@ -1,0 +1,29 @@
+{
+  "counts_by_timeframe": {
+    "5m": {
+      "raw_candidates": 69,
+      "tier_a": 51
+    }
+  },
+  "effective_end": "2026-08-26T09:40:08Z",
+  "effective_start": "2026-08-24T22:47:53Z",
+  "first_valid_by_timeframe": {
+    "15m": {
+      "warmup_complete": true
+    },
+    "1h": {
+      "warmup_complete": true
+    },
+    "30m": {
+      "warmup_complete": true
+    },
+    "4h": {
+      "warmup_complete": true
+    }
+  },
+  "missing_sources": [
+    "liquidity_locations:OPTIONAL_UNAVAILABLE"
+  ],
+  "symbol": "DOGEUSDT",
+  "warmup_complete": true
+}

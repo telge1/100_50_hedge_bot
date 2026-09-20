@@ -1,0 +1,12 @@
+{
+  "job_id": "FIXTUREUSDT_20260910T130421Z_36e21a48",
+  "state": "RUNNING",
+  "pid": 759105,
+  "consumer_pid": 759105,
+  "started_at": "2026-09-10T13:04:22Z",
+  "finished_at": null,
+  "error_code": null,
+  "message": "fixture sleep 12s",
+  "oa_job_id": "FIXTUREUSDT_20260910T130421Z_36e21a48",
+  "claimed_at": "2026-09-10T13:04:22Z"
+}

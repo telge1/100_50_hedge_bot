@@ -1,0 +1,76 @@
+{
+  "ok": true,
+  "protocol_version": "full_ob_cache_bridge_protocol_v1",
+  "collector_instance_id": "collector-1978678",
+  "collector_start_time": "2026-09-05T16:12:17.633992Z",
+  "symbols": [
+    "BTCUSDT",
+    "DOGEUSDT"
+  ],
+  "buffer_start": 1788624739215547633,
+  "buffer_end": 1788625336162932992,
+  "retention_seconds": 600.0,
+  "message_count": 2986,
+  "gap_count": 0,
+  "overflow_count": 0,
+  "last_event_time": 1788625336072,
+  "last_receive_time": 1788625336162932992,
+  "freshness_ms": 126,
+  "replay_capability": "RAW_FULL_BOOK_REPLAY",
+  "anchor_status": {
+    "BTCUSDT": {
+      "checkpoint_count": 10,
+      "checkpoint_bytes": 15882112,
+      "skipped_oversized": 0,
+      "oldest_receive_time_ns": 1788624739520018663,
+      "newest_receive_time_ns": 1788625280162456991
+    },
+    "DOGEUSDT": {
+      "checkpoint_count": 10,
+      "checkpoint_bytes": 4660408,
+      "skipped_oversized": 0,
+      "oldest_receive_time_ns": 1788624739925262391,
+      "newest_receive_time_ns": 1788625280623839128
+    }
+  },
+  "bridge_enabled": true,
+  "per_symbol": {
+    "BTCUSDT": {
+      "buffer_start_ns": 1788624739215547633,
+      "buffer_end_ns": 1788625336162932992,
+      "message_count": 2986,
+      "overflow_count": 0,
+      "gap_count": 0,
+      "last_event_time_ms": 1788625336072,
+      "last_receive_time_ns": 1788625336162932992,
+      "freshness_ms": 126,
+      "anchor_status": {
+        "checkpoint_count": 10,
+        "checkpoint_bytes": 15882112,
+        "skipped_oversized": 0,
+        "oldest_receive_time_ns": 1788624739520018663,
+        "newest_receive_time_ns": 1788625280162456991
+      },
+      "reconnect_mark_ns": 1788624738310394553
+    },
+    "DOGEUSDT": {
+      "buffer_start_ns": 1788624739735251540,
+      "buffer_end_ns": 1788625336223566564,
+      "message_count": 2984,
+      "overflow_count": 0,
+      "gap_count": 0,
+      "last_event_time_ms": 1788625336134,
+      "last_receive_time_ns": 1788625336223566564,
+      "freshness_ms": 65,
+      "anchor_status": {
+        "checkpoint_count": 10,
+        "checkpoint_bytes": 4660408,
+        "skipped_oversized": 0,
+        "oldest_receive_time_ns": 1788624739925262391,
+        "newest_receive_time_ns": 1788625280623839128
+      },
+      "reconnect_mark_ns": 1788624738310394553
+    }
+  },
+  "status": "DATA_COMPLETE"
+}

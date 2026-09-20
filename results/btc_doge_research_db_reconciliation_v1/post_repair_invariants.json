@@ -1,0 +1,132 @@
+{
+  "FAILED_importable": 0,
+  "READY_plus_PARTIAL": 662,
+  "RUNNING_canonical": 0,
+  "RUNNING_naive_argmax": 0,
+  "all_invariants_pass": true,
+  "aug27": {
+    "has_060000": true,
+    "missing_064223": true,
+    "physical": 3599,
+    "status": "PARTIAL",
+    "unique": 3599
+  },
+  "collector_pids_after": [
+    "147111 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0",
+    "3946369 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "doge_orphan": {
+    "status": "PARTIAL",
+    "unique_seconds": 3567
+  },
+  "generated_at": "2026-09-03T07:12:22.768889Z",
+  "global_ob_duplicate_hours": 0,
+  "importable_plan_segments": 662,
+  "mapped_segments": 662,
+  "missing_importable": 0,
+  "parity": {
+    "aug27_btc": {
+      "has_060000": true,
+      "has_064223": false,
+      "physical": 3599,
+      "unique": 3599,
+      "verdict": "SOURCE_GAP"
+    },
+    "contract_version": "btc_doge_research_reconciliation_v1",
+    "generated_at": "2026-09-03T07:12:22.768889Z",
+    "golden_btc": {
+      "builds": [
+        "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51"
+      ],
+      "levels_ok": 3600,
+      "physical": 3600,
+      "symbol": "BTCUSDT",
+      "unique": 3600,
+      "verdict": "EXACT",
+      "window_end": "2026-08-31 19:00:00",
+      "window_start": "2026-08-31 18:00:00"
+    },
+    "golden_doge": {
+      "builds": [
+        "f9a65b4ed345791701a1b24b8d719e2d5a3917cb645f6469fa776467fed52064"
+      ],
+      "levels_ok": 3600,
+      "physical": 3600,
+      "symbol": "DOGEUSDT",
+      "unique": 3600,
+      "verdict": "EXACT",
+      "window_end": "2026-08-31 19:00:00",
+      "window_start": "2026-08-31 18:00:00"
+    },
+    "trade_day_counts": [
+      {
+        "buckets": 67058,
+        "day": "2026-08-31",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "buckets": 27157,
+        "day": "2026-08-31",
+        "symbol": "DOGEUSDT"
+      },
+      {
+        "buckets": 66777,
+        "day": "2026-07-20",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "buckets": 26855,
+        "day": "2026-07-20",
+        "symbol": "DOGEUSDT"
+      }
+    ]
+  },
+  "partial_disjoint": {
+    "OB200": 19,
+    "OPEN_INTEREST": 18,
+    "total": 37
+  },
+  "performance": [
+    {
+      "cold_s": 0.005262,
+      "max_s": 0.00423,
+      "p50_s": 0.004204,
+      "query": "OB200_BTC_60m",
+      "result_rows": 3600,
+      "warm_s": [
+        0.004204,
+        0.004152,
+        0.00423
+      ]
+    },
+    {
+      "cold_s": 0.00626,
+      "max_s": 0.003919,
+      "p50_s": 0.003836,
+      "query": "OB200_DOGE_60m",
+      "result_rows": 3600,
+      "warm_s": [
+        0.003815,
+        0.003836,
+        0.003919
+      ]
+    },
+    {
+      "cold_s": 0.017698,
+      "max_s": 0.014798,
+      "p50_s": 0.014677,
+      "query": "FIGHT_INPUT_JOIN_60m",
+      "result_rows": 3600,
+      "warm_s": [
+        0.014621,
+        0.014677,
+        0.014798
+      ]
+    }
+  ],
+  "status_counts": {
+    "PARTIAL": 37,
+    "READY": 625
+  }
+}

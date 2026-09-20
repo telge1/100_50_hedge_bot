@@ -1,0 +1,154 @@
+{
+  "documented_at": "2026-09-04T08:01:30.213376Z",
+  "pid": 1530387,
+  "alive": true,
+  "oi_pid": 147111,
+  "oi_alive": true,
+  "pgrep_orderbook_v2_live": [
+    "1530387 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "collector_count": 1,
+  "cmdline": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO ",
+  "cwd": "/home/telgenbuescher/projects/orderbook_analyse",
+  "fr_env": {
+    "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+    "OB_V3_RAW_ARCHIVE_MIN_FREE_DISK_GB": "5",
+    "OB_V3_ON_DEMAND_SOCKET_PATH": "/run/user/1000/orderbook_ob1000.sock",
+    "OB_V3_RAW_ARCHIVE_RETENTION_DAYS": "0",
+    "OB_V3_FULL_BOOK_ENABLE": "true",
+    "OB_V3_RAW_ARCHIVE_WARN_FREE_DISK_GB": "20",
+    "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "PYTHONPATH": "src",
+    "OB_V3_RAW_ARCHIVE_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+    "OB_V3_RAW_ARCHIVE_ROTATION": "hour",
+    "OB_V3_RAW_ARCHIVE_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "OB_V3_RAW_ARCHIVE_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3",
+    "OB_V3_ON_DEMAND_ENABLE": "true"
+  },
+  "proc_status": {
+    "State": "S (sleeping)",
+    "VmRSS": "294664 kB",
+    "Threads": "8"
+  },
+  "utime_ticks": 136822,
+  "stime_ticks": 3044,
+  "interesting_fds": [
+    {
+      "fd": "13",
+      "target": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/BTCUSDT/2026/09/04/BTCUSDT_20260904T080000Z_open_ob200_v3.zst.tmp"
+    },
+    {
+      "fd": "14",
+      "target": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3/DOGEUSDT/2026/09/04/DOGEUSDT_20260904T080000Z_open_ob200_v3.zst.tmp"
+    }
+  ],
+  "open_fr_tmp_fds": [],
+  "fr_tmp_on_disk": [
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/public_trades_raw.jsonl.zst.tmp",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/full_ob_raw_deltas.jsonl.zst.tmp",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/rest_full_snapshot.json.zst.tmp",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/public_trades_raw.jsonl.zst.tmp",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/full_ob_raw_deltas.jsonl.zst.tmp",
+    "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/rest_full_snapshot.json.zst.tmp"
+  ],
+  "health": {
+    "uptime_seconds": 32196.975,
+    "rss_mb": 287.76,
+    "reconnects_total": 49,
+    "sequence_gaps_total": 0,
+    "writer_mode": "BATCH_STREAMING_ZSTD",
+    "queue_drop_count": 0,
+    "process_lifetime_queue_drops": null,
+    "writer_error_count": 0,
+    "full_book_active_topics": 2,
+    "signal_count": 2,
+    "bootstrap_observation_count": 2,
+    "runtimes": {
+      "DOGEUSDT": {
+        "lifecycle": "COOLDOWN",
+        "event_id": null,
+        "fight_event_id": null,
+        "continuation_index": null,
+        "buffer_messages": 3000,
+        "buffer_bytes": 1522468,
+        "buffer_span_seconds": 599.81486802,
+        "prebuffer_coverage_seconds": 599.955275512,
+        "buffer_overflow": 0,
+        "capturing": false,
+        "bootstrap_status": "N/A",
+        "bootstrap_observation_count": 1,
+        "bootstrap_persistent_capture": false,
+        "writer_backlog": 0,
+        "queue_drops": 0,
+        "dropped_price_level_updates": 0,
+        "minimum_capture_end_ts": null,
+        "normal_end_ts": null,
+        "extension_count": null,
+        "pre_trigger_seconds_actual": null,
+        "trigger_source": null,
+        "trigger_quality": null,
+        "research_eligible": null,
+        "data_quality": null
+      },
+      "BTCUSDT": {
+        "lifecycle": "COOLDOWN",
+        "event_id": null,
+        "fight_event_id": null,
+        "continuation_index": null,
+        "buffer_messages": 3000,
+        "buffer_bytes": 16135584,
+        "buffer_span_seconds": 599.814238765,
+        "prebuffer_coverage_seconds": 599.815140448,
+        "buffer_overflow": 0,
+        "capturing": false,
+        "bootstrap_status": "N/A",
+        "bootstrap_observation_count": 1,
+        "bootstrap_persistent_capture": false,
+        "writer_backlog": 0,
+        "queue_drops": 0,
+        "dropped_price_level_updates": 0,
+        "minimum_capture_end_ts": null,
+        "normal_end_ts": null,
+        "extension_count": null,
+        "pre_trigger_seconds_actual": null,
+        "trigger_source": null,
+        "trigger_quality": null,
+        "research_eligible": null,
+        "data_quality": null
+      }
+    },
+    "full_book_runtimes": [
+      {
+        "symbol": "BTCUSDT",
+        "subscription_state": "live",
+        "raw_bids": 39476,
+        "raw_asks": 24307,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4347000,
+        "seq": 805047539537,
+        "cts_ms": 1788508882465,
+        "gap_count": 0,
+        "reconnect_count": 49,
+        "last_error": ""
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "subscription_state": "live",
+        "raw_bids": 5248,
+        "raw_asks": 13885,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4346686,
+        "seq": 345972114857,
+        "cts_ms": 1788508882333,
+        "gap_count": 0,
+        "reconnect_count": 49,
+        "last_error": ""
+      }
+    ]
+  },
+  "open_event": false,
+  "restart_safe": true
+}

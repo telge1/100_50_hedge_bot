@@ -1,0 +1,19 @@
+{
+  "peak_rss_kb": 78188,
+  "run_id": "9234d1e5c09b4582af15beea083a0780",
+  "stages": [
+    {
+      "duration_s": 0.066616,
+      "ended_at": "2026-08-18T09:07:05.906893Z",
+      "error": "Received ClickHouse exception, code: 497, server response: Code: 497. DB::Exception: fade_gold_reader: Not enough privileges. To execute this query, it's necessary to have the grant SELECT ON signal_generator.signals. (ACCESS_DENIED) (for url http://127.0.0.1:8123)",
+      "input_rows": null,
+      "name": "snapshot_before",
+      "output_rows": null,
+      "rss_kb": 78188,
+      "started_at": "2026-08-18T09:07:05.840060Z",
+      "status": "FAILED"
+    }
+  ],
+  "status": "FAILED",
+  "updated_at": "2026-08-18T09:07:05.906913Z"
+}

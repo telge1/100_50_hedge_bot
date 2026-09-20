@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 359700,
+      "error": null,
+      "raw_count": 6819,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "DOGEUSDT",
+      "tier_a_count": 915,
+      "warmup_complete": false
+    }
+  ]
+}

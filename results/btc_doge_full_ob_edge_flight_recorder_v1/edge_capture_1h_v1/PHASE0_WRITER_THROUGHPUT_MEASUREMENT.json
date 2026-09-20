@@ -1,0 +1,39 @@
+{
+  "captured_at": "2026-09-03T20:34:18.557548Z",
+  "pid": 1481866,
+  "note": "read-only measurement; live process not modified",
+  "sample_dt_sec": 10.76060700416565,
+  "queue_capacity_configured_default_at_cutover": 4096,
+  "queue_capacity_live_env_override": null,
+  "writer_queue_drops_h1": 41648,
+  "writer_queue_drops_h2": 41944,
+  "drops_per_sec_total": 27.50774188532416,
+  "math_check_66k_over_19min_is_approx_58_per_sec": 57.89473684210526,
+  "symbols": {
+    "BTCUSDT": {
+      "u_per_sec": 2.323289010584811,
+      "queue_drops_per_sec": 13.75387094266208,
+      "writer_backlog": 0,
+      "book_ready": true
+    },
+    "DOGEUSDT": {
+      "u_per_sec": 2.323289010584811,
+      "queue_drops_per_sec": 13.75387094266208,
+      "writer_backlog": 0,
+      "book_ready": true
+    }
+  },
+  "architecture_observations": {
+    "A_one_queue_item_per_ws_message": true,
+    "B_one_queue_item_per_price_level": false,
+    "C_full_book_enqueued_per_delta": false,
+    "D_fsync_per_record": false,
+    "E_shared_writer_serializes_both_symbols": false,
+    "F_bottleneck": "per-item orjson+zstd write on per-symbol daemon thread under live GIL/disk contention; live writer ~10 msg/s/symbol vs ingress writes+drops ~35+/s/symbol"
+  },
+  "btc_recovered_packet_stats": {
+    "levels_mean_approx": 205,
+    "bytes_mean_approx": 5305,
+    "source": "legacy recovered deltas sample"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "causal_manifest_hash": "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf",
+  "confirmation_policy": "cross_recognition",
+  "confirmation_source": "cross_recognition",
+  "exit_policy": "NO_BE50",
+  "fixed_strategy_version": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "intrabar_policy": "SL_FIRST",
+  "job_id": "128a8b2c9a9b4824a0aa05a8734022b8",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs",
+  "requested_at": "2026-08-18T09:41:59Z",
+  "selected_symbols": [
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT",
+    "AVAXUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-17T00:00:00Z",
+  "signal_start": "2026-03-01T00:00:00Z",
+  "universe_count": 51,
+  "universe_source": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32/config/universe_tradeable_51.json"
+}

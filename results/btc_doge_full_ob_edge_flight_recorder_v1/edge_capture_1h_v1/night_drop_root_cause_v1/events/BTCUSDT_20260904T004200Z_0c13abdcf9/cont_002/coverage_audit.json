@@ -1,0 +1,10 @@
+{
+  "continuation_reason": "SEGMENT_TIME_LIMIT",
+  "incomplete_reason": "writer_thread_error",
+  "public_trades": {
+    "live_ws_publicTrade": false,
+    "mode": "canonical_reference_preferred",
+    "note": "Shadow V1 writes empty public_trades_raw.jsonl.zst placeholder; correlate via public_trades_canonical using event time range in manifest."
+  },
+  "rpi_included": false
+}

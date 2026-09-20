@@ -1,0 +1,26 @@
+{
+  "generated_at_utc": "2026-09-05T16:10:58Z",
+  "service": "bybit-full-ob-raw-archive-btc-doge.service",
+  "old_main_pid": 1902763,
+  "active_state": "active",
+  "single_instance": true,
+  "collector_state": "LIVE",
+  "connected": true,
+  "sequence_gaps_total": 0,
+  "reconnects_total": 0,
+  "rss_kb": 252724,
+  "rss_mb_health": 246.8,
+  "full_book_active_topics": 2,
+  "prebuffer_coverage_seconds": {
+    "DOGEUSDT": 599.875419391,
+    "BTCUSDT": 599.936482133
+  },
+  "full_ob_cache_bridge_enabled": null,
+  "bridge_env_present_on_pid": false,
+  "loadavg": "0.63 0.40 0.45 2/1315 1977967",
+  "mem_total_used_available_bytes": "18852208640 3910598656 14941609984",
+  "swap_total_used_bytes": "2147479552 1499308032",
+  "tests_pre_restart": "67 passed",
+  "fingerprint_match": true,
+  "precheck": "PASS"
+}

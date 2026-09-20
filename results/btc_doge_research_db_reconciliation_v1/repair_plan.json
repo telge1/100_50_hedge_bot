@@ -1,0 +1,89 @@
+{
+  "backup_manifest": "backup_manifest.json",
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "generated_at": "2026-09-03T07:04:07.185404Z",
+  "invariants_after": [
+    "importable_plan_segments=662 all terminal",
+    "RUNNING=0 FAILED_importable=0 MISSING=0",
+    "READY+PARTIAL=662",
+    "no duplicate canonical (symbol, snapshot_ts) in OB200",
+    "BTC 2026-08-27 06:00 remains 3599 unique with gap 06:42:23 PARTIAL",
+    "DOGE 23:00 terminal PARTIAL 3567",
+    "Golden hour BTC/DOGE EXACT 3600",
+    "no imputation of source gaps"
+  ],
+  "mutations": [
+    {
+      "database": "btc_doge_research",
+      "id": "M1_DELETE_AUG27_DUP",
+      "keeps_gap": "2026-08-27T06:42:23Z still missing",
+      "method": "ALTER TABLE DELETE",
+      "predicate": "symbol='BTCUSDT' AND snapshot_ts>='2026-08-27 06:00:00' AND snapshot_ts<'2026-08-27 07:00:00' AND build_id='a1d4e666513df0efb7651f88d7981228d1aed8243eb8ef49eec765b14cb9ad9f' AND computed_at=toDateTime64('2026-09-02 22:26:17.690219', 6, 'UTC')",
+      "rollback": "re-INSERT from backups/ob_loser_aug27_later_computed.jsonl",
+      "rows_after_matching_predicate": 0,
+      "rows_before_matching_predicate": 3599,
+      "status_change": null,
+      "table": "research_ob200_snapshots_1s",
+      "why_safe": "Second copy is byte-identical market payload including build_id/coverage; only computed_at differs",
+      "window_rows_after": 3599,
+      "window_rows_before": 7198,
+      "window_unique_after": 3599,
+      "window_unique_before": 3599
+    },
+    {
+      "database": "btc_doge_research",
+      "id": "M2_DELETE_AUG24_DUP",
+      "method": "ALTER TABLE DELETE",
+      "predicate": "symbol='BTCUSDT' AND snapshot_ts>='2026-08-24 22:47:54' AND snapshot_ts<'2026-08-24 23:00:00' AND build_id='137e352f56179931c3b9d31971be720a2176a3c550e9017fd171397376b77340' AND coverage_status='PARTIAL' AND computed_at=toDateTime64('2026-09-02 20:15:37.783290', 6, 'UTC')",
+      "rollback": "re-INSERT from backups/ob_loser_aug24_partial_coverage.jsonl",
+      "rows_after_matching_predicate": 0,
+      "rows_before_matching_predicate": 726,
+      "status_change": null,
+      "table": "research_ob200_snapshots_1s",
+      "why_safe": "Market levels/mids/update_ids identical; only coverage_status PARTIAL vs COMPLETE differs; keep COMPLETE matching terminal READY",
+      "window_rows_after": 726,
+      "window_rows_before": 1452,
+      "window_unique_after": 726,
+      "window_unique_before": 726
+    },
+    {
+      "database": "btc_doge_research",
+      "id": "M3_DELETE_GOLDEN_NONPLAN_BUILD",
+      "method": "ALTER TABLE DELETE",
+      "predicate": "symbol='BTCUSDT' AND snapshot_ts>='2026-08-31 18:00:00' AND snapshot_ts<'2026-08-31 19:00:00' AND build_id='ed650f8048cea17b8ecc921b0108f7308696e581504a9c891dff824256fdc0d1'",
+      "rollback": "re-INSERT from backups/ob_loser_golden_nonplan_build.jsonl",
+      "rows_after_matching_predicate": 0,
+      "rows_before_matching_predicate": 3600,
+      "status_change": null,
+      "table": "research_ob200_snapshots_1s",
+      "why_safe": "Two build_ids with fully identical market content; keep plan-matching build_id ecd48675...",
+      "window_rows_after": 3600,
+      "window_rows_before": 7200,
+      "window_unique_after": 3600,
+      "window_unique_before": 3600
+    },
+    {
+      "database": "btc_doge_research",
+      "expected_naive_argmax_after": "PARTIAL",
+      "expected_status_after_canonical": "PARTIAL",
+      "id": "M4_APPEND_ORPHAN_TERMINAL_PARTIAL",
+      "method": "INSERT append-only terminal PARTIAL with later started_at",
+      "predicate": "batch_id='fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_'",
+      "rollback": "ignore appended row (append-only); restore interpretation via backups/batch_runs_orphan_doge.jsonl",
+      "rows_after_matching_predicate": 3,
+      "rows_before_matching_predicate": 2,
+      "rows_written": 3567,
+      "status_change": "canonical RUNNING-or-tie -> PARTIAL",
+      "table": "research_batch_runs",
+      "why_safe": "No data rows mutated; append terminal PARTIAL with recovery_reason; data already PARTIAL 3567/3600"
+    }
+  ],
+  "stop_gate": {
+    "canonical_winner_unique": true,
+    "delete_predicates_exact": true,
+    "duplicates_content_identical": true,
+    "engine_known": true,
+    "orphan_status_proven_PARTIAL": true,
+    "passed": true
+  }
+}

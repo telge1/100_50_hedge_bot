@@ -1,0 +1,38 @@
+{
+  "dataset_fingerprint_sha256": "9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8",
+  "episodes": {
+    "BTCUSDT": {
+      "path": "BTCUSDT/episodes.csv",
+      "rows": 879,
+      "sha256": "ca3ba554e59653fbdbe03124d1558aa3f4f767c274c532c9c611d92abf4cf1a4"
+    },
+    "DOGEUSDT": {
+      "path": "DOGEUSDT/episodes.csv",
+      "rows": 840,
+      "sha256": "2d1217b46d490bed10377add4318563e461eefb6a509a943631e9d5e8d0b08af"
+    }
+  },
+  "evaluation_contract_path": "evaluation_contract_frozen_v1.yaml",
+  "evaluation_contract_sha256": "185691763f9b11f0602c832c99a6b5210642684d10a3f61360236dab42f85a0c",
+  "generated_at_utc": "2026-09-05T13:31:53.439468Z",
+  "git_branch": "feature/btc-doge-research-db",
+  "git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "manifest_version": "liquidity_destination_phase_2_dataset_freeze_v1",
+  "phase_1d_artifact_hashes_verified": true,
+  "phase_1d_root": "results/liquidity_destination_bias_phase_1d_full_bounded_history",
+  "pre_outcome_evaluation": true,
+  "splits_frozen": {
+    "TEST": {
+      "end_exclusive": null,
+      "start_inclusive": "2026-08-30T00:00:00Z"
+    },
+    "TRAIN": {
+      "end_exclusive": "2026-08-29T00:00:00Z",
+      "start_inclusive": "2026-08-25T00:00:00Z"
+    },
+    "VALIDATION": {
+      "end_exclusive": "2026-08-30T00:00:00Z",
+      "start_inclusive": "2026-08-29T00:00:00Z"
+    }
+  }
+}

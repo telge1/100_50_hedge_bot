@@ -1,0 +1,57 @@
+{
+  "aug27_btc": {
+    "has_060000": true,
+    "has_064223": false,
+    "physical": 3599,
+    "unique": 3599,
+    "verdict": "SOURCE_GAP"
+  },
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "generated_at": "2026-09-03T07:12:22.768889Z",
+  "golden_btc": {
+    "builds": [
+      "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51"
+    ],
+    "levels_ok": 3600,
+    "physical": 3600,
+    "symbol": "BTCUSDT",
+    "unique": 3600,
+    "verdict": "EXACT",
+    "window_end": "2026-08-31 19:00:00",
+    "window_start": "2026-08-31 18:00:00"
+  },
+  "golden_doge": {
+    "builds": [
+      "f9a65b4ed345791701a1b24b8d719e2d5a3917cb645f6469fa776467fed52064"
+    ],
+    "levels_ok": 3600,
+    "physical": 3600,
+    "symbol": "DOGEUSDT",
+    "unique": 3600,
+    "verdict": "EXACT",
+    "window_end": "2026-08-31 19:00:00",
+    "window_start": "2026-08-31 18:00:00"
+  },
+  "trade_day_counts": [
+    {
+      "buckets": 67058,
+      "day": "2026-08-31",
+      "symbol": "BTCUSDT"
+    },
+    {
+      "buckets": 27157,
+      "day": "2026-08-31",
+      "symbol": "DOGEUSDT"
+    },
+    {
+      "buckets": 66777,
+      "day": "2026-07-20",
+      "symbol": "BTCUSDT"
+    },
+    {
+      "buckets": 26855,
+      "day": "2026-07-20",
+      "symbol": "DOGEUSDT"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "causal_manifest_hash": null,
+  "confirmation_policy": null,
+  "confirmation_source": null,
+  "exit_policy": null,
+  "fixed_strategy_version": "ema_zone_microstructure_confirmation_v1",
+  "intrabar_policy": null,
+  "job_id": "4effb0fa156a4337bd91ba84066fed96",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs",
+  "requested_at": "2026-08-26T18:08:52Z",
+  "result_contract_version": "ezm_stoch_signale_candidates/v1",
+  "run_intent": "candidate_discovery",
+  "runner_kind": "ezm_continuous_discovery",
+  "selected_symbols": [
+    "XRPUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-26T18:05:00Z",
+  "signal_start": "2026-08-19T18:05:00Z",
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "strategy_spec_hash": "e5fc667fdd4ae5f8c3c58e2583e17b61a6f19c37e94fc4c717c3fafdf3189f58",
+  "symbols": [
+    "XRPUSDT"
+  ],
+  "universe_count": 51,
+  "universe_source": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32/config/universe_tradeable_51.json"
+}

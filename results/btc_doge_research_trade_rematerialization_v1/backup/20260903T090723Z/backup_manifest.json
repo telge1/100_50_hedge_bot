@@ -1,0 +1,53 @@
+{
+  "created_at": "2026-09-03T09:07:23.925776Z",
+  "backup_dir": "results/btc_doge_research_trade_rematerialization_v1/backup/20260903T090723Z",
+  "exports": [
+    {
+      "table": "btc_doge_research.research_public_trades_invalid_shifted_v0",
+      "rows": 85013,
+      "path": "results/btc_doge_research_trade_rematerialization_v1/backup/20260903T090723Z/research_public_trades_shifted.parquet",
+      "sha256": "4b2b0054356859e39bbeb6b39d7942d5ed63555ebe83c7aecc2416535a8f7ef3",
+      "bytes": 7023501
+    },
+    {
+      "table": "btc_doge_research.research_ingestion_batches",
+      "rows": 2,
+      "path": "results/btc_doge_research_trade_rematerialization_v1/backup/20260903T090723Z/research_ingestion_batches.parquet",
+      "sha256": "2cdf164eff95fb0a2af1ee6ed7186f3ff19e8a6edd55df203f613d33473a7ba4",
+      "bytes": 4989
+    },
+    {
+      "table": "btc_doge_research._tz_probe_trades",
+      "rows": 3,
+      "path": "results/btc_doge_research_trade_rematerialization_v1/backup/20260903T090723Z/tz_probe_trades.parquet",
+      "sha256": "25430e3aca42caa5a936f76822ed3950e632581197d1df3dbccb6a640c053a53",
+      "bytes": 1174
+    }
+  ],
+  "symbol_fingerprints": [
+    {
+      "symbol": "BTCUSDT",
+      "rows": 80738,
+      "unique_trade_ids": 80738,
+      "min_ts": "2026-08-31T16:30:00.465000Z",
+      "max_ts": "2026-08-31T17:29:56.684000Z",
+      "trade_id_siphash": "598D7329A4AF60300237DB2230D6877F"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "rows": 4275,
+      "unique_trade_ids": 4275,
+      "min_ts": "2026-08-29T09:45:15.086000Z",
+      "max_ts": "2026-08-29T10:29:34.701000Z",
+      "trade_id_siphash": "8AF8616D00F23FA3326606D730B9BE9A"
+    }
+  ],
+  "shifted_batch_ids": [
+    "phase1:btc_run_018",
+    "phase1:doge_20260829_1145_1230"
+  ],
+  "restore": {
+    "instruction": "To restore pre-repair shifted rows: ensure btc_doge_research.research_public_trades_invalid_shifted_v0 exists (or recreate from parquet). Do not copy shifted rows back into the canonical research_public_trades view.",
+    "parquet": "results/btc_doge_research_trade_rematerialization_v1/backup/20260903T090723Z/research_public_trades_shifted.parquet"
+  }
+}

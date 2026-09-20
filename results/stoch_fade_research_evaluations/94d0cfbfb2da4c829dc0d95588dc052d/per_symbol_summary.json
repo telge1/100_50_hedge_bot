@@ -1,0 +1,62 @@
+{
+  "ADAUSDT": {
+    "losses": 411,
+    "open": 3,
+    "signals": 740,
+    "wins": 326
+  },
+  "AVAXUSDT": {
+    "losses": 356,
+    "open": 3,
+    "signals": 717,
+    "wins": 358
+  },
+  "BNBUSDT": {
+    "losses": 190,
+    "open": 1,
+    "signals": 375,
+    "wins": 184
+  },
+  "DOGEUSDT": {
+    "losses": 321,
+    "open": 4,
+    "signals": 611,
+    "wins": 286
+  },
+  "HYPEUSDT": {
+    "losses": 574,
+    "open": 2,
+    "signals": 990,
+    "wins": 414
+  },
+  "LINKUSDT": {
+    "losses": 341,
+    "open": 2,
+    "signals": 650,
+    "wins": 307
+  },
+  "SOLUSDT": {
+    "losses": 337,
+    "open": 3,
+    "signals": 625,
+    "wins": 285
+  },
+  "SUIUSDT": {
+    "losses": 435,
+    "open": 3,
+    "signals": 808,
+    "wins": 370
+  },
+  "XAUTUSDT": {
+    "losses": 113,
+    "open": 4,
+    "signals": 228,
+    "wins": 111
+  },
+  "ZECUSDT": {
+    "losses": 629,
+    "open": 2,
+    "signals": 1158,
+    "wins": 527
+  }
+}

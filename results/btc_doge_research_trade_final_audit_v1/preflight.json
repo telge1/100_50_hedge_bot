@@ -1,0 +1,46 @@
+{
+  "branch": "feature/btc-doge-research-db",
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "clickhouse_timezone": "UTC",
+  "clickhouse_version": "26.7.1.1315",
+  "collector_processes": "147111 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0\n1349030 bash -lc pgrep -af 'oi_liquidation_collector|run_live_collector' || true\n1661773 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades",
+  "contract_version": "research_public_trades_contract_v2",
+  "dirty_count": 114,
+  "disk_free_line": "/dev/sda2       916G  510G  359G  59% /",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "history_end": "2026-09-01T00:00:00Z",
+  "history_start": "2026-07-19T00:00:00Z",
+  "progress_completed": 1794,
+  "progress_failed": [],
+  "progress_finished_at": "2026-09-03T10:56:51.165090Z",
+  "progress_invariant_ok": true,
+  "progress_json_valid": true,
+  "progress_rows_written": 62759179,
+  "progress_skipped": 318,
+  "progress_status": "COMPLETED",
+  "progress_updated_at": "2026-09-03T10:56:51.165148Z",
+  "rematerialization_processes": "1349024 bash -lc pgrep -af 'run_btc_doge_trade_rematerialization' || true",
+  "runner_pid_alive": false,
+  "runner_pid_file": null,
+  "runner_pid_is_stale_metadata": false,
+  "table_ddl": {
+    "research_public_trades": {
+      "ddl_excerpt": "CREATE TABLE btc_doge_research.research_public_trades (`symbol` LowCardinality(String), `event_time` DateTime64(3, 'UTC'), `receive_time` DateTime64(6, 'UTC'), `trade_id` String, `price` Decimal(18, 8), `base_size` Decimal(24, 12), `quote_notional` Decimal(24, 8), `taker_side` Enum8('Buy' = 1, 'Sell' = 2), `source` LowCardinality(String), `source_id` LowCardinality(String), `source_fingerprint` FixedString(64), `source_segment_start` DateTime64(3, 'UTC'), `source_segment_end` DateTime64(3, 'UTC'), `source_contract_version` LowCardinality(String), `processor_version` LowCardinality(String), `ingestion_batch_id` String, `build_id` String, `contract_version` LowCardinality(String), `record_version` UInt64, `ingested_at` DateTime64(6, 'UTC'), `imported_at` DateTime64(6, 'UTC'), `quality_flags`",
+      "engine": "ReplacingMergeTree",
+      "partition_key": "(symbol, toYYYYMM(event_time))",
+      "sorting_key": "symbol, trade_id"
+    },
+    "research_public_trades_invalid_shifted_v0": {
+      "ddl_excerpt": "CREATE TABLE btc_doge_research.research_public_trades_invalid_shifted_v0 (`symbol` LowCardinality(String), `event_time` DateTime64(3, 'UTC'), `receive_time` DateTime64(6, 'UTC'), `trade_id` String, `price` Decimal(18, 8), `base_size` Decimal(24, 12), `quote_notional` Decimal(24, 8), `taker_side` Enum8('Buy' = 1, 'Sell' = 2), `source_id` LowCardinality(String), `source_contract_version` LowCardinality(String), `processor_version` LowCardinality(String), `ingestion_batch_id` String, `ingested_at` DateTime64(6, 'UTC'), `quality_flags` Array(LowCardinality(String)), `coverage_status` LowCardinality(String), `finalization_status` LowCardinality(String), `event_key` String) ENGINE = MergeTree PARTITION BY (symbol, toYYYYMM(event_time)) ORDER BY (symbol, event_time, trade_id) SETTINGS index_granu",
+      "engine": "MergeTree",
+      "partition_key": "(symbol, toYYYYMM(event_time))",
+      "sorting_key": "symbol, event_time, trade_id"
+    },
+    "research_trade_rematerialization_watermarks": {
+      "ddl_excerpt": "CREATE TABLE btc_doge_research.research_trade_rematerialization_watermarks (`build_id` String, `symbol` LowCardinality(String), `segment_start` DateTime64(3, 'UTC'), `segment_end` DateTime64(3, 'UTC'), `status` LowCardinality(String), `source_row_count` UInt64, `source_unique_trade_ids` UInt64, `rows_written` UInt64, `source_fingerprint` FixedString(64), `record_version` UInt64, `started_at` DateTime64(6, 'UTC'), `completed_at` Nullable(DateTime64(6, 'UTC')), `error` String DEFAULT '') ENGINE = ReplacingMergeTree(record_version) ORDER BY (build_id, symbol, segment_start) SETTINGS index_granularity = 8192",
+      "engine": "ReplacingMergeTree",
+      "partition_key": "",
+      "sorting_key": "build_id, symbol, segment_start"
+    }
+  }
+}

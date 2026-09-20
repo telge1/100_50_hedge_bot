@@ -1,0 +1,16 @@
+{
+  "orderbook_analysis.public_trades_canonical": {
+    "engine": "ReplacingMergeTree implied by FINAL usage / see DDL",
+    "time_column": "trade_ts DateTime64(3,'UTC')",
+    "key": "trade_id unique per symbol in audited range",
+    "ddl": "CREATE TABLE orderbook_analysis.public_trades_canonical\n(\n    `trade_ts` DateTime64(3, 'UTC'),\n    `ingest_timestamp` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC'),\n    `symbol` LowCardinality(String),\n    `trade_id` String,\n    `side` Enum8('Buy' = 1, 'Sell' = 2),\n    `price` Decimal(18, 8),\n    `size` Decimal(18, 8),\n    `notional` Decimal(18, 8),\n    `tick_direction` LowCardinality(String),\n    `is_rpi_trade` UInt8 DEFAULT 0,\n    `source` LowCardinality(String),\n    `source_file` String DEFAUL"
+  },
+  "btc_doge_research.research_public_trades": {
+    "engine": "MergeTree",
+    "order_by": "(symbol, event_time, trade_id)",
+    "time_column": "event_time DateTime64(3,'UTC')",
+    "event_key": "symbol|trade_id",
+    "replacing": false,
+    "ddl": "CREATE TABLE btc_doge_research.research_public_trades\n(\n    `symbol` LowCardinality(String),\n    `event_time` DateTime64(3, 'UTC'),\n    `receive_time` DateTime64(6, 'UTC'),\n    `trade_id` String,\n    `price` Decimal(18, 8),\n    `base_size` Decimal(24, 12),\n    `quote_notional` Decimal(24, 8),\n    `taker_side` Enum8('Buy' = 1, 'Sell' = 2),\n    `source_id` LowCardinality(String),\n    `source_contract_version` LowCardinality(String),\n    `processor_version` LowCardinality(String),\n    `ingestion_ba"
+  }
+}

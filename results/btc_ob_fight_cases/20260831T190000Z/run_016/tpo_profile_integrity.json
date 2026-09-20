@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "checks": {
+    "row_tpo_sum_equals_bracket_touches": true,
+    "row_tpo_sum_equals_total_marks": true,
+    "bracket_touch_sum_equals_total_marks": true,
+    "each_bracket_counts_bins_at_most_once": true,
+    "no_trade_after_anchor": true,
+    "value_area_level_order": true,
+    "value_area_share_target_met": true,
+    "all_values_finite": true,
+    "partial_brackets_causal": true,
+    "price_step_positive": true
+  },
+  "totals": {
+    "total_tpo_marks": 486,
+    "row_tpo_sum": 486,
+    "bracket_touch_sum": 486,
+    "bracket_count": 11
+  }
+}

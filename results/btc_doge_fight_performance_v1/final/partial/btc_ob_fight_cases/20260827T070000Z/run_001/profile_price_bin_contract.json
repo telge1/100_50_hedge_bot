@@ -1,0 +1,128 @@
+{
+  "contract_version": "profile_price_bin_contract_v1",
+  "price_step": 10.0,
+  "orderbook_tick_size": 0.1,
+  "bin_index_rule": "floor(price / price_step)",
+  "interval_semantics": "[LOWER,UPPER)",
+  "level_representation": {
+    "poc": "CENTER",
+    "vah": "UPPER_EDGE",
+    "val": "LOWER_EDGE",
+    "vvah": "UPPER_EDGE",
+    "vval": "LOWER_EDGE",
+    "display_price_in_rows": "CENTER"
+  },
+  "tpo_bin_orientation": "same_as_volume",
+  "volume_bin_orientation": "same_as_tpo",
+  "rounding_rule": "floor_to_bin_index_no_float_equality",
+  "orderbook_tick_to_bin": "tick_price maps to bin via floor(price/step)",
+  "source_references": [
+    "orderbook_analyse.market_profile.loader.fetch_volume_at_price",
+    "orderbook_analyse.market_profile.profile.compute_value_area",
+    "research.btc_ob_fight.tpo_profile.price_to_bin_index",
+    "research.btc_ob_fight.volume_profile._aggregate_bins"
+  ],
+  "tpo_vah_bin": {
+    "bin_index": 7894,
+    "price_low": 78940.0,
+    "price_high": 78950.0,
+    "price_mid": 78945.0,
+    "level_representation": "UPPER_EDGE",
+    "level_price": 78950.0
+  },
+  "tpo_val_bin": {
+    "bin_index": 7827,
+    "price_low": 78270.0,
+    "price_high": 78280.0,
+    "price_mid": 78275.0,
+    "level_representation": "LOWER_EDGE",
+    "level_price": 78270.0
+  },
+  "volume_vvah_bin": {
+    "bin_index": 7895,
+    "price_low": 78950.0,
+    "price_high": 78960.0,
+    "price_mid": 78955.0,
+    "level_representation": "UPPER_EDGE",
+    "level_price": 78960.0
+  },
+  "volume_vval_bin": {
+    "bin_index": 7819,
+    "price_low": 78190.0,
+    "price_high": 78200.0,
+    "price_mid": 78195.0,
+    "level_representation": "LOWER_EDGE",
+    "level_price": 78190.0
+  },
+  "upper_profile_edge_zone": {
+    "edge": "UPPER",
+    "price_low": 78940.0,
+    "price_high": 78960.0,
+    "bin_indices": [
+      7894,
+      7895
+    ],
+    "inner_level_bin": {
+      "bin_index": 7894,
+      "price_low": 78940.0,
+      "price_high": 78950.0,
+      "price_mid": 78945.0,
+      "level_representation": "UPPER_EDGE",
+      "level_price": 78950.0
+    },
+    "outer_level_bin": {
+      "bin_index": 7895,
+      "price_low": 78950.0,
+      "price_high": 78960.0,
+      "price_mid": 78955.0,
+      "level_representation": "UPPER_EDGE",
+      "level_price": 78960.0
+    }
+  },
+  "lower_profile_edge_zone": {
+    "edge": "LOWER",
+    "price_low": 78190.0,
+    "price_high": 78280.0,
+    "bin_indices": [
+      7819,
+      7820,
+      7821,
+      7822,
+      7823,
+      7824,
+      7825,
+      7826,
+      7827
+    ],
+    "inner_level_bin": {
+      "bin_index": 7827,
+      "price_low": 78270.0,
+      "price_high": 78280.0,
+      "price_mid": 78275.0,
+      "level_representation": "LOWER_EDGE",
+      "level_price": 78270.0
+    },
+    "outer_level_bin": {
+      "bin_index": 7819,
+      "price_low": 78190.0,
+      "price_high": 78200.0,
+      "price_mid": 78195.0,
+      "level_representation": "LOWER_EDGE",
+      "level_price": 78190.0
+    }
+  },
+  "first_outside_bins": {
+    "upper": {
+      "bin_index": 7896,
+      "price_low": 78960.0,
+      "price_high": 78970.0,
+      "price_mid": 78965.0
+    },
+    "lower": {
+      "bin_index": 7818,
+      "price_low": 78180.0,
+      "price_high": 78190.0,
+      "price_mid": 78185.0
+    }
+  }
+}

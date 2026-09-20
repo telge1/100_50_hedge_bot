@@ -1,0 +1,49 @@
+{
+  "be": 0,
+  "be50_activated_count": 0,
+  "be50_exit_count": 0,
+  "evaluation_data_end": "2026-08-11T08:02:00Z",
+  "evaluation_data_start": "2026-01-01T18:16:00Z",
+  "execution_dedup_applied": false,
+  "exit_policy": "NO_BE50",
+  "filtered_signals": 1212,
+  "finished_at": "2026-08-15T21:00:14Z",
+  "gross_loss_pct": -598.0,
+  "gross_profit_pct": 1094.0,
+  "hold_minutes_by_tf": {
+    "15m": 1440,
+    "1h": 4320,
+    "30m": 2880,
+    "4h": 14400
+  },
+  "identity": {
+    "as_of": "2026-08-11T08:02:00Z",
+    "candle_data_to": "2026-08-11T08:01:00Z",
+    "exit_policy": "NO_BE50",
+    "hashes": {
+      "src/signal_generator/pipeline/outcome_eval.py": "983b6e25fd4a60a1646ee8f206cdaa81132f51e4738de11506236edc799423d0",
+      "src/signal_generator/pipeline/versions.py": "0919699d7ac702bc13983a9f810afc201898d7e3d565dd83a535f265afd12680",
+      "src/signal_generator/strategy/wave_fade/exits.py": "3f39937dce6a34ff432f97c4588ae35764b88d8c19d1a8d10c743300123e6fea"
+    },
+    "outcome_engine": "evaluate_signal_no_be50",
+    "scan_exit": "signal_generator.strategy.wave_fade.exits.scan_exit_sl_first",
+    "signal_source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+    "signal_strategy_version": "wave_fade_frozen_f16ae32",
+    "source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+    "uses_be50_exit_for_evaluation": false
+  },
+  "losses": 475,
+  "open": 1,
+  "pnl_basis": "gross",
+  "raw_input": 6303,
+  "signal_scope": "TIER_A_ONLY",
+  "signal_strategy_version": "wave_fade_frozen_f16ae32",
+  "signals": 1212,
+  "strategy_version": "wave_fade_frozen_f16ae32",
+  "symbol": "AAVEUSDT",
+  "tier_a_input": 1212,
+  "total_pnl_pct": 496.0,
+  "win_rate_denominator": "wins+losses (OPEN excluded)",
+  "win_rate_pct": 60.77621800165153,
+  "wins": 736
+}

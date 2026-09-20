@@ -1,0 +1,30 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT",
+      "duration_seconds": 0.315,
+      "error_code": null,
+      "losses": 2,
+      "message": "",
+      "open": 0,
+      "raw_total": 0,
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "wins": 0
+    },
+    {
+      "artifact_reference": "coin_runs/1000BONKUSDT",
+      "duration_seconds": 0.265,
+      "error_code": null,
+      "losses": 2,
+      "message": "",
+      "open": 0,
+      "raw_total": 0,
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT",
+      "tier_a_total": 4,
+      "wins": 2
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+=== Post-pilot regression ===
+generated_at_utc=2026-09-05T12:28:37Z
+......................................                                   [100%]
+38 passed in 0.04s
+elapsed_seconds=0.15 maxrss_kb=38204
+compile=PASS

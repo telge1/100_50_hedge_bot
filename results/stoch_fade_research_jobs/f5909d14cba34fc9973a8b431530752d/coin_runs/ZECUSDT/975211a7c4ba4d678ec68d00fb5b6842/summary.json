@@ -1,0 +1,9 @@
+{
+  "raw_total": 5050,
+  "run_id": "975211a7c4ba4d678ec68d00fb5b6842",
+  "statuses": {
+    "ZECUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1158
+}

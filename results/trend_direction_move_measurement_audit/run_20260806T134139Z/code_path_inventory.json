@@ -1,0 +1,13 @@
+{
+  "signal_extraction": "trend_direction_forward_validation.extract_direction_signals",
+  "entry_price": "open of bar signal_index+1 (next_open after confirm close)",
+  "episode_begin": "confirming bar close (signal known); forward from next open",
+  "episode_end_raw": "first subsequent bar with direction != signal_dir (UNCLEAR or opposite)",
+  "forward_horizons": "fixed bars from entry, independent of scanner state",
+  "mfe_bullish": "(max_high/entry)-1 then *100 -> percent points",
+  "mae_bullish": "1-(min_low/entry) then *100 (positive adverse)",
+  "mfe_bearish": "1-(min_low/entry) then *100",
+  "mae_bearish": "(max_high/entry)-1 then *100",
+  "first_touch": "first_touch() high/low vs targets; SAME_CANDLE_AMBIGUOUS if both same bar",
+  "percent_scaling": "percent points (0.27 means 0.27%); single *100 after ratio"
+}

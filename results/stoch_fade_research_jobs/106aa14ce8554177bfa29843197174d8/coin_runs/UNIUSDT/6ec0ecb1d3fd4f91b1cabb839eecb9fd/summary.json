@@ -1,0 +1,9 @@
+{
+  "raw_total": 6329,
+  "run_id": "6ec0ecb1d3fd4f91b1cabb839eecb9fd",
+  "statuses": {
+    "UNIUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1132
+}

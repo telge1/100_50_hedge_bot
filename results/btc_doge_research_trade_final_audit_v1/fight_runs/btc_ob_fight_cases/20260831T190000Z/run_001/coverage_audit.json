@@ -1,0 +1,214 @@
+{
+  "eligibility": {
+    "eligibility_contract": "fight_data_eligibility_contract_v1",
+    "eligibility_status": "DATA_COMPLETE",
+    "facts_computation_allowed": true,
+    "interpretation_allowed": false,
+    "trade_decision_eligible": false,
+    "profile_causality_passed": true,
+    "mandatory_data_complete": true,
+    "context_data_complete": true,
+    "rules_frozen": false,
+    "trade_verdict_evaluated": false,
+    "direction": null,
+    "decision_blocked_reason": null,
+    "windows": {
+      "profile_input_window": {
+        "start": "2026-08-31T13:30:00Z",
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "session_id": "us_developing_to_anchor",
+        "predicate": "session_start <= event_ts < anchor"
+      },
+      "pre_anchor_observation_window": {
+        "start": "2026-08-31T18:30:00Z",
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "predicate": "anchor - before <= event_ts < anchor"
+      },
+      "post_anchor_observation_window": {
+        "start": "2026-08-31T19:00:00Z",
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor <= event_ts <= anchor + after"
+      },
+      "full_fight_window": {
+        "start": "2026-08-31T18:30:00Z",
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor - before <= event_ts <= anchor + after"
+      },
+      "auto_extension_enabled": false
+    },
+    "sources": [
+      {
+        "source_name": "OB200",
+        "symbol": "BTCUSDT",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "requested_end": "2026-08-31T19:30:00Z",
+        "available_start": "2026-08-31T18:30:00Z",
+        "available_end": "2026-08-31T19:30:00Z",
+        "expected_units": 3601,
+        "observed_units": 3601,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "missing_seconds": [],
+        "duplicate_seconds": 0,
+        "levels_200x200_ok": true,
+        "source_segment_status": "COMPLETE",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "build_ids": [
+          "67dc0f37a889a02fcb759dc4595a4bd64678792d0f18a1ad33473faf86daf167",
+          "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51"
+        ],
+        "source_fingerprints": [
+          "ca6c396738439faccc5ffb8a1ef3f51879c9043ca3841b3bcab7237c58387350",
+          "e7d6817f15883e72b139c0af9b0e834b4bb7408064259d6a85270fa68314f425"
+        ]
+      },
+      {
+        "source_name": "PUBLIC_TRADES",
+        "symbol": "BTCUSDT",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "requested_end": "2026-08-31T19:30:00Z",
+        "available_start": "2026-08-31T13:30:00.141Z",
+        "available_end": "2026-08-31T19:29:56.684Z",
+        "expected_units": null,
+        "observed_units": 80738,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "source_segment_status": "RESEARCH_PUBLIC_TRADES",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "lineage": {
+          "table": "btc_doge_research.research_public_trades",
+          "lineage_companion_used": false,
+          "raw_archive_replay_used": false
+        },
+        "deduped_count": 850561,
+        "raw_count": 850561
+      },
+      {
+        "source_name": "PROFILE_TRADES",
+        "symbol": "BTCUSDT",
+        "requested_start": "2026-08-31T13:30:00Z",
+        "requested_end": "2026-08-31T19:00:00Z",
+        "available_start": "2026-08-31T13:30:00.141Z",
+        "available_end": "2026-08-31T18:59:59.635Z",
+        "expected_units": null,
+        "observed_units": 813062,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "source_segment_status": "RESEARCH_PUBLIC_TRADES",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "lineage": {
+          "table": "btc_doge_research.research_public_trades",
+          "lineage_companion_used": false,
+          "raw_archive_replay_used": false
+        },
+        "deduped_count": 813062,
+        "raw_count": 850561
+      },
+      {
+        "source_name": "OPEN_INTEREST",
+        "symbol": "BTCUSDT",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "requested_end": "2026-08-31T19:30:00Z",
+        "available_start": "2026-08-31T18:30:00Z",
+        "available_end": "2026-08-31T19:29:55Z",
+        "expected_units": 720,
+        "observed_units": 720,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "source_segment_status": "PARTIAL",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "resolution_ms": 5000,
+        "note": "effective status uses window sample density; day PARTIAL tags are informational"
+      },
+      {
+        "source_name": "LIQUIDATIONS",
+        "symbol": "BTCUSDT",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "requested_end": "2026-08-31T19:30:00Z",
+        "available_start": "2026-08-31T18:33:08.199Z",
+        "available_end": "2026-08-31T19:10:29.628Z",
+        "expected_units": null,
+        "observed_units": 8,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "source_segment_status": "READY",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "null_events_are_valid": true
+      },
+      {
+        "source_name": "CANDLES_1M",
+        "symbol": "BTCUSDT",
+        "requested_start": null,
+        "requested_end": null,
+        "available_start": "2026-08-31T18:30:00Z",
+        "available_end": "2026-08-31T19:29:00Z",
+        "expected_units": 60,
+        "observed_units": 60,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "source_segment_status": "COVERAGE_ONLY",
+        "effective_coverage_status": "COMPLETE",
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "classification": "COVERAGE_ONLY"
+      }
+    ],
+    "mandatory_statuses": {
+      "OB200": "COMPLETE",
+      "PUBLIC_TRADES": "COMPLETE",
+      "PROFILE_TRADES": "COMPLETE"
+    },
+    "context_statuses": {
+      "OPEN_INTEREST": "COMPLETE",
+      "LIQUIDATIONS": "COMPLETE",
+      "CANDLES_1M": "COMPLETE"
+    },
+    "missing_rows": [],
+    "mandatory_sources": [
+      "PUBLIC_TRADES",
+      "OB200",
+      "PROFILE_TRADES"
+    ],
+    "context_sources": [
+      "OPEN_INTEREST",
+      "LIQUIDATIONS",
+      "CANDLES_1M"
+    ]
+  },
+  "ob_meta": {
+    "table": "btc_doge_research.research_ob200_snapshots_1s",
+    "raw_rows": 3601,
+    "unique_seconds": 3601,
+    "duplicate_seconds_dropped": 0,
+    "min_ts": "2026-08-31T18:30:00Z",
+    "max_ts": "2026-08-31T19:30:00Z",
+    "levels_200x200": 3601
+  },
+  "trade_meta": {
+    "table": "btc_doge_research.research_public_trades",
+    "raw_count": 850561,
+    "deduped_count": 850561,
+    "dedup_removed": 0,
+    "aggressor_semantics": "side/taker_side Buy/Sell is Bybit taker/aggressor",
+    "sort": "ts, trade_id",
+    "source_mode": "RESEARCH_PUBLIC_TRADES",
+    "lineage_companion_used": false,
+    "raw_archive_replay_used": false,
+    "data_source": "BTC_DOGE_RESEARCH_DB",
+    "mixed_sources_used": false,
+    "research_event_count": 850561,
+    "research_trade_events_missing": false,
+    "min_ts": "2026-08-31T13:30:00.141Z",
+    "max_ts": "2026-08-31T19:29:56.684Z"
+  }
+}

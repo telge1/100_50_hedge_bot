@@ -1,0 +1,10 @@
+{
+  "contract_version": "research_public_trades_contract_v2",
+  "fight_trade_table": "btc_doge_research.research_public_trades FINAL",
+  "legacy_trade_companion_default": false,
+  "mixed_sources_used": false,
+  "oa_canonical_usage": "parity_audit_read_only",
+  "pass": true,
+  "raw_archive_replay_used": false,
+  "source_pure": true
+}

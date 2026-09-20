@@ -1,0 +1,30 @@
+{
+  "by_scope": {
+    "TPO_EDGE_BIN": {
+      "trade_associated": 4,
+      "unmatched": 911,
+      "total": 915
+    },
+    "PROFILE_EDGE_ZONE": {
+      "trade_associated": 42,
+      "unmatched": 4077,
+      "total": 4119
+    },
+    "VOLUME_EDGE_BIN": {
+      "trade_associated": 5,
+      "unmatched": 423,
+      "total": 428
+    },
+    "FIRST_OUTSIDE_BIN": {
+      "trade_associated": 11,
+      "unmatched": 368,
+      "total": 379
+    },
+    "EXACT_LEVEL_TICK": {
+      "trade_associated": 0,
+      "unmatched": 30,
+      "total": 30
+    }
+  },
+  "total_events": 5871
+}

@@ -1,0 +1,11 @@
+PID=144416
+    PID                  STARTED CMD
+ 144416 Wed Sep  9 14:08:44 2026 ../.venv/bin/python app.py
+/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+LISTEN 0      2048         0.0.0.0:3000       0.0.0.0:*    users:(("python",pid=144416,fd=19))          
+MainPID=0
+NRestarts=117
+KillMode=process
+ActiveState=inactive
+SubState=dead
+FragmentPath=/etc/systemd/system/dashboard.service

@@ -1,0 +1,118 @@
+{
+  "schema_version": "doge_front_open_path_v1",
+  "config": {
+    "film": {
+      "barrier_bps": 25,
+      "film_start_offset_s": 30,
+      "film_end_offset_s": 8,
+      "min_break_gap_s": 120,
+      "max_wall_rank": 5,
+      "score_version": "v1_broad_structure"
+    },
+    "entry_cooldown_s": 120,
+    "wall_touch_bps": 5.0,
+    "hold_reverse_bps": 10.0,
+    "max_hold_s": 3600,
+    "mfe_target_bps": 41.0,
+    "require_public_tape": true,
+    "exit_mode": "stop_only",
+    "stop_loss_bps": 50.0
+  },
+  "semantics": {
+    "long_trigger": "ask_front_cleared AND ask_vacuum_growth>0 AND tape_imbalance>0 AND ask_fill_dominates",
+    "short_trigger": "bid_front_cleared AND bid_vacuum_growth>0 AND tape_imbalance<0 AND bid_fill_dominates",
+    "film_window": "[entry-30s, entry-8s]",
+    "exit": "hold through wall pullbacks; fictional stop-loss at 50.0 bps (0.50%); else censor at max_hold/hour end",
+    "mfe_target": "0.41% = 41 bps favorable excursion after entry",
+    "entries": "reused from prior front_open_path_v1 trades when repathing"
+  },
+  "evaluation": {
+    "long": {
+      "n": 185,
+      "mfe_target_bps": 41.0,
+      "stop_loss_bps": 50.0,
+      "exit_mode": "stop_only",
+      "hit_mfe_target": {
+        "successes": 48,
+        "rate": 0.259459,
+        "wilson_low": 0.201642,
+        "wilson_high": 0.327064
+      },
+      "touched_next_wall_rate": 0.87027,
+      "wall_hold_exit_rate": 0.0,
+      "stop_loss_rate": 0.12973,
+      "pullback_after_touch_rate": 0.772973,
+      "continued_after_pullback_rate": 0.545455,
+      "mfe_bps": {
+        "mean": 41.565689,
+        "median": 19.821606
+      },
+      "mae_bps": {
+        "mean": 19.916835,
+        "median": 15.376427
+      },
+      "exit_return_bps": {
+        "mean": 13.541368,
+        "median": 1.189839
+      },
+      "hold_seconds": {
+        "mean": 1782.367568,
+        "median": 1785.0
+      },
+      "exit_reasons": {
+        "CENSORED_HOUR_END": 161,
+        "STOP_LOSS": 24
+      }
+    },
+    "short": {
+      "n": 290,
+      "mfe_target_bps": 41.0,
+      "stop_loss_bps": 50.0,
+      "exit_mode": "stop_only",
+      "hit_mfe_target": {
+        "successes": 52,
+        "rate": 0.17931,
+        "wilson_low": 0.139441,
+        "wilson_high": 0.227565
+      },
+      "touched_next_wall_rate": 0.751724,
+      "wall_hold_exit_rate": 0.0,
+      "stop_loss_rate": 0.210345,
+      "pullback_after_touch_rate": 0.627586,
+      "continued_after_pullback_rate": 0.571429,
+      "mfe_bps": {
+        "mean": 20.922536,
+        "median": 13.766348
+      },
+      "mae_bps": {
+        "mean": 22.696823,
+        "median": 17.145306
+      },
+      "exit_return_bps": {
+        "mean": -4.273723,
+        "median": -4.740179
+      },
+      "hold_seconds": {
+        "mean": 1706.086207,
+        "median": 1669.0
+      },
+      "exit_reasons": {
+        "CENSORED_HOUR_END": 229,
+        "STOP_LOSS": 61
+      }
+    },
+    "verdict": "FAIL_FRONT_OPEN_PATH_MFE_TARGET",
+    "pass_criteria": {
+      "min_trades_per_side_20": {
+        "long": true,
+        "short": true
+      },
+      "mfe_hit_wilson_low_gt_0_55": {
+        "long": false,
+        "short": false
+      }
+    }
+  },
+  "verdict": "FAIL_FRONT_OPEN_PATH_MFE_TARGET",
+  "interpretation": "Front-open triggers do not reach 0.41% MFE often enough under the frozen gate; MAE and exit paths are reported descriptively."
+}

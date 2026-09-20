@@ -1,0 +1,391 @@
+{
+  "premove_wall_film": {
+    "schema_version": "doge_premove_wall_film_v1",
+    "config": {
+      "barrier_bps": 25,
+      "film_start_offset_s": 30,
+      "film_end_offset_s": 8,
+      "min_break_gap_s": 120,
+      "max_wall_rank": 5
+    },
+    "semantics": {
+      "event": "independent first \u00b125 bps break",
+      "film_window": "[break-30s, break-8s]",
+      "dedup": "min gap 120s between break times",
+      "walls": "connected walls with rank <= 5"
+    },
+    "evaluation": {
+      "event_counts": {
+        "UP": 64,
+        "DOWN": 72,
+        "total": 136
+      },
+      "feature_contrasts": {
+        "film_mid_return_bps": {
+          "up": {
+            "n": 64,
+            "mean": 3.389257,
+            "median": 3.305967
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.423199,
+            "median": -1.18998
+          },
+          "mean_diff_up_minus_down": 5.812456
+        },
+        "ask_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": 1.533484,
+            "median": -0.017041
+          },
+          "down": {
+            "n": 72,
+            "mean": -2.662263,
+            "median": 0.00992
+          },
+          "mean_diff_up_minus_down": 4.195747
+        },
+        "bid_vacuum_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -2.461537,
+            "median": -0.03566
+          },
+          "down": {
+            "n": 72,
+            "mean": 2.386668,
+            "median": 0.015431
+          },
+          "mean_diff_up_minus_down": -4.848205
+        },
+        "nearest_ask_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -1.333124,
+            "median": -0.463602
+          },
+          "down": {
+            "n": 72,
+            "mean": 1.208721,
+            "median": 0.170956
+          },
+          "mean_diff_up_minus_down": -2.541845
+        },
+        "nearest_bid_wall_change_bps": {
+          "up": {
+            "n": 64,
+            "mean": -0.107715,
+            "median": -0.000124
+          },
+          "down": {
+            "n": 72,
+            "mean": -1.397553,
+            "median": -0.273798
+          },
+          "mean_diff_up_minus_down": 1.289838
+        },
+        "distinct_ask_walls_pulled": {
+          "up": {
+            "n": 64,
+            "mean": 7.828125,
+            "median": 7.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 6.569444,
+            "median": 6.0
+          },
+          "mean_diff_up_minus_down": 1.258681
+        },
+        "distinct_ask_walls_filled": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.388889,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.486111
+        },
+        "distinct_bid_walls_refilled": {
+          "up": {
+            "n": 64,
+            "mean": 0.46875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.208333,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.260417
+        },
+        "distinct_bid_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 12.046875,
+            "median": 8.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 10.361111,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 1.685764
+        },
+        "distinct_ask_walls_following": {
+          "up": {
+            "n": 64,
+            "mean": 13.140625,
+            "median": 11.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 9.541667,
+            "median": 8.0
+          },
+          "mean_diff_up_minus_down": 3.598958
+        },
+        "executed_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 26092.278368,
+            "median": 470.8008
+          },
+          "down": {
+            "n": 72,
+            "mean": 16742.611345,
+            "median": 113.83596
+          },
+          "mean_diff_up_minus_down": 9349.667023
+        },
+        "pull_notional_usdt": {
+          "up": {
+            "n": 64,
+            "mean": 10333354.64854,
+            "median": 7727565.11299
+          },
+          "down": {
+            "n": 72,
+            "mean": 6715293.938643,
+            "median": 5699755.6891
+          },
+          "mean_diff_up_minus_down": 3618060.709897
+        },
+        "ask_pull_events": {
+          "up": {
+            "n": 64,
+            "mean": 330.828125,
+            "median": 237.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 252.375,
+            "median": 223.0
+          },
+          "mean_diff_up_minus_down": 78.453125
+        },
+        "ask_fill_events": {
+          "up": {
+            "n": 64,
+            "mean": 1.796875,
+            "median": 1.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.680556,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 1.116319
+        },
+        "bid_refill_events": {
+          "up": {
+            "n": 64,
+            "mean": 0.875,
+            "median": 0.0
+          },
+          "down": {
+            "n": 72,
+            "mean": 0.375,
+            "median": 0.0
+          },
+          "mean_diff_up_minus_down": 0.5
+        },
+        "ask_front_cleared_pull_and_fill": {
+          "up": {
+            "n": 64,
+            "successes": 41,
+            "rate": 0.640625,
+            "wilson_low": 0.518206,
+            "wilson_high": 0.747118
+          },
+          "down": {
+            "n": 72,
+            "successes": 26,
+            "rate": 0.361111,
+            "wilson_low": 0.259815,
+            "wilson_high": 0.476477
+          },
+          "rate_diff_up_minus_down": 0.279514
+        },
+        "bullish_support_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        },
+        "bearish_pressure_proxy": {
+          "up": {
+            "n": 64,
+            "successes": 64,
+            "rate": 1.0,
+            "wilson_low": 0.943374,
+            "wilson_high": 1.0
+          },
+          "down": {
+            "n": 72,
+            "successes": 71,
+            "rate": 0.986111,
+            "wilson_low": 0.925432,
+            "wilson_high": 0.997544
+          },
+          "rate_diff_up_minus_down": 0.013889
+        }
+      },
+      "score_summary": {
+        "up_mean": 9.512723,
+        "down_mean": 8.442107,
+        "mean_diff_up_minus_down": 1.070616,
+        "sign_hit_rate": 0.470588,
+        "sign_hit_wilson_low": 0.388664,
+        "sign_hit_wilson_high": 0.554129,
+        "correct": 64,
+        "n": 136
+      },
+      "verdict": "FAIL_PREMOVE_FILM_SEPARATION",
+      "pass_criteria": {
+        "min_events_30": true,
+        "up_score_gt_down_score": true,
+        "sign_hit_wilson_low_gt_0_55": false
+      }
+    },
+    "verdict": "FAIL_PREMOVE_FILM_SEPARATION",
+    "interpretation": "Pre-move wall films do not yet separate UP vs DOWN breaks under the pre-registered gate."
+  },
+  "staircase_r12_fill_pull_v2": {
+    "schema_version": "doge_structure_followups_v1",
+    "test": "bullish_staircase_r12_fill_pull_v2",
+    "hypothesis": "Front Rank-1/2 ask walls that are both pulled and filled, with bid refill and ask vacuum growth, raise UP@25bps versus matched controls.",
+    "rule_freeze": {
+      "max_front_rank": 2,
+      "requires_ask_pull_and_ask_fill": true,
+      "requires_bid_refill_under_aggression": true,
+      "ask_vacuum_growth_min_bps": 5.0,
+      "no_signed_past_return_gate": true,
+      "note": "Structural rewrite; not a retune of BULLISH_STAIRCASE V1 thresholds."
+    },
+    "counts": {
+      "raw_detections": 8,
+      "independent_episodes": 6,
+      "matched_episodes": 4,
+      "unmatched_episodes": 2,
+      "unmatched_reasons": {
+        "censored_outcome": 2
+      }
+    },
+    "raw_detection_first_25bps": {
+      "n": 6,
+      "successes": 4,
+      "rate": 0.666667,
+      "wilson_low": 0.299988,
+      "wilson_high": 0.903231,
+      "counts": {
+        "SIDEWAYS": 1,
+        "UP": 4,
+        "DOWN": 1
+      }
+    },
+    "evaluation": {
+      "outcome_name": "first_25bps_up",
+      "success_definition": "UP",
+      "episode_first_25bps": {
+        "n": 4,
+        "successes": 3,
+        "rate": 0.75,
+        "wilson_low": 0.300636,
+        "wilson_high": 0.954414,
+        "counts": {
+          "SIDEWAYS": 1,
+          "UP": 3
+        }
+      },
+      "control_first_25bps": {
+        "n": 20,
+        "successes": 8,
+        "rate": 0.4,
+        "wilson_low": 0.218804,
+        "wilson_high": 0.613422,
+        "counts": {
+          "SIDEWAYS": 9,
+          "DOWN": 3,
+          "UP": 8
+        }
+      },
+      "episode_first_50bps": {
+        "n": 4,
+        "successes": 2,
+        "rate": 0.5,
+        "wilson_low": 0.150036,
+        "wilson_high": 0.849964,
+        "counts": {
+          "SIDEWAYS": 2,
+          "UP": 2
+        }
+      },
+      "control_first_50bps": {
+        "n": 20,
+        "successes": 10,
+        "rate": 0.5,
+        "wilson_low": 0.299295,
+        "wilson_high": 0.700705,
+        "counts": {
+          "SIDEWAYS": 10,
+          "UP": 10
+        }
+      },
+      "paired_risk_difference_25bps": {
+        "mean": 0.347075,
+        "ci95_low": 0.0,
+        "ci95_high": 0.75,
+        "bootstrap_p_one_sided_le_zero": 0.064,
+        "draws": 2000
+      },
+      "verdict": "INSUFFICIENT_SAMPLE",
+      "pass_criteria": {
+        "positive_mean_risk_diff": true,
+        "ci95_excludes_zero": false,
+        "bootstrap_p_one_sided_lt_0_05": false,
+        "min_matched_episodes_20": false
+      },
+      "note": "Matched episode count below pre-registered minimum of 20; directional point estimates are descriptive only."
+    },
+    "verdict": "INSUFFICIENT_SAMPLE",
+    "interpretation": "Rank-1/2 Fill+Pull staircase is too rare in this 18h sample for a matched-control decision; point estimate is directionally high but underpowered."
+  }
+}

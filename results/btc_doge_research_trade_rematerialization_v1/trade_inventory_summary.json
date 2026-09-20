@@ -1,0 +1,10 @@
+{
+  "generated_at": "2026-09-03T09:13:38.865057Z",
+  "hours_total": 2100,
+  "hours_exact_match_ready": 186,
+  "hours_missing": 1914,
+  "hours_partial": 0,
+  "research_rows_final": 11075415,
+  "invalid_shifted_rows": 85013,
+  "full_backfill_pid": "1299533"
+}

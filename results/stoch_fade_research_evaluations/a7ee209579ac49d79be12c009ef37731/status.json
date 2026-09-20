@@ -1,0 +1,125 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT",
+      "duration_seconds": 0.316,
+      "error_code": null,
+      "losses": 1,
+      "message": "",
+      "open": 0,
+      "raw_total": 0,
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "wins": 0
+    },
+    {
+      "artifact_reference": "coin_runs/1000BONKUSDT",
+      "duration_seconds": 0.266,
+      "error_code": null,
+      "losses": 1,
+      "message": "",
+      "open": 0,
+      "raw_total": 0,
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT",
+      "tier_a_total": 4,
+      "wins": 1
+    }
+  ],
+  "combined_summary": {
+    "be50_activated_count": 4,
+    "be50_exit_count": 3,
+    "by_direction": {
+      "LONG": {
+        "losses": 2,
+        "open": 0,
+        "signals": 5,
+        "wins": 1
+      },
+      "SHORT": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 0
+      }
+    },
+    "by_symbol": {
+      "1000BONKUSDT": {
+        "losses": 1,
+        "open": 0,
+        "signals": 4,
+        "wins": 1
+      },
+      "AAVEUSDT": {
+        "losses": 1,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      }
+    },
+    "by_timeframe": {
+      "15m": {
+        "losses": 1,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      },
+      "1h": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 1
+      },
+      "30m": {
+        "losses": 0,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      },
+      "4h": {
+        "losses": 1,
+        "open": 0,
+        "signals": 1,
+        "wins": 0
+      }
+    },
+    "execution_dedup_applied": false,
+    "exit_reason_counts": {
+      "BE": 3,
+      "SL": 2,
+      "TP": 1
+    },
+    "gross_loss_pct": -3.0,
+    "gross_profit_pct": 2.0,
+    "losses": 2,
+    "open": 0,
+    "pnl_basis": "gross",
+    "signal_scope": "TIER_A_ONLY",
+    "signals": 6,
+    "total_pnl_pct": -1.0,
+    "win_rate_denominator": "wins+losses (OPEN and BE excluded)",
+    "win_rate_pct": 33.33333333333333,
+    "wins": 1
+  },
+  "completed_coins": 2,
+  "created_at": "2026-08-15T17:47:25Z",
+  "current_index": 2,
+  "current_symbol": null,
+  "evaluation_id": "a7ee209579ac49d79be12c009ef37731",
+  "failed_coins": 0,
+  "finished_at": "2026-08-15T17:47:25Z",
+  "last_worker_pid": 1249677,
+  "losses": 2,
+  "message": "COMPLETED",
+  "open": 0,
+  "progress_percent": 100,
+  "source_job_id": "8e86d1527a4749a79531d787cf67a032",
+  "started_at": "2026-08-15T17:47:25Z",
+  "state": "COMPLETED",
+  "successful_coins": 2,
+  "tier_a_total": 6,
+  "total_coins": 2,
+  "wins": 1,
+  "worker_pid": null
+}

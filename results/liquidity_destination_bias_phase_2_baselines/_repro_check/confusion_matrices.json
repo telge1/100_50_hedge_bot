@@ -1,0 +1,2239 @@
+{
+  "B0_TRAIN_MAJORITY": {
+    "TEST": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 105,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 95
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 105,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 95,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 220,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 105,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 95,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 32,
+          "UPPER_FIRST": 183
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 221,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 183,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 436,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 221,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 183,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 116,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 88
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 116,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 88,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 216,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 116,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 12,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 88,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "TRAIN": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 264,
+          "NEITHER_WITHIN_HORIZON": 35,
+          "UPPER_FIRST": 254
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 264,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 254,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 553,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 264,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 35,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 254,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 509,
+          "NEITHER_WITHIN_HORIZON": 75,
+          "UPPER_FIRST": 490
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 509,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 490,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 1074,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 509,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 75,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 490,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 245,
+          "NEITHER_WITHIN_HORIZON": 40,
+          "UPPER_FIRST": 236
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 245,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 236,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 521,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 245,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 40,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 236,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "VALIDATION": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 55,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 106,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 9,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 55,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 103
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 86,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 103,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 209,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 86,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 103,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 44,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 103,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 44,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 11,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    }
+  },
+  "B1_NEAREST_TARGET": {
+    "TEST": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 105,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 95
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 93,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 12
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 80
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 117,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 103
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 93,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 12
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 9,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 11
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 80
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 32,
+          "UPPER_FIRST": 183
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 194,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 27
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 151
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 241,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 195
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 194,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 27
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 17
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 151
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 116,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 88
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 101,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 15
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 17,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 71
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 124,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 92
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 101,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 15
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 6,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 6
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 17,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 71
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "TRAIN": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 264,
+          "NEITHER_WITHIN_HORIZON": 35,
+          "UPPER_FIRST": 254
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 227,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 37
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 34,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 220
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 275,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 278
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 227,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 37
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 14,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 21
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 34,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 220
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 509,
+          "NEITHER_WITHIN_HORIZON": 75,
+          "UPPER_FIRST": 490
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 439,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 69
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 70,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 420
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 542,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 531
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 439,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 69
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 33,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 42
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 70,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 420
+          }
+        },
+        "warnings": []
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 245,
+          "NEITHER_WITHIN_HORIZON": 40,
+          "UPPER_FIRST": 236
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 212,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 32
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 36,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 200
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 267,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 253
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 212,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 32
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 19,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 21
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 36,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 200
+          }
+        },
+        "warnings": []
+      }
+    },
+    "VALIDATION": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 29,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 13
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 48
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 40,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 66
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 29,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 13
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 4,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 5
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 48
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 103
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 66,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 20
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 14,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 89
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 88,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 121
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 66,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 20
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 8,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 12
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 14,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 89
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 41
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 48,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 55
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 4,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 41
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    }
+  },
+  "B2_INVERSE_NEAREST": {
+    "TEST": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 105,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 95
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 12,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 93
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 80,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 15
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 103,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 117
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 12,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 93
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 11,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 9
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 80,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 15
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 32,
+          "UPPER_FIRST": 183
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 27,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 194
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 151,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 32
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 195,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 241
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 27,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 194
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 17,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 15
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 151,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 32
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 116,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 88
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 101
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 71,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 17
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 92,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 124
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 101
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 6,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 6
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 71,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 17
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "TRAIN": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 264,
+          "NEITHER_WITHIN_HORIZON": 35,
+          "UPPER_FIRST": 254
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 227
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 220,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 34
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 278,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 275
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 227
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 21,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 14
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 220,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 34
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 509,
+          "NEITHER_WITHIN_HORIZON": 75,
+          "UPPER_FIRST": 490
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 69,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 439
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 420,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 70
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 531,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 542
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 69,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 439
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 33
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 420,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 70
+          }
+        },
+        "warnings": []
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 245,
+          "NEITHER_WITHIN_HORIZON": 40,
+          "UPPER_FIRST": 236
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 212
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 200,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 36
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 253,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 267
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 212
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 21,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 19
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 200,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 36
+          }
+        },
+        "warnings": []
+      }
+    },
+    "VALIDATION": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 13,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 29
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 66,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 40
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 13,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 29
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 5,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 4
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 103
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 66
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 89,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 14
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 121,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 88
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 66
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 12,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 8
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 89,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 14
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 37
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 41,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 55,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 48
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 37
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 4
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 41,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 7
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    }
+  },
+  "B3_DETERMINISTIC_HASH_CONTROL": {
+    "TEST": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 105,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 95
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 29,
+            "NEITHER_WITHIN_HORIZON": 42,
+            "UPPER_FIRST": 34
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 31,
+            "NEITHER_WITHIN_HORIZON": 31,
+            "UPPER_FIRST": 33
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 64,
+          "NEITHER_WITHIN_HORIZON": 85,
+          "UPPER_FIRST": 71
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 29,
+            "NEITHER_WITHIN_HORIZON": 42,
+            "UPPER_FIRST": 34
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 4,
+            "NEITHER_WITHIN_HORIZON": 12,
+            "UPPER_FIRST": 4
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 31,
+            "NEITHER_WITHIN_HORIZON": 31,
+            "UPPER_FIRST": 33
+          }
+        },
+        "warnings": []
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 32,
+          "UPPER_FIRST": 183
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 71,
+            "NEITHER_WITHIN_HORIZON": 77,
+            "UPPER_FIRST": 73
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 67,
+            "NEITHER_WITHIN_HORIZON": 55,
+            "UPPER_FIRST": 61
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 149,
+          "NEITHER_WITHIN_HORIZON": 145,
+          "UPPER_FIRST": 142
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 71,
+            "NEITHER_WITHIN_HORIZON": 77,
+            "UPPER_FIRST": 73
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 11,
+            "NEITHER_WITHIN_HORIZON": 13,
+            "UPPER_FIRST": 8
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 67,
+            "NEITHER_WITHIN_HORIZON": 55,
+            "UPPER_FIRST": 61
+          }
+        },
+        "warnings": []
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 116,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 88
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 35,
+            "UPPER_FIRST": 39
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 36,
+            "NEITHER_WITHIN_HORIZON": 24,
+            "UPPER_FIRST": 28
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 85,
+          "NEITHER_WITHIN_HORIZON": 60,
+          "UPPER_FIRST": 71
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 35,
+            "UPPER_FIRST": 39
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 7,
+            "NEITHER_WITHIN_HORIZON": 1,
+            "UPPER_FIRST": 4
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 36,
+            "NEITHER_WITHIN_HORIZON": 24,
+            "UPPER_FIRST": 28
+          }
+        },
+        "warnings": []
+      }
+    },
+    "TRAIN": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 264,
+          "NEITHER_WITHIN_HORIZON": 35,
+          "UPPER_FIRST": 254
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 111,
+            "NEITHER_WITHIN_HORIZON": 69,
+            "UPPER_FIRST": 84
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 96,
+            "NEITHER_WITHIN_HORIZON": 77,
+            "UPPER_FIRST": 81
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 156,
+          "UPPER_FIRST": 176
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 111,
+            "NEITHER_WITHIN_HORIZON": 69,
+            "UPPER_FIRST": 84
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 14,
+            "NEITHER_WITHIN_HORIZON": 10,
+            "UPPER_FIRST": 11
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 96,
+            "NEITHER_WITHIN_HORIZON": 77,
+            "UPPER_FIRST": 81
+          }
+        },
+        "warnings": []
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 509,
+          "NEITHER_WITHIN_HORIZON": 75,
+          "UPPER_FIRST": 490
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 193,
+            "NEITHER_WITHIN_HORIZON": 148,
+            "UPPER_FIRST": 168
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 171,
+            "NEITHER_WITHIN_HORIZON": 152,
+            "UPPER_FIRST": 167
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 397,
+          "NEITHER_WITHIN_HORIZON": 319,
+          "UPPER_FIRST": 358
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 193,
+            "NEITHER_WITHIN_HORIZON": 148,
+            "UPPER_FIRST": 168
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 33,
+            "NEITHER_WITHIN_HORIZON": 19,
+            "UPPER_FIRST": 23
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 171,
+            "NEITHER_WITHIN_HORIZON": 152,
+            "UPPER_FIRST": 167
+          }
+        },
+        "warnings": []
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 245,
+          "NEITHER_WITHIN_HORIZON": 40,
+          "UPPER_FIRST": 236
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 82,
+            "NEITHER_WITHIN_HORIZON": 79,
+            "UPPER_FIRST": 84
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 75,
+            "NEITHER_WITHIN_HORIZON": 75,
+            "UPPER_FIRST": 86
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 176,
+          "NEITHER_WITHIN_HORIZON": 163,
+          "UPPER_FIRST": 182
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 82,
+            "NEITHER_WITHIN_HORIZON": 79,
+            "UPPER_FIRST": 84
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 19,
+            "NEITHER_WITHIN_HORIZON": 9,
+            "UPPER_FIRST": 12
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 75,
+            "NEITHER_WITHIN_HORIZON": 75,
+            "UPPER_FIRST": 86
+          }
+        },
+        "warnings": []
+      }
+    },
+    "VALIDATION": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 16,
+            "UPPER_FIRST": 11
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 19,
+            "NEITHER_WITHIN_HORIZON": 16,
+            "UPPER_FIRST": 20
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 35,
+          "NEITHER_WITHIN_HORIZON": 34,
+          "UPPER_FIRST": 37
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 15,
+            "NEITHER_WITHIN_HORIZON": 16,
+            "UPPER_FIRST": 11
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 1,
+            "NEITHER_WITHIN_HORIZON": 2,
+            "UPPER_FIRST": 6
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 19,
+            "NEITHER_WITHIN_HORIZON": 16,
+            "UPPER_FIRST": 20
+          }
+        },
+        "warnings": []
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 103
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 24,
+            "NEITHER_WITHIN_HORIZON": 29,
+            "UPPER_FIRST": 33
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 29,
+            "UPPER_FIRST": 37
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 65,
+          "NEITHER_WITHIN_HORIZON": 63,
+          "UPPER_FIRST": 81
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 24,
+            "NEITHER_WITHIN_HORIZON": 29,
+            "UPPER_FIRST": 33
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 4,
+            "NEITHER_WITHIN_HORIZON": 5,
+            "UPPER_FIRST": 11
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 37,
+            "NEITHER_WITHIN_HORIZON": 29,
+            "UPPER_FIRST": 37
+          }
+        },
+        "warnings": []
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 9,
+            "NEITHER_WITHIN_HORIZON": 13,
+            "UPPER_FIRST": 22
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 18,
+            "NEITHER_WITHIN_HORIZON": 13,
+            "UPPER_FIRST": 17
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 30,
+          "NEITHER_WITHIN_HORIZON": 29,
+          "UPPER_FIRST": 44
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 9,
+            "NEITHER_WITHIN_HORIZON": 13,
+            "UPPER_FIRST": 22
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 3,
+            "NEITHER_WITHIN_HORIZON": 3,
+            "UPPER_FIRST": 5
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 18,
+            "NEITHER_WITHIN_HORIZON": 13,
+            "UPPER_FIRST": 17
+          }
+        },
+        "warnings": []
+      }
+    }
+  },
+  "B4_SYMBOL_TRAIN_MAJORITY": {
+    "TEST": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 105,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 95
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 105,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 95,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 220,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 105,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 95,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 221,
+          "NEITHER_WITHIN_HORIZON": 32,
+          "UPPER_FIRST": 183
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 221,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 183,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 436,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 221,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 32,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 183,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 116,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 88
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 116,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 88,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 216,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 116,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 12,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 88,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "TRAIN": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 264,
+          "NEITHER_WITHIN_HORIZON": 35,
+          "UPPER_FIRST": 254
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 264,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 254,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 553,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 264,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 35,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 254,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 509,
+          "NEITHER_WITHIN_HORIZON": 75,
+          "UPPER_FIRST": 490
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 509,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 490,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 1074,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 509,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 75,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 490,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 245,
+          "NEITHER_WITHIN_HORIZON": 40,
+          "UPPER_FIRST": 236
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 245,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 236,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 521,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 245,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 40,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 236,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    },
+    "VALIDATION": {
+      "BTCUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 55,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 106,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 42,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 9,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 55,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "COMBINED": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 20,
+          "UPPER_FIRST": 103
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 86,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 103,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 209,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 86,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 20,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 103,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      },
+      "DOGEUSDT": {
+        "actual_class_distribution": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "directional": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 44,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 0,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "prediction_distribution": {
+          "LOWER_FIRST": 103,
+          "NEITHER_WITHIN_HORIZON": 0,
+          "UPPER_FIRST": 0
+        },
+        "primary": {
+          "LOWER_FIRST": {
+            "LOWER_FIRST": 44,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "NEITHER_WITHIN_HORIZON": {
+            "LOWER_FIRST": 11,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          },
+          "UPPER_FIRST": {
+            "LOWER_FIRST": 48,
+            "NEITHER_WITHIN_HORIZON": 0,
+            "UPPER_FIRST": 0
+          }
+        },
+        "warnings": [
+          "missing_predicted_class:UPPER_FIRST",
+          "missing_predicted_class:NEITHER_WITHIN_HORIZON"
+        ]
+      }
+    }
+  }
+}

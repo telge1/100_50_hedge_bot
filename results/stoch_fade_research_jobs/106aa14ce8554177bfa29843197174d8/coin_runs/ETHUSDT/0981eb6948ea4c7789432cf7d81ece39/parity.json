@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6341,
+  "detail_count": 6341,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T00:15:00"
+      ],
+      "signal_id": "4d700d65-94fe-511f-aa31-bc09b469c011"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T01:45:00"
+      ],
+      "signal_id": "2ed9f37a-4ee6-5652-804d-afbb680099be"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T04:45:00"
+      ],
+      "signal_id": "570c662c-fa74-5628-b5ea-3418b7f9fabe"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:15:00"
+      ],
+      "signal_id": "7b403986-64dd-5654-ac9c-9df3be2fc15a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T07:15:00"
+      ],
+      "signal_id": "11a23db7-86d6-5343-814f-b165402651d8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T09:45:00"
+      ],
+      "signal_id": "4f87a460-04cb-5583-9504-14dfef0834c1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T11:00:00"
+      ],
+      "signal_id": "1013f71f-c760-50c8-b8ad-92c377fc52dd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T12:00:00"
+      ],
+      "signal_id": "d7654dfa-9385-5839-a785-09bb82ee1dba"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:00:00"
+      ],
+      "signal_id": "023cb89d-c087-51a2-b3af-daa9cdc007d0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T14:30:00"
+      ],
+      "signal_id": "d8744ac2-d17a-5c56-b7a9-9066bcf48266"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T16:15:00"
+      ],
+      "signal_id": "8ed95372-a439-5296-9311-2768a3badf2a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T17:15:00"
+      ],
+      "signal_id": "90d7ecf4-d049-5ca0-8f9e-2af73f0a2e84"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T18:00:00"
+      ],
+      "signal_id": "b58f5fa8-b03f-5aaf-ac71-e785ef390eb6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T18:45:00"
+      ],
+      "signal_id": "fb667d82-e6b3-5db9-810d-9bb84ee0692f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T20:15:00"
+      ],
+      "signal_id": "98917d86-0af6-5549-9b12-0f864af17e69"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T21:15:00"
+      ],
+      "signal_id": "18c3e6ef-18be-5c16-aa7e-1619b7ff9305"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T23:45:00"
+      ],
+      "signal_id": "dbb4abe0-c68c-5ce1-896a-3359a174e918"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T00:45:00"
+      ],
+      "signal_id": "81274b35-514f-5221-89cb-7374036d00a9"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T02:45:00"
+      ],
+      "signal_id": "431e9116-9108-52fc-8616-79e030b89e57"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:00:00"
+      ],
+      "signal_id": "5ce49e3e-0237-54ba-86b9-52f7c2dfdcbb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T05:45:00"
+      ],
+      "signal_id": "26135fa1-71ac-504c-bb27-91bdfa7850c1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T07:15:00"
+      ],
+      "signal_id": "3a7709ac-65a9-53b0-9dc9-0f720ab92fac"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T08:15:00"
+      ],
+      "signal_id": "56c243da-ce93-5024-b8db-c1a92c7b3f1a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T10:15:00"
+      ],
+      "signal_id": "568c5eca-d379-52a4-8a2c-99505fd8b9d1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T12:30:00"
+      ],
+      "signal_id": "f0c704be-c3a2-598b-921b-37ef99d8c695"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T14:30:00"
+      ],
+      "signal_id": "40d69453-786d-50e1-95ef-6cbcc0df3e19"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T15:30:00"
+      ],
+      "signal_id": "fbad4eef-5c65-518f-b5cf-db99d66cd3f0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:15:00"
+      ],
+      "signal_id": "70d9f20c-203f-5a2d-b170-b271bdebf6c7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T19:15:00"
+      ],
+      "signal_id": "ea3d64a3-553d-56b7-88cf-d2ef080e6917"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T20:15:00"
+      ],
+      "signal_id": "b4d80c7c-a520-5516-929c-f3a8919e6115"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T21:15:00"
+      ],
+      "signal_id": "3b9c7518-1f52-5cfc-961d-d9b1b33bd072"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T22:45:00"
+      ],
+      "signal_id": "51b4c67a-6ec9-570a-b509-447414d4a3e3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T00:00:00"
+      ],
+      "signal_id": "dfaab006-a490-5d0e-9f12-b8a6836b2e19"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T01:15:00"
+      ],
+      "signal_id": "81aca253-a714-52c3-94c8-51594e309bb5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T02:15:00"
+      ],
+      "signal_id": "cb2305af-d2c7-5546-b4b1-b06339f1d5b4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T03:45:00"
+      ],
+      "signal_id": "8028d87b-43e4-5139-bd82-c98280978c19"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T05:45:00"
+      ],
+      "signal_id": "7d89663b-5abb-51ad-b8ef-76bea972fcb5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T06:30:00"
+      ],
+      "signal_id": "2f97a054-f5b6-56b6-b2dc-fc845e0b161e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:30:00"
+      ],
+      "signal_id": "7185498b-a135-554c-94ab-d2ceb665bfd2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T09:15:00"
+      ],
+      "signal_id": "8c0cf32e-24c0-5f71-8bda-c4cb24881a44"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T11:45:00"
+      ],
+      "signal_id": "262f983a-65b1-54dc-bdc3-2570510517f4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T13:30:00"
+      ],
+      "signal_id": "5c6a21ab-2716-57a1-ae08-b5c227135254"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T14:30:00"
+      ],
+      "signal_id": "15d3c846-0570-57c4-976a-5cd1452f220d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T16:30:00"
+      ],
+      "signal_id": "001a615c-5dc6-5ed1-ab55-29e133ac7a1f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T17:15:00"
+      ],
+      "signal_id": "7f33e35a-a980-5f9a-8852-d5a0b52e7837"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T19:00:00"
+      ],
+      "signal_id": "e750aebc-0c9e-5509-adb2-69d4605cc817"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T20:30:00"
+      ],
+      "signal_id": "30a7e226-454b-551c-9d87-9250b6c90b79"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T22:00:00"
+      ],
+      "signal_id": "0c35f62f-3863-50f5-a467-95ec12029399"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T22:45:00"
+      ],
+      "signal_id": "dee76a09-04a1-5f1d-b29a-0d2ac8ed6674"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "ETHUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T23:30:00"
+      ],
+      "signal_id": "841a31af-74ae-51df-b60d-403dd71690ff"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6341,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6341,
+  "research_keys": 6341,
+  "research_only": 6341,
+  "scope_symbol": "ETHUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32"
+}

@@ -1,0 +1,15 @@
+Sep 10 15:02:51 server-telgenbuescher systemd[1531]: Started dashboard.service - Spread Recovery Hedge Dashboard (user unit).
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,569 - __main__ - INFO - ================================================================================
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,569 - __main__ - INFO - 🚀 Dashboard wird gestartet...
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,570 - __main__ - INFO - 📁 Working Directory: /home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,570 - __main__ - INFO - 🌐 Host: 0.0.0.0, Port: 3000
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,570 - __main__ - INFO - 🔄 Reload: False
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,570 - __main__ - INFO - ================================================================================
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:51,570 - __main__ - INFO - 🐕 Watchdog-Autostart deaktiviert, um Fremd-Dashboard-Reaktivierung zu vermeiden
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: INFO:     Started server process [758058]
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: INFO:     Waiting for application startup.
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: INFO:     Application startup complete.
+Sep 10 15:02:51 server-telgenbuescher dashboard-user[758058]: INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+Sep 10 15:02:53 server-telgenbuescher dashboard-user[758058]: INFO:     127.0.0.1:58488 - "GET /login HTTP/1.1" 200 OK
+Sep 10 15:02:53 server-telgenbuescher dashboard-user[758058]: 2026-09-10 15:02:53,142 - app - WARNING - [AUTH] Authentication failed for http://127.0.0.1:3000/stoch-signale
+Sep 10 15:02:53 server-telgenbuescher dashboard-user[758058]: INFO:     127.0.0.1:58496 - "GET /stoch-signale HTTP/1.1" 401 Unauthorized

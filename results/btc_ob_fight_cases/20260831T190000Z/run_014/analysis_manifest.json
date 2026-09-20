@@ -1,0 +1,174 @@
+{
+  "package_version": "0.2.0",
+  "schema_version": "btc_ob_fight_facts_v2_0",
+  "symbol": "BTCUSDT",
+  "anchor_timestamp_utc": "2026-08-31T19:00:00Z",
+  "normalized_anchor_utc": "2026-08-31T19:00:00Z",
+  "window": {
+    "before_minutes": 30,
+    "after_minutes": 30
+  },
+  "ob_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3",
+  "read_only": true,
+  "no_overwrite": true,
+  "auto_extension_enabled": false,
+  "auto_extension_reason": "RULES_UNFROZEN",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "heuristics": {
+    "heuristic_contract_version": "wall_heuristics_v1",
+    "status": "UNFROZEN_HEURISTIC",
+    "wall_max_bps": 800,
+    "wall_qty_median_mult": 3.0,
+    "wall_trade_match_frac": 0.3,
+    "wall_sample_interval_seconds": 1,
+    "level_touch_band_bps": 5.0,
+    "btcusdt_tick_size": 0.1,
+    "report_micro_episode_seconds": 1.0
+  },
+  "profile_settings": {
+    "value_area_pct": 0.7,
+    "target_bins": 160,
+    "tpo_profile_engine": "research.btc_ob_fight.tpo_profile",
+    "tpo_bracket_minutes": 30,
+    "volume_at_price_engine": "research.btc_ob_fight.volume_profile",
+    "oa_volume_path_not_used_for_tpo": true
+  },
+  "output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/20260831T190000Z/run_014",
+  "fight_facts": {
+    "schema_version": "btc_ob_fight_facts_v2_0",
+    "fight_fact_contract": "fight_fact_contract_v1",
+    "interpretation_status": "NOT_EVALUATED",
+    "episode_count": 269,
+    "outside_episode_count": 117,
+    "edge_consumption_count": 30
+  },
+  "sequence_validation": {
+    "schema_version": "btc_ob_fight_sequence_v2_1",
+    "verdict": "BTC_OB_FIGHT_SEQUENCE_EDGE_REGION_READY",
+    "interpretation_status": "NOT_EVALUATED",
+    "summary": {
+      "verdict": "BTC_OB_FIGHT_SEQUENCE_EDGE_REGION_READY",
+      "schema_version": "btc_ob_fight_sequence_v2_1",
+      "sequence_validation_contract": "fight_sequence_validation_v1",
+      "interpretation_status": "NOT_EVALUATED",
+      "rules_frozen": false,
+      "trade_verdict_evaluated": false,
+      "direction": null,
+      "raw_state_episode_count": 269,
+      "edge_visits_upper": 17,
+      "edge_visits_lower": 0,
+      "outside_excursion_count": 117,
+      "reclaim_count": 117,
+      "open_excursion_count": 0,
+      "cluster_counts_by_gap": {
+        "0": 7,
+        "1": 4,
+        "2": 4,
+        "5": 4,
+        "10": 3,
+        "30": 2,
+        "60": 2
+      },
+      "consumption_by_scope": {
+        "TPO_EDGE_BIN": {
+          "trade_associated": 20,
+          "unmatched": 894,
+          "total": 914
+        },
+        "PROFILE_EDGE_ZONE": {
+          "trade_associated": 87,
+          "unmatched": 4030,
+          "total": 4117
+        },
+        "VOLUME_EDGE_BIN": {
+          "trade_associated": 11,
+          "unmatched": 417,
+          "total": 428
+        },
+        "FIRST_OUTSIDE_BIN": {
+          "trade_associated": 13,
+          "unmatched": 366,
+          "total": 379
+        },
+        "EXACT_LEVEL_TICK": {
+          "trade_associated": 0,
+          "unmatched": 30,
+          "total": 30
+        }
+      },
+      "exact_refill_count": 0,
+      "nearby_liquidity_increase_count": 668,
+      "edge_book_coverage": {
+        "sample_count": 36010,
+        "by_scope_status": {
+          "EXACT_LEVEL_TICK": {
+            "EDGE_REGION_OUTSIDE_BOOK_RANGE": 13327,
+            "FULL_EDGE_REGION_COVERAGE": 1074,
+            "PARTIAL_EDGE_REGION_COVERAGE": 3
+          },
+          "TPO_EDGE_BIN": {
+            "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6190,
+            "PARTIAL_EDGE_REGION_COVERAGE": 1012
+          },
+          "VOLUME_EDGE_BIN": {
+            "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6732,
+            "PARTIAL_EDGE_REGION_COVERAGE": 470
+          },
+          "PROFILE_EDGE_ZONE": {
+            "EDGE_REGION_OUTSIDE_BOOK_RANGE": 5790,
+            "PARTIAL_EDGE_REGION_COVERAGE": 1412
+          }
+        },
+        "scopes_analyzed": [
+          "EXACT_LEVEL_TICK",
+          "TPO_EDGE_BIN",
+          "VOLUME_EDGE_BIN",
+          "PROFILE_EDGE_ZONE"
+        ],
+        "note": "missing_coverage_does_not_imply_zero_consumption"
+      },
+      "oi_liquidation_coverage": {
+        "visit_count": 17,
+        "excursion_count": 117,
+        "data_insufficient_count": 126
+      },
+      "phase2a_reclaim_bug_documented": true,
+      "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+    }
+  },
+  "tpo_profile": {
+    "status": "COMPUTED_SEPARATELY",
+    "contract_version": "tpo_profile_facts_v1",
+    "profile_kind": "TPO_BRACKET",
+    "brackets": {
+      "bracket_minutes": 30,
+      "full_count": 11,
+      "partial_count": 0,
+      "total_count": 11,
+      "total_tpo_marks": 486
+    },
+    "integrity": "PASS",
+    "trade_size_invariance": "PASS",
+    "prefix_parity": "PASS"
+  },
+  "volume_profile": {
+    "status": "COMPUTED_SEPARATELY",
+    "contract_version": "volume_profile_facts_v1",
+    "primary_volume_basis": "base_volume",
+    "prefix_parity": "PASS",
+    "integrity": "PASS",
+    "oa_parity": "EXACT"
+  },
+  "causality": {
+    "rules_frozen": false,
+    "trade_verdict_evaluated": false,
+    "tpo_profile_computed_separately": true,
+    "volume_profile_computed_separately": true,
+    "oa_volume_path_not_used_for_tpo": true,
+    "tpo_volume_confluence_status": "VALID_INDEPENDENT_MEASURES",
+    "volume_profile_future_trades_used": 0,
+    "tpo_profile_future_trades_used": 0
+  },
+  "analysis_status": "FACTS_READY_RULES_UNFROZEN"
+}

@@ -1,0 +1,351 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/SOLUSDT",
+      "completed_outcomes": 625,
+      "duration_seconds": 6.274,
+      "error_code": null,
+      "evaluated_tier_a_total": 625,
+      "failed_outcomes": 0,
+      "losses": 337,
+      "message": "",
+      "open": 3,
+      "raw_total": 4996,
+      "source_raw_total": 4996,
+      "source_tier_a_total": 625,
+      "state": "COMPLETED",
+      "symbol": "SOLUSDT",
+      "tier_a_total": 625,
+      "wins": 285
+    },
+    {
+      "artifact_reference": "coin_runs/HYPEUSDT",
+      "completed_outcomes": 990,
+      "duration_seconds": 8.83,
+      "error_code": null,
+      "evaluated_tier_a_total": 990,
+      "failed_outcomes": 0,
+      "losses": 574,
+      "message": "",
+      "open": 2,
+      "raw_total": 5077,
+      "source_raw_total": 5077,
+      "source_tier_a_total": 990,
+      "state": "COMPLETED",
+      "symbol": "HYPEUSDT",
+      "tier_a_total": 990,
+      "wins": 414
+    },
+    {
+      "artifact_reference": "coin_runs/XAUTUSDT",
+      "completed_outcomes": 228,
+      "duration_seconds": 3.119,
+      "error_code": null,
+      "evaluated_tier_a_total": 228,
+      "failed_outcomes": 0,
+      "losses": 113,
+      "message": "",
+      "open": 4,
+      "raw_total": 5052,
+      "source_raw_total": 5052,
+      "source_tier_a_total": 228,
+      "state": "COMPLETED",
+      "symbol": "XAUTUSDT",
+      "tier_a_total": 228,
+      "wins": 111
+    },
+    {
+      "artifact_reference": "coin_runs/ZECUSDT",
+      "completed_outcomes": 1158,
+      "duration_seconds": 10.131,
+      "error_code": null,
+      "evaluated_tier_a_total": 1158,
+      "failed_outcomes": 0,
+      "losses": 629,
+      "message": "",
+      "open": 2,
+      "raw_total": 5050,
+      "source_raw_total": 5050,
+      "source_tier_a_total": 1158,
+      "state": "COMPLETED",
+      "symbol": "ZECUSDT",
+      "tier_a_total": 1158,
+      "wins": 527
+    },
+    {
+      "artifact_reference": "coin_runs/LINKUSDT",
+      "completed_outcomes": 650,
+      "duration_seconds": 6.277,
+      "error_code": null,
+      "evaluated_tier_a_total": 650,
+      "failed_outcomes": 0,
+      "losses": 341,
+      "message": "",
+      "open": 2,
+      "raw_total": 5032,
+      "source_raw_total": 5032,
+      "source_tier_a_total": 650,
+      "state": "COMPLETED",
+      "symbol": "LINKUSDT",
+      "tier_a_total": 650,
+      "wins": 307
+    },
+    {
+      "artifact_reference": "coin_runs/DOGEUSDT",
+      "completed_outcomes": 611,
+      "duration_seconds": 5.974,
+      "error_code": null,
+      "evaluated_tier_a_total": 611,
+      "failed_outcomes": 0,
+      "losses": 321,
+      "message": "",
+      "open": 4,
+      "raw_total": 5057,
+      "source_raw_total": 5057,
+      "source_tier_a_total": 611,
+      "state": "COMPLETED",
+      "symbol": "DOGEUSDT",
+      "tier_a_total": 611,
+      "wins": 286
+    },
+    {
+      "artifact_reference": "coin_runs/BNBUSDT",
+      "completed_outcomes": 375,
+      "duration_seconds": 4.273,
+      "error_code": null,
+      "evaluated_tier_a_total": 375,
+      "failed_outcomes": 0,
+      "losses": 190,
+      "message": "",
+      "open": 1,
+      "raw_total": 5033,
+      "source_raw_total": 5033,
+      "source_tier_a_total": 375,
+      "state": "COMPLETED",
+      "symbol": "BNBUSDT",
+      "tier_a_total": 375,
+      "wins": 184
+    },
+    {
+      "artifact_reference": "coin_runs/SUIUSDT",
+      "completed_outcomes": 808,
+      "duration_seconds": 7.476,
+      "error_code": null,
+      "evaluated_tier_a_total": 808,
+      "failed_outcomes": 0,
+      "losses": 435,
+      "message": "",
+      "open": 3,
+      "raw_total": 5045,
+      "source_raw_total": 5045,
+      "source_tier_a_total": 808,
+      "state": "COMPLETED",
+      "symbol": "SUIUSDT",
+      "tier_a_total": 808,
+      "wins": 370
+    },
+    {
+      "artifact_reference": "coin_runs/ADAUSDT",
+      "completed_outcomes": 740,
+      "duration_seconds": 6.927,
+      "error_code": null,
+      "evaluated_tier_a_total": 740,
+      "failed_outcomes": 0,
+      "losses": 411,
+      "message": "",
+      "open": 3,
+      "raw_total": 5018,
+      "source_raw_total": 5018,
+      "source_tier_a_total": 740,
+      "state": "COMPLETED",
+      "symbol": "ADAUSDT",
+      "tier_a_total": 740,
+      "wins": 326
+    },
+    {
+      "artifact_reference": "coin_runs/AVAXUSDT",
+      "completed_outcomes": 717,
+      "duration_seconds": 6.926,
+      "error_code": null,
+      "evaluated_tier_a_total": 717,
+      "failed_outcomes": 0,
+      "losses": 356,
+      "message": "",
+      "open": 3,
+      "raw_total": 5046,
+      "source_raw_total": 5046,
+      "source_tier_a_total": 717,
+      "state": "COMPLETED",
+      "symbol": "AVAXUSDT",
+      "tier_a_total": 717,
+      "wins": 358
+    }
+  ],
+  "combined_summary": {
+    "be50_activated_count": 0,
+    "be50_exit_count": 0,
+    "by_direction": {
+      "LONG": {
+        "losses": 1871,
+        "open": 18,
+        "signals": 3424,
+        "wins": 1535
+      },
+      "SHORT": {
+        "losses": 1836,
+        "open": 9,
+        "signals": 3478,
+        "wins": 1633
+      }
+    },
+    "by_symbol": {
+      "ADAUSDT": {
+        "losses": 411,
+        "open": 3,
+        "signals": 740,
+        "wins": 326
+      },
+      "AVAXUSDT": {
+        "losses": 356,
+        "open": 3,
+        "signals": 717,
+        "wins": 358
+      },
+      "BNBUSDT": {
+        "losses": 190,
+        "open": 1,
+        "signals": 375,
+        "wins": 184
+      },
+      "DOGEUSDT": {
+        "losses": 321,
+        "open": 4,
+        "signals": 611,
+        "wins": 286
+      },
+      "HYPEUSDT": {
+        "losses": 574,
+        "open": 2,
+        "signals": 990,
+        "wins": 414
+      },
+      "LINKUSDT": {
+        "losses": 341,
+        "open": 2,
+        "signals": 650,
+        "wins": 307
+      },
+      "SOLUSDT": {
+        "losses": 337,
+        "open": 3,
+        "signals": 625,
+        "wins": 285
+      },
+      "SUIUSDT": {
+        "losses": 435,
+        "open": 3,
+        "signals": 808,
+        "wins": 370
+      },
+      "XAUTUSDT": {
+        "losses": 113,
+        "open": 4,
+        "signals": 228,
+        "wins": 111
+      },
+      "ZECUSDT": {
+        "losses": 629,
+        "open": 2,
+        "signals": 1158,
+        "wins": 527
+      }
+    },
+    "by_timeframe": {
+      "15m": {
+        "losses": 1948,
+        "open": 8,
+        "signals": 3839,
+        "wins": 1883
+      },
+      "1h": {
+        "losses": 562,
+        "open": 6,
+        "signals": 982,
+        "wins": 414
+      },
+      "30m": {
+        "losses": 1036,
+        "open": 10,
+        "signals": 1849,
+        "wins": 803
+      },
+      "4h": {
+        "losses": 161,
+        "open": 3,
+        "signals": 232,
+        "wins": 68
+      }
+    },
+    "execution_dedup_applied": false,
+    "exit_policy": "NO_BE50",
+    "exit_reason_counts": {
+      "END_OF_HISTORY": 27,
+      "SL": 3707,
+      "TP": 3168
+    },
+    "gross_loss_pct": -4667.0,
+    "gross_profit_pct": 4589.000000000001,
+    "intrabar_policy": "SL_FIRST",
+    "losses": 3707,
+    "open": 27,
+    "outcome_engine": "evaluate_signal_no_be50_full_1m",
+    "pnl_basis": "gross",
+    "side_effect_flags": {
+      "cleanup_enabled": false,
+      "live_orders_enabled": false,
+      "publish_enabled": false,
+      "writes_to_clickhouse": false,
+      "writes_to_processing_state": false,
+      "writes_to_signal_outcomes": false,
+      "writes_to_signals": false
+    },
+    "signal_scope": "TIER_A_ONLY",
+    "signals": 6902,
+    "successful_coins": [
+      "SOLUSDT",
+      "HYPEUSDT",
+      "XAUTUSDT",
+      "ZECUSDT",
+      "LINKUSDT",
+      "DOGEUSDT",
+      "BNBUSDT",
+      "SUIUSDT",
+      "ADAUSDT",
+      "AVAXUSDT"
+    ],
+    "total_pnl_pct": -77.99999999999909,
+    "win_rate_denominator": "wins+losses (OPEN excluded)",
+    "win_rate_pct": 46.08,
+    "wins": 3168
+  },
+  "completed_coins": 10,
+  "created_at": "2026-08-18T10:05:56Z",
+  "current_index": 10,
+  "current_symbol": null,
+  "evaluation_id": "94d0cfbfb2da4c829dc0d95588dc052d",
+  "failed_coins": 0,
+  "finished_at": "2026-08-18T10:07:03Z",
+  "last_worker_pid": 2803143,
+  "losses": 3707,
+  "message": "COMPLETED",
+  "open": 27,
+  "progress_percent": 100,
+  "source_job_id": "f5909d14cba34fc9973a8b431530752d",
+  "started_at": "2026-08-18T10:05:56Z",
+  "state": "COMPLETED",
+  "successful_coins": 10,
+  "tier_a_total": 6902,
+  "total_coins": 10,
+  "wins": 3168,
+  "worker_pid": null
+}

@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "protocol_version": "full_ob_cache_bridge_protocol_v1",
+  "status": "REQUEST_BUSY",
+  "request_id": "phase1b_btc_freeze_20260905T162323Z_parallel",
+  "error": "rate_limited"
+}

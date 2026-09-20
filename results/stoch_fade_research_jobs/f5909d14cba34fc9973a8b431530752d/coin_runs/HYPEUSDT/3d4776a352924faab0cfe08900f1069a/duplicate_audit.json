@@ -1,0 +1,317 @@
+{
+  "execution_dedup_applied": false,
+  "pair_window_min": {
+    "15m|1h": 60,
+    "15m|30m": 30,
+    "15m|4h": 240,
+    "1h|4h": 240,
+    "30m|1h": 60,
+    "30m|4h": 240
+  },
+  "same_entry_mixed_direction": 7,
+  "same_entry_multi_tf_count": 32,
+  "same_entry_multi_tf_sample": {
+    "2026-03-02T08:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-03-12T11:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-03-17T16:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-03-18T18:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-01T19:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-08T00:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-04-10T00:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-04-10T15:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-04-14T16:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-04-29T14:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-04T22:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-05T07:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-06T00:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-05-13T13:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-17T20:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-25T18:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-26T02:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-05-27T11:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-05-29T18:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-05-31T12:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-06-03T00:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "1h"
+      }
+    ],
+    "2026-06-04T08:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-06-08T16:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-06-11T20:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-06-15T04:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-06-22T08:01:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "4h"
+      }
+    ],
+    "2026-06-24T22:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-06-29T16:31:00Z": [
+      {
+        "direction": "SHORT",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "SHORT",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-07-21T16:01:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ],
+    "2026-07-27T16:31:00Z": [
+      {
+        "direction": "LONG",
+        "timeframe": "15m"
+      },
+      {
+        "direction": "LONG",
+        "timeframe": "30m"
+      }
+    ]
+  },
+  "same_entry_same_direction": 25,
+  "tier_a_n": 990
+}

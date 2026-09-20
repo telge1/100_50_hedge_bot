@@ -1,0 +1,29 @@
+{
+  "coins_evaluated": 1,
+  "coins_with_signals": 0,
+  "coins_without_tier_a": 1,
+  "execution_dedup_applied": false,
+  "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+  "failed_coins": 0,
+  "incomplete_coins": 0,
+  "multi_tf_collisions": 0,
+  "outcome_evaluation_enabled": false,
+  "raw_by_timeframe": {
+    "15m": 0,
+    "1h": 0,
+    "30m": 0,
+    "4h": 0
+  },
+  "raw_candidates": 0,
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "successful_coins": 1,
+  "tier_a": 0,
+  "tier_a_by_timeframe": {
+    "15m": 0,
+    "1h": 0,
+    "30m": 0,
+    "4h": 0
+  },
+  "warmup_warnings": 0,
+  "writes_to_clickhouse": false
+}

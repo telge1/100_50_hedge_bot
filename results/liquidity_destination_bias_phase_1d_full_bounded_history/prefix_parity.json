@@ -1,0 +1,31 @@
+{
+  "actual": {
+    "candidate_prefix_count": 360,
+    "eligible_prefix_count": 41,
+    "excluded_prefix_count": 319,
+    "outcomes": {
+      "LOWER_FIRST": 7,
+      "NEITHER_WITHIN_HORIZON": 3,
+      "UPPER_FIRST": 31
+    }
+  },
+  "cut_utc": "2026-08-25T06:05:00.000Z",
+  "exclusion_rows_equal": true,
+  "expected": {
+    "candidates": 360,
+    "eligible": 41,
+    "outcomes": {
+      "LOWER_FIRST": 7,
+      "NEITHER_WITHIN_HORIZON": 3,
+      "UPPER_FIRST": 31
+    }
+  },
+  "full_run": "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT",
+  "passed": true,
+  "provenance_fields_excluded_from_comparison": [
+    "source_coverage_start_utc",
+    "source_coverage_end_utc"
+  ],
+  "reference": "results/liquidity_destination_bias_phase_1c_multiday_support/pilot_btc_6h",
+  "semantic_episode_fields_equal": true
+}

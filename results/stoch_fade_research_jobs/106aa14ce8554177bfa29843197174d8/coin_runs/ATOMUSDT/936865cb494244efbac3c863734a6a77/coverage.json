@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6376,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "ATOMUSDT",
+      "tier_a_count": 982,
+      "warmup_complete": false
+    }
+  ]
+}

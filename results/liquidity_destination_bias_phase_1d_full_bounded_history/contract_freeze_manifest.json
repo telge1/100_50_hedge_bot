@@ -1,0 +1,41 @@
+{
+  "after": {
+    "research/liquidity_destination_bias/builder.py": "0f11bd098d3936cbdce6c1e9aee7f8a3d8d9a08f5813f6dfd65b58d7db30d431",
+    "research/liquidity_destination_bias/cli.py": "69b84faaa5390b16b89d40eccfcfb8039c17a232cea73e187a62c4184dd7bb67",
+    "research/liquidity_destination_bias/contract.py": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+    "results/liquidity_destination_bias_phase_1/contract_frozen_v1.yaml": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+    "scripts/build_liquidity_destination_episodes.py": "a82c23427678a1985a7190b2fc2ad9bde82aea61ed91bd7e46eb13938675a22c",
+    "tests/research/test_liquidity_destination_episodes.py": "dd843d58f59596a9f9a8ce1fe7d801d2fecd41cfdf7c31ca1a92a9bcacd6d39d",
+    "tests/research/test_liquidity_destination_multiday.py": "343bb402322f1740bcef45c84cc5ad9e2a44a5410906ec9819900994be2ca4a8"
+  },
+  "before": {
+    "research/liquidity_destination_bias/builder.py": "0f11bd098d3936cbdce6c1e9aee7f8a3d8d9a08f5813f6dfd65b58d7db30d431",
+    "research/liquidity_destination_bias/cli.py": "69b84faaa5390b16b89d40eccfcfb8039c17a232cea73e187a62c4184dd7bb67",
+    "research/liquidity_destination_bias/contract.py": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+    "results/liquidity_destination_bias_phase_1/contract_frozen_v1.yaml": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+    "scripts/build_liquidity_destination_episodes.py": "a82c23427678a1985a7190b2fc2ad9bde82aea61ed91bd7e46eb13938675a22c",
+    "tests/research/test_liquidity_destination_episodes.py": "dd843d58f59596a9f9a8ce1fe7d801d2fecd41cfdf7c31ca1a92a9bcacd6d39d",
+    "tests/research/test_liquidity_destination_multiday.py": "343bb402322f1740bcef45c84cc5ad9e2a44a5410906ec9819900994be2ca4a8"
+  },
+  "code_or_test_changed": false,
+  "contract_hashes": {
+    "contract.py": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+    "contract_frozen_v1.yaml": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+    "generated_contract.json": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+  },
+  "git_branch": "feature/btc-doge-research-db",
+  "git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "manifest_version": "liquidity_destination_phase_1d_contract_freeze_v1",
+  "phase_1c_artifact_manifest": "results/liquidity_destination_bias_phase_1c_multiday_support/artifact_manifest.json",
+  "unchanged": true,
+  "verified_semantics": {
+    "causality": "available_at <= T0",
+    "horizon_minutes": 60,
+    "lower_touch": "BID upper edge",
+    "minimum_persistence_seconds": 60,
+    "overlap": "one active episode per symbol",
+    "price_path": "Public-Trade-1s",
+    "target_source": "LLD_POOL",
+    "upper_touch": "ASK lower edge"
+  }
+}

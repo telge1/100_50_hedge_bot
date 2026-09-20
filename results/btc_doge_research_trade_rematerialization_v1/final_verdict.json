@@ -1,0 +1,44 @@
+{
+  "verdict": "BTC_DOGE_RESEARCH_TRADE_REMATERIALIZATION_STARTED",
+  "reason": "Pilot-Backfill l\u00e4uft nach bestandenem Pilot+Idempotenz; History noch nicht vollst\u00e4ndig",
+  "pilot": "PILOT_PASS",
+  "idempotency": "IDEMPOTENCY_PASS",
+  "fight_btc_source_pure": true,
+  "fight_doge_source_pure": true,
+  "runner_pid": 1301223,
+  "progress": {
+    "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+    "completed": 0,
+    "eta_seconds": null,
+    "rows_per_sec": 0.0,
+    "rows_written": 0,
+    "segment_start": "2026-07-21T04:00:00Z",
+    "skipped": 53,
+    "status": "RUNNING",
+    "symbol": "BTCUSDT",
+    "updated_at": "2026-09-03T09:25:18.685589Z"
+  },
+  "heartbeat": {
+    "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+    "completed": 0,
+    "eta_seconds": null,
+    "rows_per_sec": 0.0,
+    "rows_written": 0,
+    "runner_pid": 1301223,
+    "segment_start": "2026-07-21T04:00:00Z",
+    "skipped": 53,
+    "status": "RUNNING",
+    "symbol": "BTCUSDT",
+    "updated_at": "2026-09-03T09:25:18.698106Z"
+  },
+  "canonical_invariants_partial": {
+    "duplicate_canonical_trade_keys": 0,
+    "shifted_canonical_timestamps": 0,
+    "stale_ACTIVE_batch": 1,
+    "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+    "pass": false
+  },
+  "no_commit_no_push": true,
+  "fight_cli_optimization_may_continue": true,
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323"
+}

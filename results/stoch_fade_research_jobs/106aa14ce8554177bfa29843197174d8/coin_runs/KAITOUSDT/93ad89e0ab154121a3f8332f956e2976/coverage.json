@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6409,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "KAITOUSDT",
+      "tier_a_count": 1416,
+      "warmup_complete": false
+    }
+  ]
+}

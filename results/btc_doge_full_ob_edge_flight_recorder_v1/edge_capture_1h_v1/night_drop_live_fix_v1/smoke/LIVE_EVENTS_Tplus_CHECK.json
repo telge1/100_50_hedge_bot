@@ -1,0 +1,263 @@
+{
+  "ts": "2026-09-04T08:08:21.286816Z",
+  "health": {
+    "process_lifetime_queue_drops": 0,
+    "writer_error_count": 0,
+    "queue_drop_count": 0,
+    "uptime": 318.837,
+    "runtimes": {
+      "BTCUSDT": {
+        "lifecycle": "CAPTURING",
+        "capturing": true,
+        "continuation_index": 0,
+        "queue_drops": 0,
+        "extension_count": 0,
+        "writer_alive": true,
+        "writer_error_count": 0,
+        "symbol_lifetime_queue_drops": 0,
+        "current_event_queue_drops": 0,
+        "pre_trigger_seconds_actual": 143.290483,
+        "research_eligible": true
+      },
+      "DOGEUSDT": {
+        "lifecycle": "CAPTURING",
+        "capturing": true,
+        "continuation_index": 0,
+        "queue_drops": 0,
+        "extension_count": 0,
+        "writer_alive": true,
+        "writer_error_count": 0,
+        "symbol_lifetime_queue_drops": 0,
+        "current_event_queue_drops": 0,
+        "pre_trigger_seconds_actual": 161.130878,
+        "research_eligible": true
+      }
+    }
+  },
+  "events": {
+    "BTC": {
+      "manifest": {
+        "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+        "trigger_ts": "2026-09-04T08:05:34.762483Z",
+        "trigger_source": "CROSS_IN",
+        "trigger_quality": "REAL_CROSS_IN",
+        "edge_entry_crossed": true,
+        "research_eligible": true,
+        "queue_drop_count": 0,
+        "extension_count": 0,
+        "retouch_count": 0,
+        "u_gap_count": 0,
+        "source_feed_u_gap_count": 0,
+        "persisted_capture_u_gap_count": 0,
+        "pre_trigger_seconds_actual": 143.290483,
+        "data_quality": "OK",
+        "incomplete_reasons": [],
+        "segment_count": 1
+      },
+      "tmp_bytes": 1536857,
+      "records_decoded": 1558,
+      "delta_count": 1548,
+      "marker_count": 10,
+      "marker_types": {
+        "PROFILE_UPDATE_DURING_CAPTURE": 8,
+        "RESULT": 1,
+        "EDGE_RETOUCH": 1
+      },
+      "marker_ts_types": {
+        "str": 10
+      },
+      "persisted_u_gaps": 0,
+      "persisted_missing_u": 0,
+      "first_u": 4347545,
+      "last_u": 4349092,
+      "decode_err": null,
+      "markers_sample": [
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:05:43.021282Z",
+          "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+          "new_profile": {
+            "profile_id": "BTCUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 80742.5,
+            "volume_vah": 80765.0,
+            "volume_val": 80635.0,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 80635.0
+        },
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:06:03.066619Z",
+          "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+          "new_profile": {
+            "profile_id": "BTCUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 80742.5,
+            "volume_vah": 80765.0,
+            "volume_val": 80635.0,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 80635.0
+        },
+        {
+          "channel": "marker",
+          "marker_type": "RESULT",
+          "ts": "2026-09-04T08:06:11.772207Z",
+          "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+          "result_kind": "RECLAIM"
+        },
+        {
+          "channel": "marker",
+          "marker_type": "EDGE_RETOUCH",
+          "ts": "2026-09-04T08:06:11.772207Z",
+          "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+          "retouch_count": 1
+        },
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:06:23.115590Z",
+          "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+          "new_profile": {
+            "profile_id": "BTCUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 80742.5,
+            "volume_vah": 80765.0,
+            "volume_val": 80635.0,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 80635.0
+        }
+      ],
+      "age_s": 166.524333,
+      "past_Tplus5": true
+    },
+    "DOGE": {
+      "manifest": {
+        "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+        "trigger_ts": "2026-09-04T08:05:51.864878Z",
+        "trigger_source": "CROSS_IN",
+        "trigger_quality": "REAL_CROSS_IN",
+        "edge_entry_crossed": true,
+        "research_eligible": true,
+        "queue_drop_count": 0,
+        "extension_count": 0,
+        "retouch_count": 0,
+        "u_gap_count": 0,
+        "source_feed_u_gap_count": 0,
+        "persisted_capture_u_gap_count": 0,
+        "pre_trigger_seconds_actual": 161.130878,
+        "data_quality": "OK",
+        "incomplete_reasons": [],
+        "segment_count": 1
+      },
+      "tmp_bytes": 193177,
+      "records_decoded": 1560,
+      "delta_count": 1550,
+      "marker_count": 10,
+      "marker_types": {
+        "PROFILE_UPDATE_DURING_CAPTURE": 7,
+        "RESULT": 1,
+        "EDGE_RETOUCH": 2
+      },
+      "marker_ts_types": {
+        "str": 10
+      },
+      "persisted_u_gaps": 0,
+      "persisted_missing_u": 0,
+      "first_u": 4347228,
+      "last_u": 4348777,
+      "decode_err": null,
+      "markers_sample": [
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:06:03.066619Z",
+          "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+          "new_profile": {
+            "profile_id": "DOGEUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 0.0871525,
+            "volume_vah": 0.087315,
+            "volume_val": 0.08707,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 0.08707
+        },
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:06:23.115590Z",
+          "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+          "new_profile": {
+            "profile_id": "DOGEUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 0.0871525,
+            "volume_vah": 0.087315,
+            "volume_val": 0.08707,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 0.08707
+        },
+        {
+          "channel": "marker",
+          "marker_type": "RESULT",
+          "ts": "2026-09-04T08:06:34.421172Z",
+          "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+          "result_kind": "RECLAIM"
+        },
+        {
+          "channel": "marker",
+          "marker_type": "EDGE_RETOUCH",
+          "ts": "2026-09-04T08:06:34.421172Z",
+          "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+          "retouch_count": 1
+        },
+        {
+          "channel": "marker",
+          "marker_type": "PROFILE_UPDATE_DURING_CAPTURE",
+          "ts": "2026-09-04T08:06:43.116978Z",
+          "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+          "new_profile": {
+            "profile_id": "DOGEUSDT_20260904T073000_080000",
+            "session_start": "2026-09-04T07:30:00+00:00",
+            "cutoff": "2026-09-04T08:00:00+00:00",
+            "bracket_minutes": 30,
+            "tpo_source": "volume_proxy_fallback",
+            "volume_poc": 0.0871525,
+            "volume_vah": 0.087315,
+            "volume_val": 0.08707,
+            "causality": "trades_strictly_before_cutoff",
+            "completeness": "completed_window_only"
+          },
+          "frozen_edge_price": 0.08707
+        }
+      ],
+      "age_s": 149.421938,
+      "past_Tplus5": true
+    }
+  }
+}

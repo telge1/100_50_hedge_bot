@@ -1,0 +1,61 @@
+contract_version: liquidity_destination_episode_contract_v1
+builder_version: liquidity_destination_episode_builder_v1
+status: FROZEN_FOR_PHASE_1_FACT_DATASET
+research_only: true
+
+target:
+  source: LLD_POOL
+  provider: liquidity_pool_signal/canonical_v1
+  timeframe: 5m
+  upper_selection: nearest active ASK pool strictly above price_t0
+  lower_selection: nearest active BID pool strictly below price_t0
+  known_at_rule: available_at <= t0_utc
+  minimum_persistence_seconds: 60
+  upper_touch_price: upper_target_lower_price
+  lower_touch_price: lower_target_upper_price
+  immutable_after_t0: true
+
+price:
+  source: btc_doge_research.research_public_trades
+  deduplication: ClickHouse FINAL
+  bucket: 1s
+  price_t0: last event-time trade from a bucket strictly before t0_utc
+  future_path: event-time trade OHLC buckets in [t0_utc, horizon_end_utc)
+
+outcome:
+  allowed:
+    - UPPER_FIRST
+    - LOWER_FIRST
+    - NEITHER_WITHIN_HORIZON
+    - SIMULTANEOUS_OR_AMBIGUOUS
+    - INELIGIBLE_DATA
+  upper_touch: bucket_high >= frozen upper_touch_price
+  lower_touch: bucket_low <= frozen lower_touch_price
+  ambiguity_milliseconds: 1000
+  acceptance_rule: none
+
+sampling:
+  grid_seconds: 60
+  warmup_seconds: 300
+  maximum_candidate_window_seconds: 7200
+  overlap_policy: one active episode per symbol
+  next_episode_rule: next t0 must be at or after prior first_touch_utc or horizon_end_utc
+
+completeness:
+  require_complete: fail_closed
+  source_quality: every selected event row has coverage_status COMPLETE
+  boundary_coverage: query covers warmup and complete horizon
+  empty_trade_second: valid no-trade state, not automatically a source gap
+
+explicit_non_scope:
+  - bias
+  - probability
+  - prediction
+  - machine_learning
+  - now_evaluation
+  - trading
+  - orders
+  - dashboard
+  - collector_changes
+  - full_ob_storage
+  - frozen_30m_market_profile_strategy

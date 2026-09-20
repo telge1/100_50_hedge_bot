@@ -1,0 +1,20 @@
+{
+  "compiler": "compile_candidate_discovery_v2",
+  "coverage_status": "OK",
+  "effective_end": "2026-08-26T09:40:08Z",
+  "effective_start": "2026-08-24T22:47:53Z",
+  "oa_repo": "/home/telgenbuescher/projects/orderbook_analyse",
+  "result_contract_version": "ezm_stoch_signale_candidates/v1",
+  "run_id": "ezmbfb26648033a",
+  "run_intent": "candidate_discovery",
+  "runner_kind": "ezm_continuous_discovery",
+  "selected_symbol": "DOGEUSDT",
+  "selected_symbols": [
+    "DOGEUSDT"
+  ],
+  "signal_end_exclusive": "2026-08-26T10:09:00Z",
+  "signal_start": "2026-08-19T10:09:00Z",
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "strategy_spec_hash": "e5fc667fdd4ae5f8c3c58e2583e17b61a6f19c37e94fc4c717c3fafdf3189f58",
+  "trade_compiler_used": false
+}

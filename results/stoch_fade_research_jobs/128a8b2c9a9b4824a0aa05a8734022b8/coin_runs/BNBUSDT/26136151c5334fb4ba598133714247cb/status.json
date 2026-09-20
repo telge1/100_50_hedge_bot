@@ -1,0 +1,258 @@
+{
+  "peak_rss_kb": 782548,
+  "run_id": "26136151c5334fb4ba598133714247cb",
+  "stages": [
+    {
+      "duration_s": 0.062525,
+      "ended_at": "2026-08-18T09:47:24.920272Z",
+      "input_rows": null,
+      "name": "snapshot_before",
+      "output_rows": null,
+      "rss_kb": 78072,
+      "started_at": "2026-08-18T09:47:24.857520Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.000161,
+      "ended_at": "2026-08-18T09:47:24.927422Z",
+      "input_rows": null,
+      "name": "identity_validation",
+      "output_rows": null,
+      "rss_kb": 78072,
+      "started_at": "2026-08-18T09:47:24.920455Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 1.638481,
+      "ended_at": "2026-08-18T09:47:26.569009Z",
+      "input_rows": null,
+      "name": "clickhouse_load",
+      "output_rows": 358560,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:24.930301Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.90201,
+      "ended_at": "2026-08-18T09:47:30.476479Z",
+      "input_rows": 358560,
+      "name": "candle_normalization",
+      "output_rows": 358560,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:26.573137Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.890413,
+      "ended_at": "2026-08-18T09:47:34.367332Z",
+      "input_rows": 358560,
+      "name": "aggregate_15m",
+      "output_rows": 23904,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:30.476764Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.165332,
+      "ended_at": "2026-08-18T09:47:38.017503Z",
+      "input_rows": 23904,
+      "name": "indicators_waves_15m",
+      "output_rows": 4064,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:37.851774Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.441746,
+      "ended_at": "2026-08-18T09:47:41.466328Z",
+      "input_rows": 358560,
+      "name": "aggregate_30m",
+      "output_rows": 11952,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:38.017853Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.092861,
+      "ended_at": "2026-08-18T09:47:44.964076Z",
+      "input_rows": 11952,
+      "name": "indicators_waves_30m",
+      "output_rows": 2084,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:44.870793Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.379706,
+      "ended_at": "2026-08-18T09:47:48.344870Z",
+      "input_rows": 358560,
+      "name": "aggregate_1h",
+      "output_rows": 5976,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:44.964418Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.049442,
+      "ended_at": "2026-08-18T09:47:51.749591Z",
+      "input_rows": 5976,
+      "name": "indicators_waves_1h",
+      "output_rows": 1014,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:51.699742Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.316858,
+      "ended_at": "2026-08-18T09:47:55.067478Z",
+      "input_rows": 358560,
+      "name": "aggregate_4h",
+      "output_rows": 1494,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:51.749886Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.020723,
+      "ended_at": "2026-08-18T09:47:58.768129Z",
+      "input_rows": 1494,
+      "name": "indicators_waves_4h",
+      "output_rows": 240,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:58.747008Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 18.879017,
+      "ended_at": "2026-08-18T09:48:17.648102Z",
+      "input_rows": null,
+      "name": "htf_adapter_parity_slices",
+      "output_rows": 358560,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:47:58.768400Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.049112,
+      "ended_at": "2026-08-18T09:48:17.704291Z",
+      "input_rows": null,
+      "name": "signals_batch",
+      "output_rows": 7402,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:17.648490Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:48:17.715912Z",
+      "input_rows": 2745,
+      "name": "signals_15m",
+      "output_rows": 2745,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:17.715634Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.140813,
+      "ended_at": "2026-08-18T09:48:17.859003Z",
+      "input_rows": 2745,
+      "name": "entries_15m",
+      "output_rows": 2745,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:17.718018Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3e-06,
+      "ended_at": "2026-08-18T09:48:18.271199Z",
+      "input_rows": 1411,
+      "name": "signals_30m",
+      "output_rows": 1411,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.270827Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.073927,
+      "ended_at": "2026-08-18T09:48:18.352035Z",
+      "input_rows": 1411,
+      "name": "entries_30m",
+      "output_rows": 1411,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.277929Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:48:18.561823Z",
+      "input_rows": 701,
+      "name": "signals_1h",
+      "output_rows": 701,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.561425Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.038139,
+      "ended_at": "2026-08-18T09:48:18.606886Z",
+      "input_rows": 701,
+      "name": "entries_1h",
+      "output_rows": 701,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.568556Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:48:18.712750Z",
+      "input_rows": 176,
+      "name": "signals_4h",
+      "output_rows": 176,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.712385Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.011096,
+      "ended_at": "2026-08-18T09:48:18.724745Z",
+      "input_rows": 176,
+      "name": "entries_4h",
+      "output_rows": 176,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.713449Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.000829,
+      "ended_at": "2026-08-18T09:48:18.752577Z",
+      "input_rows": 5033,
+      "name": "technical_dedup",
+      "output_rows": 5033,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.751496Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.073449,
+      "ended_at": "2026-08-18T09:48:18.896033Z",
+      "input_rows": null,
+      "name": "snapshot_after",
+      "output_rows": null,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.822121Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.071803,
+      "ended_at": "2026-08-18T09:48:18.978247Z",
+      "input_rows": null,
+      "name": "artifact_write",
+      "output_rows": null,
+      "rss_kb": 782548,
+      "started_at": "2026-08-18T09:48:18.906209Z",
+      "status": "OK"
+    }
+  ],
+  "status": "COMPLETED",
+  "updated_at": "2026-08-18T09:48:18.978265Z"
+}

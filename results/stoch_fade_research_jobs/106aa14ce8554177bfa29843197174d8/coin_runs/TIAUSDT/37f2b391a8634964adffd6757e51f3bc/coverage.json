@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6340,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "TIAUSDT",
+      "tier_a_count": 1438,
+      "warmup_complete": false
+    }
+  ]
+}

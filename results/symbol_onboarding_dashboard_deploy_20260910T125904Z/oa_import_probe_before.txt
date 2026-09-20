@@ -1,0 +1,3 @@
+orderbook_analyse OK
+orderbook_analyse.symbol_onboarding OK
+orderbook_analyse.symbol_onboarding.service OK

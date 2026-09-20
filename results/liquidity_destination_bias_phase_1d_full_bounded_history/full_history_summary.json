@@ -1,0 +1,443 @@
+{
+  "engineering_gate": {
+    "both_touch_classes_present": true,
+    "contract_builder_unchanged": true,
+    "minimum_100_eligible": true,
+    "minimum_3_utc_days": true,
+    "no_critical_coverage_gap": true,
+    "passed": true,
+    "prefix_parity_passed": true,
+    "quality_gate_passed": true,
+    "resources_controlled": true
+  },
+  "freeze_unchanged": true,
+  "idempotence": {
+    "core_fingerprint_sha256": "a938a9f79ba95cf354dd288d23f0aa841392280de54ff75325189a71ee33f16a",
+    "full_btc_repeat": true,
+    "passed": true,
+    "repeat_dir": "idempotence_btc_repeat",
+    "same_contract": true,
+    "same_core_output_hashes": true,
+    "same_input": true
+  },
+  "interpretation": "Descriptive factual episode dataset only. A higher UPPER_FIRST count can be caused solely by a nearer upper target and does not prove directional prediction, bias, edge, or profitability.",
+  "overall": {
+    "candidate_count": 20031,
+    "eligible_episode_count": 1719,
+    "eligible_ratio": 0.08581698367530328,
+    "episodes_by_utc_day": {
+      "2026-08-25": 264,
+      "2026-08-26": 254,
+      "2026-08-27": 248,
+      "2026-08-28": 308,
+      "2026-08-29": 209,
+      "2026-08-30": 247,
+      "2026-08-31": 189
+    },
+    "episodes_by_utc_hour": {
+      "00": 73,
+      "01": 75,
+      "02": 94,
+      "03": 46,
+      "04": 76,
+      "05": 67,
+      "06": 70,
+      "07": 50,
+      "08": 96,
+      "09": 65,
+      "10": 70,
+      "11": 39,
+      "12": 83,
+      "13": 103,
+      "14": 92,
+      "15": 51,
+      "16": 84,
+      "17": 94,
+      "18": 57,
+      "19": 38,
+      "20": 73,
+      "21": 78,
+      "22": 64,
+      "23": 81
+    },
+    "excluded_candidate_count": 18312,
+    "exclusion_counts": {
+      "DUPLICATE_OR_OVERLAPPING_EPISODE": 18156,
+      "MISSING_LOWER_TARGET": 104,
+      "MISSING_UPPER_TARGET": 52
+    },
+    "first_touch_duration_seconds": {
+      "count": 1592,
+      "median": 82.5,
+      "p25": 11.0,
+      "p75": 481.5
+    },
+    "independent_utc_days": 7,
+    "largest_day_share": 0.179173938336242,
+    "largest_day_utc": "2026-08-28",
+    "largest_hour_share": 0.05991855730075625,
+    "largest_hour_utc": "13",
+    "lower_distance_bps": {
+      "count": 1719,
+      "median": 19.650300712988976,
+      "p25": 4.776328826049648,
+      "p75": 43.70833291272906
+    },
+    "neither_share": 0.07388016288539849,
+    "outcome_counts": {
+      "LOWER_FIRST": 816,
+      "NEITHER_WITHIN_HORIZON": 127,
+      "UPPER_FIRST": 776
+    },
+    "outcomes_by_utc_day": {
+      "2026-08-25": {
+        "LOWER_FIRST": 141,
+        "NEITHER_WITHIN_HORIZON": 23,
+        "UPPER_FIRST": 100
+      },
+      "2026-08-26": {
+        "LOWER_FIRST": 98,
+        "NEITHER_WITHIN_HORIZON": 16,
+        "UPPER_FIRST": 140
+      },
+      "2026-08-27": {
+        "LOWER_FIRST": 87,
+        "NEITHER_WITHIN_HORIZON": 17,
+        "UPPER_FIRST": 144
+      },
+      "2026-08-28": {
+        "LOWER_FIRST": 183,
+        "NEITHER_WITHIN_HORIZON": 19,
+        "UPPER_FIRST": 106
+      },
+      "2026-08-29": {
+        "LOWER_FIRST": 86,
+        "NEITHER_WITHIN_HORIZON": 20,
+        "UPPER_FIRST": 103
+      },
+      "2026-08-30": {
+        "LOWER_FIRST": 133,
+        "NEITHER_WITHIN_HORIZON": 17,
+        "UPPER_FIRST": 97
+      },
+      "2026-08-31": {
+        "LOWER_FIRST": 88,
+        "NEITHER_WITHIN_HORIZON": 15,
+        "UPPER_FIRST": 86
+      }
+    },
+    "upper_distance_bps": {
+      "count": 1719,
+      "median": 18.38471609779757,
+      "p25": 4.610154246627204,
+      "p75": 45.09281552524416
+    },
+    "upper_to_lower_distance_ratio": {
+      "count": 1719,
+      "median": 1.083767451552432,
+      "p25": 0.11896436896437451,
+      "p75": 7.313286081578675
+    }
+  },
+  "prefix_parity": {
+    "actual": {
+      "candidate_prefix_count": 360,
+      "eligible_prefix_count": 41,
+      "excluded_prefix_count": 319,
+      "outcomes": {
+        "LOWER_FIRST": 7,
+        "NEITHER_WITHIN_HORIZON": 3,
+        "UPPER_FIRST": 31
+      }
+    },
+    "cut_utc": "2026-08-25T06:05:00.000Z",
+    "exclusion_rows_equal": true,
+    "expected": {
+      "candidates": 360,
+      "eligible": 41,
+      "outcomes": {
+        "LOWER_FIRST": 7,
+        "NEITHER_WITHIN_HORIZON": 3,
+        "UPPER_FIRST": 31
+      }
+    },
+    "full_run": "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT",
+    "passed": true,
+    "provenance_fields_excluded_from_comparison": [
+      "source_coverage_start_utc",
+      "source_coverage_end_utc"
+    ],
+    "reference": "results/liquidity_destination_bias_phase_1c_multiday_support/pilot_btc_6h",
+    "semantic_episode_fields_equal": true
+  },
+  "research_only": true,
+  "resources": {
+    "BTCUSDT": {
+      "cpu_percent": 33,
+      "max_rss_kb": 101160,
+      "system_cpu_seconds": 0.29,
+      "user_cpu_seconds": 93.92,
+      "wall_seconds": 279.02
+    },
+    "BTCUSDT_idempotence_repeat": {
+      "max_rss_kb": 102004,
+      "wall_seconds": 279.0
+    },
+    "DOGEUSDT": {
+      "cpu_percent": 74,
+      "max_rss_kb": 98812,
+      "system_cpu_seconds": 0.26,
+      "user_cpu_seconds": 90.2,
+      "wall_seconds": 121.54
+    }
+  },
+  "symbols": {
+    "BTCUSDT": {
+      "candidate_count": 10016,
+      "candidate_window_end_utc": "2026-08-31T23:01:00.000Z",
+      "candidate_window_start_utc": "2026-08-25T00:05:00.000Z",
+      "core_fingerprint_sha256": "a938a9f79ba95cf354dd288d23f0aa841392280de54ff75325189a71ee33f16a",
+      "eligible_episode_count": 879,
+      "eligible_ratio": 0.08775958466453675,
+      "episodes_by_utc_day": {
+        "2026-08-25": 137,
+        "2026-08-26": 121,
+        "2026-08-27": 142,
+        "2026-08-28": 153,
+        "2026-08-29": 106,
+        "2026-08-30": 119,
+        "2026-08-31": 101
+      },
+      "episodes_by_utc_hour": {
+        "00": 45,
+        "01": 31,
+        "02": 54,
+        "03": 19,
+        "04": 30,
+        "05": 36,
+        "06": 35,
+        "07": 26,
+        "08": 50,
+        "09": 38,
+        "10": 40,
+        "11": 22,
+        "12": 48,
+        "13": 53,
+        "14": 53,
+        "15": 25,
+        "16": 40,
+        "17": 53,
+        "18": 25,
+        "19": 21,
+        "20": 21,
+        "21": 36,
+        "22": 36,
+        "23": 42
+      },
+      "excluded_candidate_count": 9137,
+      "exclusion_counts": {
+        "DUPLICATE_OR_OVERLAPPING_EPISODE": 9070,
+        "MISSING_LOWER_TARGET": 23,
+        "MISSING_UPPER_TARGET": 44
+      },
+      "first_touch_duration_seconds": {
+        "count": 815,
+        "median": 82.0,
+        "p25": 11.0,
+        "p75": 445.0
+      },
+      "independent_utc_days": 7,
+      "internal_chunk_count_approx": 84,
+      "internal_chunk_hours": 2,
+      "largest_day_share": 0.17406143344709898,
+      "largest_day_utc": "2026-08-28",
+      "largest_hour_share": 0.06143344709897611,
+      "largest_hour_utc": "02",
+      "lower_distance_bps": {
+        "count": 879,
+        "median": 14.532319497803654,
+        "p25": 4.017707587667882,
+        "p75": 33.493688687789394
+      },
+      "neither_share": 0.07281001137656427,
+      "outcome_counts": {
+        "LOWER_FIRST": 411,
+        "NEITHER_WITHIN_HORIZON": 64,
+        "UPPER_FIRST": 404
+      },
+      "outcomes_by_utc_day": {
+        "2026-08-25": {
+          "LOWER_FIRST": 69,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 57
+        },
+        "2026-08-26": {
+          "LOWER_FIRST": 48,
+          "NEITHER_WITHIN_HORIZON": 7,
+          "UPPER_FIRST": 66
+        },
+        "2026-08-27": {
+          "LOWER_FIRST": 50,
+          "NEITHER_WITHIN_HORIZON": 8,
+          "UPPER_FIRST": 84
+        },
+        "2026-08-28": {
+          "LOWER_FIRST": 97,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 47
+        },
+        "2026-08-29": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 55
+        },
+        "2026-08-30": {
+          "LOWER_FIRST": 63,
+          "NEITHER_WITHIN_HORIZON": 10,
+          "UPPER_FIRST": 46
+        },
+        "2026-08-31": {
+          "LOWER_FIRST": 42,
+          "NEITHER_WITHIN_HORIZON": 10,
+          "UPPER_FIRST": 49
+        }
+      },
+      "upper_distance_bps": {
+        "count": 879,
+        "median": 14.144633679588846,
+        "p25": 3.6523119864512905,
+        "p75": 34.74988760388469
+      },
+      "upper_to_lower_distance_ratio": {
+        "count": 879,
+        "median": 0.9136363636363636,
+        "p25": 0.11192270631150489,
+        "p75": 7.347668365960973
+      }
+    },
+    "DOGEUSDT": {
+      "candidate_count": 10015,
+      "candidate_window_end_utc": "2026-08-31T23:00:00.000Z",
+      "candidate_window_start_utc": "2026-08-25T00:05:00.000Z",
+      "core_fingerprint_sha256": "e2f05258a578618c3a8da2a2a4c2826adb0651145c7320d3f7d1715b9c8efb86",
+      "eligible_episode_count": 840,
+      "eligible_ratio": 0.08387418871692462,
+      "episodes_by_utc_day": {
+        "2026-08-25": 127,
+        "2026-08-26": 133,
+        "2026-08-27": 106,
+        "2026-08-28": 155,
+        "2026-08-29": 103,
+        "2026-08-30": 128,
+        "2026-08-31": 88
+      },
+      "episodes_by_utc_hour": {
+        "00": 28,
+        "01": 44,
+        "02": 40,
+        "03": 27,
+        "04": 46,
+        "05": 31,
+        "06": 35,
+        "07": 24,
+        "08": 46,
+        "09": 27,
+        "10": 30,
+        "11": 17,
+        "12": 35,
+        "13": 50,
+        "14": 39,
+        "15": 26,
+        "16": 44,
+        "17": 41,
+        "18": 32,
+        "19": 17,
+        "20": 52,
+        "21": 42,
+        "22": 28,
+        "23": 39
+      },
+      "excluded_candidate_count": 9175,
+      "exclusion_counts": {
+        "DUPLICATE_OR_OVERLAPPING_EPISODE": 9086,
+        "MISSING_LOWER_TARGET": 81,
+        "MISSING_UPPER_TARGET": 8
+      },
+      "first_touch_duration_seconds": {
+        "count": 777,
+        "median": 85.0,
+        "p25": 12.0,
+        "p75": 511.0
+      },
+      "independent_utc_days": 7,
+      "internal_chunk_count_approx": 84,
+      "internal_chunk_hours": 2,
+      "largest_day_share": 0.18452380952380953,
+      "largest_day_utc": "2026-08-28",
+      "largest_hour_share": 0.06190476190476191,
+      "largest_hour_utc": "20",
+      "lower_distance_bps": {
+        "count": 840,
+        "median": 25.957172926827518,
+        "p25": 6.86518575634482,
+        "p75": 55.179638532392175
+      },
+      "neither_share": 0.075,
+      "outcome_counts": {
+        "LOWER_FIRST": 405,
+        "NEITHER_WITHIN_HORIZON": 63,
+        "UPPER_FIRST": 372
+      },
+      "outcomes_by_utc_day": {
+        "2026-08-25": {
+          "LOWER_FIRST": 72,
+          "NEITHER_WITHIN_HORIZON": 12,
+          "UPPER_FIRST": 43
+        },
+        "2026-08-26": {
+          "LOWER_FIRST": 50,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 74
+        },
+        "2026-08-27": {
+          "LOWER_FIRST": 37,
+          "NEITHER_WITHIN_HORIZON": 9,
+          "UPPER_FIRST": 60
+        },
+        "2026-08-28": {
+          "LOWER_FIRST": 86,
+          "NEITHER_WITHIN_HORIZON": 10,
+          "UPPER_FIRST": 59
+        },
+        "2026-08-29": {
+          "LOWER_FIRST": 44,
+          "NEITHER_WITHIN_HORIZON": 11,
+          "UPPER_FIRST": 48
+        },
+        "2026-08-30": {
+          "LOWER_FIRST": 70,
+          "NEITHER_WITHIN_HORIZON": 7,
+          "UPPER_FIRST": 51
+        },
+        "2026-08-31": {
+          "LOWER_FIRST": 46,
+          "NEITHER_WITHIN_HORIZON": 5,
+          "UPPER_FIRST": 37
+        }
+      },
+      "upper_distance_bps": {
+        "count": 840,
+        "median": 27.897511829742115,
+        "p25": 5.904073846792192,
+        "p75": 56.470745002170176
+      },
+      "upper_to_lower_distance_ratio": {
+        "count": 840,
+        "median": 1.2130252100840235,
+        "p25": 0.12499999999998482,
+        "p75": 7.264423076923184
+      }
+    }
+  },
+  "verdict": "LIQUIDITY_DESTINATION_FULL_BOUNDED_HISTORY_V1_READY_FOR_BASELINES"
+}

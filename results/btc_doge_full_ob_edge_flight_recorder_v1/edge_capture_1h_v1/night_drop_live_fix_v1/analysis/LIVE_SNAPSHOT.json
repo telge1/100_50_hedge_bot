@@ -1,0 +1,303 @@
+{
+  "ts": "2026-09-04T08:23:13.955441Z",
+  "verdict": "NIGHT_DROP_FIX_LIVE_RUNNING_WAITING_FINAL_EVENT",
+  "smoke_pass": true,
+  "watchdog_status": "RUNNING",
+  "reconnect_samples": [
+    {
+      "ts": "2026-09-04T08:12:35.792352Z",
+      "reconnects_total": 1,
+      "delta": 1,
+      "seq_gaps": 0,
+      "runtimes": {
+        "x": [
+          {
+            "symbol": "DOGEUSDT",
+            "subscription_state": "live",
+            "raw_bids": 5253,
+            "raw_asks": 13882,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4349891,
+            "seq": 345974327599,
+            "cts_ms": 1788509523317,
+            "gap_count": 0,
+            "reconnect_count": 0,
+            "last_error": ""
+          },
+          {
+            "symbol": "BTCUSDT",
+            "subscription_state": "live",
+            "raw_bids": 39533,
+            "raw_asks": 24245,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350204,
+            "seq": 805051079937,
+            "cts_ms": 1788509523268,
+            "gap_count": 0,
+            "reconnect_count": 0,
+            "last_error": ""
+          }
+        ]
+      },
+      "per_symbol_gaps": [
+        {
+          "symbol": "DOGEUSDT",
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "book_ready": true,
+          "update_id": 4349891,
+          "seq": 345974327599
+        },
+        {
+          "symbol": "BTCUSDT",
+          "gap_count": 0,
+          "reconnect_count": 0,
+          "book_ready": true,
+          "update_id": 4350204,
+          "seq": 805051079937
+        }
+      ],
+      "fr_capturing": {
+        "BTCUSDT": true,
+        "DOGEUSDT": true
+      },
+      "lifetime_drops": 0,
+      "werr": 0
+    },
+    {
+      "ts": "2026-09-04T08:13:05.814297Z",
+      "reconnects_total": 2,
+      "delta": 1,
+      "seq_gaps": 0,
+      "runtimes": {
+        "x": [
+          {
+            "symbol": "DOGEUSDT",
+            "subscription_state": "live",
+            "raw_bids": 5259,
+            "raw_asks": 13875,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350040,
+            "seq": 345974413734,
+            "cts_ms": 1788509553122,
+            "gap_count": 0,
+            "reconnect_count": 1,
+            "last_error": ""
+          },
+          {
+            "symbol": "BTCUSDT",
+            "subscription_state": "live",
+            "raw_bids": 39598,
+            "raw_asks": 24195,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350354,
+            "seq": 805051321238,
+            "cts_ms": 1788509553271,
+            "gap_count": 0,
+            "reconnect_count": 1,
+            "last_error": ""
+          }
+        ]
+      },
+      "per_symbol_gaps": [
+        {
+          "symbol": "DOGEUSDT",
+          "gap_count": 0,
+          "reconnect_count": 1,
+          "book_ready": true,
+          "update_id": 4350040,
+          "seq": 345974413734
+        },
+        {
+          "symbol": "BTCUSDT",
+          "gap_count": 0,
+          "reconnect_count": 1,
+          "book_ready": true,
+          "update_id": 4350354,
+          "seq": 805051321238
+        }
+      ],
+      "fr_capturing": {
+        "BTCUSDT": true,
+        "DOGEUSDT": true
+      },
+      "lifetime_drops": 0,
+      "werr": 0
+    },
+    {
+      "ts": "2026-09-04T08:14:05.867920Z",
+      "reconnects_total": 3,
+      "delta": 1,
+      "seq_gaps": 0,
+      "runtimes": {
+        "x": [
+          {
+            "symbol": "DOGEUSDT",
+            "subscription_state": "live",
+            "raw_bids": 5258,
+            "raw_asks": 13876,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350295,
+            "seq": 345974541441,
+            "cts_ms": 1788509604127,
+            "gap_count": 0,
+            "reconnect_count": 2,
+            "last_error": ""
+          },
+          {
+            "symbol": "BTCUSDT",
+            "subscription_state": "live",
+            "raw_bids": 39500,
+            "raw_asks": 24263,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350609,
+            "seq": 805051538113,
+            "cts_ms": 1788509604271,
+            "gap_count": 0,
+            "reconnect_count": 2,
+            "last_error": ""
+          }
+        ]
+      },
+      "per_symbol_gaps": [
+        {
+          "symbol": "DOGEUSDT",
+          "gap_count": 0,
+          "reconnect_count": 2,
+          "book_ready": true,
+          "update_id": 4350295,
+          "seq": 345974541441
+        },
+        {
+          "symbol": "BTCUSDT",
+          "gap_count": 0,
+          "reconnect_count": 2,
+          "book_ready": true,
+          "update_id": 4350609,
+          "seq": 805051538113
+        }
+      ],
+      "fr_capturing": {
+        "BTCUSDT": true,
+        "DOGEUSDT": true
+      },
+      "lifetime_drops": 0,
+      "werr": 0
+    },
+    {
+      "ts": "2026-09-04T08:14:56.165434Z",
+      "reconnects_total": 4,
+      "delta": 1,
+      "seq_gaps": 0,
+      "runtimes": {
+        "x": [
+          {
+            "symbol": "DOGEUSDT",
+            "subscription_state": "live",
+            "raw_bids": 5259,
+            "raw_asks": 13875,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350495,
+            "seq": 345974648839,
+            "cts_ms": 1788509644131,
+            "gap_count": 0,
+            "reconnect_count": 3,
+            "last_error": ""
+          },
+          {
+            "symbol": "BTCUSDT",
+            "subscription_state": "live",
+            "raw_bids": 39538,
+            "raw_asks": 24216,
+            "snapshot_loaded": true,
+            "book_ready": true,
+            "update_id": 4350810,
+            "seq": 805051673257,
+            "cts_ms": 1788509644468,
+            "gap_count": 0,
+            "reconnect_count": 3,
+            "last_error": ""
+          }
+        ]
+      },
+      "per_symbol_gaps": [
+        {
+          "symbol": "DOGEUSDT",
+          "gap_count": 0,
+          "reconnect_count": 3,
+          "book_ready": true,
+          "update_id": 4350495,
+          "seq": 345974648839
+        },
+        {
+          "symbol": "BTCUSDT",
+          "gap_count": 0,
+          "reconnect_count": 3,
+          "book_ready": true,
+          "update_id": 4350810,
+          "seq": 805051673257
+        }
+      ],
+      "fr_capturing": {
+        "BTCUSDT": true,
+        "DOGEUSDT": true
+      },
+      "lifetime_drops": 0,
+      "werr": 0
+    }
+  ],
+  "segment_checks": [],
+  "t5m_n": 99,
+  "events": {
+    "BTCUSDT_20260904T080534Z_1fd9a66d36": {
+      "fight_event_id": "BTCUSDT_20260904T080534Z_1fd9a66d36",
+      "trigger_ts": "2026-09-04T08:05:34.762483Z",
+      "trigger_source": "CROSS_IN",
+      "trigger_quality": "REAL_CROSS_IN",
+      "edge_entry_crossed": true,
+      "research_eligible": true,
+      "queue_drop_count": 0,
+      "extension_count": 0,
+      "retouch_count": 0,
+      "u_gap_count": 0,
+      "source_feed_u_gap_count": 0,
+      "persisted_capture_u_gap_count": 0,
+      "pre_trigger_seconds_actual": 143.290483,
+      "data_quality": "OK",
+      "incomplete_reasons": [],
+      "segment_count": 1,
+      "normal_end_ts": "2026-09-04T09:05:34.762483Z",
+      "minimum_capture_end_ts": "2026-09-04T09:05:34.762483Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:34.762483Z"
+    },
+    "DOGEUSDT_20260904T080551Z_2c38905508": {
+      "fight_event_id": "DOGEUSDT_20260904T080551Z_2c38905508",
+      "trigger_ts": "2026-09-04T08:05:51.864878Z",
+      "trigger_source": "CROSS_IN",
+      "trigger_quality": "REAL_CROSS_IN",
+      "edge_entry_crossed": true,
+      "research_eligible": true,
+      "queue_drop_count": 0,
+      "extension_count": 0,
+      "retouch_count": 0,
+      "u_gap_count": 0,
+      "source_feed_u_gap_count": 0,
+      "persisted_capture_u_gap_count": 0,
+      "pre_trigger_seconds_actual": 161.130878,
+      "data_quality": "OK",
+      "incomplete_reasons": [],
+      "segment_count": 1,
+      "normal_end_ts": "2026-09-04T09:05:51.864878Z",
+      "minimum_capture_end_ts": "2026-09-04T09:05:51.864878Z",
+      "hard_capture_end_ts": "2026-09-04T11:05:51.864878Z"
+    }
+  },
+  "pytest": "66 passed"
+}

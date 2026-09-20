@@ -1,0 +1,78 @@
+{
+  "at": "2026-08-15T17:47:25Z",
+  "combined_summary": {
+    "be50_activated_count": 4,
+    "be50_exit_count": 3,
+    "by_direction": {
+      "LONG": {
+        "losses": 2,
+        "open": 0,
+        "signals": 5,
+        "wins": 1
+      },
+      "SHORT": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 0
+      }
+    },
+    "by_symbol": {
+      "1000BONKUSDT": {
+        "losses": 1,
+        "open": 0,
+        "signals": 4,
+        "wins": 1
+      },
+      "AAVEUSDT": {
+        "losses": 1,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      }
+    },
+    "by_timeframe": {
+      "15m": {
+        "losses": 1,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      },
+      "1h": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 1
+      },
+      "30m": {
+        "losses": 0,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      },
+      "4h": {
+        "losses": 1,
+        "open": 0,
+        "signals": 1,
+        "wins": 0
+      }
+    },
+    "execution_dedup_applied": false,
+    "exit_reason_counts": {
+      "BE": 3,
+      "SL": 2,
+      "TP": 1
+    },
+    "gross_loss_pct": -3.0,
+    "gross_profit_pct": 2.0,
+    "losses": 2,
+    "open": 0,
+    "pnl_basis": "gross",
+    "signal_scope": "TIER_A_ONLY",
+    "signals": 6,
+    "total_pnl_pct": -1.0,
+    "win_rate_denominator": "wins+losses (OPEN and BE excluded)",
+    "win_rate_pct": 33.33333333333333,
+    "wins": 1
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "coin_timeout_s": 600,
+  "fixed_strategy_version": "wave_fade_frozen_f16ae32",
+  "frozen_module_hashes": {
+    "src/signal_generator/pipeline/mapper.py": "6bf812b467f11f4c3b6e51f8d07323cbe5ab9bdf84af79e10a9dabe856171962",
+    "src/signal_generator/pipeline/trade_plan.py": "e8faaf2909e3d2f726ea344c7e535f9e9a8b1b406fdc262f91591d3faa9b5642",
+    "src/signal_generator/pipeline/versions.py": "0919699d7ac702bc13983a9f810afc201898d7e3d565dd83a535f265afd12680",
+    "src/signal_generator/strategy/wave_fade/edges.py": "b3ada4d09ad6c5a588ccdbfa9d724f0ca6757e2b83d5dc6256ac6cd84d6317f7",
+    "src/signal_generator/strategy/wave_fade/parameters.py": "0840ab112f4ca9685bab79901a5b378fa0f70340dbf995a8a3644322e082b7cd",
+    "src/signal_generator/strategy/wave_fade/signals.py": "adbc4d940c69a12ee5dc37af6ee2aa6a35ab35aadb36d5815ccc28516fbe286a",
+    "src/signal_generator/strategy/wave_fade/trend.py": "d1c1941f3b22eb25400230f60cd92d2bc600dda899fa8460b72e3e22f54c9207"
+  },
+  "frozen_source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+  "job_id": "5e059f73d87348bd87083a56368c70d5",
+  "jobs_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs",
+  "live_orders": false,
+  "max_parallelism": 1,
+  "outcome_evaluation_enabled": false,
+  "pool_v1_enabled": false,
+  "publish": false,
+  "python_path": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+  "repo_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev",
+  "requested_at": "2026-08-15T15:16:50Z",
+  "resume": false,
+  "runner_code_revision": "abc381efd3854be82fa5f9feaa3dac79952e503d",
+  "selected_symbols": [
+    "AAVEUSDT"
+  ],
+  "sequential": true,
+  "side_effect_flags": {
+    "cleanup_enabled": false,
+    "execution_dedup_applied": false,
+    "live_orders_enabled": false,
+    "outcome_evaluation_enabled": false,
+    "pool_v1_enabled": false,
+    "publish_enabled": false,
+    "writes_to_clickhouse": false,
+    "writes_to_processing_state": false,
+    "writes_to_signals": false
+  },
+  "signal_end_exclusive": "2026-08-02T00:00:00Z",
+  "signal_start": "2026-08-01T00:00:00Z",
+  "universe_count": 51,
+  "universe_source": "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/config/universe_tradeable_51.json",
+  "writes_to_clickhouse": false
+}

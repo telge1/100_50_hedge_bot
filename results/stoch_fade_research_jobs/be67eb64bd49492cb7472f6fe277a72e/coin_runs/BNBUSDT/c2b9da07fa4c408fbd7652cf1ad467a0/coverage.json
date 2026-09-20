@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 359700,
+      "error": null,
+      "raw_count": 6798,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "BNBUSDT",
+      "tier_a_count": 586,
+      "warmup_complete": false
+    }
+  ]
+}

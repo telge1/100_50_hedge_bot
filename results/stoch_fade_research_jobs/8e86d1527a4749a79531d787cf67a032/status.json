@@ -1,0 +1,131 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT/e6b88c5bca914cfb9e18cadb6f833794",
+      "duration_seconds": 30.309,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:50:57Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 15,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 4,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 8,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 1
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "e6b88c5bca914cfb9e18cadb6f833794",
+      "started_at": "2026-08-15T15:50:27Z",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/1000BONKUSDT/a4f5c75d146e49c385b9841721ffebd1",
+      "duration_seconds": 29.858,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:51:27Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 17,
+          "tier_a": 2
+        },
+        "1h": {
+          "raw": 3,
+          "tier_a": 1
+        },
+        "30m": {
+          "raw": 7,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "a4f5c75d146e49c385b9841721ffebd1",
+      "started_at": "2026-08-15T15:50:57Z",
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT",
+      "tier_a_total": 4,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ],
+  "combined_summary": {
+    "coins_evaluated": 2,
+    "coins_with_signals": 2,
+    "coins_without_tier_a": 0,
+    "execution_dedup_applied": false,
+    "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+    "failed_coins": 0,
+    "multi_tf_collisions": 0,
+    "outcome_evaluation_enabled": false,
+    "raw_by_timeframe": {
+      "15m": 32,
+      "1h": 7,
+      "30m": 15,
+      "4h": 2
+    },
+    "raw_candidates": 56,
+    "successful_coins": 2,
+    "tier_a": 6,
+    "tier_a_by_timeframe": {
+      "15m": 2,
+      "1h": 1,
+      "30m": 2,
+      "4h": 1
+    },
+    "warmup_warnings": 0,
+    "writes_to_clickhouse": false
+  },
+  "completed_coins": 2,
+  "created_at": "2026-08-15T15:50:26Z",
+  "current_index": 2,
+  "current_symbol": null,
+  "error_summary": "",
+  "failed_coins": 0,
+  "finished_at": "2026-08-15T15:51:27Z",
+  "job_id": "8e86d1527a4749a79531d787cf67a032",
+  "last_worker_pid": 1181875,
+  "message": "COMPLETED",
+  "progress_percent": 100,
+  "raw_total": 56,
+  "started_at": "2026-08-15T15:50:26Z",
+  "state": "COMPLETED",
+  "successful_coins": 2,
+  "tier_a_total": 6,
+  "total_coins": 2,
+  "worker_pid": null
+}

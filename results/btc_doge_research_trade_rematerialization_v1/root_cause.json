@@ -1,0 +1,38 @@
+{
+  "status": "ROOT_CAUSE_PROVEN",
+  "shift_seconds": -7200,
+  "shift_constant": true,
+  "other_shift_classes": false,
+  "btc": {
+    "rows": 80738,
+    "all_delta_m7200": 80738,
+    "price_size_side_mismatches": 0,
+    "batch_id": "phase1:btc_run_018",
+    "intended_window": "2026-08-31T18:30Z\u201319:30Z (btc_run_018 golden)"
+  },
+  "doge": {
+    "rows": 4275,
+    "all_delta_m7200": 4275,
+    "price_size_side_mismatches": 0,
+    "batch_id": "phase1:doge_20260829_1145_1230",
+    "intended_window": "2026-08-29T11:45Z\u201312:30Z"
+  },
+  "mechanism": {
+    "host_tz": "Europe/Berlin (CEST UTC+2 in Sep)",
+    "clickhouse_server_timezone": "UTC",
+    "clickhouse_connect_read": "DateTime64('UTC') returned as naive datetime with UTC wall-clock values",
+    "clickhouse_connect_insert_naive": "naive datetime interpreted as local CEST then stored into UTC column => -7200s",
+    "clickhouse_connect_insert_aware": "timezone-aware UTC datetime stores correctly (probe proven)",
+    "code_path": "pilot_runner.run_pilot -> read_public_trades -> transform_trades -> insert(research_public_trades)",
+    "prior_doc": "pilot_runner.timezone correction already notes cause: clickhouse_connect UTC DateTime64 returned naive datetime",
+    "not_dst_ambiguity": true,
+    "not_source_shift": true,
+    "not_fixed_plus_2h_in_transform": true
+  },
+  "logical_key": {
+    "preferred": "(symbol, trade_id)",
+    "event_key": "{symbol}|{trade_id}",
+    "oa_unique_trade_id_in_range": true
+  },
+  "why_only_80k_visible": "Only phase1 pilot batches imported events; full-history PUBLIC_TRADES modality wrote buckets_1s only, not research_public_trades events"
+}

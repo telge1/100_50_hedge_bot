@@ -1,0 +1,9 @@
+{
+  "segment": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_v1/BTCUSDT/2026/09/06/BTCUSDT_20260906T100000Z_eb3cbb7ffd1f_full_ob_continuous_raw_archive_v1.ndjson.zst",
+  "completion_status": "COMPLETE",
+  "replay_ok": true,
+  "in_segment_u_gap_count": 0,
+  "first_event_time": "2026-09-06T10:00:00.073000Z",
+  "last_event_time": "2026-09-06T10:59:59.872000Z",
+  "build_seconds": 27.876758813858032
+}

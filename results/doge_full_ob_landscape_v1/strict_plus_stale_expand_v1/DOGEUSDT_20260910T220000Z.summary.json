@@ -1,0 +1,46 @@
+{
+  "schema_version": "doge_full_ob_landscape_v1",
+  "verdict": "PASS_STRICT_DOGE_FULL_OB_LANDSCAPE",
+  "symbol": "DOGEUSDT",
+  "utc_hour": "2026-09-10T22:00:00Z",
+  "segment": "data/orderbook_raw_shadow/full_ob_v1/DOGEUSDT/2026/09/10/DOGEUSDT_20260910T220000Z_6063357c3386_full_ob_continuous_raw_archive_v1.ndjson.zst",
+  "manifest_completion_status": "COMPLETE",
+  "manifest_gap_count": 0,
+  "sequence_audit": {
+    "forward_gap_count": 0,
+    "stale_delta_count": 0,
+    "duplicate_delta_count": 0,
+    "gap_marker_count": 0
+  },
+  "frame_count": 3600,
+  "wall_event_count": 55645,
+  "level_change_count": 211244,
+  "applied_record_count": 18011,
+  "book_reset_count": 12,
+  "elapsed_seconds": 73.34,
+  "max_rss_mb": 56.027,
+  "config": {
+    "symbol": "DOGEUSDT",
+    "sample_seconds": 1,
+    "wall_quantile": 0.95,
+    "major_wall_quantile": 0.99,
+    "minimum_wall_notional_usdt": 10000.0,
+    "cluster_gap_bps": 2.0,
+    "move_match_bps": 4.0,
+    "change_fraction": 0.1,
+    "max_rss_mb": 4096.0,
+    "max_io_full_avg10": 60.0
+  },
+  "outputs": {
+    "landscape_frames": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260910T220000Z.landscape.jsonl.zst",
+    "wall_events": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260910T220000Z.wall_events.jsonl.zst",
+    "level_changes": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260910T220000Z.level_changes.jsonl.zst",
+    "price_outcomes": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260910T220000Z.outcomes.jsonl"
+  },
+  "semantics": {
+    "coverage": "all visible aggregated L2 price levels",
+    "wall_relevance": "side-local quantile AND minimum notional, clustered by price distance",
+    "disappearance": "unattributed until public-trade matching is added",
+    "outcome_horizon_seconds": 900
+  }
+}

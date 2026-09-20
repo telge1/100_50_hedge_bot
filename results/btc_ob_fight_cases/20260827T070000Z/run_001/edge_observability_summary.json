@@ -1,0 +1,9 @@
+{
+  "contract_version": "edge_observability_contract_v1",
+  "row_count": 0,
+  "visit_count_by_edge": {
+    "UPPER": 0,
+    "LOWER": 0
+  },
+  "by_edge_time_scope": {}
+}

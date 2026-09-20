@@ -1,0 +1,146 @@
+{
+  "clickhouse_version": "26.7.1.1315",
+  "collector_pids_before": [
+    "147111 /home/telgenbuescher/projects/orderbook_analyse/.venv/bin/python -m orderbook_analyse.oi_liquidation_collector --mode live --duration 0",
+    "1661773 /home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python scripts/run_live_collector_service.py --live-universe config/live_universe.json --candle-universe config/universe_tradeable_51.json --api-host 127.0.0.1 --api-port 8787 --default-desired RUNNING --enable-public-trades",
+    "3946369 .venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO"
+  ],
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "disk": {
+    "avail": "370G",
+    "filesystem": "/dev/sda2",
+    "size": "916G",
+    "use_pct": "58%",
+    "used": "499G"
+  },
+  "generated_at": "2026-09-03T07:03:02.457326Z",
+  "heartbeat": {
+    "completed": 662,
+    "failed_segments": 0,
+    "importable_segments": 662,
+    "ready_segments": 472,
+    "remaining_segments": 0,
+    "runner_pid": 1248597,
+    "skipped_segments": 190,
+    "status": "COMPLETED",
+    "updated_at": "2026-09-02T23:08:14.252810Z"
+  },
+  "heartbeat_invariants": {
+    "completed_662": true,
+    "failed_0": true,
+    "json_valid": true,
+    "ready_plus_skipped_eq_completed": true,
+    "remaining_0": true,
+    "runner_alive": false,
+    "runner_note": "stale PID after COMPLETED is OK",
+    "status_COMPLETED": true
+  },
+  "progress_json_valid": true,
+  "repository": {
+    "branch": "feature/btc-doge-research-db",
+    "dirty_count": 67,
+    "dirty_sample": [
+      "M research/btc_doge_research/full_history_contracts.py",
+      " M research/btc_doge_research/full_history_runner.py",
+      " M research/btc_doge_research/phase2_day_loader.py",
+      "?? \"(base) telgenbuescher@server-telgenbuesc.yaml\"",
+      "?? 100_100_hegde_strategie.md",
+      "?? 100_50_close_strategie.md",
+      "?? Analyse_plan.md",
+      "?? \"Das sollten wir unbedingt mitpr\\303\\274fen, son.md\"",
+      "?? EMA_OB_Strategie.md",
+      "?? Market_Tools.md",
+      "?? Stochanalyse.md",
+      "?? research/btc_doge_research/atomic_json.py",
+      "?? research/btc_doge_research/backfill_plan.py",
+      "?? research/btc_doge_research/backfill_recovery.py",
+      "?? research/btc_doge_research/modality_coverage.py",
+      "?? research/btc_doge_research/ob200_boundary.py",
+      "?? research/btc_doge_research/ob200_segments.py",
+      "?? research/btc_doge_research/run_state.py",
+      "?? research/btc_doge_research/seam_root_cause_audit.py",
+      "?? research/btc_doge_research/seam_variants.py",
+      "?? research/btc_doge_research/segment_loader.py",
+      "?? research/btc_doge_research/source_discovery.py",
+      "?? results/aggressor_efficiency_data_audit_v1/",
+      "?? results/aggressor_efficiency_flip_design_v1/",
+      "?? results/aggressor_efficiency_flip_f0_doge_20260829/",
+      "?? results/aggressor_efficiency_flip_missed_reference_audit_v1/",
+      "?? results/apt_timestamp_direction_sticky_audit/",
+      "?? results/btc_doge_research_db_backfill_recovery_v1/",
+      "?? results/btc_doge_research_db_final_audit_v1/",
+      "?? results/btc_doge_research_db_source_recovery_v1/",
+      "?? results/btc_ob_fight_cases/",
+      "?? results/btc_ob_fight_explanatory_audit_20260831_1900_v1/",
+      "?? results/btc_profile_edge_ob_fight_20260831_1900_v1/",
+      "?? results/btc_tpo_volume_semantics_audit_20260831_1900_v1/",
+      "?? results/ch_break_reclaim_microstructure_audit_20260808/",
+      "?? results/ch_break_reclaim_microstructure_audit_20260808_smoke/",
+      "?? results/ch_break_reclaim_subgroup_validation_20260808/",
+      "?? results/ema_pool_trend_flip_v1/",
+      "?? results/event_ob_coverage_audit_20260808/",
+      "?? results/historical_break_pull_consumption_deep_dive_20260808/"
+    ],
+    "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12"
+  },
+  "root_causes": {
+    "duplicate_ob_snapshots": {
+      "affected_hours": 3,
+      "cause": "_ready_exists() only skipped status=READY; PARTIAL segments and reimports with a new build_id (golden hour source_path/fingerprint in build hash) re-inserted identical snapshots. Audit/smoke reimport wrote second copy.",
+      "content_identity": {
+        "aug24_market_identical_coverage_differs": {
+          "coverage_differs": 726,
+          "dup_keys": 726,
+          "market_identical": 726
+        },
+        "aug27_full_identical_including_build": {
+          "dup_keys": 3599,
+          "identical": 3599
+        },
+        "golden_two_build_ids_market_identical": {
+          "build_drop": "ed650f8048cea17b8ecc921b0108f7308696e581504a9c891dff824256fdc0d1",
+          "build_keep": "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51",
+          "identical": 3600,
+          "keys": 3600,
+          "note": "keep plan-matching build_id (later import ecd48675...); drop earlier ed650f80...",
+          "plan_build_id": "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51",
+          "plan_matches_keep": true
+        }
+      }
+    },
+    "partial_counting": {
+      "boundary_audit_PARTIAL_TRUE_GAP_hours_source_inventory": 24,
+      "canonical_terminal_preferring_PARTIAL": 37,
+      "disjoint_by_modality": {
+        "OB200": 19,
+        "OPEN_INTEREST": 18
+      },
+      "explanation": "36+1 was an artifact of argMax(status, started_at) on tied timestamps for the DOGE 23:00 orphan. Canonical terminal-preferring status yields 37 PARTIAL. 24 OB200 mid-hour gaps are source-file boundary-audit classifications (all discovered hours), not equal to the 19 imported OB200 PARTIAL plan segments (8 BTC + 11 DOGE). 18 OI partial days/symbol = 9 BTC + 9 DOGE day segments. Disjoint: 19 OB200 + 18 OI = 37 PARTIAL plan segments.",
+      "prior_audit_claimed_PARTIAL_via_naive_argmax": 36,
+      "prior_audit_claimed_RUNNING": 1,
+      "prior_audit_effective_PARTIAL": 37
+    },
+    "running_orphan": {
+      "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+      "cause": "Append-only batch_runs wrote RUNNING and PARTIAL with identical started_at; naive argMax(status, started_at) can return RUNNING despite terminal PARTIAL existing.",
+      "proven_data_status": "PARTIAL"
+    }
+  },
+  "stop_gate_inputs_ready": true,
+  "table_engines": {
+    "research_batch_runs": {
+      "append_only": true,
+      "canonical_status_rule": "prefer READY|PARTIAL|FAILED over RUNNING; then max(started_at); then max(completed_at)",
+      "engine": "MergeTree",
+      "order_by": "(batch_id, status, phase)"
+    },
+    "research_ob200_snapshots_1s": {
+      "canonical_logical_key": "(symbol, snapshot_ts)",
+      "engine": "MergeTree",
+      "not_replacing": true,
+      "order_by": "(symbol, snapshot_ts, producer_id, contract_version, build_id)",
+      "partition_by": "(symbol, toYYYYMMDD(snapshot_ts))"
+    }
+  },
+  "watermarks_json_valid": true
+}

@@ -1,0 +1,377 @@
+{
+  "volume_profile_status": "COMPUTED_SEPARATELY",
+  "contract_version": "volume_profile_facts_v1",
+  "provenance": {
+    "source_table": "orderbook_analysis.public_trades_canonical",
+    "engine": "research.btc_ob_fight.volume_profile",
+    "algorithm_source": "orderbook_analyse.market_profile.profile (compute_value_area, find_nodes)",
+    "session_start_utc": "2026-08-26T13:30:00Z",
+    "cutoff_utc": "2026-08-27T06:42:23Z",
+    "profile_session_id": "us_developing_to_anchor",
+    "session_timezone": "UTC",
+    "primary_volume_basis": "base_volume",
+    "available_volume_bases": [
+      "base_volume",
+      "quote_notional"
+    ],
+    "source_quantity_field": "size",
+    "quote_notional_formula": "price * size (canonical notional when present)",
+    "price_increment": 10.0,
+    "value_area_percentage": 0.7,
+    "target_bins": 160,
+    "aggressor_semantics": "side=Buy/Sell is taker/aggressor",
+    "trade_cutoff_rule": "session_start <= trade_ts < anchor_cutoff",
+    "dedup_key": "trade_id",
+    "tpo_values_not_copied": true
+  },
+  "coverage": {
+    "session_start_utc": "2026-08-26T13:30:00Z",
+    "cutoff_utc": "2026-08-27T06:42:23Z",
+    "raw_trade_rows_in_session": 1347700,
+    "dedup_removed_duplicates": 0,
+    "deduped_trade_rows_used": 1347700,
+    "future_trade_count_excluded": 18062,
+    "min_trade_ts": "2026-08-26T13:30:00.095Z",
+    "max_trade_ts": "2026-08-27T06:42:22.77Z",
+    "profile_session_id": "us_developing_to_anchor"
+  },
+  "integrity": {
+    "status": "PASS",
+    "checks": {
+      "base_volume_conservation": true,
+      "quote_notional_conservation": true,
+      "trade_count_conservation": true,
+      "buy_sell_sum_equals_total": true,
+      "delta_equals_buy_minus_sell": true,
+      "no_trade_after_anchor": true,
+      "deduped_trade_count": 1347700,
+      "value_area_level_order": true,
+      "all_values_finite": true,
+      "value_area_share_target_met": true
+    },
+    "totals": {
+      "trade_base_volume": 33684.289,
+      "row_base_volume": 33684.28899999863,
+      "trade_notional": 2641337517.4583,
+      "row_notional": 2641337517.458304,
+      "trade_count": 1347700,
+      "row_trade_count": 1347700
+    },
+    "tolerance_abs": 1e-06,
+    "tolerance_rel": 1e-09
+  },
+  "prefix_parity": {
+    "status": "PASS",
+    "anchor_cutoff_utc": "2026-08-27T06:42:23Z",
+    "extra_post_anchor_trades_added": 50
+  },
+  "vpoc": {
+    "vpoc_price": 78705.0,
+    "vpoc_volume": 561.9989999998427,
+    "vpoc_trade_count": 22917,
+    "vpoc_tie_count": 1,
+    "vpoc_tie_break_rule": "max_volume_then_center_bin_index",
+    "vpoc_bin_index": 7870
+  },
+  "value_area": {
+    "value_area_percentage": 0.7,
+    "total_profile_volume": 33684.28899999863,
+    "target_value_area_volume": 23579.00229999904,
+    "actual_value_area_volume": 23598.216999998145,
+    "actual_value_area_share": 0.700570435077288,
+    "vvah": 78960.0,
+    "vval": 78180.0,
+    "included_bin_count": 78,
+    "value_area_tie_break_rule": "expand_toward_larger_neighbor_bin_volume"
+  },
+  "hvn_candidates": [
+    {
+      "node_type": "HVN",
+      "price": 78095.0,
+      "volume": 287.4170000000048,
+      "volume_share": 0.00853267230904047,
+      "neighbor_comparison": {
+        "below_volume": 256.7230000000197,
+        "above_volume": 349.0359999999912
+      },
+      "prominence": 1.365227569446475,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78365.0,
+      "volume": 420.9209999999003,
+      "volume_share": 0.012496063075575601,
+      "neighbor_comparison": {
+        "below_volume": 421.0169999999103,
+        "above_volume": 440.3689999998958
+      },
+      "prominence": 1.9993700920920963,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78405.0,
+      "volume": 472.3939999998777,
+      "volume_share": 0.014024164203076898,
+      "neighbor_comparison": {
+        "below_volume": 340.65099999996016,
+        "above_volume": 481.27099999987365
+      },
+      "prominence": 2.2438662724923035,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78445.0,
+      "volume": 375.9609999999614,
+      "volume_share": 0.011161316185120508,
+      "neighbor_comparison": {
+        "below_volume": 409.5269999999733,
+        "above_volume": 349.85199999996894
+      },
+      "prominence": 1.7858105896192813,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78515.0,
+      "volume": 374.4139999999543,
+      "volume_share": 0.011115389729614584,
+      "neighbor_comparison": {
+        "below_volume": 442.7079999999299,
+        "above_volume": 378.0759999999603
+      },
+      "prominence": 1.7784623567383335,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78695.0,
+      "volume": 476.6369999998927,
+      "volume_share": 0.01415012797212113,
+      "neighbor_comparison": {
+        "below_volume": 469.2199999999137,
+        "above_volume": 561.9989999998427
+      },
+      "prominence": 2.2640204755393807,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78785.0,
+      "volume": 410.52499999993466,
+      "volume_share": 0.0121874325445893,
+      "neighbor_comparison": {
+        "below_volume": 501.94699999986904,
+        "above_volume": 350.942999999961
+      },
+      "prominence": 1.949989207134288,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "HVN",
+      "price": 78815.0,
+      "volume": 388.1559999999264,
+      "volume_share": 0.01152335440418357,
+      "neighbor_comparison": {
+        "below_volume": 410.1529999999222,
+        "above_volume": 392.65999999992073
+      },
+      "prominence": 1.8437367046693711,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    }
+  ],
+  "lvn_candidates": [
+    {
+      "node_type": "LVN",
+      "price": 77635.0,
+      "volume": 55.999999999999,
+      "volume_share": 0.0016624961269035923,
+      "neighbor_comparison": {
+        "below_volume": 53.51199999999939,
+        "above_volume": 29.034000000000425
+      },
+      "prominence": 0.26599938030457476,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 77685.0,
+      "volume": 66.11999999999975,
+      "volume_share": 0.001962932926979769,
+      "neighbor_comparison": {
+        "below_volume": 87.43700000000109,
+        "above_volume": 43.716999999999565
+      },
+      "prominence": 0.3140692683167631,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 77865.0,
+      "volume": 73.87599999999962,
+      "volume_share": 0.002193188640555917,
+      "neighbor_comparison": {
+        "below_volume": 129.35300000000888,
+        "above_volume": 107.36000000000455
+      },
+      "prominence": 0.35091018248894673,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 78985.0,
+      "volume": 58.68799999999869,
+      "volume_share": 0.001742295940994957,
+      "neighbor_comparison": {
+        "below_volume": 75.30100000000108,
+        "above_volume": 74.18399999999956
+      },
+      "prominence": 0.2787673505591931,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 79045.0,
+      "volume": 26.376000000000218,
+      "volume_share": 0.0007830356757716125,
+      "neighbor_comparison": {
+        "below_volume": 20.782000000000327,
+        "above_volume": 26.274000000000356
+      },
+      "prominence": 0.125285708123458,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 79085.0,
+      "volume": 15.864999999999869,
+      "volume_share": 0.0004709910902379597,
+      "neighbor_comparison": {
+        "below_volume": 20.038999999999948,
+        "above_volume": 12.274999999999896
+      },
+      "prominence": 0.07535857443807356,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    },
+    {
+      "node_type": "LVN",
+      "price": 79135.0,
+      "volume": 25.59800000000021,
+      "volume_share": 0.0007599388545799868,
+      "neighbor_comparison": {
+        "below_volume": 11.637000000000008,
+        "above_volume": 1.4289999999999956
+      },
+      "prominence": 0.12159021673279789,
+      "heuristic_contract_version": "volume_nodes_v1",
+      "status": "UNFROZEN_HEURISTIC",
+      "parameters": {
+        "hvn_factor": 1.35,
+        "lvn_factor": 0.55,
+        "min_separation_bins": 3
+      }
+    }
+  ],
+  "oa_parity": {
+    "status": "EXACT",
+    "oa_poc": 78705.0,
+    "oa_vah": 78960.0,
+    "oa_val": 78180.0,
+    "local_vpoc": 78705.0,
+    "local_vvah": 78960.0,
+    "local_vval": 78180.0,
+    "price_step_oa": 10.0,
+    "price_step_local": 10.0,
+    "note": "OA aggregates in CH; local pipeline dedups trade_id in Python first"
+  },
+  "volume_profile_cutoff_utc": "2026-08-27T06:42:23Z",
+  "max_trade_ts_used": "2026-08-27T06:42:22.77Z",
+  "future_trade_count_used": 0,
+  "volume_profile_computed_separately": true
+}

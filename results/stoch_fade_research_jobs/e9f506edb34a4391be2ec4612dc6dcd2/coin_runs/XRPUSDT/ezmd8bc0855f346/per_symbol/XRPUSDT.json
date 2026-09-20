@@ -1,0 +1,27 @@
+{
+  "counts_by_timeframe": {
+    "5m": {
+      "raw_candidates": 0,
+      "tier_a": 0
+    }
+  },
+  "effective_end": "2026-08-27T08:44:00Z",
+  "effective_start": "2026-07-28T08:45:00Z",
+  "first_valid_by_timeframe": {
+    "15m": {
+      "warmup_complete": true
+    },
+    "1h": {
+      "warmup_complete": true
+    },
+    "30m": {
+      "warmup_complete": true
+    },
+    "4h": {
+      "warmup_complete": true
+    }
+  },
+  "missing_sources": [],
+  "symbol": "XRPUSDT",
+  "warmup_complete": true
+}

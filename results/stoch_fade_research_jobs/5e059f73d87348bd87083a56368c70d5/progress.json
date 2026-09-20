@@ -1,0 +1,39 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/5e059f73d87348bd87083a56368c70d5/coin_runs/AAVEUSDT/def3dc3960ab4afa97c59e2c2ac444c7",
+      "duration_seconds": 30.921,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:17:21Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 15,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 4,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 8,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 1
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "def3dc3960ab4afa97c59e2c2ac444c7",
+      "started_at": "2026-08-15T15:16:50Z",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {}
+    }
+  ]
+}

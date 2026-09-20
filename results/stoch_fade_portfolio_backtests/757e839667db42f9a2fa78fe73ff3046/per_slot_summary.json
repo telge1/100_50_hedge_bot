@@ -1,0 +1,112 @@
+{
+  "0": {
+    "gross_loss_usdt": -637.9999999999997,
+    "gross_profit_usdt": 1298.0000000000002,
+    "losses": 490,
+    "open": 0,
+    "profit_factor": 2.0344827586206913,
+    "realized_pnl_usdt": 660.0000000000006,
+    "trades": 1323,
+    "win_rate": 0.6296296296296297,
+    "wins": 833
+  },
+  "1": {
+    "gross_loss_usdt": -727.4999999999998,
+    "gross_profit_usdt": 1247.0000000000002,
+    "losses": 560,
+    "open": 0,
+    "profit_factor": 1.7140893470790386,
+    "realized_pnl_usdt": 519.5000000000006,
+    "trades": 1402,
+    "win_rate": 0.6005706134094151,
+    "wins": 842
+  },
+  "2": {
+    "gross_loss_usdt": -702.4999999999997,
+    "gross_profit_usdt": 1259.0,
+    "losses": 553,
+    "open": 0,
+    "profit_factor": 1.7921708185053389,
+    "realized_pnl_usdt": 556.5000000000007,
+    "trades": 1395,
+    "win_rate": 0.603584229390681,
+    "wins": 842
+  },
+  "3": {
+    "gross_loss_usdt": -596.9999999999998,
+    "gross_profit_usdt": 1070.0000000000002,
+    "losses": 472,
+    "open": 0,
+    "profit_factor": 1.7922948073701854,
+    "realized_pnl_usdt": 473.0000000000005,
+    "trades": 1192,
+    "win_rate": 0.6040268456375839,
+    "wins": 720
+  },
+  "4": {
+    "gross_loss_usdt": -626.4999999999994,
+    "gross_profit_usdt": 1088.0000000000002,
+    "losses": 489,
+    "open": 0,
+    "profit_factor": 1.7366320830008,
+    "realized_pnl_usdt": 461.5000000000008,
+    "trades": 1206,
+    "win_rate": 0.5945273631840796,
+    "wins": 717
+  },
+  "5": {
+    "gross_loss_usdt": -611.4999999999997,
+    "gross_profit_usdt": 1156.0000000000002,
+    "losses": 480,
+    "open": 0,
+    "profit_factor": 1.8904333605887178,
+    "realized_pnl_usdt": 544.5000000000006,
+    "trades": 1257,
+    "win_rate": 0.6181384248210023,
+    "wins": 777
+  },
+  "6": {
+    "gross_loss_usdt": -576.4999999999997,
+    "gross_profit_usdt": 1082.0000000000002,
+    "losses": 460,
+    "open": 0,
+    "profit_factor": 1.876843018213358,
+    "realized_pnl_usdt": 505.5000000000006,
+    "trades": 1183,
+    "win_rate": 0.6111580726965342,
+    "wins": 723
+  },
+  "7": {
+    "gross_loss_usdt": -608.9999999999999,
+    "gross_profit_usdt": 1029.0,
+    "losses": 483,
+    "open": 0,
+    "profit_factor": 1.6896551724137934,
+    "realized_pnl_usdt": 420.00000000000045,
+    "trades": 1172,
+    "win_rate": 0.5878839590443686,
+    "wins": 689
+  },
+  "8": {
+    "gross_loss_usdt": -563.4999999999998,
+    "gross_profit_usdt": 1034.0,
+    "losses": 447,
+    "open": 0,
+    "profit_factor": 1.8349600709849165,
+    "realized_pnl_usdt": 470.50000000000045,
+    "trades": 1149,
+    "win_rate": 0.6109660574412533,
+    "wins": 702
+  },
+  "9": {
+    "gross_loss_usdt": -613.4999999999999,
+    "gross_profit_usdt": 1091.0,
+    "losses": 489,
+    "open": 0,
+    "profit_factor": 1.7783211083944583,
+    "realized_pnl_usdt": 477.50000000000057,
+    "trades": 1247,
+    "win_rate": 0.6078588612670409,
+    "wins": 758
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "COMPLETE_EMPTY": 12,
+  "CONFLICT": 0,
+  "FAILED": 0,
+  "MISSING_IMPORTABLE": 0,
+  "READY": 2100,
+  "RUNNING": 0,
+  "all_planned_terminal": true,
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "extra_non_plan_segments": [
+    {
+      "note": "NON_HOUR_ALIGNED_PILOT_SEGMENT_NOT_IN_PLAN_2112",
+      "rows_written": 80738,
+      "segment_end": "2026-08-31T19:30:00Z",
+      "segment_start": "2026-08-31T18:30:00Z",
+      "symbol": "BTCUSDT",
+      "watermark_status": "COMPLETE"
+    }
+  ],
+  "planned_segments": 2112,
+  "progress_skipped_318_explanation": "Segments already terminal with matching fingerprint at resume",
+  "terminal_counts": {
+    "COMPLETE_EMPTY": 12,
+    "CONFLICT": 0,
+    "FAILED": 0,
+    "MISSING": 0,
+    "PARTIAL": 0,
+    "READY": 2100,
+    "RUNNING": 0
+  },
+  "watermark_segment_identities": 2113
+}

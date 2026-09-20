@@ -1,0 +1,35 @@
+{
+  "contract_version": "research_public_trades_contract_v2",
+  "processor": "btc_doge_research_trade_rematerialization_v1",
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "logical_key": [
+    "symbol",
+    "trade_id"
+  ],
+  "event_key": "{symbol}|{trade_id}",
+  "time_contract": {
+    "source_interpreted_as": "UTC",
+    "column": "event_time DateTime64(3,'UTC')",
+    "alias": "trade_ts_utc",
+    "insert_path": "server-side INSERT SELECT (no Python naive datetime)",
+    "forbidden": [
+      "naive local reinterpretation",
+      "blind +2h correction",
+      "DST-local anchors"
+    ]
+  },
+  "engine": "ReplacingMergeTree(record_version)",
+  "order_by": "(symbol, trade_id)",
+  "history": {
+    "start": "2026-07-19T00:00:00Z",
+    "end": "2026-09-01T00:00:00Z"
+  },
+  "pilot": {
+    "symbol": "BTCUSDT",
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T19:30:00Z"
+  },
+  "invalid_shifted_table": "research_public_trades_invalid_shifted_v0",
+  "source_table": "orderbook_analysis.public_trades_canonical",
+  "source_access": "READ_ONLY"
+}

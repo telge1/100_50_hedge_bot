@@ -1,0 +1,53 @@
+{
+  "generated_at": "2026-09-03T13:03:45Z",
+  "hotspots": [
+    {
+      "rank": 1,
+      "name": "FINAL on research_public_trades span/count",
+      "baseline_s": 4.0,
+      "after_s": 0.05,
+      "fix": "omit FINAL; physical==canonical"
+    },
+    {
+      "rank": 2,
+      "name": "edge_observability / sequence validation",
+      "baseline_s": 15.0,
+      "after_s": 1.8,
+      "fix": "prepare OB once; book-level coverage"
+    },
+    {
+      "rank": 3,
+      "name": "summary/fight JSON embed + heavy CSVs",
+      "baseline_s": 5.0,
+      "after_s": 0.4,
+      "fix": "lean summary; heavy_detail_csv=False"
+    },
+    {
+      "rank": 4,
+      "name": "OA volume parity query",
+      "baseline_s": 2.1,
+      "after_s": 0.01,
+      "fix": "fingerprint disk cache"
+    },
+    {
+      "rank": 5,
+      "name": "Decimal tick / wall O(n^2) scan",
+      "baseline_s": 2.0,
+      "after_s": 0.4,
+      "fix": "float ticks; ts_by_sample dict"
+    },
+    {
+      "rank": 6,
+      "name": "TPO/volume recompute verifies",
+      "baseline_s": 2.0,
+      "after_s": 0.3,
+      "fix": "baseline reuse; causal fast-path"
+    }
+  ],
+  "query_plan": {
+    "sorting_key": "(symbol, trade_id)",
+    "final_breaks_event_time_minmax": true,
+    "action": "omit FINAL for Fight reads (physical==canonical, multi-version keys=0)",
+    "new_projection_or_table": false
+  }
+}

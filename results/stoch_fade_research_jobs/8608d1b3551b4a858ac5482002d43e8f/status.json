@@ -1,0 +1,459 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/XRPUSDT/cbc666337cc343a089939ebea1320894",
+      "duration_seconds": 51.493,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:38:30Z",
+      "message": "",
+      "multi_tf_collision_count": 49,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3468,
+          "tier_a": 435
+        },
+        "1h": {
+          "raw": 878,
+          "tier_a": 117
+        },
+        "30m": {
+          "raw": 1777,
+          "tier_a": 205
+        },
+        "4h": {
+          "raw": 209,
+          "tier_a": 22
+        }
+      },
+      "raw_total": 6332,
+      "returncode": 0,
+      "runner_run_id": "cbc666337cc343a089939ebea1320894",
+      "started_at": "2026-08-15T18:37:38Z",
+      "state": "COMPLETED",
+      "symbol": "XRPUSDT",
+      "tier_a_total": 779,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/SOLUSDT/f8c5ea95db8844ab93b177fe2284066a",
+      "duration_seconds": 52.141,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:39:22Z",
+      "message": "",
+      "multi_tf_collision_count": 65,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3436,
+          "tier_a": 487
+        },
+        "1h": {
+          "raw": 875,
+          "tier_a": 126
+        },
+        "30m": {
+          "raw": 1749,
+          "tier_a": 250
+        },
+        "4h": {
+          "raw": 209,
+          "tier_a": 31
+        }
+      },
+      "raw_total": 6269,
+      "returncode": 0,
+      "runner_run_id": "f8c5ea95db8844ab93b177fe2284066a",
+      "started_at": "2026-08-15T18:38:30Z",
+      "state": "COMPLETED",
+      "symbol": "SOLUSDT",
+      "tier_a_total": 894,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/HYPEUSDT/3e514b77ee6242bc862211b85ae38a9a",
+      "duration_seconds": 52.34,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:40:14Z",
+      "message": "",
+      "multi_tf_collision_count": 97,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3500,
+          "tier_a": 796
+        },
+        "1h": {
+          "raw": 870,
+          "tier_a": 188
+        },
+        "30m": {
+          "raw": 1774,
+          "tier_a": 360
+        },
+        "4h": {
+          "raw": 214,
+          "tier_a": 49
+        }
+      },
+      "raw_total": 6358,
+      "returncode": 0,
+      "runner_run_id": "3e514b77ee6242bc862211b85ae38a9a",
+      "started_at": "2026-08-15T18:39:22Z",
+      "state": "COMPLETED",
+      "symbol": "HYPEUSDT",
+      "tier_a_total": 1393,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/XAUTUSDT/7d55b824d3c54e11a82e121a1e62d184",
+      "duration_seconds": 52.289,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:41:06Z",
+      "message": "",
+      "multi_tf_collision_count": 8,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3496,
+          "tier_a": 186
+        },
+        "1h": {
+          "raw": 862,
+          "tier_a": 49
+        },
+        "30m": {
+          "raw": 1763,
+          "tier_a": 84
+        },
+        "4h": {
+          "raw": 212,
+          "tier_a": 13
+        }
+      },
+      "raw_total": 6333,
+      "returncode": 0,
+      "runner_run_id": "7d55b824d3c54e11a82e121a1e62d184",
+      "started_at": "2026-08-15T18:40:14Z",
+      "state": "COMPLETED",
+      "symbol": "XAUTUSDT",
+      "tier_a_total": 332,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/ZECUSDT/e75d3f7d16a245758e7c74f12414ddd6",
+      "duration_seconds": 51.589,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:41:58Z",
+      "message": "",
+      "multi_tf_collision_count": 99,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3480,
+          "tier_a": 867
+        },
+        "1h": {
+          "raw": 887,
+          "tier_a": 222
+        },
+        "30m": {
+          "raw": 1758,
+          "tier_a": 404
+        },
+        "4h": {
+          "raw": 204,
+          "tier_a": 50
+        }
+      },
+      "raw_total": 6329,
+      "returncode": 0,
+      "runner_run_id": "e75d3f7d16a245758e7c74f12414ddd6",
+      "started_at": "2026-08-15T18:41:06Z",
+      "state": "COMPLETED",
+      "symbol": "ZECUSDT",
+      "tier_a_total": 1543,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/LINKUSDT/4d67ae45c88248ce9bd385b7f5b69e44",
+      "duration_seconds": 51.74,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:42:50Z",
+      "message": "",
+      "multi_tf_collision_count": 57,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3492,
+          "tier_a": 487
+        },
+        "1h": {
+          "raw": 872,
+          "tier_a": 123
+        },
+        "30m": {
+          "raw": 1781,
+          "tier_a": 249
+        },
+        "4h": {
+          "raw": 216,
+          "tier_a": 32
+        }
+      },
+      "raw_total": 6361,
+      "returncode": 0,
+      "runner_run_id": "4d67ae45c88248ce9bd385b7f5b69e44",
+      "started_at": "2026-08-15T18:41:58Z",
+      "state": "COMPLETED",
+      "symbol": "LINKUSDT",
+      "tier_a_total": 891,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/DOGEUSDT/780d3d1c1ab443bb8f9e462f0d691f7a",
+      "duration_seconds": 52.288,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:43:42Z",
+      "message": "",
+      "multi_tf_collision_count": 52,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3470,
+          "tier_a": 489
+        },
+        "1h": {
+          "raw": 852,
+          "tier_a": 120
+        },
+        "30m": {
+          "raw": 1773,
+          "tier_a": 244
+        },
+        "4h": {
+          "raw": 220,
+          "tier_a": 31
+        }
+      },
+      "raw_total": 6315,
+      "returncode": 0,
+      "runner_run_id": "780d3d1c1ab443bb8f9e462f0d691f7a",
+      "started_at": "2026-08-15T18:42:50Z",
+      "state": "COMPLETED",
+      "symbol": "DOGEUSDT",
+      "tier_a_total": 884,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/BNBUSDT/065a5ff93482448ba5debe68a904a87e",
+      "duration_seconds": 51.889,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:44:34Z",
+      "message": "",
+      "multi_tf_collision_count": 32,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3463,
+          "tier_a": 307
+        },
+        "1h": {
+          "raw": 874,
+          "tier_a": 82
+        },
+        "30m": {
+          "raw": 1761,
+          "tier_a": 156
+        },
+        "4h": {
+          "raw": 210,
+          "tier_a": 19
+        }
+      },
+      "raw_total": 6308,
+      "returncode": 0,
+      "runner_run_id": "065a5ff93482448ba5debe68a904a87e",
+      "started_at": "2026-08-15T18:43:42Z",
+      "state": "COMPLETED",
+      "symbol": "BNBUSDT",
+      "tier_a_total": 564,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/SUIUSDT/ce3998b3b19845caa44498dbaa3228ab",
+      "duration_seconds": 51.94,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:45:26Z",
+      "message": "",
+      "multi_tf_collision_count": 68,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3471,
+          "tier_a": 622
+        },
+        "1h": {
+          "raw": 868,
+          "tier_a": 149
+        },
+        "30m": {
+          "raw": 1754,
+          "tier_a": 302
+        },
+        "4h": {
+          "raw": 213,
+          "tier_a": 41
+        }
+      },
+      "raw_total": 6306,
+      "returncode": 0,
+      "runner_run_id": "ce3998b3b19845caa44498dbaa3228ab",
+      "started_at": "2026-08-15T18:44:34Z",
+      "state": "COMPLETED",
+      "symbol": "SUIUSDT",
+      "tier_a_total": 1114,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/ADAUSDT/d88b00131f6140cfb7367ea398f593bd",
+      "duration_seconds": 52.089,
+      "error_code": null,
+      "finished_at": "2026-08-15T18:46:18Z",
+      "message": "",
+      "multi_tf_collision_count": 55,
+      "per_timeframe": {
+        "15m": {
+          "raw": 3475,
+          "tier_a": 533
+        },
+        "1h": {
+          "raw": 857,
+          "tier_a": 141
+        },
+        "30m": {
+          "raw": 1745,
+          "tier_a": 283
+        },
+        "4h": {
+          "raw": 223,
+          "tier_a": 31
+        }
+      },
+      "raw_total": 6300,
+      "returncode": 0,
+      "runner_run_id": "d88b00131f6140cfb7367ea398f593bd",
+      "started_at": "2026-08-15T18:45:26Z",
+      "state": "COMPLETED",
+      "symbol": "ADAUSDT",
+      "tier_a_total": 988,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": false
+      },
+      "warmup_schema_error": null
+    }
+  ],
+  "combined_summary": {
+    "coins_evaluated": 10,
+    "coins_with_signals": 10,
+    "coins_without_tier_a": 0,
+    "execution_dedup_applied": false,
+    "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+    "failed_coins": 0,
+    "multi_tf_collisions": 582,
+    "outcome_evaluation_enabled": false,
+    "raw_by_timeframe": {
+      "15m": 34751,
+      "1h": 8695,
+      "30m": 17635,
+      "4h": 2130
+    },
+    "raw_candidates": 63211,
+    "successful_coins": 10,
+    "tier_a": 9382,
+    "tier_a_by_timeframe": {
+      "15m": 5209,
+      "1h": 1317,
+      "30m": 2537,
+      "4h": 319
+    },
+    "warmup_warnings": 10,
+    "writes_to_clickhouse": false
+  },
+  "completed_coins": 10,
+  "created_at": "2026-08-15T18:37:38Z",
+  "current_index": 10,
+  "current_symbol": null,
+  "error_summary": "",
+  "failed_coins": 0,
+  "finished_at": "2026-08-15T18:46:18Z",
+  "job_id": "8608d1b3551b4a858ac5482002d43e8f",
+  "last_worker_pid": 1273242,
+  "message": "COMPLETED",
+  "progress_percent": 100,
+  "raw_total": 63211,
+  "started_at": "2026-08-15T18:37:38Z",
+  "state": "COMPLETED",
+  "successful_coins": 10,
+  "tier_a_total": 9382,
+  "total_coins": 10,
+  "worker_pid": null
+}

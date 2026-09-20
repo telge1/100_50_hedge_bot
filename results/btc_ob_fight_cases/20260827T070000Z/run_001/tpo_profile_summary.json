@@ -1,0 +1,51 @@
+{
+  "tpo_profile_status": "TPO_PROFILE_DATA_INSUFFICIENT",
+  "contract_version": "tpo_profile_facts_v1",
+  "provenance": {
+    "profile_kind": "TPO_BRACKET",
+    "source": "btc_doge_research.research_public_trades",
+    "weighting": "DISTINCT_BRACKET_PRESENCE",
+    "bracket_minutes": 30,
+    "bracket_alignment": "SESSION_START",
+    "partial_bracket_policy": "INCLUDE_CAUSAL_PARTIAL_BRACKET",
+    "anchor_exclusive": true,
+    "trade_size_used_as_weight": false,
+    "chart_timeframe_dependency": false,
+    "session_start_utc": "2026-08-26T13:30:00Z",
+    "cutoff_utc": "2026-08-27T07:00:00Z",
+    "profile_session_id": "us_developing_to_anchor",
+    "orderbook_tick_size": 0.1,
+    "symbol": "BTCUSDT"
+  },
+  "coverage": {
+    "session_start_utc": "2026-08-26T13:30:00Z",
+    "cutoff_utc": "2026-08-27T07:00:00Z",
+    "raw_trade_rows_in_session": 0,
+    "dedup_removed_duplicates": 0,
+    "deduped_trade_rows_used": 0,
+    "future_trade_count_excluded": 0,
+    "min_trade_ts": null,
+    "max_trade_ts": null,
+    "profile_session_id": "us_developing_to_anchor"
+  },
+  "brackets": null,
+  "integrity": {
+    "status": "FAIL",
+    "reason": "no_trades_in_session"
+  },
+  "prefix_parity": {
+    "status": "SKIP",
+    "reason": "baseline_not_computed"
+  },
+  "trade_size_invariance": {
+    "status": "SKIP",
+    "reason": "baseline_not_computed"
+  },
+  "tpoc": {},
+  "value_area": {},
+  "hvn_candidates": [],
+  "lvn_candidates": [],
+  "tpo_profile_cutoff_utc": null,
+  "future_trade_count_used": 0,
+  "tpo_profile_computed_separately": true
+}

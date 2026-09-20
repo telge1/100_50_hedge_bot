@@ -1,0 +1,13 @@
+{
+  "status": "DATA_COMPLETE",
+  "data_complete": true,
+  "replay_ok": true,
+  "epochs": [
+    0,
+    1
+  ],
+  "resync_present": true,
+  "final_u": 1060,
+  "final_seq": 10600,
+  "REPLAY_PARITY": true
+}

@@ -1,0 +1,2533 @@
+{
+  "reasons": [
+    {
+      "code": "ANCHOR_INSIDE_TPO_VALUE_AREA",
+      "fields": {
+        "price_at_anchor": 78984.4,
+        "tpo_vah": 79140.0,
+        "tpo_val": 78190.0
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:30:34.108Z",
+        "price": 78865.0,
+        "level_id": "tpo_hvn_78865.00",
+        "label": "TPO-HVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:37:00.259Z",
+        "price": 78935.0,
+        "level_id": "tpo_lvn_78935.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:41:04.329Z",
+        "price": 79035.0,
+        "level_id": "tpo_lvn_79035.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:44:21.809Z",
+        "price": 79140.0,
+        "level_id": "tpo_vah",
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:44:21.82Z",
+        "price": 79145.0,
+        "level_id": "tpo_lvn_79145.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:53:06.961Z",
+        "price": 78985.0,
+        "level_id": "tpo_lvn_78985.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LIQUIDATIONS_OBSERVED",
+      "fields": {
+        "liquidation_count": 60,
+        "liquidation_summary": {
+          "long_count": 1,
+          "short_count": 59,
+          "long_notional": 78.7603,
+          "short_notional": 490938.9752,
+          "largest_notional": 128089.1365,
+          "largest_ts": "2026-08-31T18:44:29.884Z",
+          "largest_price": 79410.5,
+          "side_semantics": "liquidated_position_side: LIQUIDATED_LONG / LIQUIDATED_SHORT"
+        }
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "fields": {
+        "delta_notional": -4244705.919799998,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:00:00Z",
+        "window": "anchor_pre_30m"
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "fields": {
+        "delta_notional": -5117983.503700003,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "full"
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "fields": {
+        "delta_notional": -873277.5838999972,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "anchor_0_30m"
+      }
+    },
+    {
+      "code": "OI_INCREASE_OBSERVED",
+      "fields": {
+        "oi_first": 52549.44,
+        "oi_last": 52663.77,
+        "oi_delta": 114.32999999999447,
+        "oi_delta_pct": 0.21756654304973463,
+        "oi_unit": {
+          "source_field": "open_interest",
+          "table": "orderbook_analysis.open_interest_5s",
+          "physical_unit_confirmed": false,
+          "display_label": "Source-Einheiten (open_interest)"
+        }
+      }
+    },
+    {
+      "code": "POSITIVE_TAKER_DELTA_OBSERVED",
+      "fields": {
+        "delta_notional": 2756241.6088999994,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:10:00Z",
+        "window": "anchor_0_10m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "fields": {
+        "price_change_bps": 14.97471036424826,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:00:00Z",
+        "window": "anchor_pre_30m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "fields": {
+        "price_change_bps": 24.066045953722046,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "full"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "fields": {
+        "price_change_bps": 25.878495147781422,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:10:00Z",
+        "window": "anchor_0_10m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "fields": {
+        "price_change_bps": 9.065069728871592,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "anchor_0_30m"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:00:01.28Z",
+        "end_ts": "2026-08-31T19:27:13.653Z",
+        "duration_seconds": 1632.373,
+        "max_excursion_bps": 37.450148762423616,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_039",
+        "episode_index": 39,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:13.653Z",
+        "end_ts": "2026-08-31T19:27:13.851Z",
+        "duration_seconds": 0.198,
+        "max_excursion_bps": 1.0634930683033714,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:32.739Z",
+        "end_ts": "2026-08-31T19:01:42.015Z",
+        "duration_seconds": 9.276,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_003",
+        "episode_index": 3,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:23.995Z",
+        "end_ts": "2026-08-31T19:02:27.649Z",
+        "duration_seconds": 3.654,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_006",
+        "episode_index": 6,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:31.595Z",
+        "end_ts": "2026-08-31T19:02:32.65Z",
+        "duration_seconds": 1.055,
+        "max_excursion_bps": 0.30366293414236467,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_007",
+        "episode_index": 7,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:45.692Z",
+        "end_ts": "2026-08-31T19:04:13.532Z",
+        "duration_seconds": 87.84,
+        "max_excursion_bps": 3.7198709432522525,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_008",
+        "episode_index": 8,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:13.532Z",
+        "end_ts": "2026-08-31T19:04:13.535Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.025305244511556857,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_009",
+        "episode_index": 9,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:49.506Z",
+        "end_ts": "2026-08-31T19:04:59.158Z",
+        "duration_seconds": 9.652,
+        "max_excursion_bps": 1.493009426203949,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_010",
+        "episode_index": 10,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:59.158Z",
+        "end_ts": "2026-08-31T19:05:00.876Z",
+        "duration_seconds": 1.718,
+        "max_excursion_bps": 0.41753653444713235,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_011",
+        "episode_index": 11,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:15.695Z",
+        "end_ts": "2026-08-31T19:05:25.04Z",
+        "duration_seconds": 9.345,
+        "max_excursion_bps": 2.1003352944905194,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_013",
+        "episode_index": 13,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:25.04Z",
+        "end_ts": "2026-08-31T19:05:25.131Z",
+        "duration_seconds": 0.091,
+        "max_excursion_bps": 0.050610489023113714,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_016",
+        "episode_index": 16,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:29.629Z",
+        "end_ts": "2026-08-31T19:18:42.031Z",
+        "duration_seconds": 792.402,
+        "max_excursion_bps": 31.100145505156313,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_017",
+        "episode_index": 17,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:42.031Z",
+        "end_ts": "2026-08-31T19:18:42.034Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_020",
+        "episode_index": 20,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:50.39Z",
+        "end_ts": "2026-08-31T19:19:06.173Z",
+        "duration_seconds": 15.783,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_022",
+        "episode_index": 22,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:07.216Z",
+        "end_ts": "2026-08-31T19:19:14.205Z",
+        "duration_seconds": 6.989,
+        "max_excursion_bps": 0.6326311127981273,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_029",
+        "episode_index": 29,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:42.886Z",
+        "end_ts": "2026-08-31T19:19:44.813Z",
+        "duration_seconds": 1.927,
+        "max_excursion_bps": 0.1391788448163245,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_045",
+        "episode_index": 45,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:18.398Z",
+        "end_ts": "2026-08-31T19:20:26.571Z",
+        "duration_seconds": 8.173,
+        "max_excursion_bps": 0.518757512495201,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_046",
+        "episode_index": 46,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:57.031Z",
+        "end_ts": "2026-08-31T19:21:04.567Z",
+        "duration_seconds": 7.536,
+        "max_excursion_bps": 0.986904535965447,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_056",
+        "episode_index": 56,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:35.555Z",
+        "end_ts": "2026-08-31T19:21:46.685Z",
+        "duration_seconds": 11.13,
+        "max_excursion_bps": 0.8730309356606794,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_057",
+        "episode_index": 57,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:22:56.304Z",
+        "end_ts": "2026-08-31T19:25:00.875Z",
+        "duration_seconds": 124.571,
+        "max_excursion_bps": 5.630416903903334,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:08:15.264Z",
+        "end_ts": "2026-08-31T19:10:53.853Z",
+        "duration_seconds": 158.589,
+        "max_excursion_bps": 17.15838018826242,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_074",
+        "episode_index": 74,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:53.853Z",
+        "end_ts": "2026-08-31T19:10:56.698Z",
+        "duration_seconds": 2.845,
+        "max_excursion_bps": 2.6407227241132327,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:59.33Z",
+        "end_ts": "2026-08-31T19:11:00.852Z",
+        "duration_seconds": 1.522,
+        "max_excursion_bps": 0.6317518478741551,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_077",
+        "episode_index": 77,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:04.587Z",
+        "end_ts": "2026-08-31T19:11:23.58Z",
+        "duration_seconds": 18.993,
+        "max_excursion_bps": 2.059511024070113,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_078",
+        "episode_index": 78,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:23.58Z",
+        "end_ts": "2026-08-31T19:11:23.587Z",
+        "duration_seconds": 0.007,
+        "max_excursion_bps": 0.1895255543622465,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_082",
+        "episode_index": 82,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:12:55.759Z",
+        "end_ts": "2026-08-31T19:13:05.634Z",
+        "duration_seconds": 9.875,
+        "max_excursion_bps": 0.5938467370013379,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_084",
+        "episode_index": 84,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:24.115Z",
+        "end_ts": "2026-08-31T19:13:26.187Z",
+        "duration_seconds": 2.072,
+        "max_excursion_bps": 1.3772190283649224,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_085",
+        "episode_index": 85,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:28.615Z",
+        "end_ts": "2026-08-31T19:13:30.612Z",
+        "duration_seconds": 1.997,
+        "max_excursion_bps": 0.4548613304701271,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_086",
+        "episode_index": 86,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:34.309Z",
+        "end_ts": "2026-08-31T19:15:00.231Z",
+        "duration_seconds": 85.922,
+        "max_excursion_bps": 10.701876302987818,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_001",
+        "episode_index": 1,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:08:13.577Z",
+        "end_ts": "2026-08-31T19:10:58.515Z",
+        "duration_seconds": 164.938,
+        "max_excursion_bps": 17.791256002022102,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:10:59.22Z",
+        "end_ts": "2026-08-31T19:11:35.748Z",
+        "duration_seconds": 36.528,
+        "max_excursion_bps": 2.6914329037153033,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_007",
+        "episode_index": 7,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:12:13.63Z",
+        "end_ts": "2026-08-31T19:13:08.738Z",
+        "duration_seconds": 55.108,
+        "max_excursion_bps": 1.2256760171843681,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_044",
+        "episode_index": 44,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:16.363Z",
+        "end_ts": "2026-08-31T19:13:20.206Z",
+        "duration_seconds": 3.843,
+        "max_excursion_bps": 0.5054334091483447,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_065",
+        "episode_index": 65,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:20.206Z",
+        "end_ts": "2026-08-31T19:13:20.567Z",
+        "duration_seconds": 0.361,
+        "max_excursion_bps": 0.18953752843062927,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_079",
+        "episode_index": 79,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:21.595Z",
+        "end_ts": "2026-08-31T19:15:04.574Z",
+        "duration_seconds": 102.979,
+        "max_excursion_bps": 11.334344200151262,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_above_081",
+        "episode_index": 81,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:04.574Z",
+        "end_ts": "2026-08-31T19:15:04.665Z",
+        "duration_seconds": 0.091,
+        "max_excursion_bps": 0.12635835228708617,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_INCOMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_040",
+        "episode_index": 40,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:33.988Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_INCOMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:28:01.56Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:00:01.279Z",
+        "end_ts": "2026-08-31T19:00:01.28Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_below_039",
+        "episode_index": 39,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:13.851Z",
+        "end_ts": "2026-08-31T19:27:33.988Z",
+        "duration_seconds": 20.137,
+        "max_excursion_bps": 1.7218459201121503,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:32.736Z",
+        "end_ts": "2026-08-31T19:01:32.739Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.25305244511925096,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:42.015Z",
+        "end_ts": "2026-08-31T19:02:23.995Z",
+        "duration_seconds": 41.98,
+        "max_excursion_bps": 1.214651736573141,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_003",
+        "episode_index": 3,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:27.649Z",
+        "end_ts": "2026-08-31T19:02:31.595Z",
+        "duration_seconds": 3.946,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_006",
+        "episode_index": 6,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:32.65Z",
+        "end_ts": "2026-08-31T19:02:45.692Z",
+        "duration_seconds": 13.042,
+        "max_excursion_bps": 1.5056620484588066,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_008",
+        "episode_index": 8,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:13.535Z",
+        "end_ts": "2026-08-31T19:04:49.506Z",
+        "duration_seconds": 35.971,
+        "max_excursion_bps": 3.694565698740696,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_010",
+        "episode_index": 10,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:00.876Z",
+        "end_ts": "2026-08-31T19:05:15.695Z",
+        "duration_seconds": 14.819,
+        "max_excursion_bps": 1.8852407161376832,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_013",
+        "episode_index": 13,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:25.131Z",
+        "end_ts": "2026-08-31T19:05:29.626Z",
+        "duration_seconds": 4.495,
+        "max_excursion_bps": 0.6326311127981273,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_015",
+        "episode_index": 15,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:29.626Z",
+        "end_ts": "2026-08-31T19:05:29.629Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_017",
+        "episode_index": 17,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:42.034Z",
+        "end_ts": "2026-08-31T19:18:50.315Z",
+        "duration_seconds": 8.281,
+        "max_excursion_bps": 2.0244195609540077,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_019",
+        "episode_index": 19,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:50.315Z",
+        "end_ts": "2026-08-31T19:18:50.39Z",
+        "duration_seconds": 0.075,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_021",
+        "episode_index": 21,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:06.173Z",
+        "end_ts": "2026-08-31T19:19:07.216Z",
+        "duration_seconds": 1.043,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_022",
+        "episode_index": 22,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:14.205Z",
+        "end_ts": "2026-08-31T19:19:42.879Z",
+        "duration_seconds": 28.674,
+        "max_excursion_bps": 3.0239767191743123,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_028",
+        "episode_index": 28,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:42.879Z",
+        "end_ts": "2026-08-31T19:19:42.886Z",
+        "duration_seconds": 0.007,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_029",
+        "episode_index": 29,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:44.813Z",
+        "end_ts": "2026-08-31T19:20:07.308Z",
+        "duration_seconds": 22.495,
+        "max_excursion_bps": 3.0239767191743123,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_030",
+        "episode_index": 30,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:07.308Z",
+        "end_ts": "2026-08-31T19:20:16.674Z",
+        "duration_seconds": 9.366,
+        "max_excursion_bps": 0.7085468463346392,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_042",
+        "episode_index": 42,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:16.674Z",
+        "end_ts": "2026-08-31T19:20:18.398Z",
+        "duration_seconds": 1.724,
+        "max_excursion_bps": 0.3542734231673196,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_045",
+        "episode_index": 45,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:26.571Z",
+        "end_ts": "2026-08-31T19:20:57.031Z",
+        "duration_seconds": 30.46,
+        "max_excursion_bps": 4.985133168848507,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_052",
+        "episode_index": 52,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:04.567Z",
+        "end_ts": "2026-08-31T19:21:35.555Z",
+        "duration_seconds": 30.988,
+        "max_excursion_bps": 0.5820206237750136,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_056",
+        "episode_index": 56,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:46.685Z",
+        "end_ts": "2026-08-31T19:22:56.304Z",
+        "duration_seconds": 69.619,
+        "max_excursion_bps": 5.073701524641718,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_057",
+        "episode_index": 57,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:25:00.875Z",
+        "end_ts": "2026-08-31T19:28:01.56Z",
+        "duration_seconds": 180.685,
+        "max_excursion_bps": 8.047067754792918,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:08:15.206Z",
+        "end_ts": "2026-08-31T19:08:15.264Z",
+        "duration_seconds": 0.058,
+        "max_excursion_bps": 0.07581022174563405,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_074",
+        "episode_index": 74,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:56.698Z",
+        "end_ts": "2026-08-31T19:10:59.33Z",
+        "duration_seconds": 2.632,
+        "max_excursion_bps": 1.7183650262184371,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:00.852Z",
+        "end_ts": "2026-08-31T19:11:04.587Z",
+        "duration_seconds": 3.735,
+        "max_excursion_bps": 0.037905110872817026,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_078",
+        "episode_index": 78,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:23.587Z",
+        "end_ts": "2026-08-31T19:12:55.759Z",
+        "duration_seconds": 92.172,
+        "max_excursion_bps": 4.763408932970761,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_082",
+        "episode_index": 82,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:05.634Z",
+        "end_ts": "2026-08-31T19:13:24.114Z",
+        "duration_seconds": 18.48,
+        "max_excursion_bps": 3.2219344241581904,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_083",
+        "episode_index": 83,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:24.114Z",
+        "end_ts": "2026-08-31T19:13:24.115Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.22743066523506356,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_084",
+        "episode_index": 84,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:26.187Z",
+        "end_ts": "2026-08-31T19:13:28.615Z",
+        "duration_seconds": 2.428,
+        "max_excursion_bps": 0.24006570219144346,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_085",
+        "episode_index": 85,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:30.612Z",
+        "end_ts": "2026-08-31T19:13:34.309Z",
+        "duration_seconds": 3.697,
+        "max_excursion_bps": 0.012635036958218557,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:10:58.515Z",
+        "end_ts": "2026-08-31T19:10:59.22Z",
+        "duration_seconds": 0.705,
+        "max_excursion_bps": 1.0866818296696767,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_002",
+        "episode_index": 2,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:11:35.748Z",
+        "end_ts": "2026-08-31T19:12:13.63Z",
+        "duration_seconds": 37.882,
+        "max_excursion_bps": 4.1319181197873505,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_039",
+        "episode_index": 39,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:08.738Z",
+        "end_ts": "2026-08-31T19:13:16.362Z",
+        "duration_seconds": 7.624,
+        "max_excursion_bps": 2.4513520343687363,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_043",
+        "episode_index": 43,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:16.362Z",
+        "end_ts": "2026-08-31T19:13:16.363Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.3158958807177154,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_078",
+        "episode_index": 78,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:20.567Z",
+        "end_ts": "2026-08-31T19:13:21.595Z",
+        "duration_seconds": 1.028,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_081",
+        "episode_index": 81,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:04.665Z",
+        "end_ts": "2026-08-31T19:15:20.53Z",
+        "duration_seconds": 15.865,
+        "max_excursion_bps": 4.991154915339904,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_INCOMPLETE",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_093",
+        "episode_index": 93,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:15:00.231Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_INCOMPLETE",
+      "fields": {
+        "episode_id": "tpo_vah_below_116",
+        "episode_index": 116,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:20.53Z",
+        "label": "TPO-VAH"
+      }
+    }
+  ],
+  "templates_de": [
+    {
+      "code": "ANCHOR_INSIDE_TPO_VALUE_AREA",
+      "text_de": "Der Ankerpreis 78984.4 lag innerhalb der TPO-Value-Area (VAL 78190.0, VAH 79140.0).",
+      "fields": {
+        "price_at_anchor": 78984.4,
+        "tpo_vah": 79140.0,
+        "tpo_val": 78190.0
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-HVN 78865.0 wurde erstmals berührt um 2026-08-31 18:30:34.108 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:30:34.108Z",
+        "price": 78865.0,
+        "level_id": "tpo_hvn_78865.00",
+        "label": "TPO-HVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-LVN 78935.0 wurde erstmals berührt um 2026-08-31 18:37:00.259 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:37:00.259Z",
+        "price": 78935.0,
+        "level_id": "tpo_lvn_78935.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-LVN 79035.0 wurde erstmals berührt um 2026-08-31 18:41:04.329 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:41:04.329Z",
+        "price": 79035.0,
+        "level_id": "tpo_lvn_79035.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-VAH 79140.0 wurde erstmals berührt um 2026-08-31 18:44:21.809 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:44:21.809Z",
+        "price": 79140.0,
+        "level_id": "tpo_vah",
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-LVN 79145.0 wurde erstmals berührt um 2026-08-31 18:44:21.82 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:44:21.82Z",
+        "price": 79145.0,
+        "level_id": "tpo_lvn_79145.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LEVEL_TOUCHED",
+      "text_de": "Level TPO-LVN 78985.0 wurde erstmals berührt um 2026-08-31 18:53:06.961 UTC.",
+      "fields": {
+        "first_touch_ts": "2026-08-31T18:53:06.961Z",
+        "price": 78985.0,
+        "level_id": "tpo_lvn_78985.00",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "LIQUIDATIONS_OBSERVED",
+      "text_de": "Es wurden 60 Liquidationen beobachtet (Long 1, Short 59).",
+      "fields": {
+        "liquidation_count": 60,
+        "liquidation_summary": {
+          "long_count": 1,
+          "short_count": 59,
+          "long_notional": 78.7603,
+          "short_notional": 490938.9752,
+          "largest_notional": 128089.1365,
+          "largest_ts": "2026-08-31T18:44:29.884Z",
+          "largest_price": 79410.5,
+          "side_semantics": "liquidated_position_side: LIQUIDATED_LONG / LIQUIDATED_SHORT"
+        }
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "text_de": "Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:00:00 UTC: Taker-Delta -4.24 Mio. USD.",
+      "fields": {
+        "delta_notional": -4244705.919799998,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:00:00Z",
+        "window": "anchor_pre_30m"
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "text_de": "Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:30:00 UTC: Taker-Delta -5.12 Mio. USD.",
+      "fields": {
+        "delta_notional": -5117983.503700003,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "full"
+      }
+    },
+    {
+      "code": "NEGATIVE_TAKER_DELTA_OBSERVED",
+      "text_de": "Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:30:00 UTC: Taker-Delta -0.87 Mio. USD.",
+      "fields": {
+        "delta_notional": -873277.5838999972,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "anchor_0_30m"
+      }
+    },
+    {
+      "code": "OI_INCREASE_OBSERVED",
+      "text_de": "OI-Delta: +114.33 Source-Einheiten (open_interest) (+0.218 %); Start +52549.44, Ende +52663.77.",
+      "fields": {
+        "oi_first": 52549.44,
+        "oi_last": 52663.77,
+        "oi_delta": 114.32999999999447,
+        "oi_delta_pct": 0.21756654304973463,
+        "oi_unit": {
+          "source_field": "open_interest",
+          "table": "orderbook_analysis.open_interest_5s",
+          "physical_unit_confirmed": false,
+          "display_label": "Source-Einheiten (open_interest)"
+        }
+      }
+    },
+    {
+      "code": "POSITIVE_TAKER_DELTA_OBSERVED",
+      "text_de": "Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:10:00 UTC: Taker-Delta +2.76 Mio. USD.",
+      "fields": {
+        "delta_notional": 2756241.6088999994,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:10:00Z",
+        "window": "anchor_0_10m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "text_de": "Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:00:00 UTC: Preisänderung +14.97 bps.",
+      "fields": {
+        "price_change_bps": 14.97471036424826,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:00:00Z",
+        "window": "anchor_pre_30m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "text_de": "Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:30:00 UTC: Preisänderung +24.07 bps.",
+      "fields": {
+        "price_change_bps": 24.066045953722046,
+        "start_utc": "2026-08-31T18:30:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "full"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "text_de": "Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:10:00 UTC: Preisänderung +25.88 bps.",
+      "fields": {
+        "price_change_bps": 25.878495147781422,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:10:00Z",
+        "window": "anchor_0_10m"
+      }
+    },
+    {
+      "code": "PRICE_MOVED_UP_IN_WINDOW",
+      "text_de": "Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:30:00 UTC: Preisänderung +9.07 bps.",
+      "fields": {
+        "price_change_bps": 9.065069728871592,
+        "start_utc": "2026-08-31T19:00:00Z",
+        "end_utc": "2026-08-31T19:30:00Z",
+        "window": "anchor_0_30m"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:00:01.28 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 1632.373 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:00:01.28Z",
+        "end_ts": "2026-08-31T19:27:13.653Z",
+        "duration_seconds": 1632.373,
+        "max_excursion_bps": 37.450148762423616,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.851 UTC mit einer Dauer von 0.198 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_039",
+        "episode_index": 39,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:13.653Z",
+        "end_ts": "2026-08-31T19:27:13.851Z",
+        "duration_seconds": 0.198,
+        "max_excursion_bps": 1.0634930683033714,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:01:32.739 UTC und endete am 2026-08-31 19:01:42.015 UTC mit einer Dauer von 9.276 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:32.739Z",
+        "end_ts": "2026-08-31T19:01:42.015Z",
+        "duration_seconds": 9.276,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:23.995 UTC und endete am 2026-08-31 19:02:27.649 UTC mit einer Dauer von 3.654 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_003",
+        "episode_index": 3,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:23.995Z",
+        "end_ts": "2026-08-31T19:02:27.649Z",
+        "duration_seconds": 3.654,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:32.65 UTC mit einer Dauer von 1.055 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_006",
+        "episode_index": 6,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:31.595Z",
+        "end_ts": "2026-08-31T19:02:32.65Z",
+        "duration_seconds": 1.055,
+        "max_excursion_bps": 0.30366293414236467,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:45.692 UTC und endete am 2026-08-31 19:04:13.532 UTC mit einer Dauer von 87.840 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_007",
+        "episode_index": 7,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:45.692Z",
+        "end_ts": "2026-08-31T19:04:13.532Z",
+        "duration_seconds": 87.84,
+        "max_excursion_bps": 3.7198709432522525,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:13.532 UTC und endete am 2026-08-31 19:04:13.535 UTC mit einer Dauer von 0.003 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_008",
+        "episode_index": 8,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:13.532Z",
+        "end_ts": "2026-08-31T19:04:13.535Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.025305244511556857,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:49.506 UTC und endete am 2026-08-31 19:04:59.158 UTC mit einer Dauer von 9.652 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_009",
+        "episode_index": 9,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:49.506Z",
+        "end_ts": "2026-08-31T19:04:59.158Z",
+        "duration_seconds": 9.652,
+        "max_excursion_bps": 1.493009426203949,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:59.158 UTC und endete am 2026-08-31 19:05:00.876 UTC mit einer Dauer von 1.718 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_010",
+        "episode_index": 10,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:59.158Z",
+        "end_ts": "2026-08-31T19:05:00.876Z",
+        "duration_seconds": 1.718,
+        "max_excursion_bps": 0.41753653444713235,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:15.695 UTC und endete am 2026-08-31 19:05:25.04 UTC mit einer Dauer von 9.345 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_011",
+        "episode_index": 11,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:15.695Z",
+        "end_ts": "2026-08-31T19:05:25.04Z",
+        "duration_seconds": 9.345,
+        "max_excursion_bps": 2.1003352944905194,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.04 UTC und endete am 2026-08-31 19:05:25.131 UTC mit einer Dauer von 0.091 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_013",
+        "episode_index": 13,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:25.04Z",
+        "end_ts": "2026-08-31T19:05:25.131Z",
+        "duration_seconds": 0.091,
+        "max_excursion_bps": 0.050610489023113714,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.629 UTC und endete am 2026-08-31 19:18:42.031 UTC mit einer Dauer von 792.402 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_016",
+        "episode_index": 16,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:29.629Z",
+        "end_ts": "2026-08-31T19:18:42.031Z",
+        "duration_seconds": 792.402,
+        "max_excursion_bps": 31.100145505156313,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:42.031 UTC und endete am 2026-08-31 19:18:42.034 UTC mit einer Dauer von 0.003 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_017",
+        "episode_index": 17,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:42.031Z",
+        "end_ts": "2026-08-31T19:18:42.034Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.39 UTC und endete am 2026-08-31 19:19:06.173 UTC mit einer Dauer von 15.783 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_020",
+        "episode_index": 20,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:50.39Z",
+        "end_ts": "2026-08-31T19:19:06.173Z",
+        "duration_seconds": 15.783,
+        "max_excursion_bps": 0.8603783134058215,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:07.216 UTC und endete am 2026-08-31 19:19:14.205 UTC mit einer Dauer von 6.989 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_022",
+        "episode_index": 22,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:07.216Z",
+        "end_ts": "2026-08-31T19:19:14.205Z",
+        "duration_seconds": 6.989,
+        "max_excursion_bps": 0.6326311127981273,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.886 UTC und endete am 2026-08-31 19:19:44.813 UTC mit einer Dauer von 1.927 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_029",
+        "episode_index": 29,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:42.886Z",
+        "end_ts": "2026-08-31T19:19:44.813Z",
+        "duration_seconds": 1.927,
+        "max_excursion_bps": 0.1391788448163245,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:26.571 UTC mit einer Dauer von 8.173 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_045",
+        "episode_index": 45,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:18.398Z",
+        "end_ts": "2026-08-31T19:20:26.571Z",
+        "duration_seconds": 8.173,
+        "max_excursion_bps": 0.518757512495201,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:57.031 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 7.536 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_046",
+        "episode_index": 46,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:57.031Z",
+        "end_ts": "2026-08-31T19:21:04.567Z",
+        "duration_seconds": 7.536,
+        "max_excursion_bps": 0.986904535965447,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:46.685 UTC mit einer Dauer von 11.130 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_056",
+        "episode_index": 56,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:35.555Z",
+        "end_ts": "2026-08-31T19:21:46.685Z",
+        "duration_seconds": 11.13,
+        "max_excursion_bps": 0.8730309356606794,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:22:56.304 UTC und endete am 2026-08-31 19:25:00.875 UTC mit einer Dauer von 124.571 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_057",
+        "episode_index": 57,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:22:56.304Z",
+        "end_ts": "2026-08-31T19:25:00.875Z",
+        "duration_seconds": 124.571,
+        "max_excursion_bps": 5.630416903903334,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:08:15.264 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 158.589 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:08:15.264Z",
+        "end_ts": "2026-08-31T19:10:53.853Z",
+        "duration_seconds": 158.589,
+        "max_excursion_bps": 17.15838018826242,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:56.698 UTC mit einer Dauer von 2.845 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_074",
+        "episode_index": 74,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:53.853Z",
+        "end_ts": "2026-08-31T19:10:56.698Z",
+        "duration_seconds": 2.845,
+        "max_excursion_bps": 2.6407227241132327,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:59.33 UTC und endete am 2026-08-31 19:11:00.852 UTC mit einer Dauer von 1.522 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:59.33Z",
+        "end_ts": "2026-08-31T19:11:00.852Z",
+        "duration_seconds": 1.522,
+        "max_excursion_bps": 0.6317518478741551,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:04.587 UTC und endete am 2026-08-31 19:11:23.58 UTC mit einer Dauer von 18.993 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_077",
+        "episode_index": 77,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:04.587Z",
+        "end_ts": "2026-08-31T19:11:23.58Z",
+        "duration_seconds": 18.993,
+        "max_excursion_bps": 2.059511024070113,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:23.58 UTC und endete am 2026-08-31 19:11:23.587 UTC mit einer Dauer von 0.007 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_078",
+        "episode_index": 78,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:23.58Z",
+        "end_ts": "2026-08-31T19:11:23.587Z",
+        "duration_seconds": 0.007,
+        "max_excursion_bps": 0.1895255543622465,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:13:05.634 UTC mit einer Dauer von 9.875 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_082",
+        "episode_index": 82,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:12:55.759Z",
+        "end_ts": "2026-08-31T19:13:05.634Z",
+        "duration_seconds": 9.875,
+        "max_excursion_bps": 0.5938467370013379,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:24.115 UTC und endete am 2026-08-31 19:13:26.187 UTC mit einer Dauer von 2.072 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_084",
+        "episode_index": 84,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:24.115Z",
+        "end_ts": "2026-08-31T19:13:26.187Z",
+        "duration_seconds": 2.072,
+        "max_excursion_bps": 1.3772190283649224,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:28.615 UTC und endete am 2026-08-31 19:13:30.612 UTC mit einer Dauer von 1.997 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_085",
+        "episode_index": 85,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:28.615Z",
+        "end_ts": "2026-08-31T19:13:30.612Z",
+        "duration_seconds": 1.997,
+        "max_excursion_bps": 0.4548613304701271,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:34.309 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 85.922 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_above_086",
+        "episode_index": 86,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:34.309Z",
+        "end_ts": "2026-08-31T19:15:00.231Z",
+        "duration_seconds": 85.922,
+        "max_excursion_bps": 10.701876302987818,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Der Preis überschritt das TPO-VAH 79140.0 am 2026-08-31 19:08:13.577 UTC und fiel am 2026-08-31 19:10:58.515 UTC wieder darunter. Die Episode oberhalb dauerte 164.938 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_001",
+        "episode_index": 1,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:08:13.577Z",
+        "end_ts": "2026-08-31T19:10:58.515Z",
+        "duration_seconds": 164.938,
+        "max_excursion_bps": 17.791256002022102,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:10:59.22 UTC und endete am 2026-08-31 19:11:35.748 UTC mit einer Dauer von 36.528 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_002",
+        "episode_index": 2,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:10:59.22Z",
+        "end_ts": "2026-08-31T19:11:35.748Z",
+        "duration_seconds": 36.528,
+        "max_excursion_bps": 2.6914329037153033,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 55.108 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_007",
+        "episode_index": 7,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:12:13.63Z",
+        "end_ts": "2026-08-31T19:13:08.738Z",
+        "duration_seconds": 55.108,
+        "max_excursion_bps": 1.2256760171843681,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.363 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 3.843 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_044",
+        "episode_index": 44,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:16.363Z",
+        "end_ts": "2026-08-31T19:13:20.206Z",
+        "duration_seconds": 3.843,
+        "max_excursion_bps": 0.5054334091483447,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.361 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_065",
+        "episode_index": 65,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:20.206Z",
+        "end_ts": "2026-08-31T19:13:20.567Z",
+        "duration_seconds": 0.361,
+        "max_excursion_bps": 0.18953752843062927,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:21.595 UTC und endete am 2026-08-31 19:15:04.574 UTC mit einer Dauer von 102.979 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_079",
+        "episode_index": 79,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:21.595Z",
+        "end_ts": "2026-08-31T19:15:04.574Z",
+        "duration_seconds": 102.979,
+        "max_excursion_bps": 11.334344200151262,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.574 UTC und endete am 2026-08-31 19:15:04.665 UTC mit einer Dauer von 0.091 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_above_081",
+        "episode_index": 81,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:04.574Z",
+        "end_ts": "2026-08-31T19:15:04.665Z",
+        "duration_seconds": 0.091,
+        "max_excursion_bps": 0.12635835228708617,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_INCOMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:33.988 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_above_040",
+        "episode_index": 40,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:33.988Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_ABOVE_EPISODE_INCOMPLETE",
+      "text_de": "Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_above_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:28:01.56Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Der Preis fiel unter das TPO-LVN 78985.0 am 2026-08-31 19:00:01.279 UTC und stieg am 2026-08-31 19:00:01.28 UTC wieder darüber. Die Episode unterhalb dauerte 0.001 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:00:01.279Z",
+        "end_ts": "2026-08-31T19:00:01.28Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.851 UTC und endete am 2026-08-31 19:27:33.988 UTC mit einer Dauer von 20.137 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_78985.00_below_039",
+        "episode_index": 39,
+        "level_id": "tpo_lvn_78985.00",
+        "level_price": 78985.0,
+        "start_ts": "2026-08-31T19:27:13.851Z",
+        "end_ts": "2026-08-31T19:27:33.988Z",
+        "duration_seconds": 20.137,
+        "max_excursion_bps": 1.7218459201121503,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Der Preis fiel unter das TPO-LVN 79035.0 am 2026-08-31 19:01:32.736 UTC und stieg am 2026-08-31 19:01:32.739 UTC wieder darüber. Die Episode unterhalb dauerte 0.003 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:32.736Z",
+        "end_ts": "2026-08-31T19:01:32.739Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.25305244511925096,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:01:42.015 UTC und endete am 2026-08-31 19:02:23.995 UTC mit einer Dauer von 41.980 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_002",
+        "episode_index": 2,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:01:42.015Z",
+        "end_ts": "2026-08-31T19:02:23.995Z",
+        "duration_seconds": 41.98,
+        "max_excursion_bps": 1.214651736573141,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:27.649 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 3.946 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_003",
+        "episode_index": 3,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:27.649Z",
+        "end_ts": "2026-08-31T19:02:31.595Z",
+        "duration_seconds": 3.946,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:32.65 UTC und endete am 2026-08-31 19:02:45.692 UTC mit einer Dauer von 13.042 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_006",
+        "episode_index": 6,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:02:32.65Z",
+        "end_ts": "2026-08-31T19:02:45.692Z",
+        "duration_seconds": 13.042,
+        "max_excursion_bps": 1.5056620484588066,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:13.535 UTC und endete am 2026-08-31 19:04:49.506 UTC mit einer Dauer von 35.971 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_008",
+        "episode_index": 8,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:04:13.535Z",
+        "end_ts": "2026-08-31T19:04:49.506Z",
+        "duration_seconds": 35.971,
+        "max_excursion_bps": 3.694565698740696,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:00.876 UTC und endete am 2026-08-31 19:05:15.695 UTC mit einer Dauer von 14.819 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_010",
+        "episode_index": 10,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:00.876Z",
+        "end_ts": "2026-08-31T19:05:15.695Z",
+        "duration_seconds": 14.819,
+        "max_excursion_bps": 1.8852407161376832,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.131 UTC und endete am 2026-08-31 19:05:29.626 UTC mit einer Dauer von 4.495 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_013",
+        "episode_index": 13,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:25.131Z",
+        "end_ts": "2026-08-31T19:05:29.626Z",
+        "duration_seconds": 4.495,
+        "max_excursion_bps": 0.6326311127981273,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.626 UTC und endete am 2026-08-31 19:05:29.629 UTC mit einer Dauer von 0.003 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_015",
+        "episode_index": 15,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:05:29.626Z",
+        "end_ts": "2026-08-31T19:05:29.629Z",
+        "duration_seconds": 0.003,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:42.034 UTC und endete am 2026-08-31 19:18:50.315 UTC mit einer Dauer von 8.281 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_017",
+        "episode_index": 17,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:42.034Z",
+        "end_ts": "2026-08-31T19:18:50.315Z",
+        "duration_seconds": 8.281,
+        "max_excursion_bps": 2.0244195609540077,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.315 UTC und endete am 2026-08-31 19:18:50.39 UTC mit einer Dauer von 0.075 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_019",
+        "episode_index": 19,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:18:50.315Z",
+        "end_ts": "2026-08-31T19:18:50.39Z",
+        "duration_seconds": 0.075,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:06.173 UTC und endete am 2026-08-31 19:19:07.216 UTC mit einer Dauer von 1.043 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_021",
+        "episode_index": 21,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:06.173Z",
+        "end_ts": "2026-08-31T19:19:07.216Z",
+        "duration_seconds": 1.043,
+        "max_excursion_bps": 0.12652622255962548,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:14.205 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 28.674 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_022",
+        "episode_index": 22,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:14.205Z",
+        "end_ts": "2026-08-31T19:19:42.879Z",
+        "duration_seconds": 28.674,
+        "max_excursion_bps": 3.0239767191743123,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.886 UTC mit einer Dauer von 0.007 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_028",
+        "episode_index": 28,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:42.879Z",
+        "end_ts": "2026-08-31T19:19:42.886Z",
+        "duration_seconds": 0.007,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:44.813 UTC und endete am 2026-08-31 19:20:07.308 UTC mit einer Dauer von 22.495 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_029",
+        "episode_index": 29,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:19:44.813Z",
+        "end_ts": "2026-08-31T19:20:07.308Z",
+        "duration_seconds": 22.495,
+        "max_excursion_bps": 3.0239767191743123,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:07.308 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 9.366 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_030",
+        "episode_index": 30,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:07.308Z",
+        "end_ts": "2026-08-31T19:20:16.674Z",
+        "duration_seconds": 9.366,
+        "max_excursion_bps": 0.7085468463346392,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 1.724 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_042",
+        "episode_index": 42,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:16.674Z",
+        "end_ts": "2026-08-31T19:20:18.398Z",
+        "duration_seconds": 1.724,
+        "max_excursion_bps": 0.3542734231673196,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:26.571 UTC und endete am 2026-08-31 19:20:57.031 UTC mit einer Dauer von 30.460 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_045",
+        "episode_index": 45,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:20:26.571Z",
+        "end_ts": "2026-08-31T19:20:57.031Z",
+        "duration_seconds": 30.46,
+        "max_excursion_bps": 4.985133168848507,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 30.988 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_052",
+        "episode_index": 52,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:04.567Z",
+        "end_ts": "2026-08-31T19:21:35.555Z",
+        "duration_seconds": 30.988,
+        "max_excursion_bps": 0.5820206237750136,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:46.685 UTC und endete am 2026-08-31 19:22:56.304 UTC mit einer Dauer von 69.619 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_056",
+        "episode_index": 56,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:21:46.685Z",
+        "end_ts": "2026-08-31T19:22:56.304Z",
+        "duration_seconds": 69.619,
+        "max_excursion_bps": 5.073701524641718,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:25:00.875 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 180.685 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79035.00_below_057",
+        "episode_index": 57,
+        "level_id": "tpo_lvn_79035.00",
+        "level_price": 79035.0,
+        "start_ts": "2026-08-31T19:25:00.875Z",
+        "end_ts": "2026-08-31T19:28:01.56Z",
+        "duration_seconds": 180.685,
+        "max_excursion_bps": 8.047067754792918,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Der Preis fiel unter das TPO-LVN 79145.0 am 2026-08-31 19:08:15.206 UTC und stieg am 2026-08-31 19:08:15.264 UTC wieder darüber. Die Episode unterhalb dauerte 0.058 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:08:15.206Z",
+        "end_ts": "2026-08-31T19:08:15.264Z",
+        "duration_seconds": 0.058,
+        "max_excursion_bps": 0.07581022174563405,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:56.698 UTC und endete am 2026-08-31 19:10:59.33 UTC mit einer Dauer von 2.632 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_074",
+        "episode_index": 74,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:10:56.698Z",
+        "end_ts": "2026-08-31T19:10:59.33Z",
+        "duration_seconds": 2.632,
+        "max_excursion_bps": 1.7183650262184371,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:00.852 UTC und endete am 2026-08-31 19:11:04.587 UTC mit einer Dauer von 3.735 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_076",
+        "episode_index": 76,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:00.852Z",
+        "end_ts": "2026-08-31T19:11:04.587Z",
+        "duration_seconds": 3.735,
+        "max_excursion_bps": 0.037905110872817026,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:23.587 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 92.172 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_078",
+        "episode_index": 78,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:11:23.587Z",
+        "end_ts": "2026-08-31T19:12:55.759Z",
+        "duration_seconds": 92.172,
+        "max_excursion_bps": 4.763408932970761,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:05.634 UTC und endete am 2026-08-31 19:13:24.114 UTC mit einer Dauer von 18.480 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_082",
+        "episode_index": 82,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:05.634Z",
+        "end_ts": "2026-08-31T19:13:24.114Z",
+        "duration_seconds": 18.48,
+        "max_excursion_bps": 3.2219344241581904,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:24.114 UTC und endete am 2026-08-31 19:13:24.115 UTC mit einer Dauer von 0.001 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_083",
+        "episode_index": 83,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:24.114Z",
+        "end_ts": "2026-08-31T19:13:24.115Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.22743066523506356,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:26.187 UTC und endete am 2026-08-31 19:13:28.615 UTC mit einer Dauer von 2.428 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_084",
+        "episode_index": 84,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:26.187Z",
+        "end_ts": "2026-08-31T19:13:28.615Z",
+        "duration_seconds": 2.428,
+        "max_excursion_bps": 0.24006570219144346,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:30.612 UTC und endete am 2026-08-31 19:13:34.309 UTC mit einer Dauer von 3.697 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_085",
+        "episode_index": 85,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:13:30.612Z",
+        "end_ts": "2026-08-31T19:13:34.309Z",
+        "duration_seconds": 3.697,
+        "max_excursion_bps": 0.012635036958218557,
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Der Preis fiel unter das TPO-VAH 79140.0 am 2026-08-31 19:10:58.515 UTC und stieg am 2026-08-31 19:10:59.22 UTC wieder darüber. Die Episode unterhalb dauerte 0.705 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_001",
+        "episode_index": 1,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:10:58.515Z",
+        "end_ts": "2026-08-31T19:10:59.22Z",
+        "duration_seconds": 0.705,
+        "max_excursion_bps": 1.0866818296696767,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:11:35.748 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 37.882 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_002",
+        "episode_index": 2,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:11:35.748Z",
+        "end_ts": "2026-08-31T19:12:13.63Z",
+        "duration_seconds": 37.882,
+        "max_excursion_bps": 4.1319181197873505,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 7.624 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_039",
+        "episode_index": 39,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:08.738Z",
+        "end_ts": "2026-08-31T19:13:16.362Z",
+        "duration_seconds": 7.624,
+        "max_excursion_bps": 2.4513520343687363,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.363 UTC mit einer Dauer von 0.001 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_043",
+        "episode_index": 43,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:16.362Z",
+        "end_ts": "2026-08-31T19:13:16.363Z",
+        "duration_seconds": 0.001,
+        "max_excursion_bps": 0.3158958807177154,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:21.595 UTC mit einer Dauer von 1.028 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_078",
+        "episode_index": 78,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:13:20.567Z",
+        "end_ts": "2026-08-31T19:13:21.595Z",
+        "duration_seconds": 1.028,
+        "max_excursion_bps": 0.0,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_COMPLETE",
+      "text_de": "Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.665 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 15.865 Sekunden.",
+      "fields": {
+        "episode_id": "tpo_vah_below_081",
+        "episode_index": 81,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:04.665Z",
+        "end_ts": "2026-08-31T19:15:20.53Z",
+        "duration_seconds": 15.865,
+        "max_excursion_bps": 4.991154915339904,
+        "label": "TPO-VAH"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_INCOMPLETE",
+      "text_de": "Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.",
+      "fields": {
+        "episode_id": "tpo_lvn_79145.00_below_093",
+        "episode_index": 93,
+        "level_id": "tpo_lvn_79145.00",
+        "level_price": 79145.0,
+        "start_ts": "2026-08-31T19:15:00.231Z",
+        "label": "TPO-LVN"
+      }
+    },
+    {
+      "code": "PROFILE_LEVEL_BELOW_EPISODE_INCOMPLETE",
+      "text_de": "Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.",
+      "fields": {
+        "episode_id": "tpo_vah_below_116",
+        "episode_index": 116,
+        "level_id": "tpo_vah",
+        "level_price": 79140.0,
+        "start_ts": "2026-08-31T19:15:20.53Z",
+        "label": "TPO-VAH"
+      }
+    }
+  ]
+}

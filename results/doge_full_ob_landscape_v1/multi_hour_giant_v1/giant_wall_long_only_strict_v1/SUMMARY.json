@@ -1,0 +1,221 @@
+{
+  "schema_version": "doge_giant_wall_long_only_strict_v1",
+  "peak_rss_gb": 0.071,
+  "best_long": "long_strict_250k_4_10",
+  "variants": [
+    {
+      "name": "long_strict_200k_4_10",
+      "config": {
+        "name": "long_strict_200k_4_10",
+        "side": "bid",
+        "min_birth": 200000,
+        "min_touch": 200000,
+        "min_d": 400,
+        "max_d": 1000,
+        "reject": 15,
+        "win": 90,
+        "sl": 0.2,
+        "tp": 0.4
+      },
+      "funnel": {
+        "trades": 15,
+        "no_trade": {
+          "birth_small": 90,
+          "distance": 71,
+          "wall_gone": 8,
+          "wrong_side": 147,
+          "reject_sl": 1
+        }
+      },
+      "stats": {
+        "n": 15,
+        "win_rate": 0.5333,
+        "win_wilson_low": 0.3012,
+        "tp_n": 4,
+        "sl_n": 7,
+        "tp_rate": 0.2667,
+        "avg_pnl": 0.8007,
+        "median_pnl": 0.4001,
+        "median_mfe": 0.2998,
+        "median_mae": -0.1987,
+        "outcomes": {
+          "SL": 7,
+          "TIMEOUT": 4,
+          "TP": 4
+        }
+      },
+      "rss_gb": 0.071,
+      "verdict": "PASS_LONG_STRICT"
+    },
+    {
+      "name": "long_strict_250k_5_10",
+      "config": {
+        "name": "long_strict_250k_5_10",
+        "side": "bid",
+        "min_birth": 250000,
+        "min_touch": 250000,
+        "min_d": 500,
+        "max_d": 1000,
+        "reject": 15,
+        "win": 120,
+        "sl": 0.2,
+        "tp": 0.4
+      },
+      "funnel": {
+        "trades": 4,
+        "no_trade": {
+          "distance": 124,
+          "wrong_side": 147,
+          "birth_small": 51,
+          "wall_gone": 5,
+          "reject_sl": 1
+        }
+      },
+      "stats": {
+        "n": 4,
+        "win_rate": 0.5,
+        "win_wilson_low": 0.15,
+        "tp_n": 2,
+        "sl_n": 2,
+        "tp_rate": 0.5,
+        "avg_pnl": 0.1045,
+        "median_pnl": 0.4211,
+        "median_mfe": 0.4211,
+        "median_mae": -0.1287,
+        "outcomes": {
+          "SL": 2,
+          "TP": 2
+        }
+      },
+      "rss_gb": 0.071,
+      "verdict": "INSUFFICIENT_SAMPLE"
+    },
+    {
+      "name": "long_strict_250k_4_10",
+      "config": {
+        "name": "long_strict_250k_4_10",
+        "side": "bid",
+        "min_birth": 250000,
+        "min_touch": 250000,
+        "min_d": 400,
+        "max_d": 1000,
+        "reject": 15,
+        "win": 120,
+        "sl": 0.2,
+        "tp": 0.4
+      },
+      "funnel": {
+        "trades": 12,
+        "no_trade": {
+          "birth_small": 93,
+          "distance": 71,
+          "wall_gone": 8,
+          "wrong_side": 147,
+          "reject_sl": 1
+        }
+      },
+      "stats": {
+        "n": 12,
+        "win_rate": 0.5833,
+        "win_wilson_low": 0.3195,
+        "tp_n": 4,
+        "sl_n": 5,
+        "tp_rate": 0.3333,
+        "avg_pnl": 0.8878,
+        "median_pnl": 0.4091,
+        "median_mfe": 0.3804,
+        "median_mae": -0.1874,
+        "outcomes": {
+          "SL": 5,
+          "TIMEOUT": 3,
+          "TP": 4
+        }
+      },
+      "rss_gb": 0.071,
+      "verdict": "PASS_LONG_STRICT"
+    },
+    {
+      "name": "long_strict_300k_5_10",
+      "config": {
+        "name": "long_strict_300k_5_10",
+        "side": "bid",
+        "min_birth": 300000,
+        "min_touch": 300000,
+        "min_d": 500,
+        "max_d": 1000,
+        "reject": 15,
+        "win": 120,
+        "sl": 0.2,
+        "tp": 0.4
+      },
+      "funnel": {
+        "trades": 4,
+        "no_trade": {
+          "distance": 124,
+          "wrong_side": 147,
+          "birth_small": 51,
+          "wall_gone": 5,
+          "reject_sl": 1
+        }
+      },
+      "stats": {
+        "n": 4,
+        "win_rate": 0.5,
+        "win_wilson_low": 0.15,
+        "tp_n": 2,
+        "sl_n": 2,
+        "tp_rate": 0.5,
+        "avg_pnl": 0.1045,
+        "median_pnl": 0.4211,
+        "median_mfe": 0.4211,
+        "median_mae": -0.1287,
+        "outcomes": {
+          "SL": 2,
+          "TP": 2
+        }
+      },
+      "rss_gb": 0.071,
+      "verdict": "INSUFFICIENT_SAMPLE"
+    },
+    {
+      "name": "short_strict_250k_5_10",
+      "config": {
+        "name": "short_strict_250k_5_10",
+        "side": "ask",
+        "min_birth": 250000,
+        "min_touch": 250000,
+        "min_d": 500,
+        "max_d": 1000,
+        "reject": 15,
+        "win": 120,
+        "sl": 0.4,
+        "tp": 0.8
+      },
+      "funnel": {
+        "trades": 5,
+        "no_trade": {
+          "wrong_side": 185,
+          "distance": 126,
+          "birth_small": 16
+        }
+      },
+      "stats": {
+        "n": 5,
+        "win_rate": 0.0,
+        "win_wilson_low": 0.0,
+        "tp_n": 0,
+        "sl_n": 5,
+        "tp_rate": 0.0,
+        "avg_pnl": -0.4158,
+        "median_pnl": -0.4091,
+        "median_mfe": 0.1987,
+        "median_mae": -0.4091,
+        "outcomes": {
+          "SL": 5
+        }
+      },
+      "rss_gb": 0.071,
+      "verdict": "INSUFFICIENT_SAMPLE"
+    }
+  ]
+}

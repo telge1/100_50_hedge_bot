@@ -1,0 +1,104 @@
+{
+  "all_files_match_phase_1_manifest": true,
+  "builder_code_changed": false,
+  "contract_verified": {
+    "causality": "available_at <= T0 with 60s minimum persistence cutoff",
+    "horizon_minutes": 60,
+    "lower_touch": "frozen BID upper edge",
+    "minimum_persistence_seconds": 60,
+    "overlap_policy": "one active episode per symbol",
+    "price_path": "read-only public-trade 1s",
+    "target_source": "LLD_POOL",
+    "upper_touch": "frozen ASK lower edge"
+  },
+  "files": {
+    "research/liquidity_destination_bias/__init__.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "89a6e5c906c8132ca9c5b7b90c314f13fa03a180ef6877eb02ef5f3004da1bdd",
+      "sha256": "89a6e5c906c8132ca9c5b7b90c314f13fa03a180ef6877eb02ef5f3004da1bdd"
+    },
+    "research/liquidity_destination_bias/builder.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "b1000afe93fd743adfb036df3e30db2ef4301c9cf68bb0c87ff463bff348a2a7",
+      "sha256": "b1000afe93fd743adfb036df3e30db2ef4301c9cf68bb0c87ff463bff348a2a7"
+    },
+    "research/liquidity_destination_bias/cli.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "c2d11fec00b6b57a1104100a90883189e3551ce6d36ef6d192a992c6e9203367",
+      "sha256": "c2d11fec00b6b57a1104100a90883189e3551ce6d36ef6d192a992c6e9203367"
+    },
+    "research/liquidity_destination_bias/contract.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32",
+      "sha256": "1e2449c13a3ba54e0f9c61ec5a90d37c91a297b1eb55a67cf1b80c7c56af4d32"
+    },
+    "research/liquidity_destination_bias/eligibility.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "0ab194e4115605ab4f2c04bf52eb7bc114829a539f52c7264f23fa0843de4da1",
+      "sha256": "0ab194e4115605ab4f2c04bf52eb7bc114829a539f52c7264f23fa0843de4da1"
+    },
+    "research/liquidity_destination_bias/models.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "e879849492d79b091083f7087cd55108602709500dd14e95b39958554dbcd5f1",
+      "sha256": "e879849492d79b091083f7087cd55108602709500dd14e95b39958554dbcd5f1"
+    },
+    "research/liquidity_destination_bias/path_label.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "a70e40cafef5d615e39526631196478af2c5dde708f93c0c9b2da556ef4e0e53",
+      "sha256": "a70e40cafef5d615e39526631196478af2c5dde708f93c0c9b2da556ef4e0e53"
+    },
+    "research/liquidity_destination_bias/sources.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "23db42b747c9a0e63aef167e5119ac2eaafbbe2d88ee25d088f54e2e72a27da0",
+      "sha256": "23db42b747c9a0e63aef167e5119ac2eaafbbe2d88ee25d088f54e2e72a27da0"
+    },
+    "research/liquidity_destination_bias/targets.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "5d83e9b5f236489ef432879195204314f5da19c3a359cc0522bd40f9a2dff466",
+      "sha256": "5d83e9b5f236489ef432879195204314f5da19c3a359cc0522bd40f9a2dff466"
+    },
+    "results/liquidity_destination_bias_phase_1/contract_frozen_v1.yaml": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51",
+      "sha256": "66ab82f4ac5e1b416594d17fa50116ed8a6daadae01e9fe29a29586072a91a51"
+    },
+    "results/liquidity_destination_bias_phase_1/schema.md": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "3d3ca2bc1efe63a514bcdb16d4aee95427bffb1969beceaecb18e03104536f39",
+      "sha256": "3d3ca2bc1efe63a514bcdb16d4aee95427bffb1969beceaecb18e03104536f39"
+    },
+    "scripts/build_liquidity_destination_episodes.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "a82c23427678a1985a7190b2fc2ad9bde82aea61ed91bd7e46eb13938675a22c",
+      "sha256": "a82c23427678a1985a7190b2fc2ad9bde82aea61ed91bd7e46eb13938675a22c"
+    },
+    "tests/research/test_liquidity_destination_episodes.py": {
+      "matches_phase_1_manifest": true,
+      "phase_1_manifest_sha256": "dd843d58f59596a9f9a8ce1fe7d801d2fecd41cfdf7c31ca1a92a9bcacd6d39d",
+      "sha256": "dd843d58f59596a9f9a8ce1fe7d801d2fecd41cfdf7c31ca1a92a9bcacd6d39d"
+    }
+  },
+  "fingerprint_path_order": [
+    "research/liquidity_destination_bias/__init__.py",
+    "research/liquidity_destination_bias/builder.py",
+    "research/liquidity_destination_bias/cli.py",
+    "research/liquidity_destination_bias/contract.py",
+    "research/liquidity_destination_bias/eligibility.py",
+    "research/liquidity_destination_bias/models.py",
+    "research/liquidity_destination_bias/path_label.py",
+    "research/liquidity_destination_bias/sources.py",
+    "research/liquidity_destination_bias/targets.py",
+    "scripts/build_liquidity_destination_episodes.py",
+    "tests/research/test_liquidity_destination_episodes.py",
+    "results/liquidity_destination_bias_phase_1/contract_frozen_v1.yaml",
+    "results/liquidity_destination_bias_phase_1/schema.md"
+  ],
+  "freeze_fingerprint_after_sha256": "ee29a49f941fe85a32ebdda7814649cdc3fb84e9b7c7ccae1eea80a5aaf278d8",
+  "freeze_fingerprint_before_sha256": "ee29a49f941fe85a32ebdda7814649cdc3fb84e9b7c7ccae1eea80a5aaf278d8",
+  "git_branch": "feature/btc-doge-research-db",
+  "git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "manifest_version": "liquidity_destination_phase_1b_freeze_manifest_v1",
+  "phase_1_manifest": "results/liquidity_destination_bias_phase_1/artifact_manifest.json",
+  "phase_1_manifest_git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "unchanged_before_after": true
+}

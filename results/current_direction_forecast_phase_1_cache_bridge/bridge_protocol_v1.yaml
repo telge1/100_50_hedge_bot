@@ -1,0 +1,70 @@
+protocol_version: full_ob_cache_bridge_protocol_v1
+status: FROZEN_FOR_CONTROLLED_RESTART
+generated_at_utc: "2026-09-05T15:12:26Z"
+transport: unix_domain_socket
+tcp_fallback: false
+default_enabled: false
+enable_env: FULL_OB_CACHE_BRIDGE_ENABLED
+operations:
+  status:
+    request: [protocol_version, operation]
+    response_fields:
+      - protocol_version
+      - collector_instance_id
+      - collector_start_time
+      - symbols
+      - buffer_start
+      - buffer_end
+      - retention_seconds
+      - message_count
+      - gap_count
+      - overflow_count
+      - last_event_time
+      - last_receive_time
+      - freshness_ms
+      - replay_capability
+      - anchor_status
+      - bridge_enabled
+  freeze_pre_roll:
+    request: [protocol_version, operation, request_id, symbol, requested_pre_roll_seconds, client_request_time]
+    t0_authority: collector
+    client_cannot_force_historical_t0: true
+    response_fields:
+      - protocol_version
+      - request_id
+      - forecast_id_seed
+      - symbol
+      - collector_instance_id
+      - t0_utc
+      - feature_cutoff_utc
+      - pre_roll_start_utc
+      - pre_roll_end_utc
+      - actual_pre_roll_seconds
+      - message_count
+      - anchor_time
+      - anchor_type
+      - first_u
+      - last_u
+      - first_seq
+      - last_seq
+      - gap_count
+      - overflow_count
+      - reconnect_count
+      - freshness_ms
+      - replay_capability
+      - data_complete
+      - exclusion_reasons
+      - payload_sha256
+      - manifest_sha256
+      - dump_dir
+data_complete_requires:
+  - periodic_book_checkpoint_anchor
+  - contiguous_u_replay
+  - no_overflow
+  - no_reconnect_in_window
+  - not_stale
+  - sufficient_pre_roll
+  - no_post_t0_deltas
+replay_capability_values: [RAW_FULL_BOOK_REPLAY, NONE]
+anchor_type: PERIODIC_BOOK_CHECKPOINT
+ob200_fallback: forbidden

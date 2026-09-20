@@ -1,0 +1,95 @@
+{
+  "coins": [
+    {
+      "artifact_reference": null,
+      "duration_seconds": 0.249,
+      "effective_end": null,
+      "effective_start": null,
+      "error_code": "DATA_INCOMPLETE",
+      "finished_at": "2026-08-26T18:18:44Z",
+      "message": "missing:orderbook_ob200_v3_raw",
+      "missing_sources": [
+        "orderbook_ob200_v3_raw:DATA_INCOMPLETE",
+        "liquidity_locations:OPTIONAL_UNAVAILABLE"
+      ],
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "4h": {
+          "raw": 0,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 0,
+      "returncode": null,
+      "runner_run_id": "ezmcbb8600dd392",
+      "started_at": "2026-08-26T18:18:44Z",
+      "state": "DATA_INCOMPLETE",
+      "symbol": "XRPUSDT",
+      "tier_a_total": 0,
+      "warmup_complete": false,
+      "warmup_complete_by_tf": {},
+      "warmup_schema_error": "missing:orderbook_ob200_v3_raw"
+    }
+  ],
+  "combined_summary": {
+    "coins_evaluated": 1,
+    "coins_with_signals": 0,
+    "coins_without_tier_a": 0,
+    "execution_dedup_applied": false,
+    "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+    "failed_coins": 0,
+    "incomplete_coins": 1,
+    "multi_tf_collisions": 0,
+    "outcome_evaluation_enabled": false,
+    "raw_by_timeframe": {
+      "15m": 0,
+      "1h": 0,
+      "30m": 0,
+      "4h": 0
+    },
+    "raw_candidates": 0,
+    "strategy_id": "ema_zone_microstructure_confirmation_v1",
+    "successful_coins": 0,
+    "tier_a": 0,
+    "tier_a_by_timeframe": {
+      "15m": 0,
+      "1h": 0,
+      "30m": 0,
+      "4h": 0
+    },
+    "warmup_warnings": 0,
+    "writes_to_clickhouse": false
+  },
+  "completed_coins": 1,
+  "created_at": "2026-08-26T18:18:44Z",
+  "current_index": 1,
+  "current_symbol": null,
+  "error_summary": "DATA_INCOMPLETE",
+  "failed_coins": 0,
+  "finished_at": "2026-08-26T18:18:44Z",
+  "incomplete_coins": 1,
+  "job_id": "9a0e97cc0aaf409ab5fec245a2667c9f",
+  "last_worker_pid": 793486,
+  "message": "missing:orderbook_ob200_v3_raw",
+  "progress_percent": 100,
+  "raw_total": 0,
+  "started_at": "2026-08-26T18:18:44Z",
+  "state": "COMPLETED_WITH_ERRORS",
+  "strategy_id": "ema_zone_microstructure_confirmation_v1",
+  "successful_coins": 0,
+  "tier_a_total": 0,
+  "total_coins": 1,
+  "worker_pid": null
+}

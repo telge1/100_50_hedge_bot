@@ -1,0 +1,96 @@
+ M research/btc_doge_research/full_history_contracts.py
+ M research/btc_doge_research/full_history_runner.py
+ M research/btc_doge_research/phase2_day_loader.py
+ M research/btc_ob_fight/cli.py
+ M research/btc_ob_fight/config.py
+ M research/btc_ob_fight/edge_book_coverage.py
+ M research/btc_ob_fight/edge_observability.py
+ M research/btc_ob_fight/first_outside_bin_contract.py
+ M research/btc_ob_fight/formatting.py
+ M research/btc_ob_fight/profile_edge_state.py
+ M research/btc_ob_fight/profile_price_bin_contract.py
+ M research/btc_ob_fight/tpo_profile.py
+ M research/btc_ob_fight/volume_profile.py
+ M research/btc_ob_fight/wall_events.py
+?? "(base) telgenbuescher@server-telgenbuesc.yaml"
+?? 100_100_hegde_strategie.md
+?? 100_50_close_strategie.md
+?? Analyse_plan.md
+?? "Das sollten wir unbedingt mitpr\303\274fen, son.md"
+?? EMA_OB_Strategie.md
+?? Market_Tools.md
+?? Stochanalyse.md
+?? research/btc_doge_research/atomic_json.py
+?? research/btc_doge_research/backfill_plan.py
+?? research/btc_doge_research/backfill_recovery.py
+?? research/btc_doge_research/modality_coverage.py
+?? research/btc_doge_research/ob200_boundary.py
+?? research/btc_doge_research/ob200_segments.py
+?? research/btc_doge_research/run_state.py
+?? research/btc_doge_research/seam_root_cause_audit.py
+?? research/btc_doge_research/seam_variants.py
+?? research/btc_doge_research/segment_loader.py
+?? research/btc_doge_research/source_discovery.py
+?? research/btc_doge_research/trade_contract.py
+?? research/btc_doge_research/trade_importer.py
+?? research/btc_doge_research/trade_parity.py
+?? research/btc_doge_research/trade_rematerialization.py
+?? research/btc_doge_research/trade_run_state.py
+?? research/btc_ob_fight/coverage_gate.py
+?? research/btc_ob_fight/eligibility_contract.py
+?? research/btc_ob_fight/instrument_contract.py
+?? research/btc_ob_fight/research_db_cli.py
+?? research/btc_ob_fight/research_db_loader.py
+?? results/aggressor_efficiency_data_audit_v1/
+?? results/aggressor_efficiency_flip_design_v1/
+?? results/aggressor_efficiency_flip_f0_doge_20260829/
+?? results/aggressor_efficiency_flip_missed_reference_audit_v1/
+?? results/apt_timestamp_direction_sticky_audit/
+?? results/btc_doge_fight_research_db_optimization_v1/
+?? results/btc_doge_research_db_backfill_recovery_v1/
+?? results/btc_doge_research_db_final_audit_v1/
+?? results/btc_doge_research_db_reconciliation_v1/
+?? results/btc_doge_research_db_source_recovery_v1/
+?? results/btc_doge_research_trade_rematerialization_v1/
+?? results/btc_ob_fight_cases/
+?? results/btc_ob_fight_explanatory_audit_20260831_1900_v1/
+?? results/btc_ob_fight_research_db_cli_v1/
+?? results/btc_profile_edge_ob_fight_20260831_1900_v1/
+?? results/btc_tpo_volume_semantics_audit_20260831_1900_v1/
+?? results/ch_break_reclaim_microstructure_audit_20260808/
+?? results/ch_break_reclaim_microstructure_audit_20260808_smoke/
+?? results/ch_break_reclaim_subgroup_validation_20260808/
+?? results/ema_pool_trend_flip_v1/
+?? results/event_ob_coverage_audit_20260808/
+?? results/historical_break_pull_consumption_deep_dive_20260808/
+?? results/historical_ob_replay_smoke/
+?? results/historical_post_break_acceptance_reclaim_audit_20260808/
+?? results/historical_protected_level_pull_break_risk_audit_20260808/
+?? results/historical_structure_break_ob_deep_dive_20260808/
+?? results/historical_trade_download_smoke_20260808/
+?? results/historical_trade_event_data_20260808/
+?? results/mysql_candle_coverage_audit/
+?? results/pool_order_plan_v1_comparisons/
+?? results/research_db_phase_1b_seam_root_cause_v1/
+?? results/stoch_dashboard_job_start.lock
+?? results/stoch_fade_filter_tests/
+?? results/stoch_fade_portfolio_backtests/
+?? results/stoch_fade_profile_runs/
+?? results/stoch_fade_research_evaluations/
+?? results/stoch_fade_research_jobs/
+?? results/stoch_fade_research_runs/
+?? results/stoch_fade_trade_context_analysis/
+?? results/stoch_universe_update_jobs/
+?? results/trend_direction_forward_validation/
+?? results/trend_direction_move_measurement_audit/
+?? results/trend_direction_range/
+?? run/
+?? scripts/run_btc_doge_trade_rematerialization.py
+?? tests/research/test_btc_doge_research_full_history.py
+?? tests/research/test_btc_doge_research_phase1b.py
+?? tests/research/test_btc_doge_trade_rematerialization.py
+?? tests/research/test_btc_ob_fight_research_db_cli.py
+?? tests/research/test_ob200_boundary.py
+?? tests/research/test_ob200_idempotency.py
+?? tests/research/test_ob200_segments.py
+?? tmp_debug_multi/

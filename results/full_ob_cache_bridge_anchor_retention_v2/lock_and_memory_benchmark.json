@@ -1,0 +1,12 @@
+{
+  "checkpoint_build_from_60k_levels_ms": 20.302,
+  "checkpoint_orjson_serialize_ms": 1.839,
+  "note": "orjson serialization measured outside any book lock; build uses already-copied snap",
+  "ru_maxrss_kb_before": 46524,
+  "ru_maxrss_kb_after": 68332,
+  "approx_rss_delta_mb": 21.3,
+  "payload_bytes": 1844753,
+  "levels": 60000,
+  "max_payload_bytes_limit": 100663296,
+  "under_payload_cap": true
+}

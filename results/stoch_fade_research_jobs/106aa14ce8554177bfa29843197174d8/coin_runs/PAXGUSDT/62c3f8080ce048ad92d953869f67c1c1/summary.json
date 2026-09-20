@@ -1,0 +1,9 @@
+{
+  "raw_total": 6289,
+  "run_id": "62c3f8080ce048ad92d953869f67c1c1",
+  "statuses": {
+    "PAXGUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 348
+}

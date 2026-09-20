@@ -1,0 +1,15 @@
+{
+  "branch": "feature/btc-doge-research-db",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "git_status_short_count": 93,
+  "clickhouse_version": "26.7.1.1315",
+  "clickhouse_timezone": "UTC",
+  "host_timezone": "Europe/Paris (CEST +0200)",
+  "disk_free_gb": 369,
+  "collectors_active": true,
+  "competing_trade_importer_at_preflight": false,
+  "logical_trade_key": "(symbol, trade_id) / event_key={symbol}|{trade_id}",
+  "root_cause_status": "PROVEN",
+  "architecture": "B_VERSIONED_REPLACING_MERGETREE",
+  "invalid_shifted_table": "research_public_trades_invalid_shifted_v0"
+}

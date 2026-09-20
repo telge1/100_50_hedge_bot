@@ -1,0 +1,156 @@
+{
+  "captured_at": "2026-09-03T19:50:13.279166Z",
+  "note": "pre-cutover snapshot; SHA256 is moment-in-time while writer may still append",
+  "pid": 1467869,
+  "alive": true,
+  "state": "S",
+  "rss_bytes": 215896064,
+  "cmdline": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO ",
+  "cpu_etime": [
+    "16292",
+    "324"
+  ],
+  "utime_ticks": 16292,
+  "stime_ticks": 324,
+  "health": {
+    "collector_state": "LIVE",
+    "rss_mb": 205.89,
+    "full_book_enabled": true,
+    "full_book_active_topics": 2,
+    "full_ob_flight_recorder_enabled": true,
+    "full_book_runtimes": [
+      {
+        "symbol": "BTCUSDT",
+        "subscription_state": "live",
+        "raw_bids": 40899,
+        "raw_asks": 21625,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4127609,
+        "seq": 804735178693,
+        "cts_ms": 1788465004271,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "subscription_state": "live",
+        "raw_bids": 5451,
+        "raw_asks": 13376,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4127296,
+        "seq": 345809366716,
+        "cts_ms": 1788465004317,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      }
+    ],
+    "runtimes": {
+      "DOGEUSDT": {
+        "lifecycle": "FIGHT_ACTIVE",
+        "event_id": "DOGEUSDT_20260903T184212Z_f5d68293cd",
+        "buffer_messages": 0,
+        "buffer_bytes": 0,
+        "buffer_overflow": 0,
+        "capturing": true
+      },
+      "BTCUSDT": {
+        "lifecycle": "FIGHT_ACTIVE",
+        "event_id": "BTCUSDT_20260903T184212Z_4a22a89fe6",
+        "buffer_messages": 0,
+        "buffer_bytes": 0,
+        "buffer_overflow": 0,
+        "capturing": true
+      }
+    },
+    "writer_backlog": null,
+    "timing_contract": null
+  },
+  "events": {
+    "BTCUSDT": {
+      "dir": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6",
+      "files": {
+        "full_ob_raw_deltas.jsonl.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/full_ob_raw_deltas.jsonl.zst.tmp",
+          "size": 21942126,
+          "mtime": 1788465012.7781754,
+          "sha256_moment": "4c15a13ee4e71c6a5f8e48d8bad8f4effe54312a71d869e8a588fe31f3e95aa4",
+          "fds": [
+            {
+              "fd": "18",
+              "link": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/full_ob_raw_deltas.jsonl.zst.tmp"
+            }
+          ]
+        },
+        "rest_full_snapshot.json.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/rest_full_snapshot.json.zst.tmp",
+          "size": 270847,
+          "mtime": 1788460932.5928824,
+          "sha256_moment": "bebefd726abb07b99938b98527a432593c6ac2e27179328367399fcc12c19617",
+          "fds": []
+        },
+        "public_trades_raw.jsonl.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/public_trades_raw.jsonl.zst.tmp",
+          "size": 0,
+          "mtime": 1788460932.5888822,
+          "sha256_moment": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "fds": [
+            {
+              "fd": "19",
+              "link": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/public_trades_raw.jsonl.zst.tmp"
+            }
+          ]
+        }
+      }
+    },
+    "DOGEUSDT": {
+      "dir": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd",
+      "files": {
+        "full_ob_raw_deltas.jsonl.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/full_ob_raw_deltas.jsonl.zst.tmp",
+          "size": 2417702,
+          "mtime": 1788465012.7141757,
+          "sha256_moment": "def94e1cf4b14a07c2382b69da2d99d3478d101d696b287e523297c72ac9a95a",
+          "fds": [
+            {
+              "fd": "16",
+              "link": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/full_ob_raw_deltas.jsonl.zst.tmp"
+            }
+          ]
+        },
+        "rest_full_snapshot.json.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/rest_full_snapshot.json.zst.tmp",
+          "size": 86326,
+          "mtime": 1788460932.5888822,
+          "sha256_moment": "123ff0a1e67b70856c04cea5eb1c93a6acaa5abfea86270e965a5d82e0b0c8ab",
+          "fds": []
+        },
+        "public_trades_raw.jsonl.zst.tmp": {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/public_trades_raw.jsonl.zst.tmp",
+          "size": 0,
+          "mtime": 1788460932.5878823,
+          "sha256_moment": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "fds": [
+            {
+              "fd": "17",
+              "link": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/public_trades_raw.jsonl.zst.tmp"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "orderbook_v2_live_processes": [
+    {
+      "pid": 1467869,
+      "cmd": ".venv/bin/python -m orderbook_analyse.orderbook_v2_live --mode raw-archive-only --symbols BTCUSDT,DOGEUSDT --confirm-raw-archive-symbols --health-file logs/orderbook_v3_raw_archive_btc_doge.health.ndjson --log-level INFO "
+    },
+    {
+      "pid": 1481434,
+      "cmd": "/bin/bash -O extglob -c snap=$(command cat <&3) && builtin shopt -s extglob && builtin eval -- \"$snap\" && { builtin set +u 2>/dev/null || true; builtin eval \"${__CURSOR_SANDBOX_ENV_RESTORE:-}\" 2>/dev/null; builtin export PWD=\"$(builtin pwd)\"; builtin shopt -s expand_aliases 2>/dev/null; builtin eval \"$1\" < /dev/null; }; COMMAND_EXIT_CODE=$?; dump_bash_state >&4; builtin exit $COMMAND_EXIT_CODE -- python3 << 'PY'\nimport json, os, time, hashlib\nfrom pathlib import Path\nfrom datetime import datetime, timezone\n\nPID = 1467869\nout = {\n    \"captured_at\": datetime.now(timezone.utc).isoformat().replace(\"+00:00\",\"Z\"),\n    \"note\": \"pre-cutover snapshot; SHA256 is moment-in-time while writer may still append\",\n    \"pid\": PID,\n    \"alive\": Path(f\"/proc/{PID}\").exists(),\n}\nif out[\"alive\"]:\n    st = Path(f\"/proc/{PID}/status\").read_text()\n    rss = None\n    for line in st.splitlines():\n        if line.startswith(\"VmRSS:\"):\n            rss = int(line.split()[1]) * 1024\n        if line.startswith(\"State:\"):\n            out[\"state\"] = line.split()[1]\n    out[\"rss_bytes\"] = rss\n    out[\"cmdline\"] = Path(f\"/proc/{PID}/cmdline\").read_bytes().replace(b\"\\0\", b\" \").decode()\n    try:\n        out[\"cpu_etime\"] = Path(f\"/proc/{PID}/stat\").read_text().split()[13:15]\n    except Exception:\n        pass\n    utime, stime = None, None\n    parts = Path(f\"/proc/{PID}/stat\").read_text().split()\n    # fields 14,15 are utime stime\n    out[\"utime_ticks\"] = int(parts[13])\n    out[\"stime_ticks\"] = int(parts[14])\n\nhealth_path = Path(\"/home/telgenbuescher/projects/orderbook_analyse/logs/orderbook_v3_raw_archive_btc_doge.health.ndjson\")\nline = health_path.read_text().strip().splitlines()[-1]\nh = json.loads(line)\nout[\"health\"] = {\n    \"collector_state\": h.get(\"collector_state\"),\n    \"rss_mb\": h.get(\"rss_mb\"),\n    \"full_book_enabled\": h.get(\"full_book_enabled\"),\n    \"full_book_active_topics\": h.get(\"full_book_active_topics\"),\n    \"full_ob_flight_recorder_enabled\": h.get(\"full_ob_flight_recorder_enabled\"),\n    \"full_book_runtimes\": h.get(\"full_book_runtimes\"),\n    \"runtimes\": h.get(\"runtimes\"),\n    \"writer_backlog\": h.get(\"writer_backlog\"),\n    \"timing_contract\": h.get(\"timing_contract\"),\n}\n\nevents = {\n    \"BTCUSDT\": Path(\"/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6\"),\n    \"DOGEUSDT\": Path(\"/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd\"),\n}\n\ndef sha256(p):\n    h = hashlib.sha256()\n    with open(p,'rb') as f:\n        for c in iter(lambda: f.read(1<<20), b''):\n            h.update(c)\n    return h.hexdigest()\n\ndef fds_for(path):\n    target = str(path.resolve())\n    found = []\n    fd_dir = Path(f\"/proc/{PID}/fd\")\n    if not fd_dir.exists():\n        return found\n    for fd in fd_dir.iterdir():\n        try:\n            link = os.readlink(fd)\n        except OSError:\n            continue\n        if link == target:\n            found.append({\"fd\": fd.name, \"link\": link})\n    return found\n\nout[\"events\"] = {}\nfor sym, d in events.items():\n    rec = {\"dir\": str(d), \"files\": {}}\n    for name in [\"full_ob_raw_deltas.jsonl.zst.tmp\",\"rest_full_snapshot.json.zst.tmp\",\"public_trades_raw.jsonl.zst.tmp\"]:\n        p = d / name\n        if not p.exists():\n            continue\n        stt = p.stat()\n        rec[\"files\"][name] = {\n            \"path\": str(p),\n            \"size\": stt.st_size,\n            \"mtime\": stt.st_mtime,\n            \"sha256_moment\": sha256(p),\n            \"fds\": fds_for(p),\n        }\n    out[\"events\"][sym] = rec\n\n# other collectors\nothers = []\nfor ent in Path(\"/proc\").iterdir():\n    if not ent.name.isdigit():\n        continue\n    try:\n        cmd = (ent/\"cmdline\").read_bytes().replace(b\"\\0\", b\" \").decode()\n    except Exception:\n        continue\n    if \"orderbook_v2_live\" in cmd:\n        others.append({\"pid\": int(ent.name), \"cmd\": cmd})\nout[\"orderbook_v2_live_processes\"] = others\n\ndest = Path(\"/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/PRE_CUTOVER_INVENTORY.json\")\ndest.write_text(json.dumps(out, indent=2)+\"\\n\")\nprint(json.dumps({k: out[k] for k in [\"pid\",\"alive\",\"rss_bytes\",\"health\"]}, indent=2)[:2500])\nprint(\"events sizes\", {s: {n: f[\"size\"] for n,f in rec[\"files\"].items()} for s,rec in out[\"events\"].items()})\nprint(\"fds\", {s: {n: f[\"fds\"] for n,f in rec[\"files\"].items()} for s,rec in out[\"events\"].items()})\nprint(\"collectors\", out[\"orderbook_v2_live_processes\"])\nprint(\"wrote\", dest)\nPY "
+    }
+  ]
+}

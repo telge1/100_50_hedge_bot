@@ -1,0 +1,29 @@
+{
+  "sample_count": 36010,
+  "by_scope_status": {
+    "EXACT_LEVEL_TICK": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 13327,
+      "FULL_EDGE_REGION_COVERAGE": 1074,
+      "PARTIAL_EDGE_REGION_COVERAGE": 3
+    },
+    "TPO_EDGE_BIN": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6190,
+      "PARTIAL_EDGE_REGION_COVERAGE": 1012
+    },
+    "VOLUME_EDGE_BIN": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6732,
+      "PARTIAL_EDGE_REGION_COVERAGE": 470
+    },
+    "PROFILE_EDGE_ZONE": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 5790,
+      "PARTIAL_EDGE_REGION_COVERAGE": 1412
+    }
+  },
+  "scopes_analyzed": [
+    "EXACT_LEVEL_TICK",
+    "TPO_EDGE_BIN",
+    "VOLUME_EDGE_BIN",
+    "PROFILE_EDGE_ZONE"
+  ],
+  "note": "missing_coverage_does_not_imply_zero_consumption"
+}

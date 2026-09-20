@@ -1,0 +1,23 @@
+{
+  "generated_at_utc": "2026-09-05T16:12:26Z",
+  "old_main_pid": 1902763,
+  "old_active_enter": "Sat 2026-09-05 12:36:28 CEST",
+  "new_main_pid": 1978678,
+  "new_active_enter": "Sat 2026-09-05 18:12:17 CEST",
+  "restart_count": 1,
+  "active_state": "active",
+  "sub_state": "running",
+  "old_pid_gone": true,
+  "socket_path": "/run/user/1000/full_ob_cache_bridge.sock",
+  "socket_exists": true,
+  "socket_mode": "0o600",
+  "socket_owner": "telgenbuescher:telgenbuescher",
+  "tcp_bridge_listen": false,
+  "health_bridge_enabled": true,
+  "health_bridge": null,
+  "collector_state": "LIVE",
+  "full_book_active_topics": 2,
+  "sequence_gaps_total": 0,
+  "reconnects_total": 0,
+  "rss_mb": 162.26
+}

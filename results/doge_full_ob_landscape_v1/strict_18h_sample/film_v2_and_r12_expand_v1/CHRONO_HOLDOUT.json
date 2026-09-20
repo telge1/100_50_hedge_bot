@@ -1,0 +1,82 @@
+{
+  "n_events": 136,
+  "chronological_holdout": {
+    "discovery_first_10h": {
+      "hours": [
+        "20260906T100000Z",
+        "20260907T230000Z",
+        "20260908T050000Z",
+        "20260909T070000Z",
+        "20260910T060000Z",
+        "20260910T180000Z",
+        "20260910T220000Z",
+        "20260911T050000Z",
+        "20260912T030000Z",
+        "20260912T190000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 36,
+          "DOWN": 45,
+          "total": 81
+        },
+        "score_summary": {
+          "up_mean": 1.878117,
+          "down_mean": 0.84565,
+          "mean_diff_up_minus_down": 1.032467,
+          "sign_hit_rate": 0.592593,
+          "sign_hit_wilson_low": 0.483761,
+          "sign_hit_wilson_high": 0.693039,
+          "correct": 48,
+          "n": 81,
+          "mean_per_hour_sign_hit_rate": 0.605275,
+          "hours_with_events": 10,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.177778
+        },
+        "verdict": "FAIL_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": false
+        }
+      }
+    },
+    "confirmation_last_8h": {
+      "hours": [
+        "20260913T070000Z",
+        "20260913T210000Z",
+        "20260914T210000Z",
+        "20260916T050000Z",
+        "20260917T230000Z",
+        "20260918T090000Z",
+        "20260918T130000Z"
+      ],
+      "evaluation": {
+        "event_counts": {
+          "UP": 28,
+          "DOWN": 27,
+          "total": 55
+        },
+        "score_summary": {
+          "up_mean": 1.426997,
+          "down_mean": -0.829873,
+          "mean_diff_up_minus_down": 2.25687,
+          "sign_hit_rate": 0.709091,
+          "sign_hit_wilson_low": 0.57859,
+          "sign_hit_wilson_high": 0.81229,
+          "correct": 39,
+          "n": 55,
+          "mean_per_hour_sign_hit_rate": 0.728938,
+          "hours_with_events": 7,
+          "ask_front_cleared_rate_diff_up_minus_down": 0.416667
+        },
+        "verdict": "PASS_PREMOVE_FILM_SEPARATION",
+        "pass_criteria": {
+          "min_events_30": true,
+          "up_score_gt_down_score": true,
+          "sign_hit_wilson_low_gt_0_55": true
+        }
+      }
+    }
+  }
+}

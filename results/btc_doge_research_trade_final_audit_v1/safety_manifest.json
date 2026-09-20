@@ -1,0 +1,7 @@
+{
+  "collector_check_required": true,
+  "contract_version": "research_public_trades_contract_v2",
+  "no_ch_writes": true,
+  "no_commit_no_push": true,
+  "read_only": true
+}

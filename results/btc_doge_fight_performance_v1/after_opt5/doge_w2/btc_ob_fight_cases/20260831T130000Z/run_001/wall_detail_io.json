@@ -1,0 +1,6 @@
+{
+  "heavy_detail_csv": false,
+  "observation_count": 36010,
+  "track_count": 2347,
+  "note": "per-sample wall CSVs omitted for research-db performance; summaries retained"
+}

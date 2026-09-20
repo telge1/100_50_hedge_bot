@@ -1,0 +1,9 @@
+{
+  "status": "COMPLETED",
+  "completed": 1794,
+  "skipped": 318,
+  "rows_written": 62759179,
+  "failed": [],
+  "finished_at": "2026-09-03T10:56:51.165090Z",
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323"
+}

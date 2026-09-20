@@ -1,0 +1,72 @@
+{
+  "artifacts": {
+    "ABSCHLUSSBERICHT.md": {
+      "bytes": 5616,
+      "sha256": "9272d971145e32f899bcd91875fd291891551b6ae8f97359aaa3ba84b5b14e4b"
+    },
+    "artifact_manifest.json": {
+      "bytes": 2632,
+      "sha256": "e9737d98fafc98023b9630d8db53269d4a3b8f24f44ef155631a75fcc9daf964"
+    },
+    "feature_availability_audit.csv": {
+      "bytes": 3520,
+      "sha256": "6432b2ee83ac1687d0d69812fb1687cb0f6f5e8da2f75d0f6f9e0a5ae2b11db3"
+    },
+    "field_knowledge_matrix.csv": {
+      "bytes": 2209,
+      "sha256": "5b0a0e7436e8470682cd2de1715432aa417c2d865bb01b9c676dd6e79a309467"
+    },
+    "history_extension_options.md": {
+      "bytes": 4963,
+      "sha256": "3b94d651aa906ecef1c24d14851d44cfeeb78c302b6b767022b456a877a98299"
+    },
+    "history_sufficiency_policy.yaml": {
+      "bytes": 3546,
+      "sha256": "26f9cc1fb8204a1858e65c8cb33f8b9ed3b6433e65b4c75d14bbd8f9151123c8"
+    },
+    "next_phase_plan.md": {
+      "bytes": 2133,
+      "sha256": "df289b4ac96b45a00a491174b94414157f570179f4cd66eab19d098bb09c7bcd"
+    },
+    "source_coverage_inventory.csv": {
+      "bytes": 4538,
+      "sha256": "d4ae717e6c87195bfff794dcccdcb0166909c2a7fe7f384b3aef08dc78d56e85"
+    },
+    "split_leakage_audit.md": {
+      "bytes": 2535,
+      "sha256": "3cc882caf6814519b9ca2f27fc1d25a66f815bef30af51b9cfd0a9141d61224f"
+    },
+    "upstream_causality_audit.md": {
+      "bytes": 6313,
+      "sha256": "b581672033d545d565de38632f752512750735dfa1bead7f658080007d6b8986"
+    }
+  },
+  "audit_results": {
+    "consumed_benchmark_test": [
+      "2026-08-30",
+      "2026-08-31"
+    ],
+    "live_bias_prognosis_allowed": false,
+    "newer_history_available": "live_from_2026-09-01_but_research_sot_missing",
+    "older_history_extendable": "yes_partial_jul19_for_lld_episodes",
+    "phase2_splits": "PASS",
+    "public_trade_1s": "PASS",
+    "seven_day_root_cause": "MAX_BOUNDED_EXPAND_HOURS_168_plus_research_trades_end_Aug31_plus_conservative_start",
+    "t0_outcome_separation": "PASS",
+    "upstream_lld_causality": "PASS_WITH_HTF_TIP_CAVEAT"
+  },
+  "generated_at_utc": "2026-09-05T14:03:16Z",
+  "git": {
+    "oa_branch": "feature/strategy-lab-phase1",
+    "oa_head": "1019974694c27f01249718c99b192c8490038f49",
+    "sr_branch": "feature/btc-doge-research-db",
+    "sr_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34"
+  },
+  "manifest_version": "liquidity_destination_phase_2b_history_lookahead_audit_v1",
+  "phase_references": {
+    "phase_1d_fingerprint": "9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8",
+    "phase_2_eval_contract": "185691763f9b11f0602c832c99a6b5210642684d10a3f61360236dab42f85a0c"
+  },
+  "recommended_variant": "A_causal_older_history_extension",
+  "verdict": "LIQUIDITY_DESTINATION_HISTORY_LOOKAHEAD_V1_CAUSAL_EXTENSION_READY"
+}

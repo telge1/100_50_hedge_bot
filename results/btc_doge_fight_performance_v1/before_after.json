@@ -1,0 +1,54 @@
+{
+  "btc_full_facts_warm_s": {
+    "before": 36.721,
+    "after_median": 9.83,
+    "after_mean": 9.886,
+    "after_runs": [
+      9.794,
+      9.782,
+      9.83,
+      10.086,
+      9.936
+    ]
+  },
+  "doge_full_facts_warm_s": {
+    "before": 22.31,
+    "after_mean": 5.542,
+    "after_runs": [
+      5.558,
+      5.525
+    ]
+  },
+  "coverage_only_warm_s": {
+    "before": 0.1,
+    "after": 0.112,
+    "note": "FINAL removal restored ~0.11s after probe regression to ~4s"
+  },
+  "speedup_btc": 3.74,
+  "speedup_doge": 4.03,
+  "golden_parity": {
+    "tpo_poc_vah_val": [
+      78545.0,
+      79080.0,
+      78230.0
+    ],
+    "vpoc_vvah_vval": [
+      78565.0,
+      79140.0,
+      78190.0
+    ],
+    "delta_0_10m": "+2.76 Mio. USD",
+    "price_0_10m_bps": 25.88,
+    "oa_parity": "EXACT",
+    "status": "PASS"
+  },
+  "gates": {
+    "partial_require_complete_exit": 4,
+    "not_available_exit": 3,
+    "legacy_trade_companion_used": false,
+    "raw_archive_replay_used": false,
+    "mixed_sources_used": false
+  },
+  "clickhouse_schema_change": false,
+  "reason_no_projection": "Code/query opts reached <10s median without new sorting key or projection"
+}

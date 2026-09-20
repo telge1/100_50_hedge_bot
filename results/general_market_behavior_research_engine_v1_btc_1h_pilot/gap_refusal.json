@@ -1,0 +1,12 @@
+{
+  "tested": true,
+  "window": "2026-09-05T17:00:00Z",
+  "full_wall_clock_coverage": false,
+  "replay_chain_complete": true,
+  "full_join": false,
+  "refused_full_label": true,
+  "reasons": [
+    "not_FULL_WALL_CLOCK start_lag_s=2379.272 end_lead_s=0.127"
+  ],
+  "ok": true
+}

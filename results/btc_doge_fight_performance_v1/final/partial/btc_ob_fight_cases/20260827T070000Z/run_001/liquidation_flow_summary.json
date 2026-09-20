@@ -1,0 +1,497 @@
+{
+  "contract_version": "liquidation_flow_facts_v1",
+  "contract_frozen": true,
+  "interpretation_status": "NOT_EVALUATED",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "raw_liquidation_event_count": 271,
+  "unique_liquidation_event_count": 271,
+  "duplicate_liquidation_event_count": 0,
+  "short_liquidation_event_count": 269,
+  "long_liquidation_event_count": 2,
+  "short_liquidation_executed_base_size": 25.012,
+  "long_liquidation_executed_base_size": 0.113,
+  "short_liquidation_bankruptcy_reference_quote": 2011119.8587,
+  "long_liquidation_bankruptcy_reference_quote": 9061.4972,
+  "execution_price": null,
+  "execution_notional": null,
+  "total_taker_buy_base": 579.451,
+  "total_taker_sell_base": 426.826,
+  "total_taker_buy_quote": 45632272.8927,
+  "total_taker_sell_quote": 33614659.9958,
+  "taker_delta_quote": 12017612.896899998,
+  "liquidation_to_trade_direct_id_available": false,
+  "attribution_method": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+  "attribution_decision_eligible": false,
+  "bankruptcy_reference_quote_definition": "sum(executed_base_size × bankruptcy_price); NOT execution quote",
+  "matching_sensitivity": [
+    {
+      "sensitivity_window_ms": 100,
+      "association_type": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+      "identification_status": "NOT_DIRECTLY_IDENTIFIED",
+      "liquidation_event_count": 271,
+      "events_with_candidate_trade_capacity": 7,
+      "total_liquidation_executed_base_size": 25.125,
+      "allocated_liquidation_base": 0.04000000000000001,
+      "unallocated_liquidation_base": 25.085,
+      "total_taker_buy_base": 579.451,
+      "total_taker_sell_base": 426.826,
+      "remaining_unattributed_taker_buy_base": 579.4110000000001,
+      "remaining_unattributed_taker_sell_base": 426.826,
+      "allocated_liquidation_share_of_total_taker_buy_base": 6.903085851952969e-05,
+      "union_window_taker_buy_base": 0.191,
+      "liquidation_capacity_coverage_pct": 0.1592039800995025,
+      "double_counted_trade_volume_base": 0.0,
+      "coverage_status": "COMPUTED",
+      "volume_identity_check": true
+    },
+    {
+      "sensitivity_window_ms": 250,
+      "association_type": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+      "identification_status": "NOT_DIRECTLY_IDENTIFIED",
+      "liquidation_event_count": 271,
+      "events_with_candidate_trade_capacity": 12,
+      "total_liquidation_executed_base_size": 25.125,
+      "allocated_liquidation_base": 1.658,
+      "unallocated_liquidation_base": 23.467,
+      "total_taker_buy_base": 579.451,
+      "total_taker_sell_base": 426.826,
+      "remaining_unattributed_taker_buy_base": 577.793,
+      "remaining_unattributed_taker_sell_base": 426.826,
+      "allocated_liquidation_share_of_total_taker_buy_base": 0.0028613290856345057,
+      "union_window_taker_buy_base": 1.789,
+      "liquidation_capacity_coverage_pct": 6.5990049751243784,
+      "double_counted_trade_volume_base": 0.0,
+      "coverage_status": "COMPUTED",
+      "volume_identity_check": true
+    },
+    {
+      "sensitivity_window_ms": 500,
+      "association_type": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+      "identification_status": "NOT_DIRECTLY_IDENTIFIED",
+      "liquidation_event_count": 271,
+      "events_with_candidate_trade_capacity": 20,
+      "total_liquidation_executed_base_size": 25.125,
+      "allocated_liquidation_base": 1.991999999999999,
+      "unallocated_liquidation_base": 23.133000000000003,
+      "total_taker_buy_base": 579.451,
+      "total_taker_sell_base": 426.826,
+      "remaining_unattributed_taker_buy_base": 577.4590000000001,
+      "remaining_unattributed_taker_sell_base": 426.826,
+      "allocated_liquidation_share_of_total_taker_buy_base": 0.0034377367542725787,
+      "union_window_taker_buy_base": 2.066,
+      "liquidation_capacity_coverage_pct": 7.9283582089552205,
+      "double_counted_trade_volume_base": 0.0,
+      "coverage_status": "COMPUTED",
+      "volume_identity_check": true
+    },
+    {
+      "sensitivity_window_ms": 1000,
+      "association_type": "HEURISTIC_TEMPORAL_VOLUME_ASSOCIATION",
+      "identification_status": "NOT_DIRECTLY_IDENTIFIED",
+      "liquidation_event_count": 271,
+      "events_with_candidate_trade_capacity": 31,
+      "total_liquidation_executed_base_size": 25.125,
+      "allocated_liquidation_base": 2.5579999999999967,
+      "unallocated_liquidation_base": 22.567000000000004,
+      "total_taker_buy_base": 579.451,
+      "total_taker_sell_base": 426.826,
+      "remaining_unattributed_taker_buy_base": 576.8960000000001,
+      "remaining_unattributed_taker_sell_base": 426.82300000000004,
+      "allocated_liquidation_share_of_total_taker_buy_base": 0.004409346087934959,
+      "union_window_taker_buy_base": 2.624,
+      "liquidation_capacity_coverage_pct": 10.181094527363172,
+      "double_counted_trade_volume_base": 0.0,
+      "coverage_status": "COMPUTED",
+      "volume_identity_check": true
+    }
+  ],
+  "phase_boundaries": [
+    {
+      "phase": "OUTER_CROSS_TO_PEAK",
+      "start_ts": "2026-08-27T07:00:00Z",
+      "end_ts": "2026-08-27T07:30:00Z",
+      "analysis_role": "EXPLANATORY_HINDSIGHT_SEGMENT",
+      "phase_role": "HINDSIGHT",
+      "usable_for_live_signal": false,
+      "outer_edge_price": 78960.0,
+      "peak_price": null,
+      "reclaim_price": null
+    },
+    {
+      "phase": "PEAK_TO_RECLAIM",
+      "start_ts": "2026-08-27T07:00:00Z",
+      "end_ts": "2026-08-27T07:30:00Z",
+      "analysis_role": "EXPLANATORY_HINDSIGHT_SEGMENT",
+      "phase_role": "HINDSIGHT",
+      "usable_for_live_signal": false,
+      "outer_edge_price": 78960.0,
+      "peak_price": null,
+      "reclaim_price": null
+    },
+    {
+      "phase": "RECLAIM_TO_WINDOW_END",
+      "start_ts": "2026-08-27T07:00:00Z",
+      "end_ts": "2026-08-27T07:30:00Z",
+      "analysis_role": "PARTIAL_BOUNDARY",
+      "phase_role": "CAUSAL",
+      "usable_for_live_signal": false,
+      "outer_edge_price": 78960.0,
+      "peak_price": null,
+      "reclaim_price": null
+    }
+  ],
+  "liquidation_bursts": [
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 7,
+      "start_ts": "2026-08-27T06:30:04.455Z",
+      "end_ts": "2026-08-27T06:30:05.624Z",
+      "short_executed_base_size": 3.909,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 2,
+      "start_ts": "2026-08-27T06:30:09.71Z",
+      "end_ts": "2026-08-27T06:30:10.189Z",
+      "short_executed_base_size": 0.032,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 5,
+      "start_ts": "2026-08-27T06:30:14.076Z",
+      "end_ts": "2026-08-27T06:30:14.759Z",
+      "short_executed_base_size": 0.362,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 15,
+      "start_ts": "2026-08-27T06:42:19.05Z",
+      "end_ts": "2026-08-27T06:42:20.076Z",
+      "short_executed_base_size": 0.23,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 2,
+      "start_ts": "2026-08-27T06:42:58.033Z",
+      "end_ts": "2026-08-27T06:42:58.213Z",
+      "short_executed_base_size": 0.008,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 11,
+      "start_ts": "2026-08-27T06:43:02.868Z",
+      "end_ts": "2026-08-27T06:43:03.848Z",
+      "short_executed_base_size": 0.504,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 6,
+      "start_ts": "2026-08-27T06:43:07.958Z",
+      "end_ts": "2026-08-27T06:43:08.636Z",
+      "short_executed_base_size": 0.168,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 3,
+      "start_ts": "2026-08-27T06:45:32.274Z",
+      "end_ts": "2026-08-27T06:45:32.603Z",
+      "short_executed_base_size": 0.323,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 27,
+      "start_ts": "2026-08-27T07:20:04.296Z",
+      "end_ts": "2026-08-27T07:20:08.727Z",
+      "short_executed_base_size": 1.8860000000000001,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 3,
+      "start_ts": "2026-08-27T07:25:02.626Z",
+      "end_ts": "2026-08-27T07:25:03.674Z",
+      "short_executed_base_size": 0.051000000000000004,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 8,
+      "start_ts": "2026-08-27T07:25:05.012Z",
+      "end_ts": "2026-08-27T07:25:06.528Z",
+      "short_executed_base_size": 0.435,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 4,
+      "start_ts": "2026-08-27T07:25:08.984Z",
+      "end_ts": "2026-08-27T07:25:09.778Z",
+      "short_executed_base_size": 0.093,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 6,
+      "start_ts": "2026-08-27T07:25:30.181Z",
+      "end_ts": "2026-08-27T07:25:31.624Z",
+      "short_executed_base_size": 0.114,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 39,
+      "start_ts": "2026-08-27T07:25:38.588Z",
+      "end_ts": "2026-08-27T07:25:42.604Z",
+      "short_executed_base_size": 4.586,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 11,
+      "start_ts": "2026-08-27T07:25:55.25Z",
+      "end_ts": "2026-08-27T07:25:57.749Z",
+      "short_executed_base_size": 0.244,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 12,
+      "start_ts": "2026-08-27T07:26:02.634Z",
+      "end_ts": "2026-08-27T07:26:04.019Z",
+      "short_executed_base_size": 1.2570000000000001,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 27,
+      "start_ts": "2026-08-27T07:26:06.174Z",
+      "end_ts": "2026-08-27T07:26:10.85Z",
+      "short_executed_base_size": 3.799,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 26,
+      "start_ts": "2026-08-27T07:26:43.888Z",
+      "end_ts": "2026-08-27T07:26:47.892Z",
+      "short_executed_base_size": 1.758,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 1,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 42,
+      "start_ts": "2026-08-27T07:27:05.128Z",
+      "end_ts": "2026-08-27T07:27:09.9Z",
+      "short_executed_base_size": 4.692,
+      "long_executed_base_size": 0.11
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 15,
+      "start_ts": "2026-08-27T06:30:01.331Z",
+      "end_ts": "2026-08-27T06:30:14.759Z",
+      "short_executed_base_size": 4.327,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 15,
+      "start_ts": "2026-08-27T06:42:19.05Z",
+      "end_ts": "2026-08-27T06:42:20.076Z",
+      "short_executed_base_size": 0.23,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 19,
+      "start_ts": "2026-08-27T06:42:58.033Z",
+      "end_ts": "2026-08-27T06:43:08.636Z",
+      "short_executed_base_size": 0.6799999999999999,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 3,
+      "start_ts": "2026-08-27T06:45:32.274Z",
+      "end_ts": "2026-08-27T06:45:32.603Z",
+      "short_executed_base_size": 0.323,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 29,
+      "start_ts": "2026-08-27T07:20:01.317Z",
+      "end_ts": "2026-08-27T07:20:08.727Z",
+      "short_executed_base_size": 1.9100000000000001,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 2,
+      "start_ts": "2026-08-27T07:20:52.776Z",
+      "end_ts": "2026-08-27T07:20:57.042Z",
+      "short_executed_base_size": 0.029,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 15,
+      "start_ts": "2026-08-27T07:25:02.626Z",
+      "end_ts": "2026-08-27T07:25:09.778Z",
+      "short_executed_base_size": 0.579,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 6,
+      "start_ts": "2026-08-27T07:25:30.181Z",
+      "end_ts": "2026-08-27T07:25:31.624Z",
+      "short_executed_base_size": 0.114,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 39,
+      "start_ts": "2026-08-27T07:25:38.588Z",
+      "end_ts": "2026-08-27T07:25:42.604Z",
+      "short_executed_base_size": 4.586,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 51,
+      "start_ts": "2026-08-27T07:25:55.25Z",
+      "end_ts": "2026-08-27T07:26:10.85Z",
+      "short_executed_base_size": 5.308,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 26,
+      "start_ts": "2026-08-27T07:26:43.888Z",
+      "end_ts": "2026-08-27T07:26:47.892Z",
+      "short_executed_base_size": 1.758,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 5,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 43,
+      "start_ts": "2026-08-27T07:27:03.34Z",
+      "end_ts": "2026-08-27T07:27:09.9Z",
+      "short_executed_base_size": 4.695,
+      "long_executed_base_size": 0.11
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 16,
+      "start_ts": "2026-08-27T06:30:01.331Z",
+      "end_ts": "2026-08-27T06:30:19.976Z",
+      "short_executed_base_size": 4.487,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 38,
+      "start_ts": "2026-08-27T06:42:03.537Z",
+      "end_ts": "2026-08-27T06:43:15.854Z",
+      "short_executed_base_size": 1.201,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 3,
+      "start_ts": "2026-08-27T06:45:32.274Z",
+      "end_ts": "2026-08-27T06:45:32.603Z",
+      "short_executed_base_size": 0.323,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 30,
+      "start_ts": "2026-08-27T07:19:55.107Z",
+      "end_ts": "2026-08-27T07:20:08.727Z",
+      "short_executed_base_size": 1.917,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 2,
+      "start_ts": "2026-08-27T07:20:52.776Z",
+      "end_ts": "2026-08-27T07:20:57.042Z",
+      "short_executed_base_size": 0.029,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 111,
+      "start_ts": "2026-08-27T07:25:02.626Z",
+      "end_ts": "2026-08-27T07:26:10.85Z",
+      "short_executed_base_size": 10.587,
+      "long_executed_base_size": 0
+    },
+    {
+      "burst_gap_seconds": 30,
+      "classification": "UNFROZEN_SENSITIVITY_ONLY",
+      "event_count": 69,
+      "start_ts": "2026-08-27T07:26:43.888Z",
+      "end_ts": "2026-08-27T07:27:09.9Z",
+      "short_executed_base_size": 6.453,
+      "long_executed_base_size": 0.11
+    }
+  ],
+  "superseded_explanatory_audit": {
+    "contract": "btc_ob_fight_explanatory_audit_v1",
+    "do_not_use_for_research": true,
+    "superseded_by": "liquidation_flow_facts_v1",
+    "reason": "overlapping-window double counting and denominator mismatch",
+    "superseded_output_marker_file": "SUPERSEDED.json",
+    "historical_outputs_preserved": true
+  }
+}

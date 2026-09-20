@@ -1,0 +1,16 @@
+{
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "code_paths": {
+    "import_segment": "research/btc_doge_research/trade_importer.py",
+    "runner_lock": "research/btc_doge_research/trade_run_state.py",
+    "watermark_sot": "research_trade_rematerialization_watermarks"
+  },
+  "conflict_on_fingerprint_change": true,
+  "contract_version": "research_public_trades_contract_v2",
+  "no_production_rerun": true,
+  "parallel_runner_block": "ALREADY_RUNNING / LOCK_HELD",
+  "pass": true,
+  "pass2_all_idempotent_skip": true,
+  "pilot_idempotency_verdict": "IDEMPOTENCY_PASS",
+  "terminal_skip_status": "IDEMPOTENT_SKIP"
+}

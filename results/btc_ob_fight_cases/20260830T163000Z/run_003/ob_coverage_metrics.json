@@ -1,0 +1,71 @@
+{
+  "by_scope": {
+    "EXACT_LEVEL_TICK": {
+      "sample_count": 14404,
+      "full_count": 121,
+      "full_pct": 0.84,
+      "partial_count": 0,
+      "partial_pct": 0.0,
+      "outside_book_range_count": 14283,
+      "outside_book_range_pct": 99.16,
+      "missing_sample_count": 0,
+      "missing_sample_pct": 0.0
+    },
+    "TPO_EDGE_BIN": {
+      "sample_count": 7202,
+      "full_count": 0,
+      "full_pct": 0.0,
+      "partial_count": 114,
+      "partial_pct": 1.58,
+      "outside_book_range_count": 7088,
+      "outside_book_range_pct": 98.42,
+      "missing_sample_count": 0,
+      "missing_sample_pct": 0.0
+    },
+    "VOLUME_EDGE_BIN": {
+      "sample_count": 7202,
+      "full_count": 0,
+      "full_pct": 0.0,
+      "partial_count": 138,
+      "partial_pct": 1.92,
+      "outside_book_range_count": 7064,
+      "outside_book_range_pct": 98.08,
+      "missing_sample_count": 0,
+      "missing_sample_pct": 0.0
+    },
+    "PROFILE_EDGE_ZONE": {
+      "sample_count": 7202,
+      "full_count": 0,
+      "full_pct": 0.0,
+      "partial_count": 188,
+      "partial_pct": 2.61,
+      "outside_book_range_count": 7014,
+      "outside_book_range_pct": 97.39,
+      "missing_sample_count": 0,
+      "missing_sample_pct": 0.0
+    },
+    "FIRST_OUTSIDE_BIN": {
+      "sample_count": 7202,
+      "full_count": 0,
+      "full_pct": 0.0,
+      "partial_count": 149,
+      "partial_pct": 2.07,
+      "outside_book_range_count": 7053,
+      "outside_book_range_pct": 97.93,
+      "missing_sample_count": 0,
+      "missing_sample_pct": 0.0
+    }
+  },
+  "total_sample_rows": 43212,
+  "overall": {
+    "sample_count": 43212,
+    "full_count": 121,
+    "full_coverage_pct": 0.28,
+    "partial_count": 589,
+    "partial_coverage_pct": 1.36,
+    "outside_book_range_count": 42502,
+    "outside_book_range_pct": 98.36,
+    "missing_sample_count": 0,
+    "missing_sample_pct": 0.0
+  }
+}

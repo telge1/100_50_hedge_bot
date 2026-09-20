@@ -1,0 +1,151 @@
+{
+  "preflight_version": "phase_2a1_v1",
+  "q1_why_episode_count": {
+    "episode_count": 811,
+    "cause": "profile_state_changes_on_each_deduplicated_public_trade_post_anchor_crossing_edge_tick_boundary",
+    "state_change_source": "deduplicated_public_trade_chronological",
+    "not_candle_or_bucket": true,
+    "trade_count_observed": 197346
+  },
+  "q2_state_distribution": {
+    "INSIDE_BOTH_PROFILES": 225,
+    "OUTSIDE_BOTH_ABOVE": 170,
+    "BETWEEN_UPPER_PROFILE_EDGES": 215,
+    "BETWEEN_LOWER_PROFILE_EDGES": 117,
+    "OUTSIDE_BOTH_BELOW": 84
+  },
+  "q3_duration_by_state": {
+    "INSIDE_BOTH_PROFILES": {
+      "count": 225,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.022,
+      "max": 287.042,
+      "total_seconds": 901.4259999999999
+    },
+    "OUTSIDE_BOTH_ABOVE": {
+      "count": 170,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.001,
+      "p95": 0.366,
+      "max": 4043.663,
+      "total_seconds": 4409.212
+    },
+    "BETWEEN_UPPER_PROFILE_EDGES": {
+      "count": 215,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.003,
+      "p95": 0.614,
+      "max": 19.478,
+      "total_seconds": 66.10600000000001
+    },
+    "BETWEEN_LOWER_PROFILE_EDGES": {
+      "count": 117,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "max": 2.364,
+      "total_seconds": 3.808
+    },
+    "OUTSIDE_BOTH_BELOW": {
+      "count": 84,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "max": 14.101,
+      "total_seconds": 18.144000000000002
+    }
+  },
+  "q4_duration_buckets": {
+    "under_100ms": 770,
+    "under_500ms": 9,
+    "under_1s": 5,
+    "under_2s": 3,
+    "under_5s": 6,
+    "under_10s": 4,
+    "under_30s": 6,
+    "at_least_30s": 8
+  },
+  "q5_outside_episodes_closed": {
+    "count": 254,
+    "all_closed": true,
+    "window_end_outside": 0
+  },
+  "q6_reclaim_chronological_cross": {
+    "phase2a_reclaim_count": 0,
+    "unique_cross_ts_in_phase2a": 0,
+    "phase2a_global_first_reclaim_bug": false
+  },
+  "q7_window_end_as_reclaim": {
+    "window_end_reclaim_count_phase2a": 0,
+    "note": "Phase 2A reclaim builder does not filter WINDOW_END; corrected in Phase 2A.1"
+  },
+  "q8_reclaim_equals_outside_count": {
+    "outside_count": 254,
+    "phase2a_reclaim_count": 0,
+    "equal": false,
+    "explanation_if_equal": "Phase 2A assigns one reclaim per outside episode via flawed global-first transition match"
+  },
+  "q9_state_change_data_source": "each_deduplicated_public_trade_sorted_by_ts_trade_id",
+  "q10_trade_dedup_and_sort": {
+    "deduplicated_by_trade_id": true,
+    "sort_key": "(ts, trade_id)",
+    "meta": {
+      "table": "btc_doge_research.research_public_trades",
+      "raw_count": 330892,
+      "deduped_count": 330892,
+      "dedup_removed": 0,
+      "aggressor_semantics": "side/taker_side Buy/Sell is Bybit taker/aggressor",
+      "sort": "ts, trade_id",
+      "source_mode": "RESEARCH_PUBLIC_TRADES",
+      "lineage_companion_used": false,
+      "raw_archive_replay_used": false,
+      "data_source": "BTC_DOGE_RESEARCH_DB",
+      "mixed_sources_used": false,
+      "research_event_count": 330892,
+      "research_trade_events_missing": false,
+      "min_ts": "2026-08-30T13:30:00.005Z",
+      "max_ts": "2026-08-30T17:29:59.323Z",
+      "query_mode": "NO_FINAL_PRUNED"
+    }
+  },
+  "q11_identical_timestamp_order": "deterministic_trade_id_tiebreak",
+  "q12_edge_event_ticks": [
+    787275,
+    787375,
+    789000,
+    789100
+  ],
+  "q13_exact_tick_only": {
+    "exact_level_ticks_only_in_phase2a": true,
+    "ticks_observed": [
+      787275,
+      787375,
+      789000,
+      789100
+    ]
+  },
+  "q14_ob_coverage_at_edges": "requires_phase_2a1_edge_book_coverage",
+  "q15_profile_edges_in_ob200": "requires_phase_2a1_edge_book_coverage",
+  "duration_sum_seconds": 5398.696,
+  "observation_window_seconds": 5400.0,
+  "trade_span_seconds": 5398.696,
+  "duration_sum_matches_window": false,
+  "duration_sum_matches_trade_span": true,
+  "transition_count": 810
+}

@@ -1,0 +1,29 @@
+{
+  "causal_manifest_hash": "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf",
+  "confirmation_policy": "cross_recognition",
+  "confirmation_source": "cross_recognition",
+  "evaluation_id": "94d0cfbfb2da4c829dc0d95588dc052d",
+  "execution_dedup_applied": false,
+  "exit_policy": "NO_BE50",
+  "fixed_strategy_version": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "intrabar_policy": "SL_FIRST",
+  "outcome_data_end": "2026-08-17T00:00:00Z",
+  "outcome_engine": "evaluate_signal_no_be50_full_1m",
+  "requested_at": "2026-08-18T10:05:56Z",
+  "selected_symbols": [
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT",
+    "AVAXUSDT"
+  ],
+  "signal_scope": "TIER_A_ONLY",
+  "signal_source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+  "signal_strategy_version": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "source_job_id": "f5909d14cba34fc9973a8b431530752d"
+}

@@ -1,0 +1,27 @@
+{
+  "coins_evaluated": 9,
+  "coins_with_signals": 9,
+  "coins_without_tier_a": 0,
+  "execution_dedup_applied": false,
+  "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+  "failed_coins": 0,
+  "multi_tf_collisions": 190,
+  "outcome_evaluation_enabled": false,
+  "raw_by_timeframe": {
+    "15m": 33752,
+    "1h": 8458,
+    "30m": 17128,
+    "4h": 2065
+  },
+  "raw_candidates": 61403,
+  "successful_coins": 9,
+  "tier_a": 8729,
+  "tier_a_by_timeframe": {
+    "15m": 4866,
+    "1h": 1214,
+    "30m": 2352,
+    "4h": 297
+  },
+  "warmup_warnings": 9,
+  "writes_to_clickhouse": false
+}

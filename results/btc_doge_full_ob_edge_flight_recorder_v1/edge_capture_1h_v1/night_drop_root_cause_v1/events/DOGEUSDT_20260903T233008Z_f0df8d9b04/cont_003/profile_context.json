@@ -1,0 +1,12 @@
+{
+  "bracket_minutes": 30,
+  "causality": "trades_strictly_before_cutoff",
+  "completeness": "completed_window_only",
+  "cutoff": "2026-09-03T23:30:00+00:00",
+  "profile_id": "DOGEUSDT_20260903T230000_233000",
+  "session_start": "2026-09-03T23:00:00+00:00",
+  "tpo_source": "volume_proxy_fallback",
+  "volume_poc": 0.08752249999999999,
+  "volume_vah": 0.087695,
+  "volume_val": 0.08751999999999999
+}

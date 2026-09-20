@@ -1,0 +1,57 @@
+{
+  "allowed_exclusion_reasons": [
+    "MISSING_UPPER_TARGET",
+    "MISSING_LOWER_TARGET",
+    "TARGET_ALREADY_TOUCHED_AT_T0",
+    "TARGETS_OVERLAP",
+    "TARGET_ORDER_INVALID",
+    "PRICE_MISSING_AT_T0",
+    "FUTURE_PRICE_PATH_INCOMPLETE",
+    "INSUFFICIENT_WARMUP",
+    "SOURCE_COVERAGE_INCOMPLETE",
+    "ORDERBOOK_DEPTH_UNPROVEN",
+    "SEQUENCE_GAP",
+    "PUBLIC_TRADES_MISSING_IF_MANDATORY",
+    "HORIZON_NOT_CLOSED",
+    "SIMULTANEOUS_TOUCH",
+    "CAUSALITY_VIOLATION",
+    "DUPLICATE_OR_OVERLAPPING_EPISODE",
+    "UNSUPPORTED_TARGET_SOURCE"
+  ],
+  "allowed_outcomes": [
+    "UPPER_FIRST",
+    "LOWER_FIRST",
+    "NEITHER_WITHIN_HORIZON",
+    "SIMULTANEOUS_OR_AMBIGUOUS",
+    "INELIGIBLE_DATA"
+  ],
+  "ambiguity_milliseconds": 1000,
+  "builder_version": "liquidity_destination_episode_builder_v1",
+  "contract_version": "liquidity_destination_episode_contract_v1",
+  "forbidden_capabilities": [
+    "bias",
+    "probability",
+    "prediction",
+    "now",
+    "trading",
+    "orders",
+    "dashboard",
+    "full_ob_invention"
+  ],
+  "grid_seconds": 60,
+  "minimum_target_persistence_seconds": 60,
+  "overlap_policy": "one active episode per symbol; next T0 >= prior outcome time or horizon end",
+  "price_bucket": "1s",
+  "price_source": "btc_doge_research.research_public_trades",
+  "research_only": true,
+  "target_contract_version": "liquidity_pool_signal/canonical_v1",
+  "target_source": "LLD_POOL",
+  "target_timeframe": "5m",
+  "touch_semantics": {
+    "acceptance": "not evaluated",
+    "lower": "bucket_low <= frozen lower block upper edge",
+    "same_or_adjacent_within_ms": "SIMULTANEOUS_OR_AMBIGUOUS",
+    "upper": "bucket_high >= frozen upper block lower edge"
+  },
+  "warmup_seconds": 300
+}

@@ -1,0 +1,85 @@
+# LIQUIDITY_DESTINATION_BIAS — Phase 2B History Sufficiency Policy
+# Frozen BEFORE any future model/feature outcome evaluation.
+# These gates must not be relaxed after seeing later model results.
+
+policy_version: liquidity_destination_history_sufficiency_v1
+frozen_at_utc: "2026-09-05T13:59:26Z"
+research_only: true
+research_banner: RESEARCH_ONLY_NO_TRADE
+
+current_dataset_status:
+  phase_1d_fingerprint_sha256: 9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8
+  eligible_episodes: 1719
+  independent_utc_days: 7
+  symbols: [BTCUSDT, DOGEUSDT]
+  touch_classes_present: [UPPER_FIRST, LOWER_FIRST, NEITHER_WITHIN_HORIZON]
+  meets_provisional_feature_gate: true
+  meets_model_bias_gate: false
+  meets_final_forward_gate: false
+  live_bias_prognosis_allowed: false
+
+gates:
+  provisional_feature_development:
+    purpose: technical feature plumbing and internal exploration only
+    minimum_complete_utc_days: 7
+    minimum_eligible_episodes: 1000
+    minimum_symbols: 2
+    require_both_touch_classes: true
+    status_on_current_data: PASSED
+    allows:
+      - feature_contract_drafting
+      - causal_feature_replay_tests
+      - leakage_unit_tests
+      - comparison_against_frozen_B1_NEAREST_TARGET
+    forbids:
+      - bias_claim
+      - live_bias_prognosis
+      - threshold_freeze_for_production
+      - final_forward_test_substitution
+
+  model_or_bias_development:
+    purpose: develop rules/models that claim predictive lift beyond distance baseline
+    minimum_complete_utc_days: 30
+    require_multiple_volatility_and_trend_regimes: true
+    minimum_eligible_episodes_total: 5000
+    adequate_per_symbol_counts: required
+    no_critical_source_seams: required
+    full_causal_feature_coverage: required
+    status_on_current_data: FAILED
+    rationale: |
+      Current set has only 7 UTC days and 1719 episodes. Nearest-target already
+      reaches TEST accuracy ~0.79 / directional ~0.85 on 2 test days. Regime
+      independence and lift beyond distance cannot be established on this span.
+      Gate must not be loosened after model results.
+    stricter_addendum:
+      - reserved_unconsumed_holdout_required_after_feature_freeze
+      - 30_31_aug_marked_consumed_benchmark_not_final_holdout
+
+  final_untouched_forward_test:
+    purpose: post-freeze forward proof only
+    requires_freeze_of:
+      - feature_contract
+      - model_or_rules
+      - thresholds
+      - abstention_rule
+      - confidence_calibration
+    minimum_new_closed_utc_days: 14
+    minimum_eligible_forward_episodes: 1000
+    outcomes_unused_during_development: true
+    if_not_met: result_remains_provisional
+    status_on_current_data: NOT_STARTED
+
+safe_cutoff_rules:
+  pool_targets: "available_at <= T0 - 60s AND active_as_of at T0"
+  trade_t0_price: "event_time buckets with bucket_start < T0 (strict)"
+  trade_path_labels: "T0 <= bucket_start < horizon_end (future allowed for labels only)"
+  closed_bucket_features: "use last fully closed AND received bucket with available_at/bucket_end <= T0"
+  oi_5m_or_5s: "last completed received bucket ending <= T0; never in-progress bucket"
+  market_profile: "profile built only from data with event_time/available_at <= T0; no full-session backfill into earlier T0"
+  ob_features: "reconstructed book state as_of T0 from sequence-complete deltas; no later snapshot backprojection"
+
+consumed_benchmark:
+  dates_utc: ["2026-08-30", "2026-08-31"]
+  status: consumed_benchmark_test
+  may_reuse_for: reproducible_baseline_comparisons
+  must_not_serve_as: sole_final_holdout_for_later_orderflow_models

@@ -1,0 +1,52 @@
+{
+  "branch": "feature/btc-doge-research-db",
+  "head": "2af0477dc4654d47603a2845a0ea1463b0bcfa12",
+  "dirty_count": 114,
+  "rematerialization_verdict": "BTC_DOGE_RESEARCH_TRADE_REMATERIALIZATION_READY",
+  "rematerialization_audit": "results/btc_doge_research_trade_final_audit_v1/ABSCHLUSSBERICHT.md",
+  "rematerialization_runner_active": false,
+  "collector_pids": {
+    "oi_liquidation_collector": 147111,
+    "run_live_collector_service": 1661773
+  },
+  "clickhouse_version": "26.7.1.1315",
+  "clickhouse_timezone": "UTC",
+  "cpu_cores": 6,
+  "memory": {
+    "total_gi": 17,
+    "available_gi": 13,
+    "swap_used_gi": 2.0
+  },
+  "disk_free_line": "/dev/sda2       916G  512G  358G  59% /",
+  "research_public_trades": {
+    "engine": "ReplacingMergeTree",
+    "sorting_key": "symbol, trade_id",
+    "partition_key": "(symbol, toYYYYMM(event_time))",
+    "rows": 82031289,
+    "projections": [],
+    "views": []
+  },
+  "source_purity_invariants": {
+    "legacy_trade_companion_used": false,
+    "raw_archive_replay_used": false,
+    "mixed_sources_used": false,
+    "trade_source": "BTC_DOGE_RESEARCH_DB"
+  },
+  "baseline_runtimes_from_final_audit_s": {
+    "btc_golden": 39.7,
+    "doge_golden": 22.31,
+    "coverage_only": 0.1
+  },
+  "query_plan_probe_notes": {
+    "final_breaks_event_time_minmax": true,
+    "final_granules_btc_6h": 8641,
+    "nofinal_granules_btc_6h": 1716,
+    "span_final_s": 2.04,
+    "count_nofinal_s": 0.022,
+    "fetch_final_s": 2.789,
+    "physical_equals_canonical": true,
+    "physical_multi_version_keys": 0
+  },
+  "contract_version": "btc_doge_fight_performance_v1",
+  "read_only_preflight": true
+}

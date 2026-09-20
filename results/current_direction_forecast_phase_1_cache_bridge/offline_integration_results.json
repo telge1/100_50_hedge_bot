@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-09-05T15:11:40Z",
+  "default_bridge_enabled": false,
+  "positive_freeze": {
+    "status": "DATA_COMPLETE",
+    "data_complete": true,
+    "message_count": 59,
+    "actual_pre_roll_seconds": 116.0,
+    "replay_capability": "RAW_FULL_BOOK_REPLAY",
+    "anchor_type": "PERIODIC_BOOK_CHECKPOINT"
+  },
+  "negative_sequence_gap": {
+    "status": "SEQUENCE_GAP",
+    "data_complete": false
+  },
+  "protocol_version": "full_ob_cache_bridge_protocol_v1"
+}

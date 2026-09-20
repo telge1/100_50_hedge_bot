@@ -1,0 +1,37 @@
+{
+  "oi_first": 52549.44,
+  "oi_last": 52663.77,
+  "oi_delta": 114.32999999999447,
+  "oi_delta_pct": 0.21756654304973463,
+  "oi_sample_count": 720,
+  "oi_unit": {
+    "source_field": "open_interest",
+    "table": "orderbook_analysis.open_interest_5s",
+    "physical_unit_confirmed": false,
+    "display_label": "Source-Einheiten (open_interest)"
+  },
+  "liquidation_count": 60,
+  "long_liquidation_notional": 78.7603,
+  "short_liquidation_notional": 490938.9752,
+  "largest_liquidation": 128089.1365,
+  "liquidation_summary": {
+    "long_count": 1,
+    "short_count": 59,
+    "long_notional": 78.7603,
+    "short_notional": 490938.9752,
+    "largest_notional": 128089.1365,
+    "largest_ts": "2026-08-31T18:44:29.884Z",
+    "largest_price": 79410.5,
+    "side_semantics": "liquidated_position_side: LIQUIDATED_LONG / LIQUIDATED_SHORT"
+  },
+  "freshness": {
+    "oi_last_ts": "2026-08-31T19:29:55Z",
+    "liq_last_ts": "2026-08-31T19:14:14.761Z"
+  },
+  "coverage": {
+    "oi_present": true,
+    "liquidations_present": true,
+    "window_start_utc": "2026-08-31T18:30:00Z",
+    "window_end_utc": "2026-08-31T19:30:00Z"
+  }
+}

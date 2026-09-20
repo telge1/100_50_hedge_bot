@@ -1,0 +1,155 @@
+{
+  "package_version": "0.2.0",
+  "schema_version": "btc_ob_fight_facts_v2_0",
+  "symbol": "BTCUSDT",
+  "anchor_timestamp_utc": "2026-08-30T16:30:00Z",
+  "normalized_anchor_utc": "2026-08-30T16:30:00Z",
+  "window": {
+    "before_minutes": 30,
+    "after_minutes": 30,
+    "profile_input_window": {
+      "start": "2026-08-30T13:30:00Z",
+      "end_exclusive": "2026-08-30T16:30:00Z",
+      "session_id": "us_developing_to_anchor",
+      "predicate": "session_start <= event_ts < anchor"
+    },
+    "pre_anchor_observation_window": {
+      "start": "2026-08-30T16:00:00Z",
+      "end_exclusive": "2026-08-30T16:30:00Z",
+      "predicate": "anchor - before <= event_ts < anchor"
+    },
+    "post_anchor_observation_window": {
+      "start": "2026-08-30T16:30:00Z",
+      "end_inclusive": "2026-08-30T17:00:00Z",
+      "predicate": "anchor <= event_ts <= anchor + after"
+    },
+    "full_fight_window": {
+      "start": "2026-08-30T16:00:00Z",
+      "end_inclusive": "2026-08-30T17:00:00Z",
+      "predicate": "anchor - before <= event_ts <= anchor + after"
+    },
+    "auto_extension_enabled": false
+  },
+  "data_source": "BTC_DOGE_RESEARCH_DB",
+  "database": "btc_doge_research",
+  "raw_archive_replay_used": false,
+  "mixed_sources_used": false,
+  "eligibility_contract": "fight_data_eligibility_contract_v1",
+  "eligibility_status": "DATA_COMPLETE",
+  "facts_computation_allowed": true,
+  "interpretation_allowed": false,
+  "trade_decision_eligible": false,
+  "mandatory_data_complete": true,
+  "context_data_complete": true,
+  "profile_causality_passed": true,
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "auto_extension_enabled": false,
+  "auto_extension_reason": "RULES_UNFROZEN",
+  "read_only": true,
+  "no_overwrite": true,
+  "require_complete": true,
+  "coverage_only": false,
+  "allow_legacy_trade_companion": false,
+  "benchmark": false,
+  "heuristics": {
+    "heuristic_contract_version": "wall_heuristics_v1",
+    "status": "UNFROZEN_HEURISTIC",
+    "wall_max_bps": 800,
+    "wall_qty_median_mult": 3.0,
+    "wall_trade_match_frac": 0.3,
+    "wall_sample_interval_seconds": 1,
+    "level_touch_band_bps": 5.0,
+    "tick_size": 0.1,
+    "btcusdt_tick_size": 0.1,
+    "report_micro_episode_seconds": 1.0
+  },
+  "instrument": {
+    "symbol": "BTCUSDT",
+    "tick_size": "0.1",
+    "quantity_step": "0.001",
+    "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+    "price_precision": 1,
+    "quantity_precision": 3,
+    "contract_type": "linear_perp",
+    "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+    "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+    "contract_version": "fight_instrument_contract_v1"
+  },
+  "query_timings": [
+    {
+      "source_name": "OB200",
+      "elapsed_s": 0.447371,
+      "row_count": 3601,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES",
+      "elapsed_s": 0.198452,
+      "row_count": 271981,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "elapsed_s": 0.004567,
+      "row_count": 720,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "elapsed_s": 0.010234,
+      "row_count": 8,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "elapsed_s": 0.002603,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "BATCH_LIQUIDATIONS",
+      "elapsed_s": 0.010355,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    }
+  ],
+  "causality": {
+    "anchor_exclusive": true,
+    "profile_session_id": "us_developing_to_anchor",
+    "session_start_utc": "2026-08-30T13:30:00Z",
+    "future_trades_in_profile_inputs": 0,
+    "profile_causality_passed": true
+  },
+  "output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/20260830T163000Z/run_002",
+  "lineage_companion_used": false,
+  "research_trade_events_missing": false,
+  "input_coverage_runtime_s": 1.641,
+  "analysis_status": "FACTS_READY_RULES_UNFROZEN",
+  "fight_facts": {
+    "schema_version": "btc_ob_fight_facts_v2_2",
+    "fight_fact_contract": "fight_fact_contract_v1",
+    "interpretation_status": "NOT_EVALUATED"
+  },
+  "sequence_validation": {
+    "schema_version": "btc_ob_fight_sequence_v2_3",
+    "verdict": "BTC_OB_FIGHT_CANONICAL_ELIGIBILITY_READY"
+  },
+  "canonical_reclaim_contract": "reclaim_event_contract_v3",
+  "liquidation_flow_contract": "liquidation_flow_facts_v1",
+  "tpo_profile": {
+    "status": "COMPUTED_SEPARATELY",
+    "poc": null,
+    "vah": null,
+    "val": null
+  },
+  "volume_profile": {
+    "status": "COMPUTED_SEPARATELY",
+    "vpoc": 78832.5,
+    "vvah": 78945.0,
+    "vval": 78645.0
+  },
+  "total_runtime_s": 7.77,
+  "full_analysis_runtime_s": 7.77
+}

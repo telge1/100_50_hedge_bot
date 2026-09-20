@@ -1,0 +1,100 @@
+{
+  "schema_version": "doge_structure_followups_v1",
+  "test": "bullish_staircase_r12_fill_pull_v2",
+  "hypothesis": "Front Rank-1/2 ask walls that are both pulled and filled, with bid refill and ask vacuum growth, raise UP@25bps versus matched controls.",
+  "rule_freeze": {
+    "max_front_rank": 2,
+    "requires_ask_pull_and_ask_fill": true,
+    "requires_bid_refill_under_aggression": true,
+    "ask_vacuum_growth_min_bps": 5.0,
+    "no_signed_past_return_gate": true,
+    "note": "Structural rewrite; not a retune of BULLISH_STAIRCASE V1 thresholds."
+  },
+  "counts": {
+    "raw_detections": 8,
+    "independent_episodes": 6,
+    "matched_episodes": 4,
+    "unmatched_episodes": 2,
+    "unmatched_reasons": {
+      "censored_outcome": 2
+    }
+  },
+  "raw_detection_first_25bps": {
+    "n": 6,
+    "successes": 4,
+    "rate": 0.666667,
+    "wilson_low": 0.299988,
+    "wilson_high": 0.903231,
+    "counts": {
+      "SIDEWAYS": 1,
+      "UP": 4,
+      "DOWN": 1
+    }
+  },
+  "evaluation": {
+    "outcome_name": "first_25bps_up",
+    "success_definition": "UP",
+    "episode_first_25bps": {
+      "n": 4,
+      "successes": 3,
+      "rate": 0.75,
+      "wilson_low": 0.300636,
+      "wilson_high": 0.954414,
+      "counts": {
+        "SIDEWAYS": 1,
+        "UP": 3
+      }
+    },
+    "control_first_25bps": {
+      "n": 20,
+      "successes": 8,
+      "rate": 0.4,
+      "wilson_low": 0.218804,
+      "wilson_high": 0.613422,
+      "counts": {
+        "SIDEWAYS": 9,
+        "DOWN": 3,
+        "UP": 8
+      }
+    },
+    "episode_first_50bps": {
+      "n": 4,
+      "successes": 2,
+      "rate": 0.5,
+      "wilson_low": 0.150036,
+      "wilson_high": 0.849964,
+      "counts": {
+        "SIDEWAYS": 2,
+        "UP": 2
+      }
+    },
+    "control_first_50bps": {
+      "n": 20,
+      "successes": 10,
+      "rate": 0.5,
+      "wilson_low": 0.299295,
+      "wilson_high": 0.700705,
+      "counts": {
+        "SIDEWAYS": 10,
+        "UP": 10
+      }
+    },
+    "paired_risk_difference_25bps": {
+      "mean": 0.347075,
+      "ci95_low": 0.0,
+      "ci95_high": 0.75,
+      "bootstrap_p_one_sided_le_zero": 0.064,
+      "draws": 2000
+    },
+    "verdict": "INSUFFICIENT_SAMPLE",
+    "pass_criteria": {
+      "positive_mean_risk_diff": true,
+      "ci95_excludes_zero": false,
+      "bootstrap_p_one_sided_lt_0_05": false,
+      "min_matched_episodes_20": false
+    },
+    "note": "Matched episode count below pre-registered minimum of 20; directional point estimates are descriptive only."
+  },
+  "verdict": "INSUFFICIENT_SAMPLE",
+  "interpretation": "Rank-1/2 Fill+Pull staircase is too rare in this 18h sample for a matched-control decision; point estimate is directionally high but underpowered."
+}

@@ -1,0 +1,86 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT/e6b88c5bca914cfb9e18cadb6f833794",
+      "duration_seconds": 30.309,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:50:57Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 15,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 4,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 8,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 1
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "e6b88c5bca914cfb9e18cadb6f833794",
+      "started_at": "2026-08-15T15:50:27Z",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    },
+    {
+      "artifact_reference": "coin_runs/1000BONKUSDT/a4f5c75d146e49c385b9841721ffebd1",
+      "duration_seconds": 29.858,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:51:27Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 17,
+          "tier_a": 2
+        },
+        "1h": {
+          "raw": 3,
+          "tier_a": 1
+        },
+        "30m": {
+          "raw": 7,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "a4f5c75d146e49c385b9841721ffebd1",
+      "started_at": "2026-08-15T15:50:57Z",
+      "state": "COMPLETED",
+      "symbol": "1000BONKUSDT",
+      "tier_a_total": 4,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ]
+}

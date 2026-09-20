@@ -1,0 +1,28 @@
+{
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "contract_version": "research_public_trades_contract_v2",
+  "hour_exact": 2100,
+  "hour_mismatch": 0,
+  "joined_keys": 82031289,
+  "notional_mismatches": 0,
+  "pass": true,
+  "price_mismatches": 0,
+  "side_mismatches": 0,
+  "size_mismatches": 0,
+  "source_gaps_count": 0,
+  "symbol_summary": [
+    {
+      "delta": 0,
+      "research_unique": 68974911,
+      "source_unique": 68974911,
+      "symbol": "BTCUSDT"
+    },
+    {
+      "delta": 0,
+      "research_unique": 13056378,
+      "source_unique": 13056378,
+      "symbol": "DOGEUSDT"
+    }
+  ],
+  "target_gaps_count": 0
+}

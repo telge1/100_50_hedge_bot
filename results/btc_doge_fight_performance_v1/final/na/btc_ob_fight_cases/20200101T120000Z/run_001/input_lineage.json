@@ -1,0 +1,69 @@
+{
+  "data_source": "BTC_DOGE_RESEARCH_DB",
+  "database": "btc_doge_research",
+  "raw_archive_replay_used": false,
+  "mixed_sources_used": false,
+  "lineage_companion_used": false,
+  "trade_tick_source": "btc_doge_research.research_public_trades",
+  "trade_source_mode": "RESEARCH_TRADE_EVENTS_MISSING",
+  "ob_table": "btc_doge_research.research_ob200_snapshots_1s",
+  "candles_table": "signal_generator.candles_1m",
+  "candles_classification": "COVERAGE_ONLY",
+  "query_timings": [
+    {
+      "source_name": "OB200_COVERAGE_META",
+      "elapsed_s": 0.003314,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_EVENT_SPAN",
+      "elapsed_s": 0.002377,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.001761,
+      "row_count": 0,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PROFILE_TRADES_EVENT_SPAN",
+      "elapsed_s": 0.002157,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.001629,
+      "row_count": 0,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "elapsed_s": 0.001856,
+      "row_count": 0,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "elapsed_s": 0.001796,
+      "row_count": 0,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "elapsed_s": 0.001877,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "BATCH_LIQUIDATIONS",
+      "elapsed_s": 0.001944,
+      "row_count": 0,
+      "database": "btc_doge_research"
+    }
+  ],
+  "probe_mode": "COVERAGE_ONLY"
+}

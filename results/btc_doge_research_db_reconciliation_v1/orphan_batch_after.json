@@ -1,0 +1,40 @@
+{
+  "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+  "batch_run_rows": [
+    {
+      "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+      "build_id": "9ea5ce47b2a73b0f08d0bbf20296fe7fc7c6a4371e5b7930d1686f6b55ca30cc",
+      "completed_at": "2026-09-02T23:08:14.122841",
+      "error": "",
+      "phase": "COMPLETE",
+      "rows_written": 3567,
+      "started_at": "2026-09-02T23:08:06.891782",
+      "status": "PARTIAL"
+    },
+    {
+      "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+      "build_id": "9ea5ce47b2a73b0f08d0bbf20296fe7fc7c6a4371e5b7930d1686f6b55ca30cc",
+      "completed_at": null,
+      "error": "",
+      "phase": "OB200",
+      "rows_written": 0,
+      "started_at": "2026-09-02T23:08:06.891782",
+      "status": "RUNNING"
+    },
+    {
+      "batch_id": "fh:DOGEUSDT:OB200:20260831T230000Z:20260901T000000Z:BYBIT_OB200_",
+      "build_id": "9ea5ce47b2a73b0f08d0bbf20296fe7fc7c6a4371e5b7930d1686f6b55ca30cc",
+      "completed_at": "2026-09-03T07:09:42.528684",
+      "error": "{\"expected_seconds\": 3600, \"missing_seconds_count\": 33, \"proven_unique_seconds\": 3567, \"recovered_at\": \"2026-09-03T07:09:42.528684Z\", \"recovery_reason\": \"RECONCILE_RUNNING_ORPHAN_TIE\"}",
+      "phase": "RECOVERY",
+      "rows_written": 3567,
+      "started_at": "2026-09-03T07:09:42.528684",
+      "status": "PARTIAL"
+    }
+  ],
+  "canonical_status": "PARTIAL",
+  "contract_version": "btc_doge_research_reconciliation_v1",
+  "naive_argmax_status_started_at": "PARTIAL",
+  "physical_rows": 3567,
+  "unique_seconds": 3567
+}

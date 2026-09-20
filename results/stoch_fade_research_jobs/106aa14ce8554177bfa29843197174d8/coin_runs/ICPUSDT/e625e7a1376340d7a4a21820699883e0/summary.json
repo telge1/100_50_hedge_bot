@@ -1,0 +1,9 @@
+{
+  "raw_total": 6354,
+  "run_id": "e625e7a1376340d7a4a21820699883e0",
+  "statuses": {
+    "ICPUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1212
+}

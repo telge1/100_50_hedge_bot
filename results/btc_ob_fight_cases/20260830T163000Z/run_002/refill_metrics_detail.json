@@ -1,0 +1,16 @@
+{
+  "exact_same_tick_refills": 0,
+  "exact_ask_count": 0,
+  "exact_bid_count": 0,
+  "partial_recovery_count": 0,
+  "full_recovery_count": 0,
+  "nearby_liquidity_increase_count": 7,
+  "nearby_ask_count": 2,
+  "nearby_bid_count": 5,
+  "nearby_unknown_count": 0,
+  "refill_delay_seconds_min": null,
+  "refill_delay_seconds_median": null,
+  "refill_delay_seconds_max": null,
+  "nearby_tick_distance_min": 4,
+  "nearby_tick_distance_max": 10
+}

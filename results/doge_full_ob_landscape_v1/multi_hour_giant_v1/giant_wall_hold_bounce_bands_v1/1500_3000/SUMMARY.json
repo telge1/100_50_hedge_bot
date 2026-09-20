@@ -1,0 +1,128 @@
+{
+  "schema_version": "doge_giant_wall_hold_bounce_v1",
+  "config": {
+    "giant": {
+      "min_distance_bps": 1500.0,
+      "max_distance_bps": 3000.0,
+      "min_notional_usdt": 100000.0,
+      "require_q99": true,
+      "identity_match_bps": 25.0,
+      "approach_bps": 25.0,
+      "touch_bps": 10.0,
+      "bounce_away_bps": 15.0,
+      "outcome_horizon_s": 300,
+      "min_gap_between_approaches_s": 120,
+      "include_disconnected": true
+    },
+    "wall_near_bps": 25.0,
+    "min_wall_notional_usdt": 100000.0,
+    "approach_bps": 25.0,
+    "horizons_h": [
+      1,
+      4,
+      12
+    ]
+  },
+  "sample": {
+    "hours_n": 26,
+    "frames_n": 93600,
+    "giant_births_n": 206,
+    "reach_events_n": 0,
+    "bid_reaches": 0,
+    "ask_reaches": 0
+  },
+  "semantics": {
+    "LONG": "bid giant still present near birth price when mid arrives -> expect bounce up",
+    "SHORT": "ask giant still present near birth price when mid arrives -> expect bounce down",
+    "favorable_move": "LONG uses max rise; SHORT uses max drop after reach",
+    "wall_holds": ">=100000.0 USDT within 25.0 bps of birth price"
+  },
+  "evaluation": {
+    "all": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "bid": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "ask": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "LONG_HOLD": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "LONG_GONE": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "SHORT_HOLD": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    },
+    "SHORT_GONE": {
+      "n": 0,
+      "wall_holds_n": 0,
+      "wall_holds_rate": null,
+      "median_delay_h": null,
+      "favorable_1h_pct": null,
+      "adverse_1h_pct": null,
+      "favorable_4h_pct": null,
+      "adverse_4h_pct": null,
+      "favorable_12h_pct": null,
+      "adverse_12h_pct": null
+    }
+  },
+  "verdict": "INSUFFICIENT_SAMPLE",
+  "interpretation": "Not enough hold-and-bounce evidence yet under the frozen sample."
+}

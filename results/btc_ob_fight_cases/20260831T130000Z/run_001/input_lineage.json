@@ -1,0 +1,73 @@
+{
+  "data_source": "BTC_DOGE_RESEARCH_DB",
+  "database": "btc_doge_research",
+  "raw_archive_replay_used": false,
+  "mixed_sources_used": false,
+  "trade_tick_source": "orderbook_analysis.public_trades_canonical",
+  "trade_source_mode": "LINEAGE_COMPANION_OA_CANONICAL",
+  "lineage_companion_used": true,
+  "ob_table": "btc_doge_research.research_ob200_snapshots_1s",
+  "oi_table": "btc_doge_research.research_open_interest_observations",
+  "liq_table": "btc_doge_research.research_liquidation_events",
+  "candles_table": "signal_generator.candles_1m",
+  "ob_build_ids": [
+    "9c5765eac3d5f64af8a899226b9dd0166b3d0eb99506d9b9ca5e2d0d9790d6cb",
+    "d6e56df5a304c54295c5f112ff4b8423b9b36206dd37977751c8af0eaefcd182"
+  ],
+  "query_timings": [
+    {
+      "source_name": "OB200",
+      "elapsed_s": 0.439841,
+      "row_count": 3601,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_EVENT_SPAN",
+      "elapsed_s": 0.003429,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.002342,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES_BATCH_STATUS",
+      "elapsed_s": 0.001962,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "PUBLIC_TRADES",
+      "elapsed_s": 0.76773,
+      "row_count": 349399,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "elapsed_s": 0.012955,
+      "row_count": 720,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "elapsed_s": 0.003199,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "elapsed_s": 0.002378,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    },
+    {
+      "source_name": "BATCH_LIQUIDATIONS",
+      "elapsed_s": 0.010891,
+      "row_count": 1,
+      "database": "btc_doge_research"
+    }
+  ]
+}

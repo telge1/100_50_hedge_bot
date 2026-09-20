@@ -1,0 +1,9 @@
+{
+  "raw_total": 6372,
+  "run_id": "4dd30d01823d42c5b1192d2c6eea0f44",
+  "statuses": {
+    "DOTUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1070
+}

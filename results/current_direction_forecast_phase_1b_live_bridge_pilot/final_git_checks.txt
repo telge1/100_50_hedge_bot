@@ -1,0 +1,49 @@
+=== SR ===
+ M dashboard/app.py
+?? "(base) telgenbuescher@server-telgenbuesc.yaml"
+?? research/liquidity_destination_bias/
+?? results/btc_doge_fight_performance_v1/
+?? results/btc_doge_full_ob_edge_flight_recorder_v1/
+?? results/btc_doge_research_db_reconciliation_v1/
+?? results/btc_doge_research_trade_final_audit_v1/
+?? results/btc_doge_research_trade_rematerialization_v1/
+?? results/btc_ob_fight_cases/
+?? results/current_direction_forecast_phase_0/
+?? results/current_direction_forecast_phase_1_cache_bridge/
+?? results/current_direction_forecast_phase_1b_live_bridge_pilot/
+?? results/liquidity_destination_bias_phase_1/
+?? results/liquidity_destination_bias_phase_1_bounded_expand/
+?? results/liquidity_destination_bias_phase_1c_multiday_support/
+?? results/liquidity_destination_bias_phase_1d_full_bounded_history/
+?? results/liquidity_destination_bias_phase_2_baselines/
+?? results/liquidity_destination_bias_phase_2b_history_lookahead_audit/
+?? results/stoch_dashboard_job_start.lock
+?? results/stoch_fade_portfolio_backtests/
+?? results/stoch_fade_research_evaluations/
+?? results/stoch_fade_research_jobs/
+?? results/stoch_fade_research_runs/
+?? results/trend_direction_forward_validation/
+?? results/trend_direction_move_measurement_audit/
+?? run/
+?? scripts/build_liquidity_destination_episodes.py
+?? scripts/evaluate_liquidity_destination_baselines.py
+?? tests/research/test_liquidity_destination_baselines.py
+?? tests/research/test_liquidity_destination_episodes.py
+?? tests/research/test_liquidity_destination_multiday.py
+?? tmp_debug_multi/
+feature/btc-doge-research-db
+9ab70ee955ff5a47e2c42ecaa6d727df581c2d34
+ dashboard/app.py | 73 ++++++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 55 insertions(+), 18 deletions(-)
+=== OA ===
+ M sql/001_initial_schema.sql
+ M src/orderbook_analyse/orderbook_v2_live/collector.py
+ M src/orderbook_analyse/orderbook_v2_live/full_ob_edge_flight_recorder/manager.py
+?? data/orderbook_raw_shadow/
+?? results_test_et.txt
+?? scripts/audit_out/
+?? sql/005_drop_legacy_orderbook_deltas.sql
+?? src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/
+?? tests/test_full_ob_cache_bridge_v1.py
+feature/strategy-lab-phase1
+1019974694c27f01249718c99b192c8490038f49

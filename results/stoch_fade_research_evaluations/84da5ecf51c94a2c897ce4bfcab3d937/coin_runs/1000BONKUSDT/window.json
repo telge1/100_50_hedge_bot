@@ -1,0 +1,7 @@
+{
+  "candle_rows": 5401,
+  "evaluation_data_end": "2026-08-04T19:02:00Z",
+  "evaluation_data_start": "2026-08-01T01:01:00Z",
+  "signal_job_not_used_as_candle_cap": true,
+  "symbol": "1000BONKUSDT"
+}

@@ -1,0 +1,26 @@
+{
+  "preflight_version": "phase_2a2_consistency_v1",
+  "repository": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev",
+  "branch": "feature/dashboard-research-charts",
+  "head": "cda980879529717a11fb71631a73d283868ddad3",
+  "dirty": true,
+  "run_014_present": true,
+  "run_014_file_count": 56,
+  "reclaim_output_paths": {
+    "canonical": "reclaim_events.csv",
+    "deprecated_removed": "reclaim_events_corrected.csv",
+    "legacy_bug_function": "fight_facts._build_reclaim_events (removed in 2A.2)",
+    "canonical_builder": "outside_reclaim.build_canonical_reclaim_pipeline"
+  },
+  "competing_sources_before_fix": [
+    "fight_facts._build_reclaim_events (DEPRECATED_INVALID_GLOBAL_FIRST_BUG)",
+    "fight_sequence.reclaim_events_corrected (duplicate corrected layer)"
+  ],
+  "single_source_of_truth_after_fix": "reclaim_events.csv from reclaim_event_contract_v2",
+  "edge_visit_output": "edge_visits.csv",
+  "cluster_sensitivity_output": "fight_cluster_sensitivity.csv",
+  "known_gap0_invariant_violation": "cluster_count(gap=0) < edge_visit_count due to gap<=0 merge",
+  "historical_run_012_reclaim_status": "KNOWN_INVALID_GLOBAL_FIRST_BUG",
+  "historical_run_014_reclaim_status": "CORRECTED_LAYER_ONLY_IN_reclaim_events_corrected.csv",
+  "legacy_global_first_reclaim_enabled": false
+}

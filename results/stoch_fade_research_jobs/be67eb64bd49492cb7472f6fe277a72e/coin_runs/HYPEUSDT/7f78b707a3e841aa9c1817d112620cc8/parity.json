@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6861,
+  "detail_count": 6861,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T00:00:00"
+      ],
+      "signal_id": "f7febfbc-e95c-5509-ab89-d7d03d98c140"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T01:00:00"
+      ],
+      "signal_id": "a33d8525-83fc-59c9-88c2-db622107524f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T04:45:00"
+      ],
+      "signal_id": "2cd420be-d77d-5182-825d-8bf08038ecd2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:30:00"
+      ],
+      "signal_id": "400b79da-7a2c-5e1a-9dca-f03449150b4c"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T08:00:00"
+      ],
+      "signal_id": "99f0c8a2-de1a-5a23-937f-b742108d6ccc"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T08:45:00"
+      ],
+      "signal_id": "f1000bae-42a7-5935-a20c-0c9efc948f8f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T09:30:00"
+      ],
+      "signal_id": "3088a0a4-3c06-555a-98a7-8bd3fb467513"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T11:30:00"
+      ],
+      "signal_id": "cc0eeeee-13dc-5b5e-8fb3-70ec5223ab2b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T12:15:00"
+      ],
+      "signal_id": "4579f6d6-4d1e-530b-aee7-6b945c5bb58a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:45:00"
+      ],
+      "signal_id": "de79bb4c-e651-5b50-8ec5-8c14c776f84c"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T14:30:00"
+      ],
+      "signal_id": "dab44354-4bb5-5c8f-86df-e3eae6a9ea2e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T16:00:00"
+      ],
+      "signal_id": "4950424b-56dd-5338-b47a-21c011342d73"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T19:15:00"
+      ],
+      "signal_id": "dad2d1d0-3eed-55d1-bd94-2ed1668587dd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T20:45:00"
+      ],
+      "signal_id": "1eacd69e-58ba-5158-b744-f0bc7784d1ba"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T21:30:00"
+      ],
+      "signal_id": "1abf786f-26e9-5c16-b0ec-3c4895f5c738"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T23:45:00"
+      ],
+      "signal_id": "9ed783eb-220c-5047-b094-fbe5693cc178"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T00:30:00"
+      ],
+      "signal_id": "1c89fdc1-a3a7-50e0-92a6-460f07ee99b2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T01:15:00"
+      ],
+      "signal_id": "97ba20c5-1874-5f2b-9f11-cb0500bbf9d0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T02:45:00"
+      ],
+      "signal_id": "7c3120cb-0e10-55ea-961f-6f25180ea2cd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T03:45:00"
+      ],
+      "signal_id": "68dfeb25-4f47-52a6-81ca-068e6f9dbcd5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:45:00"
+      ],
+      "signal_id": "ef8a1e15-c757-5bb8-8262-a360160ad811"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T05:45:00"
+      ],
+      "signal_id": "470aa532-5a77-5029-a09b-cdf091fa03b7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T07:45:00"
+      ],
+      "signal_id": "e57e90aa-0c63-5a57-9a27-db6852c9f7eb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T10:00:00"
+      ],
+      "signal_id": "b8a8b684-1dd9-5d99-9c61-d9d92a1ff870"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T12:00:00"
+      ],
+      "signal_id": "ee288eba-7b88-5468-8a81-bc4d62a80b6c"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T12:45:00"
+      ],
+      "signal_id": "edcb8e98-e00e-53c0-aba1-eb7f0c12ec02"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T15:00:00"
+      ],
+      "signal_id": "71bb900b-3f2f-5a9d-aae3-f50765693404"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:00:00"
+      ],
+      "signal_id": "973324d4-bb77-59b6-ae2f-4c9236e83b35"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T18:00:00"
+      ],
+      "signal_id": "fcaac950-83e9-5f81-83c2-136552afc370"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T21:00:00"
+      ],
+      "signal_id": "e597b50c-e37f-5f2a-9464-1630552b60c3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T00:00:00"
+      ],
+      "signal_id": "f485251f-c7d9-5210-b7d2-0f7dff30d9ca"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T00:45:00"
+      ],
+      "signal_id": "49506848-66c1-5a73-ba1f-8e02d4ea2fe4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T01:30:00"
+      ],
+      "signal_id": "30494b12-9f50-56aa-a2a9-2b3d27651aff"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T02:30:00"
+      ],
+      "signal_id": "41b330cb-fc34-54bc-96d7-1057769248fb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T04:30:00"
+      ],
+      "signal_id": "436ef155-52e4-52a0-b14c-ca326f2354ab"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T06:15:00"
+      ],
+      "signal_id": "d9509fc0-b46c-5ebb-840c-ba166d6329e0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:30:00"
+      ],
+      "signal_id": "ffe6a29e-1187-5e6e-84e5-8a867be4b2f3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T08:45:00"
+      ],
+      "signal_id": "4fb0884b-c399-55b8-a5a7-0a1f7c23aba6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T10:45:00"
+      ],
+      "signal_id": "c176362d-cf1a-5d62-aca3-f75b408f8d4a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T12:00:00"
+      ],
+      "signal_id": "5d8eb62a-674f-565f-ae40-c7127da82da4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T13:30:00"
+      ],
+      "signal_id": "a7e4b76a-4816-5ef0-abc8-a8760028c61d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T16:30:00"
+      ],
+      "signal_id": "3a26df02-4a1f-50ce-bd7b-a93c7c65e25a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T17:45:00"
+      ],
+      "signal_id": "829a19d1-11cd-5310-b055-acc4d84254fd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T18:30:00"
+      ],
+      "signal_id": "c50b9c33-798b-5ab7-8676-b461bc9c33fc"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T20:15:00"
+      ],
+      "signal_id": "6e0fdaa3-c993-587e-9fc9-7a2a633f41cd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T22:45:00"
+      ],
+      "signal_id": "79e6a0d2-d8c2-524f-9952-91939b5c73e7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-04T00:45:00"
+      ],
+      "signal_id": "8f9dfb6b-46c9-51bd-b241-abd8d899a502"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-04T02:45:00"
+      ],
+      "signal_id": "4d57be25-a644-5d92-ba62-08e8240569c9"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-04T04:15:00"
+      ],
+      "signal_id": "f2237d72-4ae2-5e78-bb14-48931312f4b4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "HYPEUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-04T05:45:00"
+      ],
+      "signal_id": "4d7bb0dc-2a2b-516b-b513-051c08319c89"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6861,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6861,
+  "research_keys": 6861,
+  "research_only": 6861,
+  "scope_symbol": "HYPEUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32_causal_entry_v1"
+}

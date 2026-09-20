@@ -1,0 +1,194 @@
+{
+  "schema_version": "doge_structure_followups_v1",
+  "compression_movement_filter": {
+    "schema_version": "doge_structure_followups_v1",
+    "test": "compression_movement_filter",
+    "hypothesis": "Compression raises the chance of a \u00b125 bps move within 15 minutes versus matched quiet/context-similar seconds.",
+    "config": {
+      "pattern": "COMPRESSION",
+      "success": "UP or DOWN at first_25bps",
+      "match_signed_return": false,
+      "min_gap_seconds": 120,
+      "controls_per_episode": 5
+    },
+    "counts": {
+      "raw_detections": 273,
+      "independent_episodes": 158,
+      "matched_episodes": 124,
+      "unmatched_episodes": 34,
+      "unmatched_reasons": {
+        "censored_outcome": 34
+      }
+    },
+    "evaluation": {
+      "outcome_name": "first_25bps_moved_either_side",
+      "success_definition": "MOVED",
+      "episode_first_25bps": {
+        "n": 124,
+        "successes": 52,
+        "rate": 0.419355,
+        "wilson_low": 0.336204,
+        "wilson_high": 0.507352,
+        "counts": {
+          "SIDEWAYS": 72,
+          "UP": 29,
+          "DOWN": 23
+        }
+      },
+      "control_first_25bps": {
+        "n": 620,
+        "successes": 260,
+        "rate": 0.419355,
+        "wilson_low": 0.381126,
+        "wilson_high": 0.458577,
+        "counts": {
+          "SIDEWAYS": 360,
+          "UP": 147,
+          "DOWN": 113
+        }
+      },
+      "episode_first_50bps": {
+        "n": 122,
+        "successes": 15,
+        "rate": 0.122951,
+        "wilson_low": 0.075943,
+        "wilson_high": 0.192979,
+        "counts": {
+          "SIDEWAYS": 107,
+          "DOWN": 2,
+          "UP": 13
+        }
+      },
+      "control_first_50bps": {
+        "n": 617,
+        "successes": 69,
+        "rate": 0.111831,
+        "wilson_low": 0.089326,
+        "wilson_high": 0.13914,
+        "counts": {
+          "SIDEWAYS": 548,
+          "UP": 57,
+          "DOWN": 12
+        }
+      },
+      "paired_risk_difference_25bps": {
+        "mean": 0.000301,
+        "ci95_low": -0.067742,
+        "ci95_high": 0.066129,
+        "bootstrap_p_one_sided_le_zero": 0.504,
+        "draws": 2000
+      },
+      "verdict": "FAIL_MATCHED_CONTROL",
+      "pass_criteria": {
+        "positive_mean_risk_diff": true,
+        "ci95_excludes_zero": false,
+        "bootstrap_p_one_sided_lt_0_05": false,
+        "min_matched_episodes_20": true
+      }
+    },
+    "verdict": "FAIL_MATCHED_CONTROL",
+    "interpretation": "Compression does not raise move rates versus matched controls; rates are essentially identical."
+  },
+  "bullish_staircase_r12_fill_pull_v2": {
+    "schema_version": "doge_structure_followups_v1",
+    "test": "bullish_staircase_r12_fill_pull_v2",
+    "hypothesis": "Front Rank-1/2 ask walls that are both pulled and filled, with bid refill and ask vacuum growth, raise UP@25bps versus matched controls.",
+    "rule_freeze": {
+      "max_front_rank": 2,
+      "requires_ask_pull_and_ask_fill": true,
+      "requires_bid_refill_under_aggression": true,
+      "ask_vacuum_growth_min_bps": 5.0,
+      "no_signed_past_return_gate": true,
+      "note": "Structural rewrite; not a retune of BULLISH_STAIRCASE V1 thresholds."
+    },
+    "counts": {
+      "raw_detections": 6,
+      "independent_episodes": 4,
+      "matched_episodes": 3,
+      "unmatched_episodes": 1,
+      "unmatched_reasons": {
+        "censored_outcome": 1
+      }
+    },
+    "raw_detection_first_25bps": {
+      "n": 5,
+      "successes": 4,
+      "rate": 0.8,
+      "wilson_low": 0.375528,
+      "wilson_high": 0.963777,
+      "counts": {
+        "UP": 4,
+        "DOWN": 1
+      }
+    },
+    "evaluation": {
+      "outcome_name": "first_25bps_up",
+      "success_definition": "UP",
+      "episode_first_25bps": {
+        "n": 3,
+        "successes": 3,
+        "rate": 1.0,
+        "wilson_low": 0.438494,
+        "wilson_high": 1.0,
+        "counts": {
+          "UP": 3
+        }
+      },
+      "control_first_25bps": {
+        "n": 15,
+        "successes": 8,
+        "rate": 0.533333,
+        "wilson_low": 0.301166,
+        "wilson_high": 0.751908,
+        "counts": {
+          "SIDEWAYS": 4,
+          "DOWN": 3,
+          "UP": 8
+        }
+      },
+      "episode_first_50bps": {
+        "n": 3,
+        "successes": 2,
+        "rate": 0.666667,
+        "wilson_low": 0.207655,
+        "wilson_high": 0.93851,
+        "counts": {
+          "SIDEWAYS": 1,
+          "UP": 2
+        }
+      },
+      "control_first_50bps": {
+        "n": 15,
+        "successes": 10,
+        "rate": 0.666667,
+        "wilson_low": 0.417131,
+        "wilson_high": 0.848239,
+        "counts": {
+          "SIDEWAYS": 5,
+          "UP": 10
+        }
+      },
+      "paired_risk_difference_25bps": {
+        "mean": 0.4671,
+        "ci95_low": 0.0,
+        "ci95_high": 1.0,
+        "bootstrap_p_one_sided_le_zero": 0.033,
+        "draws": 2000
+      },
+      "verdict": "INSUFFICIENT_SAMPLE",
+      "pass_criteria": {
+        "positive_mean_risk_diff": true,
+        "ci95_excludes_zero": false,
+        "bootstrap_p_one_sided_lt_0_05": true,
+        "min_matched_episodes_20": false
+      },
+      "note": "Matched episode count below pre-registered minimum of 20; directional point estimates are descriptive only."
+    },
+    "verdict": "INSUFFICIENT_SAMPLE",
+    "interpretation": "Rank-1/2 Fill+Pull staircase is too rare in this 10h sample for a matched-control decision; point estimate is directionally high but underpowered."
+  },
+  "overall_verdict": {
+    "compression": "FAIL_MATCHED_CONTROL",
+    "staircase_r12_v2": "INSUFFICIENT_SAMPLE"
+  }
+}

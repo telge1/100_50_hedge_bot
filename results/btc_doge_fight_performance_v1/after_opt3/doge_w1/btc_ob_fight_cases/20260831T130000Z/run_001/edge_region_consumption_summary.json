@@ -1,0 +1,15 @@
+{
+  "by_scope": {
+    "PROFILE_EDGE_ZONE": {
+      "trade_associated": 0,
+      "unmatched": 13,
+      "total": 13
+    },
+    "TPO_EDGE_BIN": {
+      "trade_associated": 0,
+      "unmatched": 1,
+      "total": 1
+    }
+  },
+  "total_events": 14
+}

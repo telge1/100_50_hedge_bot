@@ -1,0 +1,60 @@
+{
+  "artifacts": {
+    "ABSCHLUSSBERICHT.md": {
+      "bytes": 3462,
+      "sha256": "7f4bd98b20fe5e5a314926c028dba926e2f8d9862600e13a07672a79ab515f82"
+    },
+    "artifact_manifest.json": {
+      "bytes": 2096,
+      "sha256": "b1a62d5f9290afba21e071869305a5d806171595e24716831440fea6f6015361"
+    },
+    "cli_architecture.md": {
+      "bytes": 2685,
+      "sha256": "e16c13c8fd2a680221d5b61e747238259ea32110eea708de0239e5b64d778c13"
+    },
+    "field_knowledge_matrix.csv": {
+      "bytes": 1073,
+      "sha256": "c7612b00854b44bd1ccb6875e4147383c23b80a053f0012762439cbd6ade0b01"
+    },
+    "forward_evaluation_plan.md": {
+      "bytes": 1353,
+      "sha256": "9eba2374e1792b7b75e0c972a47bbf446f2773ec5f6f65cbeeab2fb4f8af714e"
+    },
+    "full_ob_cache_access_audit.md": {
+      "bytes": 5406,
+      "sha256": "56d07e49e49b521647b59876f48eb6462b5e88f74095cda3a7677a03ac360787"
+    },
+    "implementation_plan.md": {
+      "bytes": 1258,
+      "sha256": "c78301292d2b093a4ddd407f5b6e9cf17e0b97c619f7b6a1b5f6381e4a04ab8e"
+    },
+    "live_data_inventory.csv": {
+      "bytes": 4467,
+      "sha256": "876fd355f5a18e6dfc52f7d7082df8fd211f8ac2c9445452bc9a6e02ad5cd782"
+    },
+    "outcome_contract_v1_draft.md": {
+      "bytes": 1950,
+      "sha256": "1f16b0b163a81110d8075ac4d604fc9a330988d2ddb777094868d514b0246cb5"
+    },
+    "t0_feature_contract_v1_draft.md": {
+      "bytes": 2967,
+      "sha256": "c7c8df4916b7e88206d6621d51b5ccc276cdb45b796906ac70d794da6056babe"
+    }
+  },
+  "calibrated_direction_probability_possible": false,
+  "cli_can_read_existing_ringbuffer": false,
+  "full_ob_owner_pid": 1902763,
+  "full_ob_retention_seconds_runtime": 600,
+  "generated_at_utc": "2026-09-05T14:34:05Z",
+  "git": {
+    "oa_branch": "feature/strategy-lab-phase1",
+    "oa_head": "1019974694c27f01249718c99b192c8490038f49",
+    "sr_branch": "feature/btc-doge-research-db",
+    "sr_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34"
+  },
+  "manifest_version": "current_direction_forecast_phase_0_v1",
+  "primary_horizon_minutes": 15,
+  "recommended_cache_access": "B_localhost_readonly_bridge_plus_A_live_socket_snapshot",
+  "recommended_first_output": "state_analyzer_v1",
+  "verdict": "CURRENT_DIRECTION_FORECAST_PHASE_0_CACHE_BRIDGE_REQUIRED"
+}

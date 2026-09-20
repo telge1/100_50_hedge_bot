@@ -1,0 +1,9 @@
+{
+  "contract_version": "first_outside_bin_contract_v1",
+  "interval_semantics": "[LOWER,UPPER)",
+  "price_step": 10.0,
+  "orderbook_tick_size": 0.1,
+  "edges": {},
+  "status": "NOT_COMPUTED",
+  "reason": "INVALID_PROFILE_EDGES_OR_PRICE_STEP"
+}

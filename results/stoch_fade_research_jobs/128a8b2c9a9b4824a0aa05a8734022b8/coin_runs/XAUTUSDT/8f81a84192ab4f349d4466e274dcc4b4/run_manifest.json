@@ -1,0 +1,519 @@
+{
+  "be50_outcome_active": false,
+  "candidate_live_strategy": "wave_fade_no_be50_v1",
+  "causal_manifest_hash": "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf",
+  "clickhouse_canary": true,
+  "confirmation_policy": "cross_recognition",
+  "confirmation_source": "cross_recognition",
+  "default_canary_symbol": "ETHUSDT",
+  "default_canary_symbol_is_not_run_symbol": true,
+  "edges_version": "apt_is_q4_frozen_20260808",
+  "execution_dedup_policy": "none_phase_2a",
+  "exit_policy": "NO_BE50",
+  "frozen_identity": {
+    "be50_exit_id_on_frozen_tag": true,
+    "be50_outcome_active": false,
+    "candidate_live_strategy": "wave_fade_no_be50_v1",
+    "confirmation_policy": "cross_recognition",
+    "edges_version": "apt_is_q4_frozen_20260808",
+    "exit_policy": "NO_BE50",
+    "generation_shared_with_live": true,
+    "intrabar_policy": "SL_FIRST",
+    "manifest": {
+      "built_at": "2026-08-17T18:05:18.940030Z",
+      "combined_manifest_hash": "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf",
+      "confirmation_source": "cross_recognition",
+      "exit_policy": "NO_BE50",
+      "file_entries": [
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/parameters.py",
+          "reason": "TFs, TP/SL %, confirmation constants, WAVE_COLS",
+          "sha256": "58729fbe8acc868b956570b8500f57644605c7dfa84d25cf06cffb2cb207585d"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/indicators.py",
+          "reason": "causal RSI/Stoch/CCI/EMA/cross",
+          "sha256": "b7272b17f020ee754247036ea09c76d29cee87804c53db6bee7dcca93f1384f8"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/waves.py",
+          "reason": "wave metrics + recognition indices",
+          "sha256": "1c8afd054c1139b23b4039052205b31b0774280d6731daa0d90ebdf1f213f209"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/annotation.py",
+          "reason": "confirmation policy + fade labels",
+          "sha256": "e6c81904e11e7fd09261706623fbf349336a88152426710b84ffbff9fdafee1d"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/trend.py",
+          "reason": "TREND_ALIGNED mapping",
+          "sha256": "d1c1941f3b22eb25400230f60cd92d2bc600dda899fa8460b72e3e22f54c9207"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/signals.py",
+          "reason": "build_symbol_signals / resolve_entries",
+          "sha256": "b2ebf52a3fcd52645e81eea73eebdebdefb034225f89560413ab6e7f775fca21"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/edges.py",
+          "reason": "frozen Q4 edges",
+          "sha256": "b3ada4d09ad6c5a588ccdbfa9d724f0ca6757e2b83d5dc6256ac6cd84d6317f7"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/adapter.py",
+          "reason": "HTF/1m OHLCV + one_minute_books",
+          "sha256": "bb70dc967f72ee881fc9abe79c297b62413977bfc7fdaa99547b8d3dca25ff12"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/tpsl.py",
+          "reason": "tpsl_for_tf percent table",
+          "sha256": "b6cf334fb3342a1cfb6d571f095ef761967c08428acd0804cc5375e2a696920f"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/strategy/wave_fade/be50.py",
+          "reason": "trade_levels() initial TP/SL only; BE50 sim unused",
+          "sha256": "c60b5fb8b6e84492afa4878ab3382532466208b2602283e0086dffcb91f99a76"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/pipeline/trade_plan.py",
+          "reason": "attach_resolved_entries + levels_for_entry",
+          "sha256": "e8faaf2909e3d2f726ea344c7e535f9e9a8b1b406fdc262f91591d3faa9b5642"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/pipeline/mapper.py",
+          "reason": "setup_id/signal_id artifacts",
+          "sha256": "9bead1f99130849a29d7dce9ddd2eb6628ffe344529d41bc48cae8ce8303bb59"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/pipeline/signal_id.py",
+          "reason": "UUID5 setup_id and signal_id",
+          "sha256": "033a45db8bda8e2f46dc3d4c4d1ac19d4ae52dffe3f4e7662600d7df59422329"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/pipeline/versions.py",
+          "reason": "NO_BE50 registry / uses_be50_exit",
+          "sha256": "6ef48d386c8bed65bc240065de7cdaf2a8c2cf71b85f2cfeff70380b8dcc912d"
+        },
+        {
+          "executed": true,
+          "path": "src/signal_generator/timeframes.py",
+          "reason": "bucket open/close, require_complete",
+          "sha256": "f909c3738418998d69e0be64cebb3d7496082784590d7c7386e81165fe7d0830"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_runner/candles.py",
+          "reason": "naive CH datetime treated as UTC",
+          "sha256": "8814ea0555f76521072105b0b3f7f1de42b1afb2c0b5d0a5640bec4b2282bb85"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_runner/htf.py",
+          "reason": "runner HTF aggregate used by causal engine",
+          "sha256": "f43e8231d7c7f7d0adccdc44aec85abbdd8da2cf3cf74b327b3d325ce0b03e12"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_runner/first_valid.py",
+          "reason": "EMA400 / indicator warmup proofs",
+          "sha256": "88f3ff63aa33973498d9bb82172e43be3e9db81c34f55baf2aa85663628d104f"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_evaluation/full_1m_scan.py",
+          "reason": "authoritative NO_BE50 SL_FIRST full-1m outcomes",
+          "sha256": "0e3ac1f008a3be1f840bdf6b29b46a11d44fa2e70d10061965bd4720abc5491d"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_causal_runner/config.py",
+          "reason": "strategy id, confirmation, outcome engine pin",
+          "sha256": "c798cf72b25dd445ace057255a3639447752a6222c5c579db76ac87d9fd1aefd"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_causal_runner/runtime_root.py",
+          "reason": "fail-closed Gold import root",
+          "sha256": "aa9d50a2017b488bf8a0b4342ecff72fa9028e2d37306acf621a1394b919324f"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_causal_runner/warmup.py",
+          "reason": "80d warmup fail-closed",
+          "sha256": "3bad9498ec9be75b668b3dcb7158fce477fe8b597b7764a19e2752b46b9b1cc5"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_causal_runner/engine.py",
+          "reason": "canonical causal evaluation path",
+          "sha256": "15acd018958a7804cceb7a86ffea120c57592981687fb87c00fcec8f1a4837fd"
+        },
+        {
+          "executed": true,
+          "path": "research/stoch_fade_causal_runner/identity.py",
+          "reason": "manifest checker",
+          "sha256": "f10c1c0609f56f57ade7e14a8c250740c82b4f156f8c071b418e912c797acce0"
+        }
+      ],
+      "files": {
+        "research/stoch_fade_causal_runner/config.py": "c798cf72b25dd445ace057255a3639447752a6222c5c579db76ac87d9fd1aefd",
+        "research/stoch_fade_causal_runner/engine.py": "15acd018958a7804cceb7a86ffea120c57592981687fb87c00fcec8f1a4837fd",
+        "research/stoch_fade_causal_runner/identity.py": "f10c1c0609f56f57ade7e14a8c250740c82b4f156f8c071b418e912c797acce0",
+        "research/stoch_fade_causal_runner/runtime_root.py": "aa9d50a2017b488bf8a0b4342ecff72fa9028e2d37306acf621a1394b919324f",
+        "research/stoch_fade_causal_runner/warmup.py": "3bad9498ec9be75b668b3dcb7158fce477fe8b597b7764a19e2752b46b9b1cc5",
+        "research/stoch_fade_evaluation/full_1m_scan.py": "0e3ac1f008a3be1f840bdf6b29b46a11d44fa2e70d10061965bd4720abc5491d",
+        "research/stoch_fade_runner/candles.py": "8814ea0555f76521072105b0b3f7f1de42b1afb2c0b5d0a5640bec4b2282bb85",
+        "research/stoch_fade_runner/first_valid.py": "88f3ff63aa33973498d9bb82172e43be3e9db81c34f55baf2aa85663628d104f",
+        "research/stoch_fade_runner/htf.py": "f43e8231d7c7f7d0adccdc44aec85abbdd8da2cf3cf74b327b3d325ce0b03e12",
+        "src/signal_generator/pipeline/mapper.py": "9bead1f99130849a29d7dce9ddd2eb6628ffe344529d41bc48cae8ce8303bb59",
+        "src/signal_generator/pipeline/signal_id.py": "033a45db8bda8e2f46dc3d4c4d1ac19d4ae52dffe3f4e7662600d7df59422329",
+        "src/signal_generator/pipeline/trade_plan.py": "e8faaf2909e3d2f726ea344c7e535f9e9a8b1b406fdc262f91591d3faa9b5642",
+        "src/signal_generator/pipeline/versions.py": "6ef48d386c8bed65bc240065de7cdaf2a8c2cf71b85f2cfeff70380b8dcc912d",
+        "src/signal_generator/strategy/wave_fade/adapter.py": "bb70dc967f72ee881fc9abe79c297b62413977bfc7fdaa99547b8d3dca25ff12",
+        "src/signal_generator/strategy/wave_fade/annotation.py": "e6c81904e11e7fd09261706623fbf349336a88152426710b84ffbff9fdafee1d",
+        "src/signal_generator/strategy/wave_fade/be50.py": "c60b5fb8b6e84492afa4878ab3382532466208b2602283e0086dffcb91f99a76",
+        "src/signal_generator/strategy/wave_fade/edges.py": "b3ada4d09ad6c5a588ccdbfa9d724f0ca6757e2b83d5dc6256ac6cd84d6317f7",
+        "src/signal_generator/strategy/wave_fade/indicators.py": "b7272b17f020ee754247036ea09c76d29cee87804c53db6bee7dcca93f1384f8",
+        "src/signal_generator/strategy/wave_fade/parameters.py": "58729fbe8acc868b956570b8500f57644605c7dfa84d25cf06cffb2cb207585d",
+        "src/signal_generator/strategy/wave_fade/signals.py": "b2ebf52a3fcd52645e81eea73eebdebdefb034225f89560413ab6e7f775fca21",
+        "src/signal_generator/strategy/wave_fade/tpsl.py": "b6cf334fb3342a1cfb6d571f095ef761967c08428acd0804cc5375e2a696920f",
+        "src/signal_generator/strategy/wave_fade/trend.py": "d1c1941f3b22eb25400230f60cd92d2bc600dda899fa8460b72e3e22f54c9207",
+        "src/signal_generator/strategy/wave_fade/waves.py": "1c8afd054c1139b23b4039052205b31b0774280d6731daa0d90ebdf1f213f209",
+        "src/signal_generator/timeframes.py": "f909c3738418998d69e0be64cebb3d7496082784590d7c7386e81165fe7d0830"
+      },
+      "generator_version": "stoch_fade_causal_runner_v1",
+      "git_commit": "5636a7daab03ddd0b0151d45126b40763bdcbc58",
+      "git_working_tree": "dirty",
+      "intrabar_policy": "SL_FIRST",
+      "manifest_kind": "uncommitted_implementation_manifest",
+      "outcome_engine": "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m",
+      "outcome_engine_rejected": "signal_generator.pipeline.outcome_eval.evaluate_signal_no_be50",
+      "resolved_runtime_root": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32",
+      "runtime_root": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32",
+      "source_commit_pin": "f16ae32",
+      "strategy_version": "wave_fade_frozen_f16ae32_causal_entry_v1",
+      "warmup_days": 80,
+      "working_tree_state": "dirty/uncommitted"
+    },
+    "manifest_hash": "dac39cb3a7749f400126b6f2b8d9fd6aa2ac5524ca2cf8b4ff7e2d3da422d3cf",
+    "outcome_engine": "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m",
+    "runtime_root": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32",
+    "signal_tfs": [
+      "15m",
+      "30m",
+      "1h",
+      "4h"
+    ],
+    "source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+    "source_commit_pin": "f16ae32",
+    "strategy_id": "wave_fade_frozen_f16ae32_causal_entry_v1"
+  },
+  "full_51_run": false,
+  "generator_version": "stoch_fade_causal_dashboard_runner_v1",
+  "intrabar_policy": "SL_FIRST",
+  "max_hold": "disabled",
+  "outcome_engine": "research.stoch_fade_evaluation.full_1m_scan.evaluate_signal_no_be50_full_1m",
+  "parameter_hash": "368902c6c51f856b",
+  "phase": "2B",
+  "pid": 2793580,
+  "run_id": "8f81a84192ab4f349d4466e274dcc4b4",
+  "runtime_root": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32",
+  "selected_symbol": "XAUTUSDT",
+  "selected_symbols": [
+    "XAUTUSDT"
+  ],
+  "selection_status": "NOT_APPLIED_AMBIGUOUS",
+  "side_effect_flags": {
+    "cleanup_enabled": false,
+    "live_orders_enabled": false,
+    "publish_enabled": false,
+    "writes_to_clickhouse": false,
+    "writes_to_processing_state": false,
+    "writes_to_signals": false
+  },
+  "signal_end_exclusive": "2026-08-17T00:00:00Z",
+  "signal_start": "2026-03-01T00:00:00Z",
+  "signal_tfs": [
+    "15m",
+    "30m",
+    "1h",
+    "4h"
+  ],
+  "source_commit_pin": "f16ae32",
+  "stages": [
+    {
+      "duration_s": 0.065703,
+      "ended_at": "2026-08-18T09:43:48.429212Z",
+      "input_rows": null,
+      "name": "snapshot_before",
+      "output_rows": null,
+      "rss_kb": 78196,
+      "started_at": "2026-08-18T09:43:48.363289Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.000101,
+      "ended_at": "2026-08-18T09:43:48.430272Z",
+      "input_rows": null,
+      "name": "identity_validation",
+      "output_rows": null,
+      "rss_kb": 78196,
+      "started_at": "2026-08-18T09:43:48.429430Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 1.659668,
+      "ended_at": "2026-08-18T09:43:50.092840Z",
+      "input_rows": null,
+      "name": "clickhouse_load",
+      "output_rows": 358560,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:43:48.432969Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.879931,
+      "ended_at": "2026-08-18T09:43:53.979818Z",
+      "input_rows": 358560,
+      "name": "candle_normalization",
+      "output_rows": 358560,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:43:50.097063Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.873063,
+      "ended_at": "2026-08-18T09:43:57.859918Z",
+      "input_rows": 358560,
+      "name": "aggregate_15m",
+      "output_rows": 23904,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:43:53.980126Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.172376,
+      "ended_at": "2026-08-18T09:44:01.547476Z",
+      "input_rows": 23904,
+      "name": "indicators_waves_15m",
+      "output_rows": 4090,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:01.374681Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.456195,
+      "ended_at": "2026-08-18T09:44:05.010573Z",
+      "input_rows": 358560,
+      "name": "aggregate_30m",
+      "output_rows": 11952,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:01.547833Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.09113,
+      "ended_at": "2026-08-18T09:44:08.517430Z",
+      "input_rows": 11952,
+      "name": "indicators_waves_30m",
+      "output_rows": 2072,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:08.425902Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.414581,
+      "ended_at": "2026-08-18T09:44:11.932524Z",
+      "input_rows": 358560,
+      "name": "aggregate_1h",
+      "output_rows": 5976,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:08.517782Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.050393,
+      "ended_at": "2026-08-18T09:44:15.345558Z",
+      "input_rows": 5976,
+      "name": "indicators_waves_1h",
+      "output_rows": 1026,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:15.294743Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 3.349687,
+      "ended_at": "2026-08-18T09:44:18.696299Z",
+      "input_rows": 358560,
+      "name": "aggregate_4h",
+      "output_rows": 1494,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:15.345895Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.020417,
+      "ended_at": "2026-08-18T09:44:22.421288Z",
+      "input_rows": 1494,
+      "name": "indicators_waves_4h",
+      "output_rows": 239,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:22.400431Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 18.581895,
+      "ended_at": "2026-08-18T09:44:41.004158Z",
+      "input_rows": null,
+      "name": "htf_adapter_parity_slices",
+      "output_rows": 358560,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:22.421578Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.048943,
+      "ended_at": "2026-08-18T09:44:41.054186Z",
+      "input_rows": null,
+      "name": "signals_batch",
+      "output_rows": 7427,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.004548Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:44:41.065911Z",
+      "input_rows": 2796,
+      "name": "signals_15m",
+      "output_rows": 2796,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.065610Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.14323,
+      "ended_at": "2026-08-18T09:44:41.210821Z",
+      "input_rows": 2796,
+      "name": "entries_15m",
+      "output_rows": 2796,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.067401Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:44:41.621677Z",
+      "input_rows": 1405,
+      "name": "signals_30m",
+      "output_rows": 1405,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.621291Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.073979,
+      "ended_at": "2026-08-18T09:44:41.702569Z",
+      "input_rows": 1405,
+      "name": "entries_30m",
+      "output_rows": 1405,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.628399Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:44:41.910068Z",
+      "input_rows": 686,
+      "name": "signals_1h",
+      "output_rows": 686,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.909691Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.03666,
+      "ended_at": "2026-08-18T09:44:41.953647Z",
+      "input_rows": 686,
+      "name": "entries_1h",
+      "output_rows": 686,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:41.916794Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 2e-06,
+      "ended_at": "2026-08-18T09:44:42.055875Z",
+      "input_rows": 165,
+      "name": "signals_4h",
+      "output_rows": 165,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:42.055527Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.010523,
+      "ended_at": "2026-08-18T09:44:42.073322Z",
+      "input_rows": 165,
+      "name": "entries_4h",
+      "output_rows": 165,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:42.062593Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.000761,
+      "ended_at": "2026-08-18T09:44:42.099224Z",
+      "input_rows": 5052,
+      "name": "technical_dedup",
+      "output_rows": 5052,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:42.098209Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": 0.072183,
+      "ended_at": "2026-08-18T09:44:42.241118Z",
+      "input_rows": null,
+      "name": "snapshot_after",
+      "output_rows": null,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:42.168527Z",
+      "status": "OK"
+    },
+    {
+      "duration_s": null,
+      "input_rows": null,
+      "name": "artifact_write",
+      "output_rows": null,
+      "rss_kb": 777440,
+      "started_at": "2026-08-18T09:44:42.251010Z",
+      "status": "RUNNING"
+    }
+  ],
+  "strategy_id": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "strategy_version": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "symbol_allowlisted": true,
+  "symbols": [
+    "XAUTUSDT"
+  ],
+  "universe_count": 51,
+  "universe_source": "/home/telgenbuescher/projects/wave_fade_gold_f16ae32/config/universe_tradeable_51.json",
+  "uses_be50_exit": false,
+  "warmup_days": 80
+}

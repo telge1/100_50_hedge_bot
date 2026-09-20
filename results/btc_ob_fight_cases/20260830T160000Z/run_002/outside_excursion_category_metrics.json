@@ -1,0 +1,74 @@
+{
+  "raw_outside_excursions": {
+    "count": 254,
+    "unique_start_timestamps": 29,
+    "unique_reclaim_timestamps": 254,
+    "zero_duration_count": 233,
+    "duration": {
+      "count": 254,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.037,
+      "max": 4043.663,
+      "total": 4427.356
+    },
+    "base_volume": 4347.401000005846,
+    "quote_volume": 343904541.44409347,
+    "taker_buy_quote": 177142508.24679998,
+    "taker_sell_quote": 166762033.19729632,
+    "taker_delta_quote": 10380475.049499407,
+    "reclaim_count": 254,
+    "open_count": 0
+  },
+  "canonical_outside_excursions": {
+    "count": 21,
+    "unique_start_timestamps": 21,
+    "unique_reclaim_timestamps": 21,
+    "zero_duration_count": 0,
+    "duration": {
+      "count": 21,
+      "min": 0.001,
+      "p25": 0.026,
+      "median": 0.366,
+      "p75": 8.972,
+      "p90": 124.482,
+      "p95": 204.704,
+      "max": 4043.663,
+      "total": 4427.356
+    },
+    "base_volume": 4313.852000005846,
+    "quote_volume": 341262469.5917935,
+    "taker_buy_quote": 176791735.27509996,
+    "taker_sell_quote": 164470734.31669632,
+    "taker_delta_quote": 12321000.958399406,
+    "reclaim_count": 21,
+    "open_count": 0
+  },
+  "ambiguous_same_timestamp_excursions": {
+    "count": 233,
+    "unique_start_timestamps": 15,
+    "unique_reclaim_timestamps": 233,
+    "zero_duration_count": 233,
+    "duration": {
+      "count": 233,
+      "min": 0.0,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "max": 0.0,
+      "total": 0.0
+    },
+    "base_volume": 33.549,
+    "quote_volume": 2642071.8523,
+    "taker_buy_quote": 350772.9717,
+    "taker_sell_quote": 2291298.8806,
+    "taker_delta_quote": -1940525.9089,
+    "reclaim_count": 233,
+    "open_count": 0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "verdict": "NIGHT_DROP_ROOT_CAUSE_FIXED_READY_RESTART_REQUIRED",
+  "generated_at": "2026-09-04T07:43:37.876250Z",
+  "live_pid_untouched": 1530387,
+  "oi_pid_untouched": 147111,
+  "primary_root_cause": "marker_iso_ts_ValueError_in_note_continuity",
+  "secondary": "extension_normal_end_reset_each_tick",
+  "tertiary": "sink_queue_swap_on_segment_rollover",
+  "quaternary": "health_queue_drops_reset_when_sinks_gone",
+  "tests_passed": 29,
+  "reports": [
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/night_drop_root_cause_v1/ROOT_CAUSE_REPORT.md",
+    "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_full_ob_edge_flight_recorder_v1/edge_capture_1h_v1/BATCH_WRITER_LIVE_RESTART_REPORT.md"
+  ]
+}

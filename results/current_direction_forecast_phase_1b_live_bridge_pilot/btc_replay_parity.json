@@ -1,0 +1,6 @@
+{
+  "REPLAY_PARITY": false,
+  "reason": "BOOK_ANCHOR_MISSING \u2014 dump contains no periodic book checkpoint anchor; exact RAW_FULL_BOOK_REPLAY not possible for this freeze",
+  "data_complete": false,
+  "status": "BOOK_ANCHOR_MISSING"
+}

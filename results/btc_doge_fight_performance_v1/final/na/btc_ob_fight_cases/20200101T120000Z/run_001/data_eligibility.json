@@ -1,0 +1,236 @@
+{
+  "eligibility_contract": "fight_data_eligibility_contract_v1",
+  "eligibility_status": "DATA_NOT_AVAILABLE",
+  "facts_computation_allowed": false,
+  "interpretation_allowed": false,
+  "trade_decision_eligible": false,
+  "profile_causality_passed": true,
+  "mandatory_data_complete": false,
+  "context_data_complete": false,
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "decision_blocked_reason": "MANDATORY_DATA_ABSENT",
+  "windows": {
+    "profile_input_window": {
+      "start": "2019-12-31T13:30:00Z",
+      "end_exclusive": "2020-01-01T12:00:00Z",
+      "session_id": "us_developing_to_anchor",
+      "predicate": "session_start <= event_ts < anchor"
+    },
+    "pre_anchor_observation_window": {
+      "start": "2020-01-01T11:30:00Z",
+      "end_exclusive": "2020-01-01T12:00:00Z",
+      "predicate": "anchor - before <= event_ts < anchor"
+    },
+    "post_anchor_observation_window": {
+      "start": "2020-01-01T12:00:00Z",
+      "end_inclusive": "2020-01-01T12:30:00Z",
+      "predicate": "anchor <= event_ts <= anchor + after"
+    },
+    "full_fight_window": {
+      "start": "2020-01-01T11:30:00Z",
+      "end_inclusive": "2020-01-01T12:30:00Z",
+      "predicate": "anchor - before <= event_ts <= anchor + after"
+    },
+    "auto_extension_enabled": false
+  },
+  "sources": [
+    {
+      "source_name": "OB200",
+      "symbol": "BTCUSDT",
+      "requested_start": "2020-01-01T11:30:00Z",
+      "requested_end": "2020-01-01T12:30:00Z",
+      "available_start": "1970-01-01T00:00:00Z",
+      "available_end": "1970-01-01T00:00:00Z",
+      "expected_units": 3601,
+      "observed_units": 0,
+      "missing_count": 3601,
+      "missing_intervals": [
+        {
+          "start": "2020-01-01T11:30:00Z",
+          "end": "2020-01-01T12:30:00Z"
+        }
+      ],
+      "missing_seconds": [],
+      "duplicate_seconds": 0,
+      "levels_200x200_ok": false,
+      "source_segment_status": "NOT_AVAILABLE",
+      "effective_coverage_status": "NOT_AVAILABLE",
+      "mandatory_for_facts": true,
+      "mandatory_for_interpretation": true,
+      "probe_mode": "COVERAGE_META_NO_ARRAYS",
+      "table": "btc_doge_research.research_ob200_snapshots_1s"
+    },
+    {
+      "source_name": "PUBLIC_TRADES",
+      "symbol": "BTCUSDT",
+      "requested_start": "2020-01-01T11:30:00Z",
+      "requested_end": "2020-01-01T12:30:00Z",
+      "available_start": "1970-01-01T00:00:00Z",
+      "available_end": "1970-01-01T00:00:00Z",
+      "expected_units": null,
+      "observed_units": 0,
+      "missing_count": 1,
+      "missing_intervals": [
+        {
+          "start": "2020-01-01T11:30:00Z",
+          "end": "2020-01-01T12:30:00Z",
+          "reason": "RESEARCH_TRADE_EVENTS_MISSING"
+        }
+      ],
+      "source_segment_status": "RESEARCH_TRADE_EVENTS_MISSING",
+      "effective_coverage_status": "NOT_AVAILABLE",
+      "mandatory_for_facts": true,
+      "mandatory_for_interpretation": true,
+      "lineage": {
+        "table": "btc_doge_research.research_public_trades",
+        "lineage_companion_used": false,
+        "raw_archive_replay_used": false,
+        "public_trades_days_ready": false,
+        "research_trade_events_missing": true,
+        "query_mode": "NO_FINAL_PRUNED"
+      },
+      "probe_mode": "EVENT_SPAN_ONLY"
+    },
+    {
+      "source_name": "PROFILE_TRADES",
+      "symbol": "BTCUSDT",
+      "requested_start": "2019-12-31T13:30:00Z",
+      "requested_end": "2020-01-01T12:00:00Z",
+      "available_start": "1970-01-01T00:00:00Z",
+      "available_end": "1970-01-01T00:00:00Z",
+      "expected_units": null,
+      "observed_units": 0,
+      "missing_count": 1,
+      "missing_intervals": [
+        {
+          "start": "2019-12-31T13:30:00Z",
+          "end": "2020-01-01T12:00:00Z",
+          "reason": "RESEARCH_TRADE_EVENTS_MISSING"
+        }
+      ],
+      "source_segment_status": "RESEARCH_TRADE_EVENTS_MISSING",
+      "effective_coverage_status": "NOT_AVAILABLE",
+      "mandatory_for_facts": true,
+      "mandatory_for_interpretation": true,
+      "lineage": {
+        "table": "btc_doge_research.research_public_trades",
+        "lineage_companion_used": false,
+        "raw_archive_replay_used": false,
+        "public_trades_days_ready": false,
+        "research_trade_events_missing": true,
+        "query_mode": "NO_FINAL_PRUNED"
+      },
+      "probe_mode": "EVENT_SPAN_ONLY"
+    },
+    {
+      "source_name": "OPEN_INTEREST",
+      "symbol": "BTCUSDT",
+      "requested_start": "2020-01-01T11:30:00Z",
+      "requested_end": "2020-01-01T12:30:00Z",
+      "available_start": null,
+      "available_end": null,
+      "expected_units": 720,
+      "observed_units": 0,
+      "missing_count": 720,
+      "missing_intervals": [],
+      "source_segment_status": "",
+      "effective_coverage_status": "NOT_AVAILABLE",
+      "mandatory_for_facts": false,
+      "mandatory_for_interpretation": false,
+      "resolution_ms": 5000,
+      "note": "effective status uses window sample density; day PARTIAL tags are informational"
+    },
+    {
+      "source_name": "LIQUIDATIONS",
+      "symbol": "BTCUSDT",
+      "requested_start": "2020-01-01T11:30:00Z",
+      "requested_end": "2020-01-01T12:30:00Z",
+      "available_start": null,
+      "available_end": null,
+      "expected_units": null,
+      "observed_units": 0,
+      "missing_count": 0,
+      "missing_intervals": [],
+      "source_segment_status": null,
+      "effective_coverage_status": "COMPLETE",
+      "mandatory_for_facts": false,
+      "mandatory_for_interpretation": false,
+      "null_events_are_valid": true
+    },
+    {
+      "source_name": "CANDLES_1M",
+      "symbol": "BTCUSDT",
+      "requested_start": null,
+      "requested_end": null,
+      "available_start": "1970-01-01T00:00:00Z",
+      "available_end": "1970-01-01T00:00:00Z",
+      "expected_units": 60,
+      "observed_units": 0,
+      "missing_count": 0,
+      "missing_intervals": [],
+      "source_segment_status": "COVERAGE_ONLY",
+      "effective_coverage_status": "NOT_AVAILABLE",
+      "mandatory_for_facts": false,
+      "mandatory_for_interpretation": false,
+      "classification": "COVERAGE_ONLY"
+    }
+  ],
+  "mandatory_statuses": {
+    "OB200": "NOT_AVAILABLE",
+    "PUBLIC_TRADES": "NOT_AVAILABLE",
+    "PROFILE_TRADES": "NOT_AVAILABLE"
+  },
+  "context_statuses": {
+    "OPEN_INTEREST": "NOT_AVAILABLE",
+    "LIQUIDATIONS": "COMPLETE",
+    "CANDLES_1M": "NOT_AVAILABLE"
+  },
+  "missing_rows": [
+    {
+      "source_name": "OB200",
+      "symbol": "BTCUSDT",
+      "start": "2020-01-01T11:30:00Z",
+      "end": "2020-01-01T12:30:00Z"
+    },
+    {
+      "source_name": "PUBLIC_TRADES",
+      "symbol": "BTCUSDT",
+      "start": "2020-01-01T11:30:00Z",
+      "end": "2020-01-01T12:30:00Z",
+      "reason": "RESEARCH_TRADE_EVENTS_MISSING"
+    },
+    {
+      "source_name": "PROFILE_TRADES",
+      "symbol": "BTCUSDT",
+      "start": "2019-12-31T13:30:00Z",
+      "end": "2020-01-01T12:00:00Z",
+      "reason": "RESEARCH_TRADE_EVENTS_MISSING"
+    }
+  ],
+  "mandatory_sources": [
+    "PUBLIC_TRADES",
+    "OB200",
+    "PROFILE_TRADES"
+  ],
+  "context_sources": [
+    "OPEN_INTEREST",
+    "LIQUIDATIONS",
+    "CANDLES_1M"
+  ],
+  "coverage_only": true,
+  "loaded_event_tables": false,
+  "instrument": {
+    "symbol": "BTCUSDT",
+    "tick_size": "0.1",
+    "quantity_step": "0.001",
+    "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+    "price_precision": 1,
+    "quantity_precision": 3,
+    "contract_type": "linear_perp",
+    "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+    "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+    "contract_version": "fight_instrument_contract_v1"
+  }
+}

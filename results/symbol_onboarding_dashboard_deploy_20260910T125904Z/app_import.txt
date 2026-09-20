@@ -1,0 +1,3 @@
+app <class 'fastapi.applications.FastAPI'>
+has_symbole True
+route_count 224

@@ -1,0 +1,51 @@
+{
+  "package_version": "0.1.0",
+  "schema_version": "btc_ob_fight_facts_v1_3",
+  "symbol": "BTCUSDT",
+  "anchor_timestamp_utc": "2026-08-31T19:00:00Z",
+  "normalized_anchor_utc": "2026-08-31T19:00:00Z",
+  "window": {
+    "before_minutes": 30,
+    "after_minutes": 30
+  },
+  "ob_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3",
+  "read_only": true,
+  "no_overwrite": true,
+  "auto_extension_enabled": false,
+  "auto_extension_reason": "RULES_UNFROZEN",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "heuristics": {
+    "heuristic_contract_version": "wall_heuristics_v1",
+    "status": "UNFROZEN_HEURISTIC",
+    "wall_max_bps": 800,
+    "wall_qty_median_mult": 3.0,
+    "wall_trade_match_frac": 0.3,
+    "wall_sample_interval_seconds": 1,
+    "level_touch_band_bps": 5.0,
+    "btcusdt_tick_size": 0.1,
+    "report_micro_episode_seconds": 1.0
+  },
+  "profile_settings": {
+    "value_area_pct": 0.7,
+    "target_bins": 160,
+    "volume_at_price_engine": "research.btc_ob_fight.volume_profile",
+    "tpo_profile_engine": "orderbook_analyse.market_profile"
+  },
+  "output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_ob_fight_cases/20260831T190000Z/run_010",
+  "volume_profile": {
+    "status": "COMPUTED_SEPARATELY",
+    "contract_version": "volume_profile_facts_v1",
+    "primary_volume_basis": "base_volume",
+    "prefix_parity": "PASS",
+    "integrity": "PASS",
+    "oa_parity": "EXACT"
+  },
+  "causality": {
+    "rules_frozen": false,
+    "trade_verdict_evaluated": false,
+    "volume_profile_computed_separately": true,
+    "volume_profile_future_trades_used": 0
+  },
+  "analysis_status": "FACTS_READY_RULES_UNFROZEN"
+}

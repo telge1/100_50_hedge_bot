@@ -1,0 +1,2 @@
+login=200
+stoch_unauth=401

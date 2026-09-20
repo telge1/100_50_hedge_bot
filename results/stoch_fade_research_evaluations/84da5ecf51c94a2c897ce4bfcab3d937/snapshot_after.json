@@ -1,0 +1,93 @@
+{
+  "at": "2026-08-15T18:30:08Z",
+  "combined_summary": {
+    "be50_activated_count": 0,
+    "be50_exit_count": 0,
+    "by_direction": {
+      "LONG": {
+        "losses": 4,
+        "open": 0,
+        "signals": 5,
+        "wins": 1
+      },
+      "SHORT": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 1
+      }
+    },
+    "by_symbol": {
+      "1000BONKUSDT": {
+        "losses": 2,
+        "open": 0,
+        "signals": 4,
+        "wins": 2
+      },
+      "AAVEUSDT": {
+        "losses": 2,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      }
+    },
+    "by_timeframe": {
+      "15m": {
+        "losses": 2,
+        "open": 0,
+        "signals": 2,
+        "wins": 0
+      },
+      "1h": {
+        "losses": 0,
+        "open": 0,
+        "signals": 1,
+        "wins": 1
+      },
+      "30m": {
+        "losses": 1,
+        "open": 0,
+        "signals": 2,
+        "wins": 1
+      },
+      "4h": {
+        "losses": 1,
+        "open": 0,
+        "signals": 1,
+        "wins": 0
+      }
+    },
+    "execution_dedup_applied": false,
+    "exit_policy": "NO_BE50",
+    "exit_reason_counts": {
+      "SL": 4,
+      "TP": 2
+    },
+    "gross_loss_pct": -5.5,
+    "gross_profit_pct": 4.0,
+    "intrabar_policy": "SL_FIRST",
+    "losses": 4,
+    "open": 0,
+    "outcome_engine": "evaluate_signal_no_be50",
+    "pnl_basis": "gross",
+    "side_effect_flags": {
+      "cleanup_enabled": false,
+      "live_orders_enabled": false,
+      "publish_enabled": false,
+      "writes_to_clickhouse": false,
+      "writes_to_processing_state": false,
+      "writes_to_signal_outcomes": false,
+      "writes_to_signals": false
+    },
+    "signal_scope": "TIER_A_ONLY",
+    "signals": 6,
+    "successful_coins": [
+      "AAVEUSDT",
+      "1000BONKUSDT"
+    ],
+    "total_pnl_pct": -1.5,
+    "win_rate_denominator": "wins+losses (OPEN excluded)",
+    "win_rate_pct": 33.33333333333333,
+    "wins": 2
+  }
+}

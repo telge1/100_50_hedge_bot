@@ -1,0 +1,12 @@
+{
+  "contract_version": "level_registry_v1",
+  "level_count": 0,
+  "decision_eligible_count": 0,
+  "levels": [],
+  "reference_price": null,
+  "next_eligible_level": {
+    "free_space_status": "NO_REFERENCE_PRICE",
+    "level": null
+  },
+  "free_space_status": "NO_REFERENCE_PRICE"
+}

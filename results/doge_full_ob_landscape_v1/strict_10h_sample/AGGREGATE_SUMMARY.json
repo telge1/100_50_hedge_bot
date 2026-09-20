@@ -1,0 +1,234 @@
+{
+  "schema_version": "doge_full_ob_landscape_10h_aggregate_v1",
+  "verdict": "PASS_10_INDEPENDENT_STRICT_HOURS",
+  "hours": [
+    {
+      "utc_hour": "2026-09-11T05:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.084015,
+      "mid_end": 0.08405499999999999,
+      "hour_return_bps": 4.761,
+      "elapsed_seconds": 71.518,
+      "max_rss_mb": 47.887,
+      "wall_events": 34487
+    },
+    {
+      "utc_hour": "2026-09-12T03:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.08443500000000001,
+      "mid_end": 0.084385,
+      "hour_return_bps": -5.922,
+      "elapsed_seconds": 72.011,
+      "max_rss_mb": 49.418,
+      "wall_events": 29148
+    },
+    {
+      "utc_hour": "2026-09-12T19:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.084675,
+      "mid_end": 0.084735,
+      "hour_return_bps": 7.086,
+      "elapsed_seconds": 77.609,
+      "max_rss_mb": 49.684,
+      "wall_events": 28723
+    },
+    {
+      "utc_hour": "2026-09-13T07:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.084385,
+      "mid_end": 0.084115,
+      "hour_return_bps": -31.996,
+      "elapsed_seconds": 76.529,
+      "max_rss_mb": 49.684,
+      "wall_events": 30099
+    },
+    {
+      "utc_hour": "2026-09-13T21:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.08440500000000001,
+      "mid_end": 0.083975,
+      "hour_return_bps": -50.945,
+      "elapsed_seconds": 74.615,
+      "max_rss_mb": 49.684,
+      "wall_events": 18421
+    },
+    {
+      "utc_hour": "2026-09-14T21:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.085115,
+      "mid_end": 0.08432500000000001,
+      "hour_return_bps": -92.816,
+      "elapsed_seconds": 68.881,
+      "max_rss_mb": 49.684,
+      "wall_events": 87762
+    },
+    {
+      "utc_hour": "2026-09-16T05:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.08021500000000001,
+      "mid_end": 0.08008499999999999,
+      "hour_return_bps": -16.206,
+      "elapsed_seconds": 70.14,
+      "max_rss_mb": 49.684,
+      "wall_events": 50907
+    },
+    {
+      "utc_hour": "2026-09-17T23:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.081485,
+      "mid_end": 0.08168500000000001,
+      "hour_return_bps": 24.544,
+      "elapsed_seconds": 72.189,
+      "max_rss_mb": 50.059,
+      "wall_events": 34623
+    },
+    {
+      "utc_hour": "2026-09-18T09:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.084855,
+      "mid_end": 0.085695,
+      "hour_return_bps": 98.992,
+      "elapsed_seconds": 68.59,
+      "max_rss_mb": 50.113,
+      "wall_events": 91523
+    },
+    {
+      "utc_hour": "2026-09-18T13:00:00Z",
+      "frames": 3600,
+      "mid_start": 0.08543500000000001,
+      "mid_end": 0.087255,
+      "hour_return_bps": 213.027,
+      "elapsed_seconds": 69.73,
+      "max_rss_mb": 50.172,
+      "wall_events": 172875
+    }
+  ],
+  "hour_count": 10,
+  "frame_count": 36000,
+  "total_runtime_seconds": 721.812,
+  "peak_rss_mb": 50.172,
+  "metrics": {
+    "bid_levels": {
+      "min": 4831.0,
+      "median": 5003.0,
+      "q95": 5238.0,
+      "max": 5374.0,
+      "mean": 5026.98475
+    },
+    "ask_levels": {
+      "min": 11208.0,
+      "median": 12418.0,
+      "q95": 14085.0,
+      "max": 14112.0,
+      "mean": 12550.512528
+    },
+    "bid_walls": {
+      "min": 106.0,
+      "median": 129.0,
+      "q95": 143.0,
+      "max": 153.0,
+      "mean": 128.635167
+    },
+    "ask_walls": {
+      "min": 98.0,
+      "median": 123.0,
+      "q95": 139.0,
+      "max": 148.0,
+      "mean": 122.943167
+    },
+    "bid_connected_walls": {
+      "min": 79.0,
+      "median": 106.0,
+      "q95": 120.0,
+      "max": 129.0,
+      "mean": 106.158333
+    },
+    "ask_connected_walls": {
+      "min": 65.0,
+      "median": 96.0,
+      "q95": 114.0,
+      "max": 124.0,
+      "mean": 95.225972
+    },
+    "bid_connected_outer_bps": {
+      "min": 1039.359239,
+      "median": 1432.968334,
+      "q95": 2131.994598,
+      "max": 2797.464708,
+      "mean": 1457.731698
+    },
+    "ask_connected_outer_bps": {
+      "min": 531.586608,
+      "median": 1329.438839,
+      "q95": 1984.270645,
+      "max": 2935.522127,
+      "mean": 1344.91374
+    },
+    "imbalance": {
+      "min": -0.39562,
+      "median": -0.319419,
+      "q95": -0.007226,
+      "max": 0.049358,
+      "mean": -0.265245
+    },
+    "bid_notional": {
+      "min": 10723941.25804,
+      "median": 13417502.67462,
+      "q95": 14674732.65139,
+      "max": 15718931.09598,
+      "mean": 13467740.517163
+    },
+    "ask_notional": {
+      "min": 12350556.17493,
+      "median": 25605396.54312,
+      "q95": 27935293.91357,
+      "max": 28858594.45298,
+      "mean": 23836732.43449
+    },
+    "bid_max_vacuum_bps": {
+      "min": 51.06171,
+      "median": 127.312749,
+      "q95": 187.2988,
+      "max": 235.031436,
+      "mean": 115.174282
+    },
+    "ask_max_vacuum_bps": {
+      "min": 34.350015,
+      "median": 118.941422,
+      "q95": 216.478793,
+      "max": 249.672305,
+      "mean": 129.106881
+    }
+  },
+  "wall_event_counts": {
+    "NEW": 15978,
+    "STOOD_PRICE_APPROACHED": 477831,
+    "DISAPPEARED_UNATTRIBUTED": 13473,
+    "MOVED_UP": 20148,
+    "MOVED_DOWN": 19968,
+    "MOVED_WITH_PRICE": 12993,
+    "STRENGTHENED": 8892,
+    "REDUCED": 8855,
+    "REFILLED": 430
+  },
+  "outcome_counts": {
+    "25": {
+      "SIDEWAYS": 17493,
+      "DOWN": 4749,
+      "UP": 5889,
+      "CENSORED": 7869
+    },
+    "50": {
+      "SIDEWAYS": 24266,
+      "CENSORED": 8349,
+      "DOWN": 352,
+      "UP": 3033
+    }
+  },
+  "caveats": [
+    "Ten independent strict hours; no cross-hour wall identity.",
+    "Visible aggregated L2 levels, not individual L3 orders.",
+    "DISAPPEARED_UNATTRIBUTED is not classified as pull or fill without trade matching.",
+    "CENSORED outcomes lack the full 15-minute future horizon."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "ts_utc": "2026-09-03T18:41:35Z",
+  "old_pid": 1388502,
+  "rss_kb": 114964,
+  "fr_root": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+  "env": {
+    "OB_V3_FULL_OB_FLIGHT_RECORDER_ENABLE": "true",
+    "OB_V3_FULL_OB_FR_SYMBOLS": "BTCUSDT,DOGEUSDT",
+    "OB_V3_FULL_OB_FR_ROOT": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder",
+    "OB_V3_FULL_BOOK_ENABLE": "true",
+    "OB_V3_ON_DEMAND_ENABLE": "true"
+  },
+  "untouched_pids": {
+    "oi_liquidation": 147111,
+    "dashboard_api": 1438248
+  }
+}

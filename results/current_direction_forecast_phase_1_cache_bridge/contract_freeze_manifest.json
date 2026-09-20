@@ -1,0 +1,26 @@
+{
+  "code_sha256": {
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/__init__.py": "42ec465f58c749f1b35fc7e8596c71a051ccb7353cca957b037d0bff841e246c",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/checkpoints.py": "e3c38480c370c147df0d7e6dadf346f0b540940e5b605e307cf20735126c71cc",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/client.py": "f79c85d1e2448e6c9b2751b927c976b3c9f3a69d18d67784e61c2b3edd7acdcf",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/config.py": "fc248d5511e6982264145fabc9838bea0ce51c894db0c5020e0782b111c5ba27",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/dump.py": "07a297da8472d3ecc8ea2b094bebd1e535325bcaf3133cccda62b7131fc710a2",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/freeze.py": "2c712f938ace72ad329d103038ff8ed137d2f2562f92e448ff065cfdfe1b7aa5",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/paths.py": "7819a628cb4412bf41afe1ae4fc5f18b5b593c13089069a7ee30f939ba7e4377",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/protocol.py": "45704a91486b33a93b183d97a285e5363ec994501af896320b8467ce65be6609",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/service.py": "76399ba88aca3cc6406e1864e0901c9ac4a851f99885111e828f3739d77a373c",
+    "src/orderbook_analyse/orderbook_v2_live/full_ob_cache_bridge/socket_server.py": "552dc0fd9bf53e18dd3c916a269729a50606a6fa9353d418464edd3204692173",
+    "tests/test_full_ob_cache_bridge_v1.py": "1ee32cc8c37110cb484abf4a6237c12bbd1e559dd7a11bc053fc9e6d3c91f834"
+  },
+  "default_enabled": false,
+  "generated_at_utc": "2026-09-05T15:12:26Z",
+  "manifest_version": "current_direction_full_ob_cache_bridge_contract_freeze_v1",
+  "protocol_version": "full_ob_cache_bridge_protocol_v1",
+  "replay_capability_when_complete": "RAW_FULL_BOOK_REPLAY",
+  "solution": "B_periodic_ram_book_checkpoints",
+  "tests": {
+    "bridge_plus_related_full_ob": 67,
+    "bridge_v1": 20
+  },
+  "verdict": "CURRENT_DIRECTION_FULL_OB_CACHE_BRIDGE_V1_READY_FOR_CONTROLLED_RESTART"
+}

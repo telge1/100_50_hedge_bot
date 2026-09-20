@@ -1,0 +1,46 @@
+{
+  "volume_profile_status": "INTEGRITY_FAILED",
+  "contract_version": "volume_profile_facts_v1",
+  "provenance": {
+    "source_table": "orderbook_analysis.public_trades_canonical",
+    "session_start_utc": "2026-08-31T13:30:00Z",
+    "cutoff_utc": "2026-08-31T19:00:00Z",
+    "profile_session_id": "us_developing_to_anchor"
+  },
+  "coverage": {
+    "session_start_utc": "2026-08-31T13:30:00Z",
+    "cutoff_utc": "2026-08-31T19:00:00Z",
+    "raw_trade_rows_in_session": 0,
+    "dedup_removed_duplicates": 0,
+    "deduped_trade_rows_used": 0,
+    "future_trade_count_excluded": 0,
+    "min_trade_ts": null,
+    "max_trade_ts": null,
+    "profile_session_id": "us_developing_to_anchor"
+  },
+  "integrity": {
+    "status": "FAIL",
+    "reason": "no_trades_in_session"
+  },
+  "prefix_parity": null,
+  "vpoc": {},
+  "value_area": {},
+  "hvn_candidates": [],
+  "lvn_candidates": [],
+  "oa_parity": {
+    "status": "DIFFERENT_CONTRACT",
+    "oa_poc": 78565.0,
+    "oa_vah": 79140.0,
+    "oa_val": 78190.0,
+    "local_vpoc": null,
+    "local_vvah": null,
+    "local_vval": null,
+    "price_step_oa": 10.0,
+    "price_step_local": null,
+    "note": "OA aggregates in CH; local pipeline dedups trade_id in Python first"
+  },
+  "volume_profile_cutoff_utc": null,
+  "max_trade_ts_used": null,
+  "future_trade_count_used": 0,
+  "volume_profile_computed_separately": true
+}

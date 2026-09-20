@@ -1,0 +1,36 @@
+{
+  "candle_source": "signal_generator.candles_1m FINAL",
+  "created_at": "2026-08-15T18:12:37Z",
+  "evaluation_data_end": null,
+  "evaluation_data_start": "2026-08-01T00:00:00Z",
+  "evaluation_id": "633afb7ac1184f16a8aa6a40cd501649",
+  "execution_dedup_applied": false,
+  "exit_policy": "NO_BE50",
+  "fee_policy": "cards_use_gross_only",
+  "intrabar_policy": "SL_FIRST",
+  "outcome_engine": "evaluate_signal_no_be50",
+  "pnl_basis": "gross",
+  "side_effect_flags": {
+    "cleanup_enabled": false,
+    "live_orders_enabled": false,
+    "publish_enabled": false,
+    "writes_to_clickhouse": false,
+    "writes_to_processing_state": false,
+    "writes_to_signal_outcomes": false,
+    "writes_to_signals": false
+  },
+  "signal_scope": "TIER_A_ONLY",
+  "signal_source_commit": "f16ae32da38da86f39e75b09c63c31f62d11996b",
+  "signal_strategy_version": "wave_fade_frozen_f16ae32",
+  "signals_evaluated_independently": true,
+  "source_job_id": "8e86d1527a4749a79531d787cf67a032",
+  "source_job_manifest_hash": "441c623391d08f9cfd065ee18cff3e2ec4f93caa40da49fa36f7f8fd94f8a58e",
+  "source_signal_artifact_hashes": {
+    "coin_runs/1000BONKUSDT/a4f5c75d146e49c385b9841721ffebd1/signals.jsonl": "75a85a5eb0aee9ab1423452c37e7e906ee791d963c564078b1d2e52688ec1b94",
+    "coin_runs/AAVEUSDT/e6b88c5bca914cfb9e18cadb6f833794/signals.jsonl": "9f126f450976e903e1c60896a3ac9cc010bd4945b56fac6fa12e6af590ff636e",
+    "combined_summary.json": "db1892d46d0f5fb247d2aa6709f96f3cc265e133cde3e0a50189c722f53e5bd6",
+    "request.json": "441c623391d08f9cfd065ee18cff3e2ec4f93caa40da49fa36f7f8fd94f8a58e",
+    "status.json": "cebb897882a30e91f11b2b422872d2f893f0c3e4120bbbfdc907e7abebb791b9"
+  },
+  "strategy_version": "wave_fade_frozen_f16ae32"
+}

@@ -1,0 +1,1088 @@
+{
+  "analysis_manifest": {
+    "allow_legacy_trade_companion": false,
+    "analysis_status": "FACTS_READY_RULES_UNFROZEN",
+    "anchor_timestamp_utc": "2026-08-31T19:00:00Z",
+    "auto_extension_enabled": false,
+    "auto_extension_reason": "RULES_UNFROZEN",
+    "benchmark": false,
+    "canonical_reclaim_contract": "reclaim_event_contract_v3",
+    "causality": {
+      "anchor_exclusive": true,
+      "future_trades_in_profile_inputs": 0,
+      "profile_causality_passed": true,
+      "profile_session_id": "us_developing_to_anchor",
+      "session_start_utc": "2026-08-31T13:30:00Z"
+    },
+    "context_data_complete": true,
+    "coverage_only": false,
+    "data_source": "BTC_DOGE_RESEARCH_DB",
+    "database": "btc_doge_research",
+    "direction": null,
+    "eligibility_contract": "fight_data_eligibility_contract_v1",
+    "eligibility_status": "DATA_COMPLETE",
+    "facts_computation_allowed": true,
+    "fight_facts": {
+      "fight_fact_contract": "fight_fact_contract_v1",
+      "interpretation_status": "NOT_EVALUATED",
+      "schema_version": "btc_ob_fight_facts_v2_2"
+    },
+    "heuristics": {
+      "btcusdt_tick_size": 0.1,
+      "heuristic_contract_version": "wall_heuristics_v1",
+      "level_touch_band_bps": 5.0,
+      "report_micro_episode_seconds": 1.0,
+      "status": "UNFROZEN_HEURISTIC",
+      "tick_size": 0.1,
+      "wall_max_bps": 800,
+      "wall_qty_median_mult": 3.0,
+      "wall_sample_interval_seconds": 1,
+      "wall_trade_match_frac": 0.3
+    },
+    "instrument": {
+      "contract_type": "linear_perp",
+      "contract_version": "fight_instrument_contract_v1",
+      "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+      "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+      "price_precision": 1,
+      "quantity_precision": 3,
+      "quantity_step": "0.001",
+      "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+      "symbol": "BTCUSDT",
+      "tick_size": "0.1"
+    },
+    "interpretation_allowed": false,
+    "lineage_companion_used": false,
+    "liquidation_flow_contract": "liquidation_flow_facts_v1",
+    "mandatory_data_complete": true,
+    "mixed_sources_used": false,
+    "no_overwrite": true,
+    "normalized_anchor_utc": "2026-08-31T19:00:00Z",
+    "output_dir": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/btc_doge_research_trade_final_audit_v1/fight_runs/btc_ob_fight_cases/20260831T190000Z/run_001",
+    "package_version": "0.2.0",
+    "profile_causality_passed": true,
+    "query_timings": [
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.497402,
+        "row_count": 3601,
+        "source_name": "OB200"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 2.741363,
+        "row_count": 1,
+        "source_name": "PUBLIC_TRADES_EVENT_SPAN"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 3.153708,
+        "row_count": 850561,
+        "source_name": "PUBLIC_TRADES"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.014987,
+        "row_count": 720,
+        "source_name": "OPEN_INTEREST"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.006175,
+        "row_count": 8,
+        "source_name": "LIQUIDATIONS"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.00236,
+        "row_count": 1,
+        "source_name": "CANDLES_1M"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.012834,
+        "row_count": 1,
+        "source_name": "BATCH_LIQUIDATIONS"
+      }
+    ],
+    "raw_archive_replay_used": false,
+    "read_only": true,
+    "require_complete": true,
+    "research_trade_events_missing": false,
+    "rules_frozen": false,
+    "schema_version": "btc_ob_fight_facts_v2_0",
+    "sequence_validation": {
+      "schema_version": "btc_ob_fight_sequence_v2_3",
+      "verdict": "BTC_OB_FIGHT_CANONICAL_ELIGIBILITY_READY"
+    },
+    "symbol": "BTCUSDT",
+    "total_runtime_s": 39.443,
+    "tpo_profile": {
+      "poc": null,
+      "status": "COMPUTED_SEPARATELY",
+      "vah": null,
+      "val": null
+    },
+    "trade_decision_eligible": false,
+    "trade_verdict_evaluated": false,
+    "volume_profile": {
+      "status": "COMPUTED_SEPARATELY",
+      "vpoc": 78565.0,
+      "vvah": 79140.0,
+      "vval": 78190.0
+    },
+    "window": {
+      "after_minutes": 30,
+      "auto_extension_enabled": false,
+      "before_minutes": 30,
+      "full_fight_window": {
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor - before <= event_ts <= anchor + after",
+        "start": "2026-08-31T18:30:00Z"
+      },
+      "post_anchor_observation_window": {
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor <= event_ts <= anchor + after",
+        "start": "2026-08-31T19:00:00Z"
+      },
+      "pre_anchor_observation_window": {
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "predicate": "anchor - before <= event_ts < anchor",
+        "start": "2026-08-31T18:30:00Z"
+      },
+      "profile_input_window": {
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "predicate": "session_start <= event_ts < anchor",
+        "session_id": "us_developing_to_anchor",
+        "start": "2026-08-31T13:30:00Z"
+      }
+    }
+  },
+  "data_eligibility": {
+    "context_data_complete": true,
+    "context_sources": [
+      "OPEN_INTEREST",
+      "LIQUIDATIONS",
+      "CANDLES_1M"
+    ],
+    "context_statuses": {
+      "CANDLES_1M": "COMPLETE",
+      "LIQUIDATIONS": "COMPLETE",
+      "OPEN_INTEREST": "COMPLETE"
+    },
+    "decision_blocked_reason": null,
+    "direction": null,
+    "eligibility_contract": "fight_data_eligibility_contract_v1",
+    "eligibility_status": "DATA_COMPLETE",
+    "facts_computation_allowed": true,
+    "interpretation_allowed": false,
+    "mandatory_data_complete": true,
+    "mandatory_sources": [
+      "PUBLIC_TRADES",
+      "OB200",
+      "PROFILE_TRADES"
+    ],
+    "mandatory_statuses": {
+      "OB200": "COMPLETE",
+      "PROFILE_TRADES": "COMPLETE",
+      "PUBLIC_TRADES": "COMPLETE"
+    },
+    "missing_rows": [],
+    "profile_causality_passed": true,
+    "rules_frozen": false,
+    "sources": [
+      {
+        "available_end": "2026-08-31T19:30:00Z",
+        "available_start": "2026-08-31T18:30:00Z",
+        "build_ids": [
+          "67dc0f37a889a02fcb759dc4595a4bd64678792d0f18a1ad33473faf86daf167",
+          "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51"
+        ],
+        "duplicate_seconds": 0,
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": 3601,
+        "levels_200x200_ok": true,
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "missing_seconds": [],
+        "observed_units": 3601,
+        "requested_end": "2026-08-31T19:30:00Z",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "source_fingerprints": [
+          "ca6c396738439faccc5ffb8a1ef3f51879c9043ca3841b3bcab7237c58387350",
+          "e7d6817f15883e72b139c0af9b0e834b4bb7408064259d6a85270fa68314f425"
+        ],
+        "source_name": "OB200",
+        "source_segment_status": "COMPLETE",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "available_end": "2026-08-31T19:29:56.684Z",
+        "available_start": "2026-08-31T13:30:00.141Z",
+        "deduped_count": 850561,
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": null,
+        "lineage": {
+          "lineage_companion_used": false,
+          "raw_archive_replay_used": false,
+          "table": "btc_doge_research.research_public_trades"
+        },
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "observed_units": 80738,
+        "raw_count": 850561,
+        "requested_end": "2026-08-31T19:30:00Z",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "source_name": "PUBLIC_TRADES",
+        "source_segment_status": "RESEARCH_PUBLIC_TRADES",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "available_end": "2026-08-31T18:59:59.635Z",
+        "available_start": "2026-08-31T13:30:00.141Z",
+        "deduped_count": 813062,
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": null,
+        "lineage": {
+          "lineage_companion_used": false,
+          "raw_archive_replay_used": false,
+          "table": "btc_doge_research.research_public_trades"
+        },
+        "mandatory_for_facts": true,
+        "mandatory_for_interpretation": true,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "observed_units": 813062,
+        "raw_count": 850561,
+        "requested_end": "2026-08-31T19:00:00Z",
+        "requested_start": "2026-08-31T13:30:00Z",
+        "source_name": "PROFILE_TRADES",
+        "source_segment_status": "RESEARCH_PUBLIC_TRADES",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "available_end": "2026-08-31T19:29:55Z",
+        "available_start": "2026-08-31T18:30:00Z",
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": 720,
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "note": "effective status uses window sample density; day PARTIAL tags are informational",
+        "observed_units": 720,
+        "requested_end": "2026-08-31T19:30:00Z",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "resolution_ms": 5000,
+        "source_name": "OPEN_INTEREST",
+        "source_segment_status": "PARTIAL",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "available_end": "2026-08-31T19:10:29.628Z",
+        "available_start": "2026-08-31T18:33:08.199Z",
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": null,
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "null_events_are_valid": true,
+        "observed_units": 8,
+        "requested_end": "2026-08-31T19:30:00Z",
+        "requested_start": "2026-08-31T18:30:00Z",
+        "source_name": "LIQUIDATIONS",
+        "source_segment_status": "READY",
+        "symbol": "BTCUSDT"
+      },
+      {
+        "available_end": "2026-08-31T19:29:00Z",
+        "available_start": "2026-08-31T18:30:00Z",
+        "classification": "COVERAGE_ONLY",
+        "effective_coverage_status": "COMPLETE",
+        "expected_units": 60,
+        "mandatory_for_facts": false,
+        "mandatory_for_interpretation": false,
+        "missing_count": 0,
+        "missing_intervals": [],
+        "observed_units": 60,
+        "requested_end": null,
+        "requested_start": null,
+        "source_name": "CANDLES_1M",
+        "source_segment_status": "COVERAGE_ONLY",
+        "symbol": "BTCUSDT"
+      }
+    ],
+    "trade_decision_eligible": false,
+    "trade_verdict_evaluated": false,
+    "windows": {
+      "auto_extension_enabled": false,
+      "full_fight_window": {
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor - before <= event_ts <= anchor + after",
+        "start": "2026-08-31T18:30:00Z"
+      },
+      "post_anchor_observation_window": {
+        "end_inclusive": "2026-08-31T19:30:00Z",
+        "predicate": "anchor <= event_ts <= anchor + after",
+        "start": "2026-08-31T19:00:00Z"
+      },
+      "pre_anchor_observation_window": {
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "predicate": "anchor - before <= event_ts < anchor",
+        "start": "2026-08-31T18:30:00Z"
+      },
+      "profile_input_window": {
+        "end_exclusive": "2026-08-31T19:00:00Z",
+        "predicate": "session_start <= event_ts < anchor",
+        "session_id": "us_developing_to_anchor",
+        "start": "2026-08-31T13:30:00Z"
+      }
+    }
+  },
+  "elapsed_seconds": 39.7,
+  "exit_code": 0,
+  "input_lineage": {
+    "candles_classification": "COVERAGE_ONLY",
+    "candles_table": "signal_generator.candles_1m",
+    "data_source": "BTC_DOGE_RESEARCH_DB",
+    "database": "btc_doge_research",
+    "instrument": {
+      "contract_type": "linear_perp",
+      "contract_version": "fight_instrument_contract_v1",
+      "metadata_version": "btc_doge_research_phase_2_pilot_v1",
+      "price_bin_step_rule": "resolve_price_step(low,high,target_bins) with tick alignment",
+      "price_precision": 1,
+      "quantity_precision": 3,
+      "quantity_step": "0.001",
+      "source": "research.btc_doge_research.phase2_contracts.TICK_SIZE",
+      "symbol": "BTCUSDT",
+      "tick_size": "0.1"
+    },
+    "lineage_companion_used": false,
+    "liq_table": "btc_doge_research.research_liquidation_events",
+    "mixed_sources_used": false,
+    "ob_build_ids": [
+      "67dc0f37a889a02fcb759dc4595a4bd64678792d0f18a1ad33473faf86daf167",
+      "ecd486750a173e8570d6072d119d97c89aceb8df30853997ab8e616548424d51"
+    ],
+    "ob_table": "btc_doge_research.research_ob200_snapshots_1s",
+    "oi_table": "btc_doge_research.research_open_interest_observations",
+    "query_timings": [
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.497402,
+        "row_count": 3601,
+        "source_name": "OB200"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 2.741363,
+        "row_count": 1,
+        "source_name": "PUBLIC_TRADES_EVENT_SPAN"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 3.153708,
+        "row_count": 850561,
+        "source_name": "PUBLIC_TRADES"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.014987,
+        "row_count": 720,
+        "source_name": "OPEN_INTEREST"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.006175,
+        "row_count": 8,
+        "source_name": "LIQUIDATIONS"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.00236,
+        "row_count": 1,
+        "source_name": "CANDLES_1M"
+      },
+      {
+        "database": "btc_doge_research",
+        "elapsed_s": 0.012834,
+        "row_count": 1,
+        "source_name": "BATCH_LIQUIDATIONS"
+      }
+    ],
+    "raw_archive_replay_used": false,
+    "research_trade_events_missing": false,
+    "trade_source_mode": "RESEARCH_PUBLIC_TRADES",
+    "trade_tick_source": "btc_doge_research.research_public_trades"
+  },
+  "log_path": "results/btc_doge_research_trade_final_audit_v1/fight_runs/btcusdt_fight.log",
+  "max_rss_kb": 1520144.0,
+  "pass": true,
+  "symbol": "BTCUSDT",
+  "timestamp": "2026-08-31T19:00:00Z",
+  "tpo_profile_summary": {
+    "brackets": {
+      "bracket_minutes": 30,
+      "full_count": 11,
+      "partial_count": 0,
+      "total_count": 11,
+      "total_tpo_marks": 486
+    },
+    "contract_version": "tpo_profile_facts_v1",
+    "coverage": {
+      "cutoff_utc": "2026-08-31T19:00:00Z",
+      "dedup_removed_duplicates": 0,
+      "deduped_trade_rows_used": 813062,
+      "future_trade_count_excluded": 37499,
+      "max_trade_ts": "2026-08-31T18:59:59.635Z",
+      "min_trade_ts": "2026-08-31T13:30:00.141Z",
+      "profile_session_id": "us_developing_to_anchor",
+      "raw_trade_rows_in_session": 813062,
+      "session_start_utc": "2026-08-31T13:30:00Z"
+    },
+    "future_trade_count_used": 0,
+    "hvn_candidates": [
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78505.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 6,
+        "tpo_share": 0.012345679012345678
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78555.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 7,
+        "tpo_share": 0.01440329218106996
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78585.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 7,
+        "tpo_share": 0.01440329218106996
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78615.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 7,
+        "tpo_share": 0.01440329218106996
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78645.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 7,
+        "tpo_share": 0.01440329218106996
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78705.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 5,
+        "tpo_share": 0.0102880658436214
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78735.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 5,
+        "tpo_share": 0.0102880658436214
+      }
+    ],
+    "integrity": {
+      "checks": {
+        "all_values_finite": true,
+        "bracket_touch_sum_equals_total_marks": true,
+        "each_bracket_counts_bins_at_most_once": true,
+        "no_trade_after_anchor": true,
+        "partial_brackets_causal": true,
+        "price_step_positive": true,
+        "row_tpo_sum_equals_bracket_touches": true,
+        "row_tpo_sum_equals_total_marks": true,
+        "value_area_level_order": true,
+        "value_area_share_target_met": true
+      },
+      "status": "PASS",
+      "totals": {
+        "bracket_count": 11,
+        "bracket_touch_sum": 486,
+        "row_tpo_sum": 486,
+        "total_tpo_marks": 486
+      }
+    },
+    "lvn_candidates": [
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79095.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 1,
+        "tpo_share": 0.00205761316872428
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79125.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 1,
+        "tpo_share": 0.00205761316872428
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79155.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 1,
+        "tpo_share": 0.00205761316872428
+      },
+      {
+        "heuristic_contract_version": "tpo_nodes_v1",
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79185.0,
+        "status": "UNFROZEN_HEURISTIC",
+        "tpo_count": 1,
+        "tpo_share": 0.00205761316872428
+      }
+    ],
+    "prefix_parity": {
+      "extra_post_anchor_trades_added": 50,
+      "status": "PASS"
+    },
+    "provenance": {
+      "algorithm_source": "orderbook_analyse.market_profile.profile (compute_value_area, find_nodes on tpo_count weights)",
+      "anchor_exclusive": true,
+      "bracket_alignment": "SESSION_START",
+      "bracket_minutes": 30,
+      "chart_timeframe_dependency": false,
+      "cutoff_utc": "2026-08-31T19:00:00Z",
+      "dedup_key": "trade_id",
+      "engine": "research.btc_ob_fight.tpo_profile",
+      "oa_volume_path_not_used_for_tpo": true,
+      "orderbook_tick_size": 0.1,
+      "partial_bracket_policy": "INCLUDE_CAUSAL_PARTIAL_BRACKET",
+      "poc_tie_break_rule": "max_tpo_count_then_center_bin_index",
+      "price_increment": 10.0,
+      "profile_kind": "TPO_BRACKET",
+      "profile_session_id": "us_developing_to_anchor",
+      "session_start_utc": "2026-08-31T13:30:00Z",
+      "source": "btc_doge_research.research_public_trades",
+      "symbol": "BTCUSDT",
+      "target_bins": 160,
+      "trade_cutoff_rule": "session_start <= trade_ts < anchor_cutoff",
+      "trade_size_used_as_weight": false,
+      "value_area_percentage": 0.7,
+      "value_area_tie_break_rule": "expand_toward_larger_neighbor_tpo_count",
+      "weighting": "DISTINCT_BRACKET_PRESENCE"
+    },
+    "tpo_profile_computed_separately": true,
+    "tpo_profile_cutoff_utc": "2026-08-31T19:00:00Z",
+    "tpo_profile_status": "COMPUTED_SEPARATELY",
+    "tpoc": {
+      "tpoc_bin_index": 7854,
+      "tpoc_price": 78545.0,
+      "tpoc_tie_break_rule": "max_tpo_count_then_center_bin_index",
+      "tpoc_tpo_count": 7.0
+    },
+    "trade_size_invariance": {
+      "scaled_factor": 17.0,
+      "status": "PASS"
+    },
+    "value_area": {
+      "actual_value_area_marks": 343.0,
+      "actual_value_area_share": 0.7057613168724279,
+      "included_bin_count": 85,
+      "target_value_area_marks": 340.2,
+      "total_tpo_marks": 486,
+      "tpoc_vah": 79080.0,
+      "tpoc_val": 78230.0,
+      "value_area_percentage": 0.7,
+      "value_area_tie_break_rule": "expand_toward_larger_neighbor_tpo_count"
+    }
+  },
+  "validation": {
+    "contract_version": "research_public_trades_contract_v2",
+    "data_complete": true,
+    "exit_code_zero": true,
+    "legacy_companion_false": true,
+    "lineage_companion_false": true,
+    "mixed_sources_false": true,
+    "pass": true,
+    "profile_causality": true,
+    "public_trades_bps_logged": true,
+    "public_trades_delta_logged": true,
+    "raw_archive_false": true,
+    "tpo_poc": true,
+    "tpo_vah": true,
+    "tpo_val": true,
+    "trade_source_research_db": true,
+    "vpoc": true,
+    "vvah": true,
+    "vval": true
+  },
+  "volume_profile_summary": {
+    "contract_version": "volume_profile_facts_v1",
+    "coverage": {
+      "cutoff_utc": "2026-08-31T19:00:00Z",
+      "dedup_removed_duplicates": 0,
+      "deduped_trade_rows_used": 813062,
+      "future_trade_count_excluded": 37499,
+      "max_trade_ts": "2026-08-31T18:59:59.635Z",
+      "min_trade_ts": "2026-08-31T13:30:00.141Z",
+      "profile_session_id": "us_developing_to_anchor",
+      "raw_trade_rows_in_session": 813062,
+      "session_start_utc": "2026-08-31T13:30:00Z"
+    },
+    "future_trade_count_used": 0,
+    "hvn_candidates": [
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 194.59500000002072,
+          "below_volume": 198.43100000001635
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 77835.0,
+        "prominence": 1.7268973608838813,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 244.40500000002035,
+        "volume_share": 0.011361166847920271
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 199.1360000000133,
+          "below_volume": 186.1360000000101
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 77955.0,
+        "prominence": 2.6350543862897493,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 372.9349999999823,
+        "volume_share": 0.017335884120327296
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 155.69900000000862,
+          "below_volume": 183.85600000000855
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78355.0,
+        "prominence": 1.8462585732869816,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 261.2980000000034,
+        "volume_share": 0.012146437982151195
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 189.02700000001067,
+          "below_volume": 200.156000000011
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78455.0,
+        "prominence": 1.5434641971355436,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 218.44400000001468,
+        "volume_share": 0.010154369717996997
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 322.3009999999847,
+          "below_volume": 507.6219999998947
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78515.0,
+        "prominence": 2.6597349471683605,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 376.427999999965,
+        "volume_share": 0.01749825623137079
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 433.16499999993954,
+          "below_volume": 543.2679999998318
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78575.0,
+        "prominence": 2.6597773414896957,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 376.4339999999306,
+        "volume_share": 0.017498535141379574
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 262.91600000001387,
+          "below_volume": 290.131000000006
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78645.0,
+        "prominence": 1.4143452250490909,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 200.17000000001465,
+        "volume_share": 0.009304902796375598
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 316.3570000000025,
+          "below_volume": 148.4010000000052
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78805.0,
+        "prominence": 1.2645519554730102,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 178.97000000001074,
+        "volume_share": 0.008319420759690856
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 150.1090000000117,
+          "below_volume": 176.43000000001373
+        },
+        "node_type": "HVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78865.0,
+        "prominence": 1.9395048835979924,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 274.49499999999176,
+        "volume_share": 0.01275990054998679
+      }
+    ],
+    "integrity": {
+      "checks": {
+        "all_values_finite": true,
+        "base_volume_conservation": true,
+        "buy_sell_sum_equals_total": true,
+        "deduped_trade_count": 813062,
+        "delta_equals_buy_minus_sell": true,
+        "no_trade_after_anchor": true,
+        "quote_notional_conservation": true,
+        "trade_count_conservation": true,
+        "value_area_level_order": true,
+        "value_area_share_target_met": true
+      },
+      "status": "PASS",
+      "tolerance_abs": 1e-06,
+      "tolerance_rel": 1e-09,
+      "totals": {
+        "row_base_volume": 21512.31500000021,
+        "row_notional": 1687208600.9889987,
+        "row_trade_count": 813062,
+        "trade_base_volume": 21512.315,
+        "trade_count": 813062,
+        "trade_notional": 1687208600.989
+      }
+    },
+    "lvn_candidates": [
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 49.069999999999936,
+          "below_volume": 45.316999999999396
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78045.0,
+        "prominence": 0.4102922442331176,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 58.06799999999898,
+        "volume_share": 0.0026992910804810367
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 63.66899999999906,
+          "below_volume": 62.68699999999886
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78225.0,
+        "prominence": 0.4888065277958139,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 69.17999999999938,
+        "volume_share": 0.0032158324197093017
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 43.73499999999973,
+          "below_volume": 49.407999999998914
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78275.0,
+        "prominence": 0.19234303699997116,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 27.222000000000488,
+        "volume_share": 0.001265414717105073
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 69.27399999999957,
+          "below_volume": 75.84199999999915
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78935.0,
+        "prominence": 0.49298943419152297,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 69.77199999999944,
+        "volume_share": 0.0032433515407337033
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 68.82399999999978,
+          "below_volume": 85.46600000000144
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 78985.0,
+        "prominence": 0.47873081070074874,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 67.75399999999985,
+        "volume_share": 0.0031495448072417676
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 69.08799999999967,
+          "below_volume": 79.97900000000111
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79035.0,
+        "prominence": 0.4959005109398877,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 70.18399999999943,
+        "volume_share": 0.0032625033614466295
+      },
+      {
+        "heuristic_contract_version": "volume_nodes_v1",
+        "neighbor_comparison": {
+          "above_volume": 29.413000000000075,
+          "below_volume": 38.70599999999982
+        },
+        "node_type": "LVN",
+        "parameters": {
+          "hvn_factor": 1.35,
+          "lvn_factor": 0.55,
+          "min_separation_bins": 3
+        },
+        "price": 79145.0,
+        "prominence": 0.09408713102239213,
+        "status": "UNFROZEN_HEURISTIC",
+        "volume": 13.315999999999942,
+        "volume_share": 0.0006189942830420534
+      }
+    ],
+    "max_trade_ts_used": "2026-08-31T18:59:59.635Z",
+    "oa_parity": {
+      "local_vpoc": 78565.0,
+      "local_vvah": 79140.0,
+      "local_vval": 78190.0,
+      "note": "OA aggregates in CH; local pipeline dedups trade_id in Python first",
+      "oa_poc": 78565.0,
+      "oa_vah": 79140.0,
+      "oa_val": 78190.0,
+      "price_step_local": 10.0,
+      "price_step_oa": 10.0,
+      "status": "EXACT"
+    },
+    "prefix_parity": {
+      "anchor_cutoff_utc": "2026-08-31T19:00:00Z",
+      "extra_post_anchor_trades_added": 50,
+      "status": "PASS"
+    },
+    "provenance": {
+      "aggressor_semantics": "side=Buy/Sell is taker/aggressor",
+      "algorithm_source": "orderbook_analyse.market_profile.profile (compute_value_area, find_nodes)",
+      "available_volume_bases": [
+        "base_volume",
+        "quote_notional"
+      ],
+      "cutoff_utc": "2026-08-31T19:00:00Z",
+      "dedup_key": "trade_id",
+      "engine": "research.btc_ob_fight.volume_profile",
+      "price_increment": 10.0,
+      "primary_volume_basis": "base_volume",
+      "profile_session_id": "us_developing_to_anchor",
+      "quote_notional_formula": "price * size (canonical notional when present)",
+      "session_start_utc": "2026-08-31T13:30:00Z",
+      "session_timezone": "UTC",
+      "source_quantity_field": "size",
+      "source_table": "orderbook_analysis.public_trades_canonical",
+      "target_bins": 160,
+      "tpo_values_not_copied": true,
+      "trade_cutoff_rule": "session_start <= trade_ts < anchor_cutoff",
+      "value_area_percentage": 0.7
+    },
+    "value_area": {
+      "actual_value_area_share": 0.7013816504639208,
+      "actual_value_area_volume": 15088.342999999906,
+      "included_bin_count": 95,
+      "target_value_area_volume": 15058.620500000146,
+      "total_profile_volume": 21512.31500000021,
+      "value_area_percentage": 0.7,
+      "value_area_tie_break_rule": "expand_toward_larger_neighbor_bin_volume",
+      "vvah": 79140.0,
+      "vval": 78190.0
+    },
+    "volume_profile_computed_separately": true,
+    "volume_profile_cutoff_utc": "2026-08-31T19:00:00Z",
+    "volume_profile_status": "COMPUTED_SEPARATELY",
+    "vpoc": {
+      "vpoc_bin_index": 7856,
+      "vpoc_price": 78565.0,
+      "vpoc_tie_break_rule": "max_volume_then_center_bin_index",
+      "vpoc_tie_count": 1,
+      "vpoc_trade_count": 15857,
+      "vpoc_volume": 543.2679999998318
+    }
+  }
+}

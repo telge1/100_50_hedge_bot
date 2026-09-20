@@ -1,0 +1,36 @@
+{
+  "btc": {
+    "path": "results/btc_doge_research_trade_rematerialization_v1/fight_golden_v2/btc_ob_fight_cases/20260831T190000Z/run_001",
+    "eligibility": "DATA_COMPLETE",
+    "analysis_status": "FACTS_READY_RULES_UNFROZEN",
+    "lineage_companion_used": false,
+    "mixed_sources_used": false,
+    "raw_archive_replay_used": false,
+    "trade_source_mode": "RESEARCH_PUBLIC_TRADES",
+    "tpo_poc": 78545.0,
+    "volume_vpoc": 78565.0,
+    "expected_tpo": {
+      "POC": 78545,
+      "VAH": 79080,
+      "VAL": 78230
+    },
+    "expected_volume": {
+      "VPOC": 78565,
+      "VVAH": 79140,
+      "VVAL": 78190
+    },
+    "wall_clock_s": 41.02,
+    "source_pure": true,
+    "research_trade_contract": "research_public_trades_contract_v2",
+    "tpo_vah": 79080.0,
+    "tpo_val": 78230.0,
+    "vpoc": 78565.0,
+    "vvah": 79140.0,
+    "vval": 78190.0
+  },
+  "doge": {
+    "path": "results/btc_doge_research_trade_rematerialization_v1/fight_golden_v2/btc_ob_fight_cases/20260831T130000Z/run_001",
+    "eligibility": "DATA_COMPLETE",
+    "lineage_companion_used": false
+  }
+}

@@ -1,0 +1,190 @@
+[
+  {
+    "name": "strict_v1",
+    "config": {
+      "name": "strict_v1",
+      "min_birth_notional": 250000,
+      "min_touch_notional": 250000,
+      "min_distance_bps": 500.0,
+      "max_distance_bps": 1000.0,
+      "reject_bps": 15.0,
+      "reject_window_s": 120,
+      "long_sl": 0.2,
+      "long_tp": 0.4,
+      "short_sl": 0.4,
+      "short_tp": 0.8
+    },
+    "funnel": {
+      "candidates": 332,
+      "trades": 9,
+      "no_trade": {
+        "distance_band": 250,
+        "birth_too_small": 67,
+        "wall_gone": 5,
+        "failed_reject_hit_sl": 1
+      }
+    },
+    "all": {
+      "n": 9,
+      "win_rate": 0.2222,
+      "tp_n": 2,
+      "sl_n": 7,
+      "tp_rate": 0.2222,
+      "avg_pnl": -0.1845,
+      "median_pnl": -0.4082,
+      "median_mfe": 0.2497,
+      "long_n": 4,
+      "short_n": 5
+    },
+    "LONG": {
+      "n": 4,
+      "win_rate": 0.5,
+      "tp_n": 2,
+      "sl_n": 2,
+      "tp_rate": 0.5,
+      "avg_pnl": 0.1045,
+      "median_pnl": 0.4211,
+      "median_mfe": 0.4211,
+      "long_n": 4,
+      "short_n": 0
+    },
+    "SHORT": {
+      "n": 5,
+      "win_rate": 0.0,
+      "tp_n": 0,
+      "sl_n": 5,
+      "tp_rate": 0.0,
+      "avg_pnl": -0.4158,
+      "median_pnl": -0.4091,
+      "median_mfe": 0.1987,
+      "long_n": 0,
+      "short_n": 5
+    },
+    "peak_rss_gb": 0.071
+  },
+  {
+    "name": "strict_v2",
+    "config": {
+      "name": "strict_v2",
+      "min_birth_notional": 200000,
+      "min_touch_notional": 200000,
+      "min_distance_bps": 400.0,
+      "max_distance_bps": 1000.0,
+      "reject_bps": 15.0,
+      "reject_window_s": 90,
+      "long_sl": 0.2,
+      "long_tp": 0.4,
+      "short_sl": 0.4,
+      "short_tp": 0.8
+    },
+    "funnel": {
+      "candidates": 332,
+      "trades": 33,
+      "no_trade": {
+        "birth_too_small": 132,
+        "distance_band": 154,
+        "wall_gone": 12,
+        "failed_reject_hit_sl": 1
+      }
+    },
+    "all": {
+      "n": 33,
+      "win_rate": 0.4242,
+      "tp_n": 10,
+      "sl_n": 18,
+      "tp_rate": 0.303,
+      "avg_pnl": 0.3446,
+      "median_pnl": -0.2121,
+      "median_mfe": 0.3626,
+      "long_n": 15,
+      "short_n": 18
+    },
+    "LONG": {
+      "n": 15,
+      "win_rate": 0.5333,
+      "tp_n": 4,
+      "sl_n": 7,
+      "tp_rate": 0.2667,
+      "avg_pnl": 0.8007,
+      "median_pnl": 0.4001,
+      "median_mfe": 0.2998,
+      "long_n": 15,
+      "short_n": 0
+    },
+    "SHORT": {
+      "n": 18,
+      "win_rate": 0.3333,
+      "tp_n": 6,
+      "sl_n": 11,
+      "tp_rate": 0.3333,
+      "avg_pnl": -0.0355,
+      "median_pnl": -0.4079,
+      "median_mfe": 0.7119,
+      "long_n": 0,
+      "short_n": 18
+    },
+    "peak_rss_gb": 0.071
+  },
+  {
+    "name": "strict_v3_mega",
+    "config": {
+      "name": "strict_v3_mega",
+      "min_birth_notional": 400000,
+      "min_touch_notional": 300000,
+      "min_distance_bps": 250.0,
+      "max_distance_bps": 1000.0,
+      "reject_bps": 15.0,
+      "reject_window_s": 120,
+      "long_sl": 0.2,
+      "long_tp": 0.4,
+      "short_sl": 0.4,
+      "short_tp": 0.8
+    },
+    "funnel": {
+      "candidates": 332,
+      "trades": 61,
+      "no_trade": {
+        "birth_too_small": 224,
+        "wall_gone": 46,
+        "failed_reject_hit_sl": 1
+      }
+    },
+    "all": {
+      "n": 61,
+      "win_rate": 0.2787,
+      "tp_n": 14,
+      "sl_n": 43,
+      "tp_rate": 0.2295,
+      "avg_pnl": 0.0323,
+      "median_pnl": -0.4043,
+      "median_mfe": 0.2532,
+      "long_n": 15,
+      "short_n": 46
+    },
+    "LONG": {
+      "n": 15,
+      "win_rate": 0.5333,
+      "tp_n": 5,
+      "sl_n": 7,
+      "tp_rate": 0.3333,
+      "avg_pnl": 0.7101,
+      "median_pnl": 0.4001,
+      "median_mfe": 0.2998,
+      "long_n": 15,
+      "short_n": 0
+    },
+    "SHORT": {
+      "n": 46,
+      "win_rate": 0.1957,
+      "tp_n": 9,
+      "sl_n": 36,
+      "tp_rate": 0.1957,
+      "avg_pnl": -0.1887,
+      "median_pnl": -0.4082,
+      "median_mfe": 0.2532,
+      "long_n": 0,
+      "short_n": 46
+    },
+    "peak_rss_gb": 0.071
+  }
+]

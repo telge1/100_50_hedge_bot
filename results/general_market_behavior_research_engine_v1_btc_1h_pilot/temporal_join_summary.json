@@ -1,0 +1,11 @@
+{
+  "bucket_kind": "[state_ts, state_ts+1s)",
+  "causal_cut": "event_time < state_ts + 1s",
+  "state_ts_meaning": "UTC second start; features use events with event_time in [state_ts, state_ts+1)",
+  "oi_soft_age_ms": 30000,
+  "oi_hard_age_ms": 120000,
+  "trades_loaded": 17257,
+  "oi_loaded": 745,
+  "liq_loaded": 2,
+  "no_future_fill": true
+}

@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 336729,
+      "error": null,
+      "raw_count": 6301,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "WLDUSDT",
+      "tier_a_count": 1441,
+      "warmup_complete": false
+    }
+  ]
+}

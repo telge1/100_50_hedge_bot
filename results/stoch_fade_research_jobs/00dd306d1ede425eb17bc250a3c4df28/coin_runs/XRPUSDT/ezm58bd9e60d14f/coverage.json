@@ -1,0 +1,66 @@
+{
+  "closed_segments": 0,
+  "computation_mode": "ema_plus_microstructure",
+  "data_basis": "orderbook_ob200_v3_raw",
+  "discovery_end": null,
+  "discovery_start": null,
+  "incomplete_reason": "missing:orderbook_ob200_v3_raw",
+  "intersection_end": null,
+  "intersection_start": null,
+  "open_tmp_ignored": 0,
+  "orderbook_required": true,
+  "outcome_path_end": null,
+  "segment_files": [],
+  "sources": [
+    {
+      "max_ts": null,
+      "min_ts": null,
+      "n_rows": 0,
+      "notes": "no_closed_segments",
+      "source": "orderbook_ob200_v3_raw",
+      "status": "DATA_INCOMPLETE"
+    },
+    {
+      "max_ts": "2026-08-26T18:27:00Z",
+      "min_ts": "2025-12-11T00:00:00Z",
+      "n_rows": 372628,
+      "notes": "",
+      "source": "candles_1m",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T18:28:29Z",
+      "min_ts": "2026-07-19T00:00:00Z",
+      "n_rows": 23993471,
+      "notes": "",
+      "source": "public_trades_native",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T18:28:40Z",
+      "min_ts": "2026-08-18T14:57:15Z",
+      "n_rows": 140070,
+      "notes": "derived_from_open_interest_5s",
+      "source": "open_interest_1m",
+      "status": "OK"
+    },
+    {
+      "max_ts": "2026-08-26T17:46:46Z",
+      "min_ts": "2026-08-18T20:04:17Z",
+      "n_rows": 10558,
+      "notes": "",
+      "source": "liquidations",
+      "status": "OK"
+    },
+    {
+      "max_ts": null,
+      "min_ts": null,
+      "n_rows": 0,
+      "notes": "optional",
+      "source": "liquidity_locations",
+      "status": "OPTIONAL_UNAVAILABLE"
+    }
+  ],
+  "status": "DATA_INCOMPLETE",
+  "symbol": "XRPUSDT"
+}

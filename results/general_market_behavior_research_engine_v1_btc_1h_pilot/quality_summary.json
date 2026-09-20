@@ -1,0 +1,37 @@
+{
+  "n_rows": 3600,
+  "expected_rows": 3600,
+  "row_count_ok": true,
+  "feature_row_valid_rate": 1.0,
+  "book_valid_rate": 1.0,
+  "oi_valid_rate": 1.0,
+  "asserts": {
+    "ok": true,
+    "errors": [],
+    "error_count": 0,
+    "n_rows": 3600
+  },
+  "prefix_parity": {
+    "ok": true,
+    "mismatches": 0,
+    "prefix_rows": 1800
+  },
+  "idempotency": {
+    "ok": true,
+    "hash": "e276979d61d9c8d87fadd6529f373d68262e0567dd43e942f41f3655ae5e217a",
+    "hash2": "e276979d61d9c8d87fadd6529f373d68262e0567dd43e942f41f3655ae5e217a"
+  },
+  "gap_refusal": {
+    "tested": true,
+    "window": "2026-09-05T17:00:00Z",
+    "full_wall_clock_coverage": false,
+    "replay_chain_complete": true,
+    "full_join": false,
+    "refused_full_label": true,
+    "reasons": [
+      "not_FULL_WALL_CLOCK start_lag_s=2379.272 end_lead_s=0.127"
+    ],
+    "ok": true
+  },
+  "attribution": "MIXED_OR_UNKNOWN for removals (execute vs cancel not asserted exact)"
+}

@@ -1,0 +1,364 @@
+{
+  "verdict": "BTC_OB_FIGHT_CANONICAL_SEQUENCE_READY",
+  "schema_version": "btc_ob_fight_sequence_v2_2",
+  "sequence_validation_contract": "fight_sequence_validation_v2",
+  "canonical_reclaim_contract": "reclaim_event_contract_v2",
+  "interpretation_status": "NOT_EVALUATED",
+  "rules_frozen": false,
+  "trade_verdict_evaluated": false,
+  "direction": null,
+  "legacy_global_first_reclaim_enabled": false,
+  "same_timestamp_ordering_audited": true,
+  "raw_state_episode_count": 269,
+  "edge_visit_count": 17,
+  "edge_visits_upper": 17,
+  "edge_visits_lower": 0,
+  "cluster_count_gap_0": 17,
+  "gap0_invariant_ok": true,
+  "outside_excursion_count_raw": 117,
+  "outside_excursion_count_canonical": 8,
+  "outside_excursion_count_ambiguous": 109,
+  "reclaim_count": 117,
+  "unique_reclaim_cross_timestamps": 9,
+  "open_excursion_count": 0,
+  "cluster_counts_by_gap": {
+    "0": 17,
+    "1": 14,
+    "2": 14,
+    "5": 14,
+    "10": 13,
+    "30": 12,
+    "60": 12
+  },
+  "consumption_by_scope": {
+    "TPO_EDGE_BIN": {
+      "trade_associated": 20,
+      "unmatched": 894,
+      "total": 914
+    },
+    "PROFILE_EDGE_ZONE": {
+      "trade_associated": 87,
+      "unmatched": 4030,
+      "total": 4117
+    },
+    "VOLUME_EDGE_BIN": {
+      "trade_associated": 11,
+      "unmatched": 417,
+      "total": 428
+    },
+    "FIRST_OUTSIDE_BIN": {
+      "trade_associated": 13,
+      "unmatched": 366,
+      "total": 379
+    },
+    "EXACT_LEVEL_TICK": {
+      "trade_associated": 0,
+      "unmatched": 30,
+      "total": 30
+    }
+  },
+  "consumption_metrics": {
+    "rows": [
+      {
+        "scope": "TPO_EDGE_BIN",
+        "side": "ASK",
+        "event_count": 632,
+        "trade_associated_count": 14,
+        "unmatched_count": 618,
+        "disappearance_count": 0,
+        "matched_trade_volume": 17.110999999999994,
+        "visible_qty_reduction": 1659.367000000002,
+        "affected_tick_count": 98,
+        "edge_visit_count": 1
+      },
+      {
+        "scope": "PROFILE_EDGE_ZONE",
+        "side": "ASK",
+        "event_count": 2441,
+        "trade_associated_count": 60,
+        "unmatched_count": 2381,
+        "disappearance_count": 0,
+        "matched_trade_volume": 117.49700000000011,
+        "visible_qty_reduction": 6109.8559999999925,
+        "affected_tick_count": 616,
+        "edge_visit_count": 4
+      },
+      {
+        "scope": "TPO_EDGE_BIN",
+        "side": "BID",
+        "event_count": 282,
+        "trade_associated_count": 6,
+        "unmatched_count": 276,
+        "disappearance_count": 0,
+        "matched_trade_volume": 12.4,
+        "visible_qty_reduction": 837.5750000000002,
+        "affected_tick_count": 82,
+        "edge_visit_count": 4
+      },
+      {
+        "scope": "PROFILE_EDGE_ZONE",
+        "side": "BID",
+        "event_count": 1676,
+        "trade_associated_count": 27,
+        "unmatched_count": 1649,
+        "disappearance_count": 0,
+        "matched_trade_volume": 53.531999999999975,
+        "visible_qty_reduction": 4370.850999999998,
+        "affected_tick_count": 547,
+        "edge_visit_count": 4
+      },
+      {
+        "scope": "VOLUME_EDGE_BIN",
+        "side": "ASK",
+        "event_count": 211,
+        "trade_associated_count": 8,
+        "unmatched_count": 203,
+        "disappearance_count": 0,
+        "matched_trade_volume": 26.972000000000016,
+        "visible_qty_reduction": 497.8029999999997,
+        "affected_tick_count": 84,
+        "edge_visit_count": 1
+      },
+      {
+        "scope": "FIRST_OUTSIDE_BIN",
+        "side": "ASK",
+        "event_count": 241,
+        "trade_associated_count": 8,
+        "unmatched_count": 233,
+        "disappearance_count": 0,
+        "matched_trade_volume": 8.085999999999997,
+        "visible_qty_reduction": 561.1779999999999,
+        "affected_tick_count": 81,
+        "edge_visit_count": 1
+      },
+      {
+        "scope": "VOLUME_EDGE_BIN",
+        "side": "BID",
+        "event_count": 217,
+        "trade_associated_count": 3,
+        "unmatched_count": 214,
+        "disappearance_count": 0,
+        "matched_trade_volume": 2.35,
+        "visible_qty_reduction": 555.758,
+        "affected_tick_count": 80,
+        "edge_visit_count": 1
+      },
+      {
+        "scope": "EXACT_LEVEL_TICK",
+        "side": "BID",
+        "event_count": 16,
+        "trade_associated_count": 0,
+        "unmatched_count": 16,
+        "disappearance_count": 0,
+        "matched_trade_volume": 0.0,
+        "visible_qty_reduction": 35.169999999999995,
+        "affected_tick_count": 2,
+        "edge_visit_count": 2
+      },
+      {
+        "scope": "EXACT_LEVEL_TICK",
+        "side": "ASK",
+        "event_count": 14,
+        "trade_associated_count": 0,
+        "unmatched_count": 14,
+        "disappearance_count": 0,
+        "matched_trade_volume": 0.0,
+        "visible_qty_reduction": 27.441000000000003,
+        "affected_tick_count": 2,
+        "edge_visit_count": 1
+      },
+      {
+        "scope": "FIRST_OUTSIDE_BIN",
+        "side": "BID",
+        "event_count": 138,
+        "trade_associated_count": 5,
+        "unmatched_count": 133,
+        "disappearance_count": 0,
+        "matched_trade_volume": 7.794,
+        "visible_qty_reduction": 349.121,
+        "affected_tick_count": 58,
+        "edge_visit_count": 1
+      }
+    ],
+    "total_events": 5868
+  },
+  "ob_coverage_metrics": {
+    "by_scope": {
+      "EXACT_LEVEL_TICK": {
+        "sample_count": 14404,
+        "full_count": 1074,
+        "full_pct": 7.46,
+        "partial_count": 3,
+        "partial_pct": 0.02,
+        "outside_book_range_count": 13327,
+        "outside_book_range_pct": 92.52,
+        "missing_sample_count": 0,
+        "missing_sample_pct": 0.0
+      },
+      "TPO_EDGE_BIN": {
+        "sample_count": 7202,
+        "full_count": 0,
+        "full_pct": 0.0,
+        "partial_count": 1012,
+        "partial_pct": 14.05,
+        "outside_book_range_count": 6190,
+        "outside_book_range_pct": 85.95,
+        "missing_sample_count": 0,
+        "missing_sample_pct": 0.0
+      },
+      "VOLUME_EDGE_BIN": {
+        "sample_count": 7202,
+        "full_count": 0,
+        "full_pct": 0.0,
+        "partial_count": 470,
+        "partial_pct": 6.53,
+        "outside_book_range_count": 6732,
+        "outside_book_range_pct": 93.47,
+        "missing_sample_count": 0,
+        "missing_sample_pct": 0.0
+      },
+      "PROFILE_EDGE_ZONE": {
+        "sample_count": 7202,
+        "full_count": 0,
+        "full_pct": 0.0,
+        "partial_count": 1412,
+        "partial_pct": 19.61,
+        "outside_book_range_count": 5790,
+        "outside_book_range_pct": 80.39,
+        "missing_sample_count": 0,
+        "missing_sample_pct": 0.0
+      },
+      "FIRST_OUTSIDE_BIN": {
+        "sample_count": 0
+      }
+    },
+    "total_sample_rows": 36010
+  },
+  "refill_metrics": {
+    "exact_same_tick_refills": 0,
+    "exact_ask_count": 0,
+    "exact_bid_count": 0,
+    "partial_recovery_count": 0,
+    "full_recovery_count": 0,
+    "nearby_liquidity_increase_count": 668,
+    "nearby_ask_count": 0,
+    "nearby_bid_count": 0,
+    "refill_delay_seconds_min": null,
+    "refill_delay_seconds_median": null,
+    "refill_delay_seconds_max": null,
+    "nearby_tick_distance_min": 1,
+    "nearby_tick_distance_max": 10
+  },
+  "outside_excursion_metrics": {
+    "raw_outside_excursions": {
+      "count": 117,
+      "unique_start_timestamps": 12,
+      "unique_reclaim_timestamps": 117,
+      "zero_duration_count": 109,
+      "duration": {
+        "count": 117,
+        "min": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.338,
+        "max": 164.938,
+        "total": 363.815
+      },
+      "base_volume": 335.6750000000107,
+      "quote_volume": 26582843.24769989,
+      "taker_buy_quote": 15066670.947500046,
+      "taker_sell_quote": 11516172.300200013,
+      "taker_delta_quote": 3550498.6472999984,
+      "reclaim_count": 117,
+      "open_count": 0
+    },
+    "canonical_outside_excursions": {
+      "count": 8,
+      "unique_start_timestamps": 8,
+      "unique_reclaim_timestamps": 8,
+      "zero_duration_count": 0,
+      "duration": {
+        "count": 8,
+        "min": 0.091,
+        "p25": 0.361,
+        "median": 36.157,
+        "p75": 55.108,
+        "p90": 102.979,
+        "p95": 164.938,
+        "max": 164.938,
+        "total": 363.815
+      },
+      "base_volume": 323.0650000000107,
+      "quote_volume": 25584864.24199989,
+      "taker_buy_quote": 14376550.430400046,
+      "taker_sell_quote": 11208313.811600013,
+      "taker_delta_quote": 3168236.6187999984,
+      "reclaim_count": 8,
+      "open_count": 0
+    },
+    "ambiguous_same_timestamp_excursions": {
+      "count": 109,
+      "unique_start_timestamps": 7,
+      "unique_reclaim_timestamps": 109,
+      "zero_duration_count": 109,
+      "duration": {
+        "count": 109,
+        "min": 0.0,
+        "p25": 0.0,
+        "median": 0.0,
+        "p75": 0.0,
+        "p90": 0.0,
+        "p95": 0.0,
+        "max": 0.0,
+        "total": 0.0
+      },
+      "base_volume": 12.610000000000001,
+      "quote_volume": 997979.0057,
+      "taker_buy_quote": 690120.5171,
+      "taker_sell_quote": 307858.4886,
+      "taker_delta_quote": 382262.0285,
+      "reclaim_count": 109,
+      "open_count": 0
+    }
+  },
+  "exact_refill_count": 0,
+  "nearby_liquidity_increase_count": 668,
+  "edge_book_coverage": {
+    "sample_count": 36010,
+    "by_scope_status": {
+      "EXACT_LEVEL_TICK": {
+        "EDGE_REGION_OUTSIDE_BOOK_RANGE": 13327,
+        "FULL_EDGE_REGION_COVERAGE": 1074,
+        "PARTIAL_EDGE_REGION_COVERAGE": 3
+      },
+      "TPO_EDGE_BIN": {
+        "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6190,
+        "PARTIAL_EDGE_REGION_COVERAGE": 1012
+      },
+      "VOLUME_EDGE_BIN": {
+        "EDGE_REGION_OUTSIDE_BOOK_RANGE": 6732,
+        "PARTIAL_EDGE_REGION_COVERAGE": 470
+      },
+      "PROFILE_EDGE_ZONE": {
+        "EDGE_REGION_OUTSIDE_BOOK_RANGE": 5790,
+        "PARTIAL_EDGE_REGION_COVERAGE": 1412
+      }
+    },
+    "scopes_analyzed": [
+      "EXACT_LEVEL_TICK",
+      "TPO_EDGE_BIN",
+      "VOLUME_EDGE_BIN",
+      "PROFILE_EDGE_ZONE"
+    ],
+    "note": "missing_coverage_does_not_imply_zero_consumption"
+  },
+  "oi_liquidation_coverage": {
+    "visit_count": 17,
+    "excursion_count": 117,
+    "data_insufficient_count": 126
+  },
+  "historical_run_012_reclaim_status": "KNOWN_INVALID_GLOBAL_FIRST_BUG",
+  "sensitivity_status": "UNFROZEN_SENSITIVITY_ONLY"
+}

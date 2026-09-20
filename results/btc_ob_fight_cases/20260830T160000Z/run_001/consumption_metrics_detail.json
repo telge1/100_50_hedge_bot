@@ -1,0 +1,113 @@
+{
+  "rows": [
+    {
+      "scope": "PROFILE_EDGE_ZONE",
+      "side": "BID",
+      "event_count": 453,
+      "trade_associated_count": 0,
+      "unmatched_count": 453,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.989,
+      "visible_qty_reduction": 1158.6889999999994,
+      "affected_tick_count": 148,
+      "edge_visit_count": 4
+    },
+    {
+      "scope": "TPO_EDGE_BIN",
+      "side": "BID",
+      "event_count": 90,
+      "trade_associated_count": 0,
+      "unmatched_count": 90,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 232.16600000000003,
+      "affected_tick_count": 27,
+      "edge_visit_count": 1
+    },
+    {
+      "scope": "VOLUME_EDGE_BIN",
+      "side": "BID",
+      "event_count": 85,
+      "trade_associated_count": 0,
+      "unmatched_count": 85,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 196.68200000000007,
+      "affected_tick_count": 29,
+      "edge_visit_count": 1
+    },
+    {
+      "scope": "FIRST_OUTSIDE_BIN",
+      "side": "BID",
+      "event_count": 88,
+      "trade_associated_count": 0,
+      "unmatched_count": 88,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.14100000000000001,
+      "visible_qty_reduction": 262.979,
+      "affected_tick_count": 29,
+      "edge_visit_count": 2
+    },
+    {
+      "scope": "EXACT_LEVEL_TICK",
+      "side": "BID",
+      "event_count": 19,
+      "trade_associated_count": 0,
+      "unmatched_count": 19,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 40.816,
+      "affected_tick_count": 2,
+      "edge_visit_count": 0
+    },
+    {
+      "scope": "TPO_EDGE_BIN",
+      "side": "ASK",
+      "event_count": 22,
+      "trade_associated_count": 0,
+      "unmatched_count": 22,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.061,
+      "visible_qty_reduction": 53.61,
+      "affected_tick_count": 15,
+      "edge_visit_count": 0
+    },
+    {
+      "scope": "PROFILE_EDGE_ZONE",
+      "side": "ASK",
+      "event_count": 82,
+      "trade_associated_count": 0,
+      "unmatched_count": 82,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.078,
+      "visible_qty_reduction": 215.2260000000001,
+      "affected_tick_count": 62,
+      "edge_visit_count": 3
+    },
+    {
+      "scope": "FIRST_OUTSIDE_BIN",
+      "side": "ASK",
+      "event_count": 13,
+      "trade_associated_count": 0,
+      "unmatched_count": 13,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.20600000000000002,
+      "visible_qty_reduction": 30.092,
+      "affected_tick_count": 7,
+      "edge_visit_count": 1
+    },
+    {
+      "scope": "VOLUME_EDGE_BIN",
+      "side": "ASK",
+      "event_count": 9,
+      "trade_associated_count": 0,
+      "unmatched_count": 9,
+      "disappearance_count": 0,
+      "matched_trade_volume": 0.0,
+      "visible_qty_reduction": 27.409,
+      "affected_tick_count": 7,
+      "edge_visit_count": 1
+    }
+  ],
+  "total_events": 861
+}

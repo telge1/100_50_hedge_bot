@@ -1,0 +1,31 @@
+{
+  "contract_version": "first_outside_bin_contract_v1",
+  "interval_semantics": "[LOWER,UPPER)",
+  "price_step": 5.0,
+  "orderbook_tick_size": 0.1,
+  "edges": {
+    "UPPER": {
+      "status": "COMPUTED",
+      "price_low": 78945.0,
+      "price_high": 78950.0,
+      "price_step": 5.0,
+      "tick_low": 789450,
+      "tick_high": 789500,
+      "requested_tick_count": 51,
+      "interval_semantics": "[LOWER,UPPER)",
+      "definition": "[78945.0, 78950.0) first bin outside value area on UPPER edge"
+    },
+    "LOWER": {
+      "status": "COMPUTED",
+      "price_low": 78640.0,
+      "price_high": 78645.0,
+      "price_step": 5.0,
+      "tick_low": 786400,
+      "tick_high": 786450,
+      "requested_tick_count": 51,
+      "interval_semantics": "[LOWER,UPPER)",
+      "definition": "[78640.0, 78645.0) first bin outside value area on LOWER edge"
+    }
+  },
+  "status": "COMPUTED"
+}

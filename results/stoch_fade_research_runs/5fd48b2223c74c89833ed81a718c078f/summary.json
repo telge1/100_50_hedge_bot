@@ -1,0 +1,9 @@
+{
+  "raw_total": 7310,
+  "run_id": "5fd48b2223c74c89833ed81a718c078f",
+  "statuses": {
+    "AAVEUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1369
+}

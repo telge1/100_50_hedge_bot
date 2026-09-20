@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 358560,
+      "error": null,
+      "raw_count": 5046,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "AVAXUSDT",
+      "tier_a_count": 717,
+      "warmup_complete": true
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "all_exact": true,
+  "symbols": {
+    "BTCUSDT": {
+      "actual": {
+        "candidate_count": 120,
+        "eligible_episode_count": 19,
+        "exclusion_counts": {
+          "DUPLICATE_OR_OVERLAPPING_EPISODE": 101
+        },
+        "fingerprint": "355ceb133da88fd036001158a3aba3960bacacf1195231d01828a4b22228f28d",
+        "outcome_counts": {
+          "LOWER_FIRST": 2,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 16
+        }
+      },
+      "exact_core_fingerprint": true,
+      "exact_factual_summary": true,
+      "expected": {
+        "candidate_count": 120,
+        "eligible_episode_count": 19,
+        "exclusion_counts": {
+          "DUPLICATE_OR_OVERLAPPING_EPISODE": 101
+        },
+        "fingerprint": "355ceb133da88fd036001158a3aba3960bacacf1195231d01828a4b22228f28d",
+        "outcome_counts": {
+          "LOWER_FIRST": 2,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 16
+        }
+      },
+      "same_contract": true,
+      "same_input": true
+    },
+    "DOGEUSDT": {
+      "actual": {
+        "candidate_count": 120,
+        "eligible_episode_count": 15,
+        "exclusion_counts": {
+          "DUPLICATE_OR_OVERLAPPING_EPISODE": 105
+        },
+        "fingerprint": "4d2e3c3b832246567c2fd2fa70ebfd7e9fe2fe2fe93521807fab33e39ae90fcc",
+        "outcome_counts": {
+          "LOWER_FIRST": 4,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 10
+        }
+      },
+      "exact_core_fingerprint": true,
+      "exact_factual_summary": true,
+      "expected": {
+        "candidate_count": 120,
+        "eligible_episode_count": 15,
+        "exclusion_counts": {
+          "DUPLICATE_OR_OVERLAPPING_EPISODE": 105
+        },
+        "fingerprint": "4d2e3c3b832246567c2fd2fa70ebfd7e9fe2fe2fe93521807fab33e39ae90fcc",
+        "outcome_counts": {
+          "LOWER_FIRST": 4,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 10
+        }
+      },
+      "same_contract": true,
+      "same_input": true
+    }
+  },
+  "window": {
+    "end_utc": "2026-08-25T02:05:00Z",
+    "horizon_minutes": 60,
+    "start_utc": "2026-08-25T00:05:00Z"
+  }
+}

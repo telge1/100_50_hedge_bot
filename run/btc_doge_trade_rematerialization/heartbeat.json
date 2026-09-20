@@ -1,0 +1,11 @@
+{
+  "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+  "completed": 1794,
+  "failed": [],
+  "finished_at": "2026-09-03T10:56:51.165090Z",
+  "rows_written": 62759179,
+  "runner_pid": 1301223,
+  "skipped": 318,
+  "status": "COMPLETED",
+  "updated_at": "2026-09-03T10:56:51.173215Z"
+}

@@ -1,0 +1,9 @@
+{
+  "delta_count": 89,
+  "event_id": "BTCUSDT_20260904T004200Z_0c13abdcf9_c005",
+  "level_update_count": 17647,
+  "status": "INCOMPLETE_QUEUE_DROP",
+  "symbol": "BTCUSDT",
+  "trade_count": 0,
+  "trigger_reason": "cross_in"
+}

@@ -1,0 +1,6 @@
+PHASE 1B POST-EXPAND TARGETED TESTS
+generated_at_utc=2026-09-05T11:38:05Z
+...................                                                      [100%]
+19 passed in 0.02s
+elapsed_seconds=0.13 maxrss_kb=37820
+compile_check=PASS

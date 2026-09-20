@@ -1,0 +1,905 @@
+{
+  "fingerprints_after": {
+    "eval_manifest": {
+      "exists": true,
+      "mtime_iso": "2026-08-16T06:19:20Z",
+      "mtime_ns": 1786861160280427280,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_evaluations/1c262bf9d4f04523a8b6f61710389e0c/evaluation_manifest.json",
+      "sha256": "d7813b9b0a26ba217e48cc300a76a3cd244d26793d9d4f53208da36c3caf9d03",
+      "size_bytes": 934
+    },
+    "job_manifest": {
+      "exists": true,
+      "mtime_iso": "2026-08-15T20:09:49Z",
+      "mtime_ns": 1786824589836343725,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/job_manifest.json",
+      "sha256": "0454574de9e4b9fbd00da17d7ba87765ad098abef79949a61ddec41b453994d6",
+      "size_bytes": 3153
+    },
+    "outcomes": {
+      "exists": true,
+      "mtime_iso": "2026-08-16T06:28:47Z",
+      "mtime_ns": 1786861727055023386,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_evaluations/1c262bf9d4f04523a8b6f61710389e0c/outcomes.jsonl",
+      "sha256": "b6e4ab92859b5fa05887e5512fbb3d894f4ca6b7792fc93b9eeebe03b687ca1f",
+      "size_bytes": 72222440
+    },
+    "signal_files": {
+      "1000BONKUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000BONKUSDT/4be3c0b6f750432ba4cdf1abaa09e072/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:50:46Z",
+        "mtime_ns": 1786827046190158937,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000BONKUSDT/4be3c0b6f750432ba4cdf1abaa09e072/signals.jsonl",
+        "sha256": "0e0cc044964cc0cb3b13551ff02286eb5b9fd41e840c8fb2b8f9a1a76cf78508",
+        "size_bytes": 8344053
+      },
+      "1000PEPEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000PEPEUSDT/ae8b6bce80ac48f0bbf25aadff85326e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:23:47Z",
+        "mtime_ns": 1786825427136160257,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000PEPEUSDT/ae8b6bce80ac48f0bbf25aadff85326e/signals.jsonl",
+        "sha256": "6e23be9ab3f2de701933de8c2dbb90b789f14c7fb3d59f904dae8040ed3ec9ad",
+        "size_bytes": 8332935
+      },
+      "AAVEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AAVEUSDT/46d7739c7c8243a9836b26d66596e4e3/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:24:39Z",
+        "mtime_ns": 1786825479396710504,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AAVEUSDT/46d7739c7c8243a9836b26d66596e4e3/signals.jsonl",
+        "sha256": "9c7bec89a5e5c6233c6030f28cc3101cf69e18b7ff5add8f43330f7910abe9a9",
+        "size_bytes": 8157343
+      },
+      "ADAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ADAUSDT/19447e5213ac4c609c86894b94b6410c/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:20:17Z",
+        "mtime_ns": 1786825217623709660,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ADAUSDT/19447e5213ac4c609c86894b94b6410c/signals.jsonl",
+        "sha256": "e6657460f0b729b96c161d798b9c7a93f66da9fdeeb9b652be475fce6f5504e7",
+        "size_bytes": 8213619
+      },
+      "ALGOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ALGOUSDT/0e719b51994442c590e202963a2f3043/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:40:21Z",
+        "mtime_ns": 1786826421670468551,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ALGOUSDT/0e719b51994442c590e202963a2f3043/signals.jsonl",
+        "sha256": "ee867dda6d94a990c43b03cea774c76831991c8749407c24963f80496be4f31e",
+        "size_bytes": 8269031
+      },
+      "APTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/APTUSDT/e43886231b0d41b1bab1304f34820d9e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:35:08Z",
+        "mtime_ns": 1786826108213831265,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/APTUSDT/e43886231b0d41b1bab1304f34820d9e/signals.jsonl",
+        "sha256": "bc2acd2843d79008870f137b135e0634c66df1341f5874d87301d7bf83c9e977",
+        "size_bytes": 8255927
+      },
+      "ARBUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ARBUSDT/6c992c8981dc4b319c03b3b7ab768bf7/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:33:23Z",
+        "mtime_ns": 1786826003305344091,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ARBUSDT/6c992c8981dc4b319c03b3b7ab768bf7/signals.jsonl",
+        "sha256": "25619e115f7dee1b6f7bbd25d10fd0afa713a328d7a38b996f473ba0eec61874",
+        "size_bytes": 8217763
+      },
+      "ATOMUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ATOMUSDT/936865cb494244efbac3c863734a6a77/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:53:22Z",
+        "mtime_ns": 1786827202926620299,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ATOMUSDT/936865cb494244efbac3c863734a6a77/signals.jsonl",
+        "sha256": "a1da5a0befa0bed3def5114acca639daec0e85764da0b5f1e43cc9a2eb3f6938",
+        "size_bytes": 8277983
+      },
+      "AVAXUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AVAXUSDT/6c8cd8ca8bad4c2782b1b5c5d8474e86/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:21:09Z",
+        "mtime_ns": 1786825269964575608,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AVAXUSDT/6c8cd8ca8bad4c2782b1b5c5d8474e86/signals.jsonl",
+        "sha256": "6b77eceb4e651088c63aeb53620d11fa2282737b116032c7e48241b7bd9ea5ae",
+        "size_bytes": 8208946
+      },
+      "BNBUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BNBUSDT/fcfb71df2e27451fab416a5545fb3f3e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:18:32Z",
+        "mtime_ns": 1786825112594979344,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BNBUSDT/fcfb71df2e27451fab416a5545fb3f3e/signals.jsonl",
+        "sha256": "77f609a5a8880d9f2333aa5c72837197b63691bc1ec303c9e588b4a03bbc83bc",
+        "size_bytes": 8166515
+      },
+      "BTCUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BTCUSDT/a25ebeecd2d14aadbe1118914f3ce2b1/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:11:34Z",
+        "mtime_ns": 1786824694304066987,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BTCUSDT/a25ebeecd2d14aadbe1118914f3ce2b1/signals.jsonl",
+        "sha256": "40fe09a910f8b4923df6e2594e0ff2008c8faf96d0c5e360b22ca1aa93fb79e9",
+        "size_bytes": 8242677
+      },
+      "CRVUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/CRVUSDT/302cf98dc7de4033b14abef3cc296f5d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:44:43Z",
+        "mtime_ns": 1786826683716455972,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/CRVUSDT/302cf98dc7de4033b14abef3cc296f5d/signals.jsonl",
+        "sha256": "70d27d28dc2f42553efa5098d2f92838ac7e6f004514f4b18899f5597b9add26",
+        "size_bytes": 8256250
+      },
+      "DOGEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOGEUSDT/a76213e4fe2a429880827735cce57692/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:17:40Z",
+        "mtime_ns": 1786825060994112226,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOGEUSDT/a76213e4fe2a429880827735cce57692/signals.jsonl",
+        "sha256": "ca250bfc9223a6751959ebe9fc5a17c0f85d5c2cfe8de094c1681b458a35fef7",
+        "size_bytes": 8283849
+      },
+      "DOTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOTUSDT/4dd30d01823d42c5b1192d2c6eea0f44/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:27:16Z",
+        "mtime_ns": 1786825636294513783,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOTUSDT/4dd30d01823d42c5b1192d2c6eea0f44/signals.jsonl",
+        "sha256": "48f057663b8fa693062641496aef86c7479fdfb6c3b5d92fc23c42a046479210",
+        "size_bytes": 8269149
+      },
+      "ENAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ENAUSDT/86ef47a0e8144c588abf32785b6a314d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:29:53Z",
+        "mtime_ns": 1786825793779495748,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ENAUSDT/86ef47a0e8144c588abf32785b6a314d/signals.jsonl",
+        "sha256": "7da78bdba6c52b30d0b6906109721432da20c1804fe850095f4114b3e7962f31",
+        "size_bytes": 8306889
+      },
+      "ETHUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ETHUSDT/0981eb6948ea4c7789432cf7d81ece39/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:10:41Z",
+        "mtime_ns": 1786824641822205674,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ETHUSDT/0981eb6948ea4c7789432cf7d81ece39/signals.jsonl",
+        "sha256": "a4d2e4fca5e1ddd035d9ac082a18f8d9921c7d38785fba7ad1f645b1a82e4686",
+        "size_bytes": 8269161
+      },
+      "FARTCOINUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/FARTCOINUSDT/6c03a73ed8494aa489c5b721abf5831d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:38:36Z",
+        "mtime_ns": 1786826316687902027,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/FARTCOINUSDT/6c03a73ed8494aa489c5b721abf5831d/signals.jsonl",
+        "sha256": "1459bf03023e4d96b06c2040c86666bfe5a8e1249e04a857a12b573b7bf2760b",
+        "size_bytes": 8234908
+      },
+      "HBARUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HBARUSDT/1215dd0365504b99b901ffd02c99acb4/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:32:31Z",
+        "mtime_ns": 1786825951250612725,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HBARUSDT/1215dd0365504b99b901ffd02c99acb4/signals.jsonl",
+        "sha256": "dae1b25f3ec523c69dd1ef7c9b57b8d310bb0dde7a8e95326f806e9bd09b275e",
+        "size_bytes": 8244517
+      },
+      "HYPEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HYPEUSDT/8c37ce8e94e64cd68fbc2f26a85747bb/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:14:11Z",
+        "mtime_ns": 1786824851106656067,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HYPEUSDT/8c37ce8e94e64cd68fbc2f26a85747bb/signals.jsonl",
+        "sha256": "accf1198d2bc27ddf4ac6f70a066c03276634de3b97291206ebfdde91d33ac94",
+        "size_bytes": 8289650
+      },
+      "ICPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ICPUSDT/e625e7a1376340d7a4a21820699883e0/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:48:12Z",
+        "mtime_ns": 1786826892894696892,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ICPUSDT/e625e7a1376340d7a4a21820699883e0/signals.jsonl",
+        "sha256": "5c625c963027846895aa301397426ecd3a5f0efe90e39d3ed95f04890348b9e1",
+        "size_bytes": 8201299
+      },
+      "INJUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/INJUSDT/c2779bce88bf48b59bf8e3a3472fe28d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:45:36Z",
+        "mtime_ns": 1786826736260261997,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/INJUSDT/c2779bce88bf48b59bf8e3a3472fe28d/signals.jsonl",
+        "sha256": "f83a02c313d7b0d379288a1075cdf2c7b90c7ef8ab74aac47f4b896c93c6d876",
+        "size_bytes": 8232917
+      },
+      "JTOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/JTOUSDT/c231fd7b25954ee9b1d98fe8b754d034/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:46:28Z",
+        "mtime_ns": 1786826788616071067,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/JTOUSDT/c231fd7b25954ee9b1d98fe8b754d034/signals.jsonl",
+        "sha256": "b7deb820a1d11ff5cde2179c5102d953e585fdf5c0f13a70cd55b61ae7881434",
+        "size_bytes": 8244307
+      },
+      "KAITOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/KAITOUSDT/93ad89e0ab154121a3f8332f956e2976/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:39:29Z",
+        "mtime_ns": 1786826369530681420,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/KAITOUSDT/93ad89e0ab154121a3f8332f956e2976/signals.jsonl",
+        "sha256": "23aa8b6253b891fd7d1a0c5636d97b0bb24ba4b7651dc27c82c4745b063d28cc",
+        "size_bytes": 8335462
+      },
+      "LINKUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LINKUSDT/ca7f9c39ec07409bb5e7498a7d9eb739/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:16:48Z",
+        "mtime_ns": 1786825008894246689,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LINKUSDT/ca7f9c39ec07409bb5e7498a7d9eb739/signals.jsonl",
+        "sha256": "f0fa56692b77470c11aa7716551086dce005281f904815a3f444032c4e3d24b5",
+        "size_bytes": 8247714
+      },
+      "LITUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LITUSDT/1bc418bfa47140bbbb6307b8eb38f150/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:49:02Z",
+        "mtime_ns": 1786826942134522679,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LITUSDT/1bc418bfa47140bbbb6307b8eb38f150/signals.jsonl",
+        "sha256": "4a42feda67e68ff371d7bbfe84c14e485c335079a51bad9989dbf2dce3944593",
+        "size_bytes": 8246336
+      },
+      "LTCUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LTCUSDT/c02fccc1a6a2496ea6d88a4e96946921/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:25:31Z",
+        "mtime_ns": 1786825531717287563,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LTCUSDT/c02fccc1a6a2496ea6d88a4e96946921/signals.jsonl",
+        "sha256": "65a6707d44b6f11966e6ae5308daea332a94a372945a0cca04e5c474655915bb",
+        "size_bytes": 8295328
+      },
+      "MNTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/MNTUSDT/3d066a76bf814d69b015d57b11f116e8/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:42:59Z",
+        "mtime_ns": 1786826579250849683,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/MNTUSDT/3d066a76bf814d69b015d57b11f116e8/signals.jsonl",
+        "sha256": "53bf1a4cbca2ac701d1905ce287de6e8b5dd39c4a97faef49332f66f220d3ef4",
+        "size_bytes": 8167322
+      },
+      "NEARUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/NEARUSDT/6a20dc05cf55409baa712cca6d28baca/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:30:46Z",
+        "mtime_ns": 1786825846956184482,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/NEARUSDT/6a20dc05cf55409baa712cca6d28baca/signals.jsonl",
+        "sha256": "52d8d3fd75f5ac13fb5953c8f887a2d050835d7b5e3d786a9b03e8b75b8d6c97",
+        "size_bytes": 8275196
+      },
+      "ONDOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ONDOUSDT/6bc3deb79ebc4822ac58bed7fcd5adc0/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:22:54Z",
+        "mtime_ns": 1786825374612308164,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ONDOUSDT/6bc3deb79ebc4822ac58bed7fcd5adc0/signals.jsonl",
+        "sha256": "7eaad87ddcd6c08b004d5901f212f5d823da0a11971010b8f85f64f1b7b684ce",
+        "size_bytes": 8164468
+      },
+      "OPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/OPUSDT/ce9ebc98902140019a36843015a7dfd2/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:37:44Z",
+        "mtime_ns": 1786826264564124947,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/OPUSDT/ce9ebc98902140019a36843015a7dfd2/signals.jsonl",
+        "sha256": "f85c20c0ee6f1532b4b4f898284b1366cbe354add1c69e13191c30352749027c",
+        "size_bytes": 8340858
+      },
+      "PAXGUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PAXGUSDT/62c3f8080ce048ad92d953869f67c1c1/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:34:15Z",
+        "mtime_ns": 1786826055719083422,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PAXGUSDT/62c3f8080ce048ad92d953869f67c1c1/signals.jsonl",
+        "sha256": "bfc258c2ce80947365e01308aff087f2251e1cfe24630df9aa17b7c88b8ee234",
+        "size_bytes": 8159942
+      },
+      "PENGUUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PENGUUSDT/256580b3645c422e9be1133f7c94ffae/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:36:00Z",
+        "mtime_ns": 1786826160038590227,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PENGUUSDT/256580b3645c422e9be1133f7c94ffae/signals.jsonl",
+        "sha256": "83f9465a78c4683c022695b2e3cb104b5c235e0dad61c051a6165212afb9ca2a",
+        "size_bytes": 8270380
+      },
+      "PUMPFUNUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PUMPFUNUSDT/4878fcf304be4a7d9241b244f74b01b9/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:22:02Z",
+        "mtime_ns": 1786825322196442029,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PUMPFUNUSDT/4878fcf304be4a7d9241b244f74b01b9/signals.jsonl",
+        "sha256": "312188bdcb19706e32697e3a1a6c39cddd3005cfaae036a0d8a2e76b055ccc32",
+        "size_bytes": 8401068
+      },
+      "RENDERUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/RENDERUSDT/9329f3ac174542e8829f7b63cd50013c/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:54:14Z",
+        "mtime_ns": 1786827254471445141,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/RENDERUSDT/9329f3ac174542e8829f7b63cd50013c/signals.jsonl",
+        "sha256": "0f10ec82542cdc38c1fe2636cd0f38cf084e6b1511a9775c69de169676066580",
+        "size_bytes": 8222196
+      },
+      "SHIB1000USDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SHIB1000USDT/1b2487532e5e4cbbaa9761c9df40dd63/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:31:39Z",
+        "mtime_ns": 1786825899032893011,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SHIB1000USDT/1b2487532e5e4cbbaa9761c9df40dd63/signals.jsonl",
+        "sha256": "7dbd40d7db64ffa2eee88f38acec08ea2b514958f941813b8f6e67c480c27fd5",
+        "size_bytes": 8291445
+      },
+      "SOLUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SOLUSDT/22193efa3c3d49eba8db949c9104fde4/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:13:18Z",
+        "mtime_ns": 1786824798318793885,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SOLUSDT/22193efa3c3d49eba8db949c9104fde4/signals.jsonl",
+        "sha256": "f31d67215f5a601f3ef07216f8ed264c0f87d511a4cd71e599baf749ba699137",
+        "size_bytes": 8125334
+      },
+      "SUIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SUIUSDT/f53d1fb055cb4212a02d547a8a7c933e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:19:25Z",
+        "mtime_ns": 1786825165397843638,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SUIUSDT/f53d1fb055cb4212a02d547a8a7c933e/signals.jsonl",
+        "sha256": "06809e68beed077310a4324aac065b704ff1bebb5660f4dc0a12c50547baa44f",
+        "size_bytes": 8216038
+      },
+      "TAOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TAOUSDT/047b5e7e1f8741118fad13891aa500d2/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:26:23Z",
+        "mtime_ns": 1786825583959889883,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TAOUSDT/047b5e7e1f8741118fad13891aa500d2/signals.jsonl",
+        "sha256": "601d64c08e1bfc4523397158df72f554891a938e5afb5a527273e4df7ecbf41d",
+        "size_bytes": 8273677
+      },
+      "TIAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TIAUSDT/37f2b391a8634964adffd6757e51f3bc/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:49:53Z",
+        "mtime_ns": 1786826993883341084,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TIAUSDT/37f2b391a8634964adffd6757e51f3bc/signals.jsonl",
+        "sha256": "58d52bb35d9eb6a9ed424e60338d046a3e41cf911e4ad95fbd3282506c3e9d38",
+        "size_bytes": 8233892
+      },
+      "TRUMPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRUMPUSDT/a6be400b119b4defb4bf08d0613e9244/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:51:38Z",
+        "mtime_ns": 1786827098169979193,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRUMPUSDT/a6be400b119b4defb4bf08d0613e9244/signals.jsonl",
+        "sha256": "be0c8755193948a43d3f594b25d89b938fbc5d81cc91dcc296a0d3415c146071",
+        "size_bytes": 8215730
+      },
+      "TRXUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRXUSDT/7eaac9697dc849028dd3d2659a22d6c6/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:29:01Z",
+        "mtime_ns": 1786825741130818967,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRXUSDT/7eaac9697dc849028dd3d2659a22d6c6/signals.jsonl",
+        "sha256": "09cc751bb50d170b6893628f48705c4f7cd620548bc5c7d990cc664b3658ef1b",
+        "size_bytes": 8205392
+      },
+      "UNIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/UNIUSDT/6ec0ecb1d3fd4f91b1cabb839eecb9fd/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:36:52Z",
+        "mtime_ns": 1786826212051355445,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/UNIUSDT/6ec0ecb1d3fd4f91b1cabb839eecb9fd/signals.jsonl",
+        "sha256": "2a7173d97da0fde7d4d6922e25789ec1b294d9ea8ef5efb7048601b1a5529a22",
+        "size_bytes": 8171797
+      },
+      "WIFUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WIFUSDT/9042da33e62f4eb3acc3b6edc7dbfa64/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:52:30Z",
+        "mtime_ns": 1786827150649798876,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WIFUSDT/9042da33e62f4eb3acc3b6edc7dbfa64/signals.jsonl",
+        "sha256": "745cbd6e8b77a6ea2eeac5a58d7243a8739b4617be125a652f2d3c5410861ed8",
+        "size_bytes": 8267357
+      },
+      "WLDUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLDUSDT/4dedf7f3f7644aa7b6c84653a75c6519/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:28:08Z",
+        "mtime_ns": 1786825688808156626,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLDUSDT/4dedf7f3f7644aa7b6c84653a75c6519/signals.jsonl",
+        "sha256": "ef56e5d321da7937a05196bc4e14b45dc2b924887fe16e99a1fa76f458606f1e",
+        "size_bytes": 8180512
+      },
+      "WLFIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLFIUSDT/135832cc06fb4b8190550c8eba5a4830/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:43:51Z",
+        "mtime_ns": 1786826631439651562,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLFIUSDT/135832cc06fb4b8190550c8eba5a4830/signals.jsonl",
+        "sha256": "dc34564839b18dca1ab66e49736bf142384bee4e75c7c266d93ad2695b13be5c",
+        "size_bytes": 8351833
+      },
+      "XAUTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XAUTUSDT/05d29f58f9a541a4a13db2029dcc5d11/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:15:03Z",
+        "mtime_ns": 1786824903338520154,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XAUTUSDT/05d29f58f9a541a4a13db2029dcc5d11/signals.jsonl",
+        "sha256": "6cc0d4e7833931f3ea97cc388f5b5fdba1549fb0392df2e3ff1aadc061633e4d",
+        "size_bytes": 8249166
+      },
+      "XLMUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XLMUSDT/57029bc7147947ed8d1063e573768222/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:42:07Z",
+        "mtime_ns": 1786826527145050649,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XLMUSDT/57029bc7147947ed8d1063e573768222/signals.jsonl",
+        "sha256": "0d33a098958eea05f5d4be929b10742fcd098393b0527b427fe1a4aa8bc52a9f",
+        "size_bytes": 8291629
+      },
+      "XMRUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XMRUSDT/3c6f3f3105344731b9a6bf69b5996837/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:41:14Z",
+        "mtime_ns": 1786826474432257517,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XMRUSDT/3c6f3f3105344731b9a6bf69b5996837/signals.jsonl",
+        "sha256": "3a856c35728af83bf631a5bd7e3c2428d55aa84676593290954cd2c5dc473c21",
+        "size_bytes": 8286310
+      },
+      "XPLUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XPLUSDT/bf944be1388b462ba7b117c64c75f196/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:47:20Z",
+        "mtime_ns": 1786826840598883593,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XPLUSDT/bf944be1388b462ba7b117c64c75f196/signals.jsonl",
+        "sha256": "132d67dc173caae3ac4f5101d64f5ab7467aa3a304eb268d59b123e95269a799",
+        "size_bytes": 8264411
+      },
+      "XRPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XRPUSDT/bd15906577ce4c989a4bf4ef7e891007/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:12:26Z",
+        "mtime_ns": 1786824746338930090,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XRPUSDT/bd15906577ce4c989a4bf4ef7e891007/signals.jsonl",
+        "sha256": "aa1b23a44242384e178e85f4b4fd6478f86e0c9c4f5ac748595fa2dcfcbdb478",
+        "size_bytes": 8247156
+      },
+      "ZECUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ZECUSDT/60c64306f91c4c56a991e32a89342af6/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:15:56Z",
+        "mtime_ns": 1786824956318382714,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ZECUSDT/60c64306f91c4c56a991e32a89342af6/signals.jsonl",
+        "sha256": "78daaaf12b64e1d4d900ca849bb8ce72963000864767954f61454c5ddbc7787a",
+        "size_bytes": 8245028
+      }
+    }
+  },
+  "fingerprints_before": {
+    "eval_manifest": {
+      "exists": true,
+      "mtime_iso": "2026-08-16T06:19:20Z",
+      "mtime_ns": 1786861160280427280,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_evaluations/1c262bf9d4f04523a8b6f61710389e0c/evaluation_manifest.json",
+      "sha256": "d7813b9b0a26ba217e48cc300a76a3cd244d26793d9d4f53208da36c3caf9d03",
+      "size_bytes": 934
+    },
+    "job_manifest": {
+      "exists": true,
+      "mtime_iso": "2026-08-15T20:09:49Z",
+      "mtime_ns": 1786824589836343725,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/job_manifest.json",
+      "sha256": "0454574de9e4b9fbd00da17d7ba87765ad098abef79949a61ddec41b453994d6",
+      "size_bytes": 3153
+    },
+    "outcomes": {
+      "exists": true,
+      "mtime_iso": "2026-08-16T06:28:47Z",
+      "mtime_ns": 1786861727055023386,
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_evaluations/1c262bf9d4f04523a8b6f61710389e0c/outcomes.jsonl",
+      "sha256": "b6e4ab92859b5fa05887e5512fbb3d894f4ca6b7792fc93b9eeebe03b687ca1f",
+      "size_bytes": 72222440
+    },
+    "signal_files": {
+      "1000BONKUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000BONKUSDT/4be3c0b6f750432ba4cdf1abaa09e072/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:50:46Z",
+        "mtime_ns": 1786827046190158937,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000BONKUSDT/4be3c0b6f750432ba4cdf1abaa09e072/signals.jsonl",
+        "sha256": "0e0cc044964cc0cb3b13551ff02286eb5b9fd41e840c8fb2b8f9a1a76cf78508",
+        "size_bytes": 8344053
+      },
+      "1000PEPEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000PEPEUSDT/ae8b6bce80ac48f0bbf25aadff85326e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:23:47Z",
+        "mtime_ns": 1786825427136160257,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/1000PEPEUSDT/ae8b6bce80ac48f0bbf25aadff85326e/signals.jsonl",
+        "sha256": "6e23be9ab3f2de701933de8c2dbb90b789f14c7fb3d59f904dae8040ed3ec9ad",
+        "size_bytes": 8332935
+      },
+      "AAVEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AAVEUSDT/46d7739c7c8243a9836b26d66596e4e3/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:24:39Z",
+        "mtime_ns": 1786825479396710504,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AAVEUSDT/46d7739c7c8243a9836b26d66596e4e3/signals.jsonl",
+        "sha256": "9c7bec89a5e5c6233c6030f28cc3101cf69e18b7ff5add8f43330f7910abe9a9",
+        "size_bytes": 8157343
+      },
+      "ADAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ADAUSDT/19447e5213ac4c609c86894b94b6410c/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:20:17Z",
+        "mtime_ns": 1786825217623709660,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ADAUSDT/19447e5213ac4c609c86894b94b6410c/signals.jsonl",
+        "sha256": "e6657460f0b729b96c161d798b9c7a93f66da9fdeeb9b652be475fce6f5504e7",
+        "size_bytes": 8213619
+      },
+      "ALGOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ALGOUSDT/0e719b51994442c590e202963a2f3043/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:40:21Z",
+        "mtime_ns": 1786826421670468551,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ALGOUSDT/0e719b51994442c590e202963a2f3043/signals.jsonl",
+        "sha256": "ee867dda6d94a990c43b03cea774c76831991c8749407c24963f80496be4f31e",
+        "size_bytes": 8269031
+      },
+      "APTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/APTUSDT/e43886231b0d41b1bab1304f34820d9e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:35:08Z",
+        "mtime_ns": 1786826108213831265,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/APTUSDT/e43886231b0d41b1bab1304f34820d9e/signals.jsonl",
+        "sha256": "bc2acd2843d79008870f137b135e0634c66df1341f5874d87301d7bf83c9e977",
+        "size_bytes": 8255927
+      },
+      "ARBUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ARBUSDT/6c992c8981dc4b319c03b3b7ab768bf7/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:33:23Z",
+        "mtime_ns": 1786826003305344091,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ARBUSDT/6c992c8981dc4b319c03b3b7ab768bf7/signals.jsonl",
+        "sha256": "25619e115f7dee1b6f7bbd25d10fd0afa713a328d7a38b996f473ba0eec61874",
+        "size_bytes": 8217763
+      },
+      "ATOMUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ATOMUSDT/936865cb494244efbac3c863734a6a77/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:53:22Z",
+        "mtime_ns": 1786827202926620299,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ATOMUSDT/936865cb494244efbac3c863734a6a77/signals.jsonl",
+        "sha256": "a1da5a0befa0bed3def5114acca639daec0e85764da0b5f1e43cc9a2eb3f6938",
+        "size_bytes": 8277983
+      },
+      "AVAXUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AVAXUSDT/6c8cd8ca8bad4c2782b1b5c5d8474e86/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:21:09Z",
+        "mtime_ns": 1786825269964575608,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/AVAXUSDT/6c8cd8ca8bad4c2782b1b5c5d8474e86/signals.jsonl",
+        "sha256": "6b77eceb4e651088c63aeb53620d11fa2282737b116032c7e48241b7bd9ea5ae",
+        "size_bytes": 8208946
+      },
+      "BNBUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BNBUSDT/fcfb71df2e27451fab416a5545fb3f3e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:18:32Z",
+        "mtime_ns": 1786825112594979344,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BNBUSDT/fcfb71df2e27451fab416a5545fb3f3e/signals.jsonl",
+        "sha256": "77f609a5a8880d9f2333aa5c72837197b63691bc1ec303c9e588b4a03bbc83bc",
+        "size_bytes": 8166515
+      },
+      "BTCUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BTCUSDT/a25ebeecd2d14aadbe1118914f3ce2b1/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:11:34Z",
+        "mtime_ns": 1786824694304066987,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/BTCUSDT/a25ebeecd2d14aadbe1118914f3ce2b1/signals.jsonl",
+        "sha256": "40fe09a910f8b4923df6e2594e0ff2008c8faf96d0c5e360b22ca1aa93fb79e9",
+        "size_bytes": 8242677
+      },
+      "CRVUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/CRVUSDT/302cf98dc7de4033b14abef3cc296f5d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:44:43Z",
+        "mtime_ns": 1786826683716455972,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/CRVUSDT/302cf98dc7de4033b14abef3cc296f5d/signals.jsonl",
+        "sha256": "70d27d28dc2f42553efa5098d2f92838ac7e6f004514f4b18899f5597b9add26",
+        "size_bytes": 8256250
+      },
+      "DOGEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOGEUSDT/a76213e4fe2a429880827735cce57692/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:17:40Z",
+        "mtime_ns": 1786825060994112226,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOGEUSDT/a76213e4fe2a429880827735cce57692/signals.jsonl",
+        "sha256": "ca250bfc9223a6751959ebe9fc5a17c0f85d5c2cfe8de094c1681b458a35fef7",
+        "size_bytes": 8283849
+      },
+      "DOTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOTUSDT/4dd30d01823d42c5b1192d2c6eea0f44/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:27:16Z",
+        "mtime_ns": 1786825636294513783,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/DOTUSDT/4dd30d01823d42c5b1192d2c6eea0f44/signals.jsonl",
+        "sha256": "48f057663b8fa693062641496aef86c7479fdfb6c3b5d92fc23c42a046479210",
+        "size_bytes": 8269149
+      },
+      "ENAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ENAUSDT/86ef47a0e8144c588abf32785b6a314d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:29:53Z",
+        "mtime_ns": 1786825793779495748,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ENAUSDT/86ef47a0e8144c588abf32785b6a314d/signals.jsonl",
+        "sha256": "7da78bdba6c52b30d0b6906109721432da20c1804fe850095f4114b3e7962f31",
+        "size_bytes": 8306889
+      },
+      "ETHUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ETHUSDT/0981eb6948ea4c7789432cf7d81ece39/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:10:41Z",
+        "mtime_ns": 1786824641822205674,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ETHUSDT/0981eb6948ea4c7789432cf7d81ece39/signals.jsonl",
+        "sha256": "a4d2e4fca5e1ddd035d9ac082a18f8d9921c7d38785fba7ad1f645b1a82e4686",
+        "size_bytes": 8269161
+      },
+      "FARTCOINUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/FARTCOINUSDT/6c03a73ed8494aa489c5b721abf5831d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:38:36Z",
+        "mtime_ns": 1786826316687902027,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/FARTCOINUSDT/6c03a73ed8494aa489c5b721abf5831d/signals.jsonl",
+        "sha256": "1459bf03023e4d96b06c2040c86666bfe5a8e1249e04a857a12b573b7bf2760b",
+        "size_bytes": 8234908
+      },
+      "HBARUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HBARUSDT/1215dd0365504b99b901ffd02c99acb4/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:32:31Z",
+        "mtime_ns": 1786825951250612725,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HBARUSDT/1215dd0365504b99b901ffd02c99acb4/signals.jsonl",
+        "sha256": "dae1b25f3ec523c69dd1ef7c9b57b8d310bb0dde7a8e95326f806e9bd09b275e",
+        "size_bytes": 8244517
+      },
+      "HYPEUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HYPEUSDT/8c37ce8e94e64cd68fbc2f26a85747bb/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:14:11Z",
+        "mtime_ns": 1786824851106656067,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/HYPEUSDT/8c37ce8e94e64cd68fbc2f26a85747bb/signals.jsonl",
+        "sha256": "accf1198d2bc27ddf4ac6f70a066c03276634de3b97291206ebfdde91d33ac94",
+        "size_bytes": 8289650
+      },
+      "ICPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ICPUSDT/e625e7a1376340d7a4a21820699883e0/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:48:12Z",
+        "mtime_ns": 1786826892894696892,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ICPUSDT/e625e7a1376340d7a4a21820699883e0/signals.jsonl",
+        "sha256": "5c625c963027846895aa301397426ecd3a5f0efe90e39d3ed95f04890348b9e1",
+        "size_bytes": 8201299
+      },
+      "INJUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/INJUSDT/c2779bce88bf48b59bf8e3a3472fe28d/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:45:36Z",
+        "mtime_ns": 1786826736260261997,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/INJUSDT/c2779bce88bf48b59bf8e3a3472fe28d/signals.jsonl",
+        "sha256": "f83a02c313d7b0d379288a1075cdf2c7b90c7ef8ab74aac47f4b896c93c6d876",
+        "size_bytes": 8232917
+      },
+      "JTOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/JTOUSDT/c231fd7b25954ee9b1d98fe8b754d034/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:46:28Z",
+        "mtime_ns": 1786826788616071067,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/JTOUSDT/c231fd7b25954ee9b1d98fe8b754d034/signals.jsonl",
+        "sha256": "b7deb820a1d11ff5cde2179c5102d953e585fdf5c0f13a70cd55b61ae7881434",
+        "size_bytes": 8244307
+      },
+      "KAITOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/KAITOUSDT/93ad89e0ab154121a3f8332f956e2976/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:39:29Z",
+        "mtime_ns": 1786826369530681420,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/KAITOUSDT/93ad89e0ab154121a3f8332f956e2976/signals.jsonl",
+        "sha256": "23aa8b6253b891fd7d1a0c5636d97b0bb24ba4b7651dc27c82c4745b063d28cc",
+        "size_bytes": 8335462
+      },
+      "LINKUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LINKUSDT/ca7f9c39ec07409bb5e7498a7d9eb739/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:16:48Z",
+        "mtime_ns": 1786825008894246689,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LINKUSDT/ca7f9c39ec07409bb5e7498a7d9eb739/signals.jsonl",
+        "sha256": "f0fa56692b77470c11aa7716551086dce005281f904815a3f444032c4e3d24b5",
+        "size_bytes": 8247714
+      },
+      "LITUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LITUSDT/1bc418bfa47140bbbb6307b8eb38f150/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:49:02Z",
+        "mtime_ns": 1786826942134522679,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LITUSDT/1bc418bfa47140bbbb6307b8eb38f150/signals.jsonl",
+        "sha256": "4a42feda67e68ff371d7bbfe84c14e485c335079a51bad9989dbf2dce3944593",
+        "size_bytes": 8246336
+      },
+      "LTCUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LTCUSDT/c02fccc1a6a2496ea6d88a4e96946921/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:25:31Z",
+        "mtime_ns": 1786825531717287563,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/LTCUSDT/c02fccc1a6a2496ea6d88a4e96946921/signals.jsonl",
+        "sha256": "65a6707d44b6f11966e6ae5308daea332a94a372945a0cca04e5c474655915bb",
+        "size_bytes": 8295328
+      },
+      "MNTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/MNTUSDT/3d066a76bf814d69b015d57b11f116e8/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:42:59Z",
+        "mtime_ns": 1786826579250849683,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/MNTUSDT/3d066a76bf814d69b015d57b11f116e8/signals.jsonl",
+        "sha256": "53bf1a4cbca2ac701d1905ce287de6e8b5dd39c4a97faef49332f66f220d3ef4",
+        "size_bytes": 8167322
+      },
+      "NEARUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/NEARUSDT/6a20dc05cf55409baa712cca6d28baca/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:30:46Z",
+        "mtime_ns": 1786825846956184482,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/NEARUSDT/6a20dc05cf55409baa712cca6d28baca/signals.jsonl",
+        "sha256": "52d8d3fd75f5ac13fb5953c8f887a2d050835d7b5e3d786a9b03e8b75b8d6c97",
+        "size_bytes": 8275196
+      },
+      "ONDOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ONDOUSDT/6bc3deb79ebc4822ac58bed7fcd5adc0/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:22:54Z",
+        "mtime_ns": 1786825374612308164,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ONDOUSDT/6bc3deb79ebc4822ac58bed7fcd5adc0/signals.jsonl",
+        "sha256": "7eaad87ddcd6c08b004d5901f212f5d823da0a11971010b8f85f64f1b7b684ce",
+        "size_bytes": 8164468
+      },
+      "OPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/OPUSDT/ce9ebc98902140019a36843015a7dfd2/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:37:44Z",
+        "mtime_ns": 1786826264564124947,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/OPUSDT/ce9ebc98902140019a36843015a7dfd2/signals.jsonl",
+        "sha256": "f85c20c0ee6f1532b4b4f898284b1366cbe354add1c69e13191c30352749027c",
+        "size_bytes": 8340858
+      },
+      "PAXGUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PAXGUSDT/62c3f8080ce048ad92d953869f67c1c1/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:34:15Z",
+        "mtime_ns": 1786826055719083422,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PAXGUSDT/62c3f8080ce048ad92d953869f67c1c1/signals.jsonl",
+        "sha256": "bfc258c2ce80947365e01308aff087f2251e1cfe24630df9aa17b7c88b8ee234",
+        "size_bytes": 8159942
+      },
+      "PENGUUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PENGUUSDT/256580b3645c422e9be1133f7c94ffae/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:36:00Z",
+        "mtime_ns": 1786826160038590227,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PENGUUSDT/256580b3645c422e9be1133f7c94ffae/signals.jsonl",
+        "sha256": "83f9465a78c4683c022695b2e3cb104b5c235e0dad61c051a6165212afb9ca2a",
+        "size_bytes": 8270380
+      },
+      "PUMPFUNUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PUMPFUNUSDT/4878fcf304be4a7d9241b244f74b01b9/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:22:02Z",
+        "mtime_ns": 1786825322196442029,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/PUMPFUNUSDT/4878fcf304be4a7d9241b244f74b01b9/signals.jsonl",
+        "sha256": "312188bdcb19706e32697e3a1a6c39cddd3005cfaae036a0d8a2e76b055ccc32",
+        "size_bytes": 8401068
+      },
+      "RENDERUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/RENDERUSDT/9329f3ac174542e8829f7b63cd50013c/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:54:14Z",
+        "mtime_ns": 1786827254471445141,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/RENDERUSDT/9329f3ac174542e8829f7b63cd50013c/signals.jsonl",
+        "sha256": "0f10ec82542cdc38c1fe2636cd0f38cf084e6b1511a9775c69de169676066580",
+        "size_bytes": 8222196
+      },
+      "SHIB1000USDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SHIB1000USDT/1b2487532e5e4cbbaa9761c9df40dd63/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:31:39Z",
+        "mtime_ns": 1786825899032893011,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SHIB1000USDT/1b2487532e5e4cbbaa9761c9df40dd63/signals.jsonl",
+        "sha256": "7dbd40d7db64ffa2eee88f38acec08ea2b514958f941813b8f6e67c480c27fd5",
+        "size_bytes": 8291445
+      },
+      "SOLUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SOLUSDT/22193efa3c3d49eba8db949c9104fde4/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:13:18Z",
+        "mtime_ns": 1786824798318793885,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SOLUSDT/22193efa3c3d49eba8db949c9104fde4/signals.jsonl",
+        "sha256": "f31d67215f5a601f3ef07216f8ed264c0f87d511a4cd71e599baf749ba699137",
+        "size_bytes": 8125334
+      },
+      "SUIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SUIUSDT/f53d1fb055cb4212a02d547a8a7c933e/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:19:25Z",
+        "mtime_ns": 1786825165397843638,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/SUIUSDT/f53d1fb055cb4212a02d547a8a7c933e/signals.jsonl",
+        "sha256": "06809e68beed077310a4324aac065b704ff1bebb5660f4dc0a12c50547baa44f",
+        "size_bytes": 8216038
+      },
+      "TAOUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TAOUSDT/047b5e7e1f8741118fad13891aa500d2/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:26:23Z",
+        "mtime_ns": 1786825583959889883,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TAOUSDT/047b5e7e1f8741118fad13891aa500d2/signals.jsonl",
+        "sha256": "601d64c08e1bfc4523397158df72f554891a938e5afb5a527273e4df7ecbf41d",
+        "size_bytes": 8273677
+      },
+      "TIAUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TIAUSDT/37f2b391a8634964adffd6757e51f3bc/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:49:53Z",
+        "mtime_ns": 1786826993883341084,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TIAUSDT/37f2b391a8634964adffd6757e51f3bc/signals.jsonl",
+        "sha256": "58d52bb35d9eb6a9ed424e60338d046a3e41cf911e4ad95fbd3282506c3e9d38",
+        "size_bytes": 8233892
+      },
+      "TRUMPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRUMPUSDT/a6be400b119b4defb4bf08d0613e9244/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:51:38Z",
+        "mtime_ns": 1786827098169979193,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRUMPUSDT/a6be400b119b4defb4bf08d0613e9244/signals.jsonl",
+        "sha256": "be0c8755193948a43d3f594b25d89b938fbc5d81cc91dcc296a0d3415c146071",
+        "size_bytes": 8215730
+      },
+      "TRXUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRXUSDT/7eaac9697dc849028dd3d2659a22d6c6/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:29:01Z",
+        "mtime_ns": 1786825741130818967,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/TRXUSDT/7eaac9697dc849028dd3d2659a22d6c6/signals.jsonl",
+        "sha256": "09cc751bb50d170b6893628f48705c4f7cd620548bc5c7d990cc664b3658ef1b",
+        "size_bytes": 8205392
+      },
+      "UNIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/UNIUSDT/6ec0ecb1d3fd4f91b1cabb839eecb9fd/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:36:52Z",
+        "mtime_ns": 1786826212051355445,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/UNIUSDT/6ec0ecb1d3fd4f91b1cabb839eecb9fd/signals.jsonl",
+        "sha256": "2a7173d97da0fde7d4d6922e25789ec1b294d9ea8ef5efb7048601b1a5529a22",
+        "size_bytes": 8171797
+      },
+      "WIFUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WIFUSDT/9042da33e62f4eb3acc3b6edc7dbfa64/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:52:30Z",
+        "mtime_ns": 1786827150649798876,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WIFUSDT/9042da33e62f4eb3acc3b6edc7dbfa64/signals.jsonl",
+        "sha256": "745cbd6e8b77a6ea2eeac5a58d7243a8739b4617be125a652f2d3c5410861ed8",
+        "size_bytes": 8267357
+      },
+      "WLDUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLDUSDT/4dedf7f3f7644aa7b6c84653a75c6519/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:28:08Z",
+        "mtime_ns": 1786825688808156626,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLDUSDT/4dedf7f3f7644aa7b6c84653a75c6519/signals.jsonl",
+        "sha256": "ef56e5d321da7937a05196bc4e14b45dc2b924887fe16e99a1fa76f458606f1e",
+        "size_bytes": 8180512
+      },
+      "WLFIUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLFIUSDT/135832cc06fb4b8190550c8eba5a4830/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:43:51Z",
+        "mtime_ns": 1786826631439651562,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/WLFIUSDT/135832cc06fb4b8190550c8eba5a4830/signals.jsonl",
+        "sha256": "dc34564839b18dca1ab66e49736bf142384bee4e75c7c266d93ad2695b13be5c",
+        "size_bytes": 8351833
+      },
+      "XAUTUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XAUTUSDT/05d29f58f9a541a4a13db2029dcc5d11/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:15:03Z",
+        "mtime_ns": 1786824903338520154,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XAUTUSDT/05d29f58f9a541a4a13db2029dcc5d11/signals.jsonl",
+        "sha256": "6cc0d4e7833931f3ea97cc388f5b5fdba1549fb0392df2e3ff1aadc061633e4d",
+        "size_bytes": 8249166
+      },
+      "XLMUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XLMUSDT/57029bc7147947ed8d1063e573768222/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:42:07Z",
+        "mtime_ns": 1786826527145050649,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XLMUSDT/57029bc7147947ed8d1063e573768222/signals.jsonl",
+        "sha256": "0d33a098958eea05f5d4be929b10742fcd098393b0527b427fe1a4aa8bc52a9f",
+        "size_bytes": 8291629
+      },
+      "XMRUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XMRUSDT/3c6f3f3105344731b9a6bf69b5996837/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:41:14Z",
+        "mtime_ns": 1786826474432257517,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XMRUSDT/3c6f3f3105344731b9a6bf69b5996837/signals.jsonl",
+        "sha256": "3a856c35728af83bf631a5bd7e3c2428d55aa84676593290954cd2c5dc473c21",
+        "size_bytes": 8286310
+      },
+      "XPLUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XPLUSDT/bf944be1388b462ba7b117c64c75f196/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:47:20Z",
+        "mtime_ns": 1786826840598883593,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XPLUSDT/bf944be1388b462ba7b117c64c75f196/signals.jsonl",
+        "sha256": "132d67dc173caae3ac4f5101d64f5ab7467aa3a304eb268d59b123e95269a799",
+        "size_bytes": 8264411
+      },
+      "XRPUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XRPUSDT/bd15906577ce4c989a4bf4ef7e891007/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:12:26Z",
+        "mtime_ns": 1786824746338930090,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/XRPUSDT/bd15906577ce4c989a4bf4ef7e891007/signals.jsonl",
+        "sha256": "aa1b23a44242384e178e85f4b4fd6478f86e0c9c4f5ac748595fa2dcfcbdb478",
+        "size_bytes": 8247156
+      },
+      "ZECUSDT:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ZECUSDT/60c64306f91c4c56a991e32a89342af6/signals.jsonl": {
+        "exists": true,
+        "mtime_iso": "2026-08-15T20:15:56Z",
+        "mtime_ns": 1786824956318382714,
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/stoch_fade_research_jobs/106aa14ce8554177bfa29843197174d8/coin_runs/ZECUSDT/60c64306f91c4c56a991e32a89342af6/signals.jsonl",
+        "sha256": "78daaaf12b64e1d4d900ca849bb8ce72963000864767954f61454c5ddbc7787a",
+        "size_bytes": 8245028
+      }
+    }
+  },
+  "join": {
+    "blocker": null,
+    "complete": true,
+    "duplicate_outcome_ids": [],
+    "duplicate_signal_ids": [],
+    "field_mismatch_count": 0,
+    "field_mismatches": [],
+    "matched_ids": 58177,
+    "outcomes": 58177,
+    "outcomes_without_source_signal": [],
+    "outcomes_without_source_signal_count": 0,
+    "signals_without_outcome": [],
+    "signals_without_outcome_count": 0,
+    "tier_a_signals": 58177,
+    "unique_outcome_ids": 58177,
+    "unique_signal_ids": 58177
+  },
+  "matching_evaluations": [
+    {
+      "evaluation_id": "1c262bf9d4f04523a8b6f61710389e0c",
+      "mtime_iso": "2026-08-16T06:28:47Z",
+      "sha256": "b6e4ab92859b5fa05887e5512fbb3d894f4ca6b7792fc93b9eeebe03b687ca1f",
+      "size_bytes": 72222440,
+      "source_job_id": "106aa14ce8554177bfa29843197174d8",
+      "window": {
+        "end": null,
+        "start": null
+      }
+    }
+  ],
+  "source_unchanged": true
+}

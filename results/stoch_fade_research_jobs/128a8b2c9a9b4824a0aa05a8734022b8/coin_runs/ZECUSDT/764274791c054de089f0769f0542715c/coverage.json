@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 358560,
+      "error": null,
+      "raw_count": 5050,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "ZECUSDT",
+      "tier_a_count": 1158,
+      "warmup_complete": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "verdict": "GENERAL_MARKET_BEHAVIOR_V1_BTC_1H_STATE_PILOT_PASS_WITH_PROXY_LIMITS",
+  "files": [
+    "ABSCHLUSSBERICHT.md",
+    "btc_state_1s_schema.json",
+    "btc_state_1s_v1.parquet",
+    "coverage_proof.json",
+    "feature_semantics.md",
+    "gap_refusal.json",
+    "output_manifest.json",
+    "quality_summary.json",
+    "replay_summary.json",
+    "resource_measurements.json",
+    "selected_window.json",
+    "spot_check_samples.csv",
+    "temporal_join_summary.json"
+  ],
+  "parquet": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/general_market_behavior_research_engine_v1_btc_1h_pilot/btc_state_1s_v1.parquet",
+  "content_hash": "e276979d61d9c8d87fadd6529f373d68262e0567dd43e942f41f3655ae5e217a",
+  "selected_hour": "2026-09-06T10:00:00Z"
+}

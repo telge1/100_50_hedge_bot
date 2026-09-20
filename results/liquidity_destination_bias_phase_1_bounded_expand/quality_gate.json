@@ -1,0 +1,59 @@
+{
+  "BTCUSDT": {
+    "checks": {
+      "candidate_minutes_accounted_for": true,
+      "causality_violations": 0,
+      "chronologically_sorted": true,
+      "contract_fingerprint_unchanged": true,
+      "core_artifacts_readable": true,
+      "core_hashes_valid": true,
+      "duplicate_episode_ids": 0,
+      "exclusion_reasons_complete": true,
+      "exit_code_zero": true,
+      "full_row_prefix_equal": false,
+      "idempotence_core_hashes_equal": true,
+      "knowledge_cutoff_valid": true,
+      "nan_or_infinity_values": 0,
+      "neither_horizons_closed": true,
+      "overlapping_eligible_episodes": 0,
+      "prefix_expected_provenance_difference_only": true,
+      "semantic_prefix_equal": true,
+      "targets_positioned_correctly": true,
+      "touch_times_within_horizon": true,
+      "unknown_outcomes": 0
+    },
+    "passed": true
+  },
+  "DOGEUSDT": {
+    "checks": {
+      "candidate_minutes_accounted_for": true,
+      "causality_violations": 0,
+      "chronologically_sorted": true,
+      "contract_fingerprint_unchanged": true,
+      "core_artifacts_readable": true,
+      "core_hashes_valid": true,
+      "duplicate_episode_ids": 0,
+      "exclusion_reasons_complete": true,
+      "exit_code_zero": true,
+      "full_row_prefix_equal": false,
+      "idempotence_core_hashes_equal": true,
+      "knowledge_cutoff_valid": true,
+      "nan_or_infinity_values": 0,
+      "neither_horizons_closed": true,
+      "overlapping_eligible_episodes": 0,
+      "prefix_expected_provenance_difference_only": true,
+      "semantic_prefix_equal": true,
+      "targets_positioned_correctly": true,
+      "touch_times_within_horizon": true,
+      "unknown_outcomes": 0
+    },
+    "passed": true
+  },
+  "overall": {
+    "critical_quality_violation": false,
+    "passed": true,
+    "prefix_boundary_check_passed": true,
+    "segment_boundary_check": "NOT_APPLICABLE; unsafe merge intentionally not built",
+    "segmented_merge_performed": false
+  }
+}

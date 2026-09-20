@@ -1,0 +1,7 @@
+{
+  "candle_rows": 318901,
+  "evaluation_data_end": "2026-08-10T11:02:00Z",
+  "evaluation_data_start": "2026-01-01T00:01:00Z",
+  "signal_job_not_used_as_candle_cap": true,
+  "symbol": "DOGEUSDT"
+}

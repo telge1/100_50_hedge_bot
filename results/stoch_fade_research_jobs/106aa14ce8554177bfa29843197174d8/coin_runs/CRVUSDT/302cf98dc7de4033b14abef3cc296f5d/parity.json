@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6354,
+  "detail_count": 6354,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T00:45:00"
+      ],
+      "signal_id": "2ba85b72-f4f4-5e19-9e2b-c137e7d257cb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T02:00:00"
+      ],
+      "signal_id": "c2b912c3-5739-5f69-8993-aba767efca90"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T04:00:00"
+      ],
+      "signal_id": "4d31b42f-bc86-587b-9105-3d9b38cee262"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T05:00:00"
+      ],
+      "signal_id": "63ed4200-cd9f-5863-9fc3-fc46b4ba1e24"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:15:00"
+      ],
+      "signal_id": "aa4010b6-36b7-510f-a011-4dda0119e791"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T07:00:00"
+      ],
+      "signal_id": "7481579c-fc15-5048-a6a8-1f5085305dec"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T08:15:00"
+      ],
+      "signal_id": "072431cf-a576-50cf-aee7-09f2f190cee4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T09:00:00"
+      ],
+      "signal_id": "23a1fbc7-58e3-55d4-8cb6-b7a9103bcb8b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T09:45:00"
+      ],
+      "signal_id": "f272aade-b619-5147-82a7-05321fce3614"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T12:15:00"
+      ],
+      "signal_id": "d8d9ed97-0293-5088-8f36-3d6183daf162"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:00:00"
+      ],
+      "signal_id": "5d7f2327-d19f-50f0-910d-0d1064f6fd78"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T14:00:00"
+      ],
+      "signal_id": "a1ba40ad-86dd-532e-82a2-b27bc8d54de6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T15:00:00"
+      ],
+      "signal_id": "f130aa1d-8153-5c48-9428-40065122c8cd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T16:15:00"
+      ],
+      "signal_id": "cdc37bb5-afa6-590e-a342-f6e6f46c33c0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T19:30:00"
+      ],
+      "signal_id": "ff3a14d1-6610-5b4c-8eb9-f6cf27067a2f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T20:30:00"
+      ],
+      "signal_id": "4d6fa872-0c1b-5e34-bee0-e7caf798a716"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T22:15:00"
+      ],
+      "signal_id": "8b71c092-ebd4-5b5f-95e7-0feb6c0e9d08"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T23:45:00"
+      ],
+      "signal_id": "489c6f75-bcdf-53ef-8dad-e7d1fbd1ece8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T01:15:00"
+      ],
+      "signal_id": "4573e1de-5507-5916-bca3-21299d1e68d7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T02:45:00"
+      ],
+      "signal_id": "bc62d373-b3a8-5c1d-b870-54e3165e624a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:00:00"
+      ],
+      "signal_id": "81692bd5-0829-5f31-957b-0a1fbfa8bb9f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T06:00:00"
+      ],
+      "signal_id": "d2a65c74-519c-54d0-b889-1644c7488c42"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T06:45:00"
+      ],
+      "signal_id": "7d229901-4111-56ab-899a-34ad9fc97071"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T08:00:00"
+      ],
+      "signal_id": "ba9aacc0-a45d-5f03-91a9-ccf3233211c3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T10:15:00"
+      ],
+      "signal_id": "c6097b31-0d39-5821-bb34-7b15ffd1cb17"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T12:15:00"
+      ],
+      "signal_id": "bd5cee62-026b-5efa-8af9-384bab6bda7d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T13:15:00"
+      ],
+      "signal_id": "ebac59e8-76b9-5182-92b8-30a441a426a0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T14:45:00"
+      ],
+      "signal_id": "58c49173-a283-5716-ba7a-bdedfda04239"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:15:00"
+      ],
+      "signal_id": "5aec32b2-74ab-5ee0-b36a-787834a2c33d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T19:30:00"
+      ],
+      "signal_id": "f7df5dfc-6f78-5459-bba7-847300bbe255"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T21:00:00"
+      ],
+      "signal_id": "2dc3f8f1-0d60-54db-8bbb-967c7ef3f3e8"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T22:45:00"
+      ],
+      "signal_id": "f1a6c407-5a3a-5c02-8887-f79ef3aa8937"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T00:00:00"
+      ],
+      "signal_id": "f681aee1-ff63-5337-b63c-3eee8bf849f1"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T00:45:00"
+      ],
+      "signal_id": "c8f73231-9545-54f8-b611-79e8f8e9433f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T02:15:00"
+      ],
+      "signal_id": "f7cf8ab0-f746-553e-93e1-bc4ee429e592"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T03:15:00"
+      ],
+      "signal_id": "c84528db-630f-527c-a66f-aa38b2841a8e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T04:30:00"
+      ],
+      "signal_id": "b0365fb6-c2d4-5193-99e5-9a58d859e971"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T05:15:00"
+      ],
+      "signal_id": "6365a176-ab4c-561e-9263-e0575ed148d2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:30:00"
+      ],
+      "signal_id": "7abe608d-5aef-58a0-96fa-d155a96c4afd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T09:00:00"
+      ],
+      "signal_id": "c4191cac-aa68-5380-9c45-7ab4c0b2dfe9"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T11:00:00"
+      ],
+      "signal_id": "1a82fbb3-1005-597f-9350-5a3af51ca62b"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T12:45:00"
+      ],
+      "signal_id": "86a5259d-17b9-5847-b52d-81fa5775d7b0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T15:30:00"
+      ],
+      "signal_id": "d85887c5-ee79-5292-8e82-c7c402ab8669"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T17:00:00"
+      ],
+      "signal_id": "8b873fd3-ed1b-52a4-b9c4-618b32e017fb"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T17:45:00"
+      ],
+      "signal_id": "6271e283-4169-5d73-8c80-f0ee55b41543"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T18:30:00"
+      ],
+      "signal_id": "3bc8241f-efcb-5f38-b476-aec5c7d8c90d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T21:00:00"
+      ],
+      "signal_id": "ebae36d0-b43b-52e0-8405-ffce279e88cd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T23:30:00"
+      ],
+      "signal_id": "77e3004e-270b-5ea1-a830-518387473482"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-04T01:00:00"
+      ],
+      "signal_id": "9ece3e84-9050-5f67-a14a-1c60a20c1c1f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "CRVUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-04T01:45:00"
+      ],
+      "signal_id": "eb977641-7ce6-5ec6-8eb3-0d699e55a84b"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6354,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6354,
+  "research_keys": 6354,
+  "research_only": 6354,
+  "scope_symbol": "CRVUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32"
+}

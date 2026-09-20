@@ -1,0 +1,3 @@
+OnboardService <class 'orderbook_analyse.symbol_onboarding.service.OnboardService'>
+router_ok
+consumer_ok <function main at 0x78e8c68dd300>

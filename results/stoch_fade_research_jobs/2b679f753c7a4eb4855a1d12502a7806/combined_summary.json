@@ -1,0 +1,29 @@
+{
+  "coins_evaluated": 1,
+  "coins_with_signals": 1,
+  "coins_without_tier_a": 0,
+  "execution_dedup_applied": false,
+  "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+  "failed_coins": 0,
+  "incomplete_coins": 0,
+  "multi_tf_collisions": 2,
+  "outcome_evaluation_enabled": false,
+  "raw_by_timeframe": {
+    "15m": 509,
+    "1h": 131,
+    "30m": 244,
+    "4h": 34
+  },
+  "raw_candidates": 918,
+  "strategy_id": "wave_fade_frozen_f16ae32_causal_entry_v1",
+  "successful_coins": 1,
+  "tier_a": 101,
+  "tier_a_by_timeframe": {
+    "15m": 56,
+    "1h": 15,
+    "30m": 27,
+    "4h": 3
+  },
+  "warmup_warnings": 0,
+  "writes_to_clickhouse": false
+}

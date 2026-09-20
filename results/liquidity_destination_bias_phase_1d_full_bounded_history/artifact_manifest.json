@@ -1,0 +1,146 @@
+{
+  "code_changed": false,
+  "committed": false,
+  "contract_changed": false,
+  "files": {
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/ABSCHLUSSBERICHT.md": {
+      "bytes": 6909,
+      "sha256": "7b710757592994609890f8d16db1dc1f41bcd09bb9c5defa9a4b786d58d3edc4"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT/contract.json": {
+      "bytes": 1709,
+      "sha256": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT/episodes.csv": {
+      "bytes": 600042,
+      "sha256": "ca3ba554e59653fbdbe03124d1558aa3f4f767c274c532c9c611d92abf4cf1a4"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT/excluded_candidates.csv": {
+      "bytes": 2034373,
+      "sha256": "e93ab0d33eaeca8ab0461b2e9112867767b93958a623e1311deb17cab961b1fc"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT/run_manifest.json": {
+      "bytes": 703,
+      "sha256": "c7565b32311896bd2c9c70e8307e2b5cc6daa4e63dea7000973f51c0f17836fb"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT/summary.json": {
+      "bytes": 776,
+      "sha256": "972e723bafacf5eb06c5a2628e76ec4b3d6ec64e597f968b6580c80333e54262"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT_resource.txt": {
+      "bytes": 1062,
+      "sha256": "c6646dc22b9ac7b479d138b62fd47217832b6e2a1cb214dd676772d7f011ce98"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/BTCUSDT_stdout.txt": {
+      "bytes": 1077,
+      "sha256": "02cf9db0bc59603037b55d10267f9e1f2ff187870c471307ebe2ee5f8ece6410"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT/contract.json": {
+      "bytes": 1709,
+      "sha256": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT/episodes.csv": {
+      "bytes": 577283,
+      "sha256": "2d1217b46d490bed10377add4318563e461eefb6a509a943631e9d5e8d0b08af"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT/excluded_candidates.csv": {
+      "bytes": 2050944,
+      "sha256": "6f3cc74882250c7a5556552ca544ee7bf3673be88832758ce63f55c329c38d76"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT/run_manifest.json": {
+      "bytes": 703,
+      "sha256": "6872f90adc519f8cf30ac0eb4de208c5c5f13b962567e3b862b657996b4a517c"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT/summary.json": {
+      "bytes": 776,
+      "sha256": "6a64c31056ea15714b960495a0adaf14d3fed52482568f769e0ae9925ae6504a"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT_resource.txt": {
+      "bytes": 1064,
+      "sha256": "fe0482288c569ecb3708c4741706ad43f94544345b2f53bd5c2a6984e9720949"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/DOGEUSDT_stdout.txt": {
+      "bytes": 1077,
+      "sha256": "f852f074ac7cd4e4a2c59b97f32e40effd82f08745217c1249f9a70042b848b6"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/contract_freeze_manifest.json": {
+      "bytes": 2803,
+      "sha256": "751efbe13f973377b17e322666376ee2a5b56fdfd5fc22e1a024b349476b7546"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/coverage_final.csv": {
+      "bytes": 1405,
+      "sha256": "c8ca66da39aa5aa38baa2ef12b30ddae6163654835aaef3935a9b57b5a894e6d"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/daily_distribution.csv": {
+      "bytes": 580,
+      "sha256": "d3e754c74fbc17c25a911241096baecfbb51386eb858def3ac2af55896eeea29"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/exclusion_distribution.csv": {
+      "bytes": 536,
+      "sha256": "7b1ebeaa1e80bd7d9e47b4105b06cd6b8652b6c84aba4a7acf7f865cb5e70cc5"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/full_history_summary.json": {
+      "bytes": 11800,
+      "sha256": "895f53596a4f5f83074333f324576fa60354aa9c4517ba9eec5b1f24a992dff1"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/hourly_distribution.csv": {
+      "bytes": 730,
+      "sha256": "51ae5cead4949cfa1833b876da40d0021bf1f7ba0c6687c6ba07555fd2429acc"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat/contract.json": {
+      "bytes": 1709,
+      "sha256": "2aad3b9bc2ba949f72f16a11b04ad53d7428d94bdec13ca55497aa30b450f6c3"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat/episodes.csv": {
+      "bytes": 600042,
+      "sha256": "ca3ba554e59653fbdbe03124d1558aa3f4f767c274c532c9c611d92abf4cf1a4"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat/excluded_candidates.csv": {
+      "bytes": 2034373,
+      "sha256": "e93ab0d33eaeca8ab0461b2e9112867767b93958a623e1311deb17cab961b1fc"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat/run_manifest.json": {
+      "bytes": 703,
+      "sha256": "2c9140178fb3e14a672c35c43b92bea6dae329151eb48d8a4424815e0a178e1f"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat/summary.json": {
+      "bytes": 776,
+      "sha256": "972e723bafacf5eb06c5a2628e76ec4b3d6ec64e597f968b6580c80333e54262"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat_resource.txt": {
+      "bytes": 1077,
+      "sha256": "1af95895060ce0affe9c80764cac1ce149f8680379101af48552a9d41d536cda"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/idempotence_btc_repeat_stdout.txt": {
+      "bytes": 1077,
+      "sha256": "02cf9db0bc59603037b55d10267f9e1f2ff187870c471307ebe2ee5f8ece6410"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/pre_expand_tests.txt": {
+      "bytes": 951,
+      "sha256": "c928ba6bed808ae24fc757ac0e79ebe0657d27f75e6c3f5cf509abb5fdde86c4"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/prefix_parity.json": {
+      "bytes": 834,
+      "sha256": "6df4fbf5ab2e381503705d5b5818621528bb6dc3530af98a0460c636aef4e9e1"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/quality_gate.json": {
+      "bytes": 627,
+      "sha256": "9de7659b4fd3638edc3ddfc7c40a3830e91b974e3a46f5c8e45468d48f8a8a4a"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/resource_metrics.csv": {
+      "bytes": 381,
+      "sha256": "473fbe7df9233f81493270d0daed3b24eeced0b1fbc614f5174192cdbcde8ffb"
+    },
+    "results/liquidity_destination_bias_phase_1d_full_bounded_history/resource_observe.txt": {
+      "bytes": 2284,
+      "sha256": "a4ab00122e4b3004890593bee97d503bea5b8c782ec4e50bb9654f10cd3e3c36"
+    }
+  },
+  "generated_at_utc": "2026-09-05T13:05:44.122720Z",
+  "git_branch": "feature/btc-doge-research-db",
+  "git_head": "9ab70ee955ff5a47e2c42ecaa6d727df581c2d34",
+  "manifest_version": "liquidity_destination_phase_1d_artifact_manifest_v1",
+  "pushed": false,
+  "test_changed": false,
+  "verdict": "LIQUIDITY_DESTINATION_FULL_BOUNDED_HISTORY_V1_READY_FOR_BASELINES"
+}

@@ -1,0 +1,147 @@
+{
+  "be50_activated_count": 0,
+  "be50_exit_count": 0,
+  "by_direction": {
+    "LONG": {
+      "losses": 1871,
+      "open": 18,
+      "signals": 3424,
+      "wins": 1535
+    },
+    "SHORT": {
+      "losses": 1836,
+      "open": 9,
+      "signals": 3478,
+      "wins": 1633
+    }
+  },
+  "by_symbol": {
+    "ADAUSDT": {
+      "losses": 411,
+      "open": 3,
+      "signals": 740,
+      "wins": 326
+    },
+    "AVAXUSDT": {
+      "losses": 356,
+      "open": 3,
+      "signals": 717,
+      "wins": 358
+    },
+    "BNBUSDT": {
+      "losses": 190,
+      "open": 1,
+      "signals": 375,
+      "wins": 184
+    },
+    "DOGEUSDT": {
+      "losses": 321,
+      "open": 4,
+      "signals": 611,
+      "wins": 286
+    },
+    "HYPEUSDT": {
+      "losses": 574,
+      "open": 2,
+      "signals": 990,
+      "wins": 414
+    },
+    "LINKUSDT": {
+      "losses": 341,
+      "open": 2,
+      "signals": 650,
+      "wins": 307
+    },
+    "SOLUSDT": {
+      "losses": 337,
+      "open": 3,
+      "signals": 625,
+      "wins": 285
+    },
+    "SUIUSDT": {
+      "losses": 435,
+      "open": 3,
+      "signals": 808,
+      "wins": 370
+    },
+    "XAUTUSDT": {
+      "losses": 113,
+      "open": 4,
+      "signals": 228,
+      "wins": 111
+    },
+    "ZECUSDT": {
+      "losses": 629,
+      "open": 2,
+      "signals": 1158,
+      "wins": 527
+    }
+  },
+  "by_timeframe": {
+    "15m": {
+      "losses": 1948,
+      "open": 8,
+      "signals": 3839,
+      "wins": 1883
+    },
+    "1h": {
+      "losses": 562,
+      "open": 6,
+      "signals": 982,
+      "wins": 414
+    },
+    "30m": {
+      "losses": 1036,
+      "open": 10,
+      "signals": 1849,
+      "wins": 803
+    },
+    "4h": {
+      "losses": 161,
+      "open": 3,
+      "signals": 232,
+      "wins": 68
+    }
+  },
+  "execution_dedup_applied": false,
+  "exit_policy": "NO_BE50",
+  "exit_reason_counts": {
+    "END_OF_HISTORY": 27,
+    "SL": 3707,
+    "TP": 3168
+  },
+  "gross_loss_pct": -4667.0,
+  "gross_profit_pct": 4589.000000000001,
+  "intrabar_policy": "SL_FIRST",
+  "losses": 3707,
+  "open": 27,
+  "outcome_engine": "evaluate_signal_no_be50_full_1m",
+  "pnl_basis": "gross",
+  "side_effect_flags": {
+    "cleanup_enabled": false,
+    "live_orders_enabled": false,
+    "publish_enabled": false,
+    "writes_to_clickhouse": false,
+    "writes_to_processing_state": false,
+    "writes_to_signal_outcomes": false,
+    "writes_to_signals": false
+  },
+  "signal_scope": "TIER_A_ONLY",
+  "signals": 6902,
+  "successful_coins": [
+    "SOLUSDT",
+    "HYPEUSDT",
+    "XAUTUSDT",
+    "ZECUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "ADAUSDT",
+    "AVAXUSDT"
+  ],
+  "total_pnl_pct": -77.99999999999909,
+  "win_rate_denominator": "wins+losses (OPEN excluded)",
+  "win_rate_pct": 46.08,
+  "wins": 3168
+}

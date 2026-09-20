@@ -1,0 +1,33 @@
+{
+  "run_id": "long_gap_multi_20260709T105126",
+  "trades": [
+    {
+      "run_id": "long_gap_multi_20260709T105126",
+      "trade_number": 1,
+      "cycle3_candle_index": 0,
+      "initial_long_qty": 5.0,
+      "initial_short_qty": 5.0,
+      "initial_gap_qty": 0.0,
+      "planned_gap_reduce_qty_per_step": 0.0,
+      "total_reduced_qty": 0.0,
+      "total_gap_reduction_gross_pnl": 0.0,
+      "total_gap_reduction_fees": 0.0,
+      "total_gap_reduction_net_pnl": 0.0,
+      "final_long_qty": 5.0,
+      "final_short_qty": 5.0,
+      "remaining_gap_qty": 0.0,
+      "gap_fully_closed": false
+    }
+  ],
+  "inputs": {
+    "input_results": "tmp_debug_multi/continuous_results.json",
+    "input_candles": "tmp_debug_multi/candles.json",
+    "candle_meta": {
+      "symbol": "TESTUSDT",
+      "timeframe": "5m",
+      "first_timestamp": "2026-01-01T00:00:00+00:00",
+      "last_timestamp": "2026-01-01T00:00:00+00:00",
+      "candle_count": 5
+    }
+  }
+}

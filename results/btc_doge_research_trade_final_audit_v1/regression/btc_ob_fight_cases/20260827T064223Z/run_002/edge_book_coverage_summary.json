@@ -1,0 +1,28 @@
+{
+  "sample_count": 43200,
+  "by_scope_status": {
+    "EXACT_LEVEL_TICK": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 14400
+    },
+    "TPO_EDGE_BIN": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 7200
+    },
+    "VOLUME_EDGE_BIN": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 7200
+    },
+    "PROFILE_EDGE_ZONE": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 7200
+    },
+    "FIRST_OUTSIDE_BIN": {
+      "EDGE_REGION_OUTSIDE_BOOK_RANGE": 7200
+    }
+  },
+  "scopes_analyzed": [
+    "EXACT_LEVEL_TICK",
+    "TPO_EDGE_BIN",
+    "VOLUME_EDGE_BIN",
+    "PROFILE_EDGE_ZONE",
+    "FIRST_OUTSIDE_BIN"
+  ],
+  "note": "missing_coverage_does_not_imply_zero_consumption"
+}

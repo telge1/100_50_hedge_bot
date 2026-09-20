@@ -1,0 +1,588 @@
+{
+  "EXACT_MATCH": 0,
+  "FIELD_MISMATCH": 0,
+  "NOT_COMPARABLE_VERSION": 0,
+  "NOT_COMPARABLE_WINDOW": 0,
+  "PRODUCTION_ONLY": 0,
+  "RESEARCH_ONLY": 6328,
+  "detail_count": 6328,
+  "details_sample": [
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T00:15:00"
+      ],
+      "signal_id": "1290610e-a7d3-59f9-8b25-a5b62c328cc6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T01:30:00"
+      ],
+      "signal_id": "63daeeb4-3f3e-5e98-ab2f-e77c862c2937"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T02:45:00"
+      ],
+      "signal_id": "e54415b2-2ad3-5efa-a6a6-0bdb643e8b86"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T04:45:00"
+      ],
+      "signal_id": "9dac904a-96f0-5bf8-902c-dc45ca26e66d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T06:00:00"
+      ],
+      "signal_id": "718fd6c9-5a97-5c59-a2bd-87a4c162e544"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T06:45:00"
+      ],
+      "signal_id": "fef51d0d-78c0-5640-bf6a-ce8ddfe3c2d6"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T11:00:00"
+      ],
+      "signal_id": "244c9792-45fc-568d-bdba-bffaef893049"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T12:00:00"
+      ],
+      "signal_id": "32d00452-4d1b-5b56-8312-e36055cabb89"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T13:30:00"
+      ],
+      "signal_id": "2f9a1d6d-d3f8-5b49-a6c4-02453cd49af0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T14:45:00"
+      ],
+      "signal_id": "6ce21377-7d7b-5ce5-a3cd-0694448b07a3"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T16:00:00"
+      ],
+      "signal_id": "e9f060d5-03a7-5c0d-ac9d-ab2de8b1fd4d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T16:45:00"
+      ],
+      "signal_id": "7d0e9eed-cdf1-59ff-b7a2-40f432d777e2"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T18:00:00"
+      ],
+      "signal_id": "5aa17033-3ead-513b-a825-f1f87e39f487"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T19:30:00"
+      ],
+      "signal_id": "0d68789b-c627-5323-b86d-bccd0204071d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T20:30:00"
+      ],
+      "signal_id": "48f1a19b-c68b-5a00-a1a2-c894d818f920"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T21:15:00"
+      ],
+      "signal_id": "2c703b08-dadc-521b-bc98-9642bda505da"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-01T23:00:00"
+      ],
+      "signal_id": "44344cb1-97dd-5541-8a32-2e337ebbe165"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-01T23:45:00"
+      ],
+      "signal_id": "5168b0a1-c8e3-5746-b425-b45b624af6ab"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T00:45:00"
+      ],
+      "signal_id": "5072682f-8975-5341-b266-3a68dc99bc4e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T02:30:00"
+      ],
+      "signal_id": "9d04a2f4-f5bc-55f0-8fc8-0610bca9ad7f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T04:00:00"
+      ],
+      "signal_id": "71253e24-f1cf-5054-b7f3-a7cfa2d14474"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T05:45:00"
+      ],
+      "signal_id": "5daa18a7-f811-521d-9860-37ac9cf7dbb7"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T07:15:00"
+      ],
+      "signal_id": "176ad0ca-c284-5594-b5d9-73d7d8863dbd"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T08:00:00"
+      ],
+      "signal_id": "265f3f52-0d0c-5f6d-a185-ad5d737aeb8e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T09:15:00"
+      ],
+      "signal_id": "5f8128b1-ebc9-50ea-8c99-0cb55de3ca28"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T10:00:00"
+      ],
+      "signal_id": "65cb136a-8d2b-592c-854b-25f308af133c"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T13:15:00"
+      ],
+      "signal_id": "0700bef7-2525-50a3-baef-ec643228ad6e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T14:30:00"
+      ],
+      "signal_id": "4014c029-4f9d-5930-838f-15aae2c05fa0"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T15:15:00"
+      ],
+      "signal_id": "1e74c09f-42bf-5d1e-bc9c-b1f2c446b1bf"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T17:15:00"
+      ],
+      "signal_id": "082c6872-9c42-515e-9db3-096056d5d00f"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T19:30:00"
+      ],
+      "signal_id": "675d4afa-e998-5f49-983b-64682ba6643e"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T20:15:00"
+      ],
+      "signal_id": "94617460-2c0f-5f64-adb3-5446017d715d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-02T21:15:00"
+      ],
+      "signal_id": "e4675898-79f9-5f2a-8d00-03aba70058e4"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-02T22:45:00"
+      ],
+      "signal_id": "653041d3-ac94-50ee-849f-da4b76c3e306"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T00:00:00"
+      ],
+      "signal_id": "4834b126-e68f-5665-b351-65a684094aa5"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T01:30:00"
+      ],
+      "signal_id": "86c2a282-f958-5be3-8e6b-51a8ba73b690"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T03:00:00"
+      ],
+      "signal_id": "0e27af54-95d0-5b78-838b-61a1233a9216"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T03:45:00"
+      ],
+      "signal_id": "1230e683-298c-521e-82b9-e408b45cbd43"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T05:45:00"
+      ],
+      "signal_id": "0e059288-8e51-50c2-a523-55fcf53b1c12"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T06:30:00"
+      ],
+      "signal_id": "943178bc-23cb-5f05-a5c3-de2b89bd0659"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T07:30:00"
+      ],
+      "signal_id": "2dfd2a6d-d20b-55ae-a256-97e223a04f9d"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T10:00:00"
+      ],
+      "signal_id": "e40c3eed-6f86-5389-9060-ebbb689a5e03"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T12:30:00"
+      ],
+      "signal_id": "a51da9cc-bb87-5629-adbd-9c4103d72b36"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T13:30:00"
+      ],
+      "signal_id": "4b1379d7-b283-5df8-953b-22aecb1e9d5a"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T14:45:00"
+      ],
+      "signal_id": "e902a268-f325-5451-8683-1439df7cc758"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T16:30:00"
+      ],
+      "signal_id": "041b8efe-99f7-5cae-ac08-bf95bf935391"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T17:15:00"
+      ],
+      "signal_id": "b95cde11-7fd4-5053-9b65-a58988f6d985"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T19:00:00"
+      ],
+      "signal_id": "e43e35fb-4dcb-55fd-9cc8-cba81ada4c17"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "LONG",
+        "wave_fade",
+        "2026-01-03T19:45:00"
+      ],
+      "signal_id": "a72a72ad-f4c3-549e-b738-fb606e318e81"
+    },
+    {
+      "class": "RESEARCH_ONLY",
+      "generation_key": [
+        "BTCUSDT",
+        "15m",
+        "SHORT",
+        "wave_fade",
+        "2026-01-03T21:45:00"
+      ],
+      "signal_id": "0fe13ac3-f4ba-5392-80b8-9a96a94e3eae"
+    }
+  ],
+  "duplicate_generation_keys_production": 0,
+  "duplicate_generation_keys_research": 0,
+  "field_matches": 0,
+  "field_mismatches": 0,
+  "generation_key_field_mismatch": 0,
+  "generation_key_intersection": 0,
+  "generation_key_match": 0,
+  "generation_key_production_only": 0,
+  "generation_key_research_only": 6328,
+  "generation_mismatch_sample": [],
+  "intersection": 0,
+  "note": "UUID includes strategy_version; generation_key ignores version tag",
+  "price_tolerance": {
+    "abs": 1e-10,
+    "rel": 1e-08
+  },
+  "production_generation_keys": 0,
+  "production_keys": 0,
+  "production_only": 0,
+  "production_window_max": null,
+  "production_window_min": null,
+  "research_generation_keys": 6328,
+  "research_keys": 6328,
+  "research_only": 6328,
+  "scope_symbol": "BTCUSDT",
+  "strategy_production": "wave_fade_no_be50_v1",
+  "strategy_research": "wave_fade_frozen_f16ae32"
+}

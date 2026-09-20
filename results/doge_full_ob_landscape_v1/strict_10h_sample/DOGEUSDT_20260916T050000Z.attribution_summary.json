@@ -1,0 +1,37 @@
+{
+  "verdict": "PASS_CAUSAL_EXACT_PRICE_TRADE_ATTRIBUTION",
+  "utc_hour": "2026-09-16T05:00:00Z",
+  "trade_count": 9299,
+  "level_change_count": 247882,
+  "class_counts": {
+    "PULL_LIKELY": 122970,
+    "ADD_WITHOUT_MATCHED_AGGRESSION": 123011,
+    "EXECUTED_LIKELY": 973,
+    "MIXED_PULL_FILL": 595,
+    "INTERVAL_START_UNKNOWN": 203,
+    "REFILL_UNDER_AGGRESSION": 130
+  },
+  "class_abs_delta_notional_usdt": {
+    "PULL_LIKELY": 1354863876.894065,
+    "ADD_WITHOUT_MATCHED_AGGRESSION": 1360127409.201496,
+    "EXECUTED_LIKELY": 1825510.19287,
+    "MIXED_PULL_FILL": 5552644.16434,
+    "INTERVAL_START_UNKNOWN": 1930786.77299,
+    "REFILL_UNDER_AGGRESSION": 294262.92246
+  },
+  "connected_wall_class_counts": {
+    "ADD_WITHOUT_MATCHED_AGGRESSION": 99296,
+    "PULL_LIKELY": 101133,
+    "INTERVAL_START_UNKNOWN": 104,
+    "MIXED_PULL_FILL": 274,
+    "EXECUTED_LIKELY": 248,
+    "REFILL_UNDER_AGGRESSION": 32
+  },
+  "output": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/doge_full_ob_landscape_v1/strict_18h_sample/DOGEUSDT_20260916T050000Z.attributed_level_flow.jsonl.zst",
+  "semantics": {
+    "price_match": "exact execution price",
+    "time_interval": "(previous same-level book node,current book node]",
+    "trade_reuse": "impossible across non-overlapping same-level intervals",
+    "l2_limit": "gross add and cancel inside one interval are not identifiable"
+  }
+}

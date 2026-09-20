@@ -1,0 +1,9 @@
+{
+  "raw_total": 6295,
+  "run_id": "6c992c8981dc4b319c03b3b7ab768bf7",
+  "statuses": {
+    "ARBUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1259
+}

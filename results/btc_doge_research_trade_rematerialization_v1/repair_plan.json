@@ -1,0 +1,158 @@
+{
+  "architecture": "B_VERSIONED_REPLACING_MERGETREE",
+  "contract": {
+    "contract_version": "research_public_trades_contract_v2",
+    "processor": "btc_doge_research_trade_rematerialization_v1",
+    "build_id": "8244abe0186ff712a7917eb66e397dd7c93cc28457aaf0d5a42652fe8c96e323",
+    "logical_key": [
+      "symbol",
+      "trade_id"
+    ],
+    "event_key": "{symbol}|{trade_id}",
+    "time_contract": {
+      "source_interpreted_as": "UTC",
+      "column": "event_time DateTime64(3,'UTC')",
+      "alias": "trade_ts_utc",
+      "insert_path": "server-side INSERT SELECT (no Python naive datetime)",
+      "forbidden": [
+        "naive local reinterpretation",
+        "blind +2h correction",
+        "DST-local anchors"
+      ]
+    },
+    "engine": "ReplacingMergeTree(record_version)",
+    "order_by": "(symbol, trade_id)",
+    "history": {
+      "start": "2026-07-19T00:00:00Z",
+      "end": "2026-09-01T00:00:00Z"
+    },
+    "pilot": {
+      "symbol": "BTCUSDT",
+      "start": "2026-08-31T18:30:00Z",
+      "end": "2026-08-31T19:30:00Z"
+    },
+    "invalid_shifted_table": "research_public_trades_invalid_shifted_v0",
+    "source_table": "orderbook_analysis.public_trades_canonical",
+    "source_access": "READ_ONLY"
+  },
+  "current_engine": {
+    "exists": true,
+    "engine": "ReplacingMergeTree",
+    "sorting_key": "symbol, trade_id",
+    "partition_key": "(symbol, toYYYYMM(event_time))",
+    "total_rows": 19327206,
+    "columns": [
+      {
+        "name": "symbol",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "event_time",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "receive_time",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "trade_id",
+        "type": "String"
+      },
+      {
+        "name": "price",
+        "type": "Decimal(18, 8)"
+      },
+      {
+        "name": "base_size",
+        "type": "Decimal(24, 12)"
+      },
+      {
+        "name": "quote_notional",
+        "type": "Decimal(24, 8)"
+      },
+      {
+        "name": "taker_side",
+        "type": "Enum8('Buy' = 1, 'Sell' = 2)"
+      },
+      {
+        "name": "source",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "source_id",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "source_fingerprint",
+        "type": "FixedString(64)"
+      },
+      {
+        "name": "source_segment_start",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "source_segment_end",
+        "type": "DateTime64(3, 'UTC')"
+      },
+      {
+        "name": "source_contract_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "processor_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "ingestion_batch_id",
+        "type": "String"
+      },
+      {
+        "name": "build_id",
+        "type": "String"
+      },
+      {
+        "name": "contract_version",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "record_version",
+        "type": "UInt64"
+      },
+      {
+        "name": "ingested_at",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "imported_at",
+        "type": "DateTime64(6, 'UTC')"
+      },
+      {
+        "name": "quality_flags",
+        "type": "Array(LowCardinality(String))"
+      },
+      {
+        "name": "coverage_status",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "finalization_status",
+        "type": "LowCardinality(String)"
+      },
+      {
+        "name": "event_key",
+        "type": "String"
+      }
+    ],
+    "create_table_query": "CREATE TABLE btc_doge_research.research_public_trades (`symbol` LowCardinality(String), `event_time` DateTime64(3, 'UTC'), `receive_time` DateTime64(6, 'UTC'), `trade_id` String, `price` Decimal(18, 8), `base_size` Decimal(24, 12), `quote_notional` Decimal(24, 8), `taker_side` Enum8('Buy' = 1, 'Sell' = 2), `source` LowCardinality(String), `source_id` LowCardinality(String), `source_fingerprint` FixedString(64), `source_segment_start` DateTime64(3, 'UTC'), `source_segment_end` DateTime64(3, 'UTC'), `source_contract_version` LowCardinality(String), `processor_version` LowCardinality(String), `ingestion_batch_id` String, `build_id` String, `contract_version` LowCardinality(String), `record_version` UInt64, `ingested_at` DateTime64(6, 'UTC'), `imported_at` DateTime64(6, 'UTC'), `quality_flags` Array(LowCardinality(String)), `coverage_status` LowCardinality(String), `finalization_status` LowCardinality(String), `event_key` String) ENGINE = ReplacingMergeTree(record_version) PARTITION BY (symbol, toYYYYMM(event_time)) ORDER BY (symbol, trade_id) SETTINGS index_granularity = 8192 COMMENT 'research_public_trades_contract_v2; logical key (symbol, trade_id); event_time is trade_ts_utc'",
+    "has_record_version": true,
+    "is_v2": true
+  },
+  "segment_count": 2112,
+  "nonempty_segments": 2100,
+  "approx_unique_trades": 82031289,
+  "pilot": {
+    "symbol": "BTCUSDT",
+    "start": "2026-08-31T18:30:00Z",
+    "end": "2026-08-31T19:30:00Z"
+  }
+}

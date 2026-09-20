@@ -1,0 +1,23 @@
+{
+  "by_scope": {
+    "EXACT_LEVEL_TICK": {
+      "sample_count": 0
+    },
+    "TPO_EDGE_BIN": {
+      "sample_count": 0
+    },
+    "VOLUME_EDGE_BIN": {
+      "sample_count": 0
+    },
+    "PROFILE_EDGE_ZONE": {
+      "sample_count": 0
+    },
+    "FIRST_OUTSIDE_BIN": {
+      "sample_count": 0
+    }
+  },
+  "total_sample_rows": 0,
+  "overall": {
+    "sample_count": 0
+  }
+}

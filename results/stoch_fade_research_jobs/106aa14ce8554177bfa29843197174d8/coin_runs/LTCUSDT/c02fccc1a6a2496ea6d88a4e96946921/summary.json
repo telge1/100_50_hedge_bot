@@ -1,0 +1,9 @@
+{
+  "raw_total": 6425,
+  "run_id": "c02fccc1a6a2496ea6d88a4e96946921",
+  "statuses": {
+    "LTCUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 712
+}

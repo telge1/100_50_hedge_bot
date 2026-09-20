@@ -1,0 +1,3 @@
+Sep 10 15:02:50 server-telgenbuescher systemd[1531]: Started symbol-onboarding-worker.service - Symbol onboarding queue worker (OnboardService apply consumer).
+Sep 10 15:02:50 server-telgenbuescher symbol-onboarding-worker[758048]: [symbol-onboarding-worker] 2026-09-10T13:02:50Z queue=/home/telgenbuescher/projects/orderbook_analyse/results/add_symbol/queue pid=758048
+Sep 10 15:02:50 server-telgenbuescher symbol-onboarding-worker[758048]: [symbol-onboarding-worker] 2026-09-10T13:02:50Z reconciled_orphans=0

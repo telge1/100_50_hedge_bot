@@ -1,0 +1,40 @@
+{
+  "coins": [
+    {
+      "artifact_reference": null,
+      "duration_seconds": 0.303,
+      "error_code": "EZM_RUNNER_FAILED",
+      "finished_at": "2026-08-26T09:33:20Z",
+      "message": "No module named 'orjson'",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "4h": {
+          "raw": 0,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 0,
+      "returncode": null,
+      "runner_run_id": null,
+      "started_at": "2026-08-26T09:33:20Z",
+      "state": "FAILED",
+      "symbol": "DOGEUSDT",
+      "tier_a_total": 0,
+      "warmup_complete": null,
+      "warmup_complete_by_tf": {},
+      "warmup_schema_error": null
+    }
+  ]
+}

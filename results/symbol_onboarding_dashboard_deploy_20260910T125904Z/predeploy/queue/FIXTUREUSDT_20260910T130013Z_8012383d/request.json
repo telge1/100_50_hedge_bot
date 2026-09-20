@@ -1,0 +1,28 @@
+{
+  "schema_version": "symbol_onboarding_apply_queue_v1",
+  "job_id": "FIXTUREUSDT_20260910T130013Z_8012383d",
+  "created_at": "2026-09-10T13:00:13Z",
+  "principal": "fixture",
+  "plan_id": "plan_fixture",
+  "plan_hash": "fixture",
+  "mode": "fixture",
+  "request": {
+    "symbol": "FIXTUREUSDT",
+    "days": 7,
+    "candles_1m": false,
+    "open_interest_5m": false,
+    "public_trades": false,
+    "with_ob1000": false,
+    "restart_live": false
+  },
+  "allowed_keys": [
+    "symbol",
+    "days",
+    "candles_1m",
+    "open_interest_5m",
+    "public_trades",
+    "with_ob1000",
+    "restart_live"
+  ],
+  "fixture_sleep_sec": 6
+}

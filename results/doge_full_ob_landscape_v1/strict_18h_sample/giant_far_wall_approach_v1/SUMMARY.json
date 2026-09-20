@@ -1,0 +1,77 @@
+{
+  "schema_version": "doge_giant_far_wall_approach_v1",
+  "semantics": {
+    "giant_definition": "Q99 walls with notional>=100000.0 USDT and distance in [500.0,1000.0] bps (5\u201310%)",
+    "tracking": "loose identity match within 25.0 bps so shifting giants stay linked",
+    "approach": "live-wall distance <= 25.0 bps OR mid reaches birth price within 25.0 bps",
+    "outcomes": "within 300s: BOUNCE_AWAY / BREAK_THROUGH / SIDEWAYS_NEAR_WALL (threshold 15.0 bps)"
+  },
+  "evaluation": {
+    "config": {
+      "min_distance_bps": 500.0,
+      "max_distance_bps": 1000.0,
+      "min_notional_usdt": 100000.0,
+      "require_q99": true,
+      "identity_match_bps": 25.0,
+      "approach_bps": 25.0,
+      "touch_bps": 10.0,
+      "bounce_away_bps": 15.0,
+      "outcome_horizon_s": 300,
+      "min_gap_between_approaches_s": 120,
+      "include_disconnected": true
+    },
+    "track_counts": {
+      "n": 222,
+      "ever_approached_live_wall": 0,
+      "live_approach_rate": 0.0,
+      "ever_birth_level_reached": 0,
+      "birth_level_reach_rate": 0.0,
+      "shifted_while_approaching": 181,
+      "shift_rate": 0.815315,
+      "median_min_distance_bps": 586.147618
+    },
+    "live_wall_approach_counts": {
+      "n": 0,
+      "outcomes": {},
+      "shifted_while_approaching_rate": null,
+      "bounce_away": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      },
+      "break_through": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      }
+    },
+    "birth_level_reach_counts": {
+      "n": 0,
+      "outcomes": {},
+      "wall_still_near_birth_level_rate": null,
+      "median_wall_shift_bps_from_birth": null,
+      "median_live_wall_distance_bps_at_reach": null,
+      "bounce_away": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      },
+      "break_through": {
+        "n": 0,
+        "rate": null,
+        "wilson_low": null,
+        "wilson_high": null
+      }
+    },
+    "verdict": "INSUFFICIENT_SAMPLE",
+    "pass_criteria": {
+      "min_birth_level_reaches_20": false,
+      "birth_bounce_wilson_low_gt_0_55": false
+    }
+  },
+  "verdict": "INSUFFICIENT_SAMPLE",
+  "interpretation": "Too few giant birth-level reach events for a decision. Live giants often shift and rarely stay glued into the near zone."
+}

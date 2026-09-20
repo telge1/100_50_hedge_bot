@@ -1,0 +1,288 @@
+{
+  "schema_version": "add_symbol_job_v1",
+  "job_id": "AAPLUSDT_20260910T130013Z_874a422b",
+  "symbol": "AAPLUSDT",
+  "requested_days": 7,
+  "requested_streams": [
+    "candles_1m",
+    "open_interest_5m",
+    "public_trades",
+    "open_interest_5s",
+    "liquidations"
+  ],
+  "with_ob1000": false,
+  "restart_live": false,
+  "apply": false,
+  "created_at": "2026-09-10T13:00:13Z",
+  "updated_at": "2026-09-10T13:00:13Z",
+  "current_stage": "verify_existing_symbols",
+  "status": "PLANNED",
+  "progress_pct": 100,
+  "error_code": null,
+  "error_message": null,
+  "rollback_status": null,
+  "history_semantics": {
+    "candles_1m": "historical_backfill_supported",
+    "open_interest_5m": "historical_backfill_supported",
+    "public_trades": "historical_day_archives_when_available",
+    "ob1000": "live_only_from_activation",
+    "open_interest_5s": "live_only_from_activation",
+    "liquidations": "live_only_from_activation"
+  },
+  "stages": {
+    "validate_bybit": {
+      "name": "validate_bybit",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "status": "Trading",
+        "category": "linear"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "resolve_instrument_metadata": {
+      "name": "resolve_instrument_metadata",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "symbol": "AAPLUSDT",
+        "status": "Trading",
+        "category": "linear",
+        "quote_coin": "USDT",
+        "contract_type": "LinearPerpetual",
+        "tick_size": "0.01",
+        "qty_step": "0.01",
+        "min_order_qty": "0.01",
+        "min_notional": "5",
+        "orderbook_supported": true,
+        "base_coin": "AAPL",
+        "settle_coin": "USDT"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "register_universe": {
+      "name": "register_universe",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "action": "would_append",
+        "n": 3,
+        "previous": [
+          "BTCUSDT",
+          "DOGEUSDT"
+        ],
+        "already": false
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "register_tick": {
+      "name": "register_tick",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/ob1000_tick_sizes.json",
+        "symbol": "AAPLUSDT",
+        "tick_size": "0.01",
+        "action": "would_upsert",
+        "previous": null
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "register_ob1000": {
+      "name": "register_ob1000",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "note": "pass with_ob1000 to enable OB1000 live"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "backfill_candles": {
+      "name": "backfill_candles",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "status": "dry_run",
+        "cmd": [
+          "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+          "scripts/backfill_bybit_universe.py",
+          "--universe",
+          "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/universe_tradeable_51.json",
+          "--symbols",
+          "AAPLUSDT",
+          "--start",
+          "2026-09-03T13:00:00Z",
+          "--end",
+          "2026-09-10T13:00:00Z",
+          "--resume",
+          "--repair-missing",
+          "--out-dir",
+          "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/results/add_symbol/AAPLUSDT_20260910T130013Z_874a422b/candles_1m"
+        ],
+        "history": "historical_backfill_supported"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "backfill_oi": {
+      "name": "backfill_oi",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "status": "dry_run",
+        "cmd": [
+          "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/.venv/bin/python",
+          "scripts/run_oi_5m_backfill.py",
+          "--days",
+          "7",
+          "--symbols",
+          "AAPLUSDT"
+        ],
+        "history": "historical_backfill_supported",
+        "note": "OI 5s is live-only"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "backfill_public_trades": {
+      "name": "backfill_public_trades",
+      "status": "SUCCEEDED",
+      "started_at": "2026-09-10T13:00:13Z",
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "status": "dry_run",
+        "cmd": [
+          "/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python",
+          "scripts/run_public_trades_7d_backfill.py",
+          "--mode",
+          "backfill",
+          "--start-date",
+          "2026-09-04",
+          "--end-date-exclusive",
+          "2026-09-11",
+          "--universe-file",
+          "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/universe_tradeable_51.json",
+          "--symbols",
+          "AAPLUSDT",
+          "--workers",
+          "1",
+          "--resume",
+          "--run-dir",
+          "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/results/add_symbol/AAPLUSDT_20260910T130013Z_874a422b/public_trades"
+        ],
+        "history": "historical_day_archives_when_available",
+        "status_hint": "WAITING_FOR_ARCHIVE if day archive missing"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "activate_raw_collector": {
+      "name": "activate_raw_collector",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "reason": "ob1000_not_requested"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "observe_raw_snapshot": {
+      "name": "observe_raw_snapshot",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "reason": "ob1000_not_requested"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "activate_materializer": {
+      "name": "activate_materializer",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "reason": "ob1000_not_requested"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "observe_clickhouse": {
+      "name": "observe_clickhouse",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "reason": "ob1000_not_requested"
+      },
+      "error_code": null,
+      "error_message": null
+    },
+    "verify_existing_symbols": {
+      "name": "verify_existing_symbols",
+      "status": "SKIPPED",
+      "started_at": null,
+      "finished_at": "2026-09-10T13:00:13Z",
+      "detail": {
+        "reason": "restart_live_false"
+      },
+      "error_code": null,
+      "error_message": null
+    }
+  },
+  "plan": {
+    "symbol": "AAPLUSDT",
+    "days": 7,
+    "apply": false,
+    "with_ob1000": false,
+    "restart_live": false,
+    "history_semantics": {
+      "candles_1m": "historical_backfill_supported",
+      "open_interest_5m": "historical_backfill_supported",
+      "public_trades": "historical_day_archives_when_available",
+      "ob1000": "live_only_from_activation",
+      "open_interest_5s": "live_only_from_activation",
+      "liquidations": "live_only_from_activation"
+    },
+    "instrument": {
+      "symbol": "AAPLUSDT",
+      "status": "Trading",
+      "category": "linear",
+      "quote_coin": "USDT",
+      "contract_type": "LinearPerpetual",
+      "tick_size": "0.01",
+      "qty_step": "0.01",
+      "min_order_qty": "0.01",
+      "min_notional": "5",
+      "orderbook_supported": true,
+      "base_coin": "AAPL",
+      "settle_coin": "USDT"
+    },
+    "paths": {
+      "universe": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/universe_tradeable_51.json",
+      "ob1000_symbols": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/ob1000_live_symbols.json",
+      "tick_sizes": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/config/ob1000_tick_sizes.json",
+      "ob1000_raw_root": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/symbol_onboarding_dashboard_deploy_20260910T125904Z/predeploy/oa/data/orderbook_raw_shadow/ob1000_v1"
+    },
+    "notes": [
+      "Candles 1m / OI 5m / public trades: historical when archives exist",
+      "OB1000 / OI 5s / liquidations: live-only from activation"
+    ]
+  },
+  "evidence": {},
+  "final_verdict": "ONE_COMMAND_SYMBOL_ONBOARDING_READY_DRY_RUN"
+}

@@ -1,0 +1,28 @@
+{
+  "closed_segments": 0,
+  "computation_mode": "ema_only",
+  "data_basis": "candles_1m",
+  "discovery_end": "2026-08-27T08:44:00Z",
+  "discovery_start": "2025-12-11T00:00:00Z",
+  "ema200_warmup_needed_before": "2025-12-10T07:20:00Z",
+  "incomplete_reason": "",
+  "intersection_end": "2026-08-27T08:44:00Z",
+  "intersection_start": "2025-12-11T00:00:00Z",
+  "open_tmp_ignored": 0,
+  "orderbook_required": false,
+  "outcome_horizon_s": 14400,
+  "outcome_path_end": "2026-08-27T08:44:00Z",
+  "segment_files": [],
+  "sources": [
+    {
+      "max_ts": "2026-08-27T08:44:00Z",
+      "min_ts": "2025-12-11T00:00:00Z",
+      "n_rows": 373485,
+      "notes": "",
+      "source": "candles_1m",
+      "status": "OK"
+    }
+  ],
+  "status": "OK",
+  "symbol": "XRPUSDT"
+}

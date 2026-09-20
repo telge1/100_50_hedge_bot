@@ -1,0 +1,726 @@
+# BTC OB Fight Fact Report (Phase 0–1)
+
+**Status:** `FACTS_READY_RULES_UNFROZEN`
+**Schema:** `btc_ob_fight_facts_v1_1`
+
+## Anchor Profile
+
+- Ankerpreis: 78984.4
+- TPO POC/VAH/VAL: 78565.0 / 79140.0 / 78190.0
+- Abstand zu TPO-VAH: -19.70 bps
+- Abstand zu TPO-VAL: +100.58 bps
+- Volume-Profile: NOT_SEPARATELY_COMPUTED
+- VPOC/VVAH/VVAL: NOT_AVAILABLE (keine separate Volume-Pipeline in Phase 0–1)
+- Nächstes Level: lvn 78985.0 (-0.08 bps)
+
+## Level-Episoden (Fakten)
+
+- Level TPO-HVN 78865.0 wurde erstmals berührt um 2026-08-31 18:30:34.108 UTC.
+- Level TPO-LVN 78935.0 wurde erstmals berührt um 2026-08-31 18:37:00.259 UTC.
+- Level TPO-LVN 79035.0 wurde erstmals berührt um 2026-08-31 18:41:04.329 UTC.
+- Level TPO-VAH 79140.0 wurde erstmals berührt um 2026-08-31 18:44:21.809 UTC.
+- Level TPO-LVN 79145.0 wurde erstmals berührt um 2026-08-31 18:44:21.82 UTC.
+- Level TPO-LVN 78985.0 wurde erstmals berührt um 2026-08-31 18:53:06.961 UTC.
+- Der Preis überschritt das TPO-LVN 78985.0 am 2026-08-31 19:00:01.279 UTC und fiel am 2026-08-31 19:00:01.279 UTC wieder darunter. Die Episode oberhalb dauerte 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:00:01.28 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 1632.373 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.851 UTC mit einer Dauer von 0.198 Sekunden.
+- Der Preis überschritt das TPO-LVN 79035.0 am 2026-08-31 19:01:32.736 UTC und fiel am 2026-08-31 19:01:32.736 UTC wieder darunter. Die Episode oberhalb dauerte 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:01:32.739 UTC und endete am 2026-08-31 19:01:42.015 UTC mit einer Dauer von 9.276 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:23.995 UTC und endete am 2026-08-31 19:02:27.649 UTC mit einer Dauer von 3.654 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:32.65 UTC mit einer Dauer von 1.055 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:45.692 UTC und endete am 2026-08-31 19:04:13.532 UTC mit einer Dauer von 87.840 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:13.532 UTC und endete am 2026-08-31 19:04:13.535 UTC mit einer Dauer von 0.003 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:49.506 UTC und endete am 2026-08-31 19:04:59.158 UTC mit einer Dauer von 9.652 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:59.158 UTC und endete am 2026-08-31 19:05:00.876 UTC mit einer Dauer von 1.718 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:15.695 UTC und endete am 2026-08-31 19:05:25.04 UTC mit einer Dauer von 9.345 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.04 UTC und endete am 2026-08-31 19:05:25.04 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.04 UTC und endete am 2026-08-31 19:05:25.131 UTC mit einer Dauer von 0.091 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.626 UTC und endete am 2026-08-31 19:05:29.626 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.626 UTC und endete am 2026-08-31 19:05:29.626 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.629 UTC und endete am 2026-08-31 19:18:42.031 UTC mit einer Dauer von 792.402 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:42.031 UTC und endete am 2026-08-31 19:18:42.034 UTC mit einer Dauer von 0.003 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.315 UTC und endete am 2026-08-31 19:18:50.315 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.315 UTC und endete am 2026-08-31 19:18:50.315 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.39 UTC und endete am 2026-08-31 19:19:06.173 UTC mit einer Dauer von 15.783 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:06.173 UTC und endete am 2026-08-31 19:19:06.173 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:07.216 UTC und endete am 2026-08-31 19:19:14.205 UTC mit einer Dauer von 6.989 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.886 UTC und endete am 2026-08-31 19:19:44.813 UTC mit einer Dauer von 1.927 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:07.308 UTC und endete am 2026-08-31 19:20:07.308 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:26.571 UTC mit einer Dauer von 8.173 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:57.031 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 7.536 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:46.685 UTC mit einer Dauer von 11.130 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:22:56.304 UTC und endete am 2026-08-31 19:25:00.875 UTC mit einer Dauer von 124.571 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Der Preis überschritt das TPO-LVN 79145.0 am 2026-08-31 19:08:15.206 UTC und fiel am 2026-08-31 19:08:15.206 UTC wieder darunter. Die Episode oberhalb dauerte 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:08:15.264 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 158.589 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:56.698 UTC mit einer Dauer von 2.845 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:59.33 UTC und endete am 2026-08-31 19:10:59.33 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:59.33 UTC und endete am 2026-08-31 19:11:00.852 UTC mit einer Dauer von 1.522 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:04.587 UTC und endete am 2026-08-31 19:11:23.58 UTC mit einer Dauer von 18.993 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:23.58 UTC und endete am 2026-08-31 19:11:23.587 UTC mit einer Dauer von 0.007 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:13:05.634 UTC mit einer Dauer von 9.875 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:24.114 UTC und endete am 2026-08-31 19:13:24.114 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:24.115 UTC und endete am 2026-08-31 19:13:26.187 UTC mit einer Dauer von 2.072 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:28.615 UTC und endete am 2026-08-31 19:13:30.612 UTC mit einer Dauer von 1.997 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:34.309 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 85.922 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Der Preis überschritt das TPO-VAH 79140.0 am 2026-08-31 19:08:13.577 UTC und fiel am 2026-08-31 19:10:58.515 UTC wieder darunter. Die Episode oberhalb dauerte 164.938 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:10:59.22 UTC und endete am 2026-08-31 19:11:35.748 UTC mit einer Dauer von 36.528 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 55.108 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.363 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 3.843 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.361 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:21.595 UTC und endete am 2026-08-31 19:15:04.574 UTC mit einer Dauer von 102.979 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.574 UTC und endete am 2026-08-31 19:15:04.574 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.574 UTC und endete am 2026-08-31 19:15:04.665 UTC mit einer Dauer von 0.091 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode oberhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:33.988 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.
+- Eine weitere Episode oberhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.
+- Der Preis fiel unter das TPO-LVN 78985.0 am 2026-08-31 19:00:01.279 UTC und stieg am 2026-08-31 19:00:01.28 UTC wieder darüber. Die Episode unterhalb dauerte 0.001 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.653 UTC und endete am 2026-08-31 19:27:13.653 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 78985.0 begann am 2026-08-31 19:27:13.851 UTC und endete am 2026-08-31 19:27:33.988 UTC mit einer Dauer von 20.137 Sekunden.
+- Der Preis fiel unter das TPO-LVN 79035.0 am 2026-08-31 19:01:32.736 UTC und stieg am 2026-08-31 19:01:32.739 UTC wieder darüber. Die Episode unterhalb dauerte 0.003 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:01:42.015 UTC und endete am 2026-08-31 19:02:23.995 UTC mit einer Dauer von 41.980 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:27.649 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 3.946 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:31.595 UTC und endete am 2026-08-31 19:02:31.595 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:02:32.65 UTC und endete am 2026-08-31 19:02:45.692 UTC mit einer Dauer von 13.042 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:13.532 UTC und endete am 2026-08-31 19:04:13.532 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:13.535 UTC und endete am 2026-08-31 19:04:49.506 UTC mit einer Dauer von 35.971 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:04:59.158 UTC und endete am 2026-08-31 19:04:59.158 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:00.876 UTC und endete am 2026-08-31 19:05:15.695 UTC mit einer Dauer von 14.819 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.04 UTC und endete am 2026-08-31 19:05:25.04 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.04 UTC und endete am 2026-08-31 19:05:25.04 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:25.131 UTC und endete am 2026-08-31 19:05:29.626 UTC mit einer Dauer von 4.495 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.626 UTC und endete am 2026-08-31 19:05:29.626 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:05:29.626 UTC und endete am 2026-08-31 19:05:29.629 UTC mit einer Dauer von 0.003 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:42.031 UTC und endete am 2026-08-31 19:18:42.031 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:42.034 UTC und endete am 2026-08-31 19:18:50.315 UTC mit einer Dauer von 8.281 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.315 UTC und endete am 2026-08-31 19:18:50.315 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:18:50.315 UTC und endete am 2026-08-31 19:18:50.39 UTC mit einer Dauer von 0.075 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:06.173 UTC und endete am 2026-08-31 19:19:06.173 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:06.173 UTC und endete am 2026-08-31 19:19:07.216 UTC mit einer Dauer von 1.043 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:14.205 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 28.674 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.879 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:42.879 UTC und endete am 2026-08-31 19:19:42.886 UTC mit einer Dauer von 0.007 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:19:44.813 UTC und endete am 2026-08-31 19:20:07.308 UTC mit einer Dauer von 22.495 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:07.308 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 9.366 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:16.674 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:16.674 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 1.724 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:18.398 UTC und endete am 2026-08-31 19:20:18.398 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:20:26.571 UTC und endete am 2026-08-31 19:20:57.031 UTC mit einer Dauer von 30.460 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:04.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:04.567 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 30.988 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:35.555 UTC und endete am 2026-08-31 19:21:35.555 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:21:46.685 UTC und endete am 2026-08-31 19:22:56.304 UTC mit einer Dauer von 69.619 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:25:00.875 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 180.685 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79035.0 begann am 2026-08-31 19:28:01.56 UTC und endete am 2026-08-31 19:28:01.56 UTC mit einer Dauer von 0.000 Sekunden.
+- Der Preis fiel unter das TPO-LVN 79145.0 am 2026-08-31 19:08:15.206 UTC und stieg am 2026-08-31 19:08:15.264 UTC wieder darüber. Die Episode unterhalb dauerte 0.058 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:53.853 UTC und endete am 2026-08-31 19:10:53.853 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:56.698 UTC und endete am 2026-08-31 19:10:59.33 UTC mit einer Dauer von 2.632 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:10:59.33 UTC und endete am 2026-08-31 19:10:59.33 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:00.852 UTC und endete am 2026-08-31 19:11:04.587 UTC mit einer Dauer von 3.735 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:23.58 UTC und endete am 2026-08-31 19:11:23.58 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:11:23.587 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 92.172 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:12:55.759 UTC und endete am 2026-08-31 19:12:55.759 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:05.634 UTC und endete am 2026-08-31 19:13:24.114 UTC mit einer Dauer von 18.480 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:24.114 UTC und endete am 2026-08-31 19:13:24.115 UTC mit einer Dauer von 0.001 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:26.187 UTC und endete am 2026-08-31 19:13:28.615 UTC mit einer Dauer von 2.428 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:13:30.612 UTC und endete am 2026-08-31 19:13:34.309 UTC mit einer Dauer von 3.697 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC und endete am 2026-08-31 19:15:00.231 UTC mit einer Dauer von 0.000 Sekunden.
+- Der Preis fiel unter das TPO-VAH 79140.0 am 2026-08-31 19:10:58.515 UTC und stieg am 2026-08-31 19:10:59.22 UTC wieder darüber. Die Episode unterhalb dauerte 0.705 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:11:35.748 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 37.882 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:12:13.63 UTC und endete am 2026-08-31 19:12:13.63 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:08.738 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:08.738 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 7.624 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.362 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:16.362 UTC und endete am 2026-08-31 19:13:16.363 UTC mit einer Dauer von 0.001 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.206 UTC und endete am 2026-08-31 19:13:20.206 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:20.567 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:13:20.567 UTC und endete am 2026-08-31 19:13:21.595 UTC mit einer Dauer von 1.028 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.574 UTC und endete am 2026-08-31 19:15:04.574 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.574 UTC und endete am 2026-08-31 19:15:04.574 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:04.665 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 15.865 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Eine weitere Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC und endete am 2026-08-31 19:15:20.53 UTC mit einer Dauer von 0.000 Sekunden.
+- Episode unterhalb des TPO-LVN 79145.0 begann am 2026-08-31 19:15:00.231 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.
+- Episode unterhalb des TPO-VAH 79140.0 begann am 2026-08-31 19:15:20.53 UTC. Diese Episode war am Ende des Beobachtungsfensters noch nicht abgeschlossen.
+
+## Public-Trade-Fenster
+
+- Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:00:00 UTC: Taker-Delta -4.24 Mio. USD.
+- Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:30:00 UTC: Taker-Delta -5.12 Mio. USD.
+- Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:30:00 UTC: Taker-Delta -0.87 Mio. USD.
+- Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:10:00 UTC: Taker-Delta +2.76 Mio. USD.
+- Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:00:00 UTC: Preisänderung +14.97 bps.
+- Fenster 2026-08-31 18:30:00 UTC–2026-08-31 19:30:00 UTC: Preisänderung +24.07 bps.
+- Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:10:00 UTC: Preisänderung +25.88 bps.
+- Fenster 2026-08-31 19:00:00 UTC–2026-08-31 19:30:00 UTC: Preisänderung +9.07 bps.
+
+## Open Interest
+
+- OI Start: +52549.44 Source-Einheiten (open_interest)
+- OI Ende: +52663.77 Source-Einheiten (open_interest)
+- OI Delta: +114.33 Source-Einheiten (open_interest) (+0.218 %)
+- OI Sample Count: 720
+- OI Freshness: 2026-08-31T19:29:55Z
+- OI Source Field: open_interest
+- OI-Delta: +114.33 Source-Einheiten (open_interest) (+0.218 %); Start +52549.44, Ende +52663.77.
+
+## Liquidationen
+
+- Liquidationen gesamt: 60
+- Long-Liquidationen: 0 (n/a)
+- Short-Liquidationen: 0 (n/a)
+- Größtes Ereignis: +0.13 Mio. USD @ 2026-08-31 18:44:29.884 UTC
+- Side-Semantik: liquidated_position_side (Position side, nicht Aggressor)
+- Freshness: 2026-08-31T19:14:14.761Z
+- Es wurden 60 Liquidationen beobachtet (Long 0, Short 0).
+
+## Orderbuch-Walls (Heuristik, UNFROZEN)
+
+- Ask-Wall-Kandidaten: 494
+- Bid-Wall-Kandidaten: 494
+- Nach der derzeit nicht eingefrorenen Heuristik wurden 0 trade-backed Ask-Reductions beobachtet.
+- Nach der derzeit nicht eingefrorenen Heuristik wurden 0 trade-backed Bid-Reductions beobachtet.
+- Ask-Pulling-Heuristiken: 0; Bid-Pulling-Heuristiken: 0
+- Ask-Refill-Heuristiken: 0; Bid-Refill-Heuristiken: 0
+- OB-Samples/Walls: 988 Kandidaten; Heuristik: UNFROZEN_HEURISTIC (wall_heuristics_v1)
+- Wall-Schwellen (UNFROZEN): max_bps=800, qty_mult=3.0, match_frac=0.3
+
+## Nicht evaluiert
+
+- Käufer-/Verkäuferkontrolle
+- Absorption
+- Breakout-Akzeptanz
+- Long-/Short-Entry
+
+## Manifest
+
+- OB root: `/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/ob200_v3`
+- auto_extension_enabled: `False`
+- rules_frozen: `False`

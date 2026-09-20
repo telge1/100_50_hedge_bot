@@ -1,0 +1,239 @@
+{
+  "phase": "A_PRE_RESTART",
+  "captured_at": "2026-09-03T23:03:49.224317Z",
+  "pid": 1481866,
+  "collector_count": 1,
+  "rss_kb": 541756,
+  "cpu_ticks": [
+    "54863",
+    "2390"
+  ],
+  "health": {
+    "full_book_active_topics": 2,
+    "full_book_runtimes": [
+      {
+        "symbol": "BTCUSDT",
+        "subscription_state": "live",
+        "raw_bids": 40214,
+        "raw_asks": 22773,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4185687,
+        "seq": 804832637944,
+        "cts_ms": 1788476619870,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "subscription_state": "live",
+        "raw_bids": 5304,
+        "raw_asks": 13426,
+        "snapshot_loaded": true,
+        "book_ready": true,
+        "update_id": 4185373,
+        "seq": 345860006567,
+        "cts_ms": 1788476619724,
+        "gap_count": 0,
+        "reconnect_count": 0,
+        "last_error": ""
+      }
+    ],
+    "writer_queue_drops": 94302,
+    "writer_backlog": 0,
+    "runtimes": {
+      "DOGEUSDT": {
+        "lifecycle": "COOLDOWN",
+        "event_id": null,
+        "fight_event_id": null,
+        "continuation_index": null,
+        "buffer_messages": 3000,
+        "buffer_bytes": 1578897,
+        "buffer_span_seconds": 599.801800017,
+        "buffer_overflow": 0,
+        "capturing": false,
+        "writer_backlog": 0,
+        "queue_drops": 0,
+        "minimum_capture_end_ts": null,
+        "normal_end_ts": null,
+        "extension_count": null,
+        "pre_trigger_seconds_actual": null,
+        "trigger_source": null,
+        "data_quality": null
+      },
+      "BTCUSDT": {
+        "lifecycle": "FIGHT_ACTIVE",
+        "event_id": "BTCUSDT_20260903T213631Z_5ddf5e6415",
+        "fight_event_id": "BTCUSDT_20260903T213631Z_5ddf5e6415",
+        "continuation_index": 2,
+        "buffer_messages": 0,
+        "buffer_bytes": 0,
+        "buffer_span_seconds": null,
+        "buffer_overflow": 0,
+        "capturing": true,
+        "writer_backlog": 0,
+        "queue_drops": 94302,
+        "minimum_capture_end_ts": "2026-09-03T22:36:31.167060Z",
+        "normal_end_ts": "2026-09-03T23:06:31.167060Z",
+        "extension_count": 47112,
+        "pre_trigger_seconds_actual": 599.89406,
+        "trigger_source": "CROSS_IN",
+        "data_quality": "OK"
+      }
+    },
+    "timing_contract": "full_ob_edge_capture_timing_v1"
+  },
+  "open_tmps": [
+    {
+      "fd": "17",
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/cont_002/full_ob_raw_deltas.jsonl.zst.tmp",
+      "size": 8195513,
+      "sha256_moment": "353ec2a79600efe69e44daf53477bdf08bb1096f36fda553e4e9d576a8c50dfb",
+      "holders": [
+        {
+          "pid": 1481866,
+          "fd": "17"
+        }
+      ]
+    },
+    {
+      "fd": "18",
+      "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/cont_002/public_trades_raw.jsonl.zst.tmp",
+      "size": 0,
+      "sha256_moment": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "holders": [
+        {
+          "pid": 1481866,
+          "fd": "18"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "symbol": "BTCUSDT",
+      "id": "BTCUSDT_20260903T184212Z_4a22a89fe6",
+      "trigger_source": null,
+      "data_quality_manifest": null,
+      "queue_drop_count": 0,
+      "completion_status": null,
+      "open_tmp_files": [
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/public_trades_raw.jsonl.zst.tmp",
+          "size": 0,
+          "holders": []
+        },
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/full_ob_raw_deltas.jsonl.zst.tmp",
+          "size": 22076432,
+          "holders": []
+        },
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T184212Z_4a22a89fe6/rest_full_snapshot.json.zst.tmp",
+          "size": 270847,
+          "holders": []
+        }
+      ],
+      "required_classification": null,
+      "active": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "id": "BTCUSDT_20260903T195209Z_e8cb0f6198",
+      "trigger_source": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE",
+      "data_quality_manifest": "INCOMPLETE",
+      "queue_drop_count": 41192,
+      "completion_status": "SEGMENT_CONTINUED",
+      "open_tmp_files": [],
+      "required_classification": {
+        "data_quality": "INCOMPLETE_QUEUE_DROP",
+        "trigger_quality": "BOOTSTRAP_NOT_REAL_CROSS",
+        "research_eligible": false,
+        "never_valid_signal": true
+      },
+      "active": false
+    },
+    {
+      "symbol": "BTCUSDT",
+      "id": "BTCUSDT_20260903T213631Z_5ddf5e6415",
+      "trigger_source": "CROSS_IN",
+      "data_quality_manifest": "OK",
+      "queue_drop_count": 52693,
+      "completion_status": "SEGMENT_CONTINUED",
+      "open_tmp_files": [
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/cont_002/public_trades_raw.jsonl.zst.tmp",
+          "size": 0,
+          "holders": [
+            {
+              "pid": 1481866,
+              "fd": "18"
+            }
+          ]
+        },
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/BTCUSDT/2026-09-03/BTCUSDT_20260903T213631Z_5ddf5e6415/cont_002/full_ob_raw_deltas.jsonl.zst.tmp",
+          "size": 8195513,
+          "holders": [
+            {
+              "pid": 1481866,
+              "fd": "17"
+            }
+          ]
+        }
+      ],
+      "required_classification": {
+        "data_quality": "INCOMPLETE_QUEUE_DROP",
+        "trigger_quality": "REAL_CROSS_IN_BUT_QUEUE_DROPS",
+        "research_eligible": false,
+        "never_valid_signal": false
+      },
+      "active": true
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "id": "DOGEUSDT_20260903T184212Z_f5d68293cd",
+      "trigger_source": null,
+      "data_quality_manifest": null,
+      "queue_drop_count": 0,
+      "completion_status": null,
+      "open_tmp_files": [
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/public_trades_raw.jsonl.zst.tmp",
+          "size": 0,
+          "holders": []
+        },
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/full_ob_raw_deltas.jsonl.zst.tmp",
+          "size": 2417702,
+          "holders": []
+        },
+        {
+          "path": "/home/telgenbuescher/projects/orderbook_analyse/data/orderbook_raw_shadow/full_ob_edge_flight_recorder/DOGEUSDT/2026-09-03/DOGEUSDT_20260903T184212Z_f5d68293cd/rest_full_snapshot.json.zst.tmp",
+          "size": 86326,
+          "holders": []
+        }
+      ],
+      "required_classification": null,
+      "active": false
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "id": "DOGEUSDT_20260903T195209Z_dc0458f57a",
+      "trigger_source": "BOOTSTRAP_ALREADY_IN_EDGE_ZONE",
+      "data_quality_manifest": "INCOMPLETE",
+      "queue_drop_count": 104976,
+      "completion_status": "SEGMENT_CONTINUED",
+      "open_tmp_files": [],
+      "required_classification": {
+        "data_quality": "INCOMPLETE_QUEUE_DROP",
+        "trigger_quality": "BOOTSTRAP_NOT_REAL_CROSS",
+        "research_eligible": false,
+        "never_valid_signal": true
+      },
+      "active": false
+    }
+  ],
+  "oi_pid_147111_alive": true
+}

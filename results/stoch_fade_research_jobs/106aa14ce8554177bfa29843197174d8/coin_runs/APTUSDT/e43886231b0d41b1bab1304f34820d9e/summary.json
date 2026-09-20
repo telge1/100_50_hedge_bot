@@ -1,0 +1,9 @@
+{
+  "raw_total": 6362,
+  "run_id": "e43886231b0d41b1bab1304f34820d9e",
+  "statuses": {
+    "APTUSDT": "EVALUATED_WITH_SIGNALS"
+  },
+  "symbols_evaluated": 1,
+  "tier_a_total": 1260
+}

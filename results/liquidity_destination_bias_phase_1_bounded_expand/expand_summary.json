@@ -1,0 +1,186 @@
+{
+  "engineering_gate": {
+    "both_touch_classes_present": true,
+    "idempotence_passed": true,
+    "minimum_100_eligible": false,
+    "minimum_3_utc_days": false,
+    "no_critical_quality_violation": true,
+    "passed": false,
+    "prefix_boundary_passed": true
+  },
+  "executed_candidate_window": {
+    "end_utc_exclusive": "2026-08-25T02:05:00Z",
+    "reason": "Frozen two-hour maximum; no stateful safe segment merge in V1",
+    "start_utc": "2026-08-25T00:05:00Z"
+  },
+  "freeze_fingerprint_sha256": "ee29a49f941fe85a32ebdda7814649cdc3fb84e9b7c7ccae1eea80a5aaf278d8",
+  "freeze_unchanged": true,
+  "interpretation": "Descriptive factual outcomes only; no bias, predictive edge, hit-rate, profitability, strategy, or trading claim.",
+  "overall": {
+    "candidate_count": 240,
+    "eligible_episode_count": 34,
+    "eligible_ratio": 0.14166666666666666,
+    "episode_concentration_by_utc_hour": {
+      "00": 28,
+      "01": 4,
+      "02": 2
+    },
+    "episodes_and_outcomes_by_utc_day": {
+      "2026-08-25": {
+        "LOWER_FIRST": 6,
+        "NEITHER_WITHIN_HORIZON": 2,
+        "UPPER_FIRST": 26
+      }
+    },
+    "excluded_candidate_count": 206,
+    "exclusion_counts": {
+      "DUPLICATE_OR_OVERLAPPING_EPISODE": 206
+    },
+    "first_touch_duration_seconds": {
+      "count": 32,
+      "median": 91.0,
+      "p25": 9.75,
+      "p75": 291.5
+    },
+    "independent_utc_days": 1,
+    "lower_distance_bps": {
+      "count": 34,
+      "median": 48.95710532906877,
+      "p25": 17.172861644973555,
+      "p75": 92.05606976437606
+    },
+    "neither_share": 0.058823529411764705,
+    "outcome_counts": {
+      "LOWER_FIRST": 6,
+      "NEITHER_WITHIN_HORIZON": 2,
+      "UPPER_FIRST": 26
+    },
+    "upper_distance_bps": {
+      "count": 34,
+      "median": 9.38907980673977,
+      "p25": 4.480468558432936,
+      "p75": 35.53057156529313
+    }
+  },
+  "research_only": true,
+  "symbols": {
+    "BTCUSDT": {
+      "candidate_count": 120,
+      "eligible_episode_count": 19,
+      "eligible_ratio": 0.15833333333333333,
+      "episode_concentration_by_utc_hour": {
+        "00": 15,
+        "01": 2,
+        "02": 2
+      },
+      "episodes_and_outcomes_by_utc_day": {
+        "2026-08-25": {
+          "LOWER_FIRST": 2,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 16
+        }
+      },
+      "excluded_candidate_count": 101,
+      "exclusion_counts": {
+        "DUPLICATE_OR_OVERLAPPING_EPISODE": 101
+      },
+      "first_touch_duration_seconds": {
+        "count": 18,
+        "median": 58.5,
+        "p25": 10.25,
+        "p75": 136.5
+      },
+      "idempotence": {
+        "core_fingerprint_sha256": "355ceb133da88fd036001158a3aba3960bacacf1195231d01828a4b22228f28d",
+        "same_contract": true,
+        "same_core_output_hashes": true,
+        "same_input": true
+      },
+      "longest_no_trade_seconds": 6,
+      "lower_distance_bps": {
+        "count": 19,
+        "median": 40.43304116220419,
+        "p25": 15.053647515753392,
+        "p75": 125.50427926756979
+      },
+      "neither_share": 0.05263157894736842,
+      "outcome_counts": {
+        "LOWER_FIRST": 2,
+        "NEITHER_WITHIN_HORIZON": 1,
+        "UPPER_FIRST": 16
+      },
+      "prefix": {
+        "difference": "source_coverage_end_utc only (run-boundary provenance)",
+        "excluded_rows_equal": true,
+        "full_rows_equal": false,
+        "semantic_episode_fields_equal": true,
+        "short_window_end_utc": "2026-08-25T01:05:00Z"
+      },
+      "upper_distance_bps": {
+        "count": 19,
+        "median": 4.637989697580999,
+        "p25": 2.146497647425355,
+        "p75": 10.306075710737744
+      }
+    },
+    "DOGEUSDT": {
+      "candidate_count": 120,
+      "eligible_episode_count": 15,
+      "eligible_ratio": 0.125,
+      "episode_concentration_by_utc_hour": {
+        "00": 13,
+        "01": 2
+      },
+      "episodes_and_outcomes_by_utc_day": {
+        "2026-08-25": {
+          "LOWER_FIRST": 4,
+          "NEITHER_WITHIN_HORIZON": 1,
+          "UPPER_FIRST": 10
+        }
+      },
+      "excluded_candidate_count": 105,
+      "exclusion_counts": {
+        "DUPLICATE_OR_OVERLAPPING_EPISODE": 105
+      },
+      "first_touch_duration_seconds": {
+        "count": 14,
+        "median": 122.5,
+        "p25": 10.0,
+        "p75": 316.5
+      },
+      "idempotence": {
+        "core_fingerprint_sha256": "4d2e3c3b832246567c2fd2fa70ebfd7e9fe2fe2fe93521807fab33e39ae90fcc",
+        "same_contract": true,
+        "same_core_output_hashes": true,
+        "same_input": true
+      },
+      "longest_no_trade_seconds": 21,
+      "lower_distance_bps": {
+        "count": 15,
+        "median": 52.07756232686961,
+        "p25": 23.241830873588597,
+        "p75": 71.91856605443735
+      },
+      "neither_share": 0.06666666666666667,
+      "outcome_counts": {
+        "LOWER_FIRST": 4,
+        "NEITHER_WITHIN_HORIZON": 1,
+        "UPPER_FIRST": 10
+      },
+      "prefix": {
+        "difference": "source_coverage_end_utc only (run-boundary provenance)",
+        "excluded_rows_equal": true,
+        "full_rows_equal": false,
+        "semantic_episode_fields_equal": true,
+        "short_window_end_utc": "2026-08-25T01:05:00Z"
+      },
+      "upper_distance_bps": {
+        "count": 15,
+        "median": 38.94514298430946,
+        "p25": 11.10142985810208,
+        "p75": 57.01520406258857
+      }
+    }
+  },
+  "verdict": "LIQUIDITY_DESTINATION_BOUNDED_HISTORY_V1_SMALL_N"
+}

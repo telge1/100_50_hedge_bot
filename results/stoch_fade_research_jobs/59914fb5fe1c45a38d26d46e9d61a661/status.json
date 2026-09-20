@@ -1,0 +1,59 @@
+{
+  "coins": [
+    {
+      "artifact_reference": null,
+      "duration_seconds": null,
+      "error_code": null,
+      "finished_at": null,
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 0,
+          "tier_a": 0
+        },
+        "4h": {
+          "raw": 0,
+          "tier_a": 0
+        }
+      },
+      "raw_total": 0,
+      "returncode": null,
+      "runner_run_id": null,
+      "started_at": "2026-08-18T08:26:18Z",
+      "state": "RUNNING",
+      "symbol": "ETHUSDT",
+      "tier_a_total": 0,
+      "warmup_complete": null,
+      "warmup_complete_by_tf": {},
+      "warmup_schema_error": null
+    }
+  ],
+  "combined_summary": null,
+  "completed_coins": 0,
+  "created_at": "2026-08-18T08:26:18Z",
+  "current_index": 1,
+  "current_symbol": "ETHUSDT",
+  "error_summary": "verwaister Research-Worker",
+  "failed_coins": 0,
+  "finished_at": "2026-08-18T08:26:30Z",
+  "job_id": "59914fb5fe1c45a38d26d46e9d61a661",
+  "last_worker_pid": 1,
+  "message": "verwaister Research-Worker",
+  "progress_percent": 0,
+  "raw_total": 0,
+  "started_at": "2026-08-18T08:26:18Z",
+  "state": "INTERRUPTED",
+  "successful_coins": 0,
+  "tier_a_total": 0,
+  "total_coins": 1,
+  "worker_pid": 1
+}

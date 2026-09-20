@@ -1,0 +1,90 @@
+{
+  "coins": [
+    {
+      "artifact_reference": "coin_runs/AAVEUSDT/f06ea4d92aaf46dca97fc9f9ca0cdfca",
+      "duration_seconds": 30.008,
+      "error_code": null,
+      "finished_at": "2026-08-15T15:43:17Z",
+      "message": "",
+      "multi_tf_collision_count": 0,
+      "per_timeframe": {
+        "15m": {
+          "raw": 15,
+          "tier_a": 0
+        },
+        "1h": {
+          "raw": 4,
+          "tier_a": 0
+        },
+        "30m": {
+          "raw": 8,
+          "tier_a": 1
+        },
+        "4h": {
+          "raw": 1,
+          "tier_a": 1
+        }
+      },
+      "raw_total": 28,
+      "returncode": 0,
+      "runner_run_id": "f06ea4d92aaf46dca97fc9f9ca0cdfca",
+      "started_at": "2026-08-15T15:42:47Z",
+      "state": "COMPLETED",
+      "symbol": "AAVEUSDT",
+      "tier_a_total": 2,
+      "warmup_complete": true,
+      "warmup_complete_by_tf": {
+        "15m": true,
+        "1h": true,
+        "30m": true,
+        "4h": true
+      },
+      "warmup_schema_error": null
+    }
+  ],
+  "combined_summary": {
+    "coins_evaluated": 1,
+    "coins_with_signals": 1,
+    "coins_without_tier_a": 0,
+    "execution_dedup_applied": false,
+    "fail_policy": "continue_next_coin_then_COMPLETED_WITH_ERRORS",
+    "failed_coins": 0,
+    "multi_tf_collisions": 0,
+    "outcome_evaluation_enabled": false,
+    "raw_by_timeframe": {
+      "15m": 15,
+      "1h": 4,
+      "30m": 8,
+      "4h": 1
+    },
+    "raw_candidates": 28,
+    "successful_coins": 1,
+    "tier_a": 2,
+    "tier_a_by_timeframe": {
+      "15m": 0,
+      "1h": 0,
+      "30m": 1,
+      "4h": 1
+    },
+    "warmup_warnings": 0,
+    "writes_to_clickhouse": false
+  },
+  "completed_coins": 1,
+  "created_at": "2026-08-15T15:42:47Z",
+  "current_index": 1,
+  "current_symbol": null,
+  "error_summary": "",
+  "failed_coins": 0,
+  "finished_at": "2026-08-15T15:43:17Z",
+  "job_id": "2413236e2f1f4f8695633cfb4f9973ed",
+  "last_worker_pid": 1177248,
+  "message": "COMPLETED",
+  "progress_percent": 100,
+  "raw_total": 28,
+  "started_at": "2026-08-15T15:42:47Z",
+  "state": "COMPLETED",
+  "successful_coins": 1,
+  "tier_a_total": 2,
+  "total_coins": 1,
+  "worker_pid": null
+}

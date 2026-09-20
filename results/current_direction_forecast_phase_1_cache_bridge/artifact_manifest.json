@@ -1,0 +1,47 @@
+{
+  "artifacts": {
+    "ABSCHLUSSBERICHT.md": {
+      "bytes": 1804,
+      "sha256": "73fb677eb5497cf1e378c04fee96fb92cac5276149d6f9c2f6a5a1e192fa07d3"
+    },
+    "artifact_manifest.json": {
+      "bytes": 1528,
+      "sha256": "69ee0bc34f7293a8b09aa505aaf82a0cc44a61f4636b1f3041b578b95c2a09bd"
+    },
+    "bridge_protocol_v1.yaml": {
+      "bytes": 1823,
+      "sha256": "59576c414f34d9cd9bdad623bd3be4e02848eb4a2857afa7daba25b44fccf640"
+    },
+    "contract_freeze_manifest.json": {
+      "bytes": 2102,
+      "sha256": "b2bab38f621bdbc6a19e6cc7ee95a4c297ce6432c4362a10da7bad5d488f1f30"
+    },
+    "offline_integration_results.json": {
+      "bytes": 477,
+      "sha256": "89d57534f894760186f344e578eeec75874fd8f53132d1c3a3d3319e4fdbb09a"
+    },
+    "pre_roll_replay_contract.md": {
+      "bytes": 1427,
+      "sha256": "8b1a1be3546ec856e580fe24b3ae743c0e295741493afdae61cc87a255d6e225"
+    },
+    "resource_estimate.md": {
+      "bytes": 868,
+      "sha256": "0f3c0a99acefb4d762db033f4a415fad734f75fda681b9608aed66dd3e4cb2c8"
+    },
+    "root_cause_and_solution.md": {
+      "bytes": 858,
+      "sha256": "f75d0f895912adca5e6202a9dabce9ec0a2d27a6fd7991cdfeac4832231898e8"
+    },
+    "security_contract.md": {
+      "bytes": 933,
+      "sha256": "ca2f632f2d00ba3ef5c564663c702a43452c1a74c936f3872cf098dee18d6be2"
+    },
+    "test_results.txt": {
+      "bytes": 99,
+      "sha256": "7864c6fe703e70c7758d0d6841ef33f1d1169ddb50c1e23c4aeaf9cdff081a72"
+    }
+  },
+  "generated_at_utc": "2026-09-05T15:12:26Z",
+  "manifest_version": "current_direction_forecast_phase_1_cache_bridge_v1",
+  "verdict": "CURRENT_DIRECTION_FULL_OB_CACHE_BRIDGE_V1_READY_FOR_CONTROLLED_RESTART"
+}

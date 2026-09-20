@@ -1,0 +1,92 @@
+{
+  "preflight_version": "phase_2a1_v1",
+  "q1_why_episode_count": {
+    "episode_count": 1,
+    "cause": "profile_state_changes_on_each_deduplicated_public_trade_post_anchor_crossing_edge_tick_boundary",
+    "state_change_source": "deduplicated_public_trade_chronological",
+    "not_candle_or_bucket": true,
+    "trade_count_observed": 4684
+  },
+  "q2_state_distribution": {
+    "INSIDE_BOTH_PROFILES": 1
+  },
+  "q3_duration_by_state": {
+    "INSIDE_BOTH_PROFILES": {
+      "count": 1,
+      "min": 1797.701,
+      "p25": 1797.701,
+      "median": 1797.701,
+      "p75": 1797.701,
+      "p90": 1797.701,
+      "p95": 1797.701,
+      "max": 1797.701,
+      "total_seconds": 1797.701
+    }
+  },
+  "q4_duration_buckets": {
+    "under_100ms": 0,
+    "under_500ms": 0,
+    "under_1s": 0,
+    "under_2s": 0,
+    "under_5s": 0,
+    "under_10s": 0,
+    "under_30s": 0,
+    "at_least_30s": 1
+  },
+  "q5_outside_episodes_closed": {
+    "count": 0,
+    "all_closed": true,
+    "window_end_outside": 0
+  },
+  "q6_reclaim_chronological_cross": {
+    "phase2a_reclaim_count": 0,
+    "unique_cross_ts_in_phase2a": 0,
+    "phase2a_global_first_reclaim_bug": false
+  },
+  "q7_window_end_as_reclaim": {
+    "window_end_reclaim_count_phase2a": 0,
+    "note": "Phase 2A reclaim builder does not filter WINDOW_END; corrected in Phase 2A.1"
+  },
+  "q8_reclaim_equals_outside_count": {
+    "outside_count": 0,
+    "phase2a_reclaim_count": 0,
+    "equal": true,
+    "explanation_if_equal": "Phase 2A assigns one reclaim per outside episode via flawed global-first transition match"
+  },
+  "q9_state_change_data_source": "each_deduplicated_public_trade_sorted_by_ts_trade_id",
+  "q10_trade_dedup_and_sort": {
+    "deduplicated_by_trade_id": true,
+    "sort_key": "(ts, trade_id)",
+    "meta": {
+      "table": "btc_doge_research.research_public_trades",
+      "raw_count": 349399,
+      "deduped_count": 349399,
+      "dedup_removed": 0,
+      "aggressor_semantics": "side/taker_side Buy/Sell is Bybit taker/aggressor",
+      "sort": "ts, trade_id",
+      "source_mode": "RESEARCH_PUBLIC_TRADES",
+      "lineage_companion_used": false,
+      "raw_archive_replay_used": false,
+      "data_source": "BTC_DOGE_RESEARCH_DB",
+      "mixed_sources_used": false,
+      "research_event_count": 349399,
+      "research_trade_events_missing": false,
+      "min_ts": "2026-08-30T13:30:03.614Z",
+      "max_ts": "2026-08-31T13:29:58.97Z"
+    }
+  },
+  "q11_identical_timestamp_order": "deterministic_trade_id_tiebreak",
+  "q12_edge_event_ticks": [],
+  "q13_exact_tick_only": {
+    "exact_level_ticks_only_in_phase2a": true,
+    "ticks_observed": []
+  },
+  "q14_ob_coverage_at_edges": "requires_phase_2a1_edge_book_coverage",
+  "q15_profile_edges_in_ob200": "requires_phase_2a1_edge_book_coverage",
+  "duration_sum_seconds": 1797.701,
+  "observation_window_seconds": 1800.0,
+  "trade_span_seconds": 1797.701,
+  "duration_sum_matches_window": false,
+  "duration_sum_matches_trade_span": true,
+  "transition_count": 0
+}

@@ -1,0 +1,23 @@
+RESEARCH_ONLY_NO_TRADE
+{
+  "database_connection": false,
+  "dataset_fingerprint_sha256": "9f7d2bd2fd1aff9315b268c70f818020ba91f3c2f5992f3dcd15aec550ad77e8",
+  "episode_count": 1719,
+  "evaluation_contract_version": "liquidity_destination_baseline_eval_v1",
+  "fitted_train_labels": {
+    "B0_TRAIN_MAJORITY": "LOWER_FIRST",
+    "B4_SYMBOL_TRAIN_MAJORITY": {
+      "BTCUSDT": "LOWER_FIRST",
+      "DOGEUSDT": "LOWER_FIRST"
+    }
+  },
+  "output_dir": "results/liquidity_destination_bias_phase_2_baselines/_repro_check",
+  "research_only": "RESEARCH_ONLY_NO_TRADE",
+  "test_combined_accuracy": {
+    "B0_TRAIN_MAJORITY": 0.5068807339449541,
+    "B1_NEAREST_TARGET": 0.7912844036697247,
+    "B2_INVERSE_NEAREST": 0.1353211009174312,
+    "B3_DETERMINISTIC_HASH_CONTROL": 0.33256880733944955,
+    "B4_SYMBOL_TRAIN_MAJORITY": 0.5068807339449541
+  }
+}

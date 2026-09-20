@@ -1,0 +1,29 @@
+{
+  "run_id": "long_gap_multi_20260709T105126",
+  "input_results": "tmp_debug_multi/continuous_results.json",
+  "input_candles": "tmp_debug_multi/candles.json",
+  "candle_meta": {
+    "symbol": "TESTUSDT",
+    "timeframe": "5m",
+    "first_timestamp": "2026-01-01T00:00:00+00:00",
+    "last_timestamp": "2026-01-01T00:00:00+00:00",
+    "candle_count": 5
+  },
+  "total_runs_in_results": 1,
+  "selected_runs": [
+    1
+  ],
+  "eligible_trade_numbers": [
+    1
+  ],
+  "eligible_count": 1,
+  "ineligible_trades": [],
+  "dry_run": false,
+  "outputs_planned": {
+    "orders_csv": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/tmp_debug_multi/out/long_gap_reduction_multi_trade_orders.csv",
+    "events_csv": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/tmp_debug_multi/out/long_gap_reduction_multi_trade_events.csv",
+    "summary_csv": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/tmp_debug_multi/out/long_gap_reduction_multi_trade_summary.csv",
+    "summary_json": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/tmp_debug_multi/out/long_gap_reduction_multi_trade_summary.json",
+    "log": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/tmp_debug_multi/out/long_gap_reduction_multi_trade_audit.log"
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schema_version": "bullish_staircase_matched_control_v1",
+  "pattern": "BULLISH_STAIRCASE",
+  "rule_freeze": {
+    "note": "Staircase thresholds unchanged; only onset independence and matched controls added.",
+    "lookback_seconds": 30,
+    "pattern_module": "doge_full_ob_landscape_v1.patterns"
+  },
+  "config": {
+    "min_gap_seconds": 120,
+    "controls_per_episode": 5,
+    "exclude_radius_seconds": 30,
+    "bootstrap_draws": 2000,
+    "past_return_tol_bps": 8.0,
+    "abs_past_return_tol_bps": 8.0,
+    "realized_vol_tol_bps": 6.0,
+    "spread_tol_bps": 1.0,
+    "imbalance_tol": 0.12,
+    "hour_of_day_tol_s": 10800.0,
+    "require_non_censored_25bps": true
+  },
+  "counts": {
+    "raw_detections": 114,
+    "independent_episodes": 69,
+    "matched_episodes": 58,
+    "unmatched_episodes": 11
+  },
+  "raw_detection_first_25bps": {
+    "n": 98,
+    "successes": 41,
+    "rate": 0.418367,
+    "wilson_low": 0.32559,
+    "wilson_high": 0.517303,
+    "counts": {
+      "SIDEWAYS": 39,
+      "DOWN": 18,
+      "UP": 41
+    }
+  },
+  "independent_episode_first_25bps": {
+    "n": 59,
+    "successes": 21,
+    "rate": 0.355932,
+    "wilson_low": 0.246031,
+    "wilson_high": 0.483447,
+    "counts": {
+      "SIDEWAYS": 29,
+      "DOWN": 9,
+      "UP": 21
+    }
+  },
+  "unmatched_reasons": {
+    "censored_outcome": 10,
+    "no_tolerant_controls": 1
+  },
+  "evaluation": {
+    "episode_first_25bps": {
+      "n": 58,
+      "successes": 21,
+      "rate": 0.362069,
+      "wilson_low": 0.250547,
+      "wilson_high": 0.490727,
+      "counts": {
+        "SIDEWAYS": 28,
+        "DOWN": 9,
+        "UP": 21
+      }
+    },
+    "control_first_25bps": {
+      "n": 290,
+      "successes": 92,
+      "rate": 0.317241,
+      "wilson_low": 0.266363,
+      "wilson_high": 0.372899,
+      "counts": {
+        "UP": 92,
+        "SIDEWAYS": 158,
+        "DOWN": 40
+      }
+    },
+    "episode_first_50bps": {
+      "n": 56,
+      "successes": 11,
+      "rate": 0.196429,
+      "wilson_low": 0.113385,
+      "wilson_high": 0.318449,
+      "counts": {
+        "SIDEWAYS": 44,
+        "UP": 11,
+        "DOWN": 1
+      }
+    },
+    "control_first_50bps": {
+      "n": 276,
+      "successes": 56,
+      "rate": 0.202899,
+      "wilson_low": 0.159682,
+      "wilson_high": 0.254272,
+      "counts": {
+        "SIDEWAYS": 212,
+        "UP": 56,
+        "DOWN": 8
+      }
+    },
+    "paired_risk_difference_25bps": {
+      "mean": 0.043952,
+      "ci95_low": -0.031034,
+      "ci95_high": 0.12069,
+      "bootstrap_p_one_sided_le_zero": 0.128,
+      "draws": 2000
+    },
+    "verdict": "FAIL_MATCHED_CONTROL",
+    "pass_criteria": {
+      "positive_mean_risk_diff": true,
+      "ci95_excludes_zero": false,
+      "bootstrap_p_one_sided_lt_0_05": false,
+      "min_matched_episodes_20": true
+    }
+  },
+  "verdict": "FAIL_MATCHED_CONTROL",
+  "interpretation": "After onset independence and matched controls, bullish staircase does not clear the pre-registered pass gate."
+}

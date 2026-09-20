@@ -1,0 +1,13 @@
+{
+  "symbols": [
+    {
+      "bars_1m": 335520,
+      "error": null,
+      "raw_count": 6269,
+      "status": "EVALUATED_WITH_SIGNALS",
+      "symbol": "SOLUSDT",
+      "tier_a_count": 894,
+      "warmup_complete": false
+    }
+  ]
+}

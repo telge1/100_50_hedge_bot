@@ -1,0 +1,89 @@
+{
+  "schema_version": "doge_structure_followups_v1",
+  "test": "compression_movement_filter",
+  "hypothesis": "Compression raises the chance of a \u00b125 bps move within 15 minutes versus matched quiet/context-similar seconds.",
+  "config": {
+    "pattern": "COMPRESSION",
+    "success": "UP or DOWN at first_25bps",
+    "match_signed_return": false,
+    "min_gap_seconds": 120,
+    "controls_per_episode": 5
+  },
+  "counts": {
+    "raw_detections": 273,
+    "independent_episodes": 158,
+    "matched_episodes": 124,
+    "unmatched_episodes": 34,
+    "unmatched_reasons": {
+      "censored_outcome": 34
+    }
+  },
+  "evaluation": {
+    "outcome_name": "first_25bps_moved_either_side",
+    "success_definition": "MOVED",
+    "episode_first_25bps": {
+      "n": 124,
+      "successes": 52,
+      "rate": 0.419355,
+      "wilson_low": 0.336204,
+      "wilson_high": 0.507352,
+      "counts": {
+        "SIDEWAYS": 72,
+        "UP": 29,
+        "DOWN": 23
+      }
+    },
+    "control_first_25bps": {
+      "n": 620,
+      "successes": 260,
+      "rate": 0.419355,
+      "wilson_low": 0.381126,
+      "wilson_high": 0.458577,
+      "counts": {
+        "SIDEWAYS": 360,
+        "UP": 147,
+        "DOWN": 113
+      }
+    },
+    "episode_first_50bps": {
+      "n": 122,
+      "successes": 15,
+      "rate": 0.122951,
+      "wilson_low": 0.075943,
+      "wilson_high": 0.192979,
+      "counts": {
+        "SIDEWAYS": 107,
+        "DOWN": 2,
+        "UP": 13
+      }
+    },
+    "control_first_50bps": {
+      "n": 617,
+      "successes": 69,
+      "rate": 0.111831,
+      "wilson_low": 0.089326,
+      "wilson_high": 0.13914,
+      "counts": {
+        "SIDEWAYS": 548,
+        "UP": 57,
+        "DOWN": 12
+      }
+    },
+    "paired_risk_difference_25bps": {
+      "mean": 0.000301,
+      "ci95_low": -0.067742,
+      "ci95_high": 0.066129,
+      "bootstrap_p_one_sided_le_zero": 0.504,
+      "draws": 2000
+    },
+    "verdict": "FAIL_MATCHED_CONTROL",
+    "pass_criteria": {
+      "positive_mean_risk_diff": true,
+      "ci95_excludes_zero": false,
+      "bootstrap_p_one_sided_lt_0_05": false,
+      "min_matched_episodes_20": true
+    }
+  },
+  "verdict": "FAIL_MATCHED_CONTROL",
+  "interpretation": "Compression does not raise move rates versus matched controls; rates are essentially identical."
+}

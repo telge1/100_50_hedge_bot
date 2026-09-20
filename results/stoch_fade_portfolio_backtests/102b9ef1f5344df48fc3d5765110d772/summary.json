@@ -1,0 +1,231 @@
+{
+  "accepted_trades": 4575,
+  "avg_hold_seconds": 40636.32786885246,
+  "avg_open_positions": 9.70723421718611,
+  "avg_slot_utilization": 0.970723421718611,
+  "capacity_delta_pnl_usdt": 20250.5,
+  "capacity_delta_trades": 49605,
+  "dedup": {
+    "after_dedup": 54180,
+    "direction_conflict_groups": 2,
+    "dropped_signals": 3997,
+    "duplicate_groups": 3708,
+    "raw_joined": 58177,
+    "theoretical_pnl_usdt_dropped_duplicates": 3060.5
+  },
+  "expectancy_usdt_per_closed_trade": 0.4021024967148489,
+  "fee_note": "SG be50.py FEE_PCT=0.11 is diagnostic only; evaluation cards are gross. No unique authoritative roundtrip fee for this Frozen portfolio run.",
+  "fees_applied": false,
+  "final_equity_with_unrealized": null,
+  "gross_loss_usdt": -2325.0,
+  "gross_profit_usdt": 4161.0,
+  "independent_baseline": {
+    "gross_loss_usdt": -26704.5,
+    "gross_profit_usdt": 48791.0,
+    "losses": 20973,
+    "open": 345,
+    "profit_factor": 1.8270703439495217,
+    "realized_pnl_usdt": 22086.5,
+    "trades": 54180,
+    "win_rate": 0.6104207300083588,
+    "wins": 32862
+  },
+  "initial_balance_usdt": 1000.0,
+  "input": {
+    "coins": 51,
+    "losses_before_portfolio": 21830,
+    "open_before_portfolio": 354,
+    "outcomes": 58177,
+    "tier_a_signals": 58177,
+    "timeframes": [
+      "15m",
+      "30m",
+      "1h",
+      "4h"
+    ],
+    "unique_signal_ids": 58177,
+    "window": {
+      "evaluation_data_end": "2026-08-11T19:46:00Z",
+      "evaluation_data_start": "2026-01-01T00:01:00Z"
+    },
+    "wins_before_portfolio": 35993
+  },
+  "longest_hold_seconds": 19194300.0,
+  "longest_loss_streak": 16,
+  "longest_win_streak": 30,
+  "losses": 1808,
+  "max_concurrent_positions": 10,
+  "max_drawdown_pct_of_peak_equity": 2.39823288,
+  "max_drawdown_usdt": 38.0,
+  "median_hold_seconds": 4080.0,
+  "net_result_status": "NOT_EVALUATED_NO_AUTHORITATIVE_FEE_RATE",
+  "open": 9,
+  "peak_equity_usdt": 1584.5,
+  "per_direction": {
+    "LONG": {
+      "gross_loss_usdt": -1180.0,
+      "gross_profit_usdt": 2045.0,
+      "losses": 915,
+      "open": 6,
+      "profit_factor": 1.7330508474576272,
+      "realized_pnl_usdt": 865.0,
+      "trades": 2274,
+      "win_rate": 0.5965608465608465,
+      "wins": 1353
+    },
+    "SHORT": {
+      "gross_loss_usdt": -1145.0,
+      "gross_profit_usdt": 2116.0,
+      "losses": 893,
+      "open": 3,
+      "profit_factor": 1.8480349344978166,
+      "realized_pnl_usdt": 971.0,
+      "trades": 2301,
+      "win_rate": 0.6114012184508268,
+      "wins": 1405
+    }
+  },
+  "per_month": {
+    "2026-01": {
+      "gross_loss_usdt": -714.5,
+      "gross_profit_usdt": 1277.0,
+      "losses": 551,
+      "open": 5,
+      "profit_factor": 1.787263820853744,
+      "realized_pnl_usdt": 562.5,
+      "trades": 1392,
+      "win_rate": 0.6027397260273972,
+      "wins": 836
+    },
+    "2026-02": {
+      "gross_loss_usdt": -672.0,
+      "gross_profit_usdt": 1200.0,
+      "losses": 517,
+      "open": 0,
+      "profit_factor": 1.7857142857142858,
+      "realized_pnl_usdt": 528.0,
+      "trades": 1338,
+      "win_rate": 0.6136023916292974,
+      "wins": 821
+    },
+    "2026-03": {
+      "gross_loss_usdt": -452.5,
+      "gross_profit_usdt": 755.0,
+      "losses": 358,
+      "open": 2,
+      "profit_factor": 1.6685082872928176,
+      "realized_pnl_usdt": 302.5,
+      "trades": 866,
+      "win_rate": 0.5856481481481481,
+      "wins": 506
+    },
+    "2026-04": {
+      "gross_loss_usdt": -170.0,
+      "gross_profit_usdt": 317.0,
+      "losses": 139,
+      "open": 1,
+      "profit_factor": 1.8647058823529412,
+      "realized_pnl_usdt": 147.0,
+      "trades": 351,
+      "win_rate": 0.6028571428571429,
+      "wins": 211
+    },
+    "2026-05": {
+      "gross_loss_usdt": -113.0,
+      "gross_profit_usdt": 217.0,
+      "losses": 85,
+      "open": 1,
+      "profit_factor": 1.920353982300885,
+      "realized_pnl_usdt": 104.0,
+      "trades": 222,
+      "win_rate": 0.6153846153846154,
+      "wins": 136
+    },
+    "2026-06": {
+      "gross_loss_usdt": -115.5,
+      "gross_profit_usdt": 249.0,
+      "losses": 87,
+      "open": 0,
+      "profit_factor": 2.155844155844156,
+      "realized_pnl_usdt": 133.5,
+      "trades": 239,
+      "win_rate": 0.6359832635983264,
+      "wins": 152
+    },
+    "2026-07": {
+      "gross_loss_usdt": -84.0,
+      "gross_profit_usdt": 140.0,
+      "losses": 68,
+      "open": 0,
+      "profit_factor": 1.6666666666666667,
+      "realized_pnl_usdt": 56.0,
+      "trades": 162,
+      "win_rate": 0.5802469135802469,
+      "wins": 94
+    },
+    "2026-08": {
+      "gross_loss_usdt": -3.5,
+      "gross_profit_usdt": 6.0,
+      "losses": 3,
+      "open": 0,
+      "profit_factor": 1.7142857142857142,
+      "realized_pnl_usdt": 2.5,
+      "trades": 5,
+      "win_rate": 0.4,
+      "wins": 2
+    }
+  },
+  "profit_factor": 1.7896774193548388,
+  "realized_cash_usdt": 1936.0,
+  "realized_equity_usdt": 2836.0,
+  "reserved_open_notional_usdt": 900.0,
+  "return_on_initial": 1.836,
+  "seconds_by_open_count": {
+    "0": 0.0,
+    "1": 0.0,
+    "10": 15058260.0,
+    "2": 0.0,
+    "3": 300.0,
+    "4": 10560.0,
+    "5": 107280.0,
+    "6": 146220.0,
+    "7": 284940.0,
+    "8": 537600.0,
+    "9": 2276460.0
+  },
+  "skip_reasons": {
+    "INSUFFICIENT_FREE_CASH": {
+      "count": 381,
+      "losses": 153,
+      "open": 2,
+      "theoretical_pnl_usdt": 128.0,
+      "wins": 226
+    },
+    "NO_FREE_SLOT": {
+      "count": 43610,
+      "losses": 16754,
+      "open": 88,
+      "theoretical_pnl_usdt": 18364.0,
+      "wins": 26768
+    },
+    "SYMBOL_ALREADY_OPEN": {
+      "count": 5614,
+      "losses": 2258,
+      "open": 246,
+      "theoretical_pnl_usdt": 1758.5,
+      "wins": 3110
+    }
+  },
+  "skipped_losers": 19165,
+  "skipped_signals": 49605,
+  "skipped_winners": 30104,
+  "span_days": 212.70833333333334,
+  "total_realized_pnl_usdt": 1836.0,
+  "trades_per_day": 21.508325171400585,
+  "trades_per_month": 654.6488932419196,
+  "trades_per_week": 150.55827619980408,
+  "trough_equity_usdt": 1546.5,
+  "unrealized_pnl_usdt": null,
+  "win_rate": 0.604029785370127,
+  "wins": 2758
+}
