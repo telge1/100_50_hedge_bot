@@ -21,6 +21,14 @@ from ob_microstructure_breakout_bot.rule_engine import RuleEngine
 
 @dataclass(frozen=True)
 class TouchEvent:
+    """One bar-close EMA59 touch candidate.
+
+    ``bar_ts`` is the **start** of the completed 5m bucket that contains the
+    touch (e.g. a touch somewhere inside 10:05–10:10 is stored as 10:05).
+    It is *not* the exact intrabar second of the touch. Classification becomes
+    available only at ``ScannedTouch.decision_ts`` after confirm + follow-through.
+    """
+
     bar_ts: datetime
     direction: TouchDirection
     is_first_in_cluster: bool
@@ -31,6 +39,12 @@ class TouchEvent:
 
 @dataclass
 class ScannedTouch:
+    """Classified touch with availability timestamp.
+
+    ``decision_ts`` is the earliest time all confirm/follow-through bars are
+    closed. Callers must treat this — not ``touch.bar_ts`` — as the signal time.
+    """
+
     touch: TouchEvent
     context: TradeWindowStats
     confirm: TradeWindowStats
@@ -79,7 +93,11 @@ def detect_ema59_touches(
     *,
     cluster_gap_bars: int = 3,
 ) -> list[TouchEvent]:
-    """Detect bars where price touches/crosses EMA59."""
+    """Detect completed 5m bars where price touches/crosses EMA59 (bar-close).
+
+    Requires fully closed OHLC bars. The stored ``TouchEvent.bar_ts`` is the
+    bucket start of that completed candle, not an intrabar timestamp.
+    """
     closes = [b.close for b in bars]
     e9 = _ema_series(closes, 9)
     e20 = _ema_series(closes, 20)
@@ -144,7 +162,13 @@ def scan_ema59_touches(
     confirm_bars: int = 2,  # touch bar + next 5m (= 10m confirm)
     followthrough_bars: int = 2,  # following 10m
 ) -> list[ScannedTouch]:
-    """Scan a range for EMA59 touches and classify each one."""
+    """Scan a range for EMA59 touches and classify each one (bar-close model).
+
+    ``load_5m_bars`` only returns fully closed 5m buckets relative to ``end``.
+    A classification is emitted only when confirm + follow-through are complete;
+    ``decision_ts`` is the close of the last follow-through bar and is the
+    earliest valid signal time (not ``touch.bar_ts``).
+    """
     # Warmup for EMA200 (needs >= 200 closed 5m bars)
     warmup = start - timedelta(minutes=5 * 220)
     bars = load_5m_bars(symbol, warmup, end, client=client)
@@ -157,6 +181,7 @@ def scan_ema59_touches(
     results: list[ScannedTouch] = []
 
     for touch in touches:
+        # bar_ts is bucket start of a completed candle; keep it inside the scan window.
         if touch.bar_ts < start or touch.bar_ts >= end:
             continue
         if only_first_in_cluster and not touch.is_first_in_cluster:
@@ -167,9 +192,8 @@ def scan_ema59_touches(
         confirm_slice = bars[idx : idx + confirm_bars]
         ft_slice = bars[idx + confirm_bars : idx + confirm_bars + followthrough_bars]
 
-        # Do not classify a touch until the full confirm + follow-through
-        # windows are available. Otherwise the scanner would be peeking into
-        # an incomplete future window.
+        # Do not classify until confirm + follow-through bars are fully present.
+        # Otherwise the scanner would emit a decision before decision_ts.
         if len(confirm_slice) < confirm_bars or len(ft_slice) < followthrough_bars:
             continue
 
@@ -177,13 +201,17 @@ def scan_ema59_touches(
         confirm = _sum_bars(confirm_slice)
         followthrough = _sum_bars(ft_slice)
         decision_bar = bars[idx + confirm_bars + followthrough_bars - 1]
+        # Close of the last follow-through bar (= earliest known-complete decision).
         decision_ts = decision_bar.ts + timedelta(minutes=5)
+        if decision_ts <= touch.bar_ts:
+            continue
 
         ob = None
         ob_ok = True
         ob_error = None
         if fetch_ob:
             try:
+                # Conservative: OB as-of bucket start, not post-close of the touch bar.
                 ob = sample_ob_bands(symbol, touch.bar_ts)
             except Exception as exc:  # noqa: BLE001
                 ob_ok = False

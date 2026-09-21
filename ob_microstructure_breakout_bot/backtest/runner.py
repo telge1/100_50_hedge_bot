@@ -124,6 +124,7 @@ def _run_scan(args, thresholds) -> int:
     counts = Counter(s.result.state.value for s in scanned)
     rows = []
     for s in scanned:
+        # decision_ts = signal availability; touch_ts = 5m bucket start only.
         row = {
             "touch_ts": s.touch.bar_ts.isoformat(),
             "decision_ts": s.decision_ts.isoformat(),
