@@ -14,9 +14,14 @@ from ob_microstructure_breakout_bot.models import (
     EmaSnapshot,
     MarketState,
     ObBandSnapshot,
+    TouchDirection,
     TradeWindowStats,
 )
-from ob_microstructure_breakout_bot.rule_engine import RuleEngine, classify_long_breakout
+from ob_microstructure_breakout_bot.rule_engine import (
+    RuleEngine,
+    classify_long_breakout,
+    classify_short_breakout,
+)
 from ob_microstructure_breakout_bot.thresholds import load_thresholds
 
 
@@ -152,6 +157,38 @@ def test_fakeout_followthrough_flip():
     )
     assert res.state == MarketState.FAKEOUT
     assert res.tier == BreakoutTier.FAKEOUT
+
+
+def test_short_breakout_mirror():
+    engine = RuleEngine(load_thresholds("DOGEUSDT"))
+    res = engine.classify_ema59_touch(
+        direction=TouchDirection.FROM_ABOVE,
+        context=TradeWindowStats(10_000, 5_000),
+        at_touch=TradeWindowStats(40_000, 260_000),
+        followthrough=TradeWindowStats(35_000, 120_000),
+        ob_at_touch=ObBandSnapshot(40_000, 140_000, 0, 0),
+        ema=None,
+        is_first_touch=True,
+        previous_ema=None,
+    )
+    assert res.state == MarketState.BREAKOUT_CONFIRMED
+    assert res.tier == BreakoutTier.STRONG
+    assert res.side == "short"
+
+
+def test_calibrated_short_delta_led_without_ask_dominance():
+    """Calibrated short path confirms large negative delta even if book is bid-heavy."""
+    th = load_thresholds("DOGEUSDT_CALIBRATED")
+    assert th.short.require_ob_support is False
+    res = classify_short_breakout(
+        thresholds=th,
+        confirm=TradeWindowStats(100_000, 900_000),  # Δc ~= -800k
+        followthrough=TradeWindowStats(40_000, 200_000),  # still negative FT
+        ob_at_event=ObBandSnapshot(90_000, 40_000, 0, 0),  # bid-heavy
+    )
+    assert res.state == MarketState.BREAKOUT_CONFIRMED
+    assert res.side == "short"
+    assert "delta-led" in " ".join(res.reasons)
 
 
 def test_all_known_doge_cases_pass():

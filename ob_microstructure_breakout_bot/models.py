@@ -118,21 +118,54 @@ class EmaSnapshot:
 
 
 @dataclass(frozen=True)
-class CoinThresholds:
-    symbol: str
-    # Public-trade delta (USDT notional) over confirm window
+class SideThresholds:
+    """Per-side breakout thresholds (long and short can differ)."""
+
     fakeout_max_confirm_delta: float
     tier1_min_confirm_delta: float
     tier2_min_confirm_delta: float
-    # OB 5bps bid/ask ratio
-    tier1_min_bid_ask_ratio_5bps: float
-    tier2_min_bid_ask_ratio_5bps: float
-    # Follow-through: next window delta must not flip hard against
+    tier1_min_ob_ratio_5bps: float
+    tier2_min_ob_ratio_5bps: float
+    # Long: negative FT flip. Short: positive FT flip.
     fakeout_followthrough_flip_delta: float
+    # If False, tier1/tier2 can confirm on delta alone (needed for short dumps).
+    require_ob_support: bool = True
+
+
+@dataclass(frozen=True)
+class CoinThresholds:
+    symbol: str
+    long: SideThresholds
+    short: SideThresholds
     # Context windows (minutes)
     context_lookback_minutes: int = 30
     confirm_window_minutes: int = 5
     followthrough_candles: int = 2
+
+    # ---- backward-compatible aliases (long side) ----
+    @property
+    def fakeout_max_confirm_delta(self) -> float:
+        return self.long.fakeout_max_confirm_delta
+
+    @property
+    def tier1_min_confirm_delta(self) -> float:
+        return self.long.tier1_min_confirm_delta
+
+    @property
+    def tier2_min_confirm_delta(self) -> float:
+        return self.long.tier2_min_confirm_delta
+
+    @property
+    def tier1_min_bid_ask_ratio_5bps(self) -> float:
+        return self.long.tier1_min_ob_ratio_5bps
+
+    @property
+    def tier2_min_bid_ask_ratio_5bps(self) -> float:
+        return self.long.tier2_min_ob_ratio_5bps
+
+    @property
+    def fakeout_followthrough_flip_delta(self) -> float:
+        return self.long.fakeout_followthrough_flip_delta
 
 
 @dataclass

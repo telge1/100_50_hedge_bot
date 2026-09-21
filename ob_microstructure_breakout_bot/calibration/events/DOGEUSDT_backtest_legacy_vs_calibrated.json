@@ -1,0 +1,409 @@
+{
+  "legacy": {
+    "n": 171,
+    "by_state": {
+      "fakeout": 48,
+      "chop": 49,
+      "hold": 26,
+      "breakout_confirmed": 20,
+      "exit_confirmed": 28
+    },
+    "by_side_state": {
+      "short|fakeout": 13,
+      "short|chop": 11,
+      "long|chop": 38,
+      "long|hold": 26,
+      "long|fakeout": 35,
+      "long|breakout_confirmed": 15,
+      "short|breakout_confirmed": 5,
+      "long|exit_confirmed": 28
+    },
+    "breakouts": [
+      {
+        "touch_ts": "2026-09-06T16:35:00+00:00",
+        "decision_ts": "2026-09-06T16:55:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 152165.03821000003,
+        "followthrough_delta": 98720.48622999998,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T06:30:00+00:00",
+        "decision_ts": "2026-09-07T06:50:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": -193755.45778000006,
+        "followthrough_delta": 10104.566909999994,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T08:25:00+00:00",
+        "decision_ts": "2026-09-07T08:45:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 364413.1566,
+        "followthrough_delta": 497537.68542,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T19:15:00+00:00",
+        "decision_ts": "2026-09-07T19:35:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 161431.07959,
+        "followthrough_delta": 127326.23241,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T20:05:00+00:00",
+        "decision_ts": "2026-09-07T20:25:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": -500899.92876000004,
+        "followthrough_delta": -711637.58938,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-08T17:25:00+00:00",
+        "decision_ts": "2026-09-08T17:45:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": -366556.73161,
+        "followthrough_delta": -262586.08420000004,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-08T20:05:00+00:00",
+        "decision_ts": "2026-09-08T20:25:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 1424209.6378500003,
+        "followthrough_delta": -72979.50263,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-10T18:45:00+00:00",
+        "decision_ts": "2026-09-10T19:05:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 131635.94276,
+        "followthrough_delta": 59615.11337000001,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-11T01:55:00+00:00",
+        "decision_ts": "2026-09-11T02:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 165194.25238000002,
+        "followthrough_delta": 47308.3487,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-11T17:10:00+00:00",
+        "decision_ts": "2026-09-11T17:30:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": -451968.90875,
+        "followthrough_delta": 47952.272809999995,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-12T01:05:00+00:00",
+        "decision_ts": "2026-09-12T01:25:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 147276.69616,
+        "followthrough_delta": 45692.42716,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-13T14:05:00+00:00",
+        "decision_ts": "2026-09-13T14:25:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 557413.0341099999,
+        "followthrough_delta": 45454.801809999975,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-14T01:55:00+00:00",
+        "decision_ts": "2026-09-14T02:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 198436.73355,
+        "followthrough_delta": 32720.626180000138,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-15T17:30:00+00:00",
+        "decision_ts": "2026-09-15T17:50:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 654463.09785,
+        "followthrough_delta": 142092.77061999997,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-15T23:10:00+00:00",
+        "decision_ts": "2026-09-15T23:30:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 214025.89441000004,
+        "followthrough_delta": 212033.10447000002,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-16T17:55:00+00:00",
+        "decision_ts": "2026-09-16T18:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 623421.4093099998,
+        "followthrough_delta": 433075.34051,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-17T16:30:00+00:00",
+        "decision_ts": "2026-09-17T16:50:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": -112822.18001000001,
+        "followthrough_delta": -260128.95605000004,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-17T19:20:00+00:00",
+        "decision_ts": "2026-09-17T19:40:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 108499.68038999988,
+        "followthrough_delta": 32550.120510000008,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-17T23:00:00+00:00",
+        "decision_ts": "2026-09-17T23:20:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 260113.2901000001,
+        "followthrough_delta": 698829.4694299999,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-18T00:50:00+00:00",
+        "decision_ts": "2026-09-18T01:10:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 125049.28224,
+        "followthrough_delta": 683447.47969,
+        "ob_ok": true
+      }
+    ]
+  },
+  "calibrated": {
+    "n": 171,
+    "by_state": {
+      "fakeout": 43,
+      "chop": 62,
+      "hold": 25,
+      "breakout_confirmed": 13,
+      "exit_confirmed": 28
+    },
+    "by_side_state": {
+      "short|fakeout": 13,
+      "short|chop": 14,
+      "long|chop": 48,
+      "long|hold": 25,
+      "long|fakeout": 30,
+      "long|breakout_confirmed": 10,
+      "short|breakout_confirmed": 3,
+      "long|exit_confirmed": 28
+    },
+    "breakouts": [
+      {
+        "touch_ts": "2026-09-07T08:25:00+00:00",
+        "decision_ts": "2026-09-07T08:45:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 364413.1566,
+        "followthrough_delta": 497537.68542,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T19:15:00+00:00",
+        "decision_ts": "2026-09-07T19:35:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 161431.07959,
+        "followthrough_delta": 127326.23241,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-07T20:05:00+00:00",
+        "decision_ts": "2026-09-07T20:25:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": -500899.92876000004,
+        "followthrough_delta": -711637.58938,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-08T17:25:00+00:00",
+        "decision_ts": "2026-09-08T17:45:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": -366556.73161,
+        "followthrough_delta": -262586.08420000004,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-08T20:05:00+00:00",
+        "decision_ts": "2026-09-08T20:25:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 1424209.6378500003,
+        "followthrough_delta": -72979.50263,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-11T01:55:00+00:00",
+        "decision_ts": "2026-09-11T02:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 165194.25238000002,
+        "followthrough_delta": 47308.3487,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-11T17:10:00+00:00",
+        "decision_ts": "2026-09-11T17:30:00+00:00",
+        "direction": "from_above",
+        "side": "short",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": -451968.90875,
+        "followthrough_delta": 47952.272809999995,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-13T14:05:00+00:00",
+        "decision_ts": "2026-09-13T14:25:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 557413.0341099999,
+        "followthrough_delta": 45454.801809999975,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-14T01:55:00+00:00",
+        "decision_ts": "2026-09-14T02:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 198436.73355,
+        "followthrough_delta": 32720.626180000138,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-15T17:30:00+00:00",
+        "decision_ts": "2026-09-15T17:50:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 654463.09785,
+        "followthrough_delta": 142092.77061999997,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-15T23:10:00+00:00",
+        "decision_ts": "2026-09-15T23:30:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 214025.89441000004,
+        "followthrough_delta": 212033.10447000002,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-16T17:55:00+00:00",
+        "decision_ts": "2026-09-16T18:15:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier2_strong",
+        "confirm_delta": 623421.4093099998,
+        "followthrough_delta": 433075.34051,
+        "ob_ok": true
+      },
+      {
+        "touch_ts": "2026-09-17T23:00:00+00:00",
+        "decision_ts": "2026-09-17T23:20:00+00:00",
+        "direction": "from_below",
+        "side": "long",
+        "state": "breakout_confirmed",
+        "tier": "tier1_valid",
+        "confirm_delta": 260113.2901000001,
+        "followthrough_delta": 698829.4694299999,
+        "ob_ok": true
+      }
+    ]
+  }
+}

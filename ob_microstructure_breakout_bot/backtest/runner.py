@@ -129,6 +129,7 @@ def _run_scan(args, thresholds) -> int:
             "touch_ts": s.touch.bar_ts.isoformat(),
             "decision_ts": s.decision_ts.isoformat(),
             "direction": s.touch.direction.value,
+            "side": s.result.side,
             "first_in_cluster": s.touch.is_first_in_cluster,
             "state": s.result.state.value,
             "tier": s.result.tier.value if s.result.tier else None,
@@ -149,7 +150,7 @@ def _run_scan(args, thresholds) -> int:
         if not args.json:
             print(
                 f"{s.decision_ts.isoformat()}  {s.touch.direction.value:11}  "
-                f"{s.result.state.value:20}  "
+                f"{s.result.state.value:20}  side={s.result.side or '-':5}  "
                 f"tier={s.result.tier.value if s.result.tier else '-':16}  "
                 f"Δc={s.confirm.delta_notional:+.0f}  "
                 f"Δft={s.followthrough.delta_notional:+.0f}"
@@ -306,13 +307,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Include repeated EMA59 retests inside a cluster",
     )
     parser.add_argument("--json", action="store_true", help="JSON output")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Override threshold YAML path (e.g. config/doge_usdt_calibrated.yaml)",
+    )
     args = parser.parse_args(argv)
 
-    if args.symbol.upper().replace("/", "") not in list_configured_symbols():
+    symbol_key = args.symbol.upper().replace("/", "")
+    if args.config is None and symbol_key not in list_configured_symbols():
         print(f"No config for {args.symbol}", file=sys.stderr)
         return 2
 
-    thresholds = load_thresholds(args.symbol)
+    thresholds = load_thresholds(args.symbol, config_path=args.config)
 
     if args.list_cases:
         for c in list_cases():

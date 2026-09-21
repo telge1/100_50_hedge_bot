@@ -11,7 +11,8 @@ from ob_microstructure_breakout_bot.data.bars import (
     load_5m_bars,
 )
 from ob_microstructure_breakout_bot.data.ema_candles import load_5m_closes
-from ob_microstructure_breakout_bot.models import CoinThresholds, EmaSnapshot, TouchDirection
+from ob_microstructure_breakout_bot.models import EmaSnapshot, TouchDirection
+from ob_microstructure_breakout_bot.thresholds import make_thresholds
 
 
 def _bar(ts: datetime, o, h, l, c) -> Bar5m:
@@ -185,7 +186,7 @@ def test_scan_skips_incomplete_future_windows(monkeypatch):
         ema=EmaSnapshot(ema9=0.11, ema20=0.10, ema59=0.09, price=bars[-1].close),
         bar=bars[-1],
     )
-    thresholds = CoinThresholds(
+    thresholds = make_thresholds(
         symbol="DOGEUSDT",
         fakeout_max_confirm_delta=50_000.0,
         tier1_min_confirm_delta=100_000.0,
@@ -235,7 +236,7 @@ def test_scan_decision_ts_after_followthrough_close(monkeypatch):
         ),
         bar=bars[touch_idx],
     )
-    thresholds = CoinThresholds(
+    thresholds = make_thresholds(
         symbol="DOGEUSDT",
         fakeout_max_confirm_delta=50_000.0,
         tier1_min_confirm_delta=100_000.0,

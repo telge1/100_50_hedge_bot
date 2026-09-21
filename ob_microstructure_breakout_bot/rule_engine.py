@@ -20,6 +20,12 @@ def _ratio_or_zero(ob: ObBandSnapshot | None) -> float:
     return float(ratio) if ratio is not None else 0.0
 
 
+def _ask_ratio_or_zero(ob: ObBandSnapshot | None) -> float:
+    if ob is None or ob.bid_5bps <= 0:
+        return 0.0
+    return float(ob.ask_5bps / ob.bid_5bps)
+
+
 def classify_long_breakout(
     *,
     thresholds: CoinThresholds,
@@ -29,6 +35,7 @@ def classify_long_breakout(
     ema: EmaSnapshot | None = None,
 ) -> ClassificationResult:
     """Classify a long breakout candidate into tier 0 / 1 / 2."""
+    side = thresholds.long
     delta = confirm.delta_notional
     ratio = _ratio_or_zero(ob_at_event)
     metrics = {
@@ -45,10 +52,10 @@ def classify_long_breakout(
     if followthrough is not None:
         ft = followthrough.delta_notional
         metrics["followthrough_delta"] = ft
-        if ft <= thresholds.fakeout_followthrough_flip_delta:
+        if ft <= side.fakeout_followthrough_flip_delta:
             reasons.append(
                 f"follow-through delta {ft:.0f} <= "
-                f"{thresholds.fakeout_followthrough_flip_delta:.0f}"
+                f"{side.fakeout_followthrough_flip_delta:.0f}"
             )
             return ClassificationResult(
                 state=MarketState.FAKEOUT,
@@ -59,8 +66,8 @@ def classify_long_breakout(
             )
 
     # Weak confirm → fakeout / chop bucket
-    if delta < thresholds.tier1_min_confirm_delta:
-        if delta <= thresholds.fakeout_max_confirm_delta and (
+    if delta < side.tier1_min_confirm_delta:
+        if delta <= side.fakeout_max_confirm_delta and (
             ob_at_event is None or not ob_at_event.bid_dominant_5bps
         ):
             reasons.append(
@@ -85,15 +92,20 @@ def classify_long_breakout(
     # Tier 2 strong:
     # - classic: large delta + strong OB ratio
     # - delta-led: large delta with at least tier1 supportive OB (bid dominant)
-    if delta >= thresholds.tier2_min_confirm_delta and (
-        ratio >= thresholds.tier2_min_bid_ask_ratio_5bps
+    # - optional: delta alone when require_ob_support is False
+    if delta >= side.tier2_min_confirm_delta and (
+        (not side.require_ob_support)
+        or ratio >= side.tier2_min_ob_ratio_5bps
         or (
-            ratio >= thresholds.tier1_min_bid_ask_ratio_5bps
+            ratio >= side.tier1_min_ob_ratio_5bps
             and ob_at_event is not None
             and ob_at_event.bid_dominant_5bps
         )
     ):
-        reasons.append("strong confirm delta with supportive OB")
+        reasons.append(
+            "strong confirm delta"
+            + (" (delta-led)" if not side.require_ob_support else " with supportive OB")
+        )
         if ema is not None and trend_still_intact(ema):
             reasons.append(
                 "EMA structure intact"
@@ -108,10 +120,13 @@ def classify_long_breakout(
         )
 
     # Tier 1 valid (moderate)
-    if ratio >= thresholds.tier1_min_bid_ask_ratio_5bps or (
+    if (not side.require_ob_support) or ratio >= side.tier1_min_ob_ratio_5bps or (
         ob_at_event is not None and ob_at_event.bid_dominant_5bps
     ):
-        reasons.append("accepted confirm delta with supportive OB")
+        reasons.append(
+            "accepted confirm delta"
+            + (" (delta-led)" if not side.require_ob_support else " with supportive OB")
+        )
         if ema is not None and trend_still_intact(ema):
             reasons.append(
                 "EMA structure still bullish"
@@ -130,6 +145,123 @@ def classify_long_breakout(
         state=MarketState.CHOP,
         tier=BreakoutTier.FAKEOUT,
         side="long",
+        reasons=reasons,
+        metrics=metrics,
+    )
+
+
+def classify_short_breakout(
+    *,
+    thresholds: CoinThresholds,
+    confirm: TradeWindowStats,
+    followthrough: TradeWindowStats | None = None,
+    ob_at_event: ObBandSnapshot | None = None,
+    ema: EmaSnapshot | None = None,
+) -> ClassificationResult:
+    """Classify a short breakout candidate into tier 0 / 1 / 2."""
+    side = thresholds.short
+    delta = confirm.delta_notional
+    ratio = _ask_ratio_or_zero(ob_at_event)
+    metrics = {
+        "confirm_delta": delta,
+        "confirm_buy": confirm.buy_notional,
+        "confirm_sell": confirm.sell_notional,
+        "ob_ask_bid_ratio_5bps": ratio,
+        "ob_bid_5bps": None if ob_at_event is None else ob_at_event.bid_5bps,
+        "ob_ask_5bps": None if ob_at_event is None else ob_at_event.ask_5bps,
+    }
+    reasons: list[str] = []
+
+    # Hard fakeout: follow-through flips strongly positive against the short.
+    # short.fakeout_followthrough_flip_delta is stored as a positive threshold.
+    if followthrough is not None:
+        ft = followthrough.delta_notional
+        metrics["followthrough_delta"] = ft
+        flip = abs(side.fakeout_followthrough_flip_delta)
+        if ft >= flip:
+            reasons.append(f"follow-through delta {ft:.0f} >= {flip:.0f}")
+            return ClassificationResult(
+                state=MarketState.FAKEOUT,
+                tier=BreakoutTier.FAKEOUT,
+                side="short",
+                reasons=reasons,
+                metrics=metrics,
+            )
+
+    # Weak confirm -> fakeout / chop bucket
+    if delta > -side.tier1_min_confirm_delta:
+        if delta >= -side.fakeout_max_confirm_delta and (
+            ob_at_event is None or not ob_at_event.ask_dominant_5bps
+        ):
+            reasons.append(
+                f"confirm delta {delta:.0f} too weak and no durable ask dominance"
+            )
+            return ClassificationResult(
+                state=MarketState.FAKEOUT,
+                tier=BreakoutTier.FAKEOUT,
+                side="short",
+                reasons=reasons,
+                metrics=metrics,
+            )
+        reasons.append(f"confirm delta {delta:.0f} above short tier1 max")
+        return ClassificationResult(
+            state=MarketState.CHOP,
+            tier=BreakoutTier.FAKEOUT,
+            side="short",
+            reasons=reasons,
+            metrics=metrics,
+        )
+
+    # Tier 2 strong:
+    # - classic: large negative delta + strong ask/bid ratio
+    # - delta-led with ask dominance at tier1 OB
+    # - calibrated short path: delta alone when require_ob_support is False
+    if delta <= -side.tier2_min_confirm_delta and (
+        (not side.require_ob_support)
+        or ratio >= side.tier2_min_ob_ratio_5bps
+        or (
+            ratio >= side.tier1_min_ob_ratio_5bps
+            and ob_at_event is not None
+            and ob_at_event.ask_dominant_5bps
+        )
+    ):
+        reasons.append(
+            "strong confirm delta"
+            + (" (delta-led)" if not side.require_ob_support else " with supportive OB")
+        )
+        if ema is not None and not trend_still_intact(ema):
+            reasons.append("EMA structure favors short")
+        return ClassificationResult(
+            state=MarketState.BREAKOUT_CONFIRMED,
+            tier=BreakoutTier.STRONG,
+            side="short",
+            reasons=reasons,
+            metrics=metrics,
+        )
+
+    # Tier 1 valid (moderate)
+    if (not side.require_ob_support) or ratio >= side.tier1_min_ob_ratio_5bps or (
+        ob_at_event is not None and ob_at_event.ask_dominant_5bps
+    ):
+        reasons.append(
+            "accepted confirm delta"
+            + (" (delta-led)" if not side.require_ob_support else " with supportive OB")
+        )
+        if ema is not None and not trend_still_intact(ema):
+            reasons.append("EMA structure still bearish")
+        return ClassificationResult(
+            state=MarketState.BREAKOUT_CONFIRMED,
+            tier=BreakoutTier.VALID,
+            side="short",
+            reasons=reasons,
+            metrics=metrics,
+        )
+
+    reasons.append("delta ok but OB not supportive enough — treat as chop/filter")
+    return ClassificationResult(
+        state=MarketState.CHOP,
+        tier=BreakoutTier.FAKEOUT,
+        side="short",
         reasons=reasons,
         metrics=metrics,
     )
@@ -162,23 +294,36 @@ def classify_ema59_touch(
         "is_first_touch": is_first_touch,
     }
 
-    # Exit / hold path for longs when touching from above
-    if ema is not None and direction == TouchDirection.FROM_ABOVE:
-        sell_ft = followthrough is not None and followthrough.delta_notional < 0
-        exit_res = classify_ema_exit(
-            ema,
-            previous=previous_ema,
-            sell_followthrough=sell_ft,
-            ob=ob_at_touch,
+    # Short path for touches from above: evaluate long-trend exit first if
+    # EMA structure is available, then mirror into the short breakout path.
+    if direction == TouchDirection.FROM_ABOVE:
+        if ema is not None:
+            sell_ft = followthrough is not None and followthrough.delta_notional < 0
+            exit_res = classify_ema_exit(
+                ema,
+                previous=previous_ema,
+                sell_followthrough=sell_ft,
+                ob=ob_at_touch,
+            )
+            if exit_res is not None and exit_res.state in (
+                MarketState.EXIT_WARNING,
+                MarketState.EXIT_CONFIRMED,
+                MarketState.HOLD,
+            ):
+                exit_res.reasons = reasons + exit_res.reasons
+                exit_res.metrics = {**metrics, **exit_res.metrics}
+                return exit_res
+
+        short_res = classify_short_breakout(
+            thresholds=thresholds,
+            confirm=at_touch,
+            followthrough=followthrough,
+            ob_at_event=ob_at_touch,
+            ema=ema,
         )
-        if exit_res is not None and exit_res.state in (
-            MarketState.EXIT_WARNING,
-            MarketState.EXIT_CONFIRMED,
-            MarketState.HOLD,
-        ):
-            exit_res.reasons = reasons + exit_res.reasons
-            exit_res.metrics = {**metrics, **exit_res.metrics}
-            return exit_res
+        short_res.reasons = reasons + short_res.reasons
+        short_res.metrics = {**metrics, **short_res.metrics}
+        return short_res
 
     # Hold / reclaim if bid absorption + structure intact (incl. EMA200 bias)
     if (
@@ -293,6 +438,9 @@ class RuleEngine:
 
     def classify_long_breakout(self, **kwargs) -> ClassificationResult:
         return classify_long_breakout(thresholds=self.thresholds, **kwargs)
+
+    def classify_short_breakout(self, **kwargs) -> ClassificationResult:
+        return classify_short_breakout(thresholds=self.thresholds, **kwargs)
 
     def classify_ema59_touch(self, **kwargs) -> ClassificationResult:
         return classify_ema59_touch(thresholds=self.thresholds, **kwargs)
