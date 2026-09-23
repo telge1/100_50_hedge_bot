@@ -2,6 +2,12 @@
 
 This file tracks the planned exit logic for the EMA Touch V2 work.
 
+## Frozen baseline
+
+Long exit overlays are frozen at **phase1h** (mass+fee) and **phase1e** (5m meaningful,
++7.98% locked-10). See `PLAN.md`. Spike / EMA9-flow runner ideas stay notes only until a
+new phase is opened. After collectors finish, re-run both baselines on the wider window.
+
 ## Goal
 
 Define a no-lookahead exit plan that uses only:

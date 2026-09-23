@@ -5,26 +5,29 @@ Backtest SL/TP exits for calibrated breakout signals.
 This folder owns the exit simulation. Signal discovery stays in `calibration/`.
 `calibration_v2_dump/` is experiment-only and is not an input source.
 
-## Frozen baseline (phase1h)
+## Frozen baselines (do not casually retune)
 
-**Do not casually retune** the long exit path below without a new phase tag.
+Two locked-10 snapshots for later A/B when collectors cover more history:
 
-Frozen as of this commit:
+| Baseline | Report | Idea | Locked-10 |
+|---|---|---|---|
+| **phase1h** (default) | `long_exit_phase1h_fee_filter.json` | 5m ladder + 1m mass TP + fee skip | 8 traded / 2 ignored · WR 62.5% · mean **+0.84%** · sum **+6.71%** · TP/SL 5/3 |
+| **phase1e** | `long_exit_phase1e_5m_meaningful.json` | 5m meaningful ladder (pre mass/fee) | 10 traded · WR 80% · mean **+0.80%** · sum **+7.98%** · TP/SL 8/2 |
 
-- Simulator: `simulate_long.py` (mass cluster TP + 5m ladder fallback + approach zone)
-- Thresholds: `thresholds.py` (Phase-C mass gates + fee skip)
-- Canonical locked-10 report: `reports/long_exit_phase1h_fee_filter.json`
-- Scanner cohort check: `reports/long_exit_full_history_phase1h.json` → `by_source.scanner_breakout`
-- Dashboard default overlay: `dashboard/research_charts/exit_pool_backtester.py` → phase1h
+Code / thresholds currently match **phase1h** live simulation. phase1e is frozen as the
+report artifact + dashboard overlay only (replay the JSON, do not silently retune gates).
 
-Locked-10 snapshot: **8 traded / 2 ignored** · WR **62.5%** · mean **+0.84%** · sum **+6.71%**.
+Dashboard: choose either baseline in the Research Backtester dropdown, then **Backtester**.
+
+Scanner cohort check (phase1h rules): `reports/long_exit_full_history_phase1h.json`
+→ `by_source.scanner_breakout`.
 
 Out of scope for this freeze: spike/EMA9-flow runner (separate phase later).
 
 ## Phase 1 scope
 
 - **Only the 10 calibrated Long signals** (plus optional `--universe full` for checks)
-- Gross PnL in reports; fee used only as **entry skip** (`reward_below_fees`)
+- Gross PnL in reports; fee used only as **entry skip** on phase1h (`reward_below_fees`)
 - Rules from `EXIT_RULES.md` in this folder
 - No-lookahead: only data known at each closed 5m bar
 

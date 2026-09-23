@@ -17,8 +17,8 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "ob-levels-19";
-  try { console.info("[research] asset ob-levels-19"); } catch (e) { /* ignore */ }
+  const ASSET_V = "lld-cull-25";
+  try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const VP_KEY = "research.volume_profile";
@@ -89,6 +89,7 @@
     obl1000: { leaseId: null, leaseGen: 0, heartbeatTimer: null, leaseSymbol: null, leaseDepth: null, uiState: "DISABLED" },
     history: {
       preset: "30d",
+      weeks: 12,
       customStart: "",
       customEnd: "",
       loadedFrom: null,
@@ -194,11 +195,15 @@
   function readHistoryFromUi() {
     const preset = ($("researchHistoryPreset") || {}).value || "30d";
     state.history.preset = preset;
+    if ($("lldHistoryWeeks")) {
+      state.history.weeks = Math.max(1, Number(($("lldHistoryWeeks") || {}).value || 12) || 12);
+    }
     state.history.customStart = ($("researchHistoryStart") || {}).value || "";
     state.history.customEnd = ($("researchHistoryEnd") || {}).value || "";
     try {
       localStorage.setItem(HISTORY_KEY, JSON.stringify({
         preset: state.history.preset,
+        weeks: state.history.weeks,
         customStart: state.history.customStart,
         customEnd: state.history.customEnd,
       }));
@@ -211,6 +216,8 @@
       if (raw) {
         const o = JSON.parse(raw);
         if (o && o.preset) state.history.preset = o.preset;
+        if (o && o.weeks != null) state.history.weeks = Math.max(1, Number(o.weeks) || 12);
+        else if (o && o.barLimit != null) state.history.weeks = Math.max(1, Math.round(Number(o.barLimit) / 2016) || 12);
         if (o && o.customStart) state.history.customStart = o.customStart;
         if (o && o.customEnd) state.history.customEnd = o.customEnd;
       }
@@ -252,6 +259,13 @@
     }
     const days = HISTORY_SPAN_DAYS[p];
     return (days || 30) * 86400;
+  }
+
+  function historyLoadLimitForTimeframe(tf) {
+    const uiWeeks = $("lldHistoryWeeks") ? Number(($("lldHistoryWeeks") || {}).value || 0) : 0;
+    const weeks = Math.max(1, Number(uiWeeks || (state.history && state.history.weeks) || 12) || 12);
+    const step = TF_SEC[tf] || 60;
+    return Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
   }
 
   function computeHistoryRangeUnix(override) {
@@ -296,23 +310,51 @@
     return state.chartTimeMode === CHART_TIME_REPLAY;
   }
 
+  function gotoCandleLoadRange(gotoTs, win) {
+    /** Wide candle span for GO TO: keep History preset when it covers the target,
+     * otherwise at least several days left of the focus window so EMA can seed
+     * and zoom-out is not an empty void. */
+    readHistoryFromUi();
+    const hist = computeHistoryRangeUnix();
+    const contextLeft = 7 * 86400;
+    let from = Math.min(Number(win.from), Math.floor(Number(gotoTs)) - contextLeft);
+    let to = Number(win.to);
+    if (hist && hist.from != null && hist.to != null) {
+      const hf = Number(hist.from);
+      const ht = Number(hist.to);
+      if (hf <= Number(gotoTs) && Number(gotoTs) <= ht) {
+        from = Math.min(hf, from);
+        to = Math.max(ht, to);
+      }
+    }
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+      return { from: win.from, to: win.to };
+    }
+    return { from: Math.floor(from), to: Math.floor(to) };
+  }
+
   function replayViewLockPayload(win) {
     if (!win) return null;
+    const from = Math.floor(Number(win.from));
+    const to = Math.floor(Number(win.to));
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
     return {
-      from: Math.floor(Number(win.from)),
-      to: Math.floor(Number(win.to)),
+      from: from,
+      to: to,
       center: Math.floor(Number(win.goto_ts_utc != null ? win.goto_ts_utc : win.center)),
+      // Soft: block live-follow only. Never re-apply setVisibleRange (that
+      // squeezed the whole loaded history into the viewport after GO TO).
+      soft: true,
     };
   }
 
   function lockReplayViewOnAllPanes(win) {
     const lock = replayViewLockPayload(win);
-    if (!lock) return;
     visibleIds().forEach(function (pid) {
       const chart = api(state.panes[pid]);
       if (!chart) return;
       if (chart.setFollowLive) chart.setFollowLive(false);
-      if (chart.setReplayViewLock) chart.setReplayViewLock(lock);
+      if (lock && chart.setReplayViewLock) chart.setReplayViewLock(lock);
     });
   }
 
@@ -405,8 +447,13 @@
     });
     if (o.jumpToUnix != null) {
       if (!isHistoricalReplay() || o.replayGen == null || o.replayGen === state.replayGen) {
+        // Focus first; do not re-lock to full candle span (that squeezes the chart).
         await jumpChartsToUnix(o.jumpToUnix, o.jumpPadSec);
-        enforceReplayViewOnAllPanes();
+        lockReplayViewOnAllPanes(state.replayWindow || {
+          from: o.jumpToUnix - (o.jumpPadSec || 4 * 3600),
+          to: o.jumpToUnix + (o.jumpPadSec || 4 * 3600),
+          goto_ts_utc: o.jumpToUnix,
+        });
       }
     }
   }
@@ -424,6 +471,7 @@
       try {
         if (chart.setFollowLive) chart.setFollowLive(false);
       } catch (e) { /* optional */ }
+      // Prefer logical focus — reliable with multi-day candle loads.
       if (chart.focusOnTime && chart.focusOnTime(center, pad)) ok = true;
       else if (chart.setVisibleTimeRange) {
         try {
@@ -439,7 +487,16 @@
     if (!candles.length) return null;
     const times = candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
     if (!times.length) return null;
-    return { from: Math.min.apply(null, times), to: Math.max.apply(null, times) };
+    const from = Math.min.apply(null, times);
+    const lastStart = Math.max.apply(null, times);
+    let barSec = 60;
+    if (times.length >= 2) {
+      const sorted = times.slice().sort(function (a, b) { return a - b; });
+      const d = sorted[sorted.length - 1] - sorted[sorted.length - 2];
+      if (Number.isFinite(d) && d > 0) barSec = d;
+    }
+    // Candle times are bar opens; allow containment through the last bar's close.
+    return { from: from, to: lastStart, toExclusive: lastStart + barSec, barSec: barSec };
   }
 
   function visiblePanesCoverRange(from, to) {
@@ -449,7 +506,7 @@
     return ids.every(function (pid) {
       const b = paneCandleBounds(state.panes[pid]);
       if (!b) return false;
-      return b.from <= from && b.to >= to;
+      return b.from <= from && b.toExclusive > to;
     });
   }
 
@@ -461,7 +518,7 @@
     return ids.every(function (pid) {
       const b = paneCandleBounds(state.panes[pid]);
       if (!b) return false;
-      return b.from <= t && b.to >= t;
+      return b.from <= t && t < b.toExclusive;
     });
   }
 
@@ -483,9 +540,20 @@
     return new Date(n * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
   }
 
+  function updateReplayExitUi() {
+    const clearBtn = $("researchLldAsOfClear");
+    if (!clearBtn) return;
+    const inReplay = isHistoricalReplay();
+    const iso = state.liquidityLocationAsOf;
+    clearBtn.hidden = !(inReplay || iso);
+    clearBtn.textContent = inReplay ? "Zurück zu Live" : "Live pools";
+    clearBtn.title = inReplay
+      ? "Replay beenden und Chart wieder live laden"
+      : "Live pools (clear as-of)";
+  }
+
   function updateLldAsOfHint(serverIso) {
     const hint = $("researchLldAsOfHint");
-    const clearBtn = $("researchLldAsOfClear");
     const iso = serverIso || state.liquidityLocationAsOf;
     if (hint) {
       if (iso) {
@@ -496,7 +564,7 @@
         hint.hidden = true;
       }
     }
-    if (clearBtn) clearBtn.hidden = !iso;
+    updateReplayExitUi();
   }
 
   function updateGotoSyncHint(win) {
@@ -505,6 +573,7 @@
     if (!win || win.goto_ts_utc == null) {
       el.textContent = "";
       el.hidden = true;
+      updateReplayExitUi();
       return;
     }
     el.textContent =
@@ -512,16 +581,21 @@
       " · Fenster: " + fmtUtcSeconds(win.from) + " → " + fmtUtcSeconds(win.to) +
       (state.liquidityLocationAsOf ? " · LLD as-of: " + state.liquidityLocationAsOf : "");
     el.hidden = false;
+    updateReplayExitUi();
   }
 
-  async function clearLiquidityLocationAsOf() {
+  async function restoreLiveCharts(statusMsg) {
     exitHistoricalReplay();
     updateLldAsOfHint(null);
     updateGotoSyncHint(null);
     state.history.pinned = false;
     await reloadVisibleHistory({ sourceAction: "lld-asof-clear" });
     startPoll();
-    setStatus("Liquidity Location: Live-Pools · GO TO cleared");
+    if (statusMsg) setStatus(statusMsg);
+  }
+
+  async function clearLiquidityLocationAsOf() {
+    await restoreLiveCharts("Liquidity Location: Live-Pools · GO TO cleared");
   }
 
   async function goToDateTime() {
@@ -544,6 +618,7 @@
     }
     const lldOn = $("researchIndLld") && $("researchIndLld").checked;
     enterHistoricalReplay(goto_ts_utc, win);
+    updateReplayExitUi();
     if (lldOn) {
       state.liquidityLocationAsOf = asOfIso;
       updateLldAsOfHint(asOfIso);
@@ -557,36 +632,61 @@
       (lldOn ? " · LLD as-of laden …" : " · Chart laden …")
     );
     const reqReplayGen = state.replayGen;
-    await reloadVisibleHistory({
-      from: win.from,
-      to: win.to,
-      jumpToUnix: goto_ts_utc,
-      jumpPadSec: win.viewPad,
-      sourceAction: "go-to",
-      replayGen: reqReplayGen,
-    });
+    const loadRange = gotoCandleLoadRange(goto_ts_utc, win);
+    try {
+      await reloadVisibleHistory({
+        from: loadRange.from,
+        to: loadRange.to,
+        jumpToUnix: goto_ts_utc,
+        jumpPadSec: win.viewPad,
+        sourceAction: "go-to",
+        replayGen: reqReplayGen,
+      });
+    } catch (err) {
+      await restoreLiveCharts(
+        "Go To fehlgeschlagen: " + (err && err.message ? err.message : err)
+      );
+      return;
+    }
     if (!isHistoricalReplay() || reqReplayGen !== state.replayGen) return;
     if (!visiblePanesContainTime(goto_ts_utc)) {
       const bounds = mergedPaneBounds();
       const detail = bounds
         ? (" · Kerzen UTC " + fmtUtc(bounds.from) + " → " + fmtUtc(bounds.to))
         : "";
-      setStatus("Go To: " + fmtUtcSeconds(goto_ts_utc) + " außerhalb geladener Kerzen" + detail, "error");
+      await restoreLiveCharts(
+        "Go To: " + fmtUtcSeconds(goto_ts_utc) + " außerhalb geladener Kerzen" + detail
+      );
       return;
     }
+    // Soft follow-lock, then focus ±4h on the target (retry once after layout).
     lockReplayViewOnAllPanes(state.replayWindow);
-    if (!(await jumpChartsToUnix(goto_ts_utc, win.viewPad))) {
-      setStatus("Go To: Zoom auf " + fmtUtcSeconds(goto_ts_utc) + " fehlgeschlagen", "error");
+    let jumped = await jumpChartsToUnix(goto_ts_utc, win.viewPad);
+    if (!jumped) {
+      await new Promise(function (r) { setTimeout(r, 50); });
+      jumped = await jumpChartsToUnix(goto_ts_utc, win.viewPad);
+    }
+    if (!jumped) {
+      await restoreLiveCharts(
+        "Go To: Zoom auf " + fmtUtcSeconds(goto_ts_utc) + " fehlgeschlagen"
+      );
       return;
     }
+    // Re-assert focus after EMA/overlays settle (they must not re-fit the camera).
+    await new Promise(function (r) {
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(function () { r(); });
+      else setTimeout(r, 16);
+    });
+    await jumpChartsToUnix(goto_ts_utc, win.viewPad);
     const focusPane = visibleIds()[0];
     if (focusPane) handleClick(focusPane, goto_ts_utc);
     updateGotoSyncHint(win);
-    updateHistoryHint({ from: win.from, to: win.to });
+    updateHistoryHint({ from: loadRange.from, to: loadRange.to });
+    updateReplayExitUi();
     setStatus(
       "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
       (lldOn ? " · LLD as-of " + asOfIso : "") +
-      " · Replay ±4h"
+      " · Fokus ±4h · History geladen · [Zurück zu Live]"
     );
   }
 
@@ -602,39 +702,39 @@
     const lo = Math.min(start, end);
     const hi = Math.max(start, end);
     const pad = Math.max(3600, Math.floor((hi - lo) * 0.15) || 3600);
-    const from = lo - pad;
-    const to = hi + pad;
     const focus = focusIso ? Math.floor(Date.parse(focusIso) / 1000) : Math.floor((lo + hi) / 2);
+    // Camera pad around focus only — never use the full signal span as the
+    // candle-load window (that was wiping 90d History down to ~signal days).
+    const jumpPad = Math.max(4 * 3600, Math.min(pad, 12 * 3600));
     setStatus("Chart sync Signal-Fenster …");
-    await reloadVisibleHistory({
-      from: from,
-      to: to,
-      jumpToUnix: Number.isFinite(focus) ? focus : Math.floor((lo + hi) / 2),
-      // Keep the whole signal span in view (not a huge multi-day pad that fails).
-      jumpPadSec: Math.max(pad, Math.floor((hi - lo) / 2) + 3600),
-      sourceAction: "aps-signal-zoom",
-    });
-    // Explicit visible range on each pane — more reliable than focus-only.
-    let ok = false;
-    await Promise.all(visibleIds().map(async function (pid) {
-      const pane = state.panes[pid];
-      if (!pane) return;
-      const chart = api(pane) || await whenReady(pane, 4000);
-      if (!chart) return;
-      try {
-        if (chart.setFollowLive) chart.setFollowLive(false);
-      } catch (e) { /* optional */ }
-      if (chart.setVisibleTimeRange) {
+    readHistoryFromUi();
+    const needReload = !visiblePanesContainTime(focus);
+    if (needReload) {
+      // Reload ONLY the configured History preset / weeks tip — never the
+      // narrow backtest signal [from,to].
+      await reloadVisibleHistory({
+        jumpToUnix: focus,
+        jumpPadSec: jumpPad,
+        sourceAction: "bt-camera-zoom",
+      });
+    } else {
+      await jumpChartsToUnix(focus, jumpPad);
+    }
+    let ok = !!(await jumpChartsToUnix(focus, jumpPad));
+    if (!ok) {
+      await Promise.all(visibleIds().map(async function (pid) {
+        const pane = state.panes[pid];
+        if (!pane) return;
+        const chart = api(pane) || await whenReady(pane, 4000);
+        if (!chart || !chart.focusOnTime) return;
         try {
-          if (chart.setVisibleTimeRange(from, to)) ok = true;
-        } catch (e) { /* ignore */ }
-      }
-      if (!ok && chart.focusOnTime) {
+          if (chart.setFollowLive) chart.setFollowLive(false);
+        } catch (e) { /* optional */ }
         try {
-          if (chart.focusOnTime(focus, Math.max(pad, Math.floor((hi - lo) / 2)))) ok = true;
+          if (chart.focusOnTime(focus, jumpPad)) ok = true;
         } catch (e) { /* ignore */ }
-      }
-    }));
+      }));
+    }
     await refreshOverlaysVisible();
     return ok;
   }
@@ -645,16 +745,27 @@
         syncHistoryCustomUi();
         readHistoryFromUi();
         updateHistoryHint();
+        // Selecting 7d/30d/90d without Laden left the tip window on screen —
+        // auto-apply so Geladen matches the dropdown.
+        if ($("researchHistoryApply")) $("researchHistoryApply").click();
       });
     }
     if ($("researchHistoryApply")) {
       $("researchHistoryApply").addEventListener("click", async function () {
         readHistoryFromUi();
         const preset = state.history.preset || "30d";
+        // History reload always leaves GO-TO replay so live poll can resume.
+        if (isHistoricalReplay()) {
+          exitHistoricalReplay();
+          updateLldAsOfHint(null);
+          updateGotoSyncHint(null);
+        }
         state.history.pinned = preset !== "rolling";
         setStatus("History laden …");
         try {
           await reloadVisibleHistory({ sourceAction: "history-apply" });
+          startPoll();
+          updateReplayExitUi();
           setStatus("History geladen · " + (($("researchHistoryHint") || {}).textContent || ""));
         } catch (err) {
           setStatus("History laden fehlgeschlagen: " + (err.message || err), "error");
@@ -669,7 +780,18 @@
       });
     }
     if ($("researchGoTo")) {
-      $("researchGoTo").addEventListener("keydown", function (ev) {
+      var goToInput = $("researchGoTo");
+      // Keep a fixed UTC template in the field so users only edit numbers.
+      if (!(goToInput.value || "").trim()) {
+        goToInput.value = "2026-08-26 11:34:51 UTC";
+      }
+      goToInput.addEventListener("focus", function () {
+        // Select all once on focus so overtyping is easy; keep caret free after that.
+        try {
+          goToInput.select();
+        } catch (e) { /* ignore */ }
+      });
+      goToInput.addEventListener("keydown", function (ev) {
         if (ev.key === "Enter") {
           ev.preventDefault();
           goToDateTime().catch(function (err) {
@@ -2382,6 +2504,17 @@
     return el ? el.value : "stoch_fade";
   }
 
+  function isExitPoolStrategy(sid) {
+    const s = String(sid || "");
+    return (
+      s === "ob_exit_pool_liquidity_v1"
+      || s === "ob_exit_pool_liquidity_v1_phase1h"
+      || s === "ob_exit_pool_liquidity_v1_phase1e"
+      || s === "exit_pool"
+      || s === "exit_pool_phase1e"
+    );
+  }
+
   function ezmLayerMode() {
     const el = $("researchEzmLayerMode");
     return el ? el.value : "both";
@@ -2665,6 +2798,7 @@
     const reqBody = {
       symbol: state.symbol,
       timeframe: pane.tf,
+      limit: historyLoadLimitForTimeframe(pane.tf),
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
       open_interest: ws.open_interest || { enabled: false },
@@ -2702,30 +2836,34 @@
     if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
     applyPaneBundle(pane, packed, {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
-      preserveView: !!(opts && opts.preserveView) || isHistoricalReplay(),
+      // GO TO: never restore the previous live logical range onto a much longer
+      // series (looks like the chart was "squeezed"). Jump sets the camera after.
+      preserveView: !!(opts && opts.preserveView) || (isHistoricalReplay() && !(opts && opts.jumpToUnix != null)),
       skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
       skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
     });
     if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
-    enforceReplayViewOnAllPanes();
+    // Soft follow-lock only — do not yank visible range here (GO TO jump owns the camera).
+    if (!(opts && opts.jumpToUnix != null)) {
+      enforceReplayViewOnAllPanes();
+    } else {
+      lockReplayViewOnAllPanes(state.replayWindow);
+    }
     if (packed.liquidity_location_as_of) {
       state.liquidityLocationAsOf = packed.liquidity_location_as_of;
     } else if ((opts && opts.sourceAction) === "lld-asof-clear") {
       state.liquidityLocationAsOf = null;
     }
     updateLldAsOfHint(packed.liquidity_location_as_of || null);
-    if (packed.from != null && packed.to != null) {
-      state.history.loadedFrom = Number(packed.from);
-      state.history.loadedTo = Number(packed.to);
-      updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
-    } else if ((packed.candles || []).length) {
-      const times = packed.candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+    // Geladen UTC must reflect actual candles on the pane — not the request
+    // window and not indicator-only refreshes (those must not shrink History).
+    if (!(opts && opts.indicatorsOnly)) {
+      const candleRows = (pane.pendingData && pane.pendingData.candles) || packed.candles || [];
+      const times = candleRows.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
       if (times.length) {
         state.history.loadedFrom = Math.min.apply(null, times);
         state.history.loadedTo = Math.max.apply(null, times);
-        if (state.history.preset === "rolling") {
-          updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
-        }
+        updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
       }
     }
     if (force && !(opts && opts.jumpToUnix != null) && (opts && opts.sourceAction) !== "go-to") {
@@ -3373,6 +3511,7 @@
 
   function fillLld(cfg) {
     $("lldAmount").value = cfg.amount;
+    $("lldHistoryWeeks").value = String(state.history.weeks || 12);
     $("lldHigh").value = cfg.highest_len;
     $("lldLow").value = cfg.lowest_len;
     $("lldBorders").checked = !!cfg.show_pool_borders;
@@ -3676,13 +3815,15 @@
 
     function syncBtStrategyUi() {
       const sid = btStrategy();
+      const isExitPool = isExitPoolStrategy(sid);
       const isCsw = sid === "cluster_sweep_ema_9_20_59";
       const isEdc = sid === "ema_dual_cross_multisource_v1";
       const isEzm = sid === "ema_zone_microstructure_confirmation_v1";
       const isAps = sid === "a_plus_liquidity_pool_signal_scanner_v1";
       const isNap = sid === "a_plus_nested_ask_pool_edge_short_v1";
       if ($("researchBtRunBtn")) {
-        $("researchBtRunBtn").hidden = !(isCsw || isEdc || isEzm || isAps || isNap);
+        // Exit-pool uses the main Backtester button (report already computed).
+        $("researchBtRunBtn").hidden = isExitPool || !(isCsw || isEdc || isEzm || isAps || isNap);
         if (isNap) $("researchBtRunBtn").title = "Nested Ask Pool Edge Short V1 Backtest starten";
         else if (isAps) $("researchBtRunBtn").title = "A+ Pool Signal Scanner starten (CH Replay)";
         else if (isEzm) $("researchBtRunBtn").title = "EZM Candidate Discovery starten";
@@ -3702,8 +3843,16 @@
           updateNapRangeHint();
         }
       }
-      syncEzmLayerUi(state.workspace);
-      syncPoolSignalsUi(state.workspace);
+      // Exit-pool mode: never show APS/EZM filter chrome (those paint foreign 21/09 markers).
+      if (isExitPool) {
+        if ($("researchPoolSignalsWrap")) $("researchPoolSignalsWrap").hidden = true;
+        if ($("researchEzmLayerWrap")) $("researchEzmLayerWrap").hidden = true;
+        if ($("researchEzmComputationWrap")) $("researchEzmComputationWrap").hidden = true;
+        if ($("researchEzmLegend")) $("researchEzmLegend").hidden = true;
+      } else {
+        syncEzmLayerUi(state.workspace);
+        syncPoolSignalsUi(state.workspace);
+      }
       applyResearchJobSourceNote();
     }
 
@@ -4523,6 +4672,100 @@
 
     $("researchBacktesterBtn").addEventListener("click", async function () {
       if (!state.symbol) return;
+      if (isExitPoolStrategy(btStrategy())) {
+        const exitSid = btStrategy();
+        setStatus("Exit-Pool Backtester: lade nur Longs Entry/SL/TP für " + state.symbol + " …");
+        try {
+          // Kill foreign A+/EZM marker layers first — they were painting 21/09 signals.
+          try {
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "a_plus_liquidity_pool_signal_scanner_v1",
+              symbol: state.symbol,
+              display_mode: "off",
+              layer_only: true,
+            }, { sourceAction: "strategy-switch" }));
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "ema_zone_microstructure_confirmation_v1",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+            applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
+              strategy_id: "a_plus_nested_ask_pool_edge_short_v1",
+              symbol: state.symbol,
+              visible: false,
+            }, { sourceAction: "strategy-switch" }));
+          } catch (e) { /* ignore */ }
+          syncBtStrategyUi();
+
+          const snap = await sendJson("/api/research/backtester/load", "POST", {
+            strategy_id: exitSid,
+            symbol: state.symbol,
+            clear_other_strategies: true,
+            visible: true,
+          }, { sourceAction: "backtester" });
+          const bt = snap.backtester || {};
+          if (bt.strategy_id && bt.strategy_id !== "ob_exit_pool_liquidity_v1") {
+            setStatus(
+              "Backtester-API liefert noch Strategie '" + bt.strategy_id
+                + "' statt Exit-Pool — Dashboard neu starten nötig",
+              "error"
+            );
+            return;
+          }
+          if (bt.source && bt.source !== "exit_pool_backtester") {
+            setStatus(
+              "Backtester-API source='" + bt.source
+                + "' (erwartet exit_pool_backtester) — Dashboard neu starten",
+              "error"
+            );
+            return;
+          }
+          applyWorkspace(snap);
+          syncBtStrategyUi();
+          const span = bt.time_span || {};
+          let zoomed = false;
+          const syncOn = $("researchSyncChartAfterBt") && $("researchSyncChartAfterBt").checked;
+          if (syncOn && bt.loaded > 0 && span.start && span.end) {
+            // Camera jump only — History Weeks / preset stays intact (see zoomChartToIsoRange).
+            zoomed = !!(await zoomChartToIsoRange(span.start, span.end, span.focus || span.start));
+            if (!zoomed && $("researchGoTo")) {
+              $("researchGoTo").value = String(span.focus || span.start).replace("Z", "");
+              try {
+                await goToDateTime();
+                zoomed = true;
+              } catch (e) { /* ignore */ }
+            }
+          } else {
+            await refreshOverlaysVisible();
+          }
+          const sum = bt.summary || {};
+          const sumLabel = (sum.sum_pnl_pct != null)
+            ? (" · Summe PnL " + Number(sum.sum_pnl_pct).toFixed(2) + "%")
+            : "";
+          const ignoreLabel = (bt.n_ignored != null && bt.n_ignored > 0)
+            ? (" · ignored " + bt.n_ignored)
+            : "";
+          const reportLabel = bt.baseline_label
+            || bt.report_name
+            || bt.baseline
+            || "";
+          setStatus(
+            "Backtester " + state.symbol + " · Exit Pool · NUR LONGS"
+              + (reportLabel ? (" · " + reportLabel) : "") + " · "
+              + (bt.visible === false ? "ausgeblendet · " : "")
+              + (bt.loaded || 0) + "/" + (bt.n_expected_longs || bt.loaded || 0) + " gezeichnet"
+              + ignoreLabel
+              + (bt.tp_sl ? " · TP/SL " + bt.tp_sl : "")
+              + sumLabel
+              + (span.start ? " · Fenster " + String(span.start).slice(0, 16) + " … " + String(span.end).slice(5, 16) : "")
+              + (bt.loaded > 0 && !zoomed ? " · Zoom fehlgeschlagen — GO TO 2026-09-07T08:45:00Z" : "")
+              + (bt.message ? " — " + bt.message : "")
+          );
+        } catch (err) {
+          setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
       if (btStrategy() === "cluster_sweep_ema_9_20_59") {
         setStatus("Cluster Sweep Backtester umschalten …");
         try {
@@ -4751,11 +4994,35 @@
     });
     $("lldApply").addEventListener("click", async function () {
       try {
-        applyWorkspace(await sendJson("/api/research/settings", "PUT", { liquidity: readLld() }, {
+        state.history.weeks = Math.max(1, Math.min(52, Number(($("lldHistoryWeeks") || {}).value || 12) || 12));
+        if ($("lldHistoryWeeks")) $("lldHistoryWeeks").value = String(state.history.weeks);
+        // Dense 21d policy: Amount 800 leaves large gaps — nudge to ~2000.
+        if ($("lldAmount")) {
+          let cur = Math.max(1, Number($("lldAmount").value) || 2000);
+          if (cur > 2200) cur = 2200;
+          if (cur < 1800) cur = 2000;
+          $("lldAmount").value = String(cur);
+        }
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify({
+            preset: state.history.preset,
+            weeks: state.history.weeks,
+            customStart: state.history.customStart,
+            customEnd: state.history.customEnd,
+          }));
+        } catch (e) { /* ignore */ }
+        const lldBody = readLld();
+        applyWorkspace(await sendJson("/api/research/settings", "PUT", { liquidity: lldBody }, {
           sourceAction: "lld-apply",
         }));
         closeModal("modalLld");
+        await reloadVisibleHistory({ sourceAction: "lld-weeks-history" });
         await refreshIndicatorsVisible("lld-apply");
+        setStatus(
+          "LLD Apply · Amount " + lldBody.amount
+          + " (dichte 21d life≥1.5h + 50% shorts, Cap 2200) · History "
+          + state.history.weeks + " Wochen"
+        );
       } catch (err) {
         $("lldError").hidden = false;
         $("lldError").textContent = String(err.message || err);

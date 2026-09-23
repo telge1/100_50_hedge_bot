@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, Depends, Query, Request
@@ -710,6 +711,88 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         strategy_id = str(body.get("strategy_id") or "").strip()
+        if strategy_id in (
+            "ob_exit_pool_liquidity_v1",
+            "ob_exit_pool_liquidity_v1_phase1h",
+            "ob_exit_pool_liquidity_v1_phase1e",
+            "exit_pool",
+            "exit_pool_liquidity",
+            "exit_pool_phase1e",
+        ):
+            from .exit_pool_backtester import build_position_specs, resolve_baseline
+
+            symbol = str(body.get("symbol") or "").strip().upper()
+            if not symbol:
+                return _error(400, "symbol_required", "symbol required")
+            ws = get_workspace()
+            # Hard-clear every leftover long/short position before loading ours.
+            # The screenshot issue was old Stoch/NAP shorts still painted on chart.
+            for other in (
+                "stoch_fade",
+                "cluster_sweep_ema_9_20_59",
+                "ema_dual_cross_multisource_v1",
+                "ema_zone_microstructure_confirmation_v1",
+                "a_plus_liquidity_pool_signal_scanner_v1",
+                "a_plus_nested_ask_pool_edge_short_v1",
+            ):
+                ws.clear_backtester_strategy(symbol, strategy_id=other)
+
+            existing_ours = [
+                d
+                for d in ws.drawings.get_drawings(symbol, include_hidden=True)
+                if (d.metadata or {}).get("strategy_id") == "ob_exit_pool_liquidity_v1"
+                or str(d.drawing_id).startswith("exit-pool-")
+            ]
+            # Toggle off when already showing our longs (unless forced visible).
+            if existing_ours and body.get("visible") is not True:
+                ws._clear_all_position_drawings(symbol)
+                return ws.clear_exit_pool_backtester(symbol)
+            if body.get("visible") is False:
+                ws._clear_all_position_drawings(symbol)
+                return ws.clear_exit_pool_backtester(symbol)
+
+            ws._clear_all_position_drawings(symbol)
+            # Also force-off A+/EZM/NAP marker layers (source of 21/09 false signals).
+            ws.set_pool_signals_display_mode("off", symbol)
+            ws.set_ezm_visible(False, symbol)
+            try:
+                ws.set_nested_ask_pool_visible(False, symbol)
+            except Exception:
+                pass
+
+            try:
+                specs, meta = build_position_specs(
+                    symbol=symbol,
+                    strategy_id=strategy_id,
+                    baseline=str(body.get("baseline") or "") or None,
+                )
+            except FileNotFoundError as exc:
+                return _error(404, "report_missing", str(exc))
+            snap = ws.import_exit_pool_backtester(symbol, specs, meta=meta)
+            bt = dict(snap.get("backtester") or {})
+            if meta.get("time_span"):
+                # Prefer Z suffix for reliable JS Date.parse / zoom.
+                span = dict(meta["time_span"])
+                for key in ("start", "end", "focus"):
+                    if key in span and isinstance(span[key], str):
+                        span[key] = span[key].replace("+00:00", "Z")
+                bt["time_span"] = span
+            bt["side_filter"] = "long_only"
+            summary = meta.get("summary") or {}
+            bt["n_expected_longs"] = int(
+                summary.get("n_traded")
+                or summary.get("n_signals")
+                or len(specs)
+                or 0
+            )
+            bt["n_signals"] = int(summary.get("n_signals") or 0)
+            bt["n_ignored"] = int(summary.get("n_ignored") or 0)
+            report_path = str(meta.get("report_path") or "")
+            bt["report_name"] = Path(report_path).name if report_path else ""
+            bt["baseline"] = meta.get("baseline") or resolve_baseline(strategy_id)
+            bt["baseline_label"] = meta.get("baseline_label") or bt["baseline"]
+            snap["backtester"] = bt
+            return snap
         if strategy_id in ("cluster_sweep_ema_9_20_59", "cluster_sweep"):
             # Toggle / show last cluster-sweep run markers
             symbol = str(body.get("symbol") or "").strip().upper()

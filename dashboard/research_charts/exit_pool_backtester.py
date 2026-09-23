@@ -12,17 +12,47 @@ DISPLAY_NAME = "OB Exit Pool Liquidity V1 (Long)"
 BACKTESTER_SOURCE = "exit_pool_backtester"
 DRAWING_PREFIX = "exit-pool-"
 
-_DEFAULT_REPORT = (
+_REPORTS_DIR = (
     Path(__file__).resolve().parents[2]
     / "ob_microstructure_breakout_bot"
     / "exit_backtest"
     / "reports"
-    / "long_exit_phase1h_fee_filter.json"
 )
+
+# Frozen baselines — do not retune; compare when collectors cover more history.
+FROZEN_REPORTS: dict[str, Path] = {
+    "phase1h": _REPORTS_DIR / "long_exit_phase1h_fee_filter.json",
+    "phase1e": _REPORTS_DIR / "long_exit_phase1e_5m_meaningful.json",
+}
+DEFAULT_BASELINE = "phase1h"
+
+# Strategy_id aliases → frozen baseline key
+STRATEGY_BASELINES: dict[str, str] = {
+    "ob_exit_pool_liquidity_v1": "phase1h",
+    "ob_exit_pool_liquidity_v1_phase1h": "phase1h",
+    "exit_pool": "phase1h",
+    "exit_pool_liquidity": "phase1h",
+    "ob_exit_pool_liquidity_v1_phase1e": "phase1e",
+    "exit_pool_phase1e": "phase1e",
+}
+
+
+def resolve_baseline(strategy_id: str | None = None, baseline: str | None = None) -> str:
+    if baseline and str(baseline) in FROZEN_REPORTS:
+        return str(baseline)
+    sid = str(strategy_id or "").strip()
+    if sid in STRATEGY_BASELINES:
+        return STRATEGY_BASELINES[sid]
+    return DEFAULT_BASELINE
+
+
+def report_path_for(baseline: str | None = None) -> Path:
+    key = baseline if baseline in FROZEN_REPORTS else DEFAULT_BASELINE
+    return FROZEN_REPORTS[key]
 
 
 def default_report_path() -> Path:
-    return _DEFAULT_REPORT
+    return report_path_for(DEFAULT_BASELINE)
 
 
 def _parse_dt(value: Any) -> datetime | None:
@@ -103,16 +133,26 @@ def build_position_specs(
     *,
     symbol: str,
     report_path: Path | None = None,
+    baseline: str | None = None,
+    strategy_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Return (specs, meta) for the given symbol from the latest report."""
-    payload = load_report(report_path)
+    """Return (specs, meta) for the given symbol from a frozen report."""
+    key = resolve_baseline(strategy_id=strategy_id, baseline=baseline)
+    path = Path(report_path) if report_path else report_path_for(key)
+    payload = load_report(path)
     report_symbol = str(payload.get("symbol") or "DOGEUSDT").upper()
     sym = symbol.upper().replace("/", "")
+    labels = {
+        "phase1h": "phase1h mass+fee (+6.71%)",
+        "phase1e": "phase1e 5m meaningful (+7.98%)",
+    }
     meta = {
         "strategy_id": STRATEGY_ID,
         "display_name": DISPLAY_NAME,
         "source": BACKTESTER_SOURCE,
-        "report_path": str(report_path or default_report_path()),
+        "baseline": key,
+        "baseline_label": labels.get(key, key),
+        "report_path": str(path),
         "report_symbol": report_symbol,
         "summary": payload.get("summary") or {},
     }
