@@ -1,0 +1,556 @@
+{
+  "symbol": "DOGEUSDT",
+  "input": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/results/ob_pool_ema59_touch_cluster_calibration.json",
+  "n_touches": 171,
+  "by_side": {
+    "long": {
+      "side": "long",
+      "n": 89,
+      "n_train": 62,
+      "n_test": 27,
+      "label_counts": {
+        "working": 58,
+        "working_partial": 4,
+        "failed_early": 17,
+        "weak": 10
+      },
+      "quantile_proposal": {
+        "side": "long",
+        "n_working": 62,
+        "n_failed": 17,
+        "near_noise_max_dist_pct": 1.0,
+        "min_target_dist_pct": 0.8,
+        "max_target_dist_pct": 2.15,
+        "min_cluster_strength_sum": 5.51,
+        "typical_reversal_strength_sum": 5.51,
+        "min_abs_confirm_delta": 71000.0,
+        "failed_abs_confirm_delta_p75": 210000.0,
+        "min_ob_ratio": 1.0,
+        "failed_ob_p75": 1.53
+      },
+      "quantile_rule": {
+        "rule": {
+          "near_noise_max_dist_pct": 1.0,
+          "min_target_dist_pct": 0.8,
+          "max_target_dist_pct": 2.15,
+          "min_cluster_strength_sum": 5.51,
+          "min_abs_confirm_delta": 71000.0,
+          "min_ob_ratio_long": 1.0,
+          "max_ob_ratio_short": 1.0,
+          "require_ob": true
+        },
+        "full": {
+          "n_eligible": 76,
+          "n_projected": 16,
+          "hit_rate": 0.625,
+          "mean_exc_when_projected": 1.7775697410798643,
+          "false_project_rate": 0.375,
+          "coverage": 0.21052631578947367,
+          "score": 0.49210526315789477
+        },
+        "train": {
+          "n_eligible": 53,
+          "n_projected": 14,
+          "hit_rate": 0.6428571428571429,
+          "mean_exc_when_projected": 1.7065210862852713,
+          "false_project_rate": 0.35714285714285715,
+          "coverage": 0.2641509433962264,
+          "score": 0.5171159029649597
+        },
+        "test": {
+          "n_eligible": 23,
+          "n_projected": 2,
+          "hit_rate": 0.5,
+          "mean_exc_when_projected": 2.274910324642015,
+          "false_project_rate": 0.5,
+          "coverage": 0.08695652173913043,
+          "score": -1.0
+        },
+        "combined_score": -0.16558625336927218
+      },
+      "baseline_full": {
+        "n_eligible": 76,
+        "n_projected": 43,
+        "hit_rate": 0.627906976744186,
+        "mean_exc_when_projected": 1.8321191389343556,
+        "false_project_rate": 0.37209302325581395,
+        "coverage": 0.5657894736842105,
+        "score": 0.565483476132191
+      },
+      "best_rule": {
+        "rule": {
+          "near_noise_max_dist_pct": 1.0,
+          "min_target_dist_pct": 0.8,
+          "max_target_dist_pct": 2.5,
+          "min_cluster_strength_sum": 5.51,
+          "min_abs_confirm_delta": 100000.0,
+          "min_ob_ratio_long": 1.1,
+          "max_ob_ratio_short": 1.0,
+          "require_ob": true
+        },
+        "train": {
+          "n_eligible": 53,
+          "n_projected": 10,
+          "hit_rate": 0.8,
+          "mean_exc_when_projected": 1.954693235911027,
+          "false_project_rate": 0.2,
+          "coverage": 0.18867924528301888,
+          "score": 0.6277358490566037
+        },
+        "test": {
+          "n_eligible": 23,
+          "n_projected": 3,
+          "hit_rate": 0.3333333333333333,
+          "mean_exc_when_projected": 1.645310902952307,
+          "false_project_rate": 0.6666666666666666,
+          "coverage": 0.13043478260869565,
+          "score": -1.0
+        },
+        "combined_score": -0.10474528301886793
+      },
+      "top5": [
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.5,
+            "min_cluster_strength_sum": 5.51,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.1,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 53,
+            "n_projected": 10,
+            "hit_rate": 0.8,
+            "mean_exc_when_projected": 1.954693235911027,
+            "false_project_rate": 0.2,
+            "coverage": 0.18867924528301888,
+            "score": 0.6277358490566037
+          },
+          "test": {
+            "n_eligible": 23,
+            "n_projected": 3,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 1.645310902952307,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.13043478260869565,
+            "score": -1.0
+          },
+          "combined_score": -0.10474528301886793
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 3.0,
+            "min_cluster_strength_sum": 5.51,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.1,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 53,
+            "n_projected": 10,
+            "hit_rate": 0.8,
+            "mean_exc_when_projected": 1.954693235911027,
+            "false_project_rate": 0.2,
+            "coverage": 0.18867924528301888,
+            "score": 0.6277358490566037
+          },
+          "test": {
+            "n_eligible": 23,
+            "n_projected": 3,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 1.645310902952307,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.13043478260869565,
+            "score": -1.0
+          },
+          "combined_score": -0.10474528301886793
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.5,
+            "min_cluster_strength_sum": 4.0,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.1,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 53,
+            "n_projected": 11,
+            "hit_rate": 0.7272727272727273,
+            "mean_exc_when_projected": 1.8026493024937658,
+            "false_project_rate": 0.2727272727272727,
+            "coverage": 0.20754716981132076,
+            "score": 0.573327615780446
+          },
+          "test": {
+            "n_eligible": 23,
+            "n_projected": 3,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 1.645310902952307,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.13043478260869565,
+            "score": -1.0
+          },
+          "combined_score": -0.13466981132075467
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.5,
+            "min_cluster_strength_sum": 5.51,
+            "min_abs_confirm_delta": 71000.0,
+            "min_ob_ratio_long": 1.1,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 53,
+            "n_projected": 11,
+            "hit_rate": 0.7272727272727273,
+            "mean_exc_when_projected": 1.870889792569463,
+            "false_project_rate": 0.2727272727272727,
+            "coverage": 0.20754716981132076,
+            "score": 0.573327615780446
+          },
+          "test": {
+            "n_eligible": 23,
+            "n_projected": 3,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 1.645310902952307,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.13043478260869565,
+            "score": -1.0
+          },
+          "combined_score": -0.13466981132075467
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 3.0,
+            "min_cluster_strength_sum": 4.0,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.1,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 53,
+            "n_projected": 11,
+            "hit_rate": 0.7272727272727273,
+            "mean_exc_when_projected": 1.8026493024937658,
+            "false_project_rate": 0.2727272727272727,
+            "coverage": 0.20754716981132076,
+            "score": 0.573327615780446
+          },
+          "test": {
+            "n_eligible": 23,
+            "n_projected": 3,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 1.645310902952307,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.13043478260869565,
+            "score": -1.0
+          },
+          "combined_score": -0.13466981132075467
+        }
+      ]
+    },
+    "short": {
+      "side": "short",
+      "n": 82,
+      "n_train": 57,
+      "n_test": 25,
+      "label_counts": {
+        "working": 40,
+        "working_partial": 11,
+        "failed_early": 19,
+        "weak": 12
+      },
+      "quantile_proposal": {
+        "side": "short",
+        "n_working": 51,
+        "n_failed": 19,
+        "near_noise_max_dist_pct": 1.0,
+        "min_target_dist_pct": 0.8,
+        "max_target_dist_pct": 2.57,
+        "min_cluster_strength_sum": 6.91,
+        "typical_reversal_strength_sum": 6.91,
+        "min_abs_confirm_delta": 76000.0,
+        "failed_abs_confirm_delta_p75": 300000.0,
+        "max_ob_ratio": 1.05,
+        "failed_ob_p25": 0.812
+      },
+      "quantile_rule": {
+        "rule": {
+          "near_noise_max_dist_pct": 1.0,
+          "min_target_dist_pct": 0.8,
+          "max_target_dist_pct": 2.57,
+          "min_cluster_strength_sum": 6.91,
+          "min_abs_confirm_delta": 76000.0,
+          "min_ob_ratio_long": 1.05,
+          "max_ob_ratio_short": 1.05,
+          "require_ob": true
+        },
+        "full": {
+          "n_eligible": 81,
+          "n_projected": 15,
+          "hit_rate": 0.6,
+          "mean_exc_when_projected": 1.5782605533577116,
+          "false_project_rate": 0.4,
+          "coverage": 0.18518518518518517,
+          "score": 0.467037037037037
+        },
+        "train": {
+          "n_eligible": 56,
+          "n_projected": 10,
+          "hit_rate": 0.8,
+          "mean_exc_when_projected": 2.0612916351598667,
+          "false_project_rate": 0.2,
+          "coverage": 0.17857142857142858,
+          "score": 0.6257142857142857
+        },
+        "test": {
+          "n_eligible": 25,
+          "n_projected": 5,
+          "hit_rate": 0.2,
+          "mean_exc_when_projected": 0.612198389753402,
+          "false_project_rate": 0.8,
+          "coverage": 0.2,
+          "score": 0.09999999999999998
+        },
+        "combined_score": 0.3891428571428571
+      },
+      "baseline_full": {
+        "n_eligible": 81,
+        "n_projected": 61,
+        "hit_rate": 0.5573770491803278,
+        "mean_exc_when_projected": 1.484264131730291,
+        "false_project_rate": 0.4426229508196721,
+        "coverage": 0.7530864197530864,
+        "score": 0.5465189232948796
+      },
+      "best_rule": {
+        "rule": {
+          "near_noise_max_dist_pct": 1.0,
+          "min_target_dist_pct": 0.8,
+          "max_target_dist_pct": 2.0,
+          "min_cluster_strength_sum": 6.0,
+          "min_abs_confirm_delta": 76000.0,
+          "min_ob_ratio_long": 1.05,
+          "max_ob_ratio_short": 0.9,
+          "require_ob": true
+        },
+        "train": {
+          "n_eligible": 56,
+          "n_projected": 7,
+          "hit_rate": 0.8571428571428571,
+          "mean_exc_when_projected": 1.569057782334534,
+          "false_project_rate": 0.14285714285714285,
+          "coverage": 0.125,
+          "score": 0.6107142857142858
+        },
+        "test": {
+          "n_eligible": 25,
+          "n_projected": 5,
+          "hit_rate": 0.4,
+          "mean_exc_when_projected": 0.6991410596659572,
+          "false_project_rate": 0.6,
+          "coverage": 0.2,
+          "score": 0.25999999999999995
+        },
+        "combined_score": 0.4528928571428572
+      },
+      "top5": [
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.0,
+            "min_cluster_strength_sum": 6.0,
+            "min_abs_confirm_delta": 76000.0,
+            "min_ob_ratio_long": 1.05,
+            "max_ob_ratio_short": 0.9,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 56,
+            "n_projected": 7,
+            "hit_rate": 0.8571428571428571,
+            "mean_exc_when_projected": 1.569057782334534,
+            "false_project_rate": 0.14285714285714285,
+            "coverage": 0.125,
+            "score": 0.6107142857142858
+          },
+          "test": {
+            "n_eligible": 25,
+            "n_projected": 5,
+            "hit_rate": 0.4,
+            "mean_exc_when_projected": 0.6991410596659572,
+            "false_project_rate": 0.6,
+            "coverage": 0.2,
+            "score": 0.25999999999999995
+          },
+          "combined_score": 0.4528928571428572
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.0,
+            "min_cluster_strength_sum": 6.0,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.05,
+            "max_ob_ratio_short": 0.9,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 56,
+            "n_projected": 7,
+            "hit_rate": 0.8571428571428571,
+            "mean_exc_when_projected": 1.569057782334534,
+            "false_project_rate": 0.14285714285714285,
+            "coverage": 0.125,
+            "score": 0.6107142857142858
+          },
+          "test": {
+            "n_eligible": 25,
+            "n_projected": 5,
+            "hit_rate": 0.4,
+            "mean_exc_when_projected": 0.6991410596659572,
+            "false_project_rate": 0.6,
+            "coverage": 0.2,
+            "score": 0.25999999999999995
+          },
+          "combined_score": 0.4528928571428572
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.0,
+            "min_cluster_strength_sum": 6.0,
+            "min_abs_confirm_delta": 76000.0,
+            "min_ob_ratio_long": 1.05,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 56,
+            "n_projected": 10,
+            "hit_rate": 0.8,
+            "mean_exc_when_projected": 2.0269339113221396,
+            "false_project_rate": 0.2,
+            "coverage": 0.17857142857142858,
+            "score": 0.6257142857142857
+          },
+          "test": {
+            "n_eligible": 25,
+            "n_projected": 6,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 0.611501677673284,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.24,
+            "score": 0.21466666666666667
+          },
+          "combined_score": 0.44074285714285716
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.0,
+            "min_cluster_strength_sum": 6.0,
+            "min_abs_confirm_delta": 76000.0,
+            "min_ob_ratio_long": 1.05,
+            "max_ob_ratio_short": 1.05,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 56,
+            "n_projected": 10,
+            "hit_rate": 0.8,
+            "mean_exc_when_projected": 2.0269339113221396,
+            "false_project_rate": 0.2,
+            "coverage": 0.17857142857142858,
+            "score": 0.6257142857142857
+          },
+          "test": {
+            "n_eligible": 25,
+            "n_projected": 6,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 0.611501677673284,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.24,
+            "score": 0.21466666666666667
+          },
+          "combined_score": 0.44074285714285716
+        },
+        {
+          "rule": {
+            "near_noise_max_dist_pct": 1.0,
+            "min_target_dist_pct": 0.8,
+            "max_target_dist_pct": 2.0,
+            "min_cluster_strength_sum": 6.0,
+            "min_abs_confirm_delta": 100000.0,
+            "min_ob_ratio_long": 1.05,
+            "max_ob_ratio_short": 1.0,
+            "require_ob": true
+          },
+          "train": {
+            "n_eligible": 56,
+            "n_projected": 10,
+            "hit_rate": 0.8,
+            "mean_exc_when_projected": 2.0269339113221396,
+            "false_project_rate": 0.2,
+            "coverage": 0.17857142857142858,
+            "score": 0.6257142857142857
+          },
+          "test": {
+            "n_eligible": 25,
+            "n_projected": 6,
+            "hit_rate": 0.3333333333333333,
+            "mean_exc_when_projected": 0.611501677673284,
+            "false_project_rate": 0.6666666666666666,
+            "coverage": 0.24,
+            "score": 0.21466666666666667
+          },
+          "combined_score": 0.44074285714285716
+        }
+      ]
+    }
+  },
+  "suggested_rules": {
+    "long": {
+      "near_noise_max_dist_pct": 1.0,
+      "min_target_dist_pct": 0.8,
+      "max_target_dist_pct": 2.15,
+      "min_cluster_strength_sum": 5.51,
+      "min_abs_confirm_delta": 71000.0,
+      "min_ob_ratio_long": 1.0,
+      "max_ob_ratio_short": 1.0,
+      "require_ob": true
+    },
+    "short": {
+      "near_noise_max_dist_pct": 1.0,
+      "min_target_dist_pct": 0.8,
+      "max_target_dist_pct": 2.57,
+      "min_cluster_strength_sum": 6.91,
+      "min_abs_confirm_delta": 76000.0,
+      "min_ob_ratio_long": 1.05,
+      "max_ob_ratio_short": 1.05,
+      "require_ob": true
+    }
+  },
+  "note": "Primary suggestion = quantile_rule (robust). best_rule = grid walk-forward pick; may be sparse on test."
+}

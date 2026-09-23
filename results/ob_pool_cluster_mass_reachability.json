@@ -1,0 +1,5542 @@
+{
+  "symbol": "DOGEUSDT",
+  "gap_pct": 0.1,
+  "n_signals": 10,
+  "summary": {
+    "n_signals": 10,
+    "mean_max_exc_pct": 2.2973965254692343,
+    "strongest_cluster_hit_rate": 0.8,
+    "reachability_class_counts": {
+      "leicht_erreichbar": 17,
+      "reachable_moderate": 7,
+      "reachable_with_strong_delta": 1,
+      "reached_surprising": 3,
+      "nicht_erreicht": 7,
+      "unrealistisch_trotz_delta_ob_schwach": 14
+    },
+    "dist_delta_hit_grid": [
+      {
+        "dist_band": "0.0-0.8%",
+        "delta_bucket": "delta_lt_200k",
+        "n_clusters": 7,
+        "hit_rate": 1.0,
+        "mean_strength_sum": 3.244702293414458
+      },
+      {
+        "dist_band": "0.0-0.8%",
+        "delta_bucket": "delta_ge_200k",
+        "n_clusters": 12,
+        "hit_rate": 0.8333333333333334,
+        "mean_strength_sum": 8.393674381195842
+      },
+      {
+        "dist_band": "0.8-1.5%",
+        "delta_bucket": "delta_lt_200k",
+        "n_clusters": 4,
+        "hit_rate": 1.0,
+        "mean_strength_sum": 4.5941207332324385
+      },
+      {
+        "dist_band": "0.8-1.5%",
+        "delta_bucket": "delta_ge_200k",
+        "n_clusters": 5,
+        "hit_rate": 0.6,
+        "mean_strength_sum": 2.465778484204882
+      },
+      {
+        "dist_band": "1.5-2.5%",
+        "delta_bucket": "delta_lt_200k",
+        "n_clusters": 2,
+        "hit_rate": 1.0,
+        "mean_strength_sum": 2.755504025169539
+      },
+      {
+        "dist_band": "1.5-2.5%",
+        "delta_bucket": "delta_ge_200k",
+        "n_clusters": 7,
+        "hit_rate": 0.14285714285714285,
+        "mean_strength_sum": 3.0921535315515922
+      },
+      {
+        "dist_band": "2.5-99.0%",
+        "delta_bucket": "delta_lt_200k",
+        "n_clusters": 1,
+        "hit_rate": 1.0,
+        "mean_strength_sum": 0.0
+      },
+      {
+        "dist_band": "2.5-99.0%",
+        "delta_bucket": "delta_ge_200k",
+        "n_clusters": 11,
+        "hit_rate": 0.0,
+        "mean_strength_sum": 0.0
+      }
+    ],
+    "reversal_cluster_mass": [
+      {
+        "signal_ts": "2026-09-07T08:45:00+00:00",
+        "n_pools": 3,
+        "strength_sum": 14.92994251614633,
+        "strength_avg": 4.97664750538211,
+        "width_pct": 0.46848856664808,
+        "dist_pct": 1.6508644729503728,
+        "label": "reaction_near_high",
+        "max_exc_pct": 2.487451199107652
+      },
+      {
+        "signal_ts": "2026-09-07T19:35:00+00:00",
+        "n_pools": 2,
+        "strength_sum": 5.511008050339078,
+        "strength_avg": 2.755504025169539,
+        "width_pct": 0.3878546099290968,
+        "dist_pct": 1.6400709219858103,
+        "label": "reversal_point",
+        "max_exc_pct": 1.6622340425531927
+      },
+      {
+        "signal_ts": "2026-09-08T20:25:00+00:00",
+        "n_pools": 13,
+        "strength_sum": 28.26450565168894,
+        "strength_avg": 2.1741927424376106,
+        "width_pct": 0.589543937708568,
+        "dist_pct": 0.7341490545050143,
+        "label": "reversal_point",
+        "max_exc_pct": 1.4794215795328274
+      },
+      {
+        "signal_ts": "2026-09-11T02:15:00+00:00",
+        "n_pools": 6,
+        "strength_sum": 0.0,
+        "strength_avg": 0.0,
+        "width_pct": 0.5207709804860421,
+        "dist_pct": 2.885190949359523,
+        "label": "zwischenstation",
+        "max_exc_pct": 5.590805698551428
+      },
+      {
+        "signal_ts": "2026-09-13T14:25:00+00:00",
+        "n_pools": 7,
+        "strength_sum": 14.792750976317727,
+        "strength_avg": 2.113250139473961,
+        "width_pct": 0.41851010402964156,
+        "dist_pct": 0.7054884610785689,
+        "label": "reversal_point",
+        "max_exc_pct": 1.1598708597393264
+      },
+      {
+        "signal_ts": "2026-09-14T02:15:00+00:00",
+        "n_pools": 22,
+        "strength_sum": 8.4182097446086,
+        "strength_avg": 0.38264589748220906,
+        "width_pct": 0.8432005740940213,
+        "dist_pct": 1.040545389307494,
+        "label": "reversal_point",
+        "max_exc_pct": 1.4232747279033569
+      },
+      {
+        "signal_ts": "2026-09-15T23:30:00+00:00",
+        "n_pools": 4,
+        "strength_sum": 0.9342713599392881,
+        "strength_avg": 0.23356783998482203,
+        "width_pct": 0.21763462255937646,
+        "dist_pct": 0.17410769804750809,
+        "label": "reversal_point",
+        "max_exc_pct": 0.3606516602412618
+      },
+      {
+        "signal_ts": "2026-09-16T18:15:00+00:00",
+        "n_pools": 13,
+        "strength_sum": 3.8434062907654813,
+        "strength_avg": 0.2956466377511909,
+        "width_pct": 0.9112619406737271,
+        "dist_pct": 1.2946204122674574,
+        "label": "reversal_point",
+        "max_exc_pct": 2.199597787833066
+      },
+      {
+        "signal_ts": "2026-09-17T23:20:00+00:00",
+        "n_pools": 1,
+        "strength_sum": 0.0,
+        "strength_avg": 0.0,
+        "width_pct": 0.1652993755356878,
+        "dist_pct": 1.0897514387167724,
+        "label": "zwischenstation",
+        "max_exc_pct": 6.42830904861025
+      }
+    ],
+    "mean_reversal_strength_sum": 8.52156606553394,
+    "mean_reversal_n_pools": 7.888888888888889,
+    "mean_reversal_width_pct": 0.5025071901849157
+  },
+  "signals": [
+    {
+      "signal_ts": "2026-09-07T08:45:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier2_strong",
+      "entry_price": 0.08965,
+      "confirm_delta": 364413.1566,
+      "followthrough_delta": 497537.68542,
+      "entry_ob": 4.503304821326412,
+      "d10_entry_close": 251259.63730000006,
+      "d10_at_peak": 231229.14197000006,
+      "max_high": 0.09188,
+      "max_ts": "2026-09-07T13:20:00+00:00",
+      "max_exc_pct": 2.487451199107652,
+      "n_pools": 13,
+      "n_clusters": 4,
+      "n_reached": 4,
+      "n_ignored": 0,
+      "n_zwischenstation": 3,
+      "strongest_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09113,
+            "top": 0.091275,
+            "strength": 3.46931036354806,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788749220"
+          },
+          {
+            "bottom": 0.09125,
+            "top": 0.09145,
+            "strength": 6.140054132164923,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748740"
+          },
+          {
+            "bottom": 0.09134,
+            "top": 0.09155,
+            "strength": 5.320578020433347,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748860"
+          }
+        ],
+        "bottom": 0.09113,
+        "top": 0.09155,
+        "n_pools": 3,
+        "strength_sum": 14.92994251614633,
+        "strength_avg": 4.97664750538211,
+        "strength_max": 6.140054132164923,
+        "width_pct": 0.46848856664808,
+        "width_bps": 46.848856664808,
+        "density_per_pct": 31.868317775535875,
+        "dist_from_entry_pct": 1.6508644729503728,
+        "label": "reaction_near_high",
+        "reached": true,
+        "touch_ts": "2026-09-07T12:45:00+00:00",
+        "delta_at_touch": 1942710.90516,
+        "ob_at_touch": 1.091401494397236,
+        "overshoot_pct": 0.36809815950919905
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09113,
+            "top": 0.091275,
+            "strength": 3.46931036354806,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788749220"
+          },
+          {
+            "bottom": 0.09125,
+            "top": 0.09145,
+            "strength": 6.140054132164923,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748740"
+          },
+          {
+            "bottom": 0.09134,
+            "top": 0.09155,
+            "strength": 5.320578020433347,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748860"
+          }
+        ],
+        "bottom": 0.09113,
+        "top": 0.09155,
+        "n_pools": 3,
+        "strength_sum": 14.92994251614633,
+        "strength_avg": 4.97664750538211,
+        "strength_max": 6.140054132164923,
+        "width_pct": 0.46848856664808,
+        "width_bps": 46.848856664808,
+        "density_per_pct": 31.868317775535875,
+        "dist_from_entry_pct": 1.6508644729503728,
+        "label": "reaction_near_high",
+        "reached": true,
+        "touch_ts": "2026-09-07T12:45:00+00:00",
+        "delta_at_touch": 1942710.90516,
+        "ob_at_touch": 1.091401494397236,
+        "overshoot_pct": 0.36809815950919905
+      },
+      "reversal_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09113,
+            "top": 0.091275,
+            "strength": 3.46931036354806,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788749220"
+          },
+          {
+            "bottom": 0.09125,
+            "top": 0.09145,
+            "strength": 6.140054132164923,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748740"
+          },
+          {
+            "bottom": 0.09134,
+            "top": 0.09155,
+            "strength": 5.320578020433347,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788748860"
+          }
+        ],
+        "bottom": 0.09113,
+        "top": 0.09155,
+        "n_pools": 3,
+        "strength_sum": 14.92994251614633,
+        "strength_avg": 4.97664750538211,
+        "strength_max": 6.140054132164923,
+        "width_pct": 0.46848856664808,
+        "width_bps": 46.848856664808,
+        "density_per_pct": 31.868317775535875,
+        "dist_from_entry_pct": 1.6508644729503728,
+        "label": "reaction_near_high",
+        "reached": true,
+        "touch_ts": "2026-09-07T12:45:00+00:00",
+        "delta_at_touch": 1942710.90516,
+        "ob_at_touch": 1.091401494397236,
+        "overshoot_pct": 0.36809815950919905
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08967,
+              "top": 0.089775,
+              "strength": 6.121790874396398,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788770400"
+            },
+            {
+              "bottom": 0.08969,
+              "top": 0.08972000000000001,
+              "strength": 0.1324161852764283,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788770580"
+            }
+          ],
+          "bottom": 0.08967,
+          "top": 0.089775,
+          "n_pools": 2,
+          "strength_sum": 6.254207059672826,
+          "strength_avg": 3.127103529836413,
+          "strength_max": 6.121790874396398,
+          "width_pct": 0.11712214166201226,
+          "width_bps": 11.712214166201226,
+          "density_per_pct": 53.39901551425723,
+          "dist_from_entry_pct": 0.02230897936420092,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-07T08:45:00+00:00",
+          "delta_at_touch": 251259.63730000006,
+          "ob_at_touch": 4.503304821326412,
+          "overshoot_pct": 2.3480200780814386
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08997,
+              "top": 0.090055,
+              "strength": 3.907291694802397,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788769920"
+            },
+            {
+              "bottom": 0.08998,
+              "top": 0.09002500000000001,
+              "strength": 1.2627014469300446,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788769620"
+            },
+            {
+              "bottom": 0.09002,
+              "top": 0.09004000000000001,
+              "strength": 0.11317899339566392,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788763260"
+            },
+            {
+              "bottom": 0.09004,
+              "top": 0.09011,
+              "strength": 1.630447419752985,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788765240"
+            },
+            {
+              "bottom": 0.09012,
+              "top": 0.090245,
+              "strength": 3.1354863413616125,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788763020"
+            }
+          ],
+          "bottom": 0.08997,
+          "top": 0.090245,
+          "n_pools": 5,
+          "strength_sum": 10.049105896242702,
+          "strength_avg": 2.0098211792485405,
+          "strength_max": 3.907291694802397,
+          "width_pct": 0.3067484662576814,
+          "width_bps": 30.674846625768136,
+          "density_per_pct": 32.760085221749854,
+          "dist_from_entry_pct": 0.3569436698271064,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-07T09:20:00+00:00",
+          "delta_at_touch": 363119.66359999997,
+          "ob_at_touch": 1.0997289549077023,
+          "overshoot_pct": 1.8237590630228642
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.09039,
+              "top": 0.09048999999999999,
+              "strength": 3.387987400664416,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788762360"
+            },
+            {
+              "bottom": 0.09057,
+              "top": 0.090675,
+              "strength": 1.5880796032810736,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788758700"
+            },
+            {
+              "bottom": 0.09058,
+              "top": 0.090665,
+              "strength": 0.9633787305506587,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788761640"
+            }
+          ],
+          "bottom": 0.09039,
+          "top": 0.090675,
+          "n_pools": 3,
+          "strength_sum": 5.939445734496148,
+          "strength_avg": 1.9798152448320494,
+          "strength_max": 3.387987400664416,
+          "width_pct": 0.31790295593977413,
+          "width_bps": 31.79029559397741,
+          "density_per_pct": 18.683203863072478,
+          "dist_from_entry_pct": 0.8254322364751864,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-07T12:20:00+00:00",
+          "delta_at_touch": 349217.17676,
+          "ob_at_touch": 1.2201192705690278,
+          "overshoot_pct": 1.3441160066926914
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.09113,
+              "top": 0.091275,
+              "strength": 3.46931036354806,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788749220"
+            },
+            {
+              "bottom": 0.09125,
+              "top": 0.09145,
+              "strength": 6.140054132164923,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788748740"
+            },
+            {
+              "bottom": 0.09134,
+              "top": 0.09155,
+              "strength": 5.320578020433347,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788748860"
+            }
+          ],
+          "bottom": 0.09113,
+          "top": 0.09155,
+          "n_pools": 3,
+          "strength_sum": 14.92994251614633,
+          "strength_avg": 4.97664750538211,
+          "strength_max": 6.140054132164923,
+          "width_pct": 0.46848856664808,
+          "width_bps": 46.848856664808,
+          "density_per_pct": 31.868317775535875,
+          "dist_from_entry_pct": 1.6508644729503728,
+          "label": "reaction_near_high",
+          "reached": true,
+          "touch_ts": "2026-09-07T12:45:00+00:00",
+          "delta_at_touch": 1942710.90516,
+          "ob_at_touch": 1.091401494397236,
+          "overshoot_pct": 0.36809815950919905
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.02230897936420092,
+          "n_pools": 2,
+          "strength_sum": 6.254207059672826,
+          "strength_avg": 3.127103529836413,
+          "width_pct": 0.11712214166201226,
+          "density_per_pct": 53.39901551425723,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 251259.63730000006,
+          "ob_at_touch": 4.503304821326412,
+          "confirm_delta": 364413.1566,
+          "entry_ob": 4.503304821326412,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.3569436698271064,
+          "n_pools": 5,
+          "strength_sum": 10.049105896242702,
+          "strength_avg": 2.0098211792485405,
+          "width_pct": 0.3067484662576814,
+          "density_per_pct": 32.760085221749854,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 363119.66359999997,
+          "ob_at_touch": 1.0997289549077023,
+          "confirm_delta": 364413.1566,
+          "entry_ob": 4.503304821326412,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.8254322364751864,
+          "n_pools": 3,
+          "strength_sum": 5.939445734496148,
+          "strength_avg": 1.9798152448320494,
+          "width_pct": 0.31790295593977413,
+          "density_per_pct": 18.683203863072478,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 349217.17676,
+          "ob_at_touch": 1.2201192705690278,
+          "confirm_delta": 364413.1566,
+          "entry_ob": 4.503304821326412,
+          "reachability_class": "reachable_moderate"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.6508644729503728,
+          "n_pools": 3,
+          "strength_sum": 14.92994251614633,
+          "strength_avg": 4.97664750538211,
+          "width_pct": 0.46848856664808,
+          "density_per_pct": 31.868317775535875,
+          "reached": true,
+          "label": "reaction_near_high",
+          "delta_at_touch": 1942710.90516,
+          "ob_at_touch": 1.091401494397236,
+          "confirm_delta": 364413.1566,
+          "entry_ob": 4.503304821326412,
+          "reachability_class": "reachable_with_strong_delta"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-07T19:35:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier1_valid",
+      "entry_price": 0.09024,
+      "confirm_delta": 161431.07959,
+      "followthrough_delta": 127326.23241,
+      "entry_ob": 1.1594238777314148,
+      "d10_entry_close": 119298.35874,
+      "d10_at_peak": 1195355.51791,
+      "max_high": 0.09174,
+      "max_ts": "2026-09-08T00:50:00+00:00",
+      "max_exc_pct": 1.6622340425531927,
+      "n_pools": 11,
+      "n_clusters": 4,
+      "n_reached": 4,
+      "n_ignored": 0,
+      "n_zwischenstation": 3,
+      "strongest_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09172,
+            "top": 0.09196499999999999,
+            "strength": 1.961835643407501,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788786240"
+          },
+          {
+            "bottom": 0.09188,
+            "top": 0.09207000000000001,
+            "strength": 3.549172406931577,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788787380"
+          }
+        ],
+        "bottom": 0.09172,
+        "top": 0.09207000000000001,
+        "n_pools": 2,
+        "strength_sum": 5.511008050339078,
+        "strength_avg": 2.755504025169539,
+        "strength_max": 3.549172406931577,
+        "width_pct": 0.3878546099290968,
+        "width_bps": 38.785460992909684,
+        "density_per_pct": 14.208953327502122,
+        "dist_from_entry_pct": 1.6400709219858103,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-08T00:50:00+00:00",
+        "delta_at_touch": 1195355.51791,
+        "ob_at_touch": 1.109817453195157,
+        "overshoot_pct": -0.36569148936171414
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09172,
+            "top": 0.09196499999999999,
+            "strength": 1.961835643407501,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788786240"
+          },
+          {
+            "bottom": 0.09188,
+            "top": 0.09207000000000001,
+            "strength": 3.549172406931577,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788787380"
+          }
+        ],
+        "bottom": 0.09172,
+        "top": 0.09207000000000001,
+        "n_pools": 2,
+        "strength_sum": 5.511008050339078,
+        "strength_avg": 2.755504025169539,
+        "strength_max": 3.549172406931577,
+        "width_pct": 0.3878546099290968,
+        "width_bps": 38.785460992909684,
+        "density_per_pct": 14.208953327502122,
+        "dist_from_entry_pct": 1.6400709219858103,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-08T00:50:00+00:00",
+        "delta_at_touch": 1195355.51791,
+        "ob_at_touch": 1.109817453195157,
+        "overshoot_pct": -0.36569148936171414
+      },
+      "reversal_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.09172,
+            "top": 0.09196499999999999,
+            "strength": 1.961835643407501,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788786240"
+          },
+          {
+            "bottom": 0.09188,
+            "top": 0.09207000000000001,
+            "strength": 3.549172406931577,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788787380"
+          }
+        ],
+        "bottom": 0.09172,
+        "top": 0.09207000000000001,
+        "n_pools": 2,
+        "strength_sum": 5.511008050339078,
+        "strength_avg": 2.755504025169539,
+        "strength_max": 3.549172406931577,
+        "width_pct": 0.3878546099290968,
+        "width_bps": 38.785460992909684,
+        "density_per_pct": 14.208953327502122,
+        "dist_from_entry_pct": 1.6400709219858103,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-08T00:50:00+00:00",
+        "delta_at_touch": 1195355.51791,
+        "ob_at_touch": 1.109817453195157,
+        "overshoot_pct": -0.36569148936171414
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.09025,
+              "top": 0.09034,
+              "strength": 0.8593962102543001,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788809520"
+            },
+            {
+              "bottom": 0.09032,
+              "top": 0.0904,
+              "strength": 2.1470012163086976,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788802140"
+            },
+            {
+              "bottom": 0.09032,
+              "top": 0.09040999999999999,
+              "strength": 0.6923504044898826,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788801360"
+            },
+            {
+              "bottom": 0.09037,
+              "top": 0.09043000000000001,
+              "strength": 0.6199588188357505,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788803400"
+            },
+            {
+              "bottom": 0.09039,
+              "top": 0.090455,
+              "strength": 1.0120644673494332,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788803100"
+            }
+          ],
+          "bottom": 0.09025,
+          "top": 0.090455,
+          "n_pools": 5,
+          "strength_sum": 5.330771117238064,
+          "strength_avg": 1.066154223447613,
+          "strength_max": 2.1470012163086976,
+          "width_pct": 0.22717198581559936,
+          "width_bps": 22.717198581559934,
+          "density_per_pct": 23.465794420466842,
+          "dist_from_entry_pct": 0.011081560283683647,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-07T19:35:00+00:00",
+          "delta_at_touch": 119298.35874,
+          "ob_at_touch": 1.1594238777314148,
+          "overshoot_pct": 1.42398049645391
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.09059,
+              "top": 0.090645,
+              "strength": 0.670317139160067,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788793320"
+            },
+            {
+              "bottom": 0.09072,
+              "top": 0.090835,
+              "strength": 4.414722019370355,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788792840"
+            }
+          ],
+          "bottom": 0.09059,
+          "top": 0.090835,
+          "n_pools": 2,
+          "strength_sum": 5.085039158530423,
+          "strength_avg": 2.5425195792652113,
+          "strength_max": 4.414722019370355,
+          "width_pct": 0.2714982269503493,
+          "width_bps": 27.14982269503493,
+          "density_per_pct": 18.729548312889563,
+          "dist_from_entry_pct": 0.38785460992908144,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-07T19:50:00+00:00",
+          "delta_at_touch": 2012462.60153,
+          "ob_at_touch": 1.5288693265061732,
+          "overshoot_pct": 1.0028812056737622
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.09096,
+              "top": 0.09101999999999999,
+              "strength": 0.3428123402338473,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788789720"
+            },
+            {
+              "bottom": 0.09106,
+              "top": 0.09109500000000001,
+              "strength": 0.9183367911475131,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788789300"
+            }
+          ],
+          "bottom": 0.09096,
+          "top": 0.09109500000000001,
+          "n_pools": 2,
+          "strength_sum": 1.2611491313813605,
+          "strength_avg": 0.6305745656906803,
+          "strength_max": 0.9183367911475131,
+          "width_pct": 0.14960106382979843,
+          "width_bps": 14.960106382979843,
+          "density_per_pct": 8.430081304877442,
+          "dist_from_entry_pct": 0.7978723404255301,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-08T00:05:00+00:00",
+          "delta_at_touch": 1140683.79324,
+          "ob_at_touch": 0.9690119904006357,
+          "overshoot_pct": 0.7147606382978644
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.09172,
+              "top": 0.09196499999999999,
+              "strength": 1.961835643407501,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788786240"
+            },
+            {
+              "bottom": 0.09188,
+              "top": 0.09207000000000001,
+              "strength": 3.549172406931577,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788787380"
+            }
+          ],
+          "bottom": 0.09172,
+          "top": 0.09207000000000001,
+          "n_pools": 2,
+          "strength_sum": 5.511008050339078,
+          "strength_avg": 2.755504025169539,
+          "strength_max": 3.549172406931577,
+          "width_pct": 0.3878546099290968,
+          "width_bps": 38.785460992909684,
+          "density_per_pct": 14.208953327502122,
+          "dist_from_entry_pct": 1.6400709219858103,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-08T00:50:00+00:00",
+          "delta_at_touch": 1195355.51791,
+          "ob_at_touch": 1.109817453195157,
+          "overshoot_pct": -0.36569148936171414
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.011081560283683647,
+          "n_pools": 5,
+          "strength_sum": 5.330771117238064,
+          "strength_avg": 1.066154223447613,
+          "width_pct": 0.22717198581559936,
+          "density_per_pct": 23.465794420466842,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 119298.35874,
+          "ob_at_touch": 1.1594238777314148,
+          "confirm_delta": 161431.07959,
+          "entry_ob": 1.1594238777314148,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.38785460992908144,
+          "n_pools": 2,
+          "strength_sum": 5.085039158530423,
+          "strength_avg": 2.5425195792652113,
+          "width_pct": 0.2714982269503493,
+          "density_per_pct": 18.729548312889563,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 2012462.60153,
+          "ob_at_touch": 1.5288693265061732,
+          "confirm_delta": 161431.07959,
+          "entry_ob": 1.1594238777314148,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.7978723404255301,
+          "n_pools": 2,
+          "strength_sum": 1.2611491313813605,
+          "strength_avg": 0.6305745656906803,
+          "width_pct": 0.14960106382979843,
+          "density_per_pct": 8.430081304877442,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 1140683.79324,
+          "ob_at_touch": 0.9690119904006357,
+          "confirm_delta": 161431.07959,
+          "entry_ob": 1.1594238777314148,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.6400709219858103,
+          "n_pools": 2,
+          "strength_sum": 5.511008050339078,
+          "strength_avg": 2.755504025169539,
+          "width_pct": 0.3878546099290968,
+          "density_per_pct": 14.208953327502122,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": 1195355.51791,
+          "ob_at_touch": 1.109817453195157,
+          "confirm_delta": 161431.07959,
+          "entry_ob": 1.1594238777314148,
+          "reachability_class": "reached_surprising"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-08T20:25:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier2_strong",
+      "entry_price": 0.0899,
+      "confirm_delta": 1424209.6378500003,
+      "followthrough_delta": -72979.50263,
+      "entry_ob": 2.137728822176357,
+      "d10_entry_close": 233768.45818999992,
+      "d10_at_peak": 378254.92866999994,
+      "max_high": 0.09123,
+      "max_ts": "2026-09-09T08:20:00+00:00",
+      "max_exc_pct": 1.4794215795328274,
+      "n_pools": 16,
+      "n_clusters": 2,
+      "n_reached": 1,
+      "n_ignored": 1,
+      "n_zwischenstation": 0,
+      "strongest_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.09056,
+            "top": 0.09062,
+            "strength": 0.2381563484219163,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788892200"
+          },
+          {
+            "bottom": 0.09061,
+            "top": 0.09087999999999999,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788898440"
+          },
+          {
+            "bottom": 0.09072,
+            "top": 0.09076499999999998,
+            "strength": 0.0850970238981889,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891660"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09081,
+            "strength": 0.3035280206011949,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886200"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09091500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788861240"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09078,
+            "strength": 0.5517526970742639,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891420"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09085,
+            "strength": 2.0667815462430243,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891840"
+          },
+          {
+            "bottom": 0.09079,
+            "top": 0.090885,
+            "strength": 1.5979591907259858,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886800"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09088000000000002,
+            "strength": 0.9252283653856481,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883320"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09089,
+            "strength": 0.3695291574849741,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788887220"
+          },
+          {
+            "bottom": 0.09087,
+            "top": 0.09096500000000002,
+            "strength": 2.1264733018537414,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788885600"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09108000000000001,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883080"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09109,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788862800"
+          }
+        ],
+        "bottom": 0.09056,
+        "top": 0.09109,
+        "n_pools": 13,
+        "strength_sum": 28.26450565168894,
+        "strength_avg": 2.1741927424376106,
+        "strength_max": 10.0,
+        "width_pct": 0.589543937708568,
+        "width_bps": 58.954393770856804,
+        "density_per_pct": 47.943001095977785,
+        "dist_from_entry_pct": 0.7341490545050143,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-09T00:05:00+00:00",
+        "delta_at_touch": -579539.1651100002,
+        "ob_at_touch": 2.214528285066419,
+        "overshoot_pct": 0.155728587319245
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.09056,
+            "top": 0.09062,
+            "strength": 0.2381563484219163,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788892200"
+          },
+          {
+            "bottom": 0.09061,
+            "top": 0.09087999999999999,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788898440"
+          },
+          {
+            "bottom": 0.09072,
+            "top": 0.09076499999999998,
+            "strength": 0.0850970238981889,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891660"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09081,
+            "strength": 0.3035280206011949,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886200"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09091500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788861240"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09078,
+            "strength": 0.5517526970742639,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891420"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09085,
+            "strength": 2.0667815462430243,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891840"
+          },
+          {
+            "bottom": 0.09079,
+            "top": 0.090885,
+            "strength": 1.5979591907259858,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886800"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09088000000000002,
+            "strength": 0.9252283653856481,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883320"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09089,
+            "strength": 0.3695291574849741,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788887220"
+          },
+          {
+            "bottom": 0.09087,
+            "top": 0.09096500000000002,
+            "strength": 2.1264733018537414,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788885600"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09108000000000001,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883080"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09109,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788862800"
+          }
+        ],
+        "bottom": 0.09056,
+        "top": 0.09109,
+        "n_pools": 13,
+        "strength_sum": 28.26450565168894,
+        "strength_avg": 2.1741927424376106,
+        "strength_max": 10.0,
+        "width_pct": 0.589543937708568,
+        "width_bps": 58.954393770856804,
+        "density_per_pct": 47.943001095977785,
+        "dist_from_entry_pct": 0.7341490545050143,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-09T00:05:00+00:00",
+        "delta_at_touch": -579539.1651100002,
+        "ob_at_touch": 2.214528285066419,
+        "overshoot_pct": 0.155728587319245
+      },
+      "reversal_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.09056,
+            "top": 0.09062,
+            "strength": 0.2381563484219163,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788892200"
+          },
+          {
+            "bottom": 0.09061,
+            "top": 0.09087999999999999,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788898440"
+          },
+          {
+            "bottom": 0.09072,
+            "top": 0.09076499999999998,
+            "strength": 0.0850970238981889,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891660"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09081,
+            "strength": 0.3035280206011949,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886200"
+          },
+          {
+            "bottom": 0.09073,
+            "top": 0.09091500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788861240"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09078,
+            "strength": 0.5517526970742639,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891420"
+          },
+          {
+            "bottom": 0.09074,
+            "top": 0.09085,
+            "strength": 2.0667815462430243,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788891840"
+          },
+          {
+            "bottom": 0.09079,
+            "top": 0.090885,
+            "strength": 1.5979591907259858,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788886800"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09088000000000002,
+            "strength": 0.9252283653856481,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883320"
+          },
+          {
+            "bottom": 0.0908,
+            "top": 0.09089,
+            "strength": 0.3695291574849741,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788887220"
+          },
+          {
+            "bottom": 0.09087,
+            "top": 0.09096500000000002,
+            "strength": 2.1264733018537414,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788885600"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09108000000000001,
+            "strength": 10.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788883080"
+          },
+          {
+            "bottom": 0.09091,
+            "top": 0.09109,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1788862800"
+          }
+        ],
+        "bottom": 0.09056,
+        "top": 0.09109,
+        "n_pools": 13,
+        "strength_sum": 28.26450565168894,
+        "strength_avg": 2.1741927424376106,
+        "strength_max": 10.0,
+        "width_pct": 0.589543937708568,
+        "width_bps": 58.954393770856804,
+        "density_per_pct": 47.943001095977785,
+        "dist_from_entry_pct": 0.7341490545050143,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-09T00:05:00+00:00",
+        "delta_at_touch": -579539.1651100002,
+        "ob_at_touch": 2.214528285066419,
+        "overshoot_pct": 0.155728587319245
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.09056,
+              "top": 0.09062,
+              "strength": 0.2381563484219163,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788892200"
+            },
+            {
+              "bottom": 0.09061,
+              "top": 0.09087999999999999,
+              "strength": 10.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788898440"
+            },
+            {
+              "bottom": 0.09072,
+              "top": 0.09076499999999998,
+              "strength": 0.0850970238981889,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788891660"
+            },
+            {
+              "bottom": 0.09073,
+              "top": 0.09081,
+              "strength": 0.3035280206011949,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788886200"
+            },
+            {
+              "bottom": 0.09073,
+              "top": 0.09091500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788861240"
+            },
+            {
+              "bottom": 0.09074,
+              "top": 0.09078,
+              "strength": 0.5517526970742639,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788891420"
+            },
+            {
+              "bottom": 0.09074,
+              "top": 0.09085,
+              "strength": 2.0667815462430243,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788891840"
+            },
+            {
+              "bottom": 0.09079,
+              "top": 0.090885,
+              "strength": 1.5979591907259858,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788886800"
+            },
+            {
+              "bottom": 0.0908,
+              "top": 0.09088000000000002,
+              "strength": 0.9252283653856481,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788883320"
+            },
+            {
+              "bottom": 0.0908,
+              "top": 0.09089,
+              "strength": 0.3695291574849741,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788887220"
+            },
+            {
+              "bottom": 0.09087,
+              "top": 0.09096500000000002,
+              "strength": 2.1264733018537414,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788885600"
+            },
+            {
+              "bottom": 0.09091,
+              "top": 0.09108000000000001,
+              "strength": 10.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788883080"
+            },
+            {
+              "bottom": 0.09091,
+              "top": 0.09109,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788862800"
+            }
+          ],
+          "bottom": 0.09056,
+          "top": 0.09109,
+          "n_pools": 13,
+          "strength_sum": 28.26450565168894,
+          "strength_avg": 2.1741927424376106,
+          "strength_max": 10.0,
+          "width_pct": 0.589543937708568,
+          "width_bps": 58.954393770856804,
+          "density_per_pct": 47.943001095977785,
+          "dist_from_entry_pct": 0.7341490545050143,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-09T00:05:00+00:00",
+          "delta_at_touch": -579539.1651100002,
+          "ob_at_touch": 2.214528285066419,
+          "overshoot_pct": 0.155728587319245
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.09147,
+              "top": 0.09158,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788834300"
+            },
+            {
+              "bottom": 0.09165,
+              "top": 0.09172999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788830760"
+            },
+            {
+              "bottom": 0.09174,
+              "top": 0.09194,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1788828780"
+            }
+          ],
+          "bottom": 0.09147,
+          "top": 0.09194,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.5228031145717444,
+          "width_bps": 52.28031145717444,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 1.7463848720800912,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.7341490545050143,
+          "n_pools": 13,
+          "strength_sum": 28.26450565168894,
+          "strength_avg": 2.1741927424376106,
+          "width_pct": 0.589543937708568,
+          "density_per_pct": 47.943001095977785,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": -579539.1651100002,
+          "ob_at_touch": 2.214528285066419,
+          "confirm_delta": 1424209.6378500003,
+          "entry_ob": 2.137728822176357,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 1.7463848720800912,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.5228031145717444,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 1424209.6378500003,
+          "entry_ob": 2.137728822176357,
+          "reachability_class": "nicht_erreicht"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-11T02:15:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier1_valid",
+      "entry_price": 0.08353,
+      "confirm_delta": 165194.25238000002,
+      "followthrough_delta": 47308.3487,
+      "entry_ob": 3.0720572086658704,
+      "d10_entry_close": -79625.90255999999,
+      "d10_at_peak": -292549.3429200002,
+      "max_high": 0.0882,
+      "max_ts": "2026-09-11T14:00:00+00:00",
+      "max_exc_pct": 5.590805698551428,
+      "n_pools": 31,
+      "n_clusters": 6,
+      "n_reached": 6,
+      "n_ignored": 0,
+      "n_zwischenstation": 6,
+      "strongest_cluster": {
+        "cluster_id": "C3",
+        "pools": [
+          {
+            "bottom": 0.08421,
+            "top": 0.08423499999999999,
+            "strength": 0.18737697368297052,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789076880"
+          },
+          {
+            "bottom": 0.08421,
+            "top": 0.08424999999999999,
+            "strength": 0.4426661337079195,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789078560"
+          },
+          {
+            "bottom": 0.08421,
+            "top": 0.084255,
+            "strength": 0.06715124297026132,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789074060"
+          },
+          {
+            "bottom": 0.08423,
+            "top": 0.08424999999999999,
+            "strength": 0.30822998314640004,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789078800"
+          },
+          {
+            "bottom": 0.08425,
+            "top": 0.08427000000000001,
+            "strength": 0.12303479889496999,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789074600"
+          },
+          {
+            "bottom": 0.08427,
+            "top": 0.0843,
+            "strength": 0.2996485994555271,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789073040"
+          },
+          {
+            "bottom": 0.08429,
+            "top": 0.08432500000000001,
+            "strength": 0.6615245619116492,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789072680"
+          },
+          {
+            "bottom": 0.08431,
+            "top": 0.08441499999999999,
+            "strength": 5.931198877126671,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789069440"
+          },
+          {
+            "bottom": 0.08432,
+            "top": 0.08434000000000001,
+            "strength": 0.13114283398601811,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789072200"
+          },
+          {
+            "bottom": 0.08433,
+            "top": 0.08437,
+            "strength": 1.390212304233833,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789071720"
+          }
+        ],
+        "bottom": 0.08421,
+        "top": 0.08441499999999999,
+        "n_pools": 10,
+        "strength_sum": 9.54218630911622,
+        "strength_avg": 0.954218630911622,
+        "strength_max": 5.931198877126671,
+        "width_pct": 0.24542080689572235,
+        "width_bps": 24.542080689572234,
+        "density_per_pct": 38.88091816587756,
+        "dist_from_entry_pct": 0.8140787740931403,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-11T12:30:00+00:00",
+        "delta_at_touch": -60382.79386999924,
+        "ob_at_touch": 0.23665442585764326,
+        "overshoot_pct": 4.531306117562566
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C3",
+        "pools": [
+          {
+            "bottom": 0.08421,
+            "top": 0.08423499999999999,
+            "strength": 0.18737697368297052,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789076880"
+          },
+          {
+            "bottom": 0.08421,
+            "top": 0.08424999999999999,
+            "strength": 0.4426661337079195,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789078560"
+          },
+          {
+            "bottom": 0.08421,
+            "top": 0.084255,
+            "strength": 0.06715124297026132,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789074060"
+          },
+          {
+            "bottom": 0.08423,
+            "top": 0.08424999999999999,
+            "strength": 0.30822998314640004,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789078800"
+          },
+          {
+            "bottom": 0.08425,
+            "top": 0.08427000000000001,
+            "strength": 0.12303479889496999,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789074600"
+          },
+          {
+            "bottom": 0.08427,
+            "top": 0.0843,
+            "strength": 0.2996485994555271,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789073040"
+          },
+          {
+            "bottom": 0.08429,
+            "top": 0.08432500000000001,
+            "strength": 0.6615245619116492,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789072680"
+          },
+          {
+            "bottom": 0.08431,
+            "top": 0.08441499999999999,
+            "strength": 5.931198877126671,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789069440"
+          },
+          {
+            "bottom": 0.08432,
+            "top": 0.08434000000000001,
+            "strength": 0.13114283398601811,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789072200"
+          },
+          {
+            "bottom": 0.08433,
+            "top": 0.08437,
+            "strength": 1.390212304233833,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789071720"
+          }
+        ],
+        "bottom": 0.08421,
+        "top": 0.08441499999999999,
+        "n_pools": 10,
+        "strength_sum": 9.54218630911622,
+        "strength_avg": 0.954218630911622,
+        "strength_max": 5.931198877126671,
+        "width_pct": 0.24542080689572235,
+        "width_bps": 24.542080689572234,
+        "density_per_pct": 38.88091816587756,
+        "dist_from_entry_pct": 0.8140787740931403,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-11T12:30:00+00:00",
+        "delta_at_touch": -60382.79386999924,
+        "ob_at_touch": 0.23665442585764326,
+        "overshoot_pct": 4.531306117562566
+      },
+      "reversal_cluster": {
+        "cluster_id": "C6",
+        "pools": [
+          {
+            "bottom": 0.08594,
+            "top": 0.085995,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789023000"
+          },
+          {
+            "bottom": 0.086,
+            "top": 0.08602499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789019220"
+          },
+          {
+            "bottom": 0.08602,
+            "top": 0.08603,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789019940"
+          },
+          {
+            "bottom": 0.08602,
+            "top": 0.08605499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789019820"
+          },
+          {
+            "bottom": 0.08611,
+            "top": 0.08626,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789011720"
+          },
+          {
+            "bottom": 0.08624,
+            "top": 0.086375,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789018500"
+          }
+        ],
+        "bottom": 0.08594,
+        "top": 0.086375,
+        "n_pools": 6,
+        "strength_sum": 0.0,
+        "strength_avg": 0.0,
+        "strength_max": 0.0,
+        "width_pct": 0.5207709804860421,
+        "width_bps": 52.077098048604206,
+        "density_per_pct": 0.0,
+        "dist_from_entry_pct": 2.885190949359523,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-11T13:45:00+00:00",
+        "delta_at_touch": 816131.92001,
+        "ob_at_touch": 3.2441131812763317,
+        "overshoot_pct": 2.1848437687058633
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08355,
+              "top": 0.083565,
+              "strength": 0.0106669165355032,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789089120"
+            },
+            {
+              "bottom": 0.08356,
+              "top": 0.08358499999999999,
+              "strength": 0.21382472673025776,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789092300"
+            },
+            {
+              "bottom": 0.08356,
+              "top": 0.08359,
+              "strength": 0.25877858670015685,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789092000"
+            },
+            {
+              "bottom": 0.08356,
+              "top": 0.08360999999999999,
+              "strength": 0.11933732982103278,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789092780"
+            },
+            {
+              "bottom": 0.0836,
+              "top": 0.08363499999999999,
+              "strength": 0.12024451803853316,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789088640"
+            },
+            {
+              "bottom": 0.08366,
+              "top": 0.08371,
+              "strength": 0.559966507431353,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789080960"
+            }
+          ],
+          "bottom": 0.08355,
+          "top": 0.08371,
+          "n_pools": 6,
+          "strength_sum": 1.2828185852568368,
+          "strength_avg": 0.21380309754280613,
+          "strength_max": 0.559966507431353,
+          "width_pct": 0.19154794684545356,
+          "width_bps": 19.154794684545358,
+          "density_per_pct": 6.697114776656165,
+          "dist_from_entry_pct": 0.023943493355687927,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T03:35:00+00:00",
+          "delta_at_touch": 123487.84882000001,
+          "ob_at_touch": 3.0401113143662757,
+          "overshoot_pct": 5.375314258350286
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.0838,
+              "top": 0.08381,
+              "strength": 0.015854933544496772,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789080540"
+            },
+            {
+              "bottom": 0.0838,
+              "top": 0.08384,
+              "strength": 0.44389205666314374,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789080420"
+            }
+          ],
+          "bottom": 0.0838,
+          "top": 0.08384,
+          "n_pools": 2,
+          "strength_sum": 0.45974699020764054,
+          "strength_avg": 0.22987349510382027,
+          "strength_max": 0.44389205666314374,
+          "width_pct": 0.04788698671135924,
+          "width_bps": 4.788698671135924,
+          "density_per_pct": 9.600666523011444,
+          "dist_from_entry_pct": 0.32323716030169564,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T04:05:00+00:00",
+          "delta_at_touch": 182701.06214,
+          "ob_at_touch": 1.7792229185970747,
+          "overshoot_pct": 5.219681551538373
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08421,
+              "top": 0.08423499999999999,
+              "strength": 0.18737697368297052,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789076880"
+            },
+            {
+              "bottom": 0.08421,
+              "top": 0.08424999999999999,
+              "strength": 0.4426661337079195,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789078560"
+            },
+            {
+              "bottom": 0.08421,
+              "top": 0.084255,
+              "strength": 0.06715124297026132,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789074060"
+            },
+            {
+              "bottom": 0.08423,
+              "top": 0.08424999999999999,
+              "strength": 0.30822998314640004,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789078800"
+            },
+            {
+              "bottom": 0.08425,
+              "top": 0.08427000000000001,
+              "strength": 0.12303479889496999,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789074600"
+            },
+            {
+              "bottom": 0.08427,
+              "top": 0.0843,
+              "strength": 0.2996485994555271,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789073040"
+            },
+            {
+              "bottom": 0.08429,
+              "top": 0.08432500000000001,
+              "strength": 0.6615245619116492,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789072680"
+            },
+            {
+              "bottom": 0.08431,
+              "top": 0.08441499999999999,
+              "strength": 5.931198877126671,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789069440"
+            },
+            {
+              "bottom": 0.08432,
+              "top": 0.08434000000000001,
+              "strength": 0.13114283398601811,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789072200"
+            },
+            {
+              "bottom": 0.08433,
+              "top": 0.08437,
+              "strength": 1.390212304233833,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789071720"
+            }
+          ],
+          "bottom": 0.08421,
+          "top": 0.08441499999999999,
+          "n_pools": 10,
+          "strength_sum": 9.54218630911622,
+          "strength_avg": 0.954218630911622,
+          "strength_max": 5.931198877126671,
+          "width_pct": 0.24542080689572235,
+          "width_bps": 24.542080689572234,
+          "density_per_pct": 38.88091816587756,
+          "dist_from_entry_pct": 0.8140787740931403,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T12:30:00+00:00",
+          "delta_at_touch": -60382.79386999924,
+          "ob_at_touch": 0.23665442585764326,
+          "overshoot_pct": 4.531306117562566
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08477,
+              "top": 0.08492,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789044060"
+            }
+          ],
+          "bottom": 0.08477,
+          "top": 0.08492,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.1795762001676013,
+          "width_bps": 17.95762001676013,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 1.4844965880522027,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T12:35:00+00:00",
+          "delta_at_touch": 1017050.1833699998,
+          "ob_at_touch": 1.0040300410092482,
+          "overshoot_pct": 3.926732910331624
+        },
+        {
+          "cluster_id": "C5",
+          "pools": [
+            {
+              "bottom": 0.08538,
+              "top": 0.08549499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789037760"
+            },
+            {
+              "bottom": 0.08545,
+              "top": 0.08613,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789043400"
+            },
+            {
+              "bottom": 0.08546,
+              "top": 0.085505,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789039920"
+            },
+            {
+              "bottom": 0.08548,
+              "top": 0.08551,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789024740"
+            },
+            {
+              "bottom": 0.08549,
+              "top": 0.085535,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789024200"
+            },
+            {
+              "bottom": 0.08551,
+              "top": 0.085645,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789028700"
+            }
+          ],
+          "bottom": 0.08538,
+          "top": 0.08613,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.8978810008380231,
+          "width_bps": 89.78810008380232,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 2.2147731354004603,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T12:35:00+00:00",
+          "delta_at_touch": 1017050.1833699998,
+          "ob_at_touch": 1.0040300410092482,
+          "overshoot_pct": 2.4781515623129446
+        },
+        {
+          "cluster_id": "C6",
+          "pools": [
+            {
+              "bottom": 0.08594,
+              "top": 0.085995,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789023000"
+            },
+            {
+              "bottom": 0.086,
+              "top": 0.08602499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789019220"
+            },
+            {
+              "bottom": 0.08602,
+              "top": 0.08603,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789019940"
+            },
+            {
+              "bottom": 0.08602,
+              "top": 0.08605499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789019820"
+            },
+            {
+              "bottom": 0.08611,
+              "top": 0.08626,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789011720"
+            },
+            {
+              "bottom": 0.08624,
+              "top": 0.086375,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789018500"
+            }
+          ],
+          "bottom": 0.08594,
+          "top": 0.086375,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.5207709804860421,
+          "width_bps": 52.077098048604206,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 2.885190949359523,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-11T13:45:00+00:00",
+          "delta_at_touch": 816131.92001,
+          "ob_at_touch": 3.2441131812763317,
+          "overshoot_pct": 2.1848437687058633
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.023943493355687927,
+          "n_pools": 6,
+          "strength_sum": 1.2828185852568368,
+          "strength_avg": 0.21380309754280613,
+          "width_pct": 0.19154794684545356,
+          "density_per_pct": 6.697114776656165,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 123487.84882000001,
+          "ob_at_touch": 3.0401113143662757,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.32323716030169564,
+          "n_pools": 2,
+          "strength_sum": 0.45974699020764054,
+          "strength_avg": 0.22987349510382027,
+          "width_pct": 0.04788698671135924,
+          "density_per_pct": 9.600666523011444,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 182701.06214,
+          "ob_at_touch": 1.7792229185970747,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.8140787740931403,
+          "n_pools": 10,
+          "strength_sum": 9.54218630911622,
+          "strength_avg": 0.954218630911622,
+          "width_pct": 0.24542080689572235,
+          "density_per_pct": 38.88091816587756,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": -60382.79386999924,
+          "ob_at_touch": 0.23665442585764326,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "reachable_moderate"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.4844965880522027,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.1795762001676013,
+          "density_per_pct": 0.0,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 1017050.1833699998,
+          "ob_at_touch": 1.0040300410092482,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "reachable_moderate"
+        },
+        {
+          "cluster_id": "C5",
+          "dist_pct": 2.2147731354004603,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.8978810008380231,
+          "density_per_pct": 0.0,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 1017050.1833699998,
+          "ob_at_touch": 1.0040300410092482,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "reached_surprising"
+        },
+        {
+          "cluster_id": "C6",
+          "dist_pct": 2.885190949359523,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.5207709804860421,
+          "density_per_pct": 0.0,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 816131.92001,
+          "ob_at_touch": 3.2441131812763317,
+          "confirm_delta": 165194.25238000002,
+          "entry_ob": 3.0720572086658704,
+          "reachability_class": "reached_surprising"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-13T14:25:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier2_strong",
+      "entry_price": 0.08363,
+      "confirm_delta": 557413.0341099999,
+      "followthrough_delta": 45454.801809999975,
+      "entry_ob": 1.4481879820744823,
+      "d10_entry_close": -9549.641419999993,
+      "d10_at_peak": -110468.81325,
+      "max_high": 0.0846,
+      "max_ts": "2026-09-13T17:25:00+00:00",
+      "max_exc_pct": 1.1598708597393264,
+      "n_pools": 36,
+      "n_clusters": 4,
+      "n_reached": 3,
+      "n_ignored": 1,
+      "n_zwischenstation": 2,
+      "strongest_cluster": {
+        "cluster_id": "C3",
+        "pools": [
+          {
+            "bottom": 0.08422,
+            "top": 0.08425,
+            "strength": 1.6499712318307402,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286640"
+          },
+          {
+            "bottom": 0.08425,
+            "top": 0.084315,
+            "strength": 4.8175489902887385,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286100"
+          },
+          {
+            "bottom": 0.08431,
+            "top": 0.08437,
+            "strength": 3.5723589491752765,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285740"
+          },
+          {
+            "bottom": 0.08441,
+            "top": 0.084435,
+            "strength": 0.05357248465278627,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285260"
+          },
+          {
+            "bottom": 0.08442,
+            "top": 0.084475,
+            "strength": 3.2237421318518344,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285380"
+          },
+          {
+            "bottom": 0.08453,
+            "top": 0.08453999999999999,
+            "strength": 0.1755098806256169,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789284300"
+          },
+          {
+            "bottom": 0.08456,
+            "top": 0.08456999999999999,
+            "strength": 1.3000473078927335,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789283880"
+          }
+        ],
+        "bottom": 0.08422,
+        "top": 0.08456999999999999,
+        "n_pools": 7,
+        "strength_sum": 14.792750976317727,
+        "strength_avg": 2.113250139473961,
+        "strength_max": 4.8175489902887385,
+        "width_pct": 0.41851010402964156,
+        "width_bps": 41.85101040296416,
+        "density_per_pct": 35.34622183284256,
+        "dist_from_entry_pct": 0.7054884610785689,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-13T17:05:00+00:00",
+        "delta_at_touch": 161628.88734,
+        "ob_at_touch": 0.7275963640122864,
+        "overshoot_pct": 0.03587229463111593
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C3",
+        "pools": [
+          {
+            "bottom": 0.08422,
+            "top": 0.08425,
+            "strength": 1.6499712318307402,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286640"
+          },
+          {
+            "bottom": 0.08425,
+            "top": 0.084315,
+            "strength": 4.8175489902887385,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286100"
+          },
+          {
+            "bottom": 0.08431,
+            "top": 0.08437,
+            "strength": 3.5723589491752765,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285740"
+          },
+          {
+            "bottom": 0.08441,
+            "top": 0.084435,
+            "strength": 0.05357248465278627,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285260"
+          },
+          {
+            "bottom": 0.08442,
+            "top": 0.084475,
+            "strength": 3.2237421318518344,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285380"
+          },
+          {
+            "bottom": 0.08453,
+            "top": 0.08453999999999999,
+            "strength": 0.1755098806256169,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789284300"
+          },
+          {
+            "bottom": 0.08456,
+            "top": 0.08456999999999999,
+            "strength": 1.3000473078927335,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789283880"
+          }
+        ],
+        "bottom": 0.08422,
+        "top": 0.08456999999999999,
+        "n_pools": 7,
+        "strength_sum": 14.792750976317727,
+        "strength_avg": 2.113250139473961,
+        "strength_max": 4.8175489902887385,
+        "width_pct": 0.41851010402964156,
+        "width_bps": 41.85101040296416,
+        "density_per_pct": 35.34622183284256,
+        "dist_from_entry_pct": 0.7054884610785689,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-13T17:05:00+00:00",
+        "delta_at_touch": 161628.88734,
+        "ob_at_touch": 0.7275963640122864,
+        "overshoot_pct": 0.03587229463111593
+      },
+      "reversal_cluster": {
+        "cluster_id": "C3",
+        "pools": [
+          {
+            "bottom": 0.08422,
+            "top": 0.08425,
+            "strength": 1.6499712318307402,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286640"
+          },
+          {
+            "bottom": 0.08425,
+            "top": 0.084315,
+            "strength": 4.8175489902887385,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789286100"
+          },
+          {
+            "bottom": 0.08431,
+            "top": 0.08437,
+            "strength": 3.5723589491752765,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285740"
+          },
+          {
+            "bottom": 0.08441,
+            "top": 0.084435,
+            "strength": 0.05357248465278627,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285260"
+          },
+          {
+            "bottom": 0.08442,
+            "top": 0.084475,
+            "strength": 3.2237421318518344,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789285380"
+          },
+          {
+            "bottom": 0.08453,
+            "top": 0.08453999999999999,
+            "strength": 0.1755098806256169,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789284300"
+          },
+          {
+            "bottom": 0.08456,
+            "top": 0.08456999999999999,
+            "strength": 1.3000473078927335,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789283880"
+          }
+        ],
+        "bottom": 0.08422,
+        "top": 0.08456999999999999,
+        "n_pools": 7,
+        "strength_sum": 14.792750976317727,
+        "strength_avg": 2.113250139473961,
+        "strength_max": 4.8175489902887385,
+        "width_pct": 0.41851010402964156,
+        "width_bps": 41.85101040296416,
+        "density_per_pct": 35.34622183284256,
+        "dist_from_entry_pct": 0.7054884610785689,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-13T17:05:00+00:00",
+        "delta_at_touch": 161628.88734,
+        "ob_at_touch": 0.7275963640122864,
+        "overshoot_pct": 0.03587229463111593
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08368,
+              "top": 0.0837,
+              "strength": 0.1706390063397302,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789309320"
+            },
+            {
+              "bottom": 0.08374,
+              "top": 0.08383499999999999,
+              "strength": 7.364131539041223,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789308720"
+            }
+          ],
+          "bottom": 0.08368,
+          "top": 0.08383499999999999,
+          "n_pools": 2,
+          "strength_sum": 7.534770545380953,
+          "strength_avg": 3.7673852726904764,
+          "strength_max": 7.364131539041223,
+          "width_pct": 0.18534018892740464,
+          "width_bps": 18.534018892740463,
+          "density_per_pct": 40.653732949048766,
+          "dist_from_entry_pct": 0.059787157718532075,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-13T14:35:00+00:00",
+          "delta_at_touch": 20273.913230000006,
+          "ob_at_touch": 2.2101359529254974,
+          "overshoot_pct": 0.9147435130933899
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08399,
+              "top": 0.08405499999999999,
+              "strength": 3.92296427790698,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789287840"
+            },
+            {
+              "bottom": 0.08403,
+              "top": 0.08406,
+              "strength": 0.4850770658909597,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789287240"
+            },
+            {
+              "bottom": 0.08409,
+              "top": 0.084115,
+              "strength": 0.34239867869941537,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789286940"
+            }
+          ],
+          "bottom": 0.08399,
+          "top": 0.084115,
+          "n_pools": 3,
+          "strength_sum": 4.750440022497355,
+          "strength_avg": 1.5834800074991184,
+          "strength_max": 3.92296427790698,
+          "width_pct": 0.14946789429630528,
+          "width_bps": 14.946789429630527,
+          "density_per_pct": 31.78234392651628,
+          "dist_from_entry_pct": 0.4304675355733579,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-13T17:00:00+00:00",
+          "delta_at_touch": 115813.25853999998,
+          "ob_at_touch": 2.836859047234576,
+          "overshoot_pct": 0.5799354298696632
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08422,
+              "top": 0.08425,
+              "strength": 1.6499712318307402,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789286640"
+            },
+            {
+              "bottom": 0.08425,
+              "top": 0.084315,
+              "strength": 4.8175489902887385,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789286100"
+            },
+            {
+              "bottom": 0.08431,
+              "top": 0.08437,
+              "strength": 3.5723589491752765,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789285740"
+            },
+            {
+              "bottom": 0.08441,
+              "top": 0.084435,
+              "strength": 0.05357248465278627,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789285260"
+            },
+            {
+              "bottom": 0.08442,
+              "top": 0.084475,
+              "strength": 3.2237421318518344,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789285380"
+            },
+            {
+              "bottom": 0.08453,
+              "top": 0.08453999999999999,
+              "strength": 0.1755098806256169,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789284300"
+            },
+            {
+              "bottom": 0.08456,
+              "top": 0.08456999999999999,
+              "strength": 1.3000473078927335,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789283880"
+            }
+          ],
+          "bottom": 0.08422,
+          "top": 0.08456999999999999,
+          "n_pools": 7,
+          "strength_sum": 14.792750976317727,
+          "strength_avg": 2.113250139473961,
+          "strength_max": 4.8175489902887385,
+          "width_pct": 0.41851010402964156,
+          "width_bps": 41.85101040296416,
+          "density_per_pct": 35.34622183284256,
+          "dist_from_entry_pct": 0.7054884610785689,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-13T17:05:00+00:00",
+          "delta_at_touch": 161628.88734,
+          "ob_at_touch": 0.7275963640122864,
+          "overshoot_pct": 0.03587229463111593
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08466,
+              "top": 0.08466499999999999,
+              "strength": 0.0019523511062122226,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789281480"
+            },
+            {
+              "bottom": 0.0847,
+              "top": 0.08471999999999999,
+              "strength": 0.35576495901983807,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280760"
+            },
+            {
+              "bottom": 0.08471,
+              "top": 0.08471999999999999,
+              "strength": 0.007076972583034958,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789281000"
+            },
+            {
+              "bottom": 0.08474,
+              "top": 0.08474999999999999,
+              "strength": 0.22654597150479922,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280400"
+            },
+            {
+              "bottom": 0.08476,
+              "top": 0.084775,
+              "strength": 0.1793677552284827,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280100"
+            },
+            {
+              "bottom": 0.08482,
+              "top": 0.08483000000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789279320"
+            },
+            {
+              "bottom": 0.08487,
+              "top": 0.084895,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789278900"
+            },
+            {
+              "bottom": 0.08489,
+              "top": 0.08492,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789278540"
+            },
+            {
+              "bottom": 0.08494,
+              "top": 0.08496000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269720"
+            },
+            {
+              "bottom": 0.08496,
+              "top": 0.08498499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269960"
+            },
+            {
+              "bottom": 0.08498,
+              "top": 0.085035,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269120"
+            },
+            {
+              "bottom": 0.08505,
+              "top": 0.08513000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267020"
+            },
+            {
+              "bottom": 0.08506,
+              "top": 0.085145,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789233060"
+            },
+            {
+              "bottom": 0.08507,
+              "top": 0.08514000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789268640"
+            },
+            {
+              "bottom": 0.08509,
+              "top": 0.08512,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789232040"
+            },
+            {
+              "bottom": 0.0851,
+              "top": 0.08513499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789228980"
+            },
+            {
+              "bottom": 0.08511,
+              "top": 0.08514000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267500"
+            },
+            {
+              "bottom": 0.08512,
+              "top": 0.08518500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267980"
+            },
+            {
+              "bottom": 0.08512,
+              "top": 0.0852,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789228560"
+            },
+            {
+              "bottom": 0.08516,
+              "top": 0.085225,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789226760"
+            },
+            {
+              "bottom": 0.08517,
+              "top": 0.08526,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789227180"
+            },
+            {
+              "bottom": 0.0852,
+              "top": 0.08524999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789227780"
+            },
+            {
+              "bottom": 0.08527,
+              "top": 0.085325,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789226040"
+            },
+            {
+              "bottom": 0.0853,
+              "top": 0.08535000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789225680"
+            }
+          ],
+          "bottom": 0.08466,
+          "top": 0.08535000000000001,
+          "n_pools": 24,
+          "strength_sum": 0.7707080094423672,
+          "strength_avg": 0.0321128337267653,
+          "strength_max": 0.35576495901983807,
+          "width_pct": 0.8250627765156165,
+          "width_bps": 82.50627765156166,
+          "density_per_pct": 0.9341204468067278,
+          "dist_from_entry_pct": 1.2316154490015583,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.059787157718532075,
+          "n_pools": 2,
+          "strength_sum": 7.534770545380953,
+          "strength_avg": 3.7673852726904764,
+          "width_pct": 0.18534018892740464,
+          "density_per_pct": 40.653732949048766,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 20273.913230000006,
+          "ob_at_touch": 2.2101359529254974,
+          "confirm_delta": 557413.0341099999,
+          "entry_ob": 1.4481879820744823,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.4304675355733579,
+          "n_pools": 3,
+          "strength_sum": 4.750440022497355,
+          "strength_avg": 1.5834800074991184,
+          "width_pct": 0.14946789429630528,
+          "density_per_pct": 31.78234392651628,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 115813.25853999998,
+          "ob_at_touch": 2.836859047234576,
+          "confirm_delta": 557413.0341099999,
+          "entry_ob": 1.4481879820744823,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.7054884610785689,
+          "n_pools": 7,
+          "strength_sum": 14.792750976317727,
+          "strength_avg": 2.113250139473961,
+          "width_pct": 0.41851010402964156,
+          "density_per_pct": 35.34622183284256,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": 161628.88734,
+          "ob_at_touch": 0.7275963640122864,
+          "confirm_delta": 557413.0341099999,
+          "entry_ob": 1.4481879820744823,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.2316154490015583,
+          "n_pools": 24,
+          "strength_sum": 0.7707080094423672,
+          "strength_avg": 0.0321128337267653,
+          "width_pct": 0.8250627765156165,
+          "density_per_pct": 0.9341204468067278,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 557413.0341099999,
+          "entry_ob": 1.4481879820744823,
+          "reachability_class": "nicht_erreicht"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-14T02:15:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier1_valid",
+      "entry_price": 0.08361,
+      "confirm_delta": 198436.73355,
+      "followthrough_delta": 32720.626180000138,
+      "entry_ob": 1.0273461024011377,
+      "d10_entry_close": -339535.7285399999,
+      "d10_at_peak": 318477.91171,
+      "max_high": 0.0848,
+      "max_ts": "2026-09-14T09:50:00+00:00",
+      "max_exc_pct": 1.4232747279033569,
+      "n_pools": 30,
+      "n_clusters": 4,
+      "n_reached": 4,
+      "n_ignored": 0,
+      "n_zwischenstation": 2,
+      "strongest_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08368,
+            "top": 0.08380000000000001,
+            "strength": 8.429881124849077,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789351920"
+          }
+        ],
+        "bottom": 0.08368,
+        "top": 0.08380000000000001,
+        "n_pools": 1,
+        "strength_sum": 8.429881124849077,
+        "strength_avg": 8.429881124849077,
+        "strength_max": 8.429881124849077,
+        "width_pct": 0.1435235019734589,
+        "width_bps": 14.35235019734589,
+        "density_per_pct": 58.73519673738155,
+        "dist_from_entry_pct": 0.08372204281784548,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-14T02:20:00+00:00",
+        "delta_at_touch": 48832.85254999995,
+        "ob_at_touch": 0.8323386935012868,
+        "overshoot_pct": 1.1960291831120522
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08368,
+            "top": 0.08380000000000001,
+            "strength": 8.429881124849077,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789351920"
+          }
+        ],
+        "bottom": 0.08368,
+        "top": 0.08380000000000001,
+        "n_pools": 1,
+        "strength_sum": 8.429881124849077,
+        "strength_avg": 8.429881124849077,
+        "strength_max": 8.429881124849077,
+        "width_pct": 0.1435235019734589,
+        "width_bps": 14.35235019734589,
+        "density_per_pct": 58.73519673738155,
+        "dist_from_entry_pct": 0.08372204281784548,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-14T02:20:00+00:00",
+        "delta_at_touch": 48832.85254999995,
+        "ob_at_touch": 0.8323386935012868,
+        "overshoot_pct": 1.1960291831120522
+      },
+      "reversal_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.08448,
+            "top": 0.08454,
+            "strength": 6.921943843204303,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789332960"
+          },
+          {
+            "bottom": 0.0845,
+            "top": 0.08460500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789319520"
+          },
+          {
+            "bottom": 0.08455,
+            "top": 0.08458,
+            "strength": 0.6214340919219037,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789323720"
+          },
+          {
+            "bottom": 0.08456,
+            "top": 0.084585,
+            "strength": 0.4954155301472757,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789325460"
+          },
+          {
+            "bottom": 0.08457,
+            "top": 0.08459000000000001,
+            "strength": 0.12011440184455215,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789326120"
+          },
+          {
+            "bottom": 0.08458,
+            "top": 0.08460000000000001,
+            "strength": 0.2593018774905652,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789326420"
+          },
+          {
+            "bottom": 0.0846,
+            "top": 0.084655,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789320420"
+          },
+          {
+            "bottom": 0.08466,
+            "top": 0.08466499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789281480"
+          },
+          {
+            "bottom": 0.0847,
+            "top": 0.08471999999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789280760"
+          },
+          {
+            "bottom": 0.08471,
+            "top": 0.08471999999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789281000"
+          },
+          {
+            "bottom": 0.08474,
+            "top": 0.08474999999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789280400"
+          },
+          {
+            "bottom": 0.08476,
+            "top": 0.084775,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789280100"
+          },
+          {
+            "bottom": 0.08482,
+            "top": 0.08483000000000002,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789279320"
+          },
+          {
+            "bottom": 0.08487,
+            "top": 0.084895,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789278900"
+          },
+          {
+            "bottom": 0.08489,
+            "top": 0.08492,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789278540"
+          },
+          {
+            "bottom": 0.08494,
+            "top": 0.08496000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789269720"
+          },
+          {
+            "bottom": 0.08496,
+            "top": 0.08498499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789269960"
+          },
+          {
+            "bottom": 0.08498,
+            "top": 0.085035,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789269120"
+          },
+          {
+            "bottom": 0.08505,
+            "top": 0.08513000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789267020"
+          },
+          {
+            "bottom": 0.08507,
+            "top": 0.08514000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789268640"
+          },
+          {
+            "bottom": 0.08511,
+            "top": 0.08514000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789267500"
+          },
+          {
+            "bottom": 0.08512,
+            "top": 0.08518500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789267980"
+          }
+        ],
+        "bottom": 0.08448,
+        "top": 0.08518500000000001,
+        "n_pools": 22,
+        "strength_sum": 8.4182097446086,
+        "strength_avg": 0.38264589748220906,
+        "strength_max": 6.921943843204303,
+        "width_pct": 0.8432005740940213,
+        "width_bps": 84.32005740940212,
+        "density_per_pct": 9.98363853541438,
+        "dist_from_entry_pct": 1.040545389307494,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-14T06:05:00+00:00",
+        "delta_at_touch": 414618.48391999997,
+        "ob_at_touch": 1.0128059666765734,
+        "overshoot_pct": -0.46047123549815855
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08368,
+              "top": 0.08380000000000001,
+              "strength": 8.429881124849077,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789351920"
+            }
+          ],
+          "bottom": 0.08368,
+          "top": 0.08380000000000001,
+          "n_pools": 1,
+          "strength_sum": 8.429881124849077,
+          "strength_avg": 8.429881124849077,
+          "strength_max": 8.429881124849077,
+          "width_pct": 0.1435235019734589,
+          "width_bps": 14.35235019734589,
+          "density_per_pct": 58.73519673738155,
+          "dist_from_entry_pct": 0.08372204281784548,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-14T02:20:00+00:00",
+          "delta_at_touch": 48832.85254999995,
+          "ob_at_touch": 0.8323386935012868,
+          "overshoot_pct": 1.1960291831120522
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08402,
+              "top": 0.084045,
+              "strength": 0.22732343686426576,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789336740"
+            },
+            {
+              "bottom": 0.08407,
+              "top": 0.08408500000000001,
+              "strength": 0.09507013165754061,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789336380"
+            },
+            {
+              "bottom": 0.08409,
+              "top": 0.08413,
+              "strength": 0.3834626558542042,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789335780"
+            },
+            {
+              "bottom": 0.08411,
+              "top": 0.08413500000000002,
+              "strength": 0.13122261959877635,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789335960"
+            },
+            {
+              "bottom": 0.08415,
+              "top": 0.08416000000000001,
+              "strength": 0.026431102463016914,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789335180"
+            }
+          ],
+          "bottom": 0.08402,
+          "top": 0.08416000000000001,
+          "n_pools": 5,
+          "strength_sum": 0.8635099464378038,
+          "strength_avg": 0.17270198928756075,
+          "strength_max": 0.3834626558542042,
+          "width_pct": 0.1674440856357076,
+          "width_bps": 16.744408563570758,
+          "density_per_pct": 5.1570047586897845,
+          "dist_from_entry_pct": 0.4903719650759403,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-14T02:25:00+00:00",
+          "delta_at_touch": 3985.9347599999746,
+          "ob_at_touch": 1.5209518944736107,
+          "overshoot_pct": 0.7654586771917089
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08431,
+              "top": 0.084315,
+              "strength": 0.05483350374173618,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789334220"
+            },
+            {
+              "bottom": 0.08437,
+              "top": 0.08438000000000001,
+              "strength": 0.36125337546319736,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789333920"
+            }
+          ],
+          "bottom": 0.08431,
+          "top": 0.08438000000000001,
+          "n_pools": 2,
+          "strength_sum": 0.41608687920493354,
+          "strength_avg": 0.20804343960246677,
+          "strength_max": 0.36125337546319736,
+          "width_pct": 0.0837220428178621,
+          "width_bps": 8.372204281786209,
+          "density_per_pct": 4.969860567188184,
+          "dist_from_entry_pct": 0.8372204281784383,
+          "label": "reaction_near_high",
+          "reached": true,
+          "touch_ts": "2026-09-14T06:00:00+00:00",
+          "delta_at_touch": 353901.25896,
+          "ob_at_touch": 3.262751189054791,
+          "overshoot_pct": 0.5023322569070563
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08448,
+              "top": 0.08454,
+              "strength": 6.921943843204303,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789332960"
+            },
+            {
+              "bottom": 0.0845,
+              "top": 0.08460500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789319520"
+            },
+            {
+              "bottom": 0.08455,
+              "top": 0.08458,
+              "strength": 0.6214340919219037,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789323720"
+            },
+            {
+              "bottom": 0.08456,
+              "top": 0.084585,
+              "strength": 0.4954155301472757,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789325460"
+            },
+            {
+              "bottom": 0.08457,
+              "top": 0.08459000000000001,
+              "strength": 0.12011440184455215,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789326120"
+            },
+            {
+              "bottom": 0.08458,
+              "top": 0.08460000000000001,
+              "strength": 0.2593018774905652,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789326420"
+            },
+            {
+              "bottom": 0.0846,
+              "top": 0.084655,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789320420"
+            },
+            {
+              "bottom": 0.08466,
+              "top": 0.08466499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789281480"
+            },
+            {
+              "bottom": 0.0847,
+              "top": 0.08471999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280760"
+            },
+            {
+              "bottom": 0.08471,
+              "top": 0.08471999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789281000"
+            },
+            {
+              "bottom": 0.08474,
+              "top": 0.08474999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280400"
+            },
+            {
+              "bottom": 0.08476,
+              "top": 0.084775,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789280100"
+            },
+            {
+              "bottom": 0.08482,
+              "top": 0.08483000000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789279320"
+            },
+            {
+              "bottom": 0.08487,
+              "top": 0.084895,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789278900"
+            },
+            {
+              "bottom": 0.08489,
+              "top": 0.08492,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789278540"
+            },
+            {
+              "bottom": 0.08494,
+              "top": 0.08496000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269720"
+            },
+            {
+              "bottom": 0.08496,
+              "top": 0.08498499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269960"
+            },
+            {
+              "bottom": 0.08498,
+              "top": 0.085035,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789269120"
+            },
+            {
+              "bottom": 0.08505,
+              "top": 0.08513000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267020"
+            },
+            {
+              "bottom": 0.08507,
+              "top": 0.08514000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789268640"
+            },
+            {
+              "bottom": 0.08511,
+              "top": 0.08514000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267500"
+            },
+            {
+              "bottom": 0.08512,
+              "top": 0.08518500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789267980"
+            }
+          ],
+          "bottom": 0.08448,
+          "top": 0.08518500000000001,
+          "n_pools": 22,
+          "strength_sum": 8.4182097446086,
+          "strength_avg": 0.38264589748220906,
+          "strength_max": 6.921943843204303,
+          "width_pct": 0.8432005740940213,
+          "width_bps": 84.32005740940212,
+          "density_per_pct": 9.98363853541438,
+          "dist_from_entry_pct": 1.040545389307494,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-14T06:05:00+00:00",
+          "delta_at_touch": 414618.48391999997,
+          "ob_at_touch": 1.0128059666765734,
+          "overshoot_pct": -0.46047123549815855
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.08372204281784548,
+          "n_pools": 1,
+          "strength_sum": 8.429881124849077,
+          "strength_avg": 8.429881124849077,
+          "width_pct": 0.1435235019734589,
+          "density_per_pct": 58.73519673738155,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 48832.85254999995,
+          "ob_at_touch": 0.8323386935012868,
+          "confirm_delta": 198436.73355,
+          "entry_ob": 1.0273461024011377,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.4903719650759403,
+          "n_pools": 5,
+          "strength_sum": 0.8635099464378038,
+          "strength_avg": 0.17270198928756075,
+          "width_pct": 0.1674440856357076,
+          "density_per_pct": 5.1570047586897845,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 3985.9347599999746,
+          "ob_at_touch": 1.5209518944736107,
+          "confirm_delta": 198436.73355,
+          "entry_ob": 1.0273461024011377,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.8372204281784383,
+          "n_pools": 2,
+          "strength_sum": 0.41608687920493354,
+          "strength_avg": 0.20804343960246677,
+          "width_pct": 0.0837220428178621,
+          "density_per_pct": 4.969860567188184,
+          "reached": true,
+          "label": "reaction_near_high",
+          "delta_at_touch": 353901.25896,
+          "ob_at_touch": 3.262751189054791,
+          "confirm_delta": 198436.73355,
+          "entry_ob": 1.0273461024011377,
+          "reachability_class": "reachable_moderate"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.040545389307494,
+          "n_pools": 22,
+          "strength_sum": 8.4182097446086,
+          "strength_avg": 0.38264589748220906,
+          "width_pct": 0.8432005740940213,
+          "density_per_pct": 9.98363853541438,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": 414618.48391999997,
+          "ob_at_touch": 1.0128059666765734,
+          "confirm_delta": 198436.73355,
+          "entry_ob": 1.0273461024011377,
+          "reachability_class": "reachable_moderate"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-15T17:50:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier2_strong",
+      "entry_price": 0.08226,
+      "confirm_delta": 654463.09785,
+      "followthrough_delta": 142092.77061999997,
+      "entry_ob": 0.9845029386946684,
+      "d10_entry_close": 236195.58892,
+      "d10_at_peak": 382710.02076999994,
+      "max_high": 0.08241,
+      "max_ts": "2026-09-15T18:25:00+00:00",
+      "max_exc_pct": 0.1823486506199822,
+      "n_pools": 40,
+      "n_clusters": 10,
+      "n_reached": 0,
+      "n_ignored": 10,
+      "n_zwischenstation": 0,
+      "strongest_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08253,
+            "top": 0.08271,
+            "strength": 1.7716282422239802,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789493760"
+          },
+          {
+            "bottom": 0.08267,
+            "top": 0.08292,
+            "strength": 1.9634267468545863,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789479600"
+          },
+          {
+            "bottom": 0.08271,
+            "top": 0.08280000000000001,
+            "strength": 0.8266683881687565,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789481760"
+          },
+          {
+            "bottom": 0.08279,
+            "top": 0.082835,
+            "strength": 0.31201050292537846,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789482060"
+          },
+          {
+            "bottom": 0.08282,
+            "top": 0.08288000000000001,
+            "strength": 0.6237404538890083,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789481400"
+          },
+          {
+            "bottom": 0.08291,
+            "top": 0.08299,
+            "strength": 0.9746007936535914,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789480800"
+          },
+          {
+            "bottom": 0.08304,
+            "top": 0.08306,
+            "strength": 0.1578396506292727,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789478940"
+          },
+          {
+            "bottom": 0.08304,
+            "top": 0.08307,
+            "strength": 0.07098859385652952,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789478760"
+          }
+        ],
+        "bottom": 0.08253,
+        "top": 0.08307,
+        "n_pools": 8,
+        "strength_sum": 6.700903372201103,
+        "strength_avg": 0.8376129215251379,
+        "strength_max": 1.9634267468545863,
+        "width_pct": 0.6564551422319461,
+        "width_bps": 65.64551422319461,
+        "density_per_pct": 10.2077094703197,
+        "dist_from_entry_pct": 0.32822757111598144,
+        "label": "ignored",
+        "reached": false,
+        "touch_ts": null,
+        "delta_at_touch": null,
+        "ob_at_touch": null,
+        "overshoot_pct": null
+      },
+      "heaviest_reached_cluster": null,
+      "reversal_cluster": null,
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08253,
+              "top": 0.08271,
+              "strength": 1.7716282422239802,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789493760"
+            },
+            {
+              "bottom": 0.08267,
+              "top": 0.08292,
+              "strength": 1.9634267468545863,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789479600"
+            },
+            {
+              "bottom": 0.08271,
+              "top": 0.08280000000000001,
+              "strength": 0.8266683881687565,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789481760"
+            },
+            {
+              "bottom": 0.08279,
+              "top": 0.082835,
+              "strength": 0.31201050292537846,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789482060"
+            },
+            {
+              "bottom": 0.08282,
+              "top": 0.08288000000000001,
+              "strength": 0.6237404538890083,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789481400"
+            },
+            {
+              "bottom": 0.08291,
+              "top": 0.08299,
+              "strength": 0.9746007936535914,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789480800"
+            },
+            {
+              "bottom": 0.08304,
+              "top": 0.08306,
+              "strength": 0.1578396506292727,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789478940"
+            },
+            {
+              "bottom": 0.08304,
+              "top": 0.08307,
+              "strength": 0.07098859385652952,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789478760"
+            }
+          ],
+          "bottom": 0.08253,
+          "top": 0.08307,
+          "n_pools": 8,
+          "strength_sum": 6.700903372201103,
+          "strength_avg": 0.8376129215251379,
+          "strength_max": 1.9634267468545863,
+          "width_pct": 0.6564551422319461,
+          "width_bps": 65.64551422319461,
+          "density_per_pct": 10.2077094703197,
+          "dist_from_entry_pct": 0.32822757111598144,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08336,
+              "top": 0.083425,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789445220"
+            },
+            {
+              "bottom": 0.08338,
+              "top": 0.08351499999999999,
+              "strength": 1.7753323863204145,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789477620"
+            },
+            {
+              "bottom": 0.08342,
+              "top": 0.083475,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789444260"
+            },
+            {
+              "bottom": 0.08345,
+              "top": 0.08346999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789443960"
+            }
+          ],
+          "bottom": 0.08336,
+          "top": 0.08351499999999999,
+          "n_pools": 4,
+          "strength_sum": 1.7753323863204145,
+          "strength_avg": 0.4438330965801036,
+          "strength_max": 1.7753323863204145,
+          "width_pct": 0.18842693897397092,
+          "width_bps": 18.84269389739709,
+          "density_per_pct": 9.421860780563106,
+          "dist_from_entry_pct": 1.3372234378798975,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08358,
+              "top": 0.083615,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789443180"
+            }
+          ],
+          "bottom": 0.08358,
+          "top": 0.083615,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.04254801847798854,
+          "width_bps": 4.254801847798854,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 1.604668125455874,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08383,
+              "top": 0.08385500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789437780"
+            },
+            {
+              "bottom": 0.08383,
+              "top": 0.08388999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789440960"
+            },
+            {
+              "bottom": 0.08384,
+              "top": 0.08385,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789439640"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.083865,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789438320"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.083865,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789438620"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.08388499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789439280"
+            },
+            {
+              "bottom": 0.08386,
+              "top": 0.08393500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789436700"
+            },
+            {
+              "bottom": 0.08389,
+              "top": 0.08394500000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789435440"
+            },
+            {
+              "bottom": 0.08389,
+              "top": 0.08397000000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789435320"
+            },
+            {
+              "bottom": 0.08392,
+              "top": 0.083955,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789436940"
+            },
+            {
+              "bottom": 0.08392,
+              "top": 0.08396499999999998,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789427700"
+            },
+            {
+              "bottom": 0.08395,
+              "top": 0.08402,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789428420"
+            }
+          ],
+          "bottom": 0.08383,
+          "top": 0.08402,
+          "n_pools": 12,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.23097495745197633,
+          "width_bps": 23.097495745197634,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 1.9085825431558499,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C5",
+          "pools": [
+            {
+              "bottom": 0.08413,
+              "top": 0.08418999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789426800"
+            },
+            {
+              "bottom": 0.08415,
+              "top": 0.084165,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425780"
+            },
+            {
+              "bottom": 0.08416,
+              "top": 0.08418,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425420"
+            },
+            {
+              "bottom": 0.08416,
+              "top": 0.084205,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425540"
+            },
+            {
+              "bottom": 0.08423,
+              "top": 0.08426,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425000"
+            },
+            {
+              "bottom": 0.08428,
+              "top": 0.084315,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789424760"
+            }
+          ],
+          "bottom": 0.08413,
+          "top": 0.084315,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.2248966690979876,
+          "width_bps": 22.48966690979876,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 2.2732798443958138,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C6",
+          "pools": [
+            {
+              "bottom": 0.08458,
+              "top": 0.08465,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789423800"
+            },
+            {
+              "bottom": 0.08463,
+              "top": 0.08469499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789423980"
+            }
+          ],
+          "bottom": 0.08458,
+          "top": 0.08469499999999999,
+          "n_pools": 2,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.1398006321419768,
+          "width_bps": 13.98006321419768,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 2.8203257962557777,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C7",
+          "pools": [
+            {
+              "bottom": 0.08486,
+              "top": 0.08489000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789421220"
+            },
+            {
+              "bottom": 0.08488,
+              "top": 0.08491499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789420860"
+            },
+            {
+              "bottom": 0.08496,
+              "top": 0.085005,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789420020"
+            }
+          ],
+          "bottom": 0.08486,
+          "top": 0.085005,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.1762703622659766,
+          "width_bps": 17.62703622659766,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 3.160709944079753,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C8",
+          "pools": [
+            {
+              "bottom": 0.08542,
+              "top": 0.08546499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789419120"
+            }
+          ],
+          "bottom": 0.08542,
+          "top": 0.08546499999999999,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.05470459518598285,
+          "width_bps": 5.470459518598285,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 3.841478239727688,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C9",
+          "pools": [
+            {
+              "bottom": 0.08591,
+              "top": 0.085975,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789418100"
+            },
+            {
+              "bottom": 0.08591,
+              "top": 0.08599,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789417800"
+            }
+          ],
+          "bottom": 0.08591,
+          "top": 0.08599,
+          "n_pools": 2,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.09725261366398825,
+          "width_bps": 9.725261366398826,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 4.437150498419645,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C10",
+          "pools": [
+            {
+              "bottom": 0.08611,
+              "top": 0.08627500000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789417380"
+            }
+          ],
+          "bottom": 0.08611,
+          "top": 0.08627500000000002,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.20058351568199898,
+          "width_bps": 20.058351568199896,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 4.680282032579633,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.32822757111598144,
+          "n_pools": 8,
+          "strength_sum": 6.700903372201103,
+          "strength_avg": 0.8376129215251379,
+          "width_pct": 0.6564551422319461,
+          "density_per_pct": 10.2077094703197,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "nicht_erreicht"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 1.3372234378798975,
+          "n_pools": 4,
+          "strength_sum": 1.7753323863204145,
+          "strength_avg": 0.4438330965801036,
+          "width_pct": 0.18842693897397092,
+          "density_per_pct": 9.421860780563106,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "nicht_erreicht"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 1.604668125455874,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.04254801847798854,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.9085825431558499,
+          "n_pools": 12,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.23097495745197633,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C5",
+          "dist_pct": 2.2732798443958138,
+          "n_pools": 6,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.2248966690979876,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C6",
+          "dist_pct": 2.8203257962557777,
+          "n_pools": 2,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.1398006321419768,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C7",
+          "dist_pct": 3.160709944079753,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.1762703622659766,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C8",
+          "dist_pct": 3.841478239727688,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.05470459518598285,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C9",
+          "dist_pct": 4.437150498419645,
+          "n_pools": 2,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.09725261366398825,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C10",
+          "dist_pct": 4.680282032579633,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.20058351568199898,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 654463.09785,
+          "entry_ob": 0.9845029386946684,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-15T23:30:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier1_valid",
+      "entry_price": 0.08041,
+      "confirm_delta": 214025.89441000004,
+      "followthrough_delta": 212033.10447000002,
+      "entry_ob": 0.7986762289714194,
+      "d10_entry_close": -13960.058160000015,
+      "d10_at_peak": 480595.16569999995,
+      "max_high": 0.0807,
+      "max_ts": "2026-09-16T04:20:00+00:00",
+      "max_exc_pct": 0.3606516602412618,
+      "n_pools": 45,
+      "n_clusters": 8,
+      "n_reached": 1,
+      "n_ignored": 7,
+      "n_zwischenstation": 0,
+      "strongest_cluster": {
+        "cluster_id": "C2",
+        "pools": [
+          {
+            "bottom": 0.08085,
+            "top": 0.08107,
+            "strength": 2.8943396166251927,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+          },
+          {
+            "bottom": 0.08092,
+            "top": 0.08100000000000002,
+            "strength": 0.5206559073104228,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+          },
+          {
+            "bottom": 0.08097,
+            "top": 0.081,
+            "strength": 0.19637900832194158,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+          },
+          {
+            "bottom": 0.08099,
+            "top": 0.08108000000000001,
+            "strength": 0.39737511737443304,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+          },
+          {
+            "bottom": 0.08104,
+            "top": 0.08115,
+            "strength": 1.1431268726790706,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+          },
+          {
+            "bottom": 0.0811,
+            "top": 0.081205,
+            "strength": 0.30603292781704616,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+          },
+          {
+            "bottom": 0.08113,
+            "top": 0.08126499999999999,
+            "strength": 0.9866626833096913,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+          },
+          {
+            "bottom": 0.08115,
+            "top": 0.081295,
+            "strength": 1.9370934359047753,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+          },
+          {
+            "bottom": 0.08117,
+            "top": 0.08131500000000001,
+            "strength": 1.1431707165866654,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+          }
+        ],
+        "bottom": 0.08085,
+        "top": 0.08131500000000001,
+        "n_pools": 9,
+        "strength_sum": 9.524836285929238,
+        "strength_avg": 1.0583151428810265,
+        "strength_max": 2.8943396166251927,
+        "width_pct": 0.5782862828006555,
+        "width_bps": 57.82862828006555,
+        "density_per_pct": 16.470797543044267,
+        "dist_from_entry_pct": 0.5471956224350327,
+        "label": "ignored",
+        "reached": false,
+        "touch_ts": null,
+        "delta_at_touch": null,
+        "ob_at_touch": null,
+        "overshoot_pct": null
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08055,
+            "top": 0.080675,
+            "strength": 0.21837025388933784,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789503000"
+          },
+          {
+            "bottom": 0.08061,
+            "top": 0.08066999999999999,
+            "strength": 0.1427309284674077,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505700"
+          },
+          {
+            "bottom": 0.08064,
+            "top": 0.08069000000000001,
+            "strength": 0.3646485530621351,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789514340"
+          },
+          {
+            "bottom": 0.08066,
+            "top": 0.08072499999999999,
+            "strength": 0.20852162452040746,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+          }
+        ],
+        "bottom": 0.08055,
+        "top": 0.08072499999999999,
+        "n_pools": 4,
+        "strength_sum": 0.9342713599392881,
+        "strength_avg": 0.23356783998482203,
+        "strength_max": 0.3646485530621351,
+        "width_pct": 0.21763462255937646,
+        "width_bps": 21.763462255937647,
+        "density_per_pct": 4.292843431584027,
+        "dist_from_entry_pct": 0.17410769804750809,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-16T04:20:00+00:00",
+        "delta_at_touch": 480595.16569999995,
+        "ob_at_touch": 0.9156157147328305,
+        "overshoot_pct": -0.031090660365622743
+      },
+      "reversal_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08055,
+            "top": 0.080675,
+            "strength": 0.21837025388933784,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789503000"
+          },
+          {
+            "bottom": 0.08061,
+            "top": 0.08066999999999999,
+            "strength": 0.1427309284674077,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505700"
+          },
+          {
+            "bottom": 0.08064,
+            "top": 0.08069000000000001,
+            "strength": 0.3646485530621351,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789514340"
+          },
+          {
+            "bottom": 0.08066,
+            "top": 0.08072499999999999,
+            "strength": 0.20852162452040746,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+          }
+        ],
+        "bottom": 0.08055,
+        "top": 0.08072499999999999,
+        "n_pools": 4,
+        "strength_sum": 0.9342713599392881,
+        "strength_avg": 0.23356783998482203,
+        "strength_max": 0.3646485530621351,
+        "width_pct": 0.21763462255937646,
+        "width_bps": 21.763462255937647,
+        "density_per_pct": 4.292843431584027,
+        "dist_from_entry_pct": 0.17410769804750809,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-16T04:20:00+00:00",
+        "delta_at_touch": 480595.16569999995,
+        "ob_at_touch": 0.9156157147328305,
+        "overshoot_pct": -0.031090660365622743
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08055,
+              "top": 0.080675,
+              "strength": 0.21837025388933784,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789503000"
+            },
+            {
+              "bottom": 0.08061,
+              "top": 0.08066999999999999,
+              "strength": 0.1427309284674077,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789505700"
+            },
+            {
+              "bottom": 0.08064,
+              "top": 0.08069000000000001,
+              "strength": 0.3646485530621351,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789514340"
+            },
+            {
+              "bottom": 0.08066,
+              "top": 0.08072499999999999,
+              "strength": 0.20852162452040746,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+            }
+          ],
+          "bottom": 0.08055,
+          "top": 0.08072499999999999,
+          "n_pools": 4,
+          "strength_sum": 0.9342713599392881,
+          "strength_avg": 0.23356783998482203,
+          "strength_max": 0.3646485530621351,
+          "width_pct": 0.21763462255937646,
+          "width_bps": 21.763462255937647,
+          "density_per_pct": 4.292843431584027,
+          "dist_from_entry_pct": 0.17410769804750809,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-16T04:20:00+00:00",
+          "delta_at_touch": 480595.16569999995,
+          "ob_at_touch": 0.9156157147328305,
+          "overshoot_pct": -0.031090660365622743
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08085,
+              "top": 0.08107,
+              "strength": 2.8943396166251927,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+            },
+            {
+              "bottom": 0.08092,
+              "top": 0.08100000000000002,
+              "strength": 0.5206559073104228,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+            },
+            {
+              "bottom": 0.08097,
+              "top": 0.081,
+              "strength": 0.19637900832194158,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+            },
+            {
+              "bottom": 0.08099,
+              "top": 0.08108000000000001,
+              "strength": 0.39737511737443304,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+            },
+            {
+              "bottom": 0.08104,
+              "top": 0.08115,
+              "strength": 1.1431268726790706,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+            },
+            {
+              "bottom": 0.0811,
+              "top": 0.081205,
+              "strength": 0.30603292781704616,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+            },
+            {
+              "bottom": 0.08113,
+              "top": 0.08126499999999999,
+              "strength": 0.9866626833096913,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+            },
+            {
+              "bottom": 0.08115,
+              "top": 0.081295,
+              "strength": 1.9370934359047753,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+            },
+            {
+              "bottom": 0.08117,
+              "top": 0.08131500000000001,
+              "strength": 1.1431707165866654,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+            }
+          ],
+          "bottom": 0.08085,
+          "top": 0.08131500000000001,
+          "n_pools": 9,
+          "strength_sum": 9.524836285929238,
+          "strength_avg": 1.0583151428810265,
+          "strength_max": 2.8943396166251927,
+          "width_pct": 0.5782862828006555,
+          "width_bps": 57.82862828006555,
+          "density_per_pct": 16.470797543044267,
+          "dist_from_entry_pct": 0.5471956224350327,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08194,
+              "top": 0.082175,
+              "strength": 0.5611777030337803,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789497240"
+            }
+          ],
+          "bottom": 0.08194,
+          "top": 0.082175,
+          "n_pools": 1,
+          "strength_sum": 0.5611777030337803,
+          "strength_avg": 0.5611777030337803,
+          "strength_max": 0.5611777030337803,
+          "width_pct": 0.29225220743688485,
+          "width_bps": 29.225220743688485,
+          "density_per_pct": 1.9201829404658064,
+          "dist_from_entry_pct": 1.9027484143763258,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08237,
+              "top": 0.08242,
+              "strength": 0.3436200789234213,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789494660"
+            },
+            {
+              "bottom": 0.08241,
+              "top": 0.08271999999999999,
+              "strength": 4.0387061805336355,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789496940"
+            },
+            {
+              "bottom": 0.08253,
+              "top": 0.08271,
+              "strength": 1.7716282422239802,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789493760"
+            },
+            {
+              "bottom": 0.08267,
+              "top": 0.08292,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789479600"
+            },
+            {
+              "bottom": 0.08271,
+              "top": 0.08280000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789481760"
+            },
+            {
+              "bottom": 0.08279,
+              "top": 0.082835,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789482060"
+            },
+            {
+              "bottom": 0.08282,
+              "top": 0.08288000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789481400"
+            },
+            {
+              "bottom": 0.08291,
+              "top": 0.08299,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789480800"
+            },
+            {
+              "bottom": 0.08304,
+              "top": 0.08306,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789478940"
+            },
+            {
+              "bottom": 0.08304,
+              "top": 0.08307,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789478760"
+            }
+          ],
+          "bottom": 0.08237,
+          "top": 0.08307,
+          "n_pools": 10,
+          "strength_sum": 6.153954501681037,
+          "strength_avg": 0.6153954501681037,
+          "strength_max": 4.0387061805336355,
+          "width_pct": 0.8705384902375404,
+          "width_bps": 87.05384902375404,
+          "density_per_pct": 7.069135449716683,
+          "dist_from_entry_pct": 2.4375077726650956,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C5",
+          "pools": [
+            {
+              "bottom": 0.08336,
+              "top": 0.083425,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789445220"
+            },
+            {
+              "bottom": 0.08338,
+              "top": 0.08351499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789477620"
+            },
+            {
+              "bottom": 0.08342,
+              "top": 0.083475,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789444260"
+            },
+            {
+              "bottom": 0.08345,
+              "top": 0.08346999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789443960"
+            }
+          ],
+          "bottom": 0.08336,
+          "top": 0.08351499999999999,
+          "n_pools": 4,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.1927620942668679,
+          "width_bps": 19.27620942668679,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 3.668697923143898,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C6",
+          "pools": [
+            {
+              "bottom": 0.08358,
+              "top": 0.083615,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789443180"
+            }
+          ],
+          "bottom": 0.08358,
+          "top": 0.083615,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.04352692451186839,
+          "width_bps": 4.352692451186839,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 3.9422957343614056,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C7",
+          "pools": [
+            {
+              "bottom": 0.08383,
+              "top": 0.08385500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789437780"
+            },
+            {
+              "bottom": 0.08383,
+              "top": 0.08388999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789440960"
+            },
+            {
+              "bottom": 0.08384,
+              "top": 0.08385,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789439640"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.083865,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789438320"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.083865,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789438620"
+            },
+            {
+              "bottom": 0.08385,
+              "top": 0.08388499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789439280"
+            },
+            {
+              "bottom": 0.08386,
+              "top": 0.08393500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789436700"
+            },
+            {
+              "bottom": 0.08389,
+              "top": 0.08394500000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789435440"
+            },
+            {
+              "bottom": 0.08389,
+              "top": 0.08397000000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789435320"
+            },
+            {
+              "bottom": 0.08392,
+              "top": 0.083955,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789436940"
+            },
+            {
+              "bottom": 0.08392,
+              "top": 0.08396499999999998,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789427700"
+            },
+            {
+              "bottom": 0.08395,
+              "top": 0.08402,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789428420"
+            }
+          ],
+          "bottom": 0.08383,
+          "top": 0.08402,
+          "n_pools": 12,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.23628901877875358,
+          "width_bps": 23.628901877875357,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 4.253202338017668,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C8",
+          "pools": [
+            {
+              "bottom": 0.08413,
+              "top": 0.08418999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789426800"
+            },
+            {
+              "bottom": 0.08415,
+              "top": 0.084165,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425780"
+            },
+            {
+              "bottom": 0.08416,
+              "top": 0.08418,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425420"
+            },
+            {
+              "bottom": 0.08416,
+              "top": 0.084205,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789425540"
+            }
+          ],
+          "bottom": 0.08413,
+          "top": 0.084205,
+          "n_pools": 4,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.09327198109688549,
+          "width_bps": 9.327198109688549,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 4.626290262405175,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.17410769804750809,
+          "n_pools": 4,
+          "strength_sum": 0.9342713599392881,
+          "strength_avg": 0.23356783998482203,
+          "width_pct": 0.21763462255937646,
+          "density_per_pct": 4.292843431584027,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": 480595.16569999995,
+          "ob_at_touch": 0.9156157147328305,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.5471956224350327,
+          "n_pools": 9,
+          "strength_sum": 9.524836285929238,
+          "strength_avg": 1.0583151428810265,
+          "width_pct": 0.5782862828006555,
+          "density_per_pct": 16.470797543044267,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "nicht_erreicht"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 1.9027484143763258,
+          "n_pools": 1,
+          "strength_sum": 0.5611777030337803,
+          "strength_avg": 0.5611777030337803,
+          "width_pct": 0.29225220743688485,
+          "density_per_pct": 1.9201829404658064,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 2.4375077726650956,
+          "n_pools": 10,
+          "strength_sum": 6.153954501681037,
+          "strength_avg": 0.6153954501681037,
+          "width_pct": 0.8705384902375404,
+          "density_per_pct": 7.069135449716683,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C5",
+          "dist_pct": 3.668697923143898,
+          "n_pools": 4,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.1927620942668679,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C6",
+          "dist_pct": 3.9422957343614056,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.04352692451186839,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C7",
+          "dist_pct": 4.253202338017668,
+          "n_pools": 12,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.23628901877875358,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        },
+        {
+          "cluster_id": "C8",
+          "dist_pct": 4.626290262405175,
+          "n_pools": 4,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.09327198109688549,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 214025.89441000004,
+          "entry_ob": 0.7986762289714194,
+          "reachability_class": "unrealistisch_trotz_delta_ob_schwach"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-16T18:15:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier2_strong",
+      "entry_price": 0.07956,
+      "confirm_delta": 623421.4093099998,
+      "followthrough_delta": 433075.34051,
+      "entry_ob": 1.6853405439187843,
+      "d10_entry_close": -37740.73732000007,
+      "d10_at_peak": -159813.80441999994,
+      "max_high": 0.08131,
+      "max_ts": "2026-09-17T01:30:00+00:00",
+      "max_exc_pct": 2.199597787833066,
+      "n_pools": 17,
+      "n_clusters": 3,
+      "n_reached": 1,
+      "n_ignored": 2,
+      "n_zwischenstation": 0,
+      "strongest_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08059,
+            "top": 0.08073,
+            "strength": 3.8434062907654813,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789582080"
+          },
+          {
+            "bottom": 0.08062,
+            "top": 0.080675,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789533720"
+          },
+          {
+            "bottom": 0.08066,
+            "top": 0.08072499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+          },
+          {
+            "bottom": 0.0807,
+            "top": 0.080785,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789532580"
+          },
+          {
+            "bottom": 0.08085,
+            "top": 0.08107,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+          },
+          {
+            "bottom": 0.08092,
+            "top": 0.08100000000000002,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+          },
+          {
+            "bottom": 0.08097,
+            "top": 0.081,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+          },
+          {
+            "bottom": 0.08099,
+            "top": 0.08108000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+          },
+          {
+            "bottom": 0.08104,
+            "top": 0.08115,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+          },
+          {
+            "bottom": 0.0811,
+            "top": 0.081205,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+          },
+          {
+            "bottom": 0.08113,
+            "top": 0.08126499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+          },
+          {
+            "bottom": 0.08115,
+            "top": 0.081295,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+          },
+          {
+            "bottom": 0.08117,
+            "top": 0.08131500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+          }
+        ],
+        "bottom": 0.08059,
+        "top": 0.08131500000000001,
+        "n_pools": 13,
+        "strength_sum": 3.8434062907654813,
+        "strength_avg": 0.2956466377511909,
+        "strength_max": 3.8434062907654813,
+        "width_pct": 0.9112619406737271,
+        "width_bps": 91.12619406737271,
+        "density_per_pct": 4.217674544735095,
+        "dist_from_entry_pct": 1.2946204122674574,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-16T20:00:00+00:00",
+        "delta_at_touch": 325663.02044,
+        "ob_at_touch": null,
+        "overshoot_pct": -0.0062845651081182485
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08059,
+            "top": 0.08073,
+            "strength": 3.8434062907654813,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789582080"
+          },
+          {
+            "bottom": 0.08062,
+            "top": 0.080675,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789533720"
+          },
+          {
+            "bottom": 0.08066,
+            "top": 0.08072499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+          },
+          {
+            "bottom": 0.0807,
+            "top": 0.080785,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789532580"
+          },
+          {
+            "bottom": 0.08085,
+            "top": 0.08107,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+          },
+          {
+            "bottom": 0.08092,
+            "top": 0.08100000000000002,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+          },
+          {
+            "bottom": 0.08097,
+            "top": 0.081,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+          },
+          {
+            "bottom": 0.08099,
+            "top": 0.08108000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+          },
+          {
+            "bottom": 0.08104,
+            "top": 0.08115,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+          },
+          {
+            "bottom": 0.0811,
+            "top": 0.081205,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+          },
+          {
+            "bottom": 0.08113,
+            "top": 0.08126499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+          },
+          {
+            "bottom": 0.08115,
+            "top": 0.081295,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+          },
+          {
+            "bottom": 0.08117,
+            "top": 0.08131500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+          }
+        ],
+        "bottom": 0.08059,
+        "top": 0.08131500000000001,
+        "n_pools": 13,
+        "strength_sum": 3.8434062907654813,
+        "strength_avg": 0.2956466377511909,
+        "strength_max": 3.8434062907654813,
+        "width_pct": 0.9112619406737271,
+        "width_bps": 91.12619406737271,
+        "density_per_pct": 4.217674544735095,
+        "dist_from_entry_pct": 1.2946204122674574,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-16T20:00:00+00:00",
+        "delta_at_touch": 325663.02044,
+        "ob_at_touch": null,
+        "overshoot_pct": -0.0062845651081182485
+      },
+      "reversal_cluster": {
+        "cluster_id": "C1",
+        "pools": [
+          {
+            "bottom": 0.08059,
+            "top": 0.08073,
+            "strength": 3.8434062907654813,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789582080"
+          },
+          {
+            "bottom": 0.08062,
+            "top": 0.080675,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789533720"
+          },
+          {
+            "bottom": 0.08066,
+            "top": 0.08072499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+          },
+          {
+            "bottom": 0.0807,
+            "top": 0.080785,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789532580"
+          },
+          {
+            "bottom": 0.08085,
+            "top": 0.08107,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+          },
+          {
+            "bottom": 0.08092,
+            "top": 0.08100000000000002,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+          },
+          {
+            "bottom": 0.08097,
+            "top": 0.081,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+          },
+          {
+            "bottom": 0.08099,
+            "top": 0.08108000000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+          },
+          {
+            "bottom": 0.08104,
+            "top": 0.08115,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+          },
+          {
+            "bottom": 0.0811,
+            "top": 0.081205,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+          },
+          {
+            "bottom": 0.08113,
+            "top": 0.08126499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+          },
+          {
+            "bottom": 0.08115,
+            "top": 0.081295,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+          },
+          {
+            "bottom": 0.08117,
+            "top": 0.08131500000000001,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+          }
+        ],
+        "bottom": 0.08059,
+        "top": 0.08131500000000001,
+        "n_pools": 13,
+        "strength_sum": 3.8434062907654813,
+        "strength_avg": 0.2956466377511909,
+        "strength_max": 3.8434062907654813,
+        "width_pct": 0.9112619406737271,
+        "width_bps": 91.12619406737271,
+        "density_per_pct": 4.217674544735095,
+        "dist_from_entry_pct": 1.2946204122674574,
+        "label": "reversal_point",
+        "reached": true,
+        "touch_ts": "2026-09-16T20:00:00+00:00",
+        "delta_at_touch": 325663.02044,
+        "ob_at_touch": null,
+        "overshoot_pct": -0.0062845651081182485
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08059,
+              "top": 0.08073,
+              "strength": 3.8434062907654813,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789582080"
+            },
+            {
+              "bottom": 0.08062,
+              "top": 0.080675,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789533720"
+            },
+            {
+              "bottom": 0.08066,
+              "top": 0.08072499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789505400"
+            },
+            {
+              "bottom": 0.0807,
+              "top": 0.080785,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789532580"
+            },
+            {
+              "bottom": 0.08085,
+              "top": 0.08107,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789500780"
+            },
+            {
+              "bottom": 0.08092,
+              "top": 0.08100000000000002,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789501200"
+            },
+            {
+              "bottom": 0.08097,
+              "top": 0.081,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789502220"
+            },
+            {
+              "bottom": 0.08099,
+              "top": 0.08108000000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789502400"
+            },
+            {
+              "bottom": 0.08104,
+              "top": 0.08115,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499400"
+            },
+            {
+              "bottom": 0.0811,
+              "top": 0.081205,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789500180"
+            },
+            {
+              "bottom": 0.08113,
+              "top": 0.08126499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499820"
+            },
+            {
+              "bottom": 0.08115,
+              "top": 0.081295,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499940"
+            },
+            {
+              "bottom": 0.08117,
+              "top": 0.08131500000000001,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789499040"
+            }
+          ],
+          "bottom": 0.08059,
+          "top": 0.08131500000000001,
+          "n_pools": 13,
+          "strength_sum": 3.8434062907654813,
+          "strength_avg": 0.2956466377511909,
+          "strength_max": 3.8434062907654813,
+          "width_pct": 0.9112619406737271,
+          "width_bps": 91.12619406737271,
+          "density_per_pct": 4.217674544735095,
+          "dist_from_entry_pct": 1.2946204122674574,
+          "label": "reversal_point",
+          "reached": true,
+          "touch_ts": "2026-09-16T20:00:00+00:00",
+          "delta_at_touch": 325663.02044,
+          "ob_at_touch": null,
+          "overshoot_pct": -0.0062845651081182485
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08194,
+              "top": 0.082175,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789497240"
+            }
+          ],
+          "bottom": 0.08194,
+          "top": 0.082175,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.2953745600804413,
+          "width_bps": 29.537456008044128,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 2.9914529914529826,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.08237,
+              "top": 0.08242,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789494660"
+            },
+            {
+              "bottom": 0.08241,
+              "top": 0.08271999999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789496940"
+            },
+            {
+              "bottom": 0.08253,
+              "top": 0.08271,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789493760"
+            }
+          ],
+          "bottom": 0.08237,
+          "top": 0.08271999999999999,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.4399195575666028,
+          "width_bps": 43.991955756660275,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 3.531925590749111,
+          "label": "ignored",
+          "reached": false,
+          "touch_ts": null,
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "overshoot_pct": null
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 1.2946204122674574,
+          "n_pools": 13,
+          "strength_sum": 3.8434062907654813,
+          "strength_avg": 0.2956466377511909,
+          "width_pct": 0.9112619406737271,
+          "density_per_pct": 4.217674544735095,
+          "reached": true,
+          "label": "reversal_point",
+          "delta_at_touch": 325663.02044,
+          "ob_at_touch": null,
+          "confirm_delta": 623421.4093099998,
+          "entry_ob": 1.6853405439187843,
+          "reachability_class": "reachable_moderate"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 2.9914529914529826,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.2953745600804413,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 623421.4093099998,
+          "entry_ob": 1.6853405439187843,
+          "reachability_class": "nicht_erreicht"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 3.531925590749111,
+          "n_pools": 3,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.4399195575666028,
+          "density_per_pct": 0.0,
+          "reached": false,
+          "label": "ignored",
+          "delta_at_touch": null,
+          "ob_at_touch": null,
+          "confirm_delta": 623421.4093099998,
+          "entry_ob": 1.6853405439187843,
+          "reachability_class": "nicht_erreicht"
+        }
+      ]
+    },
+    {
+      "signal_ts": "2026-09-17T23:20:00+00:00",
+      "symbol": "DOGEUSDT",
+      "tier": "tier1_valid",
+      "entry_price": 0.08167,
+      "confirm_delta": 260113.2901000001,
+      "followthrough_delta": 698829.4694299999,
+      "entry_ob": 1.9693899740472143,
+      "d10_entry_close": 120294.54349999997,
+      "d10_at_peak": 509014.96656999993,
+      "max_high": 0.08692,
+      "max_ts": "2026-09-18T10:30:00+00:00",
+      "max_exc_pct": 6.42830904861025,
+      "n_pools": 13,
+      "n_clusters": 4,
+      "n_reached": 4,
+      "n_ignored": 0,
+      "n_zwischenstation": 4,
+      "strongest_cluster": {
+        "cluster_id": "C2",
+        "pools": [
+          {
+            "bottom": 0.08184,
+            "top": 0.08185999999999999,
+            "strength": 0.08611722453323015,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789677420"
+          },
+          {
+            "bottom": 0.08184,
+            "top": 0.08193,
+            "strength": 0.6098565831479152,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789674780"
+          },
+          {
+            "bottom": 0.08185,
+            "top": 0.08193500000000001,
+            "strength": 4.42502902195995,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789678920"
+          },
+          {
+            "bottom": 0.08191,
+            "top": 0.081955,
+            "strength": 2.2445426622811264,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789676220"
+          },
+          {
+            "bottom": 0.08193,
+            "top": 0.08194000000000001,
+            "strength": 0.08918992454290413,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789676580"
+          },
+          {
+            "bottom": 0.082,
+            "top": 0.08206000000000001,
+            "strength": 3.0371383918809407,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789666920"
+          },
+          {
+            "bottom": 0.08207,
+            "top": 0.08211000000000002,
+            "strength": 0.06275886574997105,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789666500"
+          }
+        ],
+        "bottom": 0.08184,
+        "top": 0.08211000000000002,
+        "n_pools": 7,
+        "strength_sum": 10.554632674096037,
+        "strength_avg": 1.5078046677280053,
+        "strength_max": 4.42502902195995,
+        "width_pct": 0.33059875107140957,
+        "width_bps": 33.059875107140954,
+        "density_per_pct": 31.925809277531812,
+        "dist_from_entry_pct": 0.20815476919308143,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-18T01:00:00+00:00",
+        "delta_at_touch": -13904.832280000002,
+        "ob_at_touch": 1.368534136243135,
+        "overshoot_pct": 5.889555528345758
+      },
+      "heaviest_reached_cluster": {
+        "cluster_id": "C2",
+        "pools": [
+          {
+            "bottom": 0.08184,
+            "top": 0.08185999999999999,
+            "strength": 0.08611722453323015,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789677420"
+          },
+          {
+            "bottom": 0.08184,
+            "top": 0.08193,
+            "strength": 0.6098565831479152,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789674780"
+          },
+          {
+            "bottom": 0.08185,
+            "top": 0.08193500000000001,
+            "strength": 4.42502902195995,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789678920"
+          },
+          {
+            "bottom": 0.08191,
+            "top": 0.081955,
+            "strength": 2.2445426622811264,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789676220"
+          },
+          {
+            "bottom": 0.08193,
+            "top": 0.08194000000000001,
+            "strength": 0.08918992454290413,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789676580"
+          },
+          {
+            "bottom": 0.082,
+            "top": 0.08206000000000001,
+            "strength": 3.0371383918809407,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789666920"
+          },
+          {
+            "bottom": 0.08207,
+            "top": 0.08211000000000002,
+            "strength": 0.06275886574997105,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789666500"
+          }
+        ],
+        "bottom": 0.08184,
+        "top": 0.08211000000000002,
+        "n_pools": 7,
+        "strength_sum": 10.554632674096037,
+        "strength_avg": 1.5078046677280053,
+        "strength_max": 4.42502902195995,
+        "width_pct": 0.33059875107140957,
+        "width_bps": 33.059875107140954,
+        "density_per_pct": 31.925809277531812,
+        "dist_from_entry_pct": 0.20815476919308143,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-18T01:00:00+00:00",
+        "delta_at_touch": -13904.832280000002,
+        "ob_at_touch": 1.368534136243135,
+        "overshoot_pct": 5.889555528345758
+      },
+      "reversal_cluster": {
+        "cluster_id": "C4",
+        "pools": [
+          {
+            "bottom": 0.08256,
+            "top": 0.08269499999999999,
+            "strength": 0.0,
+            "pool_id": "lld:DOGEUSDT:1m:upper:1789655220"
+          }
+        ],
+        "bottom": 0.08256,
+        "top": 0.08269499999999999,
+        "n_pools": 1,
+        "strength_sum": 0.0,
+        "strength_avg": 0.0,
+        "strength_max": 0.0,
+        "width_pct": 0.1652993755356878,
+        "width_bps": 16.52993755356878,
+        "density_per_pct": 0.0,
+        "dist_from_entry_pct": 1.0897514387167724,
+        "label": "zwischenstation",
+        "reached": true,
+        "touch_ts": "2026-09-18T02:00:00+00:00",
+        "delta_at_touch": -25532.895919999923,
+        "ob_at_touch": null,
+        "overshoot_pct": 5.173258234357789
+      },
+      "clusters": [
+        {
+          "cluster_id": "C1",
+          "pools": [
+            {
+              "bottom": 0.08168,
+              "top": 0.081695,
+              "strength": 0.005647189706878205,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789680480"
+            },
+            {
+              "bottom": 0.0817,
+              "top": 0.08174,
+              "strength": 0.3670062639063558,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789679580"
+            },
+            {
+              "bottom": 0.08174,
+              "top": 0.081755,
+              "strength": 0.07145750701364031,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789679160"
+            }
+          ],
+          "bottom": 0.08168,
+          "top": 0.081755,
+          "n_pools": 3,
+          "strength_sum": 0.44411096062687433,
+          "strength_avg": 0.14803698687562478,
+          "strength_max": 0.3670062639063558,
+          "width_pct": 0.09183298640870789,
+          "width_bps": 9.18329864087079,
+          "density_per_pct": 4.836072287253443,
+          "dist_from_entry_pct": 0.01224439818782432,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-17T23:20:00+00:00",
+          "delta_at_touch": 120294.54349999997,
+          "ob_at_touch": 1.9693899740472143,
+          "overshoot_pct": 6.324231664013717
+        },
+        {
+          "cluster_id": "C2",
+          "pools": [
+            {
+              "bottom": 0.08184,
+              "top": 0.08185999999999999,
+              "strength": 0.08611722453323015,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789677420"
+            },
+            {
+              "bottom": 0.08184,
+              "top": 0.08193,
+              "strength": 0.6098565831479152,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789674780"
+            },
+            {
+              "bottom": 0.08185,
+              "top": 0.08193500000000001,
+              "strength": 4.42502902195995,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789678920"
+            },
+            {
+              "bottom": 0.08191,
+              "top": 0.081955,
+              "strength": 2.2445426622811264,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789676220"
+            },
+            {
+              "bottom": 0.08193,
+              "top": 0.08194000000000001,
+              "strength": 0.08918992454290413,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789676580"
+            },
+            {
+              "bottom": 0.082,
+              "top": 0.08206000000000001,
+              "strength": 3.0371383918809407,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789666920"
+            },
+            {
+              "bottom": 0.08207,
+              "top": 0.08211000000000002,
+              "strength": 0.06275886574997105,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789666500"
+            }
+          ],
+          "bottom": 0.08184,
+          "top": 0.08211000000000002,
+          "n_pools": 7,
+          "strength_sum": 10.554632674096037,
+          "strength_avg": 1.5078046677280053,
+          "strength_max": 4.42502902195995,
+          "width_pct": 0.33059875107140957,
+          "width_bps": 33.059875107140954,
+          "density_per_pct": 31.925809277531812,
+          "dist_from_entry_pct": 0.20815476919308143,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-18T01:00:00+00:00",
+          "delta_at_touch": -13904.832280000002,
+          "ob_at_touch": 1.368534136243135,
+          "overshoot_pct": 5.889555528345758
+        },
+        {
+          "cluster_id": "C3",
+          "pools": [
+            {
+              "bottom": 0.0822,
+              "top": 0.08224,
+              "strength": 0.03889484691011838,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789665840"
+            },
+            {
+              "bottom": 0.08226,
+              "top": 0.08230499999999999,
+              "strength": 0.8806629228469494,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789664640"
+            }
+          ],
+          "bottom": 0.0822,
+          "top": 0.08230499999999999,
+          "n_pools": 2,
+          "strength_sum": 0.9195577697570677,
+          "strength_avg": 0.45977888487853386,
+          "strength_max": 0.8806629228469494,
+          "width_pct": 0.12856618097219785,
+          "width_bps": 12.856618097219785,
+          "density_per_pct": 7.152407910101336,
+          "dist_from_entry_pct": 0.6489531039549269,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-18T01:35:00+00:00",
+          "delta_at_touch": 534158.21165,
+          "ob_at_touch": 1.0137169822099479,
+          "overshoot_pct": 5.650789763683124
+        },
+        {
+          "cluster_id": "C4",
+          "pools": [
+            {
+              "bottom": 0.08256,
+              "top": 0.08269499999999999,
+              "strength": 0.0,
+              "pool_id": "lld:DOGEUSDT:1m:upper:1789655220"
+            }
+          ],
+          "bottom": 0.08256,
+          "top": 0.08269499999999999,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "strength_max": 0.0,
+          "width_pct": 0.1652993755356878,
+          "width_bps": 16.52993755356878,
+          "density_per_pct": 0.0,
+          "dist_from_entry_pct": 1.0897514387167724,
+          "label": "zwischenstation",
+          "reached": true,
+          "touch_ts": "2026-09-18T02:00:00+00:00",
+          "delta_at_touch": -25532.895919999923,
+          "ob_at_touch": null,
+          "overshoot_pct": 5.173258234357789
+        }
+      ],
+      "reachability_matrix": [
+        {
+          "cluster_id": "C1",
+          "dist_pct": 0.01224439818782432,
+          "n_pools": 3,
+          "strength_sum": 0.44411096062687433,
+          "strength_avg": 0.14803698687562478,
+          "width_pct": 0.09183298640870789,
+          "density_per_pct": 4.836072287253443,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 120294.54349999997,
+          "ob_at_touch": 1.9693899740472143,
+          "confirm_delta": 260113.2901000001,
+          "entry_ob": 1.9693899740472143,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C2",
+          "dist_pct": 0.20815476919308143,
+          "n_pools": 7,
+          "strength_sum": 10.554632674096037,
+          "strength_avg": 1.5078046677280053,
+          "width_pct": 0.33059875107140957,
+          "density_per_pct": 31.925809277531812,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": -13904.832280000002,
+          "ob_at_touch": 1.368534136243135,
+          "confirm_delta": 260113.2901000001,
+          "entry_ob": 1.9693899740472143,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C3",
+          "dist_pct": 0.6489531039549269,
+          "n_pools": 2,
+          "strength_sum": 0.9195577697570677,
+          "strength_avg": 0.45977888487853386,
+          "width_pct": 0.12856618097219785,
+          "density_per_pct": 7.152407910101336,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": 534158.21165,
+          "ob_at_touch": 1.0137169822099479,
+          "confirm_delta": 260113.2901000001,
+          "entry_ob": 1.9693899740472143,
+          "reachability_class": "leicht_erreichbar"
+        },
+        {
+          "cluster_id": "C4",
+          "dist_pct": 1.0897514387167724,
+          "n_pools": 1,
+          "strength_sum": 0.0,
+          "strength_avg": 0.0,
+          "width_pct": 0.1652993755356878,
+          "density_per_pct": 0.0,
+          "reached": true,
+          "label": "zwischenstation",
+          "delta_at_touch": -25532.895919999923,
+          "ob_at_touch": null,
+          "confirm_delta": 260113.2901000001,
+          "entry_ob": 1.9693899740472143,
+          "reachability_class": "reachable_moderate"
+        }
+      ]
+    }
+  ]
+}
