@@ -8,11 +8,21 @@ import pandas as pd
 
 from ob_microstructure_breakout_bot.data.bars import load_5m_bars
 from ob_microstructure_breakout_bot.exit_backtest.thresholds import SL_BUFFER
-from research.regime_scanner.swings import (
-    filter_pivots_as_of,
-    find_confirmed_pivots,
-    pivots_by_type,
-)
+
+
+def _load_swings():
+    try:
+        from research.regime_scanner.swings import (
+            filter_pivots_as_of,
+            find_confirmed_pivots,
+            pivots_by_type,
+        )
+    except ModuleNotFoundError as exc:  # pragma: no cover - import-time compatibility only
+        raise ModuleNotFoundError(
+            "Missing optional research.regime_scanner.swings dependency required for "
+            "compute_long_sl(). The short backtester should still import cleanly."
+        ) from exc
+    return find_confirmed_pivots, filter_pivots_as_of, pivots_by_type
 
 
 def compute_long_sl(
@@ -40,6 +50,7 @@ def compute_long_sl(
             for b in bars
         ]
     )
+    find_confirmed_pivots, filter_pivots_as_of, pivots_by_type = _load_swings()
     pivots = find_confirmed_pivots(df)
     visible = filter_pivots_as_of(pivots, entry_ts)
     lows = pivots_by_type(visible, "low")

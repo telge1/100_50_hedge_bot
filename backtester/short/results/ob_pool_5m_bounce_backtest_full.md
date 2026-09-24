@@ -29,14 +29,14 @@ Implements `results/ob_pool_5m_bounce_rule.md`.
 
 - trades taken: **78**
 - winrate: **56%**
-- mean / sum pnl %: **0.284% / 22.13%**
+- mean / sum pnl %: **0.284% / 22.12%**
 - exits: `{'tp': 29, 'sl': 32, 'timeout': 17}`
 
 ## Flow-confirmed short trades only
 
 - flow trades: **38**
 - winrate: **76%**
-- mean / sum pnl %: **0.931% / 35.40%**
+- mean / sum pnl %: **0.931% / 35.38%**
 
 ## Flow confirmation (OB≥1.05 + Δ≥100k at touch)
 
