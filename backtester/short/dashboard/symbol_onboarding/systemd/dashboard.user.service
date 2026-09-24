@@ -1,0 +1,24 @@
+[Unit]
+Description=Spread Recovery Hedge Dashboard (user unit)
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+# Not PartOf any onboarding worker — workers must survive dashboard restarts.
+
+[Service]
+Type=simple
+WorkingDirectory=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+Environment=PYTHONPATH=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev:/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard
+ExecStart=/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/.venv/bin/python app.py
+# Kill only the main process so accidental children are less coupled; onboarding
+# still uses a separate user unit and must not be PartOf this service.
+KillMode=process
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dashboard-user
+
+[Install]
+WantedBy=default.target

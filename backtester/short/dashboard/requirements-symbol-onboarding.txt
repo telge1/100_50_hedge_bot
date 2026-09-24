@@ -1,0 +1,8 @@
+# Symbol onboarding adapter depends on the local orderbook_analyse package.
+#
+# Install into THIS project's venv without upgrading other packages:
+#   .venv/bin/python -m pip install -e /home/telgenbuescher/projects/orderbook_analyse --no-deps
+#
+# Prefer `python -m pip` over `.venv/bin/pip` if the pip script points at another venv.
+#
+# orderbook-analyse @ file:///home/telgenbuescher/projects/orderbook_analyse

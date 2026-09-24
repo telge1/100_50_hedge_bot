@@ -1,0 +1,141 @@
+{
+  "status": "OK",
+  "symbol": "DOGEUSDT",
+  "from": "2026-09-16T00:00:00+00:00",
+  "to": "2026-09-20T00:00:00+00:00",
+  "bar_count": 1367,
+  "bars_in_warmup_to_end": 1367,
+  "touch_count": 182,
+  "same_direction": 171,
+  "different_direction": 11,
+  "difference_rate_pct": 6.043956043956044,
+  "prod_above_alt_below": 2,
+  "prod_below_alt_above": 1,
+  "ema_abs_move_max": 2.5132413384476582e-05,
+  "ema_abs_move_median": 1.8064002389739375e-06,
+  "rule_engine_relevant_diffs": 3,
+  "note": "Production direction uses finished-touch-bar EMA59. Alternate uses previous-bar EMA59. Rule impact: FROM_ABOVE prefers exit/hold path; FROM_BELOW prefers breakout path.",
+  "sample_diffs": [
+    {
+      "ts": "2026-09-16T07:10:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "none",
+      "prev_close": 0.0801,
+      "cur_ema59": 0.08009940604746213,
+      "prev_ema59": 0.08010248901461599,
+      "ema_abs_move": 3.0829671538584735e-06,
+      "ema_rel_move_bps": 0.38488978200480317,
+      "rule_path_impact": "prod_from_above_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-16T10:30:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "none",
+      "prev_close": 0.07979,
+      "cur_ema59": 0.07976015930292772,
+      "prev_ema59": 0.07975844065820109,
+      "ema_abs_move": 1.718644726630969e-06,
+      "ema_rel_move_bps": 0.2153960053428962,
+      "rule_path_impact": "prod_from_above_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-16T18:55:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "none",
+      "prev_close": 0.07954,
+      "cur_ema59": 0.07931496687888184,
+      "prev_ema59": 0.07930789677125709,
+      "ema_abs_move": 7.0701076247542405e-06,
+      "ema_rel_move_bps": 0.8888744813621122,
+      "rule_path_impact": "prod_from_above_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-16T22:25:00+00:00",
+      "prod_dir": "from_below",
+      "alt_dir": "none",
+      "prev_close": 0.0799,
+      "cur_ema59": 0.08005954745616532,
+      "prev_ema59": 0.08006298012706757,
+      "ema_abs_move": 3.4326709022480806e-06,
+      "ema_rel_move_bps": 0.42962088889212524,
+      "rule_path_impact": "prod_from_below_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-17T12:00:00+00:00",
+      "prod_dir": "from_below",
+      "alt_dir": "from_above",
+      "prev_close": 0.08094,
+      "cur_ema59": 0.08094113594974708,
+      "prev_ema59": 0.08093945098249698,
+      "ema_abs_move": 1.6849672501012547e-06,
+      "ema_rel_move_bps": 0.20817485175454098,
+      "rule_path_impact": "prod_breakout_path_vs_alt_exit_path"
+    },
+    {
+      "ts": "2026-09-17T18:30:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "from_below",
+      "prev_close": 0.08168,
+      "cur_ema59": 0.08167496281996882,
+      "prev_ema59": 0.08168237533100223,
+      "ema_abs_move": 7.412511033408342e-06,
+      "ema_rel_move_bps": 0.9075062479687,
+      "rule_path_impact": "prod_exit_path_vs_alt_breakout_path"
+    },
+    {
+      "ts": "2026-09-18T11:25:00+00:00",
+      "prod_dir": "from_below",
+      "alt_dir": "none",
+      "prev_close": 0.0851,
+      "cur_ema59": 0.08513486568633402,
+      "prev_ema59": 0.08514124036517313,
+      "ema_abs_move": 6.374678839113357e-06,
+      "ema_rel_move_bps": 0.7490809446666694,
+      "rule_path_impact": "prod_from_below_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-18T11:35:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "none",
+      "prev_close": 0.08517,
+      "cur_ema59": 0.08514116893578545,
+      "prev_ema59": 0.08513603683012289,
+      "ema_abs_move": 5.132105662566944e-06,
+      "ema_rel_move_bps": 0.6025719927870076,
+      "rule_path_impact": "prod_from_above_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-19T04:20:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "from_below",
+      "prev_close": 0.08801,
+      "cur_ema59": 0.08800879019377998,
+      "prev_ema59": 0.08801357606253102,
+      "ema_abs_move": 4.785868751036593e-06,
+      "ema_rel_move_bps": 0.5437869277396424,
+      "rule_path_impact": "prod_exit_path_vs_alt_breakout_path"
+    },
+    {
+      "ts": "2026-09-19T09:30:00+00:00",
+      "prod_dir": "from_below",
+      "alt_dir": "none",
+      "prev_close": 0.08729,
+      "cur_ema59": 0.08730805668163188,
+      "prev_ema59": 0.0873190241534123,
+      "ema_abs_move": 1.0967471780420901e-05,
+      "ema_rel_move_bps": 1.256440804264051,
+      "rule_path_impact": "prod_from_below_vs_alt_none"
+    },
+    {
+      "ts": "2026-09-19T19:30:00+00:00",
+      "prod_dir": "from_above",
+      "alt_dir": "none",
+      "prev_close": 0.08969,
+      "cur_ema59": 0.08951471706701741,
+      "prev_ema59": 0.0895066038624318,
+      "ema_abs_move": 8.113204585616374e-06,
+      "ema_rel_move_bps": 0.9045829619373814,
+      "rule_path_impact": "prod_from_above_vs_alt_none"
+    }
+  ]
+}

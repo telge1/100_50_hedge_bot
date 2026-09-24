@@ -1,0 +1,19 @@
+# Suggested DOGEUSDT thresholds from Phase C calibration.
+# best train candidate — review carefully before replace
+#
+# Review before replacing config/doge_usdt.yaml.
+
+symbol: DOGEUSDT
+
+fakeout_max_confirm_delta: 25000.0
+tier1_min_confirm_delta: 100000.0
+tier2_min_confirm_delta: 150000.0
+
+tier1_min_bid_ask_ratio_5bps: 1.0
+tier2_min_bid_ask_ratio_5bps: 1.5
+
+fakeout_followthrough_flip_delta: -50000.0
+
+context_lookback_minutes: 30
+confirm_window_minutes: 5
+followthrough_candles: 2

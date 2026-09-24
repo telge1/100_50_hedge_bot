@@ -1,0 +1,188 @@
+{
+  "symbol": "DOGEUSDT",
+  "scan_from": "2026-09-05T17:00:00+00:00",
+  "scan_to": "2026-09-19T11:00:00+00:00",
+  "n_scanned": 171,
+  "n_candidates": 5,
+  "n_breakouts": 0,
+  "n_long_candidates": 3,
+  "n_short_candidates": 2,
+  "n_long_breakouts": 0,
+  "n_short_breakouts": 0,
+  "ema200_ignored": true,
+  "events": [
+    {
+      "bar_ts": "2026-09-07T14:50:00+00:00",
+      "decision_ts": "2026-09-07T15:10:00+00:00",
+      "direction": "from_below",
+      "state": "fakeout",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.09027928724020647,
+        "ema20": 0.09041272976624072,
+        "ema59": 0.09027901075176381,
+        "ema200": 0.09001739699965863,
+        "price": 0.0906,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-10T03:20:00+00:00",
+      "decision_ts": "2026-09-10T03:40:00+00:00",
+      "direction": "from_above",
+      "state": "exit_confirmed",
+      "tier": null,
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08590644112585642,
+        "ema20": 0.08578636985323805,
+        "ema59": 0.08594058124440328,
+        "ema200": 0.08744637787525555,
+        "price": 0.08588,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-16T02:50:00+00:00",
+      "decision_ts": "2026-09-16T03:10:00+00:00",
+      "direction": "from_above",
+      "state": "exit_confirmed",
+      "tier": null,
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08003128200649763,
+        "ema20": 0.07996100263796474,
+        "ema59": 0.08006659753036148,
+        "ema200": 0.0809868540971929,
+        "price": 0.08003,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-17T04:35:00+00:00",
+      "decision_ts": "2026-09-17T04:55:00+00:00",
+      "direction": "from_below",
+      "state": "chop",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08087262630945947,
+        "ema20": 0.08092584613236777,
+        "ema59": 0.08082431018616001,
+        "ema200": 0.08037210732674133,
+        "price": 0.08097,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-19T03:40:00+00:00",
+      "decision_ts": "2026-09-19T04:00:00+00:00",
+      "direction": "from_below",
+      "state": "chop",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.0879990596253641,
+        "ema20": 0.08806383566855652,
+        "ema59": 0.08799085118284755,
+        "ema200": 0.08718189190313706,
+        "price": 0.088,
+        "bullish_stack": false
+      }
+    }
+  ],
+  "candidate_events": [
+    {
+      "bar_ts": "2026-09-07T14:50:00+00:00",
+      "decision_ts": "2026-09-07T15:10:00+00:00",
+      "direction": "from_below",
+      "state": "fakeout",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.09027928724020647,
+        "ema20": 0.09041272976624072,
+        "ema59": 0.09027901075176381,
+        "ema200": 0.09001739699965863,
+        "price": 0.0906,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-10T03:20:00+00:00",
+      "decision_ts": "2026-09-10T03:40:00+00:00",
+      "direction": "from_above",
+      "state": "exit_confirmed",
+      "tier": null,
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08590644112585642,
+        "ema20": 0.08578636985323805,
+        "ema59": 0.08594058124440328,
+        "ema200": 0.08744637787525555,
+        "price": 0.08588,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-16T02:50:00+00:00",
+      "decision_ts": "2026-09-16T03:10:00+00:00",
+      "direction": "from_above",
+      "state": "exit_confirmed",
+      "tier": null,
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08003128200649763,
+        "ema20": 0.07996100263796474,
+        "ema59": 0.08006659753036148,
+        "ema200": 0.0809868540971929,
+        "price": 0.08003,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-17T04:35:00+00:00",
+      "decision_ts": "2026-09-17T04:55:00+00:00",
+      "direction": "from_below",
+      "state": "chop",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.08087262630945947,
+        "ema20": 0.08092584613236777,
+        "ema59": 0.08082431018616001,
+        "ema200": 0.08037210732674133,
+        "price": 0.08097,
+        "bullish_stack": false
+      }
+    },
+    {
+      "bar_ts": "2026-09-19T03:40:00+00:00",
+      "decision_ts": "2026-09-19T04:00:00+00:00",
+      "direction": "from_below",
+      "state": "chop",
+      "tier": "tier0_fakeout",
+      "ema_stack_ok": true,
+      "reason": "strict EMA stack gate",
+      "ema": {
+        "ema9": 0.0879990596253641,
+        "ema20": 0.08806383566855652,
+        "ema59": 0.08799085118284755,
+        "ema200": 0.08718189190313706,
+        "price": 0.088,
+        "bullish_stack": false
+      }
+    }
+  ],
+  "breakout_events": []
+}

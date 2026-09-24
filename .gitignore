@@ -1,0 +1,153 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.env/
+.envrc
+
+# =========================
+# Logs (WICHTIG!)
+# =========================
+logs/
+*.log
+*.jsonl
+
+# =========================
+# Runtime / State Files
+# =========================
+state.json
+*.state
+*.db
+*.sqlite3
+
+# =========================
+# Config (optional je nach Nutzung)
+# =========================
+# Wenn sensible Daten drin sind:
+config.yaml
+config/config.yaml
+*.env
+
+# =========================
+# Data / Backtests
+# =========================
+data/
+*.csv
+*.parquet
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+# =========================
+# Git
+# =========================
+*.swp
+*.swo__pycache__/
+*.pyc
+
+# Bot runtime files
+live_bots/**/state/*.json
+live_bots/**/logs/*.log
+live_bots/**/logs/*.jsonl
+live_bots/**/snapshots/*.json
+live_bots/**/pids/*.pid
+
+# Bot group credential config (per long-bot group)
+live_bots/100_50_hedge_bot/config/config.yaml
+live_bots/short_hedge_bot/config/config.yaml
+live_bots/short_hedge_bot/**/logs/*.jsonl
+live_bots/short_hedge_bot/**/state/*.json
+live_bots/short_hedge_bot/**/run/*.json
+live_bots/short_hedge_bot/**/run/*.pid
+live_bots/short_hedge_bot/**/pids/*.pid
+live_bots/short_hedge_bot/**/snapshots/*.json
+
+# Keep bot registry/config trackable
+!live_bots/**/config/fixed_cycle_config.json
+!live_bots/**/bots.json
+
+# Python local environment
+.venv/
+__pycache__/
+*.pyc
+__pycache__/
+*.pyc
+short_bot_mirror_changes_*.diff
+
+# Local bot runtime state / locks
+live_bots/short_hedge_bot/state/
+live_bots/**/state/*.lock
+live_bots/**/state/active_bot_symbols.json
+
+# Local backup diffs
+short_bot_mirror_changes_*.diff
+
+# Bot runtime run files
+live_bots/**/run/*.json
+live_bots/**/run/*.pid
+live_bots/**/run/*.lock
+live_bots/**/run/start.lock
+!live_bots/**/run/.gitkeep
+
+# Local environment / secrets
+.env*
+env/.env*
+*.env
+
+# Local live bot credentials/configs
+live_bots/**/config/config_telge.yaml
+live_bots/**/config/config.local.yaml
+live_bots/**/config/*secret*.yaml
+live_bots/**/config/*credentials*.yaml
+
+_archive_removed_from_main_bot/
+_cleanup_safety_20260621_105139/
+legacy_backup/
+
+# Runtime bot state
+live_bots/state/
+live_bots/100_50_hedge_bot/*/state/
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Research Charts browser persistence (TRP drawings/settings adapter)
+dashboard/research_charts/user_data/
+
+# Research runtime files
+research/liquidation_level/results/**/cache/
+research/liquidation_level/results/**/nohup.out
+research/liquidation_level/results/**/pid.txt
+research/liquidation_level/results/**/run.log
+research/liquidation_level/results/**/safe_batch_run.log
+research/liquidation_level/results/**/safe_batch_nohup.out
+
+# Regime scanner generated research outputs
+research/regime_scanner/results/
+research/regime_scanner/results_*/
+
+# Generated backtest and forecast outputs
+research/backtests/results/
+research/trend_forecast_validation/results/
+results/pool_order_plan_v1/
+
+# Wall Decision V1 runtime / local preview artifacts
+dashboard/wall_decision_v1/screenshots/
+dashboard/wall_decision_v1/screenshots_real_mp_3012/
+dashboard/logs/wall_decision_shadow/

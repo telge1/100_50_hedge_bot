@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit-Verlauf 2</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .profit-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .profit-summary-card {
+            background: #1f1f1f;
+            padding: 16px;
+            border-radius: 8px;
+            color: #f5f5f5;
+            border: 1px solid #333;
+            position: relative;
+        }
+        .summary-wallet-toggle {
+            margin-top: 8px;
+            background: #2b2b2b;
+            color: #ddd;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .summary-wallet-toggle:hover {
+            background: #363636;
+        }
+        .summary-wallet-list {
+            position: absolute;
+            top: calc(100% - 8px);
+            left: 16px;
+            right: 16px;
+            background: #151515;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 8px 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            z-index: 5;
+            display: none;
+        }
+        .summary-wallet-list.visible {
+            display: block;
+        }
+        .summary-wallet-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 0.82rem;
+            padding: 4px 0;
+            color: #ddd;
+        }
+        .summary-wallet-empty {
+            font-size: 0.82rem;
+            color: #aaa;
+        }
+        .profit-trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .profit-trades-table th, .profit-trades-table td {
+            padding: 8px;
+            border: 1px solid #2f2f2f;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .table-sort-button {
+            background: transparent;
+            border: none;
+            color: #f5f5f5;
+            font: inherit;
+            cursor: pointer;
+            padding: 0;
+        }
+        .table-sort-button:hover {
+            color: #fff;
+        }
+        .table-sort-button.active {
+            color: #7cc4ff;
+        }
+        .profit-positive { color: #0f0; }
+        .profit-negative { color: #f55; }
+        .detail-row {
+            background: #121212;
+            display: none;
+        }
+        .detail-content {
+            padding: 12px;
+            background: #181818;
+        }
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .detail-table th, .detail-table td {
+            padding: 4px;
+            border: 1px solid #2a2a2a;
+            font-size: 0.85rem;
+        }
+        .details-btn {
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        .refresh-btn {
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        .refresh-btn:disabled,
+        .filter-btn:disabled,
+        .filter-select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .trade-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: end;
+            background: #1b1b1b;
+            border: 1px solid #2f2f2f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 165px;
+        }
+        .filter-field label {
+            color: #cfcfcf;
+            font-size: 0.82rem;
+        }
+        .filter-input,
+        .filter-select,
+        .filter-btn {
+            background: #252525;
+            color: #f5f5f5;
+            border: 1px solid #383838;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.9rem;
+        }
+        .filter-btn {
+            cursor: pointer;
+        }
+        .trade-pagination-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .trade-pagination-info {
+            color: #cfcfcf;
+            font-size: 0.85rem;
+            min-width: 180px;
+            text-align: right;
+        }
+        .profit-chart-toggle {
+            cursor: pointer;
+            background: #1f1f1f;
+            color: #f5f5f5;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+        }
+        .profit-chart-toggle:hover {
+            background: #272727;
+        }
+        .profit-chart-panel {
+            display: none;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .profit-chart-panel.visible {
+            display: block;
+        }
+        .profit-chart-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .profit-chart-title {
+            color: #f5f5f5;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .profit-chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .profit-chart-status {
+            color: #bdbdbd;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            min-height: 18px;
+        }
+        .profit-chart-canvas-wrap {
+            position: relative;
+            height: 300px;
+        }
+        .detail-live-chart-toggle {
+            cursor: pointer;
+            background: #242424;
+            color: #f5f5f5;
+            border: 1px solid #363636;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 12px 0 10px;
+        }
+        .detail-live-chart-toggle:hover {
+            background: #2d2d2d;
+        }
+        .detail-live-chart-panel {
+            display: none;
+            background: #121822;
+            border: 1px solid #2a3646;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            overflow: auto;
+        }
+        .detail-live-chart-panel.visible {
+            display: block;
+        }
+        .detail-live-chart-link {
+            display: inline-block;
+            margin-bottom: 8px;
+            color: #7cc4ff;
+        }
+        .detail-live-chart-iframe {
+            width: 100%;
+            height: 520px;
+            border: 1px solid #2f3b4a;
+            border-radius: 8px;
+            background: #0b1220;
+        }
+        @media (max-width: 900px) {
+            .detail-live-chart-iframe {
+                height: 400px;
+            }
+        }
+        .detail-loaded {
+            display: table-row;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📊 Profit-Verlauf 2</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        {% set nav_active = 'profit-verlauf' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="profit-summary-grid">
+                <div class="profit-summary-card">
+                    <div class="summary-label">Total Profit</div>
+                    <div class="summary-value" id="summary-total-profit">{{ summary.total_profit|round(4) }} USDT</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Closed Trades</div>
+                    <div class="summary-value" id="summary-closed-trades">{{ summary.closed_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Open Trades</div>
+                    <div class="summary-value" id="summary-open-trades">{{ summary.open_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winrate</div>
+                    <div class="summary-value" id="summary-winrate">{{ summary.winrate }} %</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winning Trades</div>
+                    <div class="summary-value" id="summary-winning-trades">{{ summary.winning_trades }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Gesamt Wallet</div>
+                    <div class="summary-value" id="summary-total-wallet">
+                        {% if summary.total_wallet_usdt is defined and summary.total_wallet_usdt is not none %}{{ summary.total_wallet_usdt|round(2) }} USDT{% else %}-{% endif %}
+                    </div>
+                    <button class="summary-wallet-toggle" id="summary-wallet-toggle" type="button">Wallets ▼</button>
+                    <div class="summary-wallet-list" id="summary-wallet-list">
+                        {% if summary.bot_wallets %}
+                            {% for wallet in summary.bot_wallets %}
+                            <div class="summary-wallet-item">
+                                <span>{{ wallet.bot_name }}</span>
+                                <span>{% if wallet.wallet_usdt is defined and wallet.wallet_usdt is not none %}{{ wallet.wallet_usdt|round(2) }} USDT{% else %}-{% endif %}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="summary-wallet-empty">Keine Wallet-Daten verfügbar</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="profit-toolbar">
+                <div class="refresh-group">
+                    <button class="refresh-btn" id="profit-refresh-btn" type="button">Refresh</button>
+                    <label class="refresh-select-label" for="profit-profile-select">Profil</label>
+                    <select class="filter-select" id="profit-profile-select" name="profile">
+                        {% for bot in bot_profiles %}
+                            <option value="{{ bot.profile }}" {% if profile == bot.profile %}selected{% endif %}>
+                                {{ bot.long_account }} / {{ bot.short_account }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <label class="refresh-select-label" for="profit-bot-side-select">Bot Seite</label>
+                    <select class="filter-select" id="profit-bot-side-select" name="bot_side">
+                        <option value="long" {% if bot_side == "long" %}selected{% endif %}>Long Bot</option>
+                        <option value="short" {% if bot_side == "short" %}selected{% endif %}>Short Bot</option>
+                    </select>
+                </div>
+                <button class="refresh-btn" id="remove-selected-trades-btn" type="button" disabled>Entfernen</button>
+                <span id="profit-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
+            </div>
+            <button class="profit-chart-toggle" id="profit-chart-toggle" type="button">
+                Profit Chart anzeigen ▼
+            </button>
+            <div class="profit-chart-panel" id="profit-chart-panel">
+                <div class="profit-chart-header">
+                    <div class="profit-chart-title">Profit Balkendiagramm</div>
+                    <div class="profit-chart-controls">
+                        <label for="profit-chart-group-by">Gruppierung</label>
+                        <select class="filter-select" id="profit-chart-group-by">
+                            <option value="day">Täglich</option>
+                            <option value="month">Monatlich</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="profit-chart-status" id="profit-chart-status"></div>
+                <div class="profit-chart-canvas-wrap">
+                    <canvas id="profit-chart-canvas"></canvas>
+                </div>
+            </div>
+            <div class="trade-filter-bar">
+                <div class="filter-field">
+                    <label for="trade-filter-start">Von</label>
+                    <input
+                        class="filter-input"
+                        id="trade-filter-start"
+                        type="datetime-local"
+                        value="{{ filter_start_time }}"
+                    >
+                </div>
+                <div class="filter-field">
+                    <label for="trade-filter-end">Bis</label>
+                    <input
+                        class="filter-input"
+                        id="trade-filter-end"
+                        type="datetime-local"
+                        value="{{ filter_end_time }}"
+                    >
+                </div>
+                <div class="filter-field">
+                    <label for="trade-page-size">Blockgröße</label>
+                    <select class="filter-select" id="trade-page-size">
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <button class="filter-btn" id="trade-filter-apply" type="button">Anwenden</button>
+                <button class="filter-btn" id="trade-filter-reset" type="button">Zurücksetzen</button>
+                <div class="trade-pagination-controls">
+                    <button class="filter-btn" id="trade-page-prev" type="button" {% if not pagination.has_prev %}disabled{% endif %}>Zurück</button>
+                    <button class="filter-btn" id="trade-page-next" type="button" {% if not pagination.has_next %}disabled{% endif %}>Weiter</button>
+                    <span class="trade-pagination-info" id="trade-pagination-info">
+                        {% if pagination.total_filtered_trades %}
+                            {% set start_idx = pagination.page * pagination.page_size + 1 %}
+                            {% set end_idx = pagination.page * pagination.page_size + trades|length %}
+                            Zeige {{ start_idx }}-{{ end_idx }} von {{ pagination.total_filtered_trades }} Trades
+                        {% else %}
+                            Keine Trades
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <table class="profit-trades-table">
+                <thead>
+                    <tr>
+                    <th>
+                        <input type="checkbox" id="select-all-trades-checkbox">
+                    </th>
+                    <th>Bot</th>
+                        <th>Symbol</th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-start" type="button">
+                                Start
+                            </button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-end" type="button">
+                                Ende
+                            </button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-profit" type="button">
+                                Endprofit
+                            </button>
+                        </th>
+                        <th>Wallet danach</th>
+                        <th>Cycles</th>
+                        <th>
+                            <button class="table-sort-button" id="trade-sort-status" type="button">
+                                Status
+                            </button>
+                        </th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="profit-trades-body">
+                    {% for trade in trades %}
+                    <tr class="trade-row" data-trade-block-id="{{ trade.trade_block_id }}" data-profile="{{ profile }}">
+                        <td><input type="checkbox" disabled></td>
+                        {% set trade_profit = trade.profit_usdt if trade.profit_usdt is not none else trade.total_trade_pnl %}
+                        <td>{{ trade.bot_name }}</td>
+                        <td>{{ trade.symbol }}</td>
+                        <td>{{ trade.start_label }}</td>
+                        <td>{{ trade.end_label }}</td>
+                        <td class="{{ 'profit-positive' if trade_profit and trade_profit > 0 else ('profit-negative' if trade_profit and trade_profit < 0 else '') }}">
+                            {{ trade_profit if trade_profit is not none else '-' }}
+                        </td>
+                        <td>{{ trade.wallet_after or '-' }}</td>
+                        <td>{{ trade.cycle_count }}</td>
+                        <td>{{ 'Closed' if trade.status == 'closed' else ('In Progress' if trade.status == 'in_progress' else 'Open') }}</td>
+                        <td>
+                            <button class="details-btn" data-trade-id="{{ trade.trade_block_id }}">Details</button>
+                        </td>
+                    </tr>
+                    <tr class="detail-row" data-details-for="{{ trade.trade_block_id }}">
+                        <td colspan="10">
+                            <div class="detail-content">
+                                <div class="detail-loader">Lade Details...</div>
+                                <div class="detail-table-wrapper" style="display:none;"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const PROFILE = "{{ profile }}";
+        const INITIAL_TRADE_FILTERS = {
+            startTime: "{{ filter_start_time }}",
+            endTime: "{{ filter_end_time }}",
+            page: {{ trade_page }},
+            pageSize: {{ page_size }},
+        };
+    </script>
+    <script>
+        window.BOT_SIDE = "{{ bot_side }}";
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        window.PROFIT_WALLET_BOT_PROFILES = {{ bot_profiles | tojson }};
+    </script>
+    <script src="/static/js/profit_trades.js"></script>
+</body>
+</html>

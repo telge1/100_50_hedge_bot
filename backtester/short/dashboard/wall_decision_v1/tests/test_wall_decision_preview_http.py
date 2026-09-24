@@ -1,0 +1,130 @@
+"""Contract checks against a running feature-preview dashboard (port 3013).
+
+Skip automatically when the preview is not up. Does not touch live :3000.
+
+Default target is the Wall X-Ray V1 preview worktree on :3013.
+Override with WD_PREVIEW_BASE / WD_PREVIEW_COOKIE_FILE when needed.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import urllib.error
+import urllib.request
+
+import pytest
+
+BASE = os.environ.get("WD_PREVIEW_BASE", "http://127.0.0.1:3013")
+COOKIE_FILE = os.environ.get(
+    "WD_PREVIEW_COOKIE_FILE",
+    "/tmp/wd_xray_v1_preview_session.txt",
+)
+
+
+def _session_cookie() -> str | None:
+    candidates = [COOKIE_FILE, "/tmp/wd_xray_v1_preview_session.txt", "/tmp/wd_v1_preview_session.txt"]
+    for path in candidates:
+        try:
+            sid = open(path, encoding="utf-8").read().strip()
+        except OSError:
+            continue
+        if sid:
+            return f"session_id={sid}"
+    return None
+
+
+def _get(path: str) -> tuple[int, str]:
+    cookie = _session_cookie()
+    if not cookie:
+        pytest.skip("preview session cookie missing")
+    req = urllib.request.Request(
+        BASE + path,
+        headers={"Cookie": cookie, "Accept": "text/html,application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as exc:
+        pytest.skip(f"preview not reachable: {exc}")
+
+
+def test_preview_market_profile_is_real_page_not_fixture():
+    code, html = _get("/live-charts/market-profile")
+    assert code == 200
+    assert 'id="mpWallBpTool"' in html
+    assert 'id="mpWallXrayTool"' in html
+    assert 'id="wdPanel"' in html
+    assert "wall_decision_ui.js" in html
+    assert "wall_decision_helpers.js" in html
+    assert "wall_xray_helpers.js" in html
+    assert "wall_xray_ui.js" in html
+    assert "FIXTURE / REPLAY PREVIEW" not in html
+    assert "wall_decision_preview" not in html
+    assert (
+        "mp-35" in html
+        or "mp-35" in html
+        or "mp-34" in html
+        or "mp-33" in html
+        or "mp-32" in html
+        or "mp-31" in html
+        or "mp-30" in html
+        or "asset_v" in html
+        or "?v=" in html
+    )
+    # AVR context script is required on mp-29+ builds; older previews may omit it.
+    if (
+        "mp-34" in html
+        or "mp-33" in html
+        or "mp-32" in html
+        or "mp-31" in html
+        or "mp-30" in html
+        or "mp-29" in html
+    ):
+        if "wall_decision_avr_context.js" not in html:
+            raise AssertionError("mp-29+ page must include wall_decision_avr_context.js")
+
+
+def test_preview_config_api_marks_non_execution():
+    code, body = _get("/api/wall-decision/v1/config")
+    assert code == 200
+    data = json.loads(body)
+    assert data.get("success") is True
+    assert data.get("execution") is False
+    assert data.get("fixture_route") is False
+    assert data.get("wall_xray_v1") is True
+
+
+def test_preview_live_metrics_blocks_invented_ready_inputs():
+    cookie = _session_cookie()
+    if not cookie:
+        pytest.skip("preview session cookie missing")
+    payload = json.dumps(
+        {
+            "symbol": "BTCUSDT",
+            "breakpoint": 1,
+            "target_wall": None,
+            "baseline_qty": None,
+            "triggered_at": None,
+            "trigger_price": 100.0,
+            "live_price": 101.0,
+        }
+    ).encode()
+    req = urllib.request.Request(
+        BASE + "/api/wall-decision/v1/live-metrics",
+        data=payload,
+        headers={
+            "Cookie": cookie,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.URLError as exc:
+        pytest.skip(f"preview not reachable: {exc}")
+    assert data.get("success") is True
+    assert data.get("wall_lost") is True
+    assert data.get("adapters", {}).get("oi_delta") == "DATA_UNAVAILABLE"
+    assert data.get("adapters", {}).get("avr_state") == "DATA_UNAVAILABLE"

@@ -1,0 +1,25 @@
+[Unit]
+Description=Multi-Symbol Hedge Bot Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=telgenbuescher
+# Beim Neustart nur den Dashboard-Prozess beenden, nicht die Cgroup (Bots/Guardian
+# werden vom Dashboard per Skript gestartet und leben in derselben Cgroup).
+KillMode=process
+WorkingDirectory=/home/telgenbuescher/projects/burn_reentry_simple/dashboard
+Environment="PATH=/home/telgenbuescher/projects/burn_reentry_simple/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="BURN_REENTRY_PROJECT_ROOT=/home/telgenbuescher/projects/burn_reentry_simple"
+Environment="MASTER_BOT_API_URL=http://localhost:8001"
+Environment="MASTER_BOT_API_TOKEN=superlongrandomstringchangeme"
+# Wrapper-Script vermeidet 203/EXEC (systemd führt /bin/bash aus statt .venv/python)
+ExecStart=/home/telgenbuescher/projects/burn_reentry_simple/dashboard/start_dashboard.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/telgenbuescher/projects/burn_reentry_simple/data/logs/dashboard.log
+StandardError=append:/home/telgenbuescher/projects/burn_reentry_simple/data/logs/dashboard_error.log
+
+[Install]
+WantedBy=multi-user.target
+

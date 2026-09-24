@@ -1,0 +1,19 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+httpx>=0.25.0
+python-multipart==0.0.6
+jinja2==3.1.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+websockets==12.0
+pyyaml==6.0.1
+aiofiles==23.2.1
+requests==2.31.0
+pymysql>=1.1.0
+clickhouse-connect>=0.7.0
+pandas>=2.0
+numpy>=1.24
+# Local editable package for symbol onboarding (install with --no-deps):
+#   .venv/bin/python -m pip install -e /home/telgenbuescher/projects/orderbook_analyse --no-deps
+# See requirements-symbol-onboarding.txt
+

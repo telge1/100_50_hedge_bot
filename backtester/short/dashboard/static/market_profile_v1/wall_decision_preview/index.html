@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Wall Decision V1 — FIXTURE PREVIEW (not live)</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #0f1218; color: #d1d4dc; margin: 0; }
+    .banner { background: #7c2d12; color: #ffedd5; padding: 10px 16px; font-weight: 700; }
+    .layout { display: grid; grid-template-columns: 1fr 340px; gap: 12px; padding: 12px; min-height: 80vh; }
+    .chart-mock { position: relative; background: #131722; border: 1px solid #2a2e39; min-height: 480px; border-radius: 6px; }
+    .price-scale { position: absolute; right: 0; top: 0; bottom: 0; width: 64px; border-left: 1px solid #2a2e39; background: #10141c; }
+    .bp-line { position: absolute; left: 0; right: 64px; height: 2px; background: #f59e0b; cursor: ns-resize; }
+    .bp-label { position: absolute; right: 4px; transform: translateY(-50%); font-size: 11px; color: #f59e0b; }
+    .toolbar { padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    button { background: #1e222d; color: #d1d4dc; border: 1px solid #3a4252; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+    button.active { border-color: #f59e0b; color: #f59e0b; }
+    .wd-panel { position: absolute; top: 16px; right: 80px; width: 300px; background: rgba(18,22,30,.95); border: 1px solid #3a4252; border-radius: 6px; z-index: 5; }
+    .wd-panel-head { display: flex; gap: 8px; align-items: center; padding: 8px; cursor: grab; border-bottom: 1px solid #2a2e39; }
+    .wd-panel-body { padding: 8px; font-size: 12px; max-height: 360px; overflow: auto; }
+    .wd-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+    .wd-k { color: #8b919d; }
+    .wd-state { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .wd-tone-armed { background: #4b5563; }
+    .wd-tone-analyse { background: #a16207; }
+    .wd-tone-long { background: #166534; }
+    .wd-tone-short { background: #991b1b; }
+    .wd-tone-data-bad { background: #9a3412; }
+    .wd-tone-neutral { background: #374151; }
+    .log { font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; background: #0b0e14; padding: 8px; border-radius: 4px; min-height: 120px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .wd-panel { right: 8px; left: 8px; width: auto; top: auto; bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">FIXTURE / REPLAY PREVIEW — keine Live-Daten · keine Orders · Port ≠ 3000</div>
+  <div class="toolbar">
+    <button type="button" id="mpWallBpTool" title="Wall-Breakpoint setzen">BP</button>
+    <span id="wdBpLabel">BP –</span>
+    <button type="button" id="wdClearBp">BP⌫</button>
+    <button type="button" id="runLong">Fixture LONG_READY</button>
+    <button type="button" id="runShort">Fixture SHORT_READY</button>
+    <button type="button" id="runGap">Fixture DATA_GAP</button>
+    <button type="button" id="dragBp">Linie verschieben (+10)</button>
+  </div>
+  <div class="layout">
+    <div class="chart-mock" id="mpChart">
+      <div id="chart" style="position:absolute;inset:0;"></div>
+      <div class="price-scale" aria-hidden="true"></div>
+      <div class="bp-line" id="bpLine" hidden></div>
+      <div class="bp-label" id="bpAxisLabel" hidden></div>
+      <div id="wdPanel" class="wd-panel" hidden>
+        <div class="wd-panel-head" id="wdPanelHead">
+          <strong>Wall Decision</strong>
+          <span class="wd-state wd-tone-armed" id="wdPanelState">DISARMED</span>
+          <span style="margin-left:auto;display:flex;gap:4px;">
+            <button type="button" id="wdPanelMin">–</button>
+            <button type="button" id="wdPanelClose">×</button>
+          </span>
+        </div>
+        <div class="wd-panel-body" id="wdPanelBody"></div>
+      </div>
+    </div>
+    <div>
+      <h3>Fixture log</h3>
+      <div class="log" id="log"></div>
+      <p style="font-size:12px;color:#8b919d;">Screenshots: manuell oder via CDP auf diesem Preview-Port speichern.</p>
+    </div>
+  </div>
+  <script src="/static/market_profile_v1/wall_decision_helpers.js"></script>
+  <script>
+    // Minimal chartApi stub for fixture preview (not live chart).
+    (function () {
+      var priceToY = function (p) { return 420 - (p - 100900) / 0.5; };
+      window.chartApi = {
+        setWallBreakpoint: function (opts) {
+          var line = document.getElementById("bpLine");
+          var lab = document.getElementById("bpAxisLabel");
+          var y = priceToY(opts.price);
+          line.hidden = false;
+          lab.hidden = false;
+          line.style.top = y + "px";
+          lab.style.top = y + "px";
+          lab.textContent = opts.title || ("BP " + opts.price);
+        },
+        clearWallBreakpoint: function () {
+          document.getElementById("bpLine").hidden = true;
+          document.getElementById("bpAxisLabel").hidden = true;
+        },
+        setInteractionMode: function () {},
+        getInteractionMode: function () { return "select"; },
+        debugOrderbookProfile: function () {
+          return { bars: [
+            { id: "ask_major_1", side: "ASK", price: 101100, qty: 80, zone_lo: 101095, zone_hi: 101105, major: true }
+          ]};
+        }
+      };
+    })();
+  </script>
+  <script src="/static/market_profile_v1/wall_decision_ui.js"></script>
+  <script>
+    var logEl = document.getElementById("log");
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+    }
+    document.getElementById("mpSymbol") || (function () {
+      var s = document.createElement("select");
+      s.id = "mpSymbol";
+      s.innerHTML = '<option value="BTCUSDT" selected>BTCUSDT</option>';
+      s.hidden = true;
+      document.body.appendChild(s);
+    })();
+
+    fetch("/fixtures/long_ready_ask_consumed.json").then(function (r) { return r.json(); }).then(function (fx) {
+      window.__FIXTURE_LONG = fx;
+    });
+    fetch("/fixtures/short_ready_ask_absorption.json").then(function (r) { return r.json(); }).then(function (fx) {
+      window.__FIXTURE_SHORT = fx;
+    });
+
+    document.getElementById("runLong").onclick = function () {
+      log(">>> FIXTURE long_ready_ask_consumed");
+      window.__mpWallDecision.applyFixture(window.__FIXTURE_LONG.sequence);
+    };
+    document.getElementById("runShort").onclick = function () {
+      log(">>> FIXTURE short_ready_ask_absorption");
+      window.__mpWallDecision.applyFixture(window.__FIXTURE_SHORT.sequence);
+    };
+    document.getElementById("runGap").onclick = function () {
+      log(">>> FIXTURE DATA_GAP");
+      window.__mpWallDecision.applyFixture([
+        { symbol: "BTCUSDT", breakpoint: 101050, refPrice: 101000, walls: [{ id: "a1", side: "ASK", price: 101100, qty: 50, major: true }] },
+        { trigger: true },
+        { state: "DATA_GAP", reasons: ["DATA_GAP", "FIXTURE"], tradeReady: false }
+      ]);
+    };
+    document.getElementById("dragBp").onclick = function () {
+      var st = window.__mpWallDecision.getState();
+      if (!st.bp) {
+        window.__mpWallDecision.placeBreakpoint(101050);
+        st = window.__mpWallDecision.getState();
+      }
+      window.__mpOnWallBpDrag({ price: st.bp.price + 10 });
+      log("dragged BP to " + (st.bp.price + 10));
+    };
+    // Seed armed BP for screenshot "breakpoint in chart"
+    setTimeout(function () {
+      window.__mpWallDecision.onPrice(101000);
+      window.__mpWallDecision.placeBreakpoint(101050);
+      log("seeded ARMED BP @ 101050 (FIXTURE)");
+    }, 200);
+  </script>
+</body>
+</html>

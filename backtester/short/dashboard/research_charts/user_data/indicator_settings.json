@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "indicators": {
+    "ema_overlays": {
+      "lines": [
+        {
+          "ema_id": "ema-default-9",
+          "enabled": true,
+          "period": 9,
+          "color": "#e53935",
+          "line_width": 2,
+          "transparency": 0
+        },
+        {
+          "ema_id": "ema-default-20",
+          "enabled": true,
+          "period": 20,
+          "color": "#ff9800",
+          "line_width": 2,
+          "transparency": 0
+        },
+        {
+          "ema_id": "ema-default-59",
+          "enabled": true,
+          "period": 59,
+          "color": "#5b8def",
+          "line_width": 2,
+          "transparency": 0
+        },
+        {
+          "ema_id": "ema-f276f7790e",
+          "enabled": true,
+          "period": 200,
+          "color": "#e9f2f7",
+          "line_width": 3,
+          "transparency": 0
+        }
+      ]
+    },
+    "stochastic": {
+      "enabled": false,
+      "k_length": 14,
+      "k_smoothing": 3,
+      "d_smoothing": 3,
+      "overbought_level": 80.0,
+      "oversold_level": 20.0,
+      "show_k": true,
+      "show_d": true,
+      "k_color": "#5b8def",
+      "d_color": "#ef9f27",
+      "show_levels": true,
+      "level_color": "#6b7388"
+    },
+    "liquidity_location": {
+      "enabled": true,
+      "amount": 2000,
+      "highest_len": 4,
+      "lowest_len": 4,
+      "show_pool_borders": true,
+      "pool_border_width": 1,
+      "strong_pool_border_width": 2,
+      "pool_border_transparency": 10,
+      "support_color": "#228bab",
+      "resistance_color": "#ec4079",
+      "fill_transparency": 30,
+      "support_border_color": "#00dcff",
+      "resistance_border_color": "#ff468c",
+      "ema_fast_enabled": false,
+      "ema_fast_length": 20,
+      "ema_fast_color": "#00ffff",
+      "ema_slow_enabled": false,
+      "ema_slow_length": 35,
+      "ema_slow_color": "#d40047",
+      "clusters_enabled": true,
+      "cluster_gap_pct": 0.1,
+      "minimum_cluster_pools": 3,
+      "show_single_pools": true,
+      "show_cluster_labels": true,
+      "cluster_fill_transparency": 88,
+      "cluster_border_width": 2
+    }
+  },
+  "open_interest": {
+    "enabled": false
+  }
+}
