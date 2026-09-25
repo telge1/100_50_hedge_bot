@@ -25,6 +25,8 @@ state.json
 *.state
 *.db
 *.sqlite3
+bot/forward_test/logs/
+bot/forward_test/state/
 
 # =========================
 # Config (optional je nach Nutzung)

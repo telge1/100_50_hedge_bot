@@ -82,6 +82,8 @@ def _md_report(
         f"- short TP: next lower pool **top**",
         f"- OB/delta watch start: **{WATCH_BEFORE_PCT}%** before pool bottom",
         f"- bounce window: **{BOUNCE_HOLD_BARS}** × 5m (~{BOUNCE_HOLD_BARS * 5 / 60:.1f}h)",
+        "- failure exit: same gate as the forward test "
+        "(price back at entry, thick pool above, OB strong, delta positive)",
         f"- bounce min: **{BOUNCE_MIN_PCT}%**",
         "",
         "## Overall (all ranks)",

@@ -8,6 +8,7 @@ Implements ``results/ob_pool_5m_bounce_rule.md``:
 - tradeable only when gap >= 0.8%
 - watch OB/delta from ~0.8% before pool bottom
 - short SL = pool top + 0.2%; TP = next lower pool top
+- failure exit uses the same live gate as the forward test
 - outcomes: bounce | pierce | weak_reaction | not_reached
 """
 
@@ -265,6 +266,51 @@ def find_short_reversal_entry(
     }
 
 
+def _workspace_root():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[4]
+
+
+def _short_failure_at_bar_close(
+    symbol: str,
+    *,
+    entry_price: float,
+    stop_price: float,
+    close_price: float,
+    as_of: datetime,
+) -> dict[str, Any] | None:
+    """Apply the live failure gate at a closed 5m bar.
+
+    Data used is only what was known at ``as_of``. SL/TP on the same bar stay
+    in front of this exit, matching the forward-test order.
+    """
+    import sys
+
+    root = str(_workspace_root())
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from bot.forward_test.config import FAILURE_NEAR_ENTRY_PCT
+    from bot.forward_test.failure_exit import evaluate_short_failure
+
+    if entry_price <= 0 or close_price <= 0:
+        return None
+    near_floor = float(entry_price) * (1.0 - float(FAILURE_NEAR_ENTRY_PCT) / 100.0)
+    if float(close_price) < near_floor:
+        return None
+    if stop_price > 0 and float(close_price) >= float(stop_price):
+        return None
+    snap = evaluate_short_failure(
+        symbol,
+        entry_price=float(entry_price),
+        stop_price=float(stop_price),
+        now=_ensure_utc(as_of),
+    )
+    if snap.get("ok") and snap.get("last_price") is not None:
+        return snap
+    return None
+
+
 def simulate_short_bounce_trade(
     bars: list[Any],
     *,
@@ -274,12 +320,15 @@ def simulate_short_bounce_trade(
     tp_price: float,
     sl_above_pct: float = SL_ABOVE_POOL_TOP_PCT,
     hold_bars: int = BOUNCE_HOLD_BARS,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     """Short after confirmed reversal; SL = pool_top+buffer, TP = next lower top.
 
     Confirmed reversal = first bar at/after touch whose close is below pool bottom.
     If price tags SL before that confirmation, skip (never entered).
     Same-bar SL+TP: SL wins (conservative).
+    After entry, a bar that is back near the entry can close as ``failure``
+    when the live thick-pool / OB / delta gate is true at that bar close.
     """
     stop = float(pool_top) * (1.0 + sl_above_pct / 100.0)
     tp = float(tp_price)
@@ -382,6 +431,29 @@ def simulate_short_bounce_trade(
                 "exit_reason": "tp",
                 "pnl_pct": float(pnl),
             }
+        if symbol:
+            failure = _short_failure_at_bar_close(
+                symbol,
+                entry_price=entry_px,
+                stop_price=stop,
+                close_price=float(b.close),
+                as_of=b.ts,
+            )
+            if failure is not None:
+                exit_px = float(failure["last_price"])
+                pnl = (entry_px - exit_px) / entry_px * 100.0
+                return {
+                    "trade_taken": True,
+                    "trade_skip_reason": "",
+                    "short_entry_ts": entry_bar.ts.isoformat(),
+                    "short_entry_price": entry_px,
+                    "stop_price": stop,
+                    "tp_price": tp,
+                    "exit_ts": b.ts.isoformat(),
+                    "exit_price": exit_px,
+                    "exit_reason": "failure",
+                    "pnl_pct": float(pnl),
+                }
 
     last = bars[end - 1] if end > entry_i else entry_bar
     exit_px = float(last.close)
@@ -593,6 +665,7 @@ def analyze_signal_bounce_backtest(
                     else:
                         trade = simulate_short_bounce_trade(
                             bars,
+                            symbol=symbol,
                             touch_idx=touch_idx,
                             pool_bottom=float(c.bottom),
                             pool_top=float(c.top),
