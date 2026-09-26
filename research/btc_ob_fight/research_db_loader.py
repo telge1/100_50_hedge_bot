@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import warnings
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -162,8 +163,15 @@ def load_ob1000_snapshots(
     return out, meta
 
 
-# Backward-compatible name used by older imports — OB1000 only, no OB200.
+# Backward-compatible name used by older imports.
+# This intentionally resolves to OB1000 only, never to an OB200 table.
 def load_ob200_snapshots(*args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    warnings.warn(
+        "load_ob200_snapshots() is a legacy alias for OB1000 only; "
+        "use load_ob1000_snapshots() to avoid table confusion.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     return load_ob1000_snapshots(*args, **kwargs)
 
 
@@ -688,6 +696,12 @@ def probe_ob1000_coverage_meta(
 
 
 def probe_ob200_coverage_meta(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    warnings.warn(
+        "probe_ob200_coverage_meta() is a legacy alias for OB1000 only; "
+        "use probe_ob1000_coverage_meta() to avoid table confusion.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     return probe_ob1000_coverage_meta(*args, **kwargs)
 
 

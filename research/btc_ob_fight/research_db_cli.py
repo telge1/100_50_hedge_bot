@@ -15,7 +15,7 @@ from .coverage_gate import (
     build_eligibility_bundle,
     evaluate_candles_coverage,
     evaluate_liq_coverage,
-    evaluate_ob200_coverage,
+    evaluate_ob1000_coverage,
     evaluate_oi_coverage,
     evaluate_trades_coverage,
 )
@@ -51,11 +51,11 @@ from .research_db_loader import (
     TimedQuery,
     load_candles_coverage,
     load_liquidations,
-    load_ob200_snapshots,
+    load_ob1000_snapshots,
     load_open_interest,
     load_public_trades,
     ob_snapshots_to_wall_rows,
-    probe_ob200_coverage_meta,
+    probe_ob1000_coverage_meta,
     probe_public_trade_events_meta,
     research_client,
 )
@@ -152,7 +152,7 @@ def _run_coverage_only(
     instrument: Any,
 ) -> int:
     """Coverage/eligibility only — no OB arrays, no trade events, no fight pipeline."""
-    ob_cov = probe_ob200_coverage_meta(
+    ob_cov = probe_ob1000_coverage_meta(
         client, timer, cfg.symbol, cfg.window_start, cfg.window_end, inclusive_end=True
     )
     fight_trades_cov = probe_public_trade_events_meta(
@@ -289,7 +289,7 @@ def run_research_db_analysis(cfg: RunConfig) -> int:
     trade_load_start = min(cfg.window_start - timedelta(minutes=5), session_start)
 
     # --- Load mandatory + context ---
-    ob_snaps, ob_meta = load_ob200_snapshots(
+    ob_snaps, ob_meta = load_ob1000_snapshots(
         client, timer, cfg.symbol, cfg.window_start, cfg.window_end, inclusive_end=True
     )
     trades, trade_meta = load_public_trades(
@@ -313,7 +313,7 @@ def run_research_db_analysis(cfg: RunConfig) -> int:
         "max_ts": iso_z(profile_trades[-1]["ts"]) if profile_trades else None,
     }
 
-    ob_cov = evaluate_ob200_coverage(
+    ob_cov = evaluate_ob1000_coverage(
         ob_snaps, symbol=cfg.symbol, start=cfg.window_start, end=cfg.window_end, inclusive_end=True
     )
     fight_trades_cov = evaluate_trades_coverage(
