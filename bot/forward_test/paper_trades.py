@@ -168,9 +168,14 @@ class PaperLedger:
             if lag_min > float(MAX_ENTRY_LAG_MINUTES):
                 # Stale backfill — opening would enable exit lookahead on past bars.
                 return None
-        trade_id = (
-            f"{symbol}|{signal.get('side')}|{signal.get('cluster_id')}|"
-            f"{entry_ts}|{float(signal.get('entry_price') or 0):.8f}"
+        from bot.forward_test.fill_identity import fill_key_text
+
+        trade_id = fill_key_text(
+            symbol=symbol,
+            side=str(signal.get("side") or ""),
+            entry_ts=entry_ts,
+            stop_price=signal.get("stop_price"),
+            tp_price=signal.get("tp_price"),
         )
         if trade_id in self.closed_trade_ids():
             return None
@@ -258,16 +263,26 @@ class PaperLedger:
                         exit_hit = ("tp", float(trade.tp_price), bar.ts)
                         break
 
-            if exit_hit is None and trade.side == "short":
+            if exit_hit is None and trade.side in {"short", "long"}:
                 # Live reclaim exit: only at this moment, never on past bars.
-                from bot.forward_test.failure_exit import evaluate_short_failure
+                if trade.side == "short":
+                    from bot.forward_test.failure_exit import evaluate_short_failure
 
-                snap = evaluate_short_failure(
-                    symbol,
-                    entry_price=float(trade.entry_price),
-                    stop_price=float(trade.stop_price),
-                    now=now,
-                )
+                    snap = evaluate_short_failure(
+                        symbol,
+                        entry_price=float(trade.entry_price),
+                        stop_price=float(trade.stop_price),
+                        now=now,
+                    )
+                else:
+                    from bot.forward_test.failure_exit import evaluate_long_failure
+
+                    snap = evaluate_long_failure(
+                        symbol,
+                        entry_price=float(trade.entry_price),
+                        stop_price=float(trade.stop_price),
+                        now=now,
+                    )
                 if snap.get("ok") and snap.get("last_price") is not None:
                     trade.exit_note = (
                         f"near_entry ob={snap.get('ob_ratio')} "

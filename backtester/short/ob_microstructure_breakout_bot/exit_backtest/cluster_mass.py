@@ -13,8 +13,9 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-# Default matches LLD chart cluster_gap_pct.
-DEFAULT_CLUSTER_GAP_PCT = 0.10  # percent of price between pool edges
+# Thin holes inside a compact stack are one pool. 0.25% covers the
+# DOGE 2026-09-07 gap of 0.23% between 0.091575 and 0.091790.
+DEFAULT_CLUSTER_GAP_PCT = 0.25  # percent of price between pool edges
 
 
 @dataclass(frozen=True)
@@ -126,22 +127,23 @@ def group_pools_into_clusters(
     *,
     gap_pct: float = DEFAULT_CLUSTER_GAP_PCT,
 ) -> list[ClusterSnap]:
-    """Merge nearby upper pools into clusters by edge gap.
+    """Merge nearby pools into clusters by envelope gap.
 
-    Two consecutive pools join the same cluster when the gap between the lower
-    pool's top and the next pool's bottom is <= ``gap_pct`` percent of mid price.
+    A new pool joins the current cluster when it overlaps the cluster envelope
+    or the gap from the envelope top to the new bottom is <= ``gap_pct``.
+    Comparing only the last slice would split nested stacks that visually are
+    one compact pool.
     """
     if not pools:
         return []
     ordered = sorted(pools, key=lambda p: (p.bottom, p.top))
     groups: list[list[PoolSnap]] = [[ordered[0]]]
     for p in ordered[1:]:
-        prev = groups[-1][-1]
-        mid = 0.5 * (prev.top + p.bottom)
-        gap = max(0.0, p.bottom - prev.top)
+        env_top = max(x.top for x in groups[-1])
+        mid = 0.5 * (env_top + p.bottom)
+        gap = max(0.0, p.bottom - env_top)
         gap_pct_val = (gap / mid) * 100.0 if mid > 0 else 0.0
-        # Also merge when overlapping / contained.
-        if gap_pct_val <= gap_pct or p.bottom <= prev.top:
+        if gap_pct_val <= gap_pct or p.bottom <= env_top:
             groups[-1].append(p)
         else:
             groups.append([p])

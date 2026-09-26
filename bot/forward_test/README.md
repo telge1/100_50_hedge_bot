@@ -56,7 +56,7 @@ Nach einem Dry-Signal wird ein Paper-Trade geoeffnet und weiterbeobachtet:
 
 - SL / TP werden an geschlossenen 5m-Bars geprüft
 - Same-Bar SL+TP: SL zuerst (wie Backtester)
-- **Failure-Exit (nur Short, live):** jeder offene Trade wird bei jedem Poll geprüft. Schließen zum aktuellen Preis, wenn alle Punkte zusammen zutreffen: Preis wieder am Entry (0.20 % darunter oder schon darüber, aber vor dem SL), dicker ACTIVE Upper-Pool direkt darüber (Stärke ≥ 4, max. 1.5 % über Entry), OB ≥ 1.05 und Delta 10m positiv. Kein Bar-Zähler, kein Lookahead.
+- **Failure-Exit:** jeder offene Trade wird bei jedem Poll geprüft. Ein Short schließt, wenn der Preis wieder am Entry ist, darüber ein dicker Pool liegt, OB ≥ 1.05 und Delta positiv ist. Ein Long schließt gespiegelt: Preis wieder am Entry, darunter ein dicker Pool, OB ask-lastig und Delta negativ. Kein Bar-Zähler, kein Lookahead.
 - Exit wird mit `pnl_pct` geloggt (`tp` / `sl` / `failure`)
 - nur **ein** offener Paper-Trade pro Symbol
 - **kein Timeout**
@@ -73,6 +73,17 @@ Nach einem Dry-Signal wird ein Paper-Trade geoeffnet und weiterbeobachtet:
 - TP = nearest ACTIVE lower pool mit Entry->TP room >= 0.8%
 - **TP-Fallback:** wenn 5m-Lower-Pools zu weit weg sind (> 3.0% Entry→TP),
   dann TP aus **1m ACTIVE lower pools** wählen
+
+## Regeln (mirrored long)
+
+- Rank 1 + Rank 2 der unteren Pools
+- Watch ab ca. 0.8% über der Pool-Oberkante
+- Flow gespiegelt: OB ≤ 1/1.05 und Delta ≤ -100k
+- Entry nach confirmed reversal candle (Schluss über der Pool-Oberkante)
+- **Regime-Filter vor dem Long:** bullish und neutral dürfen long, bearish wird ignoriert
+- SL = Pool-Bottom − 0.2%
+- TP = nearest ACTIVE upper pool mit Entry→TP room ≥ 0.8%
+- **TP-Fallback:** wenn der 5m-Upper-Pool weiter als 3.0% weg ist, TP aus 1m Upper-Pools
 
 ## Hinweis zu OB
 

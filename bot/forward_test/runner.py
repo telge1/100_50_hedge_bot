@@ -19,7 +19,7 @@ from bot.forward_test.config import (
 from bot.forward_test.logger import append_jsonl
 from bot.forward_test.paper_trades import PaperLedger
 from bot.forward_test.paths import ensure_import_paths
-from bot.forward_test.scanner import scan_symbol_short
+from bot.forward_test.scanner import scan_symbol_long, scan_symbol_short
 from bot.forward_test.state_store import SeenStore
 
 
@@ -27,6 +27,7 @@ def _event_key(ev: dict) -> str:
     return "|".join(
         [
             str(ev.get("symbol") or ""),
+            str(ev.get("side") or ""),
             str(ev.get("event") or ""),
             str(ev.get("cluster_id") or ""),
             str(ev.get("reason") or ""),
@@ -40,14 +41,14 @@ def _event_key(ev: dict) -> str:
 
 
 def _signal_key(sig: dict) -> str:
-    return "|".join(
-        [
-            str(sig.get("symbol") or ""),
-            str(sig.get("side") or ""),
-            str(sig.get("cluster_id") or ""),
-            str(sig.get("short_entry_ts") or ""),
-            f"{float(sig.get('entry_price') or 0):.8f}",
-        ]
+    from bot.forward_test.fill_identity import fill_key_text
+
+    return fill_key_text(
+        symbol=str(sig.get("symbol") or ""),
+        side=str(sig.get("side") or ""),
+        entry_ts=str(sig.get("short_entry_ts") or ""),
+        stop_price=sig.get("stop_price"),
+        tp_price=sig.get("tp_price"),
     )
 
 
@@ -97,19 +98,29 @@ def run_once(symbols: list[str], seen: SeenStore, ledger: PaperLedger) -> dict[s
             )
             continue
 
-        try:
-            events, signals = scan_symbol_short(symbol)
-        except Exception as exc:
-            counts["errors"] += 1
-            row = {
-                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "symbol": symbol,
-                "event": "error",
-                "reason": "scan_crash",
-                "detail": {"error": str(exc)},
-            }
-            append_jsonl(EVENTS_LOG, row)
-            print(f"  ERROR {symbol}: {exc}", flush=True)
+        events = []
+        signals = []
+        scan_ok = False
+        for scan_name, scan in (("short", scan_symbol_short), ("long", scan_symbol_long)):
+            try:
+                side_events, side_signals = scan(symbol)
+            except Exception as exc:
+                counts["errors"] += 1
+                row = {
+                    "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "symbol": symbol,
+                    "side": scan_name,
+                    "event": "error",
+                    "reason": "scan_crash",
+                    "detail": {"error": str(exc)},
+                }
+                append_jsonl(EVENTS_LOG, row)
+                print(f"  ERROR {symbol} {scan_name}: {exc}", flush=True)
+                continue
+            scan_ok = True
+            events.extend(side_events)
+            signals.extend(side_signals)
+        if not scan_ok:
             continue
 
         for ev in events:
@@ -136,16 +147,33 @@ def run_once(symbols: list[str], seen: SeenStore, ledger: PaperLedger) -> dict[s
                 continue
             from bot.forward_test.regime import market_regime
 
+            side = str(sig.side or "short")
             try:
                 regime = market_regime(sig.symbol)
             except Exception as exc:
-                regime = {"regime": "unknown", "allows_short": False, "error": str(exc)}
-            if not regime.get("allows_short"):
+                regime = {
+                    "regime": "unknown",
+                    "allows_short": False,
+                    "allows_long": False,
+                    "error": str(exc),
+                }
+            allowed = bool(regime.get("allows_long")) if side == "long" else bool(regime.get("allows_short"))
+            if not allowed:
+                label = str(regime.get("regime") or "unknown")
+                if label == "unknown":
+                    reason = "regime_unknown"
+                elif side == "short" and label == "bullish":
+                    reason = "regime_bullish"
+                elif side == "long" and label == "bearish":
+                    reason = "regime_bearish"
+                else:
+                    reason = f"regime_{label}"
                 skip = {
                     "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "symbol": sig.symbol,
+                    "side": side,
                     "event": "skip",
-                    "reason": "regime_bullish" if regime.get("regime") == "bullish" else "regime_unknown",
+                    "reason": reason,
                     "detail": {
                         "regime": regime.get("regime"),
                         "h1": (regime.get("h1") or {}).get("label") if isinstance(regime.get("h1"), dict) else None,
@@ -155,7 +183,7 @@ def run_once(symbols: list[str], seen: SeenStore, ledger: PaperLedger) -> dict[s
                 }
                 append_jsonl(EVENTS_LOG, skip)
                 print(
-                    f"  SKIP SIGNAL short {sig.symbol} regime={regime.get('regime')} "
+                    f"  SKIP SIGNAL {side} {sig.symbol} regime={regime.get('regime')} "
                     f"h1={skip['detail']['h1']} h4={skip['detail']['h4']}",
                     flush=True,
                 )
@@ -163,7 +191,7 @@ def run_once(symbols: list[str], seen: SeenStore, ledger: PaperLedger) -> dict[s
             append_jsonl(SIGNALS_LOG, payload)
             counts["signals_logged"] += 1
             print(
-                f"  DRY SIGNAL short {sig.symbol} entry={sig.entry_price} "
+                f"  DRY SIGNAL {side} {sig.symbol} entry={sig.entry_price} "
                 f"sl={sig.stop_price} tp={sig.tp_price} (no order)",
                 flush=True,
             )

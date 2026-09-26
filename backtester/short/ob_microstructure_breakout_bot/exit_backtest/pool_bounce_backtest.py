@@ -384,8 +384,9 @@ def simulate_short_bounce_trade(
 
     entry_bar = bars[entry_i]
     entry_px = float(entry_bar.close)
-    # Manage from next bar (fill at reversal close; avoid same-bar double-count).
-    for j in range(entry_i + 1, end):
+    # Entry search stays inside the bounce window. After the fill, keep the
+    # short open across the loaded history until SL, TP, or the failure gate.
+    for j in range(entry_i + 1, len(bars)):
         b = bars[j]
         hit_sl = float(b.high) >= stop
         hit_tp = float(b.low) <= tp
@@ -455,9 +456,6 @@ def simulate_short_bounce_trade(
                     "pnl_pct": float(pnl),
                 }
 
-    last = bars[end - 1] if end > entry_i else entry_bar
-    exit_px = float(last.close)
-    pnl = (entry_px - exit_px) / entry_px * 100.0
     return {
         "trade_taken": True,
         "trade_skip_reason": "",
@@ -465,10 +463,10 @@ def simulate_short_bounce_trade(
         "short_entry_price": entry_px,
         "stop_price": stop,
         "tp_price": tp,
-        "exit_ts": last.ts.isoformat(),
-        "exit_price": exit_px,
-        "exit_reason": "timeout",
-        "pnl_pct": float(pnl),
+        "exit_ts": None,
+        "exit_price": None,
+        "exit_reason": "open",
+        "pnl_pct": None,
     }
 
 
@@ -751,15 +749,17 @@ def summarize_backtest(rows: list[dict[str, Any]]) -> dict[str, Any]:
         ]
         gap_and_flow_bounce = [e for e in gap_and_flow if e.get("outcome") == "bounce"]
         trades = [e for e in evs if e.get("trade_taken")]
-        flow_trades = [e for e in trades if e.get("flow_confirmed")]
-        pnls = [float(e["pnl_pct"]) for e in trades if e.get("pnl_pct") is not None]
+        closed_trades = [e for e in trades if e.get("pnl_pct") is not None and e.get("exit_reason") != "open"]
+        open_trades = [e for e in trades if e.get("exit_reason") == "open"]
+        flow_trades = [e for e in closed_trades if e.get("flow_confirmed")]
+        pnls = [float(e["pnl_pct"]) for e in closed_trades if e.get("pnl_pct") is not None]
         flow_pnls = [
             float(e["pnl_pct"]) for e in flow_trades if e.get("pnl_pct") is not None
         ]
         wins = [p for p in pnls if p > 0]
         flow_wins = [p for p in flow_pnls if p > 0]
         by_exit: dict[str, int] = {}
-        for e in trades:
+        for e in closed_trades:
             key = str(e.get("exit_reason") or "unknown")
             by_exit[key] = by_exit.get(key, 0) + 1
         bps = [
@@ -797,6 +797,7 @@ def summarize_backtest(rows: list[dict[str, Any]]) -> dict[str, Any]:
             ),
             "mean_lower_gap_pct": (sum(gaps) / len(gaps)) if gaps else None,
             "n_trades": len(trades),
+            "n_open_trades": len(open_trades),
             "n_flow_trades": len(flow_trades),
             "trade_winrate": (len(wins) / len(pnls)) if pnls else None,
             "trade_mean_pnl_pct": (sum(pnls) / len(pnls)) if pnls else None,

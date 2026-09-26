@@ -32,8 +32,10 @@ from ob_microstructure_breakout_bot.exit_backtest.pool_bounce_backtest import (
     summarize_backtest,
 )
 from ob_microstructure_breakout_bot.exit_backtest.run_longs import (
+    _collapse_duplicate_fills,
     _load_dotenv,
     _parse_ts,
+    apply_regime_filter,
     load_calibrated_longs,
     load_full_history_longs,
 )
@@ -264,6 +266,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hold-hours", type=int, default=24)
     parser.add_argument("--no-flow", action="store_true", help="Skip OB/delta sampling")
     parser.add_argument(
+        "--regime",
+        action="store_true",
+        help="Apply the 1h/4h regime filter. Omit it to compare the unfiltered run.",
+    )
+    parser.add_argument(
         "--out-json",
         type=Path,
         default=_REPO / "results" / "ob_pool_5m_bounce_backtest.json",
@@ -337,11 +344,16 @@ def main(argv: list[str] | None = None) -> int:
                 flush=True,
             )
 
+    _collapse_duplicate_fills(signals)
+    regime_report = {"enabled": False}
+    if args.regime:
+        regime_report = apply_regime_filter(signals, symbol=symbol, side="short")
     summary = summarize_backtest(signals)
     payload = {
         "symbol": symbol,
         "universe": args.universe,
         "rule": "ob_pool_5m_bounce_rule.md",
+        "regime_filter": regime_report,
         "params": {
             "min_lower_gap_pct": MIN_LOWER_GAP_PCT,
             "watch_before_pct": WATCH_BEFORE_PCT,

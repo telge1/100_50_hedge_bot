@@ -5,8 +5,9 @@ This is the long-side mirror of ``pool_bounce_backtest.py``:
 - flow gate at touch
 - entry only after confirmed reversal candle
 - TP pools loaded at the long-entry candle, not earlier
-- SL = touched pool bottom - 0.2%
+- SL = touched cluster bottom - 0.2%
 - TP = nearest ACTIVE upper pool at entry with Entry->TP room >= 0.8%
+- failure exit uses the mirrored live gate
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 
 from ob_microstructure_breakout_bot.data.bars import load_5m_bars
 from ob_microstructure_breakout_bot.exit_backtest.cluster_mass import (
+    DEFAULT_CLUSTER_GAP_PCT,
     ClusterSnap,
     PoolSnap,
     group_pools_into_clusters,
@@ -176,6 +178,27 @@ def _first_watch_bar(
     return None
 
 
+def select_tp_upper_pool(
+    *,
+    entry_price: float,
+    upper_pools: list[PoolSnap],
+    min_room_pct: float = MIN_UPPER_GAP_PCT,
+) -> tuple[float | None, float | None]:
+    """Nearest upper pool bottom above entry with room >= min.
+
+    Returns ``(upper_pool_bottom, tp_room_pct)``.
+    """
+    cands = [p for p in upper_pools if float(p.bottom) > float(entry_price)]
+    if not cands or entry_price <= 0:
+        return None, None
+    for pool in sorted(cands, key=lambda p: (float(p.bottom), float(p.top))):
+        room = (float(pool.bottom) - float(entry_price)) / float(entry_price) * 100.0
+        if room < float(min_room_pct):
+            continue
+        return float(pool.bottom), float(room)
+    return None, None
+
+
 def measure_cluster_bounce_long(
     cluster: ClusterSnap,
     *,
@@ -307,6 +330,47 @@ def find_long_reversal_entry(
     }
 
 
+def _workspace_root():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[4]
+
+
+def _long_failure_at_bar_close(
+    symbol: str,
+    *,
+    entry_price: float,
+    stop_price: float,
+    close_price: float,
+    as_of: datetime,
+) -> dict[str, Any] | None:
+    """Apply the mirrored live failure gate at a closed 5m bar."""
+    import sys
+
+    root = str(_workspace_root())
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from bot.forward_test.config import FAILURE_NEAR_ENTRY_PCT
+    from bot.forward_test.failure_exit import evaluate_long_failure
+
+    if entry_price <= 0 or close_price <= 0:
+        return None
+    near_ceiling = float(entry_price) * (1.0 + float(FAILURE_NEAR_ENTRY_PCT) / 100.0)
+    if float(close_price) > near_ceiling:
+        return None
+    if stop_price > 0 and float(close_price) <= float(stop_price):
+        return None
+    snap = evaluate_long_failure(
+        symbol,
+        entry_price=float(entry_price),
+        stop_price=float(stop_price),
+        now=_ensure_utc(as_of),
+    )
+    if snap.get("ok") and snap.get("last_price") is not None:
+        return snap
+    return None
+
+
 def simulate_long_bounce_trade(
     bars: list[Any],
     *,
@@ -314,11 +378,21 @@ def simulate_long_bounce_trade(
     pool_bottom: float,
     pool_top: float,
     tp_price: float,
+    stop_price: float | None = None,
     sl_below_pct: float = SL_BELOW_POOL_BOTTOM_PCT,
     hold_bars: int = BOUNCE_HOLD_BARS,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
-    """Long after confirmed reversal; SL below pool bottom, TP = next upper bottom."""
-    stop = float(pool_bottom) * (1.0 - sl_below_pct / 100.0)
+    """Long after confirmed reversal; SL below cluster bottom, TP = next upper bottom.
+
+    Same-bar SL+TP: SL wins. A later bar back at the entry can close as
+    ``failure`` when the mirrored thick-pool / OB / delta gate is true.
+    """
+    stop = (
+        float(stop_price)
+        if stop_price is not None
+        else float(pool_bottom) * (1.0 - sl_below_pct / 100.0)
+    )
     tp = float(tp_price)
     end = min(len(bars), touch_idx + max(1, hold_bars))
     entry_i: int | None = None
@@ -372,7 +446,9 @@ def simulate_long_bounce_trade(
             "pnl_pct": None,
         }
 
-    for j in range(entry_i + 1, end):
+    # Entry search stays inside the bounce window. After the fill, keep the
+    # long open across the loaded history until SL, TP, or the failure gate.
+    for j in range(entry_i + 1, len(bars)):
         b = bars[j]
         hit_sl = float(b.low) <= stop
         hit_tp = float(b.high) >= tp
@@ -418,10 +494,30 @@ def simulate_long_bounce_trade(
                 "exit_reason": "tp",
                 "pnl_pct": float(pnl),
             }
+        if symbol:
+            failure = _long_failure_at_bar_close(
+                symbol,
+                entry_price=entry_px,
+                stop_price=stop,
+                close_price=float(b.close),
+                as_of=b.ts,
+            )
+            if failure is not None:
+                exit_px = float(failure["last_price"])
+                pnl = (exit_px - entry_px) / entry_px * 100.0
+                return {
+                    "trade_taken": True,
+                    "trade_skip_reason": "",
+                    "long_entry_ts": entry_bar.ts.isoformat(),
+                    "long_entry_price": entry_px,
+                    "stop_price": stop,
+                    "tp_price": tp,
+                    "exit_ts": b.ts.isoformat(),
+                    "exit_price": exit_px,
+                    "exit_reason": "failure",
+                    "pnl_pct": float(pnl),
+                }
 
-    last = bars[end - 1] if end > entry_i else entry_bar
-    exit_px = float(last.close)
-    pnl = (exit_px - entry_px) / entry_px * 100.0
     return {
         "trade_taken": True,
         "trade_skip_reason": "",
@@ -429,10 +525,10 @@ def simulate_long_bounce_trade(
         "long_entry_price": entry_px,
         "stop_price": stop,
         "tp_price": tp,
-        "exit_ts": last.ts.isoformat(),
-        "exit_price": exit_px,
-        "exit_reason": "timeout",
-        "pnl_pct": float(pnl),
+        "exit_ts": None,
+        "exit_price": None,
+        "exit_reason": "open",
+        "pnl_pct": None,
     }
 def analyze_signal_long_bounce_backtest(
     symbol: str,
@@ -448,10 +544,15 @@ def analyze_signal_long_bounce_backtest(
 ) -> dict[str, Any]:
     """One long signal -> ranked lower clusters with mirrored short logic."""
     decision_ts = _ensure_utc(decision_ts)
+    # Rank and touch stay inside the same 24h signal window as the short bounce
+    # runner. hold_hours only extends management after the fill.
+    search_hours = min(24, max(1, int(hold_hours)))
     lower = load_active_lower_pools_5m(
         symbol, decision_ts, entry_price, lookforward_hours=8
     )
-    clusters = group_pools_into_clusters(lower, entry_price, gap_pct=0.10)
+    clusters = group_pools_into_clusters(
+        lower, entry_price, gap_pct=DEFAULT_CLUSTER_GAP_PCT
+    )
     ranked = rank_clusters_by_mass(clusters)[: max(1, max_ranks)]
 
     bars = load_5m_bars(
@@ -460,6 +561,8 @@ def analyze_signal_long_bounce_backtest(
         decision_ts + timedelta(hours=hold_hours),
     )
     bars = [b for b in bars if b.ts >= decision_ts]
+    search_end = decision_ts + timedelta(hours=search_hours)
+    search_bars = [b for b in bars if b.ts < search_end]
 
     rows: list[BounceBacktestRow] = []
     for i, c in enumerate(ranked, 1):
@@ -467,12 +570,12 @@ def analyze_signal_long_bounce_backtest(
             c,
             rank=i,
             entry=entry_price,
-            bars=bars,
+            bars=search_bars,
             hold_bars=hold_bars,
         )
 
         watch_bar = _first_watch_bar(
-            bars, pool_top=c.top, watch_before_pct=WATCH_BEFORE_PCT
+            search_bars, pool_top=c.top, watch_before_pct=WATCH_BEFORE_PCT
         )
         watch_ts = watch_bar.ts.isoformat() if watch_bar is not None else None
         ob_watch = delta_watch = None
@@ -482,7 +585,7 @@ def analyze_signal_long_bounce_backtest(
                 ob_watch = _ob_ratio(symbol, watch_bar.ts)
                 delta_watch = _delta_10m(symbol, watch_bar.ts + timedelta(minutes=5))
             touch_bar = next(
-                (b for b in bars if float(b.low) <= c.top),
+                (b for b in search_bars if float(b.low) <= c.top),
                 None,
             )
             if touch_bar is not None:
@@ -516,12 +619,12 @@ def analyze_signal_long_bounce_backtest(
             "exit_reason": None,
             "pnl_pct": None,
         }
-        touch_bar = next((b for b in bars if float(b.low) <= c.top), None)
+        touch_bar = next((b for b in search_bars if float(b.low) <= c.top), None)
         if outcome.outcome == "not_reached" or touch_bar is None:
             trade["trade_skip_reason"] = "not_reached"
         else:
             touch_idx = next(
-                (j for j, b in enumerate(bars) if float(b.low) <= c.top),
+                (j for j, b in enumerate(search_bars) if float(b.low) <= c.top),
                 None,
             )
             if touch_idx is None:
@@ -563,6 +666,7 @@ def analyze_signal_long_bounce_backtest(
                     else:
                         trade = simulate_long_bounce_trade(
                             bars,
+                            symbol=symbol,
                             touch_idx=touch_idx,
                             pool_bottom=float(c.bottom),
                             pool_top=float(c.top),
@@ -644,13 +748,15 @@ def summarize_backtest(rows: list[dict[str, Any]]) -> dict[str, Any]:
         gap_and_flow = [e for e in tradeable_reached if e.get("flow_confirmed")]
         gap_and_flow_bounce = [e for e in gap_and_flow if e.get("outcome") == "bounce"]
         trades = [e for e in evs if e.get("trade_taken")]
-        flow_trades = [e for e in trades if e.get("flow_confirmed")]
-        pnls = [float(e["pnl_pct"]) for e in trades if e.get("pnl_pct") is not None]
+        closed_trades = [e for e in trades if e.get("pnl_pct") is not None and e.get("exit_reason") != "open"]
+        open_trades = [e for e in trades if e.get("exit_reason") == "open"]
+        flow_trades = [e for e in closed_trades if e.get("flow_confirmed")]
+        pnls = [float(e["pnl_pct"]) for e in closed_trades if e.get("pnl_pct") is not None]
         flow_pnls = [float(e["pnl_pct"]) for e in flow_trades if e.get("pnl_pct") is not None]
         wins = [p for p in pnls if p > 0]
         flow_wins = [p for p in flow_pnls if p > 0]
         by_exit: dict[str, int] = {}
-        for e in trades:
+        for e in closed_trades:
             key = str(e.get("exit_reason") or "unknown")
             by_exit[key] = by_exit.get(key, 0) + 1
         bps = [float(e["bounce_pct"]) for e in bounced if e.get("bounce_pct") is not None]
@@ -684,6 +790,7 @@ def summarize_backtest(rows: list[dict[str, Any]]) -> dict[str, Any]:
             ),
             "mean_upper_gap_pct": (sum(gaps) / len(gaps)) if gaps else None,
             "n_trades": len(trades),
+            "n_open_trades": len(open_trades),
             "n_flow_trades": len(flow_trades),
             "trade_winrate": (len(wins) / len(pnls)) if pnls else None,
             "trade_mean_pnl_pct": (sum(pnls) / len(pnls)) if pnls else None,

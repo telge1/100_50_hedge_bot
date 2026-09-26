@@ -33,6 +33,11 @@ def allows_short(regime: str) -> bool:
     return regime in {"bearish", "neutral"}
 
 
+def allows_long(regime: str) -> bool:
+    """Longs pass in bullish and mixed regimes. Bearish and unknown are ignored."""
+    return regime in {"bullish", "neutral"}
+
+
 def _utc(ts: datetime) -> datetime:
     if ts.tzinfo is None:
         return ts.replace(tzinfo=timezone.utc)
@@ -117,6 +122,7 @@ def market_regime(symbol: str, now: datetime | None = None) -> dict[str, Any]:
         "as_of": as_of.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regime": regime,
         "allows_short": allows_short(regime),
+        "allows_long": allows_long(regime),
         "h1": h1,
         "h4": h4,
     }

@@ -30,8 +30,10 @@ from ob_microstructure_breakout_bot.exit_backtest.pool_bounce_long_backtest impo
     summarize_backtest,
 )
 from ob_microstructure_breakout_bot.exit_backtest.run_longs import (
+    _collapse_duplicate_fills,
     _load_dotenv,
     _parse_ts,
+    apply_regime_filter,
     load_calibrated_longs,
     load_full_history_longs,
 )
@@ -79,6 +81,8 @@ def _md_report(
         f"- long SL: touched pool bottom - **{SL_BELOW_POOL_BOTTOM_PCT}%**",
         f"- long TP: nearest ACTIVE upper pool **bottom**",
         f"- OB/delta watch start: **{WATCH_BEFORE_PCT}%** before support touch",
+        "- failure exit: mirrored forward-test gate "
+        "(price back at entry, thick pool below, OB ask-heavy, delta negative)",
         "",
         "## Overall (all ranks)",
         "",
@@ -263,6 +267,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hold-hours", type=int, default=24)
     parser.add_argument("--no-flow", action="store_true", help="Skip OB/delta sampling")
     parser.add_argument(
+        "--regime",
+        action="store_true",
+        help="Apply the 1h/4h regime filter. Omit it to compare the unfiltered run.",
+    )
+    parser.add_argument(
         "--out-json",
         type=Path,
         default=_REPO / "results" / "ob_pool_5m_bounce_long_backtest.json",
@@ -327,11 +336,16 @@ def main(argv: list[str] | None = None) -> int:
                 flush=True,
             )
 
+    _collapse_duplicate_fills(signals)
+    regime_report = {"enabled": False}
+    if args.regime:
+        regime_report = apply_regime_filter(signals, symbol=symbol, side="long")
     summary = summarize_backtest(signals)
     payload = {
         "symbol": symbol,
         "universe": args.universe,
         "rule": "ob_pool_5m_bounce_long_rule.md",
+        "regime_filter": regime_report,
         "params": {
             "min_upper_gap_pct": MIN_UPPER_GAP_PCT,
             "watch_before_pct": WATCH_BEFORE_PCT,

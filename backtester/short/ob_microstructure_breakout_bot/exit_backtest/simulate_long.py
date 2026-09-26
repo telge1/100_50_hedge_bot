@@ -422,9 +422,6 @@ def simulate_long(
                 pnl_pct=pnl,
             )
 
-    last = path[-1]
-    exit_price = float(last.close)
-    pnl = (exit_price - entry_price) / entry_price * 100.0
     return LongTradeResult(
         decision_ts=decision_ts.isoformat(),
         tier=tier,
@@ -452,8 +449,8 @@ def simulate_long(
         pool_touch_delta=pool_touch_delta,
         pool_touch_ob_ratio=pool_touch_ob_ratio,
         continuation=continuation,
-        exit_ts=last.ts.isoformat(),
-        exit_price=exit_price,
-        exit_reason="timeout",
-        pnl_pct=pnl,
+        exit_ts=None,
+        exit_price=None,
+        exit_reason="open",
+        pnl_pct=None,
     )
