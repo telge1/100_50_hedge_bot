@@ -1,0 +1,92 @@
+{
+  "strategy_name": "long_geometry_ladder24_be100_v1",
+  "version": "v1",
+  "created_at": "2026-10-04T00:00:00+00:00",
+  "immutable": true,
+  "production_integrated": false,
+  "repo_commit_before_freeze": "93ae246e1eaa1e977a568c782679df3ac4f975b2",
+  "source_research_paths": [
+    "results/pool_scan/context_study_v1_long/long_geometry_only_v1",
+    "results/pool_scan/context_study_v1_long/long_feature_threshold_study_v1",
+    "results/pool_scan/context_study_v1_long/long_rest_sl_mfe_management_v1",
+    "results/pool_scan/context_study_v1_long/long_oos_validation_v1"
+  ],
+  "symbols": ["XRPUSDT", "ADAUSDT", "DOGEUSDT"],
+  "validation_periods": {
+    "in_sample_jun_jul_2026": ["2026-06-01T00:00:00+00:00", "2026-07-31T23:59:59+00:00"],
+    "oos_apr_may_2026": ["2026-04-01T00:00:00+00:00", "2026-05-31T23:59:59+00:00"]
+  },
+  "frozen_parameters": {
+    "ATTACH_PCT": 1.0,
+    "MIN_BRIDGE_GAP_PCT": 0.5,
+    "MIN_POOL_BRIDGE_GAP_PCT": 0.8,
+    "MIN_TP_PCT": 0.8,
+    "STOP_PAD": 0.002,
+    "HORIZON_HOURS": 48,
+    "LADDER_MAX_AGE_H": 24.0,
+    "LADDER_FEATURE": "m15_lower_2_age_h",
+    "BE_TRIGGER_MFE_PCT": 1.0,
+    "BE_STOP_OFFSET_PCT": 0.0,
+    "ENTRY_TIMEFRAME": "15m",
+    "MANAGEMENT_TIMEFRAME": "1m",
+    "BE_1M_LOAD_START": "2026-05-01T00:00:00+00:00",
+    "BE_1M_LOAD_END": "2026-08-15T23:59:59+00:00",
+    "REQUIRE_UP_4H": false
+  },
+  "expected_metrics": {
+    "jun_jul_ladder24_no_be": {
+      "trades": 94,
+      "TP": 68,
+      "SL": 26,
+      "pnl_sum_pct": 129.3675,
+      "profit_factor": 8.3238,
+      "max_drawdown_pct": 2.9833,
+      "max_loss_streak": 3
+    },
+    "jun_jul_ladder24_be100": {
+      "trades": 94,
+      "TP": 59,
+      "SL": 16,
+      "BE": 19,
+      "pnl_sum_pct": 112.3443,
+      "profit_factor": 12.4312,
+      "max_drawdown_pct": 1.907,
+      "max_loss_streak": 3,
+      "pnl_retention_vs_ladder_pct": 86.84
+    },
+    "apr_may_ladder24_be100": {
+      "trades": 74,
+      "TP": 47,
+      "SL": 22,
+      "BE": 4,
+      "horizon": 1,
+      "pnl_sum_pct": 78.1428,
+      "profit_factor": 6.9087,
+      "max_drawdown_pct": 3.1552,
+      "max_loss_streak": 4,
+      "per_coin": {
+        "XRPUSDT": {"pnl_sum_pct": 17.6493, "max_drawdown_pct": 1.5569},
+        "ADAUSDT": {"pnl_sum_pct": 11.1497, "max_drawdown_pct": 1.4615},
+        "DOGEUSDT": {"pnl_sum_pct": 49.3438, "max_drawdown_pct": 2.1972}
+      }
+    }
+  },
+  "causality_notes": [
+    "Pool known <= 15m decision close",
+    "No future pool breaks",
+    "Ladder age from active lowers at decision time",
+    "BE trigger only after high >= entry * 1.01",
+    "BE stop active from next management bar"
+  ],
+  "management_assumptions": [
+    "1m chronological simulation when candles available in BE_1M_LOAD window",
+    "15m fallback for April 2026 entries (no 1m before May 1 in research parity)",
+    "INTRABAR_AMBIGUOUS flagged when trigger and BE touch same bar",
+    "No fees/slippage"
+  ],
+  "reproduction_tolerance": {
+    "pnl_sum_pct": 0.02,
+    "max_drawdown_pct": 0.02,
+    "integer_counts_exact": true
+  }
+}

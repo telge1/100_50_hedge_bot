@@ -1,0 +1,4 @@
+This directory is a frozen reference copy of LONG GEOMETRY LADDER24 BE100 V1.
+Do not modify files in place.
+Any future strategy development must use a new directory/version,
+for example long_geometry_ladder24_be100_v2.
